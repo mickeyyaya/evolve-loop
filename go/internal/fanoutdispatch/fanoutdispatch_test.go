@@ -181,7 +181,7 @@ func TestRun_DoesNotMutateProcessEnv(t *testing.T) {
 	cmds := filepath.Join(dir, "cmds.tsv")
 	writeFile(t, cmds, "w1\ttrue\n")
 	var b bytes.Buffer
-	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.33"}, &b)
+	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10}, &b)
 	if rc != ExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
@@ -190,18 +190,20 @@ func TestRun_DoesNotMutateProcessEnv(t *testing.T) {
 	}
 }
 
-// TestRun_WorkerReceivesBudgetAndCachePrefix proves the S1 fix PRESERVES the
-// behavior the os.Setenv provided: each worker still sees the budget + cache
-// prefix in its own env (now via cmd.Env, not parent inheritance).
-func TestRun_WorkerReceivesBudgetAndCachePrefix(t *testing.T) {
-	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // not inherited → cfg default injected
+// TestRun_WorkerReceivesCachePrefix proves the S1 fix PRESERVES cache-prefix
+// delivery: each worker still sees EVOLVE_FANOUT_CACHE_PREFIX_FILE in its own
+// env (via cmd.Env, not parent inheritance). The former per-worker budget
+// injection (EVOLVE_MAX_BUDGET_USD) was removed with the token-budget cost
+// gates — this test also pins that the worker no longer receives it.
+func TestRun_WorkerReceivesCachePrefix(t *testing.T) {
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // not inherited; must NOT be injected
 	dir := t.TempDir()
 	cachePrefix := filepath.Join(dir, "cache-prefix.txt")
 	writeFile(t, cachePrefix, "x") // Run stats this file; must exist
 	cmds := filepath.Join(dir, "cmds.tsv")
 	writeFile(t, cmds, "w1\tprintenv EVOLVE_MAX_BUDGET_USD; printenv EVOLVE_FANOUT_CACHE_PREFIX_FILE\n")
 	var b bytes.Buffer
-	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.42", CachePrefixFile: cachePrefix}, &b)
+	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, CachePrefixFile: cachePrefix}, &b)
 	if rc != ExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
@@ -210,26 +212,11 @@ func TestRun_WorkerReceivesBudgetAndCachePrefix(t *testing.T) {
 		t.Fatalf("missing .out: %v", err)
 	}
 	s := string(out)
-	if !strings.Contains(s, "0.42") {
-		t.Errorf("worker missing EVOLVE_MAX_BUDGET_USD=0.42; got %q", s)
+	if strings.Contains(s, "0.20") || strings.Contains(s, "0.42") {
+		t.Errorf("worker should NOT receive an injected EVOLVE_MAX_BUDGET_USD; got %q", s)
 	}
 	if !strings.Contains(s, cachePrefix) {
 		t.Errorf("worker missing EVOLVE_FANOUT_CACHE_PREFIX_FILE=%s; got %q", cachePrefix, s)
-	}
-}
-
-// TestRun_PreservesInheritedBudget pins the "unless already set" semantics:
-// an inherited EVOLVE_MAX_BUDGET_USD must win over the cfg default.
-func TestRun_PreservesInheritedBudget(t *testing.T) {
-	t.Setenv("EVOLVE_MAX_BUDGET_USD", "9.99") // inherited
-	dir := t.TempDir()
-	cmds := filepath.Join(dir, "cmds.tsv")
-	writeFile(t, cmds, "w1\tprintenv EVOLVE_MAX_BUDGET_USD\n")
-	var b bytes.Buffer
-	Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.42"}, &b)
-	out, _ := os.ReadFile(filepath.Join(dir, "w1.out"))
-	if !strings.Contains(string(out), "9.99") || strings.Contains(string(out), "0.42") {
-		t.Errorf("inherited budget must win over cfg default; got %q", out)
 	}
 }
 

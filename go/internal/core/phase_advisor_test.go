@@ -118,7 +118,6 @@ func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
 		Triggers:      map[string]config.RoutingBlock{},
 	}
 	in.Completed = []string{"scout", "build"}
-	in.BudgetRemaining = 100
 
 	dec := strat.Decide(in)
 	if dec.NextPhase != "audit" {

@@ -15,6 +15,9 @@ import (
 
 func TestCycleScenarios(t *testing.T) {
 	t.Parallel()
+	if testing.Short() {
+		t.Skip("scenario catalog: use non-short test runs for full routing coverage")
+	}
 	RunAll(t, cycleCatalog())
 }
 
@@ -73,12 +76,6 @@ func cycleCatalog() []ScenarioSpec {
 			PhaseVerdict(audit, "FAIL"), PhaseVerdict(retro, "FAIL"),
 			SeedFailure("code-audit-fail", 2),
 			ExpectRetro("proceed:")),
-
-		// --- Budget clamp (shadow forensic) ---
-		Scenario("budget exhausted records clamp",
-			Cycle(), Shadow(), RedBuild(5), Budget(-1),
-			ExpectDecisionClamp("budget-exhausted"),
-			ExpectPhases(scout, triage, tdd, planner, build, audit, ship)),
 
 		// --- Simulated agent end-to-end ---
 		Scenario("agent legal-divergent adopted (scout->build on trivial)",

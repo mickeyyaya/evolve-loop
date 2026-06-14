@@ -19,7 +19,6 @@ func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 		Worktree:    "/tmp/x/.evolve/worktrees/cycle-104",
 		GoalHash:    "abc123",
 		Context:     map[string]string{"intent": "rewrite as Go"},
-		Budget:      BudgetEnvelope{MaxUSD: 5.0, BatchCapUSD: 20.0},
 		Env:         map[string]string{"EVOLVE_PROJECT_ROOT": "/tmp/x"},
 	}
 	raw, err := json.Marshal(in)
@@ -35,9 +34,6 @@ func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 	}
 	if out.Context["intent"] != "rewrite as Go" {
 		t.Errorf("Context lost: %+v", out.Context)
-	}
-	if out.Budget.MaxUSD != 5.0 || out.Budget.BatchCapUSD != 20.0 {
-		t.Errorf("Budget lost: %+v", out.Budget)
 	}
 }
 

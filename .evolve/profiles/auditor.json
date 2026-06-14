@@ -3,10 +3,10 @@
   "role": "auditor",
   "cli": "claude-tmux",
   "cli_fallback": [],
-  "model_tier_default": "sonnet",
+  "model_tier_default": "deep",
   "model_tier_overrides": {
-    "security_sensitive": "opus",
-    "adversarial_audit": "opus"
+    "security_sensitive": "deep",
+    "adversarial_audit": "deep"
   },
   "allowed_tools": [
     "Bash(evolve phase verify:*)",

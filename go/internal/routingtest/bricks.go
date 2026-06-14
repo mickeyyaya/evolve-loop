@@ -46,7 +46,6 @@ func Shadow() Brick   { return func(s *ScenarioSpec) { s.Stage = config.StageSha
 func Advisory() Brick { return func(s *ScenarioSpec) { s.Stage = config.StageAdvisory } }
 func Enforce() Brick  { return func(s *ScenarioSpec) { s.Stage = config.StageEnforce } }
 
-func Budget(v float64) Brick { return func(s *ScenarioSpec) { s.BudgetUSD = v } }
 func MaxInserts(n int) Brick { return func(s *ScenarioSpec) { s.MaxInsertions = n } }
 
 // Mandatory sets the ordered mandatory spine. Defensive copy: the cycle-263

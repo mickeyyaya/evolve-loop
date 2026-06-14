@@ -2,7 +2,7 @@
   "name": "triage",
   "role": "triage",
   "cli": "claude-tmux",
-  "model_tier_default": "sonnet",
+  "model_tier_default": "fast",
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
     "Read",

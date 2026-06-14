@@ -1,70 +1,133 @@
 package fleet
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+)
+
+// PlanCycles partitions a backlog into at most `count` concurrent cycle specs,
+// each scoped to a DISJOINT set of todos, plus the deferred todos that could not
+// be co-scheduled this wave (run them in a later wave). It is the single adapter
+// from the advisor's backlog to fleet's launch specs (ADR-0049 E): each spec
+// carries its todo IDs in Scope and in Env[fleetScopeEnvKey] (comma-joined) so
+// the launched cycle's triage selects only its subset. Empty buckets yield NO
+// spec — when the backlog can't fill `count` cycles, fewer launch (not idle ones).
+func PlanCycles(todos []Todo, count int) (specs []CycleSpec, deferred []Todo) {
+	buckets, deferred := Partition(todos, count)
+	for _, b := range buckets {
+		if len(b) == 0 {
+			continue
+		}
+		ids := make([]string, len(b))
+		for i, td := range b {
+			ids[i] = td.ID
+		}
+		specs = append(specs, CycleSpec{
+			Scope: ids,
+			Env:   map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
+		})
+	}
+	return specs, deferred
+}
 
 // Todo is one unit of backlog work plus the repo files it would touch. The
 // advisor supplies the file scope (from the task's plan / changed-file estimate).
+// JSON tags match the `evolve fleet --plan` backlog file: [{"id","files"}].
 type Todo struct {
-	ID    string
-	Files []string
+	ID    string   `json:"id"`
+	Files []string `json:"files"`
 }
 
-// Partition assigns todos to n independent cycle buckets such that NO bucket
-// holds two todos that touch the same repo file — so the cycles can run
-// concurrently without colliding on the shared tree (ADR-0049 E: the advisor's
-// "plan, separate and assign the todos to independent cycles"). It is a greedy
-// first-fit by normalized file ownership: each todo goes to the first bucket it
-// is disjoint from. A todo that conflicts with EVERY bucket is returned in
-// `deferred` rather than co-scheduled with conflicting work — the caller runs it
-// in a later wave (never silently overlapping the shared tree). Determinism: the
-// input order is preserved, so the partition is reproducible (no map iteration).
+// Partition assigns todos to n concurrent cycle buckets such that every repo
+// file is owned by AT MOST ONE bucket (ADR-0049 E: the advisor's "plan, separate
+// and assign the todos to independent cycles"). Each bucket runs as its OWN
+// concurrent `evolve cycle run` in its own worktree, so the load-bearing
+// invariant is CROSS-bucket disjointness: a file appearing in two buckets means
+// two cycles edit it at once and collide on the shared tree at ship time. Two
+// todos touching one file therefore CLUSTER into the same bucket (one cycle, one
+// worktree, sequential — safe), never spread across buckets.
+//
+// Greedy file-ownership pass (deterministic — input order preserved, ties break
+// to the lowest bucket index, no map-iteration nondeterminism):
+//   - a todo whose files are all unclaimed → the least-loaded bucket (spreads
+//     independent work across cycles);
+//   - a todo overlapping exactly ONE bucket's files → joins that bucket;
+//   - a todo whose files are split across ≥2 buckets would bridge two concurrent
+//     cycles into a collision, so it is DEFERRED to a later wave rather than
+//     co-scheduled (the caller runs deferred todos once the current wave lands).
 func Partition(todos []Todo, n int) (buckets [][]Todo, deferred []Todo) {
 	if n < 1 {
 		n = 1
 	}
 	buckets = make([][]Todo, n)
-	claimed := make([]map[string]bool, n) // normalized files owned by each bucket
-	for i := range claimed {
-		claimed[i] = map[string]bool{}
-	}
+	owner := map[string]int{} // normalized file -> the one bucket that owns it
 	for _, td := range todos {
 		files := normalizeFiles(td.Files)
-		placed := false
-		for b := 0; b < n; b++ {
-			if disjoint(claimed[b], files) {
-				buckets[b] = append(buckets[b], td)
-				for f := range files {
-					claimed[b][f] = true
-				}
-				placed = true
-				break
-			}
-		}
-		if !placed {
+		owning := owningBuckets(owner, files)
+		switch len(owning) {
+		case 0:
+			// All files free: spread to the least-loaded bucket.
+			place(buckets, owner, leastLoaded(buckets), td, files)
+		case 1:
+			// Overlaps exactly one bucket: join it (same cycle, sequential — safe).
+			place(buckets, owner, only(owning), td, files)
+		default:
+			// Files split across ≥2 concurrent buckets — cannot isolate without
+			// bridging them. Defer rather than co-schedule a cross-tree collision.
 			deferred = append(deferred, td)
 		}
 	}
 	return buckets, deferred
 }
 
+// owningBuckets returns the set of bucket indices that already own any of files.
+func owningBuckets(owner map[string]int, files map[string]bool) map[int]bool {
+	out := map[int]bool{}
+	for f := range files {
+		if b, ok := owner[f]; ok {
+			out[b] = true
+		}
+	}
+	return out
+}
+
+// place adds td to bucket b and claims every one of td's files for b (including
+// previously-free ones, so the file can never later be claimed by another bucket).
+func place(buckets [][]Todo, owner map[string]int, b int, td Todo, files map[string]bool) {
+	buckets[b] = append(buckets[b], td)
+	for f := range files {
+		owner[f] = b
+	}
+}
+
+// leastLoaded returns the index of the bucket with the fewest todos (lowest
+// index on ties) — keeps independent work spread across cycles.
+func leastLoaded(buckets [][]Todo) int {
+	best, bestN := 0, -1
+	for i, b := range buckets {
+		if bestN == -1 || len(b) < bestN {
+			best, bestN = i, len(b)
+		}
+	}
+	return best
+}
+
+// only returns the single key of a one-element set. Called only from the case-1
+// branch (len==1); an empty set is a caller-contract violation — fail loud.
+func only(set map[int]bool) int {
+	for k := range set {
+		return k
+	}
+	panic("fleet.only: called on empty set")
+}
+
 // normalizeFiles returns the todo's files as a normalized set so two spellings
-// of the same repo file (./a.go vs a.go) collide. Mirrors the intent of
-// swarm.normalizePath (unexported there); a file-conflict check only needs
-// filepath.Clean.
+// of the same repo file (./a.go vs a.go) collide. filepath.Clean is enough for a
+// file-conflict check.
 func normalizeFiles(files []string) map[string]bool {
 	out := make(map[string]bool, len(files))
 	for _, f := range files {
 		out[filepath.Clean(f)] = true
 	}
 	return out
-}
-
-// disjoint reports whether none of files is already owned by the bucket.
-func disjoint(owned map[string]bool, files map[string]bool) bool {
-	for f := range files {
-		if owned[f] {
-			return false
-		}
-	}
-	return true
 }

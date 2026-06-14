@@ -60,15 +60,24 @@ state at the pause moment:
 worktree removal, branch deletion, and cycle-state clear that the default
 cleanup path would do. Worktree + state survive for `--resume`.
 
-### 2. Pre-emptive threshold (Cycle 2)
+### 2. Pre-emptive threshold (Cycle 2) — REMOVED
 
-Dispatcher tracks cumulative batch cost. Two thresholds fire BEFORE the
-existing v8.58 hard tripwire (`BATCH_TOTAL_COST > BATCH_CAP`):
+> **Removed with the token-budget cost gates.** The cost-percentage checkpoint
+> trigger below decided off the dollar-cost calculation, which was unreliable
+> across LLM models (tmux/subscription claude reports `$0`, etc.). The thresholds
+> `EVOLVE_CHECKPOINT_WARN_AT_PCT` / `EVOLVE_CHECKPOINT_AT_PCT` and the batch-cap
+> tripwire (`BATCH_TOTAL_COST > BATCH_CAP`) are gone — they are deprecated no-ops
+> now. Checkpoints still fire for the non-cost escalation reasons
+> (quota-likely, operator-requested, stall-inactivity, phase-complete). The
+> section is kept for historical context.
 
-| Threshold | Default | What it does |
+Historically the dispatcher tracked cumulative batch cost and two thresholds
+fired BEFORE the v8.58 hard tripwire (`BATCH_TOTAL_COST > BATCH_CAP`):
+
+| Threshold | Default | What it did |
 |---|---|---|
-| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | 80% | Emits `BATCH-BUDGET WARN` to stderr. Advisory only. |
-| `EVOLVE_CHECKPOINT_AT_PCT` | 95% | Exports `EVOLVE_CHECKPOINT_REQUEST=1`. The next cycle's orchestrator reads this and pauses at its next phase boundary (graceful, not mid-cycle abort). |
+| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | 80% | Emitted `BATCH-BUDGET WARN` to stderr. Advisory only. |
+| `EVOLVE_CHECKPOINT_AT_PCT` | 95% | Exported `EVOLVE_CHECKPOINT_REQUEST=1`. The next cycle's orchestrator read this and paused at its next phase boundary (graceful, not mid-cycle abort). |
 
 `EVOLVE_CHECKPOINT_DISABLE=1` opts out entirely.
 
@@ -208,11 +217,11 @@ call, the checkpoint survives for the next `--resume`.
 
 | Var | Default | Role |
 |---|---|---|
-| `EVOLVE_CHECKPOINT_AT_PCT` | `95` | Cumulative cost threshold (% of `BATCH_CAP`) at which the dispatcher signals next cycle to checkpoint |
-| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | `80` | Cumulative cost threshold (% of `BATCH_CAP`) for the advisory WARN log |
-| `EVOLVE_CHECKPOINT_DISABLE` | `0` | Set `1` to disable both pre-emptive thresholds (the existing v8.58 hard tripwire still applies) |
-| `EVOLVE_QUOTA_DANGER_PCT` | `80` | Cost threshold for reactive classification: rc=1 + empty stderr below this is NOT classified as quota-likely. Set `0` to fire for any empty-stderr rc=1. Set `100` to effectively disable. |
-| `EVOLVE_CHECKPOINT_REQUEST` | unset | Set by the dispatcher's 95% threshold — read by the next cycle's orchestrator |
+| `EVOLVE_CHECKPOINT_AT_PCT` | — | **DEPRECATED no-op** — the cost-percentage checkpoint trigger was removed with the token-budget cost gates. |
+| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | — | **DEPRECATED no-op** — the cost-percentage WARN was removed with the token-budget cost gates. |
+| `EVOLVE_CHECKPOINT_DISABLE` | — | **DEPRECATED no-op** — there is no cost-percentage trigger left to disable; the v8.58 batch-cap tripwire was also removed. |
+| `EVOLVE_QUOTA_DANGER_PCT` | — | **DEPRECATED no-op** — the cost-crossed quota heuristic was removed. Quota-likely is now detected by the non-cost empty-output classifier (`cycleclassify.MarkerQuotaLikelyEmptyOutput`). |
+| `EVOLVE_CHECKPOINT_REQUEST` | unset | Checkpoint-request signal read by the next cycle's orchestrator. The former cost-percentage source is gone; it now fires only via the non-cost escalation paths. |
 | `EVOLVE_CHECKPOINT_TRIGGERED` | unset | Set by reactive classification — read by `run-cycle.sh`'s EXIT trap to force preserve-mode |
 | `EVOLVE_RESUME_MODE` | unset | Set by `resume-cycle.sh` to `1`; orchestrator branches into resume protocol |
 | `EVOLVE_RESUME_PHASE` | unset | Phase to start at during resume |

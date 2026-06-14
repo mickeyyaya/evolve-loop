@@ -1,0 +1,46 @@
+{
+  "name": "secret-leak-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-secret-leak-scan",
+  "categories": [
+    "security"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/secret-leak-scan-report.md"
+    ],
+    "signals": [
+      "leak.severity_max",
+      "leak.secret_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Scanned Diff",
+      "Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "build.files_touched",
+        "op": "gt",
+        "value": 0
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

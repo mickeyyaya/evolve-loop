@@ -1,21 +1,13 @@
 // Package build implements the GREEN code-writer phase. The phase
 // boilerplate (profile lookup, prompt composition, bridge dispatch,
 // artifact reading, response packaging) lives in internal/phases/runner;
-// the cost-overrun guard lives in runner.CostGuardDecorator; this file
-// only encodes the build-specific variation points: agent name,
+// this file only encodes the build-specific variation points: agent name,
 // artifact filename, prompt context, and classification rules.
-//
-// Cost guard (applied via runner.CostGuardDecorator):
-//
-//   - EVOLVE_BUILDER_COST_THRESHOLD (default 2.00 USD) is the soft cap.
-//   - Cost > threshold + EVOLVE_BUILDER_COST_GUARD_STRICT=1 → FAIL.
-//   - Cost > threshold + advisory (default) → PASS + diagnostic.
 //
 // Verdict mapping (the artifact body classifier):
 //
 //   - "## Files Modified" missing or empty artifact → FAIL.
-//   - All other GREEN paths → PASS (possibly with cost diagnostic from
-//     the decorator).
+//   - All other GREEN paths → PASS.
 package build
 
 import (
@@ -31,12 +23,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
-)
-
-const (
-	thresholdEnvKey         = "EVOLVE_BUILDER_COST_THRESHOLD"
-	strictEnvKey            = "EVOLVE_BUILDER_COST_GUARD_STRICT"
-	defaultCostThresholdUSD = 2.00
 )
 
 // hooks implements runner.Hooks for the build phase.
@@ -88,13 +74,10 @@ type Config struct {
 }
 
 // Phase wraps a core.PhaseRunner so callers still get a concrete
-// *Phase return from New (preserves the public API). The runner is
-// constructed as BaseRunner wrapped in a CostGuardDecorator — build
-// phase opts into the cross-cutting cost-overrun check uniformly with
-// any future phase that wants the same guard.
+// *Phase return from New (preserves the public API).
 type Phase struct{ core.PhaseRunner }
 
-// New constructs the build phase. Wires BaseRunner + CostGuardDecorator.
+// New constructs the build phase from the BaseRunner.
 func New(c Config) *Phase {
 	base := runner.New(runner.Options{
 		Hooks:   hooks{},
@@ -102,12 +85,7 @@ func New(c Config) *Phase {
 		Prompts: c.Prompts,
 		NowFn:   c.NowFn,
 	})
-	guarded := runner.WithCostGuard(base, runner.CostGuardOptions{
-		ThresholdEnvKey:     thresholdEnvKey,
-		StrictEnvKey:        strictEnvKey,
-		DefaultThresholdUSD: defaultCostThresholdUSD,
-	})
-	return &Phase{PhaseRunner: guarded}
+	return &Phase{PhaseRunner: base}
 }
 
 // init registers the build phase factory at package load time.

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -61,60 +60,6 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 		return nil
 	}
 	return nil
-}
-
-// QuotaLikelyRequest captures the runtime state _quota_likely inspects.
-// Cycle + StderrTail are positional in bash; everything else flows from env.
-type QuotaLikelyRequest struct {
-	StderrTail        string
-	Cycle             int
-	DangerPct         int     // EVOLVE_QUOTA_DANGER_PCT (0..100); 80 default
-	BatchBudgetCapUSD float64 // EVOLVE_BATCH_BUDGET_CAP; 20.00 default
-}
-
-// QuotaLikelyOptions injects the cost-lookup seam. Bash shells to
-// show-cycle-cost.sh; tests stub.
-type QuotaLikelyOptions struct {
-	// CostLookup returns (currentCycleCostUSD, ok). ok=false ⇒ heuristic
-	// returns false (conservative). Tests stub to control the cost.
-	CostLookup func(cycle int) (float64, bool)
-}
-
-// QuotaLikely classifies an empty-stderr rc=1 as quota-exhaustion-likely
-// when cumulative cost has crossed DangerPct% of the batch budget cap.
-// Mirrors _quota_likely at subagent-run.sh:139.
-//
-// Returns true iff:
-//
-//	(1) stderr tail is empty/whitespace/"<empty>"
-//	(2) DangerPct < 100 (100 disables heuristic)
-//	(3) CostLookup succeeds and currentCost >= cap * danger_pct / 100
-//
-// DangerPct=0 makes condition (3) trivially true (every empty-stderr fail
-// classifies — useful under low-budget runs).
-func QuotaLikely(req QuotaLikelyRequest, opts QuotaLikelyOptions) bool {
-	// Heuristic 1: stderr must be empty/blank.
-	stripped := strings.TrimSpace(req.StderrTail)
-	if stripped != "" && req.StderrTail != "<empty>" {
-		return false
-	}
-	// DangerPct=100 disables the heuristic.
-	if req.DangerPct >= 100 {
-		return false
-	}
-	// Cost lookup: no callback ⇒ conservatively false (matches bash
-	// `command -v bc` / show-cycle-cost.sh missing branches).
-	if opts.CostLookup == nil {
-		return false
-	}
-	cost, ok := opts.CostLookup(req.Cycle)
-	if !ok {
-		return false
-	}
-	cap := req.BatchBudgetCapUSD
-	pct := float64(req.DangerPct)
-	threshold := math.Round((cap*pct/100)*100) / 100 // mirror bash `scale=2; ... bc -l`
-	return cost >= threshold
 }
 
 // FanoutLedgerEntry is the typed input to WriteFanoutLedgerEntry. Mirrors
@@ -276,16 +221,4 @@ func ParseQuotaDangerPct(raw string) int {
 		return 80
 	}
 	return n
-}
-
-// ParseBatchBudgetCap parses EVOLVE_BATCH_BUDGET_CAP with bash's 20.00 default.
-func ParseBatchBudgetCap(raw string) float64 {
-	if raw == "" {
-		return 20.00
-	}
-	f, err := strconv.ParseFloat(raw, 64)
-	if err != nil || f <= 0 {
-		return 20.00
-	}
-	return f
 }

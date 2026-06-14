@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -225,12 +226,23 @@ trust_level = "trusted"
 	}
 }
 
-// TestPretrustCodexProjects_ConcurrentCallsInSameProcess covers
-// MEDIUM-1 from the cycle-122 review: -race must show no data race
-// across two goroutines pre-trusting different paths into the same
-// config file. (Cross-process race is mitigated separately by the
-// PID-suffixed tmp filename — see HIGH-1 fix.)
-func TestPretrustCodexProjects_ConcurrentCallsInSameProcess(t *testing.T) {
+// TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive is the N10
+// (ADR-0049) regression. Under `evolve fleet` the whole-cycle project lock is
+// skipped, so multiple cycles' codex Preflights pre-trust DISTINCT paths into
+// the SAME host-global ~/.codex/config.toml concurrently. The unique CreateTemp
+// already prevents temp-file clobbering, but the read-merge-write-RENAME was
+// last-writer-wins: cycles that each read a config WITHOUT the others' entries
+// each rename their own snapshot, so the final file keeps only the last writer's
+// trust entries. A dropped trust entry re-arms codex's "Press enter to confirm"
+// runtime modal that hung cycle-122 for the cycle whose entry lost the race.
+//
+// The fix serializes the whole RMW under flock.WithPathLock(configPath), so the
+// append-only merges compose losslessly: EVERY path stays trusted. A start
+// barrier forces all readers to observe the same (empty) initial state, so the
+// pre-fix lost-update trips reliably across the iterations. (This REPLACES the
+// old test, which asserted only "at least the LAST writer's entries" — it
+// enshrined the very lost-update this fix removes.)
+func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
@@ -239,28 +251,46 @@ func TestPretrustCodexProjects_ConcurrentCallsInSameProcess(t *testing.T) {
 		{Worktree: "/tmp/wt-A", Workspace: "/tmp/ws-A"},
 		{Worktree: "/tmp/wt-B", Workspace: "/tmp/ws-B"},
 		{Worktree: "/tmp/wt-C", Workspace: "/tmp/ws-C"},
+		{Worktree: "/tmp/wt-D", Workspace: "/tmp/ws-D"},
 	}
-	done := make(chan error, len(cfgs))
+	var wantHeaders []string
 	for _, c := range cfgs {
-		c := c
-		go func() { done <- pretrustCodexProjects(c) }()
+		wantHeaders = append(wantHeaders, codexProjectHeader(c.Worktree), codexProjectHeader(c.Workspace))
 	}
-	for range cfgs {
-		if err := <-done; err != nil {
-			t.Errorf("concurrent pretrustCodexProjects: %v", err)
+
+	const iters = 100
+	for i := 0; i < iters; i++ {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			t.Fatalf("iter %d reset: %v", i, err)
 		}
-	}
-	// Best-effort: in-process last-writer-wins means SOME entries may
-	// be absent from the final file (the docstring documents this).
-	// The invariant under test is "no data race + no panic + no
-	// half-written file" — proven by -race + the read below succeeding.
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read after concurrent calls: %v", err)
-	}
-	// At least the LAST writer's entries must be present (last rename wins).
-	if !strings.Contains(string(got), `trust_level = "trusted"`) {
-		t.Errorf("expected at least one trust entry; got:\n%s", got)
+		start := make(chan struct{})
+		errs := make([]error, len(cfgs))
+		var wg sync.WaitGroup
+		wg.Add(len(cfgs))
+		for j, c := range cfgs {
+			go func(idx int, cfg *Config) {
+				defer wg.Done()
+				<-start
+				errs[idx] = pretrustCodexProjects(cfg)
+			}(j, c)
+		}
+		close(start)
+		wg.Wait()
+
+		for j, err := range errs {
+			if err != nil {
+				t.Fatalf("iter %d cfg %d: pretrustCodexProjects: %v", i, j, err)
+			}
+		}
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("iter %d read: %v", i, err)
+		}
+		for _, h := range wantHeaders {
+			if !strings.Contains(string(got), h) {
+				t.Fatalf("iter %d lost trust entry under concurrent pretrust: %q absent\n%s", i, h, got)
+			}
+		}
 	}
 }
 

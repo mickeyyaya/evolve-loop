@@ -1,10 +1,10 @@
-// Package cyclehealth performs a 13-signal integrity check on a
+// Package cyclehealth performs a 12-signal integrity check on a
 // completed cycle's workspace and writes the findings to
 // <workspace>/cycle-health.json. The orchestrator and Scout read the
 // file before the next phase; any ANOMALY in a non-WARN-only signal
 // halts the cycle so the integrity breach is investigated.
 //
-// The 13 signals (each emits zero or more anomalies):
+// The 12 signals (each emits zero or more anomalies):
 //
 //  1. ledger_completeness  — every required role appears in ledger.jsonl
 //  2. ledger_timestamps    — entries are monotonic, no future timestamps
@@ -16,10 +16,9 @@
 //  8. canary_files         — no orphan canary files left from previous cycles
 //  9. hash_chain           — ledger prev_hash chain unbroken
 //
-// 10. cost_envelope        — per-phase cost ≤ EVOLVE_PHASE_COST_CEILING
-// 11. duplicate_ledger     — no two ledger entries with same SHA
-// 12. phase_latency        — per-phase execution time ≤ EVOLVE_PHASE_LATENCY_CEILING
-// 13. self_heal_events     — anomalous self-heal retries / backfills in cycle
+// 10. duplicate_ledger     — no two ledger entries with same SHA
+// 11. phase_latency        — per-phase execution time ≤ EVOLVE_PHASE_LATENCY_CEILING
+// 12. self_heal_events     — anomalous self-heal retries / backfills in cycle
 //
 // Per the skill docs: "Any ANOMALY = halt." Operators bypass via
 // EVOLVE_SKIP_CYCLE_HEALTH=1 (logged loudly).
@@ -107,7 +106,6 @@ func Check(opts Options) (Report, error) {
 		checkChallengeTokens,
 		checkVelocity,
 		checkCanaryFiles,
-		checkCostEnvelope,
 		checkPhaseLatency,
 		checkSelfHealEvents,
 	}
@@ -145,7 +143,6 @@ func signalNames() []string {
 		"challenge_tokens",
 		"velocity",
 		"canary_files",
-		"cost_envelope",
 		"phase_latency",
 		"self_heal_events",
 	}
@@ -435,28 +432,6 @@ func checkCanaryFiles(opts Options) []Anomaly {
 			out = append(out, Anomaly{
 				Signal: "canary_files", Severity: SeverityWarn,
 				Message: fmt.Sprintf("orphan canary from another cycle: %s", name),
-			})
-		}
-	}
-	return out
-}
-
-const defaultCostCeilingUSD = 5.00
-
-func checkCostEnvelope(opts Options) []Anomaly {
-	entries, err := loadLedger(opts.Workspace)
-	if err != nil {
-		return nil
-	}
-	var out []Anomaly
-	for _, e := range entries {
-		if e.Cycle != opts.Cycle {
-			continue
-		}
-		if e.CostUSD > defaultCostCeilingUSD {
-			out = append(out, Anomaly{
-				Signal: "cost_envelope", Severity: SeverityWarn,
-				Message: fmt.Sprintf("%s phase cost %.2f > ceiling %.2f", e.Phase, e.CostUSD, defaultCostCeilingUSD),
 			})
 		}
 	}

@@ -1,0 +1,46 @@
+{
+  "name": "resilience-gap-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-resilience-gap-scan",
+  "categories": [
+    "resilience"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/resilience-gap-scan-report.md"
+    ],
+    "signals": [
+      "resilience.severity_max",
+      "resilience.unguarded_call_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "External Call Sites",
+      "Resilience Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "resilience"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

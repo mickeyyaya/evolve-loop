@@ -1,0 +1,46 @@
+{
+  "name": "frontend-design-review",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-frontend-design-review",
+  "categories": [
+    "frontend-ui"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/frontend-design-review-report.md"
+    ],
+    "signals": [
+      "uidesign.severity_max",
+      "uidesign.defect_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "UI Changes",
+      "Design Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "frontend-ui"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

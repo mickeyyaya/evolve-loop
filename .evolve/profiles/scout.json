@@ -2,10 +2,10 @@
   "name": "scout",
   "role": "scout",
   "cli": "claude-tmux",
-  "model_tier_default": "sonnet",
+  "model_tier_default": "balanced",
   "model_tier_overrides": {
-    "cycle_1_or_low_goal": "opus",
-    "cycle_4_plus_mature": "haiku"
+    "cycle_1_or_low_goal": "deep",
+    "cycle_4_plus_mature": "fast"
   },
   "allowed_tools": [
     "Bash(evolve phase verify:*)",

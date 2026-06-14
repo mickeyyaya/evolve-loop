@@ -46,8 +46,7 @@ type ScenarioSpec struct {
 	Conditional   map[string]config.CondRule
 	Enable        map[string]config.Enable
 	Triggers      map[string]config.RoutingBlock
-	MaxInsertions int     // 0 → default 4
-	BudgetUSD     float64 // 0 → default 100 (positive ⇒ content inserts not budget-clamped)
+	MaxInsertions int // 0 → default 4
 
 	// --- world fixtures ---
 	Signals SignalSpec

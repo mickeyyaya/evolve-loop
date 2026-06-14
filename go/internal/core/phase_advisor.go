@@ -372,7 +372,7 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	fmt.Fprintf(b, "## Cycle\n- cycle: %d\n- just_completed: %s\n- last_verdict: %s\n", in.Cycle, in.Current, in.Verdict)
 	fmt.Fprintf(b, "- completed_phases: %s\n", strings.Join(in.Completed, ", "))
 	fmt.Fprintf(b, "- mandatory_spine: %s\n", strings.Join(in.Cfg.Mandatory, ", "))
-	fmt.Fprintf(b, "- budget_remaining_usd: %.2f\n- max_optional_insertions: %d\n\n", in.BudgetRemaining, in.Cfg.MaxInsertions)
+	fmt.Fprintf(b, "- max_optional_insertions: %d\n\n", in.Cfg.MaxInsertions)
 
 	// The goal text (when threaded) is the brain's primary input for composing the
 	// cycle: it lets the advisor judge whether the work is novel/cross-cutting

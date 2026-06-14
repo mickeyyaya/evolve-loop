@@ -1,0 +1,46 @@
+{
+  "name": "telemetry-coverage-check",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-telemetry-coverage-check",
+  "categories": [
+    "observability"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/telemetry-coverage-check-report.md"
+    ],
+    "signals": [
+      "telemetry.severity_max",
+      "telemetry.uninstrumented_paths"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "New Code Paths",
+      "Instrumentation Gaps",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "observability"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

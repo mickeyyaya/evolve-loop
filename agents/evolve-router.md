@@ -50,13 +50,28 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | fault-localization → bug-reproduction → [tdd, build] → (regression via existing tdd/audit) |
-| feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
-| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
-| security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |
+| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → error-handling-scan → coverage-gate → flake-rerun-scan |
+| feature | premise-challenge → spec-verify → api-contract-design → [tdd, build] → test-amplification → coverage-gate → secret-leak-scan |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → type-safety-audit → mutation-gate → coverage-gate → cleanup-sweep |
+| security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
 | performance | benchmark baseline capture → [build] → benchmark-gate |
-| release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
+| release | rollout-plan → rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | docs / trivial | spine only (no insertions) |
+| concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
+| api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
+| data-migration | rollback-plan → [tdd, build] → migration-safety-check → coverage-gate |
+| observability | observability-design → [build] → telemetry-coverage-check → adversarial-review |
+| supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
+| agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
+| accessibility | scope-baseline → [build] → accessibility-audit → adversarial-review |
+| frontend-ui | prd-draft → [build] → frontend-design-review → accessibility-audit |
+| i18n | scope-baseline → [build] → locale-format-check |
+| database | data-model-design → [tdd, build] → query-performance-scan → migration-safety-check |
+| caching | caching-strategy-design → [build] → cache-strategy-scan |
+| resilience | resilience-design → [tdd, build] → resilience-gap-scan → flake-rerun-scan |
+| messaging | [tdd, build] → idempotency-check → contract-fuzz-probe |
+| infrastructure | [build] → container-hardening-scan → cicd-pipeline-audit → secret-leak-scan |
+| data-pipeline | scope-baseline → [build] → data-integrity-check → migration-safety-check |
 | project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
 | business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
 | accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
@@ -116,6 +131,35 @@ something plausible.
 | `post-ship-monitor` | integration failures from the ship accumulating unseen — `evolve doctor` + dry-run probe one cycle after ship |
 | `api-contract-design` | building a new exported surface with no explicit interface contract — contract-first design before build |
 | `context-condense` | downstream phases exhausting context budget on long run-dir artifacts — digest-based compression preserving verdicts and signals |
+| `premise-challenge` | building the wrong thing well — adversarially falsifies the goal, success criteria, and simpler-approach assumptions before any code (Core Rules 1–3 as a gate) |
+| `coverage-gate` | a change shipping with newly-uncovered lines — gates the coverage delta of changed code vs the pre-cycle baseline (regression, not strength) |
+| `secret-leak-scan` | a hardcoded credential/token/key reaching the tree — entropy + known-pattern scan of added diff lines, fixture-aware |
+| `flake-rerun-scan` | a non-deterministic test passing once and lying — re-runs touched tests under -count/-shuffle, rules out the t.Setenv+parallel false alarm |
+| `race-condition-scan` | a data race or goroutine leak in changed concurrent code — orchestrates `go test -race` + leak detection on touched packages |
+| `authz-gap-scan` | an authenticated-but-unauthorized access path — RBAC/ABAC/object-level/JWT/session gaps the general SAST lens misses |
+| `compat-surface-check` | a silent breaking change to a public signature/CLI flag/env var/JSON field — apidiff of the realized surface vs the prior release |
+| `contract-fuzz-probe` | an untrusted boundary accepting malformed input — asserts validation/strict-parse/schema-compat (not merely non-crashing) |
+| `migration-safety-check` | an irreversible or non-idempotent data/schema migration — verifies a reversible forward+rollback pair, blocks unguarded destructive ops |
+| `telemetry-coverage-check` | a new code path that is unobservable in production — gates structured logs/metrics/traces/error-context on new branches before ship |
+| `license-provenance-audit` | a license-incompatible or unverifiable-provenance dependency — license + SLSA/SBOM provenance lens dependency-audit (CVE-only) lacks |
+| `prompt-regression-eval` | a persona/skill/prompt edit silently regressing agent behavior — scores instruction changes against a behavioral rubric vs the prior instruction |
+| `accessibility-audit` | a WCAG 2.1/2.2 AA violation on a user-facing path — semantics/ARIA/contrast/keyboard/focus/screen-reader review mapped to success criteria |
+| `frontend-design-review` | a UI shipping with broken layout/responsiveness or off-design-system polish — senior-design-reviewer critique distinct from a11y compliance |
+| `locale-format-check` | hardcoded copy or non-locale-aware formatting blocking a market — i18n anti-pattern + plural/RTL/date/number/currency review |
+| `query-performance-scan` | an N+1 / missing-index / full-scan / unbounded-result query reaching production — the query-shape lens the correctness audit and CPU benchmarks lack |
+| `cache-strategy-scan` | a cache serving stale data or stampeding — missing/incorrect invalidation, unbounded TTL, no stampede protection, cache-aside race (verifies what caching-strategy-design proposed) |
+| `resilience-gap-scan` | an external-dependency call with no timeout/retry/circuit-breaker/bulkhead (or retry without backoff/idempotency) — one slow dependency cascading into total failure |
+| `idempotency-check` | a non-idempotent handler under at-least-once delivery — duplicate-delivery double-processing with no dedup key / exactly-once guard / safe replay |
+| `error-handling-scan` | an error silently swallowed, a return ignored, or a catch-all fallback hiding failure — a failure that looks like success until production (focused, not smell-scan's broad ranking) |
+| `container-hardening-scan` | a Dockerfile/k8s manifest shipping insecure defaults — root user, :latest, no resource limits, privileged/hostPath, secrets in env, no healthcheck, writable rootfs |
+| `cicd-pipeline-audit` | a CI/CD workflow leaking secrets or running untrusted code — unpinned action SHAs, pull_request_target+fork checkout, over-privileged token, secret-to-log, untrusted-input interpolation |
+| `type-safety-audit` | a type escape hatch (any/interface{}/unchecked cast) or a boundary with no invariant — bugs the compiler should have caught but a weak type lets through (static, not runtime fuzzing) |
+| `data-integrity-check` | a stream/batch pipeline corrupting or dropping records — schema drift, null/dedup gaps, out-of-order/late data, at-least-once vs exactly-once confusion, partial-write with no transaction boundary |
+| `resilience-design` | building a new external integration with no fault-tolerance design — declares timeout/retry/circuit-breaker/bulkhead/fallback BEFORE build (forward half of resilience-gap-scan) |
+| `data-model-design` | building a data-heavy feature with no schema/index/access-pattern decision — the data-layer counterpart to api-contract-design, fixing entities/keys/indexes/access paths before any table |
+| `caching-strategy-design` | adding caching with no pattern/key/invalidation decision — declares cache pattern, key schema, invalidation triggers, TTL/eviction BEFORE build (forward half of cache-strategy-scan) |
+| `observability-design` | building a new path with no instrumentation plan — declares metrics/logs/traces/SLOs/alerts BEFORE build (forward half of telemetry-coverage-check, distinct from metric-tree's product metrics) |
+| `rollout-plan` | shipping a risky change with no progressive-delivery plan — deploy strategy (canary/blue-green), feature-flag + kill-switch, automated rollback triggers + blast radius (forward complement to rollback-plan's revert mechanism) |
 
 Selecting a phase whose persona/runner/profile is not dispatchable crashes the
 cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);

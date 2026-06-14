@@ -13,6 +13,14 @@ import (
 // cycle-state.json holds whichever run wrote last.
 const RunStateFile = "run.json"
 
+// CycleStateFile is the global per-cycle state file under .evolve/. The single
+// home for the filename (was a string literal repeated across storage /
+// checkpoint / inboxmover / resume / reset). Every read-modify-writer of this
+// file serializes on the sidecar "<dir>/cycle-state.json.lock" via
+// flock.WithPathLock (ADR-0049 G7) so concurrent fleet cycles never lose each
+// other's update.
+const CycleStateFile = "cycle-state.json"
+
 // RunWorkspacePath is the single source for a cycle's run-workspace
 // directory: <projectRoot>/.evolve/runs/cycle-<N>. Phase artifacts, the
 // tmux session registry (CB.5) and the run.json guard mirror (CB.4) all

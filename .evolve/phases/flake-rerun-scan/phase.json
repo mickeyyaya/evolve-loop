@@ -1,0 +1,46 @@
+{
+  "name": "flake-rerun-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-flake-rerun-scan",
+  "categories": [
+    "bugfix"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/flake-rerun-scan-report.md"
+    ],
+    "signals": [
+      "flake.severity_max",
+      "flake.unstable_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Tests Re-run",
+      "Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "build.files_touched",
+        "op": "gt",
+        "value": 0
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

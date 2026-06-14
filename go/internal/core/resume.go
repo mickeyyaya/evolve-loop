@@ -66,7 +66,7 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 		opts.PathExists = defaultPathExists
 	}
 
-	statePath := filepath.Join(evolveDir, "cycle-state.json")
+	statePath := filepath.Join(evolveDir, CycleStateFile)
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -171,6 +171,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	o.currentRunID.Store(cs.RunID)
 	defer o.currentRunID.Store("")
 
+	// ADR-0049 G16: re-establish the per-run .lease for the resumed (still-live)
+	// cycle so gc does not reap its run dir while resume runs. Same heartbeat as
+	// the fresh path; no-op for worktree-less cycles.
+	stopLease := startRunLease(cs.WorkspacePath, cs.RunID, o.now, leaseRefreshInterval())
+	defer stopLease()
+
 	// Snapshot env/context (same discipline as RunCycle).
 	envSnap := make(map[string]string, len(req.Env)+1)
 	for k, v := range req.Env {
@@ -253,7 +259,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// the run-record id, so session names stay run-scoped).
 			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
-			Budget:        req.Budget,
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       ctxSnap,

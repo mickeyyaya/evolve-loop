@@ -3,9 +3,9 @@
 // files, extracts the last kind==result envelope from each, and sums
 // cost + token counts into a per-phase + per-cycle summary.
 //
-// Used by cmd_loop after each cycle to update batchTotalCost +
-// trigger checkpoint thresholds (80% WARN, 95% set
-// EVOLVE_CHECKPOINT_REQUEST=1 for the next cycle).
+// Used by cmd_loop after each cycle to accumulate the batch cost total
+// for display-only telemetry (`total_cost_usd` in loop output). Cost no
+// longer gates anything — the token-budget cost gates were removed.
 //
 // Source format: each line is one normalized envelope. The result
 // envelope carries data.cost_usd plus data.tokens.{in,out,cache_r,

@@ -1,0 +1,45 @@
+{
+  "name": "observability-design",
+  "archetype": "plan",
+  "agent": "evolve-observability-design",
+  "categories": [
+    "observability"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md"
+    ],
+    "signals": [
+      "scout.goal_type",
+      "scout.cycle_size"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/observability-design-report.md"
+    ],
+    "signals": [
+      "obsdesign.signals_count",
+      "obsdesign.slo_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Critical Paths",
+      "Instrumentation Plan",
+      "SLOs & Alerts"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "observability"
+      }
+    ]
+  },
+  "after": "triage",
+  "optional": true
+}

@@ -1,0 +1,46 @@
+{
+  "name": "container-hardening-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-container-hardening-scan",
+  "categories": [
+    "infrastructure"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/container-hardening-scan-report.md"
+    ],
+    "signals": [
+      "container.severity_max",
+      "container.misconfig_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Container & Manifest Changes",
+      "Hardening Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "infrastructure"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

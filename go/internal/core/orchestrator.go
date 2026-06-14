@@ -96,7 +96,6 @@ type PhaseMinter interface {
 type CycleRequest struct {
 	ProjectRoot string
 	GoalHash    string
-	Budget      BudgetEnvelope
 	// Env is propagated to every PhaseRequest.Env that runs in this
 	// cycle. Phases consult it for CLI/model selection
 	// (EVOLVE_CLI, EVOLVE_<PHASE>_MODEL, …). The orchestrator copies the
@@ -1629,7 +1628,6 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		// CB.5: and the run identity, for run-scoped session naming.
 		RunID:         fl.CycleState.RunID,
 		GoalHash:      fl.CycleRequest.GoalHash,
-		Budget:        fl.CycleRequest.Budget,
 		PreviousPhase: string(fl.Failed),
 		Env:           fl.Env,
 		Context:       retroCtx,
@@ -1740,15 +1738,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// artifacts in seconds instead of redoing discovery) and steer
 	// downstream phases via the OLD task selection.
 	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
-	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that
-	// pre-seed workspace files to simulate phase state. The kill switch is
-	// honored from EITHER the request env OR the live process env (a disable
-	// from either source wins): tests set it programmatically via req.Env,
-	// operators via the shell. Reading the live env is a deliberate, narrow
-	// break from per-cycle snapshot isolation — it can only DISABLE a
-	// default-on guard, never enable new mid-cycle behavior.
-	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false) ||
-		envchain.BoolValue(os.Getenv("EVOLVE_DISABLE_WORKSPACE_GUARD"), false)
+	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that pre-seed
+	// workspace files to simulate phase state, and by operators via the shell
+	// (captured into req.Env from filterEvolveEnv(os.Environ()) at cycle launch,
+	// cmd_cycle.go). ADR-0049 N9: read ONLY the per-cycle env SNAPSHOT, never live
+	// os.Getenv — under concurrent fleet cycles a peer's env (or a mid-flight
+	// mutation) must not flip this cycle's guard. The launch snapshot already
+	// carries the operator's shell value, so this is behavior-preserving for the
+	// live loop while restoring per-cycle isolation.
+	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false)
 	if !guardDisabled {
 		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
 			// Best-effort: WARN but don't block the cycle; the failure
@@ -1803,6 +1801,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
 	}
 
+	// ADR-0049 G16: write + heartbeat the per-run .lease so gc's liveness check
+	// (runlease.Fresh) never reaps a concurrent fleet sibling's run dir mid-cycle.
+	// startRunLease creates the run dir itself; no-op for worktree-less / test
+	// cycles (empty WorkspacePath). Stopped on every exit (deferred).
+	stopLease := startRunLease(cs.WorkspacePath, runID, o.now, leaseRefreshInterval())
+	defer stopLease()
+
 	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
 	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
 	if o.catalogRefresh != nil {
@@ -1820,6 +1825,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	ctxSnap := make(map[string]string, len(req.Context))
 	for k, v := range req.Context {
 		ctxSnap[k] = v
+	}
+
+	// ADR-0049 E: when `evolve fleet --plan` launched this cycle, EVOLVE_FLEET_SCOPE
+	// carries its assigned (disjoint) task IDs. Surface it to triage via
+	// Context["fleet_scope"] so the cycle selects ONLY its subset and concurrent
+	// cycles never pick work touching the same files. Read from the env SNAPSHOT
+	// (not live os.Getenv) so it stays per-cycle. Empty/unset ⇒ legacy behavior.
+	if scope := envSnap["EVOLVE_FLEET_SCOPE"]; scope != "" {
+		ctxSnap["fleet_scope"] = scope
 	}
 
 	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
@@ -1880,18 +1894,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// what went wrong before. No-op when no KB is wired or no failure history.
 		lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
 		planIn := router.RouteInput{
-			Current:         string(PhaseStart),
-			Signals:         router.RoutingSignals{}, // no handoffs exist yet at cycle start
-			Cfg:             o.cfg,
-			BudgetRemaining: req.Budget.MaxUSD,
-			Now:             o.now(),
-			Workspace:       cs.WorkspacePath,
-			ProjectRoot:     req.ProjectRoot,
-			Cycle:           cycle,
-			Env:             envSnap,
-			LastReason:      lastReason,
-			Lessons:         lessons,
-			Catalog:         phaseCardsFromCatalog(o.catalog),
+			Current:     string(PhaseStart),
+			Signals:     router.RoutingSignals{}, // no handoffs exist yet at cycle start
+			Cfg:         o.cfg,
+			Now:         o.now(),
+			Workspace:   cs.WorkspacePath,
+			ProjectRoot: req.ProjectRoot,
+			Cycle:       cycle,
+			Env:         envSnap,
+			LastReason:  lastReason,
+			Lessons:     lessons,
+			Catalog:     phaseCardsFromCatalog(o.catalog),
 			// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
 			// Scout reads; NOT Context["strategy"], which is the strategy MODE like
 			// "balanced"/"harden") lets the advisor reason about WHAT the cycle is for
@@ -2036,15 +2049,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			routingSeq++
 			signals, _ := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
 			dec := o.strategy.Decide(router.RouteInput{
-				Current:         string(current),
-				Verdict:         lastVerdict,
-				Signals:         signals,
-				History:         entriesFromRecords(state.FailedAt),
-				Cfg:             o.cfg,
-				BudgetRemaining: req.Budget.MaxUSD,
-				Completed:       cs.CompletedPhases,
-				Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
-				Now:             o.now(),
+				Current:   string(current),
+				Verdict:   lastVerdict,
+				Signals:   signals,
+				History:   entriesFromRecords(state.FailedAt),
+				Cfg:       o.cfg,
+				Completed: cs.CompletedPhases,
+				Strict:    envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+				Now:       o.now(),
 				// Proposer context (DynamicLLM only; ignored by pure Route).
 				Workspace:   cs.WorkspacePath,
 				ProjectRoot: req.ProjectRoot,
@@ -2196,7 +2208,6 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Worktree:      phaseWorktree,
 			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
-			Budget:        req.Budget,
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       phaseCtx,
@@ -2253,13 +2264,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 					// try to reconstruct the artifact from stdout.clean.txt before aborting.
-					// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in EITHER
-					// the per-cycle snapshot OR the live process env (same dual-source
-					// disable rationale as the workspace guard above — a "0" from either
-					// source wins, and the live read can only ever disable a default-on
-					// safety net).
-					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true) &&
-						envchain.BoolValue(os.Getenv("EVOLVE_BACKFILL_ENABLED"), true)
+					// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in the
+					// per-cycle env SNAPSHOT (ADR-0049 N9: read the snapshot, not live
+					// os.Getenv, so a concurrent fleet cycle's env can't flip this cycle's
+					// backfill. The snapshot already carries the operator's shell value).
+					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true)
 					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
 						artifactPath := backfillArtifactPath(cs.WorkspacePath, string(next))
 						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
@@ -2770,17 +2779,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// decidable (clamped) and leaves a routing-decision artifact.
 				routingSeq++
 				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cycle, cs, routingSeq, resp.Verdict, state.FailedAt, router.RouteInput{
-					Cfg:             o.cfg,
-					BudgetRemaining: req.Budget.MaxUSD,
-					Completed:       cs.CompletedPhases,
-					Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
-					Workspace:       cs.WorkspacePath,
-					ProjectRoot:     req.ProjectRoot,
-					Cycle:           cycle,
-					Env:             envSnap,
-					Plan:            clampedPlan,
-					IntentRequired:  cs.IntentRequired,
-					PSMASEnabled:    envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
+					Cfg:            o.cfg,
+					Completed:      cs.CompletedPhases,
+					Strict:         envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+					Workspace:      cs.WorkspacePath,
+					ProjectRoot:    req.ProjectRoot,
+					Cycle:          cycle,
+					Env:            envSnap,
+					Plan:           clampedPlan,
+					IntentRequired: cs.IntentRequired,
+					PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 				})
 			} else {
 				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, state.FailedAt)
@@ -2965,9 +2973,23 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	// tree → re-ship fast-forwards. A rebase CONFLICT is genuinely overlapping
 	// work the advisor's partition should have kept apart — abort loud rather
 	// than auto-resolve.
-	if se.Code == CodeGitFleetRebaseNeeded && !rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase onto main failed; aborting\n", cycle)
-		return "", false
+	// The code/class used for the routing decision; a fleet rebase may reclassify
+	// a clean RebaseNeeded into a CONFLICT (G13a) that routes to the debugger.
+	recoverCode, recoverClass := se.Code, se.Class
+	if se.Code == CodeGitFleetRebaseNeeded {
+		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
+		switch {
+		case ok:
+			// Clean replay → router routes RebaseNeeded to audit (re-bind merged tree).
+		case conflict:
+			// Genuine overlapping work — a re-audit cannot resolve it. Reclassify to
+			// the integrity-class conflict code so recovery routes to the debugger.
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
+			recoverCode, recoverClass = CodeGitFleetRebaseConflict, ShipClassIntegrity
+		default:
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase onto main failed (infra); aborting\n", cycle)
+			return "", false
+		}
 	}
 	// Recovery is deterministic Chain-of-Responsibility (no LLM); both routing
 	// strategies just delegate to the pure router.Recover, so call it directly.
@@ -2975,8 +2997,8 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	// (e.g. Stage:Off) — error handling must not depend on routing being on.
 	dec := router.Recover(router.RouteInput{
 		Blocker: &router.Blocker{
-			Code:  string(se.Code),
-			Class: string(se.Class),
+			Code:  string(recoverCode),
+			Class: string(recoverClass),
 			Stage: string(se.Stage),
 		},
 	})
@@ -2995,19 +3017,25 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 
 // rebaseCycleBranchOntoMain rebases the cycle's worktree branch onto the current
 // main so a fleet cycle whose ff-merge diverged (a peer moved main) can re-audit
-// + re-ship the merged tree (ADR-0049 S5b). Returns false on conflict/abort or
-// an empty worktree; on any rebase failure it aborts the in-progress rebase so
-// the worktree is left clean (no half-applied rebase) for the caller's abort.
-func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) bool {
+// + re-ship the merged tree (ADR-0049 S5b). Returns ok=true on a clean replay.
+// On failure it distinguishes (G13a) a genuine merge CONFLICT (unmerged paths —
+// overlapping work the partition should have separated, route to the debugger)
+// from an infra failure (conflict=false, abort the cycle). Either way it aborts
+// the in-progress rebase so the worktree is left clean (no half-applied rebase).
+// An empty worktree returns (false, false) — a degraded run never rebases.
+func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) (ok bool, conflict bool) {
 	if worktree == "" {
-		return false
+		return false, false
 	}
 	if _, exit, err := gitCapture(ctx, worktree, "rebase", "main"); err != nil || exit != 0 {
+		// Detect a real conflict BEFORE aborting (abort clears the unmerged index).
+		unmerged, _, _ := gitCapture(ctx, worktree, "diff", "--name-only", "--diff-filter=U")
+		conflict = strings.TrimSpace(unmerged) != ""
 		_, _, _ = gitCapture(ctx, worktree, "rebase", "--abort")
-		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed (exit=%d, err=%v); rebase aborted\n", worktree, exit, err)
-		return false
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed (exit=%d, err=%v, conflict=%v); rebase aborted\n", worktree, exit, err, conflict)
+		return false, conflict
 	}
-	return true
+	return true, false
 }
 
 // decideAfterDebugger maps the debugger phase's recovery decision (surfaced on

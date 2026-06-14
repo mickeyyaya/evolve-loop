@@ -1,0 +1,46 @@
+{
+  "name": "contract-fuzz-probe",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-contract-fuzz-probe",
+  "categories": [
+    "api-design"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/contract-fuzz-probe-report.md"
+    ],
+    "signals": [
+      "boundary.severity_max",
+      "boundary.unvalidated_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Boundaries Probed",
+      "Validation Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "api-design"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

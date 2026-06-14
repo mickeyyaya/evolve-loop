@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // promotedConfidence is recorded in every promoted-signature file: below the
@@ -90,9 +92,6 @@ func PromoteSignature(dir string, sig FatalSignature) (string, error) {
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
 	var b strings.Builder
 	b.WriteString("# fatal-pane signature promoted into the deterministic registry (ADR-0044 Slice 5)\n")
 	fmt.Fprintf(&b, "id: %s\n", id)
@@ -100,11 +99,15 @@ func PromoteSignature(dir string, sig FatalSignature) (string, error) {
 	fmt.Fprintf(&b, "cause: %s\n", sig.Cause)
 	fmt.Fprintf(&b, "confidence: %s\n", promotedConfidence)
 	fmt.Fprintf(&b, "note: %s\n", strconv.Quote(sig.Note))
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(b.String()), 0o644); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	// ADR-0049 N14: route through the atomicwrite SSOT, whose per-call os.CreateTemp
+	// gives every writer a UNIQUE temp. Two concurrent fleet cycles classifying the
+	// SAME novel pane resolve to the same content-addressed path; the old hand-rolled
+	// `path + ".tmp"` was therefore SHARED, so their write/rename interleaved — the
+	// loser's rename hit ENOENT (a lost promotion) and a partial write could tear the
+	// entry that every later boot replays. The SSOT also mkdirs the parent, so the
+	// explicit MkdirAll is gone. This is what the package header's "same write-if-absent
+	// atomic posture as faillearn's lessons" claim always meant; now it is true.
+	if err := atomicwrite.Bytes(path, []byte(b.String())); err != nil {
 		return "", err
 	}
 	return id, nil

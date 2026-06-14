@@ -67,17 +67,20 @@ func setupDivergedRepo(t *testing.T, conflict bool) (worktree string) {
 // re-audit + re-ship the merged tree.
 func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 	wt := setupDivergedRepo(t, false)
-	if !rebaseCycleBranchOntoMain(context.Background(), wt) {
-		t.Fatal("clean disjoint rebase should succeed")
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), wt)
+	if !ok || conflict {
+		t.Fatalf("clean disjoint rebase: ok=%v conflict=%v, want ok=true conflict=false", ok, conflict)
 	}
 }
 
-// TestRebaseCycleBranchOntoMain_Conflict_Fails: overlapping work the partition
-// should have kept apart → rebase conflicts → false (caller aborts the cycle).
-func TestRebaseCycleBranchOntoMain_Conflict_Fails(t *testing.T) {
+// TestRebaseCycleBranchOntoMain_Conflict: overlapping work the partition should
+// have kept apart → rebase conflicts → (ok=false, conflict=true) so the caller
+// routes to the debugger (G13a) instead of a silent abort.
+func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 	wt := setupDivergedRepo(t, true)
-	if rebaseCycleBranchOntoMain(context.Background(), wt) {
-		t.Fatal("conflicting rebase must return false")
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), wt)
+	if ok || !conflict {
+		t.Fatalf("conflicting rebase: ok=%v conflict=%v, want ok=false conflict=true", ok, conflict)
 	}
 	// The rebase must have been aborted (worktree left clean, not mid-rebase).
 	if _, err := os.Stat(filepath.Join(wt, ".git", "rebase-merge")); !os.IsNotExist(err) {
@@ -91,7 +94,7 @@ func TestRebaseCycleBranchOntoMain_Conflict_Fails(t *testing.T) {
 // TestRebaseCycleBranchOntoMain_EmptyWorktree_False: a degraded (no-worktree)
 // run must not attempt a rebase.
 func TestRebaseCycleBranchOntoMain_EmptyWorktree_False(t *testing.T) {
-	if rebaseCycleBranchOntoMain(context.Background(), "") {
-		t.Fatal("empty worktree must return false")
+	if ok, conflict := rebaseCycleBranchOntoMain(context.Background(), ""); ok || conflict {
+		t.Fatalf("empty worktree: ok=%v conflict=%v, want both false", ok, conflict)
 	}
 }

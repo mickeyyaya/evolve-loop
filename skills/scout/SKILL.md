@@ -45,7 +45,7 @@ Spec at `<workspace>/spec.md` with sections:
 |---|---|
 | Phase | `scout` (plan archetype, mandatory) |
 | Persona | `agents/evolve-scout.md` |
-| Profile | `.evolve/profiles/scout.json` — CLI `claude-tmux`, tier `sonnet`, fan-out ×3 |
+| Profile | `.evolve/profiles/scout.json` — CLI `claude-tmux`, tier `balanced`, fan-out ×3 |
 | Inputs | `intent.md` |
 | Artifact | `scout-report.md` (cycle workspace) |
 

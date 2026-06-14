@@ -76,14 +76,11 @@ func TestGet_HappyPath_TypedFields(t *testing.T) {
 	if got := p.ModelTierOverrides["cycle_1_or_low_goal"]; got != "opus" {
 		t.Errorf("override[cycle_1_or_low_goal]=%q, want opus", got)
 	}
-	if p.MaxTurns != 30 || p.MaxBudgetUSD != 1.50 {
-		t.Errorf("MaxTurns=%d MaxBudgetUSD=%g, want 30 1.5", p.MaxTurns, p.MaxBudgetUSD)
+	if p.MaxTurns != 30 {
+		t.Errorf("MaxTurns=%d, want 30", p.MaxTurns)
 	}
 	if !p.ParallelEligible {
 		t.Error("ParallelEligible=false, want true")
-	}
-	if got := p.BudgetTiers["high"]; got != 2.0 {
-		t.Errorf("BudgetTiers[high]=%g, want 2.0", got)
 	}
 	if p.ResearchQuota["web_search"] != 3 || p.ResearchQuota["kb_search"] != 20 {
 		t.Errorf("ResearchQuota=%v missing expected entries", p.ResearchQuota)

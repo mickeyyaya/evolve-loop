@@ -188,39 +188,18 @@ func TestParseLoopArgs_DryRun(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_BudgetDriven flags --budget-usd as budget-driven mode.
-func TestParseLoopArgs_BudgetDriven(t *testing.T) {
+// TestParseLoopArgs_BudgetFlagsAreNoOps verifies the deprecated --budget-usd
+// flag is accepted but no longer drives behavior: it parses without error and
+// does NOT bump the cycle count (the former budget-mode 50-cycle default is
+// gone — cost is display-only telemetry now).
+func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &stderr)
 	if rc != 0 {
-		t.Fatalf("rc=%d", rc)
+		t.Fatalf("rc=%d, want 0 (--budget-usd must still be accepted)", rc)
 	}
-	if !cfg.BudgetDriven {
-		t.Errorf("BudgetDriven=false, want true (--budget-usd=5 is below default 999999)")
-	}
-	if cfg.BudgetUSD != 5.0 {
-		t.Errorf("BudgetUSD=%v, want 5.0", cfg.BudgetUSD)
-	}
-}
-
-// TestBudgetGatingUnobservable — cycle-190: detect when a --budget-usd run
-// cannot be gated by spend because the driver/auth reports $0 cost.
-func TestBudgetGatingUnobservable(t *testing.T) {
-	cases := []struct {
-		name         string
-		budgetDriven bool
-		delta        float64
-		want         bool
-	}{
-		{"budget-driven, zero-cost cycle (tmux/subscription)", true, 0, true},
-		{"budget-driven, observable cost", true, 0.42, false},
-		{"cycles-mode, zero cost (not budget-gated)", false, 0, false},
-		{"cycles-mode, observable cost", false, 1.0, false},
-	}
-	for _, c := range cases {
-		if got := budgetGatingUnobservable(c.budgetDriven, c.delta); got != c.want {
-			t.Errorf("%s: budgetGatingUnobservable(%v, %v)=%v, want %v", c.name, c.budgetDriven, c.delta, got, c.want)
-		}
+	if cfg.MaxCycles != 1 {
+		t.Errorf("MaxCycles=%d, want 1 (--budget-usd must not drive cycle count)", cfg.MaxCycles)
 	}
 }
 

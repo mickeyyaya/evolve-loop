@@ -1,0 +1,46 @@
+{
+  "name": "rollout-plan",
+  "archetype": "plan",
+  "agent": "evolve-rollout-plan",
+  "categories": [
+    "release"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md"
+    ],
+    "signals": [
+      "scout.goal_type",
+      "scout.cycle_size"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/rollout-plan-report.md"
+    ],
+    "signals": [
+      "rollout.strategy",
+      "rollout.blast_radius",
+      "rollout.trigger_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Deploy Strategy",
+      "Feature Flags & Kill Switch",
+      "Rollback Triggers"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "release"
+      }
+    ]
+  },
+  "after": "triage",
+  "optional": true
+}

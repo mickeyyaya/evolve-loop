@@ -1,0 +1,46 @@
+{
+  "name": "locale-format-check",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-locale-format-check",
+  "categories": [
+    "i18n"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/locale-format-check-report.md"
+    ],
+    "signals": [
+      "i18n.severity_max",
+      "i18n.hardcoded_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Localized Surfaces",
+      "Formatting Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "i18n"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

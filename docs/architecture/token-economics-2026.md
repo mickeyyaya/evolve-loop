@@ -1,5 +1,12 @@
 # Token Economics — Findings, Forensics, Optimization Roadmap
 
+> **Note (token-budget cost gates removed):** evolve no longer computes or gates
+> on a dollar cost — the calculation was unreliable across LLM models
+> (tmux/subscription claude reports `$0`, gemini was hardcoded, ollama is free).
+> Cost is now display-only telemetry. The pricing analysis below remains useful
+> *reference* material for reasoning about token economics, but the figures are
+> illustrative, not enforced by any runtime cap.
+
 > Canonical reference for evolve-loop's token-economics analysis as of
 > v9.0.2 (2026-05-11). Pairs with [`token-floor-history.md`](token-floor-history.md)
 > (static context-floor measurements) and [`control-flags.md`](control-flags.md)

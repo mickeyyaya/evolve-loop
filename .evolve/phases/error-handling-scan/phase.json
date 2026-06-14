@@ -1,0 +1,46 @@
+{
+  "name": "error-handling-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-error-handling-scan",
+  "categories": [
+    "bugfix"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/error-handling-scan-report.md"
+    ],
+    "signals": [
+      "errhandling.severity_max",
+      "errhandling.swallowed_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Error Paths Reviewed",
+      "Swallowed-Error Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "build.diff_loc",
+        "op": "gte",
+        "value": 50
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

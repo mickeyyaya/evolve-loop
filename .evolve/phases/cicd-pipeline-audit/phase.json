@@ -1,0 +1,46 @@
+{
+  "name": "cicd-pipeline-audit",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-cicd-pipeline-audit",
+  "categories": [
+    "infrastructure"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/cicd-pipeline-audit-report.md"
+    ],
+    "signals": [
+      "cicd.severity_max",
+      "cicd.unpinned_action_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Workflow Changes",
+      "Supply-Chain & Secret Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "infrastructure"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

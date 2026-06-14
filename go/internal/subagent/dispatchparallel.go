@@ -31,7 +31,6 @@ type DispatchParallelRequest struct {
 
 	// Env tunables (passed through to fanoutdispatch).
 	Concurrency        int    // EVOLVE_FANOUT_CONCURRENCY (default 2)
-	PerWorkerBudgetUSD string // EVOLVE_FANOUT_PER_WORKER_BUDGET_USD (default "0.20")
 	CachePrefixEnabled bool   // EVOLVE_FANOUT_CACHE_PREFIX (default true)
 	TrackWorkers       bool   // EVOLVE_FANOUT_TRACK_WORKERS (default true)
 	TestExecutor       string // EVOLVE_FANOUT_TEST_EXECUTOR — bypass LLM
@@ -230,12 +229,11 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 
 	// Step 8: run fanout dispatcher.
 	fanoutCfg := fanoutdispatch.Config{
-		CommandsFile:       commandsTSV,
-		ResultsFile:        resultsTSV,
-		Concurrency:        req.Concurrency,
-		PerWorkerBudgetUSD: req.PerWorkerBudgetUSD,
-		CachePrefixFile:    cachePrefixPath,
-		TrackWorkers:       req.TrackWorkers,
+		CommandsFile:    commandsTSV,
+		ResultsFile:     resultsTSV,
+		Concurrency:     req.Concurrency,
+		CachePrefixFile: cachePrefixPath,
+		TrackWorkers:    req.TrackWorkers,
 	}
 	fanoutRC := opts.RunFanout(fanoutCfg, os.Stderr)
 

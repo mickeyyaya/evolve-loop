@@ -22,9 +22,15 @@ const fleetEnvKey = "EVOLVE_FLEET"
 // errNoLaunch surfaces a misconfigured supervisor instead of a silent no-op.
 var errNoLaunch = errors.New("fleet: no LaunchFn configured")
 
+// fleetScopeEnvKey carries this cycle's assigned todo IDs (comma-joined) to the
+// launched `evolve cycle run`, so its triage selects only its disjoint subset
+// (ADR-0049 E). Empty / unset ⇒ the cycle works the whole backlog (legacy).
+const fleetScopeEnvKey = "EVOLVE_FLEET_SCOPE"
+
 // CycleSpec describes one cycle the supervisor will launch.
 type CycleSpec struct {
 	GoalHash string            // --goal-hash for `evolve cycle run`
+	Scope    []string          // todo IDs this cycle owns (disjoint across specs); also in Env[fleetScopeEnvKey]
 	Env      map[string]string // base env overlay; EVOLVE_FLEET is forced on
 }
 
@@ -46,13 +52,29 @@ type Supervisor struct {
 	Concurrency int // max concurrent cycles; <=0 → all at once
 }
 
+// Validate reports a misconfigured supervisor — a nil LaunchFn — so the caller
+// fails loud at check time rather than after N goroutines each return errNoLaunch.
+func (s *Supervisor) Validate() error {
+	if s.Launch == nil {
+		return errNoLaunch
+	}
+	return nil
+}
+
 // Run launches every spec concurrently (bounded by Concurrency), forcing
 // EVOLVE_FLEET=1 on each, waits for all, and returns per-cycle results in input
 // order. The caller's spec.Env is never mutated (each launch gets a copy). A nil
-// Launch yields an error per spec (fail loud, never a silent no-op).
+// Launch is caught up front by Validate — every result carries errNoLaunch and
+// no launch goroutines are spawned (fail loud, never a silent no-op).
 func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 	results := make([]Result, len(specs))
 	if len(specs) == 0 {
+		return results
+	}
+	if err := s.Validate(); err != nil {
+		for i := range results {
+			results[i] = Result{Index: i, ExitCode: -1, Err: err}
+		}
 		return results
 	}
 	limit := s.Concurrency

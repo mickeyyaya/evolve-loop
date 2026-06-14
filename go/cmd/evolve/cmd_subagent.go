@@ -398,10 +398,6 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 			concurrency = n
 		}
 	}
-	perWorkerBudget := os.Getenv("EVOLVE_FANOUT_PER_WORKER_BUDGET_USD")
-	if perWorkerBudget == "" {
-		perWorkerBudget = "0.20"
-	}
 
 	res, err := subagent.DispatchParallel(context.Background(), subagent.DispatchParallelRequest{
 		Agent:              agent,
@@ -415,7 +411,6 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 		LedgerPath:         layout.LedgerFile,
 		WorktreePath:       os.Getenv("WORKTREE_PATH"),
 		Concurrency:        concurrency,
-		PerWorkerBudgetUSD: perWorkerBudget,
 		CachePrefixEnabled: os.Getenv("EVOLVE_FANOUT_CACHE_PREFIX") != "0",
 		TrackWorkers:       os.Getenv("EVOLVE_FANOUT_TRACK_WORKERS") != "0",
 		TestExecutor:       os.Getenv("EVOLVE_FANOUT_TEST_EXECUTOR"),

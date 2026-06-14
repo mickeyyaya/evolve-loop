@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -48,7 +49,7 @@ func (s *FilesystemStorage) WriteState(_ context.Context, st core.State) error {
 // CycleState (no error) — matches bash cycle-state.sh bootstrap behaviour.
 func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {
 	var cs core.CycleState
-	path := filepath.Join(s.evolveDir, "cycle-state.json")
+	path := filepath.Join(s.evolveDir, core.CycleStateFile)
 	if err := readJSON(path, &cs); err != nil {
 		return core.CycleState{}, err
 	}
@@ -63,32 +64,42 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 // inside a cycle worktree read this run's phase — not whichever concurrent
 // run last wrote the global file.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	path := filepath.Join(s.evolveDir, "cycle-state.json")
-	checkpoint, ok, err := readExistingCheckpoint(path)
-	if err != nil {
-		return err
-	}
-
-	// Determine the value to persist at the global path. When a checkpoint
-	// block already exists it must be spliced in (the CycleState struct does
-	// not model it, so a plain rewrite would erase resume state).
-	var global any = cs
-	if ok {
-		raw, err := json.Marshal(cs)
+	path := filepath.Join(s.evolveDir, core.CycleStateFile)
+	// ADR-0049 G7: serialize the whole read-modify-write (and the run.json
+	// mirror) on the cycle-state.json sidecar lock. checkpoint.ApplyToStateFile
+	// (the other read-modify-writer of this file) holds the SAME lock, so a
+	// concurrent fleet cycle that owns a different key (the checkpoint block)
+	// never renames over a stale read and reverts this write — or vice versa.
+	// No-op cost for the live sequential loop (uncontended); shared with the
+	// checkpoint writer across packages via flock.WithPathLock (the single
+	// sidecar-lock home).
+	return flock.WithPathLock(path, func() error {
+		checkpoint, ok, err := readExistingCheckpoint(path)
 		if err != nil {
-			return fmt.Errorf("marshal cycle state: %w", err)
+			return err
 		}
-		var merged map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &merged); err != nil {
-			return fmt.Errorf("unmarshal cycle state: %w", err)
+
+		// Determine the value to persist at the global path. When a checkpoint
+		// block already exists it must be spliced in (the CycleState struct does
+		// not model it, so a plain rewrite would erase resume state).
+		var global any = cs
+		if ok {
+			raw, err := json.Marshal(cs)
+			if err != nil {
+				return fmt.Errorf("marshal cycle state: %w", err)
+			}
+			var merged map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &merged); err != nil {
+				return fmt.Errorf("unmarshal cycle state: %w", err)
+			}
+			merged["checkpoint"] = checkpoint
+			global = merged
 		}
-		merged["checkpoint"] = checkpoint
-		global = merged
-	}
-	if err := writeJSONAtomic(path, global); err != nil {
-		return err
-	}
-	return mirrorRunState(cs)
+		if err := writeJSONAtomic(path, global); err != nil {
+			return err
+		}
+		return mirrorRunState(cs)
+	})
 }
 
 // mirrorRunState writes the run.json guard mirror into the run workspace.

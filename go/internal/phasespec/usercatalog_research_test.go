@@ -160,6 +160,157 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## North Star Metric", "## Input Metrics", "## Guardrail Metrics"},
 			hasVerdict: true,
 		},
+		// Wave 4 — adversarial-pipeline phases (2026-06-14, micro-phase-catalog.md §8).
+		// All 15 are evaluate gates → hasVerdict true; artifact <name>-report.md.
+		"premise-challenge": {
+			artifact:   "premise-challenge-report.md",
+			sections:   []string{"## Stated Premise", "## Falsification Attempts", "## Verdict"},
+			hasVerdict: true,
+		},
+		"coverage-gate": {
+			artifact:   "coverage-gate-report.md",
+			sections:   []string{"## Coverage Delta", "## Uncovered Changed Lines", "## Verdict"},
+			hasVerdict: true,
+		},
+		"secret-leak-scan": {
+			artifact:   "secret-leak-scan-report.md",
+			sections:   []string{"## Scanned Diff", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"flake-rerun-scan": {
+			artifact:   "flake-rerun-scan-report.md",
+			sections:   []string{"## Tests Re-run", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"race-condition-scan": {
+			artifact:   "race-condition-scan-report.md",
+			sections:   []string{"## Concurrent Surfaces Touched", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"authz-gap-scan": {
+			artifact:   "authz-gap-scan-report.md",
+			sections:   []string{"## Protected Resources Touched", "## Authorization Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"compat-surface-check": {
+			artifact:   "compat-surface-check-report.md",
+			sections:   []string{"## Exported Surface Diff", "## Breaking Changes", "## Verdict"},
+			hasVerdict: true,
+		},
+		"contract-fuzz-probe": {
+			artifact:   "contract-fuzz-probe-report.md",
+			sections:   []string{"## Boundaries Probed", "## Validation Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"migration-safety-check": {
+			artifact:   "migration-safety-check-report.md",
+			sections:   []string{"## Migration Operations", "## Reversibility Analysis", "## Verdict"},
+			hasVerdict: true,
+		},
+		"telemetry-coverage-check": {
+			artifact:   "telemetry-coverage-check-report.md",
+			sections:   []string{"## New Code Paths", "## Instrumentation Gaps", "## Verdict"},
+			hasVerdict: true,
+		},
+		"license-provenance-audit": {
+			artifact:   "license-provenance-audit-report.md",
+			sections:   []string{"## New Dependencies", "## License & Provenance Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"prompt-regression-eval": {
+			artifact:   "prompt-regression-eval-report.md",
+			sections:   []string{"## Instruction Changes", "## Behavioral Rubric Scores", "## Verdict"},
+			hasVerdict: true,
+		},
+		"accessibility-audit": {
+			artifact:   "accessibility-audit-report.md",
+			sections:   []string{"## Components Audited", "## WCAG Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"frontend-design-review": {
+			artifact:   "frontend-design-review-report.md",
+			sections:   []string{"## UI Changes", "## Design Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"locale-format-check": {
+			artifact:   "locale-format-check-report.md",
+			sections:   []string{"## Localized Surfaces", "## Formatting Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		// Wave 5 — coverage expansion + plan/evaluate design pairing (2026-06-14,
+		// micro-phase-catalog.md §9). 9 evaluate gates (hasVerdict true, end in
+		// ## Verdict) + 5 plan design phases (hasVerdict false, no ## Verdict —
+		// ADR-0035 leaves plan verdict_on_pass inert, risk-register precedent).
+		"query-performance-scan": {
+			artifact:   "query-performance-scan-report.md",
+			sections:   []string{"## Queries Touched", "## Performance Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"cache-strategy-scan": {
+			artifact:   "cache-strategy-scan-report.md",
+			sections:   []string{"## Cache Sites Touched", "## Coherence Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"resilience-gap-scan": {
+			artifact:   "resilience-gap-scan-report.md",
+			sections:   []string{"## External Call Sites", "## Resilience Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"idempotency-check": {
+			artifact:   "idempotency-check-report.md",
+			sections:   []string{"## Message Handlers Touched", "## Idempotency Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"error-handling-scan": {
+			artifact:   "error-handling-scan-report.md",
+			sections:   []string{"## Error Paths Reviewed", "## Swallowed-Error Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"container-hardening-scan": {
+			artifact:   "container-hardening-scan-report.md",
+			sections:   []string{"## Container & Manifest Changes", "## Hardening Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"cicd-pipeline-audit": {
+			artifact:   "cicd-pipeline-audit-report.md",
+			sections:   []string{"## Workflow Changes", "## Supply-Chain & Secret Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"type-safety-audit": {
+			artifact:   "type-safety-audit-report.md",
+			sections:   []string{"## Type Surfaces Changed", "## Type-Safety Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"data-integrity-check": {
+			artifact:   "data-integrity-check-report.md",
+			sections:   []string{"## Pipeline Stages Touched", "## Integrity Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"resilience-design": {
+			artifact:   "resilience-design-report.md",
+			sections:   []string{"## Failure Modes", "## Resilience Strategy", "## Fallback & Degradation"},
+			hasVerdict: false,
+		},
+		"data-model-design": {
+			artifact:   "data-model-design-report.md",
+			sections:   []string{"## Entities & Relationships", "## Schema & Indexes", "## Access Patterns"},
+			hasVerdict: false,
+		},
+		"caching-strategy-design": {
+			artifact:   "caching-strategy-design-report.md",
+			sections:   []string{"## Cacheable Surfaces", "## Cache Strategy", "## Invalidation & TTL"},
+			hasVerdict: false,
+		},
+		"observability-design": {
+			artifact:   "observability-design-report.md",
+			sections:   []string{"## Critical Paths", "## Instrumentation Plan", "## SLOs & Alerts"},
+			hasVerdict: false,
+		},
+		"rollout-plan": {
+			artifact:   "rollout-plan-report.md",
+			sections:   []string{"## Deploy Strategy", "## Feature Flags & Kill Switch", "## Rollback Triggers"},
+			hasVerdict: false,
+		},
 	}
 
 	for name, w := range cases {

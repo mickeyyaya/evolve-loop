@@ -380,11 +380,10 @@ func TestPhaseAdvisorOptions(t *testing.T) {
 func TestBuildRoutingPrompt_FullSignalsAndTriggers(t *testing.T) {
 	t.Parallel()
 	in := router.RouteInput{
-		Current:         "build",
-		Verdict:         VerdictPASS,
-		Cycle:           9,
-		Completed:       []string{"scout", "build"},
-		BudgetRemaining: 12.5,
+		Current:   "build",
+		Verdict:   VerdictPASS,
+		Cycle:     9,
+		Completed: []string{"scout", "build"},
 		Signals: router.RoutingSignals{
 			Scout:  router.ScoutSignals{Present: true, CycleSizeEstimate: "medium", ItemCount: 3, CarryoverCount: 1},
 			Triage: router.TriageSignals{Present: true, CycleSize: "small", PhaseSkip: []string{"plan-review"}},

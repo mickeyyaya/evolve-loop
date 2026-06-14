@@ -2,10 +2,23 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 )
+
+// TestSupervisor_Validate: a misconfigured supervisor (nil LaunchFn) is caught
+// by Validate BEFORE any work is scheduled — one loud error, not N late ones.
+func TestSupervisor_Validate(t *testing.T) {
+	if err := (&Supervisor{}).Validate(); !errors.Is(err, errNoLaunch) {
+		t.Errorf("Validate() nil Launch = %v, want errNoLaunch", err)
+	}
+	ok := &Supervisor{Launch: func(context.Context, CycleSpec) (int, error) { return 0, nil }}
+	if err := ok.Validate(); err != nil {
+		t.Errorf("Validate() configured = %v, want nil", err)
+	}
+}
 
 // TestSupervisor_LaunchesAllWithFleetEnv: every spec is launched, in input order,
 // each forced to EVOLVE_FLEET=1 (so the orchestrator skips the global lock), and

@@ -350,24 +350,16 @@ func lastCycleIn(lr loopResult) int {
 // tests can inspect what would be done without invoking the
 // orchestrator.
 type loopConfig struct {
-	ProjectRoot    string  `json:"project_root"`
-	EvolveDir      string  `json:"evolve_dir"`
-	GoalHash       string  `json:"goal_hash"`
-	GoalText       string  `json:"goal_text,omitempty"`
-	Strategy       string  `json:"strategy"`
-	MaxCycles      int     `json:"max_cycles"`
-	BudgetUSD      float64 `json:"budget_usd"`
-	BatchCapUSD    float64 `json:"batch_cap_usd"`
-	Resume         bool    `json:"resume,omitempty"`
-	Reset          bool    `json:"reset,omitempty"`
-	ConsensusAudit bool    `json:"consensus_audit,omitempty"`
-	DryRun         bool    `json:"dry_run,omitempty"`
-	// BudgetDriven is true when --budget-usd (or --budget alias) is
-	// passed with a finite positive value. In budget mode, MaxCycles
-	// becomes a safety upper bound (default EVOLVE_BUDGET_MAX_CYCLES=50)
-	// and the loop stops when cumulative cost ≥ BudgetUSD with
-	// stop_reason=budget rc=0 (mirrors bash v8.60.0 contract).
-	BudgetDriven bool `json:"budget_driven,omitempty"`
+	ProjectRoot    string `json:"project_root"`
+	EvolveDir      string `json:"evolve_dir"`
+	GoalHash       string `json:"goal_hash"`
+	GoalText       string `json:"goal_text,omitempty"`
+	Strategy       string `json:"strategy"`
+	MaxCycles      int    `json:"max_cycles"`
+	Resume         bool   `json:"resume,omitempty"`
+	Reset          bool   `json:"reset,omitempty"`
+	ConsensusAudit bool   `json:"consensus_audit,omitempty"`
+	DryRun         bool   `json:"dry_run,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -457,10 +449,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	lr := loopResult{StopReason: "max_cycles", classifyRoot: cfg.ProjectRoot}
 
-	// Pre-emptive checkpoint thresholds. WARN at warnPct (default 80),
-	// signal next-cycle to checkpoint at criticalPct (default 95).
-	warnPct, criticalPct := resolveCheckpointThresholds()
-
 	// --resume short-circuits the loop: load the checkpoint, run one
 	// cycle from the paused phase, then exit. M3 protocol.
 	if cfg.Resume {
@@ -477,12 +465,8 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		req := core.CycleRequest{
 			ProjectRoot: cfg.ProjectRoot,
 			GoalHash:    cfg.GoalHash,
-			Budget: core.BudgetEnvelope{
-				MaxUSD:      cfg.BudgetUSD,
-				BatchCapUSD: cfg.BatchCapUSD,
-			},
-			Env:     cycleEnv,
-			Context: cycleCtx,
+			Env:         cycleEnv,
+			Context:     cycleCtx,
 		}
 		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
@@ -556,7 +540,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// consecutive identical values. Trips at threshold.
 	prevRanCycle := -1
 	sameCycleStreak := 0
-	budgetUnobsWarned := false // cycle-190: warn once when --budget-usd can't gate
 
 	// Consecutive-verdict-FAIL breaker (EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS).
 	// Default 1 ⇒ stop on the first FAIL (pre-flag contract); >1 lets the
@@ -584,12 +567,8 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		req := core.CycleRequest{
 			ProjectRoot: cfg.ProjectRoot,
 			GoalHash:    cfg.GoalHash,
-			Budget: core.BudgetEnvelope{
-				MaxUSD:      cfg.BudgetUSD,
-				BatchCapUSD: cfg.BatchCapUSD,
-			},
-			Env:     cycleEnv,
-			Context: cycleCtx,
+			Env:         cycleEnv,
+			Context:     cycleCtx,
 		}
 		result, err := orch.RunCycle(context.Background(), req)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
@@ -645,43 +624,16 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] NOTE: lastCycleNumber did not advance after cycle %d — verdict likely WARN/FAIL\n", ranCycle)
 		}
 
-		// C3: cost accumulation + checkpoint thresholds. Sum the
-		// cycle's per-phase costs from <workspace>/*-stdout.log, add
-		// to batch total, then check against batch cap. WARN at
-		// warnPct, set EVOLVE_CHECKPOINT_REQUEST=1 for the next cycle
-		// at criticalPct. Missing-workspace / no-logs is non-fatal.
-		// Gap #7: EVOLVE_BATCH_BUDGET_DISABLE=1 skips ALL cost tracking
-		// (parity with bash dispatcher). EVOLVE_CHECKPOINT_DISABLE=1
-		// skips the threshold WARN/CRITICAL but keeps cost accounting.
-		batchBudgetDisabled := os.Getenv("EVOLVE_BATCH_BUDGET_DISABLE") == "1"
-		checkpointDisabled := os.Getenv("EVOLVE_CHECKPOINT_DISABLE") == "1"
-		if !batchBudgetDisabled {
-			if cs, err := cyclecost.SummarizeCycle(workspace, ranCycle); err == nil {
-				lr.TotalCost += cs.Total.CostUSD
-				fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f / cap $%.2f)\n",
-					ranCycle, cs.Total.CostUSD, lr.TotalCost, cfg.BatchCapUSD)
-				// cycle-190: a --budget-usd run whose cycle reports $0 cost cannot
-				// be gated by spend (tmux-driver / subscription auth surfaces no
-				// usage). Warn ONCE so the operator isn't misled into thinking the
-				// budget bounds the run — the cycle cap governs instead.
-				if budgetGatingUnobservable(cfg.BudgetDriven, cs.Total.CostUSD) && !budgetUnobsWarned {
-					budgetUnobsWarned = true
-					fmt.Fprintf(stderr, "[loop] WARN BUDGET-UNOBSERVABLE: --budget-usd $%.2f cannot gate this run — cycle %d reported $0.0000 cost (tmux-driver / subscription auth surfaces no usage events). Cost-based stop is INERT; the cycle cap (%d) governs. Use --cycles N for a deterministic bound on this driver/auth.\n",
-						cfg.BudgetUSD, ranCycle, cfg.MaxCycles)
-				}
-			}
-			if cfg.BatchCapUSD > 0 && !checkpointDisabled {
-				pct := (lr.TotalCost / cfg.BatchCapUSD) * 100
-				if pct >= float64(criticalPct) && cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] != "1" {
-					fmt.Fprintf(stderr, "[loop] BATCH-BUDGET CRITICAL: cumulative $%.2f (%.0f%%) >= %d%% — signaling next cycle to checkpoint at phase boundary\n",
-						lr.TotalCost, pct, criticalPct)
-					cycleEnv["EVOLVE_CHECKPOINT_REQUEST"] = "1"
-					cycleEnv["EVOLVE_CHECKPOINT_REASON"] = "batch-cap-near"
-				} else if pct >= float64(warnPct) {
-					fmt.Fprintf(stderr, "[loop] BATCH-BUDGET WARN: cumulative $%.2f (%.0f%%) >= %d%% — consider operator review\n",
-						lr.TotalCost, pct, warnPct)
-				}
-			}
+		// Cost telemetry (display-only). Sum the cycle's per-phase costs and add
+		// to the batch total for the JSON output's total_cost_usd field. Cost no
+		// longer gates anything — no cap, no checkpoint-by-cost, no budget stop
+		// (the token-budget cost calculation was unreliable across LLM models:
+		// tmux/subscription claude reports $0, gemini was hardcoded, ollama is
+		// free). Missing-workspace / no-logs is non-fatal.
+		if cs, err := cyclecost.SummarizeCycle(workspace, ranCycle); err == nil {
+			lr.TotalCost += cs.Total.CostUSD
+			fmt.Fprintf(stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f)\n",
+				ranCycle, cs.Total.CostUSD, lr.TotalCost)
 		}
 
 		// Gap #3: QUOTA-PAUSE detection. After each cycle, read
@@ -697,38 +649,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.StopReason = "quota-pause"
 			lr.emit(stdout)
 			return 5
-		}
-
-		// Gap #2: rc=4 emission on batch_cap overrun (cycles-mode only).
-		// In budget mode hitting cap IS the success signal (handled
-		// below). In cycles-mode it's a backstop the operator must
-		// raise explicitly. Skipped under BATCH_BUDGET_DISABLE.
-		if !batchBudgetDisabled && cfg.BatchCapUSD > 0 && lr.TotalCost > cfg.BatchCapUSD {
-			if cfg.BudgetDriven {
-				// Gap #4: budget-driven success.
-				fmt.Fprintf(stderr, "[loop] BUDGET-EXHAUSTED: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
-					lr.TotalCost, cfg.BudgetUSD, ranCycle)
-				lr.StopReason = "budget"
-				lr.emit(stdout)
-				return 0
-			}
-			fmt.Fprintf(stderr, "[loop] BATCH-BUDGET-EXCEEDED: cumulative $%.2f > cap $%.2f (after cycle %d)\n",
-				lr.TotalCost, cfg.BatchCapUSD, ranCycle)
-			fmt.Fprintln(stderr, "[loop]   override: EVOLVE_BATCH_BUDGET_DISABLE=1 or --batch-cap-usd <higher>")
-			lr.StopReason = "batch_cap"
-			lr.emitFatal(stdout, stderr, cfg, ranCycle)
-			return 4
-		}
-
-		// Gap #4: budget-driven mode stop condition. In budget mode,
-		// loop stops when cumulative cost meets/exceeds the requested
-		// budget (success signal). cycles becomes a safety cap only.
-		if cfg.BudgetDriven && lr.TotalCost >= cfg.BudgetUSD {
-			fmt.Fprintf(stderr, "[loop] BUDGET-DRIVEN COMPLETE: cumulative $%.2f >= budget $%.2f (after cycle %d)\n",
-				lr.TotalCost, cfg.BudgetUSD, ranCycle)
-			lr.StopReason = "budget"
-			lr.emit(stdout)
-			return 0
 		}
 
 		// Same-cycle circuit breaker (D4). Bash trips this when
@@ -892,55 +812,7 @@ const (
 	dispatchPolicyStop                         // verify + STOP on any failure (legacy fail-fast)
 )
 
-const (
-	defaultCircuitBreakerThreshold = 5
-	defaultCheckpointWarnPct       = 80
-	defaultCheckpointCriticalPct   = 95
-)
-
-// resolveCheckpointThresholds reads EVOLVE_CHECKPOINT_WARN_AT_PCT and
-// EVOLVE_CHECKPOINT_AT_PCT, defaulting to 80 and 95 respectively.
-// Invalid / out-of-range values (≤0, >100, or warn ≥ critical) fall
-// back to defaults — mirrors the bash dispatcher's lenient parsing at
-// lines 1057-1075.
-func resolveCheckpointThresholds() (warn, critical int) {
-	warn = parsePctEnv("EVOLVE_CHECKPOINT_WARN_AT_PCT", defaultCheckpointWarnPct)
-	critical = parsePctEnv("EVOLVE_CHECKPOINT_AT_PCT", defaultCheckpointCriticalPct)
-	// Sanity: warn must be below critical, otherwise neither fires
-	// meaningfully. Snap back to defaults if operator inverted them.
-	if warn <= 0 || critical <= 0 || warn >= critical || critical > 100 {
-		return defaultCheckpointWarnPct, defaultCheckpointCriticalPct
-	}
-	return warn, critical
-}
-
-// parsePctEnv reads an int env var, clamping to [1,100]. Out-of-range
-// or unparseable values return the supplied default.
-func parsePctEnv(name string, def int) int {
-	v := os.Getenv(name)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 || n > 100 {
-		return def
-	}
-	return n
-}
-
-// parseIntEnv reads a positive integer env var. Unparseable / ≤0 values
-// fall back to the default. Used by --budget-mode safety-cap resolution.
-func parseIntEnv(name string, def int) int {
-	v := os.Getenv(name)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
-		return def
-	}
-	return n
-}
+const defaultCircuitBreakerThreshold = 5
 
 // resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
 // deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
@@ -1132,21 +1004,6 @@ func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak in
 	return prev, streak, streak >= threshold
 }
 
-// budgetGatingUnobservable reports whether cost-based budget gating cannot
-// function this run: a --budget-usd run whose completed cycle contributed $0
-// cost. That is the signature of an unobservable-cost driver/auth (tmux-driver
-// scrollback or subscription auth surfaces no stream-json usage events), so the
-// `--budget-usd` stop can never trip and the run would silently fall through to
-// the cycle cap while the operator believes spend is bounding it. The loop uses
-// this to warn ONCE; it deliberately does NOT fabricate a stop, because true
-// cost is unknown — the cap governs and the operator is told to use --cycles N.
-func budgetGatingUnobservable(budgetDriven bool, cycleCostDelta float64) bool {
-	// Exact == 0 (not an epsilon) is intentional: an unobservable driver/auth
-	// produces exactly 0.0 (no usage events written), whereas any sub-cent but
-	// non-zero cost means usage IS observable and the budget can gate — don't warn.
-	return budgetDriven && cycleCostDelta == 0
-}
-
 // quotaPause is the parsed cycle-state.json checkpoint block when the
 // dispatcher detects a Claude Code subscription quota wall.
 type quotaPause struct {
@@ -1269,11 +1126,14 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.StringVar(&strategy, "strategy", "", "balanced|innovate|harden|repair|ultrathink|autoresearch (default: balanced)")
 	fs.IntVar(&maxCyclesFlag, "max-cycles", 0, "maximum cycles to run (default 1; aliased by --cycles)")
 	fs.IntVar(&cyclesFlag, "cycles", 0, "alias for --max-cycles")
-	fs.Float64Var(&budgetUSD, "budget-usd", 0, "budget-driven mode dollar cap (alias: --budget); stops loop at this cumulative cost with rc=0")
-	// --budget is the bash-dispatcher alias for --budget-usd (v8.60.0+).
-	// Pass-through to the same variable; whichever is set last wins.
-	fs.Float64Var(&budgetUSD, "budget", 0, "alias for --budget-usd")
-	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap (trips with rc=4 in cycles-mode)")
+	// --budget-usd / --budget / --batch-cap-usd are DEPRECATED no-ops: cost is
+	// display-only telemetry now (the token-budget cost gates were removed because
+	// the cost calculation was unreliable across LLM models). The flags are still
+	// accepted so existing scripts/CI don't error; they have no effect. Use
+	// --cycles N to bound a run.
+	fs.Float64Var(&budgetUSD, "budget-usd", 0, "(DEPRECATED, ignored) former budget-driven dollar cap")
+	fs.Float64Var(&budgetUSD, "budget", 0, "(DEPRECATED, ignored) alias for --budget-usd")
+	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "(DEPRECATED, ignored) former cumulative batch USD cap")
 	fs.BoolVar(&resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
@@ -1328,31 +1188,16 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	}
 	projectRoot = absOrWarn("--project-root", projectRoot)
 
-	// --budget-usd / --budget numeric validation (Go flag package allows
-	// negative floats; bash dispatcher rejects them).
-	if budgetUSD < 0 {
-		fmt.Fprintf(stderr, "evolve loop: --budget-usd must be a positive number (got: %g)\n", budgetUSD)
-		return loopConfig{}, 10
-	}
-
 	// Parse positional args: [CYCLES] [STRATEGY] [GOAL...]
 	posCycles, posStrategy, posGoal := parsePositional(fs.Args())
 
-	// Gap #7: legacy positional-integer deprecation WARN. Mirrors the
-	// bash dispatcher's v8.60.0+ message — operators relying on bare
-	// `/evolve-loop 3 ...` get nudged toward `--cycles 3` / `--budget-usd N`.
-	if posCycles > 0 && cyclesFlag == 0 && maxCyclesFlag == 0 && budgetUSD == 0 {
-		fmt.Fprintf(stderr, "evolve loop: WARN: bare positional integer (%d) parsed as --cycles; prefer explicit --cycles N or --budget-usd N (deprecated since v8.60.0)\n", posCycles)
+	// Legacy positional-integer deprecation WARN — operators relying on bare
+	// `/evolve-loop 3 ...` get nudged toward `--cycles 3`.
+	if posCycles > 0 && cyclesFlag == 0 && maxCyclesFlag == 0 {
+		fmt.Fprintf(stderr, "evolve loop: WARN: bare positional integer (%d) parsed as --cycles is deprecated; prefer explicit --cycles N\n", posCycles)
 	}
 
-	// Resolve cycles: explicit flag > positional > default
-	// Default depends on mode: cycles-mode = 1, budget-mode safety cap = 50
-	// (or EVOLVE_BUDGET_MAX_CYCLES override).
-	budgetMode := budgetUSD > 0
-	defaultCycles := 1
-	if budgetMode {
-		defaultCycles = parseIntEnv("EVOLVE_BUDGET_MAX_CYCLES", 50)
-	}
+	// Resolve cycles: explicit flag > positional > default (1).
 	resolvedCycles := 0
 	switch {
 	case cyclesFlag > 0:
@@ -1362,7 +1207,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	case posCycles > 0:
 		resolvedCycles = posCycles
 	default:
-		resolvedCycles = defaultCycles
+		resolvedCycles = 1
 	}
 
 	// Resolve strategy: explicit flag > positional > default
@@ -1394,16 +1239,6 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
-	// Resolve budget. budgetMode (computed above) is the source of
-	// truth — anything >0 is budget-driven. When unset, sentinel
-	// 999999 is used internally as "no cap" so the loop runs
-	// MaxCycles cycles regardless of cost.
-	resolvedBudget := budgetUSD
-	if resolvedBudget == 0 {
-		resolvedBudget = 999999
-	}
-	budgetDriven := budgetMode
-
 	// Resolve evolve-dir. The derived branch inherits projectRoot's (now
 	// absolute) anchor; an explicit --evolve-dir may still be relative, so
 	// absolutize the final value either way (same cwd-independence requirement
@@ -1420,13 +1255,10 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		GoalText:       resolvedGoalText,
 		Strategy:       resolvedStrategy,
 		MaxCycles:      resolvedCycles,
-		BudgetUSD:      resolvedBudget,
-		BatchCapUSD:    batchCapUSD,
 		Resume:         resume,
 		Reset:          reset,
 		ConsensusAudit: consensusAudit,
 		DryRun:         dryRun,
-		BudgetDriven:   budgetDriven,
 		PerAgentCLI:    perAgentCLI,
 		PerAgentModel:  perAgentModel,
 	}, 0

@@ -1,0 +1,46 @@
+{
+  "name": "idempotency-check",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-idempotency-check",
+  "categories": [
+    "messaging"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/idempotency-check-report.md"
+    ],
+    "signals": [
+      "idempotency.severity_max",
+      "idempotency.unsafe_handler_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Message Handlers Touched",
+      "Idempotency Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "messaging"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

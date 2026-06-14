@@ -1,0 +1,46 @@
+{
+  "name": "type-safety-audit",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-type-safety-audit",
+  "categories": [
+    "refactor"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/type-safety-audit-report.md"
+    ],
+    "signals": [
+      "typesafety.severity_max",
+      "typesafety.escape_hatch_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Type Surfaces Changed",
+      "Type-Safety Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "build.diff_loc",
+        "op": "gte",
+        "value": 50
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}
