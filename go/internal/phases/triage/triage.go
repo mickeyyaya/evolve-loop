@@ -63,6 +63,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if s := req.Context["carryover_summary"]; s != "" {
 		fmt.Fprintf(&b, "- carryover_summary: %s\n", s)
 	}
+	// ADR-0049 E: under `evolve fleet --plan` this cycle is one of several running
+	// concurrently, each assigned a DISJOINT set of tasks. Steer selection to ONLY
+	// the assigned ids so two cycles never pick work touching the same files.
+	if scope := req.Context["fleet_scope"]; scope != "" {
+		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
+	}
 	return b.String()
 }
 

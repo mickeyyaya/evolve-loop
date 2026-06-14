@@ -1829,6 +1829,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		ctxSnap[k] = v
 	}
 
+	// ADR-0049 E: when `evolve fleet --plan` launched this cycle, EVOLVE_FLEET_SCOPE
+	// carries its assigned (disjoint) task IDs. Surface it to triage via
+	// Context["fleet_scope"] so the cycle selects ONLY its subset and concurrent
+	// cycles never pick work touching the same files. Read from the env SNAPSHOT
+	// (not live os.Getenv) so it stays per-cycle. Empty/unset ⇒ legacy behavior.
+	if scope := envSnap["EVOLVE_FLEET_SCOPE"]; scope != "" {
+		ctxSnap["fleet_scope"] = scope
+	}
+
 	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
 	// ONCE per cycle, at orchestrator start, BEFORE any phase runs. Surface
 	// it to every phase via Context["challengeToken"] (scout's ComposePrompt

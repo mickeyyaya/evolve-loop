@@ -196,6 +196,24 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	}
 }
 
+// TestComposePrompt_InjectsFleetScope: under `evolve fleet --plan` a cycle gets
+// EVOLVE_FLEET_SCOPE → Context["fleet_scope"]; triage must steer selection to ONLY
+// the assigned task IDs so concurrent cycles work disjoint files (ADR-0049 E).
+// Absent when not scoped (legacy single-cycle behavior unchanged).
+func TestComposePrompt_InjectsFleetScope(t *testing.T) {
+	scoped := hooks{}.ComposePrompt("BODY", core.PhaseRequest{
+		Cycle:   1,
+		Context: map[string]string{"fleet_scope": "t1,t2"},
+	})
+	if !strings.Contains(scoped, "fleet_scope") || !strings.Contains(scoped, "t1,t2") {
+		t.Errorf("ComposePrompt did not inject the fleet_scope directive; got:\n%s", scoped)
+	}
+	unscoped := hooks{}.ComposePrompt("BODY", core.PhaseRequest{Cycle: 1})
+	if strings.Contains(unscoped, "fleet_scope") {
+		t.Errorf("fleet_scope directive leaked when unset:\n%s", unscoped)
+	}
+}
+
 func TestName(t *testing.T) {
 	p := New(Config{})
 	if p.Name() != "triage" {
