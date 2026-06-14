@@ -16,6 +16,11 @@ import (
 // can no longer fast-forward into main. Returns the worktree path.
 func divergedWorktree(t *testing.T, repo string) string {
 	t.Helper()
+	// Force the base branch to "main": makeRepo does `git init` without -b main,
+	// so the default branch name is host-dependent (main locally, master on CI).
+	// (The existing happy-path tests get "main" via addRemote, which this test
+	// doesn't need — the ff-merge diverges before any push.)
+	runGit(t, repo, "branch", "-M", "main")
 	wt := makeWorktree(t, repo, "cycle-1-branch") // branch at current main (M0)
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "this cycle's change\n")
 	// A peer cycle moves main forward (M0 -> M1) on a DISJOINT file.
