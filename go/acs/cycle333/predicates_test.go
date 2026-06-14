@@ -104,6 +104,7 @@ func assertNoDynamicCompile(t *testing.T, rel string) {
 //   - name=="auditor" fallback (no role)    ⇒ "opus"   (name fallback extracted)
 //   - role=="builder"                       ⇒ model_tier_default ("haiku")
 //   - model_tier_default absent             ⇒ error    (missing-field path)
+//
 // A broken/no-op extractor changes at least one of these, so the test is
 // anti-no-op. Auxiliary structural: modeltier.go no longer fmt.Sprintf-compiles.
 // ---------------------------------------------------------------------------
@@ -150,6 +151,7 @@ func TestC333_001_ResolveModelTierExtractsProfileStrings(t *testing.T) {
 //   - threshold present, tokens>threshold   ⇒ Emit=true,  Threshold==value
 //   - threshold present, tokens<=threshold  ⇒ Emit=false, Threshold==value
 //   - threshold ABSENT                       ⇒ Emit=false (extractInt ok==false)
+//
 // CheckCtxAdvisory reads a real file, so we materialize fixtures on disk.
 // Auxiliary structural: ctxadvisory.go no longer fmt.Sprintf-compiles.
 // ---------------------------------------------------------------------------
@@ -188,7 +190,8 @@ func TestC333_002_CheckCtxAdvisoryExtractsIntThreshold(t *testing.T) {
 //   - parallel_eligible=false  ⇒ "not parallel_eligible" (false extracted)
 //   - field ABSENT             ⇒ "not parallel_eligible" (default false)
 //   - parallel_eligible=true   ⇒ passes the gate, fails later on
-//                                "no parallel_subtasks" (true extracted)
+//     "no parallel_subtasks" (true extracted)
+//
 // The true case proves the bool is genuinely read — a no-op returning false
 // would never reach the subtasks error. Auxiliary structural: dispatchparallel.go
 // no longer fmt.Sprintf-compiles.
