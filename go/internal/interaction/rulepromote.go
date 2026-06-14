@@ -35,6 +35,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
 
@@ -116,9 +117,6 @@ func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
 	var b strings.Builder
 	b.WriteString("# auto-respond rule promoted into the interaction registry (ADR-0045 I4)\n")
 	fmt.Fprintf(&b, "id: %s\n", id)
@@ -126,11 +124,14 @@ func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string
 	fmt.Fprintf(&b, "response_keys: %s\n", strconv.Quote(responseKeys))
 	fmt.Fprintf(&b, "note: %s\n", strconv.Quote(note))
 	fmt.Fprintf(&b, "stage: %s\n", RuleStageShadow)
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(b.String()), 0o644); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	// ADR-0049 N14: route through the atomicwrite SSOT (the twin of recovery's
+	// PromoteSignature fix). The hand-rolled `path + ".tmp"` was SHARED, so two
+	// concurrent fleet cycles promoting the same content-hashed rule interleaved
+	// on one temp — the loser's rename hit ENOENT (a lost promotion) and a partial
+	// write could tear the rule every later boot replays. os.CreateTemp gives each
+	// writer a UNIQUE temp; it also mkdirs the parent, so the explicit MkdirAll is
+	// gone.
+	if err := atomicwrite.Bytes(path, []byte(b.String())); err != nil {
 		return "", err
 	}
 	return id, nil
@@ -175,11 +176,11 @@ func EnforceRule(dir, id string, corpus []string) error {
 	if !flipped {
 		lines = append(lines, "stage: "+RuleStageEnforce)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
-		return fmt.Errorf("interaction: enforce %s: %w", id, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	// ADR-0049 N14: same shared-temp fix as PromoteRule. The shadow→enforce flip
+	// is a read-modify-write; concurrent flips of one rule both wrote the shared
+	// path+".tmp" and one rename hit ENOENT. atomicwrite's unique temp makes each
+	// flip atomic and last-writer-wins is benign (both converge to stage enforce).
+	if err := atomicwrite.Bytes(path, []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("interaction: enforce %s: %w", id, err)
 	}
 	return nil
