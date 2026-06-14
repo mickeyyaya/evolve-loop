@@ -96,7 +96,6 @@ type PhaseMinter interface {
 type CycleRequest struct {
 	ProjectRoot string
 	GoalHash    string
-	Budget      BudgetEnvelope
 	// Env is propagated to every PhaseRequest.Env that runs in this
 	// cycle. Phases consult it for CLI/model selection
 	// (EVOLVE_CLI, EVOLVE_<PHASE>_MODEL, …). The orchestrator copies the
@@ -1629,7 +1628,6 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		// CB.5: and the run identity, for run-scoped session naming.
 		RunID:         fl.CycleState.RunID,
 		GoalHash:      fl.CycleRequest.GoalHash,
-		Budget:        fl.CycleRequest.Budget,
 		PreviousPhase: string(fl.Failed),
 		Env:           fl.Env,
 		Context:       retroCtx,
@@ -1896,18 +1894,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// what went wrong before. No-op when no KB is wired or no failure history.
 		lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
 		planIn := router.RouteInput{
-			Current:         string(PhaseStart),
-			Signals:         router.RoutingSignals{}, // no handoffs exist yet at cycle start
-			Cfg:             o.cfg,
-			BudgetRemaining: req.Budget.MaxUSD,
-			Now:             o.now(),
-			Workspace:       cs.WorkspacePath,
-			ProjectRoot:     req.ProjectRoot,
-			Cycle:           cycle,
-			Env:             envSnap,
-			LastReason:      lastReason,
-			Lessons:         lessons,
-			Catalog:         phaseCardsFromCatalog(o.catalog),
+			Current:     string(PhaseStart),
+			Signals:     router.RoutingSignals{}, // no handoffs exist yet at cycle start
+			Cfg:         o.cfg,
+			Now:         o.now(),
+			Workspace:   cs.WorkspacePath,
+			ProjectRoot: req.ProjectRoot,
+			Cycle:       cycle,
+			Env:         envSnap,
+			LastReason:  lastReason,
+			Lessons:     lessons,
+			Catalog:     phaseCardsFromCatalog(o.catalog),
 			// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
 			// Scout reads; NOT Context["strategy"], which is the strategy MODE like
 			// "balanced"/"harden") lets the advisor reason about WHAT the cycle is for
@@ -2052,15 +2049,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			routingSeq++
 			signals, _ := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
 			dec := o.strategy.Decide(router.RouteInput{
-				Current:         string(current),
-				Verdict:         lastVerdict,
-				Signals:         signals,
-				History:         entriesFromRecords(state.FailedAt),
-				Cfg:             o.cfg,
-				BudgetRemaining: req.Budget.MaxUSD,
-				Completed:       cs.CompletedPhases,
-				Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
-				Now:             o.now(),
+				Current:   string(current),
+				Verdict:   lastVerdict,
+				Signals:   signals,
+				History:   entriesFromRecords(state.FailedAt),
+				Cfg:       o.cfg,
+				Completed: cs.CompletedPhases,
+				Strict:    envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+				Now:       o.now(),
 				// Proposer context (DynamicLLM only; ignored by pure Route).
 				Workspace:   cs.WorkspacePath,
 				ProjectRoot: req.ProjectRoot,
@@ -2212,7 +2208,6 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			Worktree:      phaseWorktree,
 			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
-			Budget:        req.Budget,
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       phaseCtx,
@@ -2784,17 +2779,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				// decidable (clamped) and leaves a routing-decision artifact.
 				routingSeq++
 				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cycle, cs, routingSeq, resp.Verdict, state.FailedAt, router.RouteInput{
-					Cfg:             o.cfg,
-					BudgetRemaining: req.Budget.MaxUSD,
-					Completed:       cs.CompletedPhases,
-					Strict:          envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
-					Workspace:       cs.WorkspacePath,
-					ProjectRoot:     req.ProjectRoot,
-					Cycle:           cycle,
-					Env:             envSnap,
-					Plan:            clampedPlan,
-					IntentRequired:  cs.IntentRequired,
-					PSMASEnabled:    envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
+					Cfg:            o.cfg,
+					Completed:      cs.CompletedPhases,
+					Strict:         envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+					Workspace:      cs.WorkspacePath,
+					ProjectRoot:    req.ProjectRoot,
+					Cycle:          cycle,
+					Env:            envSnap,
+					Plan:           clampedPlan,
+					IntentRequired: cs.IntentRequired,
+					PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
 				})
 			} else {
 				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, state.FailedAt)

@@ -47,7 +47,6 @@ type Config struct {
 	CancelOnConsensus   bool   // EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1
 	ConsensusK          int    // ≥1; how many FAILs trigger cancel
 	ConsensusPollSecs   int    // default 1
-	PerWorkerBudgetUSD  string // default "0.20"; injected as EVOLVE_MAX_BUDGET_USD unless set
 	CachePrefixFile     string // optional; exported as EVOLVE_FANOUT_CACHE_PREFIX_FILE
 	CycleStateHelperBin string // optional; if set + TrackWorkers, shell out for status writes
 	TrackWorkers        bool   // EVOLVE_FANOUT_TRACK_WORKERS=1
@@ -89,9 +88,6 @@ func Run(cfg Config, stderr io.Writer) int {
 	if cfg.ConsensusPollSecs < 1 {
 		cfg.ConsensusPollSecs = 1
 	}
-	if cfg.PerWorkerBudgetUSD == "" {
-		cfg.PerWorkerBudgetUSD = "0.20"
-	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -114,11 +110,11 @@ func Run(cfg Config, stderr io.Writer) int {
 		return ExitOK
 	}
 
-	// Per-worker budget + cache-prefix are injected into each worker's OWN
-	// env in runWorker (cfg.workerEnv), NOT via process-global os.Setenv:
-	// the process environment is a single MT-Unsafe global, so two concurrent
+	// Per-worker cache-prefix is injected into each worker's OWN env in
+	// runWorker (cfg.workerEnv), NOT via process-global os.Setenv: the process
+	// environment is a single MT-Unsafe global, so two concurrent
 	// DispatchParallel in one process would clobber each other (ADR-0049 S1 /
-	// gap G8). See workerEnv for the "inject-unless-inherited" semantics.
+	// gap G8).
 
 	// Per-worker state.
 	type result struct {
@@ -228,17 +224,12 @@ func Run(cfg Config, stderr io.Writer) int {
 // runWorker executes a single worker command with timeout. Stdout → name.out,
 // stderr → name.err. Returns the exit code (124 for timeout, 143 for SIGTERM).
 // workerEnv builds the explicit environment for a fan-out worker subprocess —
-// the parent env plus per-worker budget/cache-prefix. Injecting per-child
+// the parent env plus cache-prefix (when configured). Injecting per-child
 // (exec.Cmd.Env) rather than mutating the process-global env (os.Setenv) keeps
 // two concurrent DispatchParallel calls in one process from clobbering each
-// other (ADR-0049 S1 / gap G8). Budget is added only when not already
-// inherited (preserving the prior "unless set" semantics); cache-prefix is
-// appended when configured (a later duplicate key wins in exec, as before).
+// other (ADR-0049 S1 / gap G8). A later duplicate key wins in exec.
 func (cfg Config) workerEnv() []string {
 	env := os.Environ()
-	if os.Getenv("EVOLVE_MAX_BUDGET_USD") == "" {
-		env = append(env, "EVOLVE_MAX_BUDGET_USD="+cfg.PerWorkerBudgetUSD)
-	}
 	if cfg.CachePrefixFile != "" {
 		env = append(env, "EVOLVE_FANOUT_CACHE_PREFIX_FILE="+cfg.CachePrefixFile)
 	}
@@ -254,11 +245,11 @@ func (cfg Config) runWorker(parent context.Context, name, command, resultsDir st
 	outF, _ := os.Create(filepath.Join(resultsDir, name+".out"))
 	errF, _ := os.Create(filepath.Join(resultsDir, name+".err"))
 	if outF != nil {
-		defer outF.Close()
+		defer func() { _ = outF.Close() }()
 		cmd.Stdout = outF
 	}
 	if errF != nil {
-		defer errF.Close()
+		defer func() { _ = errF.Close() }()
 		cmd.Stderr = errF
 	}
 
@@ -306,7 +297,7 @@ func ReadCommands(path string) ([]Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Command
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
@@ -353,7 +344,7 @@ func checkFailConsensus(resultsDir string, k int) bool {
 				break
 			}
 		}
-		f.Close()
+		_ = f.Close()
 		if matched {
 			count++
 		}

@@ -1,17 +1,16 @@
 // Package checkpoint ports the pre-emptive cycle-checkpoint logic from
-// scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint and the
-// trigger thresholds at scripts/dispatch/evolve-loop-dispatch.sh:1057+.
+// scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint.
 //
 // The on-disk shape is an additive "checkpoint" block inside
 // .evolve/cycle-state.json (not a separate file, despite older docs).
 // The block schema mirrors bash exactly so `evolve cycle resume` and
 // `bash scripts/dispatch/resume-cycle.sh` consume the same data.
 //
-// Three env vars govern the trigger (CLAUDE.md env-var table):
-//
-//	EVOLVE_CHECKPOINT_WARN_AT_PCT   default 80  — emit WARN
-//	EVOLVE_CHECKPOINT_AT_PCT        default 95  — request checkpoint
-//	EVOLVE_CHECKPOINT_DISABLE       default 0   — both off when "1"
+// Checkpoints are written for the escalation reasons (quota-likely,
+// batch-cap-near, operator-requested, stall-inactivity) plus the
+// lowest-priority phase-complete boundary. The former cost-percentage
+// trigger (EVOLVE_CHECKPOINT_*_PCT) was removed with the token-budget
+// cost gates; cost is no longer a checkpoint signal.
 package checkpoint
 
 import (
@@ -20,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -63,55 +61,9 @@ type Checkpoint struct {
 	AutoResumeMaxAttempts int      `json:"autoResumeMaxAttempts"`
 }
 
-// Decision is what Trigger.Decide returns. A single percentage maps to
-// one of three actions.
-type Decision int
-
-const (
-	DecisionNone Decision = iota
-	DecisionWarn
-	DecisionCheckpoint
-)
-
-// Default trigger constants matching CLAUDE.md.
-const (
-	DefaultWarnAtPct          = 80
-	DefaultCheckpointAtPct    = 95
-	DefaultAutoResumeAttempts = 3
-)
-
-// Trigger pins the threshold configuration. Zero value is unusable —
-// construct via TriggerFromEnv or a literal with explicit pcts.
-type Trigger struct {
-	WarnAtPct       int
-	CheckpointAtPct int
-	Disabled        bool
-}
-
-// TriggerFromEnv constructs a Trigger from the three env vars. Unset
-// or malformed values fall back to defaults.
-func TriggerFromEnv() Trigger {
-	return Trigger{
-		WarnAtPct:       envIntDefault("EVOLVE_CHECKPOINT_WARN_AT_PCT", DefaultWarnAtPct),
-		CheckpointAtPct: envIntDefault("EVOLVE_CHECKPOINT_AT_PCT", DefaultCheckpointAtPct),
-		Disabled:        os.Getenv("EVOLVE_CHECKPOINT_DISABLE") == "1",
-	}
-}
-
-// Decide returns the action for the given batch-cost progress %.
-// percentOfCap is what budget.Meter.PercentOfBatchCap returns.
-func (t Trigger) Decide(percentOfCap float64) Decision {
-	if t.Disabled {
-		return DecisionNone
-	}
-	if t.CheckpointAtPct > 0 && percentOfCap >= float64(t.CheckpointAtPct) {
-		return DecisionCheckpoint
-	}
-	if t.WarnAtPct > 0 && percentOfCap >= float64(t.WarnAtPct) {
-		return DecisionWarn
-	}
-	return DecisionNone
-}
+// DefaultAutoResumeAttempts is the default cap on automatic resume attempts
+// after a checkpoint (used by Compose).
+const DefaultAutoResumeAttempts = 3
 
 // Compose builds a Checkpoint block from a CycleState + the
 // orchestrator-supplied reason/cost/gitHead/now. Pure; no I/O.
@@ -215,18 +167,6 @@ func applyWithHooks(h hooks, path string, cp Checkpoint) error {
 		return fmt.Errorf("checkpoint: rename: %w", err)
 	}
 	return nil
-}
-
-func envIntDefault(key string, dflt int) int {
-	v := os.Getenv(key)
-	if v == "" {
-		return dflt
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return dflt
-	}
-	return n
 }
 
 // Sentinel kept exported so callers can wrap; not currently used by

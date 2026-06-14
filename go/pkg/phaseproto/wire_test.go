@@ -22,7 +22,6 @@ func TestEnvelope_RoundTripRequest(t *testing.T) {
 		Worktree:    "/tmp/proj/.evolve/worktrees/abc",
 		GoalHash:    "deadbeefcafebabe",
 		Context:     map[string]string{"k": "v"},
-		Budget:      core.BudgetEnvelope{MaxUSD: 2.50, BatchCapUSD: 20.0},
 		Env:         map[string]string{"FOO": "bar"},
 	}
 	env, err := EncodeRequest("corr-1", req)
@@ -59,7 +58,7 @@ func TestEnvelope_RoundTripRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeRequest: %v", err)
 	}
-	if got.Cycle != req.Cycle || got.GoalHash != req.GoalHash || got.Budget.MaxUSD != req.Budget.MaxUSD {
+	if got.Cycle != req.Cycle || got.GoalHash != req.GoalHash {
 		t.Errorf("round-trip mismatch:\n got=%+v\nwant=%+v", got, req)
 	}
 	if got.Context["k"] != "v" || got.Env["FOO"] != "bar" {

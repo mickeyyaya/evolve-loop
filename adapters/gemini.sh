@@ -231,28 +231,23 @@ if [ "$_GEMINI_NATIVE_CAP" = "true" ]; then
             exit "${_g_rc:-1}"
         fi
 
-        # Translate gemini stats → claude-style usage envelope.
-        # Pricing for gemini-3.1-pro-preview: $2/M input, $12/M output (<=200k ctx).
-        # Source: https://devtk.ai/en/models/gemini-3-1-pro/ (verified 2026-05-15).
-        # Note: cache_read_input_tokens billed at full rate here; gemini's actual
-        # cache pricing is lower, so cost is slightly over-estimated.
-        _g_in_price=$(awk 'BEGIN{print 2.0/1000000.0}')
-        _g_out_price=$(awk 'BEGIN{print 12.0/1000000.0}')
-
+        # Translate gemini stats → claude-style usage envelope. Token counts are
+        # passed through as telemetry, but we do NOT price them ourselves: the
+        # token-budget cost calculation was removed (it was unreliable across
+        # models — hardcoded gemini rates, $0 from subscription claude, free
+        # ollama). gemini's JSON reports no dollar cost, so total_cost_usd /
+        # costUSD are emitted as 0.
         _claude_envelope=$(jq -c \
             --arg model "$RESOLVED_MODEL" \
-            --argjson in_price "$_g_in_price" \
-            --argjson out_price "$_g_out_price" \
             --argjson dur "$_g_dur_ms" '
             (.stats.models | to_entries[0].value.tokens) as $t |
             ($t.input // 0) as $itok |
             ($t.candidates // 0) as $otok |
             ($t.cached // 0) as $ctok |
-            ($itok * $in_price + $otok * $out_price) as $cost |
             {
                 duration_ms: $dur,
                 num_turns: 1,
-                total_cost_usd: $cost,
+                total_cost_usd: 0,
                 gemini_error: (.error // null),
                 usage: {
                     input_tokens: $itok,
@@ -269,7 +264,7 @@ if [ "$_GEMINI_NATIVE_CAP" = "true" ]; then
                         cacheReadInputTokens: $ctok,
                         cacheCreationInputTokens: 0,
                         webSearchRequests: 0,
-                        costUSD: $cost,
+                        costUSD: 0,
                         contextWindow: 2000000,
                         maxOutputTokens: 65536
                     }

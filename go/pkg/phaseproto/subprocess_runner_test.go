@@ -110,7 +110,6 @@ func TestSubprocessRunner_HappyPath(t *testing.T) {
 		Cycle:     1,
 		Workspace: "/tmp/ws",
 		GoalHash:  "deadbeef",
-		Budget:    core.BudgetEnvelope{MaxUSD: 2.0, BatchCapUSD: 20.0},
 	}
 	resp, err := r.Run(ctx, req)
 	if err != nil {
@@ -131,7 +130,7 @@ func TestSubprocessRunner_HandlerReturnsWireError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must return error from WireError envelope")
 	}
@@ -151,7 +150,7 @@ func TestSubprocessRunner_PlainHandlerErrorWrapped(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must return error")
 	}
@@ -171,7 +170,7 @@ func TestSubprocessRunner_GarbageStdout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must reject garbage stdout")
 	}
@@ -184,7 +183,7 @@ func TestSubprocessRunner_ChildCrash(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must propagate child crash")
 	}
@@ -198,7 +197,7 @@ func TestSubprocessRunner_ContextCancellation(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("Run must error on context cancel")
@@ -213,7 +212,7 @@ func TestSubprocessRunner_ContextCancellation(t *testing.T) {
 // reader/writer/handler paths without the subprocess re-exec.
 
 func TestServeStdio_HappyPath(t *testing.T) {
-	req := core.PhaseRequest{Cycle: 7, Workspace: "/x", Budget: core.BudgetEnvelope{MaxUSD: 1.0}}
+	req := core.PhaseRequest{Cycle: 7, Workspace: "/x"}
 	env, _ := EncodeRequest("corr-1", req)
 	raw, _ := json.Marshal(env)
 
@@ -317,7 +316,7 @@ func TestSubprocessRunner_ErrorEnvelopeMissingErrorField(t *testing.T) {
 	r := NewSubprocessRunner("p", "/bin/sh", []string{"-c", "echo '" + bogus + "'"}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must reject error envelope with nil Error field")
 	}
@@ -346,7 +345,7 @@ func TestSubprocessRunner_EmptyStdout(t *testing.T) {
 	r := NewSubprocessRunner("p", "/bin/sh", []string{"-c", ":"}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1, Budget: core.BudgetEnvelope{MaxUSD: 1.0}})
+	_, err := r.Run(ctx, core.PhaseRequest{Cycle: 1})
 	if err == nil {
 		t.Fatal("Run must reject empty stdout")
 	}

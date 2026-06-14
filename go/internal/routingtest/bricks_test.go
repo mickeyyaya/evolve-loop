@@ -43,7 +43,7 @@ func TestBrick_PositionAndVerdictSetters(t *testing.T) {
 	}
 }
 
-func TestBrick_StageBudgetAndInsertControls(t *testing.T) {
+func TestBrick_StageAndInsertControls(t *testing.T) {
 	var s ScenarioSpec
 	Shadow()(&s)
 	if s.Stage != config.StageShadow {
@@ -51,10 +51,9 @@ func TestBrick_StageBudgetAndInsertControls(t *testing.T) {
 	}
 	Advisory()(&s)
 	Enforce()(&s)
-	Budget(12.5)(&s)
 	MaxInserts(2)(&s)
-	if s.Stage != config.StageEnforce || s.BudgetUSD != 12.5 || s.MaxInsertions != 2 {
-		t.Fatalf("stage/budget/cap bricks produced %+v", s)
+	if s.Stage != config.StageEnforce || s.MaxInsertions != 2 {
+		t.Fatalf("stage/cap bricks produced %+v", s)
 	}
 	Off()(&s)
 	if s.Stage != config.StageOff {

@@ -157,7 +157,6 @@ func TestInsertedPhaseMainTreeLeakAborts(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: root,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 	})
 
 	if !mintRan {
@@ -201,7 +200,6 @@ func TestInsertedPhaseWorktreeWriteIsClean(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: root,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 	})
 	if !mintRan {
 		t.Fatalf("precondition: minted phase never dispatched (phases=%v) — the discriminator was not exercised", res.PhasesRun)

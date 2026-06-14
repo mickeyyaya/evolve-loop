@@ -26,7 +26,7 @@ func testCfg() config.RoutingConfig {
 }
 
 func base(cur string) RouteInput {
-	return RouteInput{Current: cur, Cfg: testCfg(), BudgetRemaining: 10, Completed: []string{}, Now: fixedTime()}
+	return RouteInput{Current: cur, Cfg: testCfg(), Completed: []string{}, Now: fixedTime()}
 }
 
 func TestRoute_StartToScout(t *testing.T) {
@@ -205,20 +205,6 @@ func TestRoute_Clamp_MandatoryNeverSkipped(t *testing.T) {
 	}
 	if len(d.Clamps) == 0 || d.Clamps[0].Rule != "mandatory-never-skipped" {
 		t.Errorf("expected mandatory-never-skipped clamp, got %+v", d.Clamps)
-	}
-}
-
-func TestRoute_Clamp_BudgetExhaustedDropsInsert(t *testing.T) {
-	in := base("build")
-	in.Completed = []string{"scout", "tdd", "build"}
-	in.Signals.Build = BuildSignals{ACSRed: 5, Present: true}
-	in.BudgetRemaining = 0 // exhausted
-	d := Route(in, nil)
-	if d.NextPhase != "audit" {
-		t.Errorf("budget=0 → %q, want audit (tester insert dropped)", d.NextPhase)
-	}
-	if !hasClamp(d, "budget-exhausted") {
-		t.Errorf("expected budget-exhausted clamp, got %+v", d.Clamps)
 	}
 }
 

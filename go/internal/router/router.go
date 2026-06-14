@@ -26,17 +26,16 @@ const PhaseEnd = "end"
 // RouteInput is the complete, pre-digested context for one routing decision.
 // PURE: the caller does all I/O and hands in plain values.
 type RouteInput struct {
-	Current         string                 // phase that just completed ("start" on cycle entry)
-	Verdict         string                 // its canonical verdict
-	Signals         RoutingSignals         // digest envelope (objective)
-	History         []failureadapter.Entry // converted state.failedApproaches
-	Cfg             config.RoutingConfig
-	BudgetRemaining float64
-	Completed       []string // phases already done this cycle
-	Strict          bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
-	Now             time.Time
-	IntentRequired  bool
-	PSMASEnabled    bool // EVOLVE_PSMAS_SKIP — consume triage phase_skip[] when enabled.
+	Current        string                 // phase that just completed ("start" on cycle entry)
+	Verdict        string                 // its canonical verdict
+	Signals        RoutingSignals         // digest envelope (objective)
+	History        []failureadapter.Entry // converted state.failedApproaches
+	Cfg            config.RoutingConfig
+	Completed      []string // phases already done this cycle
+	Strict         bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
+	Now            time.Time
+	IntentRequired bool
+	PSMASEnabled   bool // EVOLVE_PSMAS_SKIP — consume triage phase_skip[] when enabled.
 
 	// Proposer context — populated by the orchestrator, consumed ONLY by a
 	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
@@ -485,8 +484,8 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 	// this cycle (scout/triage included, when the operator shrinks the mandatory
 	// set). Below Advisory, or with no plan, control falls through to the legacy
 	// trigger path (byte-identical / fail-safe to static). The MaxInsertions cap
-	// is intentionally not applied here: the plan is the advisor's coherent,
-	// budget-aware whole-cycle selection, clamped by the floor rather than capped.
+	// is intentionally not applied here: the plan is the advisor's coherent
+	// whole-cycle selection, clamped by the floor rather than capped.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil {
 		runs := planRuns(in.Plan, phase)
 		if runs && enable == config.EnableOff {
@@ -507,10 +506,7 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 		return false, true, nil
 	case config.EnableOn:
 		return true, true, nil
-	default: // EnableContent → trigger-driven, subject to budget + insertion cap
-		if in.BudgetRemaining <= 0 {
-			return false, true, &Clamp{Rule: "budget-exhausted", Proposed: phase + "=insert", Forced: phase + "=skip"}
-		}
+	default: // EnableContent → trigger-driven, subject to insertion cap
 		if optionalUsed >= in.Cfg.MaxInsertions {
 			return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
 		}

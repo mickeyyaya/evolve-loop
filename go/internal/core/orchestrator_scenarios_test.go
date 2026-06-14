@@ -77,12 +77,6 @@ func cycleCatalog() []ScenarioSpec {
 			SeedFailure("code-audit-fail", 2),
 			ExpectRetro("proceed:")),
 
-		// --- Budget clamp (shadow forensic) ---
-		Scenario("budget exhausted records clamp",
-			Cycle(), Shadow(), RedBuild(5), Budget(-1),
-			ExpectDecisionClamp("budget-exhausted"),
-			ExpectPhases(scout, triage, tdd, planner, build, audit, ship)),
-
 		// --- Simulated agent end-to-end ---
 		Scenario("agent legal-divergent adopted (scout->build on trivial)",
 			Cycle(), Enforce(), TrivialCycle(), Agent("scout", "build"),

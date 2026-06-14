@@ -91,64 +91,10 @@ while IFS= read -r line; do [ -n "$line" ] && ALLOWED_TOOLS+=("$line"); done < <
 while IFS= read -r line; do [ -n "$line" ] && DISALLOWED_TOOLS+=("$line"); done < <(jq -r '.disallowed_tools[]?' "$PROFILE_PATH")
 while IFS= read -r line; do [ -n "$line" ] && ADD_DIRS_ARR+=("$line"); done < <(jq -r '.add_dir[]?' "$PROFILE_PATH")
 while IFS= read -r line; do [ -n "$line" ] && EXTRA_FLAGS_ARR+=("$line"); done < <(jq -r '.extra_flags[]?' "$PROFILE_PATH")
-MAX_BUDGET=$(jq -r '.max_budget_usd' "$PROFILE_PATH")
 MAX_TURNS=$(jq -r '.max_turns' "$PROFILE_PATH")
 PERMISSION_MODE=$(jq -r '.permission_mode' "$PROFILE_PATH")
 EFFORT_LEVEL=$(jq -r '.effort_level // empty' "$PROFILE_PATH")
 SCHEMA_FILTER_ENABLED=$(jq -r '.schema_filter_enabled // false' "$PROFILE_PATH")
-
-# v8.13.5 token-opt: declarative task-mode budget tiers.
-# Profiles MAY define a budget_tiers map ({"research": 1.50, "deep": 2.50, ...}).
-# When EVOLVE_TASK_MODE=<mode> is set AND the mode key exists in the profile's
-# budget_tiers, that value is used. Falls back silently to the static
-# max_budget_usd when no tier matches (with WARN if EVOLVE_TASK_MODE was set
-# but the key wasn't found — caller's typo is loud, not silent).
-# Precedence (set later, by EVOLVE_MAX_BUDGET_USD block below):
-#   EVOLVE_MAX_BUDGET_USD > EVOLVE_TASK_MODE-resolved tier > profile default.
-if [ -n "${EVOLVE_TASK_MODE:-}" ]; then
-    TIER_VALUE=$(jq -r --arg mode "$EVOLVE_TASK_MODE" '.budget_tiers[$mode] // empty' "$PROFILE_PATH" 2>/dev/null || echo "")
-    if [ -n "$TIER_VALUE" ] && [[ "$TIER_VALUE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "[claude-adapter] task-mode tier: $EVOLVE_TASK_MODE → \$$TIER_VALUE (was $MAX_BUDGET from profile $(basename "$PROFILE_PATH"))" >&2
-        MAX_BUDGET="$TIER_VALUE"
-    else
-        echo "[claude-adapter] WARN: EVOLVE_TASK_MODE='$EVOLVE_TASK_MODE' has no matching budget_tiers entry in $(basename "$PROFILE_PATH") — using profile default $MAX_BUDGET" >&2
-    fi
-fi
-
-# v8.60+ deprecation bridge: EVOLVE_BUDGET_CAP → EVOLVE_MAX_BUDGET_USD
-# Emits one stderr WARN per process invocation (idempotency guard: _BUDGET_CAP_WARNED).
-# EVOLVE_MAX_BUDGET_USD always wins when both are set. Removal target: v8.61+.
-if [ -n "${EVOLVE_BUDGET_CAP:-}" ] && [ -z "${_BUDGET_CAP_WARNED:-}" ]; then
-    export _BUDGET_CAP_WARNED=1
-    if [[ "${EVOLVE_BUDGET_CAP}" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$EVOLVE_BUDGET_CAP > 0" | bc -l) )); then
-        if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
-            echo "[claude-adapter] DEPRECATED EVOLVE_BUDGET_CAP: EVOLVE_MAX_BUDGET_USD=$EVOLVE_MAX_BUDGET_USD takes precedence; remove EVOLVE_BUDGET_CAP" >&2
-        else
-            echo "[claude-adapter] DEPRECATED EVOLVE_BUDGET_CAP: use EVOLVE_MAX_BUDGET_USD instead (bridging for this invocation)" >&2
-            export EVOLVE_MAX_BUDGET_USD="$EVOLVE_BUDGET_CAP"
-        fi
-    else
-        echo "[claude-adapter] WARN: EVOLVE_BUDGET_CAP='$EVOLVE_BUDGET_CAP' invalid — falling through to default" >&2
-    fi
-fi
-
-# v8.13.4 token-opt: per-invocation budget override.
-# The static profile max_budget_usd is sized for typical workloads (codebase
-# scan, modest builds). Research-heavy or unusually long tasks may need more
-# headroom — cycle 8210's Scout invocation hit error_max_budget_usd at $0.51
-# during research, wasting the partial work. Operators can now pass
-# EVOLVE_MAX_BUDGET_USD=<value> to bump for ONE invocation without permanently
-# raising the profile baseline. Logged loudly for auditability.
-# Validation: must be a non-negative decimal; non-numeric values are ignored
-# with a warning rather than silently corrupting the budget arg.
-if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
-    if [[ "$EVOLVE_MAX_BUDGET_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "[claude-adapter] override max-budget-usd: $EVOLVE_MAX_BUDGET_USD (was $MAX_BUDGET from profile $(basename "$PROFILE_PATH"))" >&2
-        MAX_BUDGET="$EVOLVE_MAX_BUDGET_USD"
-    else
-        echo "[claude-adapter] WARN: EVOLVE_MAX_BUDGET_USD='$EVOLVE_MAX_BUDGET_USD' is not a valid decimal — ignoring, using profile value $MAX_BUDGET" >&2
-    fi
-fi
 
 # Resolve add_dir, substituting {worktree_path} placeholder if present.
 for i in "${!ADD_DIRS_ARR[@]}"; do
@@ -195,32 +141,13 @@ else
     CMD+=(--output-format json)
 fi
 
-# v8.26.0: budget cap default-unlimited.
-#
-# Pre-v8.26.0, MAX_BUDGET came from the profile (~$0.18 Scout default, $0.50
-# Intent, $1.00 Orchestrator). Complex meta-goals routinely exceeded these
-# caps mid-thought, exiting subagents with BUDGET_EXCEEDED (rc=1) and aborting
-# the cycle with no useful output — friction without protection (budget caps
-# don't prevent reward hacking; they only limit cost).
-#
-# v8.26.0 sets `--max-budget-usd` to 999999 (effectively unlimited) by default.
-# The flag is still passed (claude binary expects it) but the value never
-# triggers BUDGET_EXCEEDED in any realistic cycle.
-#
-# Operator overrides (v8.60+: EVOLVE_BUDGET_CAP is deprecated; use EVOLVE_MAX_BUDGET_USD):
-#   EVOLVE_MAX_BUDGET_USD=<value> — pin a hard cap (operator-set, highest priority)
-#   EVOLVE_BUDGET_ENFORCE=1       — use the resolved-from-profile MAX_BUDGET
-#                                   (legacy behavior; opt back in for cost discipline)
-ORIGINAL_MAX_BUDGET="$MAX_BUDGET"
-if [ -n "${EVOLVE_MAX_BUDGET_USD:-}" ]; then
-    : # operator override already applied in step 3 above; preserve it, skip unlimited default
-elif [ "${EVOLVE_BUDGET_ENFORCE:-0}" = "1" ]; then
-    echo "[claude-adapter] EVOLVE_BUDGET_ENFORCE=1: using resolved budget \$$MAX_BUDGET (legacy strict cap)" >&2
-else
-    MAX_BUDGET=999999
-    echo "[claude-adapter] budget cap unlimited (max-budget-usd=$MAX_BUDGET); was \$$ORIGINAL_MAX_BUDGET from profile. Set EVOLVE_MAX_BUDGET_USD=<value> for a hard cap, or EVOLVE_BUDGET_ENFORCE=1 to use the profile value." >&2
-fi
-# Always attach — claude binary expects the flag.
+# Budget cap removed. The token-budget cost calculation was unreliable across
+# LLM models (tmux/subscription claude reports $0, gemini was hardcoded, ollama
+# is free), so evolve no longer resolves or enforces a cost cap. The claude CLI
+# still requires --max-budget-usd, so we always pass an effectively-unlimited
+# sentinel. EVOLVE_MAX_BUDGET_USD / EVOLVE_BUDGET_CAP / EVOLVE_BUDGET_ENFORCE and
+# the EVOLVE_TASK_MODE budget tiers are deprecated no-ops (see flagregistry).
+MAX_BUDGET=999999
 CMD+=(--max-budget-usd "$MAX_BUDGET")
 
 # Allowed/disallowed tools — each pattern as its own argv element so spaces
@@ -721,26 +648,6 @@ if [ -s "$STDERR_LOG" ]; then
         fi
     fi
     unset _quota_hint _hint_dir _hint_path _hint_tmp
-fi
-
-# Phase B abnormal-event: cost-overrun (dispatch-layer observability).
-# When claude exits non-zero and the stdout log contains the budget-exceeded
-# stop_reason (error_max_budget_usd), emit a cost-overrun event to the workspace
-# abnormal-events.jsonl so the dashboard and reconcile-carryover-todos.sh can
-# surface it without operators needing to grep per-phase stdout logs.
-# Best-effort — never fails the pipeline.
-if [ "$EXIT_CODE" -ne 0 ] && [ -s "${STDOUT_LOG:-}" ]; then
-    if grep -q 'error_max_budget_usd\|max_budget_usd' "$STDOUT_LOG" 2>/dev/null; then
-        _ws_co="${WORKSPACE_PATH:-}"
-        if [ -d "$_ws_co" ]; then
-            _ts_co=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            _role_co=$(basename "${PROFILE_PATH%.*}" 2>/dev/null || echo "unknown")
-            printf '{"event_type":"cost-overrun","timestamp":"%s","source_phase":"claude-adapter","severity":"HIGH","details":"claude exited rc=%s with budget-exceeded signal for role %s (original_max_budget=%s)","remediation_hint":"Raise EVOLVE_MAX_BUDGET_USD or reduce prompt size for this role"}\n' \
-                "$_ts_co" "$EXIT_CODE" "$_role_co" "${ORIGINAL_MAX_BUDGET:-unknown}" \
-                >> "$_ws_co/abnormal-events.jsonl" 2>/dev/null || true
-        fi
-        unset _ws_co _ts_co _role_co
-    fi
 fi
 
 exit "$EXIT_CODE"

@@ -139,7 +139,6 @@ func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {
@@ -193,7 +192,6 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 		Context:     map[string]string{"goal": goal}, // the goal-text key (not "strategy" = mode)
 	})
@@ -232,7 +230,6 @@ func TestOrchestrator_ThreadsCarryoverTodosToPlanner(t *testing.T) {
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {
@@ -296,7 +293,6 @@ func TestOrchestrator_Shadow_LogsTesterInsert_StaticPathUnchanged(t *testing.T) 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100}, // positive ⇒ content inserts not budget-clamped
 		// Keep the pre-seeded handoff-build.json from being archived.
 		Env: map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
@@ -357,7 +353,6 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {
@@ -402,7 +397,6 @@ func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {

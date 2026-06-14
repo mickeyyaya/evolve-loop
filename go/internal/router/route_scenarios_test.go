@@ -71,9 +71,6 @@ func kernelCatalog() []ScenarioSpec {
 			Pure(), At("audit"), Done("scout", "build", "audit"), CompletedVerdict("PASS"),
 			PhaseEnabled("ship", config.EnableOff),
 			ExpectNext("ship"), ExpectClamp("mandatory-never-skipped")),
-		Scenario("budget exhausted drops tester",
-			Pure(), At("build"), Done("scout", "tdd", "build"), RedBuild(5), Budget(-1),
-			ExpectNext("audit"), ExpectSkips("tester"), ExpectClamp("budget-exhausted")),
 		Scenario("max-insertions cap drops tester",
 			Pure(), At("build"), Done("scout", "tdd", "build", "plan-review"), RedBuild(5), MaxInserts(1),
 			ExpectNext("audit"), ExpectSkips("tester"), ExpectClamp("max-insertions-cap")),
@@ -104,13 +101,13 @@ func kernelCatalog() []ScenarioSpec {
 }
 
 // TestKernelInvariants asserts the non-bypassable floor over an adversarial
-// cross-product: for EVERY (phase × cycle-size × build × budget × agent move),
+// cross-product: for EVERY (phase × cycle-size × build × agent move),
 // the kernel disposes — no adversarial proposal weakens it.
 func TestKernelInvariants(t *testing.T) {
 	specs := Matrix(
 		[]Brick{Pure(), ExpectInvariants(
 			"proposal-never-weakens", "mandatory-never-skipped", "no-ship-before-audit",
-			"tdd-pin-nontrivial", "insert-le-cap", "budget-zero-no-content-insert", "determinism",
+			"tdd-pin-nontrivial", "insert-le-cap", "determinism",
 		)},
 		Dim("at",
 			V("scout", At("scout"), Done("scout")),
@@ -119,7 +116,6 @@ func TestKernelInvariants(t *testing.T) {
 		),
 		Dim("size", V("trivial", TrivialCycle()), V("medium", MediumCycle())),
 		Dim("build", V("green", GreenBuild()), V("red", RedBuild(3))),
-		Dim("budget", V("ok"), V("zero", Budget(-1))),
 		Dim("agent",
 			V("none"),
 			V("ship", Agent("build", "ship")),

@@ -29,7 +29,6 @@ func TestOrchestrator_ThreadsIntentRequiredToPlannerInput(t *testing.T) {
 		if _, err := o.RunCycle(context.Background(), CycleRequest{
 			ProjectRoot: t.TempDir(),
 			GoalHash:    "g",
-			Budget:      BudgetEnvelope{MaxUSD: 100},
 			Env:         env,
 		}); err != nil {
 			t.Fatalf("RunCycle: %v", err)

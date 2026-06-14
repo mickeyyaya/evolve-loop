@@ -123,94 +123,6 @@ func TestAppendAbnormalEvent_EscapesQuotesInDetails(t *testing.T) {
 	}
 }
 
-// --- QuotaLikely ---
-
-func TestQuotaLikely_NonEmptyStderrReturnsFalse(t *testing.T) {
-	for _, tail := range []string{"some error", "  partial  ", "x"} {
-		got := QuotaLikely(
-			QuotaLikelyRequest{StderrTail: tail, DangerPct: 0, BatchBudgetCapUSD: 20},
-			QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 100, true }},
-		)
-		if got {
-			t.Errorf("tail %q: expected false, got true", tail)
-		}
-	}
-}
-
-func TestQuotaLikely_EmptyTailVariantsAcceptable(t *testing.T) {
-	for _, tail := range []string{"", "   ", "\t\n", "<empty>"} {
-		got := QuotaLikely(
-			QuotaLikelyRequest{StderrTail: tail, DangerPct: 50, BatchBudgetCapUSD: 20},
-			QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 15, true }},
-		)
-		if !got {
-			t.Errorf("tail %q: expected quota-likely, got false", tail)
-		}
-	}
-}
-
-func TestQuotaLikely_DangerPct100Disables(t *testing.T) {
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 100, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 19, true }},
-	)
-	if got {
-		t.Errorf("DangerPct=100 should disable, got true")
-	}
-}
-
-func TestQuotaLikely_DangerPct0AlwaysTrue(t *testing.T) {
-	// 0% threshold ⇒ any non-negative cost triggers.
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 0, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 0, true }},
-	)
-	if !got {
-		t.Errorf("DangerPct=0 should always classify, got false")
-	}
-}
-
-func TestQuotaLikely_NoCostLookupReturnsFalse(t *testing.T) {
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 50, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{},
-	)
-	if got {
-		t.Errorf("nil CostLookup should return false (conservative)")
-	}
-}
-
-func TestQuotaLikely_CostLookupFailureReturnsFalse(t *testing.T) {
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 50, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 0, false }},
-	)
-	if got {
-		t.Errorf("CostLookup false should return false")
-	}
-}
-
-func TestQuotaLikely_ThresholdExactlyMet(t *testing.T) {
-	// 80% of 20 = 16; cost exactly 16 should still trigger (>=).
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 80, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 16, true }},
-	)
-	if !got {
-		t.Errorf("cost==threshold should trigger, got false")
-	}
-}
-
-func TestQuotaLikely_BelowThresholdFalse(t *testing.T) {
-	got := QuotaLikely(
-		QuotaLikelyRequest{StderrTail: "", DangerPct: 80, BatchBudgetCapUSD: 20},
-		QuotaLikelyOptions{CostLookup: func(int) (float64, bool) { return 15.99, true }},
-	)
-	if got {
-		t.Errorf("cost<threshold should not trigger")
-	}
-}
-
 // --- WriteFanoutLedgerEntry ---
 
 func TestWriteFanoutLedgerEntry_BasicLine(t *testing.T) {
@@ -593,27 +505,6 @@ func TestParseQuotaDangerPct(t *testing.T) {
 		t.Run(tc.raw, func(t *testing.T) {
 			if got := ParseQuotaDangerPct(tc.raw); got != tc.want {
 				t.Errorf("got %d, want %d", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestParseBatchBudgetCap(t *testing.T) {
-	tests := []struct {
-		raw  string
-		want float64
-	}{
-		{"", 20.00},
-		{"15.50", 15.50},
-		{"100", 100},
-		{"oops", 20.00},
-		{"0", 20.00},
-		{"-1", 20.00},
-	}
-	for _, tc := range tests {
-		t.Run(tc.raw, func(t *testing.T) {
-			if got := ParseBatchBudgetCap(tc.raw); got != tc.want {
-				t.Errorf("got %f, want %f", got, tc.want)
 			}
 		})
 	}

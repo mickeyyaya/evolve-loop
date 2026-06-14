@@ -37,13 +37,12 @@ func TestSpikeAdvisorLive(t *testing.T) {
 		core.WithProposerCLI(cli), core.WithProposerModel(model), core.WithPersona(persona))
 
 	in := router.RouteInput{
-		Current:         string(core.PhaseStart),
-		Cfg:             cfg,
-		BudgetRemaining: 5.0,
-		Workspace:       ws,
-		ProjectRoot:     root,
-		Cycle:           999,
-		Env:             filterEvolveEnv(os.Environ()),
+		Current:     string(core.PhaseStart),
+		Cfg:         cfg,
+		Workspace:   ws,
+		ProjectRoot: root,
+		Cycle:       999,
+		Env:         filterEvolveEnv(os.Environ()),
 		Catalog: []router.PhaseCard{
 			{Name: "scout", Role: "plan"},
 			{Name: "tdd", Role: "plan"},

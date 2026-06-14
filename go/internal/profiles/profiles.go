@@ -56,8 +56,6 @@ type Profile struct {
 	AllowedTools       []string           `json:"allowed_tools,omitempty"`
 	DisallowedTools    []string           `json:"disallowed_tools,omitempty"`
 	MaxTurns           int                `json:"max_turns,omitempty"`
-	MaxBudgetUSD       float64            `json:"max_budget_usd,omitempty"`
-	BudgetTiers        map[string]float64 `json:"budget_tiers,omitempty"`
 	ParallelEligible   bool               `json:"parallel_eligible,omitempty"`
 	OutputArtifact     string             `json:"output_artifact,omitempty"`
 	ResearchQuota      map[string]int     `json:"research_quota,omitempty"`

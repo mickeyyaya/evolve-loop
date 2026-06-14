@@ -63,11 +63,11 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 	}
 }
 
-// TestRunLoop_BudgetDrivenCapExceeded covers the
-// `cfg.BudgetDriven && totalCost > BatchCapUSD` branch — budget-driven
-// mode hits the OUTER cap (rare; budget < cap normally but with a
-// huge cost spike this can fire).
-func TestRunLoop_BudgetDrivenCapExceeded(t *testing.T) {
+// TestRunLoop_BudgetFlagsDoNotStop verifies the deprecated cost flags no longer
+// stop the loop: even when the cycle cost exceeds both --budget-usd and
+// --batch-cap-usd, the run completes its cycles normally (rc=0, no
+// BUDGET-EXHAUSTED / batch_cap), with cost reported as telemetry only.
+func TestRunLoop_BudgetFlagsDoNotStop(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
@@ -78,9 +78,8 @@ func TestRunLoop_BudgetDrivenCapExceeded(t *testing.T) {
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Cycle cost $1.50 — exceeds both budget ($0.50) AND batch cap
-	// ($1.00). Budget-driven mode treats this as success rc=0 with
-	// stop_reason=budget via the cap-overrun branch.
+	// Cycle cost $1.50 exceeds both the (deprecated) budget ($0.50) and batch
+	// cap ($1.00). Neither gates anymore — the loop runs its one cycle and exits 0.
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 1.50)
 
 	var stdout, stderr bytes.Buffer
@@ -88,13 +87,17 @@ func TestRunLoop_BudgetDrivenCapExceeded(t *testing.T) {
 		"--project-root", projectRoot,
 		"--evolve-dir", evolveDir,
 		"--goal-text", "x",
+		"--cycles", "1",
 		"--budget-usd", "0.50",
 		"--batch-cap-usd", "1.00",
 	}, nil, &stdout, &stderr)
 	if rc != 0 {
-		t.Fatalf("rc=%d want 0 (budget-driven cap-overrun = success); stderr=%q", rc, stderr.String())
+		t.Fatalf("rc=%d want 0 (cost flags are no-ops); stderr=%q", rc, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "BUDGET-EXHAUSTED") {
-		t.Fatalf("expected BUDGET-EXHAUSTED log; stderr=%q", stderr.String())
+	if strings.Contains(stderr.String(), "BUDGET-EXHAUSTED") || strings.Contains(stderr.String(), "BATCH-BUDGET") {
+		t.Fatalf("cost flags must not emit budget stops; stderr=%q", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"stop_reason": "max_cycles"`) {
+		t.Fatalf("stop_reason should be max_cycles; stdout=%q", stdout.String())
 	}
 }

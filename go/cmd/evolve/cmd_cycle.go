@@ -151,8 +151,8 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
 	fs.StringVar(&goalText, "goal", "", "human-readable goal text (threaded to Scout + the routing advisor as Context[\"goal\"]); optional")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
-	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "per-cycle USD budget cap")
-	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "cumulative batch USD cap across cycles")
+	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "(DEPRECATED, ignored) former per-cycle USD budget cap")
+	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "(DEPRECATED, ignored) former cumulative batch USD cap")
 	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	if err := fs.Parse(args); err != nil {
 		return 10
@@ -180,12 +180,8 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    goalHash,
-		Budget: core.BudgetEnvelope{
-			MaxUSD:      budgetUSD,
-			BatchCapUSD: batchCapUSD,
-		},
-		Env:     filterEvolveEnv(os.Environ()),
-		Context: cycleContext(goalHash, goalText),
+		Env:         filterEvolveEnv(os.Environ()),
+		Context:     cycleContext(goalHash, goalText),
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)

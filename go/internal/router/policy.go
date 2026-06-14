@@ -20,7 +20,7 @@ type PhasePolicy struct {
 func NewPhasePolicy(cfg config.RoutingConfig) PhasePolicy { return PhasePolicy{Cfg: cfg} }
 
 // Enabled reports whether a phase should run. Precedence mirrors the router's
-// shouldRun (minus routing-level budget/insertion caps, which are not a phase's
+// shouldRun (minus the routing-level insertion cap, which is not a phase's
 // concern): mandatory > conditional-pin > forced on/off > content trigger.
 func (p PhasePolicy) Enabled(phase string, sig RoutingSignals) bool {
 	if isMandatory(p.Cfg, phase) {

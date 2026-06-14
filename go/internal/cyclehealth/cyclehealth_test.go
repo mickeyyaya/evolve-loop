@@ -308,34 +308,6 @@ func TestCheck_CanaryFromOtherCycle_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_CostOverrun_Warn — ledger entry with cost > ceiling fires
-// cost_envelope as warn.
-func TestCheck_CostOverrun_Warn(t *testing.T) {
-	ws := freshWorkspace(t, 1)
-	entries := []ledgerEntry{
-		{Cycle: 1, Role: "scout", Phase: "scout", Timestamp: 1000, EntryHash: "h1", CostUSD: 0.5},
-		{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1100, PrevHash: "h1", EntryHash: "h2", CostUSD: 99.0},
-		{Cycle: 1, Role: "auditor", Phase: "audit", Timestamp: 1200, PrevHash: "h2", EntryHash: "h3", CostUSD: 0.3},
-	}
-	var lines []string
-	for _, e := range entries {
-		b, _ := json.Marshal(e)
-		lines = append(lines, string(b))
-	}
-	os.WriteFile(filepath.Join(ws, "ledger.jsonl"), []byte(strings.Join(lines, "\n")), 0o644)
-
-	r, _ := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
-	found := false
-	for _, a := range r.Anomalies {
-		if a.Signal == "cost_envelope" && a.Severity == SeverityWarn {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected cost_envelope warn; got %+v", r.Anomalies)
-	}
-}
-
 // TestCheck_DuplicateLedgerEntry_Fatal — two entries with the same
 // entry_hash trips duplicate_ledger.
 func TestCheck_DuplicateLedgerEntry_Fatal(t *testing.T) {
@@ -391,13 +363,14 @@ func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	}
 }
 
-// TestSignalNames_ReturnsThirteen — the public contract grew to "13
-// signals" when self_heal_events was added (cycle-186); guard against
-// accidental removal and confirm the new signal is named.
-func TestSignalNames_ReturnsThirteen(t *testing.T) {
+// TestSignalNames_ReturnsTwelve — the public contract settled at "12
+// signals" after cost_envelope was removed with the token-budget cost
+// gates; guard against accidental removal and confirm self_heal_events
+// is still named.
+func TestSignalNames_ReturnsTwelve(t *testing.T) {
 	names := signalNames()
-	if len(names) != 13 {
-		t.Errorf("signalNames len=%d, want 13; got %v", len(names), names)
+	if len(names) != 12 {
+		t.Errorf("signalNames len=%d, want 12; got %v", len(names), names)
 	}
 	found := false
 	for _, n := range names {
@@ -709,22 +682,20 @@ func TestLoadLedger_Missing_NoFile(t *testing.T) {
 	}
 }
 
-// TestCheck_RunsThirteenSignals pins the signal roster to 13 (cycle-187
-// AC-10/AC-11 context). After cycles 180 and 186 the suite grew from 11 to 13
-// signals; the package comment must say "13", not the stale "11". This
-// behavioral test ties that number to reality: SignalsRun must list exactly 13
-// names, including the two newest — phase_latency (12) and self_heal_events
-// (13). It is pre-existing GREEN at the cycle-187 baseline (signals 12+13 already
-// shipped in cycle 186), and serves as the regression guard that keeps the
-// comment's "13" claim honest against the actual signal slice.
-func TestCheck_RunsThirteenSignals(t *testing.T) {
+// TestCheck_RunsTwelveSignals pins the signal roster to 12. The roster grew
+// from 11 to 13 over cycles 180/186; the cost_envelope signal was removed with
+// the token-budget cost gates, leaving 12. This behavioral test ties the count
+// in the package comment to reality: SignalsRun must list exactly 12 names,
+// including phase_latency and self_heal_events, and must NOT include the
+// removed cost_envelope signal.
+func TestCheck_RunsTwelveSignals(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.SignalsRun) != 13 {
-		t.Errorf("SignalsRun has %d entries, want 13: %v", len(r.SignalsRun), r.SignalsRun)
+	if len(r.SignalsRun) != 12 {
+		t.Errorf("SignalsRun has %d entries, want 12: %v", len(r.SignalsRun), r.SignalsRun)
 	}
 	for _, want := range []string{"phase_latency", "self_heal_events"} {
 		found := false
@@ -736,6 +707,11 @@ func TestCheck_RunsThirteenSignals(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("signal %q missing from SignalsRun=%v", want, r.SignalsRun)
+		}
+	}
+	for _, s := range r.SignalsRun {
+		if s == "cost_envelope" {
+			t.Errorf("cost_envelope signal should have been removed; got %v", r.SignalsRun)
 		}
 	}
 }

@@ -13,108 +13,47 @@ import (
 )
 
 // ============================================================================
-// Gap #1: --budget alias for --budget-usd
+// Deprecated cost flags are accepted no-ops
 // ============================================================================
 
-func TestParseLoopArgs_BudgetAlias(t *testing.T) {
+// TestParseLoopArgs_BudgetAliasAccepted verifies --budget-usd and its --budget
+// alias still parse without error (so existing scripts/CI don't break) but no
+// longer drive any behavior — cost is display-only telemetry now, and the flag
+// must NOT bump the cycle count (the former budget-mode 50-cycle default is gone).
+func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		flag string
-		val  string
-	}{
-		{"--budget-usd", "7.50"},
-		{"--budget", "7.50"}, // bash alias
-	}
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.flag, func(t *testing.T) {
+	for _, flag := range []string{"--budget-usd", "--budget"} {
+		flag := flag
+		t.Run(flag, func(t *testing.T) {
 			t.Parallel()
 			var stderr bytes.Buffer
-			cfg, rc := parseLoopArgs([]string{tc.flag, tc.val, "test goal"}, &stderr)
+			cfg, rc := parseLoopArgs([]string{flag, "7.50", "test goal"}, &stderr)
 			if rc != 0 {
-				t.Fatalf("%s %s: rc=%d (stderr=%q)", tc.flag, tc.val, rc, stderr.String())
+				t.Fatalf("%s: rc=%d (stderr=%q)", flag, rc, stderr.String())
 			}
-			if cfg.BudgetUSD != 7.5 {
-				t.Fatalf("BudgetUSD=%v want 7.5", cfg.BudgetUSD)
-			}
-			if !cfg.BudgetDriven {
-				t.Fatalf("BudgetDriven=false want true")
+			if cfg.MaxCycles != 1 {
+				t.Fatalf("%s must not drive cycle count: MaxCycles=%d want 1", flag, cfg.MaxCycles)
 			}
 		})
 	}
 }
 
 // ============================================================================
-// Gap #4: budget-driven mode safety-cap default
+// Deprecation WARN
 // ============================================================================
 
-func TestParseLoopArgs_BudgetModeDefaultCycles(t *testing.T) {
-	// NOT t.Parallel — mutates EVOLVE_BUDGET_MAX_CYCLES.
-	var stderr bytes.Buffer
-	// Unset env → default 50 safety cap
-	t.Setenv("EVOLVE_BUDGET_MAX_CYCLES", "")
-	cfg, _ := parseLoopArgs([]string{"--budget-usd", "1.0", "goal"}, &stderr)
-	if cfg.MaxCycles != 50 {
-		t.Fatalf("default budget-mode MaxCycles=%d want 50", cfg.MaxCycles)
-	}
-	// Env override
-	t.Setenv("EVOLVE_BUDGET_MAX_CYCLES", "12")
-	cfg, _ = parseLoopArgs([]string{"--budget", "1.0", "goal"}, &stderr)
-	if cfg.MaxCycles != 12 {
-		t.Fatalf("override MaxCycles=%d want 12", cfg.MaxCycles)
-	}
-	// Invalid env → falls back to 50
-	t.Setenv("EVOLVE_BUDGET_MAX_CYCLES", "abc")
-	cfg, _ = parseLoopArgs([]string{"--budget", "1.0", "goal"}, &stderr)
-	if cfg.MaxCycles != 50 {
-		t.Fatalf("invalid env MaxCycles=%d want 50 fallback", cfg.MaxCycles)
-	}
-	// Explicit --cycles overrides budget-mode default
-	t.Setenv("EVOLVE_BUDGET_MAX_CYCLES", "")
-	cfg, _ = parseLoopArgs([]string{"--budget", "1.0", "--cycles", "3", "goal"}, &stderr)
-	if cfg.MaxCycles != 3 {
-		t.Fatalf("explicit --cycles=3 MaxCycles=%d want 3", cfg.MaxCycles)
-	}
-}
-
-// TestParseIntEnv covers the parseIntEnv helper directly (also exercised
-// indirectly via the budget-mode default-cycles tests).
-func TestParseIntEnv(t *testing.T) {
-	tests := []struct {
-		val  string
-		def  int
-		want int
-	}{
-		{"", 50, 50},
-		{"100", 50, 100},
-		{"0", 50, 50},  // ≤0 → default
-		{"-1", 50, 50}, // ≤0 → default
-		{"abc", 50, 50},
-	}
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.val, func(t *testing.T) {
-			t.Setenv("TEST_PARSE_INT_ENV", tc.val)
-			if got := parseIntEnv("TEST_PARSE_INT_ENV", tc.def); got != tc.want {
-				t.Fatalf("parseIntEnv(%q,%d)=%d want %d", tc.val, tc.def, got, tc.want)
-			}
-		})
-	}
-}
-
-// ============================================================================
-// Gap #7: budget validation + deprecation WARN
-// ============================================================================
-
-func TestParseLoopArgs_NegativeBudgetRejected(t *testing.T) {
+// TestParseLoopArgs_NegativeBudgetAccepted — --budget-usd is a deprecated no-op,
+// so ANY value (incl. negative) is accepted and ignored. Previously a negative
+// value was a hard rc=10 error; that validation was removed for consistency.
+func TestParseLoopArgs_NegativeBudgetAccepted(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
-	_, rc := parseLoopArgs([]string{"--budget-usd", "-1", "goal"}, &stderr)
-	if rc != 10 {
-		t.Fatalf("rc=%d want 10 for negative budget", rc)
+	cfg, rc := parseLoopArgs([]string{"--budget-usd", "-1", "goal"}, &stderr)
+	if rc != 0 {
+		t.Fatalf("rc=%d want 0 (--budget-usd is an accepted no-op); stderr=%q", rc, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "must be a positive number") {
-		t.Fatalf("stderr missing positive-number diagnostic: %q", stderr.String())
+	if cfg.MaxCycles != 1 {
+		t.Fatalf("MaxCycles=%d want 1 (budget flag must not affect cycles)", cfg.MaxCycles)
 	}
 }
 
@@ -128,7 +67,7 @@ func TestParseLoopArgs_LegacyPositionalIntegerWarn(t *testing.T) {
 	if cfg.MaxCycles != 3 {
 		t.Fatalf("MaxCycles=%d want 3", cfg.MaxCycles)
 	}
-	if !strings.Contains(stderr.String(), "deprecated since v8.60.0") {
+	if !strings.Contains(stderr.String(), "deprecated") {
 		t.Fatalf("expected deprecation WARN; stderr=%q", stderr.String())
 	}
 }
@@ -287,76 +226,7 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 }
 
 // ============================================================================
-// Gap #2: rc=4 batch_cap overrun + Gap #4 budget-mode success
-// ============================================================================
-
-func TestRunLoop_BatchCapOverrun_Rc4(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
-
-	projectRoot := t.TempDir()
-	evolveDir := filepath.Join(projectRoot, ".evolve")
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	storage := &fixtures.FakeStorage{}
-	ledger := newFakeLedger()
-	defer installStubDeps(t, storage, ledger)()
-
-	// Cycle 1 cost = $2.50, cap = $1.00 → overrun → rc=4
-	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 2.50)
-
-	var stdout, stderr bytes.Buffer
-	rc := runLoop([]string{
-		"--project-root", projectRoot,
-		"--evolve-dir", evolveDir,
-		"--goal-text", "x",
-		"--cycles", "1",
-		"--batch-cap-usd", "1.0",
-	}, nil, &stdout, &stderr)
-	if rc != 4 {
-		t.Fatalf("rc=%d want 4 (batch_cap); stderr=%q", rc, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), `"stop_reason": "batch_cap"`) {
-		t.Fatalf("stop_reason should be batch_cap; stdout=%q", stdout.String())
-	}
-}
-
-func TestRunLoop_BudgetMode_Rc0(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
-	t.Setenv("EVOLVE_BUDGET_MAX_CYCLES", "5")
-
-	projectRoot := t.TempDir()
-	evolveDir := filepath.Join(projectRoot, ".evolve")
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	storage := &fixtures.FakeStorage{}
-	ledger := newFakeLedger()
-	defer installStubDeps(t, storage, ledger)()
-
-	// Cycle 1 cost = $0.60, budget = $0.50 → BUDGET-DRIVEN COMPLETE rc=0
-	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 0.60)
-
-	var stdout, stderr bytes.Buffer
-	rc := runLoop([]string{
-		"--project-root", projectRoot,
-		"--evolve-dir", evolveDir,
-		"--goal-text", "x",
-		"--budget-usd", "0.50",
-		"--batch-cap-usd", "20.0",
-	}, nil, &stdout, &stderr)
-	if rc != 0 {
-		t.Fatalf("rc=%d want 0 (budget complete); stderr=%q", rc, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), `"stop_reason": "budget"`) {
-		t.Fatalf("stop_reason should be budget; stdout=%q", stdout.String())
-	}
-}
-
-// ============================================================================
-// Gap #5: --reset Go-side pruning
+// --reset Go-side pruning
 // ============================================================================
 
 func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
@@ -409,43 +279,17 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 }
 
 // ============================================================================
-// Gap #7: env opt-outs
+// Deprecated cost env-vars are inert
 // ============================================================================
 
-func TestRunLoop_CheckpointDisabledSkipsWarn(t *testing.T) {
+// TestRunLoop_DeprecatedCostEnvVarsInert verifies the former budget env-vars
+// (EVOLVE_CHECKPOINT_DISABLE / EVOLVE_BATCH_BUDGET_DISABLE) no longer change
+// behavior: cost is always summarized as display-only telemetry, no BATCH-BUDGET
+// output is ever emitted, and the loop exits 0 regardless of cost.
+func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 	t.Setenv("EVOLVE_CHECKPOINT_DISABLE", "1")
-
-	projectRoot := t.TempDir()
-	evolveDir := filepath.Join(projectRoot, ".evolve")
-	_ = os.MkdirAll(evolveDir, 0o755)
-	storage := &fixtures.FakeStorage{}
-	ledger := newFakeLedger()
-	defer installStubDeps(t, storage, ledger)()
-	// $0.85 of $1.00 → WARN would normally fire; checkpoint-disabled silences it
-	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 0.85)
-
-	var stdout, stderr bytes.Buffer
-	_ = runLoop([]string{
-		"--project-root", projectRoot,
-		"--evolve-dir", evolveDir,
-		"--goal-text", "x",
-		"--cycles", "1",
-		"--batch-cap-usd", "1.0",
-	}, nil, &stdout, &stderr)
-	if strings.Contains(stderr.String(), "BATCH-BUDGET WARN") {
-		t.Fatalf("BATCH-BUDGET WARN should be suppressed under EVOLVE_CHECKPOINT_DISABLE=1; got %q", stderr.String())
-	}
-	// Cost tracking still happens.
-	if !strings.Contains(stderr.String(), "cost: $0.8500") {
-		t.Fatalf("expected cycle cost still logged; got %q", stderr.String())
-	}
-}
-
-func TestRunLoop_BatchBudgetDisabledSkipsAccounting(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 	t.Setenv("EVOLVE_BATCH_BUDGET_DISABLE", "1")
 
 	projectRoot := t.TempDir()
@@ -454,7 +298,7 @@ func TestRunLoop_BatchBudgetDisabledSkipsAccounting(t *testing.T) {
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
-	// $2.50 of $1.00 — would normally rc=4; disabled bypasses that
+	// $2.50 of the former $1.00 cap — would once have tripped rc=4; now inert.
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 2.50)
 
 	var stdout, stderr bytes.Buffer
@@ -466,15 +310,14 @@ func TestRunLoop_BatchBudgetDisabledSkipsAccounting(t *testing.T) {
 		"--batch-cap-usd", "1.0",
 	}, nil, &stdout, &stderr)
 	if rc != 0 {
-		t.Fatalf("rc=%d want 0 (budget tracking disabled)", rc)
+		t.Fatalf("rc=%d want 0 (cost env-vars are inert); stderr=%q", rc, stderr.String())
 	}
-	// No cost line in stderr (accounting fully skipped)
-	if strings.Contains(stderr.String(), "cycle 1 cost") {
-		t.Fatalf("cost line should be suppressed under BATCH_BUDGET_DISABLE=1; got %q", stderr.String())
+	if strings.Contains(stderr.String(), "BATCH-BUDGET") {
+		t.Fatalf("no BATCH-BUDGET output expected; got %q", stderr.String())
 	}
-	// Total cost in output should remain 0 because we skipped summing.
-	if !strings.Contains(stdout.String(), `"total_cost_usd": 0`) {
-		t.Fatalf("expected total_cost_usd 0 under BATCH_BUDGET_DISABLE; got %q", stdout.String())
+	// Cost telemetry is always summarized now (the env-var no longer skips it).
+	if !strings.Contains(stderr.String(), "cycle 1 cost: $2.5000") {
+		t.Fatalf("expected cycle cost still logged as telemetry; got %q", stderr.String())
 	}
 }
 

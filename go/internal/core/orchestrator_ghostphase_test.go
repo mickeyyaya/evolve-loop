@@ -60,7 +60,6 @@ func TestRunCycle_UnregisteredOptionalPhase_SkippedLoudly(t *testing.T) {
 	res, rerr := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if rerr != nil {
