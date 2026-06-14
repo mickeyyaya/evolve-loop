@@ -1,0 +1,46 @@
+{
+  "name": "cache-strategy-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-cache-strategy-scan",
+  "categories": [
+    "caching"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/cache-strategy-scan-report.md"
+    ],
+    "signals": [
+      "cache.severity_max",
+      "cache.invalidation_gap_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Cache Sites Touched",
+      "Coherence Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "caching"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

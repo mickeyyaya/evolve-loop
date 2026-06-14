@@ -1,0 +1,46 @@
+{
+  "name": "caching-strategy-design",
+  "archetype": "plan",
+  "agent": "evolve-caching-strategy-design",
+  "categories": [
+    "caching"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md"
+    ],
+    "signals": [
+      "scout.goal_type",
+      "scout.cycle_size"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/caching-strategy-design-report.md"
+    ],
+    "signals": [
+      "cachedesign.surfaces_count",
+      "cachedesign.invalidation_trigger_count",
+      "cachedesign.pattern"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Cacheable Surfaces",
+      "Cache Strategy",
+      "Invalidation & TTL"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "caching"
+      }
+    ]
+  },
+  "after": "triage",
+  "optional": true
+}

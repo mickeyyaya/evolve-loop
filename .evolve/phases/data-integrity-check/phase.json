@@ -1,0 +1,46 @@
+{
+  "name": "data-integrity-check",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-data-integrity-check",
+  "categories": [
+    "data-pipeline"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/data-integrity-check-report.md"
+    ],
+    "signals": [
+      "dataintegrity.severity_max",
+      "dataintegrity.gap_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Pipeline Stages Touched",
+      "Integrity Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "data-pipeline"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

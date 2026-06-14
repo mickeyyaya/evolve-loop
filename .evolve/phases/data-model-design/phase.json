@@ -1,0 +1,45 @@
+{
+  "name": "data-model-design",
+  "archetype": "plan",
+  "agent": "evolve-data-model-design",
+  "categories": [
+    "database"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md"
+    ],
+    "signals": [
+      "scout.goal_type",
+      "scout.cycle_size"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/data-model-design-report.md"
+    ],
+    "signals": [
+      "datamodel.entities_count",
+      "datamodel.index_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Entities & Relationships",
+      "Schema & Indexes",
+      "Access Patterns"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "database"
+      }
+    ]
+  },
+  "after": "triage",
+  "optional": true
+}

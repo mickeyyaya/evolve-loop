@@ -50,22 +50,28 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → coverage-gate → flake-rerun-scan |
+| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → error-handling-scan → coverage-gate → flake-rerun-scan |
 | feature | premise-challenge → spec-verify → api-contract-design → [tdd, build] → test-amplification → coverage-gate → secret-leak-scan |
-| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → coverage-gate → cleanup-sweep |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → type-safety-audit → mutation-gate → coverage-gate → cleanup-sweep |
 | security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
 | performance | benchmark baseline capture → [build] → benchmark-gate |
-| release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
+| release | rollout-plan → rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | docs / trivial | spine only (no insertions) |
 | concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
 | api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
 | data-migration | rollback-plan → [tdd, build] → migration-safety-check → coverage-gate |
-| observability | [build] → telemetry-coverage-check → adversarial-review |
+| observability | observability-design → [build] → telemetry-coverage-check → adversarial-review |
 | supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
 | agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
 | accessibility | scope-baseline → [build] → accessibility-audit → adversarial-review |
 | frontend-ui | prd-draft → [build] → frontend-design-review → accessibility-audit |
 | i18n | scope-baseline → [build] → locale-format-check |
+| database | data-model-design → [tdd, build] → query-performance-scan → migration-safety-check |
+| caching | caching-strategy-design → [build] → cache-strategy-scan |
+| resilience | resilience-design → [tdd, build] → resilience-gap-scan → flake-rerun-scan |
+| messaging | [tdd, build] → idempotency-check → contract-fuzz-probe |
+| infrastructure | [build] → container-hardening-scan → cicd-pipeline-audit → secret-leak-scan |
+| data-pipeline | scope-baseline → [build] → data-integrity-check → migration-safety-check |
 | project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
 | business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
 | accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
@@ -140,6 +146,20 @@ something plausible.
 | `accessibility-audit` | a WCAG 2.1/2.2 AA violation on a user-facing path — semantics/ARIA/contrast/keyboard/focus/screen-reader review mapped to success criteria |
 | `frontend-design-review` | a UI shipping with broken layout/responsiveness or off-design-system polish — senior-design-reviewer critique distinct from a11y compliance |
 | `locale-format-check` | hardcoded copy or non-locale-aware formatting blocking a market — i18n anti-pattern + plural/RTL/date/number/currency review |
+| `query-performance-scan` | an N+1 / missing-index / full-scan / unbounded-result query reaching production — the query-shape lens the correctness audit and CPU benchmarks lack |
+| `cache-strategy-scan` | a cache serving stale data or stampeding — missing/incorrect invalidation, unbounded TTL, no stampede protection, cache-aside race (verifies what caching-strategy-design proposed) |
+| `resilience-gap-scan` | an external-dependency call with no timeout/retry/circuit-breaker/bulkhead (or retry without backoff/idempotency) — one slow dependency cascading into total failure |
+| `idempotency-check` | a non-idempotent handler under at-least-once delivery — duplicate-delivery double-processing with no dedup key / exactly-once guard / safe replay |
+| `error-handling-scan` | an error silently swallowed, a return ignored, or a catch-all fallback hiding failure — a failure that looks like success until production (focused, not smell-scan's broad ranking) |
+| `container-hardening-scan` | a Dockerfile/k8s manifest shipping insecure defaults — root user, :latest, no resource limits, privileged/hostPath, secrets in env, no healthcheck, writable rootfs |
+| `cicd-pipeline-audit` | a CI/CD workflow leaking secrets or running untrusted code — unpinned action SHAs, pull_request_target+fork checkout, over-privileged token, secret-to-log, untrusted-input interpolation |
+| `type-safety-audit` | a type escape hatch (any/interface{}/unchecked cast) or a boundary with no invariant — bugs the compiler should have caught but a weak type lets through (static, not runtime fuzzing) |
+| `data-integrity-check` | a stream/batch pipeline corrupting or dropping records — schema drift, null/dedup gaps, out-of-order/late data, at-least-once vs exactly-once confusion, partial-write with no transaction boundary |
+| `resilience-design` | building a new external integration with no fault-tolerance design — declares timeout/retry/circuit-breaker/bulkhead/fallback BEFORE build (forward half of resilience-gap-scan) |
+| `data-model-design` | building a data-heavy feature with no schema/index/access-pattern decision — the data-layer counterpart to api-contract-design, fixing entities/keys/indexes/access paths before any table |
+| `caching-strategy-design` | adding caching with no pattern/key/invalidation decision — declares cache pattern, key schema, invalidation triggers, TTL/eviction BEFORE build (forward half of cache-strategy-scan) |
+| `observability-design` | building a new path with no instrumentation plan — declares metrics/logs/traces/SLOs/alerts BEFORE build (forward half of telemetry-coverage-check, distinct from metric-tree's product metrics) |
+| `rollout-plan` | shipping a risky change with no progressive-delivery plan — deploy strategy (canary/blue-green), feature-flag + kill-switch, automated rollback triggers + blast radius (forward complement to rollback-plan's revert mechanism) |
 
 Selecting a phase whose persona/runner/profile is not dispatchable crashes the
 cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);
