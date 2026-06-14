@@ -1,8 +1,29 @@
 {
-  "generated_at": "2026-06-07T06:51:01.091621+08:00",
+  "generated_at": "2026-06-14T21:02:48.207414+08:00",
   "project_root": "/Users/danleemh/ai/claude/evolve-loop-phase-plugin",
-  "phase_count": 42,
+  "phase_count": 65,
   "phases": [
+    {
+      "name": "accessibility-audit",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-accessibility-audit",
+      "categories": [
+        "accessibility"
+      ],
+      "artifact": "accessibility-audit-report.md",
+      "required_sections": [
+        "## Components Audited",
+        "## WCAG Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
     {
       "name": "account-reconcile",
       "source": "user",
@@ -41,6 +62,24 @@
       "after": "build"
     },
     {
+      "name": "api-contract-design",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-api-contract-design",
+      "artifact": "api-contract.md",
+      "required_sections": [
+        "## Surfaces",
+        "## Interface Definitions",
+        "## Invariants",
+        "## Verdict"
+      ],
+      "after": "triage"
+    },
+    {
       "name": "architecture-design",
       "source": "builtin",
       "archetype": "plan",
@@ -63,6 +102,27 @@
       "tier": "auto",
       "agent": "evolve-audit",
       "artifact": "audit-report.md"
+    },
+    {
+      "name": "authz-gap-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-authz-gap-scan",
+      "categories": [
+        "security"
+      ],
+      "artifact": "authz-gap-scan-report.md",
+      "required_sections": [
+        "## Protected Resources Touched",
+        "## Authorization Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "behavior-baseline",
@@ -96,6 +156,24 @@
       ],
       "emits_verdict": true,
       "after": "build"
+    },
+    {
+      "name": "benchmark-gate",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-benchmark-gate",
+      "artifact": "benchmark-gate-report.md",
+      "required_sections": [
+        "## Benchmarks",
+        "## Statistical Comparison",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "perf-profile"
     },
     {
       "name": "bug-reproduction",
@@ -156,6 +234,42 @@
       "after": "triage"
     },
     {
+      "name": "changelog-sync",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-changelog-sync",
+      "artifact": "changelog-sync-report.md",
+      "required_sections": [
+        "## Shipped Commits",
+        "## Changelog State",
+        "## Drift",
+        "## Verdict"
+      ],
+      "after": "ship"
+    },
+    {
+      "name": "cleanup-sweep",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-cleanup-sweep",
+      "artifact": "cleanup-sweep-report.md",
+      "required_sections": [
+        "## Dead Code Analysis",
+        "## Unused Dependencies",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "mutation-gate"
+    },
+    {
       "name": "close-checklist",
       "source": "user",
       "root": ".evolve/phases",
@@ -173,6 +287,86 @@
       "after": "triage"
     },
     {
+      "name": "compat-surface-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-compat-surface-check",
+      "categories": [
+        "api-design"
+      ],
+      "artifact": "compat-surface-check-report.md",
+      "required_sections": [
+        "## Exported Surface Diff",
+        "## Breaking Changes",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "context-condense",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-context-condense",
+      "artifact": "context-condense-report.md",
+      "required_sections": [
+        "## Artifacts Scanned",
+        "## Condensed Digest",
+        "## Verdict"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "contract-fuzz-probe",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-contract-fuzz-probe",
+      "categories": [
+        "api-design"
+      ],
+      "artifact": "contract-fuzz-probe-report.md",
+      "required_sections": [
+        "## Boundaries Probed",
+        "## Validation Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "coverage-gate",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-coverage-gate",
+      "categories": [
+        "feature"
+      ],
+      "artifact": "coverage-gate-report.md",
+      "required_sections": [
+        "## Coverage Delta",
+        "## Uncovered Changed Lines",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "dependency-audit",
       "source": "user",
       "root": ".evolve/phases",
@@ -185,6 +379,7 @@
       "required_sections": [
         "## Findings"
       ],
+      "emits_verdict": true,
       "after": "build"
     },
     {
@@ -232,6 +427,27 @@
       "after": "triage"
     },
     {
+      "name": "flake-rerun-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-flake-rerun-scan",
+      "categories": [
+        "bugfix"
+      ],
+      "artifact": "flake-rerun-scan-report.md",
+      "required_sections": [
+        "## Tests Re-run",
+        "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "forces-analysis",
       "source": "user",
       "root": ".evolve/phases",
@@ -249,6 +465,45 @@
       ],
       "emits_verdict": true,
       "after": "triage"
+    },
+    {
+      "name": "frontend-design-review",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-frontend-design-review",
+      "categories": [
+        "frontend-ui"
+      ],
+      "artifact": "frontend-design-review-report.md",
+      "required_sections": [
+        "## UI Changes",
+        "## Design Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "fuzz-probe",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-fuzz-probe",
+      "artifact": "fuzz-probe-report.md",
+      "required_sections": [
+        "## Target Functions",
+        "## Fuzz Results",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "incident-postmortem",
@@ -278,6 +533,48 @@
       "tier": "auto",
       "agent": "evolve-intent",
       "artifact": "intent.md"
+    },
+    {
+      "name": "license-provenance-audit",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-license-provenance-audit",
+      "categories": [
+        "supply-chain"
+      ],
+      "artifact": "license-provenance-audit-report.md",
+      "required_sections": [
+        "## New Dependencies",
+        "## License \u0026 Provenance Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "locale-format-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-locale-format-check",
+      "categories": [
+        "i18n"
+      ],
+      "artifact": "locale-format-check-report.md",
+      "required_sections": [
+        "## Localized Surfaces",
+        "## Formatting Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "market-sizing",
@@ -325,6 +622,27 @@
       ],
       "emits_verdict": true,
       "after": "triage"
+    },
+    {
+      "name": "migration-safety-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-migration-safety-check",
+      "categories": [
+        "data-migration"
+      ],
+      "artifact": "migration-safety-check-report.md",
+      "required_sections": [
+        "## Migration Operations",
+        "## Reversibility Analysis",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "mutation-gate",
@@ -408,6 +726,23 @@
       "artifact": "plan-review-report.md"
     },
     {
+      "name": "post-ship-monitor",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-post-ship-monitor",
+      "artifact": "post-ship-monitor-report.md",
+      "required_sections": [
+        "## Health Probes",
+        "## Results",
+        "## Verdict"
+      ],
+      "after": "ship"
+    },
+    {
       "name": "prd-draft",
       "source": "user",
       "root": ".evolve/phases",
@@ -424,6 +759,69 @@
         "## Out of Scope"
       ],
       "after": "triage"
+    },
+    {
+      "name": "premise-challenge",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-premise-challenge",
+      "categories": [
+        "feature"
+      ],
+      "artifact": "premise-challenge-report.md",
+      "required_sections": [
+        "## Stated Premise",
+        "## Falsification Attempts",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "triage"
+    },
+    {
+      "name": "prompt-regression-eval",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-prompt-regression-eval",
+      "categories": [
+        "agent-instruction"
+      ],
+      "artifact": "prompt-regression-eval-report.md",
+      "required_sections": [
+        "## Instruction Changes",
+        "## Behavioral Rubric Scores",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "race-condition-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-race-condition-scan",
+      "categories": [
+        "concurrency"
+      ],
+      "artifact": "race-condition-scan-report.md",
+      "required_sections": [
+        "## Concurrent Surfaces Touched",
+        "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "retrospective",
@@ -452,6 +850,24 @@
         "## Owners"
       ],
       "after": "triage"
+    },
+    {
+      "name": "rollback-plan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "control",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-rollback-plan",
+      "artifact": "rollback-plan.md",
+      "required_sections": [
+        "## Reversion Mechanism",
+        "## Blast Radius",
+        "## Verification",
+        "## Verdict"
+      ],
+      "after": "audit"
     },
     {
       "name": "runbook-draft",
@@ -499,6 +915,27 @@
       "artifact": "scout-report.md"
     },
     {
+      "name": "secret-leak-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-secret-leak-scan",
+      "categories": [
+        "security"
+      ],
+      "artifact": "secret-leak-scan-report.md",
+      "required_sections": [
+        "## Scanned Diff",
+        "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "security-scan",
       "source": "user",
       "root": ".evolve/phases",
@@ -511,16 +948,17 @@
       "required_sections": [
         "## Findings"
       ],
+      "emits_verdict": true,
       "after": "build"
     },
     {
       "name": "ship",
       "source": "builtin",
       "archetype": "control",
-      "kind": "llm",
+      "kind": "native",
       "tier": "auto",
       "agent": "evolve-ship",
-      "artifact": "ship-report.md"
+      "artifact": ""
     },
     {
       "name": "smell-scan",
@@ -557,6 +995,27 @@
       "tier": "auto",
       "agent": "evolve-tdd",
       "artifact": "tdd-contract.md"
+    },
+    {
+      "name": "telemetry-coverage-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-telemetry-coverage-check",
+      "categories": [
+        "observability"
+      ],
+      "artifact": "telemetry-coverage-check-report.md",
+      "required_sections": [
+        "## New Code Paths",
+        "## Instrumentation Gaps",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "test-amplification",
@@ -609,7 +1068,7 @@
       "optional": true,
       "tier": "auto",
       "agent": "evolve-triage",
-      "artifact": "triage-decision.md"
+      "artifact": "triage-report.md"
     },
     {
       "name": "variance-analysis",
@@ -632,25 +1091,68 @@
     }
   ],
   "category_index": {
+    "accessibility": [
+      "accessibility-audit"
+    ],
+    "agent-instruction": [
+      "prompt-regression-eval"
+    ],
+    "api-design": [
+      "compat-surface-check",
+      "contract-fuzz-probe"
+    ],
     "bugfix": [
-      "bug-reproduction"
+      "bug-reproduction",
+      "flake-rerun-scan"
+    ],
+    "concurrency": [
+      "race-condition-scan"
+    ],
+    "data-migration": [
+      "migration-safety-check"
+    ],
+    "feature": [
+      "coverage-gate",
+      "premise-challenge"
+    ],
+    "frontend-ui": [
+      "frontend-design-review"
+    ],
+    "i18n": [
+      "locale-format-check"
+    ],
+    "observability": [
+      "telemetry-coverage-check"
+    ],
+    "security": [
+      "authz-gap-scan",
+      "secret-leak-scan"
+    ],
+    "supply-chain": [
+      "license-provenance-audit"
     ],
     "uncategorized": [
       "account-reconcile",
       "adversarial-review",
+      "api-contract-design",
       "architecture-design",
       "audit",
       "behavior-baseline",
       "behavior-compare",
+      "benchmark-gate",
       "build",
       "build-planner",
       "capacity-plan",
+      "changelog-sync",
+      "cleanup-sweep",
       "close-checklist",
+      "context-condense",
       "dependency-audit",
       "dependency-map",
       "doc-sync",
       "fault-localization",
       "forces-analysis",
+      "fuzz-probe",
       "incident-postmortem",
       "intent",
       "market-sizing",
@@ -661,9 +1163,11 @@
       "opportunity-map",
       "perf-profile",
       "plan-review",
+      "post-ship-monitor",
       "prd-draft",
       "retrospective",
       "risk-register",
+      "rollback-plan",
       "runbook-draft",
       "scope-baseline",
       "scout",

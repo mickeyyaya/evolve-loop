@@ -1,0 +1,47 @@
+{
+  "name": "coverage-gate",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-coverage-gate",
+  "categories": [
+    "feature"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/coverage-gate-report.md"
+    ],
+    "signals": [
+      "coverage.delta",
+      "coverage.uncovered_changed_lines",
+      "coverage.severity_max"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Coverage Delta",
+      "Uncovered Changed Lines",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "build.diff_loc",
+        "op": "gte",
+        "value": 50
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "authz-gap-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-authz-gap-scan",
+  "categories": [
+    "security"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md",
+      ".evolve/runs/cycle-{cycle}/scout-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.security_relevant"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/authz-gap-scan-report.md"
+    ],
+    "signals": [
+      "authz.severity_max",
+      "authz.gap_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Protected Resources Touched",
+      "Authorization Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.security_relevant",
+        "op": "==",
+        "value": true
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

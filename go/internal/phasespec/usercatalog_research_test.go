@@ -160,6 +160,83 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## North Star Metric", "## Input Metrics", "## Guardrail Metrics"},
 			hasVerdict: true,
 		},
+		// Wave 4 — adversarial-pipeline phases (2026-06-14, micro-phase-catalog.md §8).
+		// All 15 are evaluate gates → hasVerdict true; artifact <name>-report.md.
+		"premise-challenge": {
+			artifact:   "premise-challenge-report.md",
+			sections:   []string{"## Stated Premise", "## Falsification Attempts", "## Verdict"},
+			hasVerdict: true,
+		},
+		"coverage-gate": {
+			artifact:   "coverage-gate-report.md",
+			sections:   []string{"## Coverage Delta", "## Uncovered Changed Lines", "## Verdict"},
+			hasVerdict: true,
+		},
+		"secret-leak-scan": {
+			artifact:   "secret-leak-scan-report.md",
+			sections:   []string{"## Scanned Diff", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"flake-rerun-scan": {
+			artifact:   "flake-rerun-scan-report.md",
+			sections:   []string{"## Tests Re-run", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"race-condition-scan": {
+			artifact:   "race-condition-scan-report.md",
+			sections:   []string{"## Concurrent Surfaces Touched", "## Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"authz-gap-scan": {
+			artifact:   "authz-gap-scan-report.md",
+			sections:   []string{"## Protected Resources Touched", "## Authorization Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"compat-surface-check": {
+			artifact:   "compat-surface-check-report.md",
+			sections:   []string{"## Exported Surface Diff", "## Breaking Changes", "## Verdict"},
+			hasVerdict: true,
+		},
+		"contract-fuzz-probe": {
+			artifact:   "contract-fuzz-probe-report.md",
+			sections:   []string{"## Boundaries Probed", "## Validation Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"migration-safety-check": {
+			artifact:   "migration-safety-check-report.md",
+			sections:   []string{"## Migration Operations", "## Reversibility Analysis", "## Verdict"},
+			hasVerdict: true,
+		},
+		"telemetry-coverage-check": {
+			artifact:   "telemetry-coverage-check-report.md",
+			sections:   []string{"## New Code Paths", "## Instrumentation Gaps", "## Verdict"},
+			hasVerdict: true,
+		},
+		"license-provenance-audit": {
+			artifact:   "license-provenance-audit-report.md",
+			sections:   []string{"## New Dependencies", "## License & Provenance Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"prompt-regression-eval": {
+			artifact:   "prompt-regression-eval-report.md",
+			sections:   []string{"## Instruction Changes", "## Behavioral Rubric Scores", "## Verdict"},
+			hasVerdict: true,
+		},
+		"accessibility-audit": {
+			artifact:   "accessibility-audit-report.md",
+			sections:   []string{"## Components Audited", "## WCAG Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"frontend-design-review": {
+			artifact:   "frontend-design-review-report.md",
+			sections:   []string{"## UI Changes", "## Design Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"locale-format-check": {
+			artifact:   "locale-format-check-report.md",
+			sections:   []string{"## Localized Surfaces", "## Formatting Findings", "## Verdict"},
+			hasVerdict: true,
+		},
 	}
 
 	for name, w := range cases {

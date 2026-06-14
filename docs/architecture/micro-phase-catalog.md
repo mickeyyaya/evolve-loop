@@ -182,3 +182,33 @@ Floor implications (≥1 evaluate before ship; build∧audit ordering) must be r
 - Per phase at implementation: `evolve phases validate <name>` OK; `evolve phases list` shows it; one shadow cycle with the phase routed but `fail_if_signal` relaxed; then tighten.
 - Catalog-level: a bugfix-goal cycle's routing-plan.json shows the bugfix recipe phases selected; a docs-goal cycle shows spine-only (cost control works both ways).
 - Advisor honors recipes: compare `routing-plan.json` justifications against goal classification across ≥3 goal types.
+
+## 8. Wave 4 — adversarial-pipeline phases (2026-06-14, skills-derived)
+
+Source: a research pass over the most-starred community agent-skill catalogs (agentskills.media → `alirezarezvani/claude-skills`, `VoltAgent/awesome-agent-skills`, `anthropics/skills`, the openaitoolshub "349 ranked" list) cross-referenced against existing coverage. Translates the highest-value, currently-uncovered skill classes into **15 new optional `evaluate` gates** so the loop hardens *any* request type. All are `optional:true` user phases (4-file scaffold, zero spine change); each is an independent skeptic that may BLOCK on CRITICAL but is advisory + clamped to the integrity floor.
+
+**The live recipes + per-phase core values are the SSOT in [`agents/evolve-router.md`](../../agents/evolve-router.md)** (Goal-Type Recipes table + Phase Catalog — Core Values). This section is the design record (what + why + which skill it derives from); it does not restate the recipes.
+
+| Phase (archetype) | Goal type | Derived from / risk removed |
+|---|---|---|
+| `premise-challenge` (evaluate) | feature/all | Brainstorming / Systematic Debugging — falsifies the premise before build (Core Rules 1–3 as a gate) |
+| `coverage-gate` (evaluate) | feature/all | Test-coverage review — changed-line coverage regression (complements mutation-gate = strength) |
+| `secret-leak-scan` (evaluate) | security/all | Security scanning — hardcoded-secret/entropy scan of the added diff |
+| `flake-rerun-scan` (evaluate) | bugfix/all | Test-quality review — re-run touched tests for non-determinism |
+| `race-condition-scan` (evaluate) | concurrency *(new)* | concurrency-patterns / go-review — `go test -race` + goroutine-leak gate |
+| `authz-gap-scan` (evaluate) | security | auth-authz-patterns — RBAC/ABAC/object-level/JWT/session gaps |
+| `compat-surface-check` (evaluate) | api-design *(new)* | API-contract review — apidiff of realized public surface vs prior release |
+| `contract-fuzz-probe` (evaluate) | api-design *(new)* | data-validation-schema — boundary validation (not just non-crashing) |
+| `migration-safety-check` (evaluate) | data-migration *(new)* | database-migrations — reversibility/idempotency of schema/state migrations |
+| `telemetry-coverage-check` (evaluate) | observability *(new)* | observability-patterns — logs/metrics/traces on new paths before ship |
+| `license-provenance-audit` (evaluate) | supply-chain *(new)* | dependency/supply-chain — license + SLSA/SBOM provenance (CVE-complement) |
+| `prompt-regression-eval` (evaluate) | agent-instruction *(new)* | agent-self-evaluation — behavioral-rubric regression on persona/skill edits |
+| `accessibility-audit` (evaluate) | accessibility *(new)* | frontend-a11y — WCAG 2.1/2.2 AA conformance |
+| `frontend-design-review` (evaluate) | frontend-ui *(new)* | frontend-design — UI quality/design-system conformance |
+| `locale-format-check` (evaluate) | i18n *(new)* | i18n-l10n-patterns — string externalization + locale-aware formatting |
+
+**New signal namespaces:** `premise.*`, `coverage.*`, `leak.*`, `flake.*`, `race.*`, `authz.*`, `compat.*`, `boundary.*`, `migration.*`, `telemetry.*`, `license.*`, `prompteval.*`, `a11y.*`, `uidesign.*`, `i18n.*` (checked against §4.3 — no collisions).
+
+**New goal types** added to the router recipe table *and* the closed `knownCategories` vocabulary (`go/internal/phasespec/validate.go`) so `.evolve/phase-inventory.json` `category_index` groups them: `concurrency`, `api-design`, `data-migration`, `observability`, `supply-chain`, `agent-instruction`, `accessibility`, `frontend-ui`, `i18n`. Routing uses the proven `insert_when: scout.goal_type == "<type>"` string-equality mechanism (free-form classifier string — no Go enum). The four broad gates (`premise-challenge`, `coverage-gate`, `secret-leak-scan`, `flake-rerun-scan`) trigger on generic signals (`build.files_touched`/`build.diff_loc`/`scout.cycle_size`) so they harden most cycles; the advisor still proposes and `ClampPlanToFloor` caps total insertions at `max_optional_insertions` (6).
+
+**Out of scope this wave (deferred):** `string-extraction-audit` (folded into `locale-format-check`); a `plan`-archetype design counterpart for each gate (the gates verify; existing `architecture-design`/`api-contract-design`/`threat-model` cover forward design).

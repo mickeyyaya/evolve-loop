@@ -26,6 +26,15 @@ var canonicalVerdicts = map[string]bool{"PASS": true, "FAIL": true, "WARN": true
 var knownCategories = map[string]bool{
 	"bugfix": true, "feature": true, "refactor": true, "security": true,
 	"performance": true, "release": true, "docs": true,
+	// Domain goal types (domain-phase-catalog.md §3 recipe table).
+	"project-management": true, "business-strategy": true, "accounting-close": true,
+	"product-discovery": true, "ops-incident": true,
+	// 2026 adversarial-pipeline goal types (skills-derived wave): each names a
+	// distinct request class the advisor classifies and routes via the
+	// evolve-router.md recipe table.
+	"concurrency": true, "api-design": true, "data-migration": true,
+	"observability": true, "supply-chain": true, "agent-instruction": true,
+	"accessibility": true, "frontend-ui": true, "i18n": true,
 }
 
 // UnknownCategories returns the entries of s.Categories that are not in the
