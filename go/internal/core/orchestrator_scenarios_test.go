@@ -15,9 +15,6 @@ import (
 
 func TestCycleScenarios(t *testing.T) {
 	t.Parallel()
-	if testing.Short() {
-		t.Skip("scenario catalog: use non-short test runs for full routing coverage")
-	}
 	RunAll(t, cycleCatalog())
 }
 
