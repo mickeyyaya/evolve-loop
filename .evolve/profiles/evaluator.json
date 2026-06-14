@@ -5,9 +5,9 @@
   "cli_fallback": [
     "claude-tmux"
   ],
-  "model_tier_default": "sonnet",
+  "model_tier_default": "fast",
   "model_tier_overrides": {
-    "harden_strategy": "opus"
+    "harden_strategy": "deep"
   },
   "allowed_tools": [
     "Read",

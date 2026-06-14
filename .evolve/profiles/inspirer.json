@@ -2,9 +2,9 @@
   "name": "inspirer",
   "role": "inspirer",
   "cli": "claude-tmux",
-  "model_tier_default": "sonnet",
+  "model_tier_default": "balanced",
   "model_tier_overrides": {
-    "cold_start": "opus"
+    "cold_start": "deep"
   },
   "allowed_tools": [
     "Read",

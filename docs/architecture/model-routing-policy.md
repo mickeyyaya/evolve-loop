@@ -64,14 +64,15 @@ model name) plus `modelcatalog` per-CLI lookup tests.
 
 ## Migration Status
 
-Driver-agnostic tier vocabulary is enforced for the **7 spine phases above**
-(default + overrides + envelope), guarded by `TestSpineProfilesAreDriverAgnostic`.
+Driver-agnostic tier vocabulary is enforced for the **7 spine phases above** by
+`TestSpineProfilesAreDriverAgnostic` and for the full `.evolve/profiles/*.json`
+fleet by `TestAllProfilesAreDriverAgnostic`. Both guards cover defaults,
+overrides, and tier envelopes.
 
-The ~48 domain/optional phase profiles (`api-contract-design`, `security-scan`,
-`market-sizing`, …) and their overrides **still carry vendor model names** and
-are migrating to canonical tiers via the evolve loop (operator note
-`driver-agnostic-model-routing`). When that migration completes, widen the guard
-test's `spine` set to the full fleet so the invariant covers every profile.
+The domain/optional phase profile migration is complete: profile defaults and
+overrides now use only `fast`, `balanced`, and `deep`. The per-driver concrete
+model remains owned by `modelcatalog`, keeping profiles driver-agnostic at
+parity across Claude, Codex, agy, and other supported bridges.
 
 ## Research Basis
 

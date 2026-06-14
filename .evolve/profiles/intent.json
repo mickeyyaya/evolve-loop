@@ -2,10 +2,10 @@
   "name": "intent",
   "role": "intent",
   "cli": "claude-tmux",
-  "model_tier_default": "opus",
+  "model_tier_default": "deep",
   "model_tier_overrides": {
-    "vague_goal": "opus",
-    "clear_goal": "sonnet"
+    "vague_goal": "deep",
+    "clear_goal": "balanced"
   },
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
