@@ -115,7 +115,31 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			// -f here; the in-memory adapter at adapters/sandbox.Sandbox.Exec
 			// stays on -p because it holds the SBPL string, not a file.
 			sbpl := sandbox.GenerateSBPL(cfg)
-			sbplPath := filepath.Join(req.Workspace, "sandbox-"+req.Phase+".sb")
+			// ADR-0049 S0 / gap G6: write the SBPL to a PER-INVOCATION profile
+			// dir, not a shared <workspace>/sandbox-<phase>.sb. Two same-phase
+			// dispatches sharing a workspace (a re-dispatch, two fan-out workers,
+			// or two runs reusing a cycle number) otherwise write the same file —
+			// and if their WritePaths differ, B's profile landing between A's
+			// write and A's sandbox-exec read confines A to B's allow-list (A's
+			// legit source writes EPERM-denied). A mktemp -d (0o700) per
+			// invocation isolates them — the per-invocation sandbox-profile
+			// pattern (CERT FIO21-C; Codex generates a profile per launch). A
+			// mkdir failure degrades to the shared workspace profile (confinement
+			// preserved, isolation lost) rather than running unconfined. No-op for
+			// the live sequential loop: a lone dispatch just gets its own subdir.
+			sbplDir := req.Workspace
+			if req.Workspace != "" {
+				mk := deps.MkScratchDir
+				if mk == nil {
+					mk = os.MkdirTemp
+				}
+				if d, err := mk(req.Workspace, "sbprofile-"); err == nil {
+					sbplDir = d
+				} else if deps.Stderr != nil {
+					fmt.Fprintf(deps.Stderr, "[bridge] WARN: per-invocation sandbox profile dir failed (%v); using shared workspace profile (isolation lost)\n", err)
+				}
+			}
+			sbplPath := filepath.Join(sbplDir, "sandbox-"+req.Phase+".sb")
 			if err := os.WriteFile(sbplPath, []byte(sbpl), 0o644); err != nil {
 				// Can't write the profile → can't wrap. Caller degrades.
 				return nil, false

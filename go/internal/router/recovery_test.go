@@ -45,6 +45,11 @@ func TestRecover_Branches(t *testing.T) {
 		// AUDIT_BINDING_ prefix but empty class still routes via the prefix rule.
 		{"binding prefix no class", &Blocker{Code: "AUDIT_BINDING_FUTURE_CODE", Class: "", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
+		// ADR-0049 S5b: fleet ff-merge divergence is transient-classed but must
+		// route to RE-AUDIT (rebase + test-the-merged-tree), NOT the generic
+		// transient retry-ship — the dedicated handler is ordered before it.
+		{"fleet rebase needed → reaudit", &Blocker{Code: "GIT_FLEET_REBASE_NEEDED", Class: "transient", Stage: "ship"}, "audit", "recover:fleet-rebase-reaudit"},
+
 		// transient → retry ship.
 		{"transient push rejected", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 		{"transient git io", &Blocker{Code: "GIT_IO", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},

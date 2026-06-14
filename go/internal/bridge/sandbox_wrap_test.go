@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -328,4 +329,67 @@ func equalSlice(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// sbplPathOf extracts the SBPL file path from a darwin sandbox prefix
+// (["sandbox-exec","-f","<path>"]).
+func sbplPathOf(t *testing.T, prefix []string) string {
+	t.Helper()
+	if len(prefix) != 3 || prefix[0] != "sandbox-exec" || prefix[1] != "-f" {
+		t.Fatalf("unexpected darwin sandbox prefix %v", prefix)
+	}
+	return prefix[2]
+}
+
+// TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir pins ADR-0049 S0 / gap
+// G6: two same-phase dispatches sharing ONE workspace must NOT write the same
+// sandbox-<phase>.sb. Pre-fix both wrote <workspace>/sandbox-build.sb, so if
+// their WritePaths differed, B's profile landing between A's write and A's
+// sandbox-exec read confined A to B's allow-list (A's legit source writes
+// EPERM-denied). A per-invocation profile dir isolates them. This is a true RED
+// before the fix (identical paths) and GREEN after (distinct mktemp -d dirs).
+func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
+	ws := t.TempDir()                      // one shared workspace for both dispatches
+	deps := Deps{Env: map[string]string{}} // not nested, mode auto → wraps
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	req := SandboxWrapRequest{Phase: "build", Worktree: t.TempDir(), Workspace: ws, RepoRoot: t.TempDir()}
+
+	prefixA, okA := wrap(req)
+	prefixB, okB := wrap(req) // identical request: same phase, same workspace
+	if !okA || !okB {
+		t.Fatalf("darwin not-nested should wrap; got okA=%v okB=%v", okA, okB)
+	}
+	pathA, pathB := sbplPathOf(t, prefixA), sbplPathOf(t, prefixB)
+	if pathA == pathB {
+		t.Fatalf("two same-phase dispatches shared sandbox profile path %q — collision (G6); want per-invocation isolation", pathA)
+	}
+	for _, p := range []string{pathA, pathB} {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("sbpl %q not written: %v", p, err)
+		}
+		if len(b) == 0 {
+			t.Fatalf("sbpl %q is empty — wrap must still emit a real profile", p)
+		}
+	}
+}
+
+// TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace pins
+// the degrade contract: if the per-invocation dir can't be created, the wrap
+// falls back to the shared workspace profile (confinement preserved, isolation
+// lost) rather than running UNCONFINED (returning false).
+func TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace(t *testing.T) {
+	ws := t.TempDir()
+	deps := Deps{
+		Env:          map[string]string{},
+		MkScratchDir: func(string, string) (string, error) { return "", errors.New("boom") },
+	}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: t.TempDir(), Workspace: ws, RepoRoot: t.TempDir()})
+	if !ok {
+		t.Fatal("mkdir failure must fall back to the shared workspace profile, not abort confinement")
+	}
+	if got, want := sbplPathOf(t, prefix), filepath.Join(ws, "sandbox-build.sb"); got != want {
+		t.Fatalf("fallback profile path = %q, want %q", got, want)
+	}
 }

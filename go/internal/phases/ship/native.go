@@ -74,6 +74,22 @@ type Options struct {
 	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
 
+	// WorkspacePath is this run's per-cycle workspace (<ProjectRoot>/.evolve/runs/
+	// cycle-<N>/). When set, ship reads run-defining inputs (active_worktree,
+	// cycle_id) from <WorkspacePath>/run.json — the per-run mirror of
+	// cycle-state.json (CB.4) — instead of the host-global cycle-state.json, so a
+	// concurrent cycle can't make ship integrate the WRONG run (ADR-0049 S3 / gap
+	// G3). Empty (standalone `evolve ship`) → the global file. Set by the ship
+	// PhaseRunner from PhaseRequest.Workspace.
+	WorkspacePath string
+
+	// RunID is this run's event-sourced identity (CA.5). When set, the
+	// audit→ship binding lookup (findLatestAudit) prefers the auditor ledger
+	// entry stamped with THIS RunID over a concurrent run's later entry
+	// (ADR-0049 S4 / gap G5). Empty (standalone / legacy) → latest auditor
+	// entry, as before. Set by the ship PhaseRunner from PhaseRequest.RunID.
+	RunID string
+
 	// PluginRoot is the read-only side — where .claude-plugin/plugin.json lives.
 	// May equal ProjectRoot when running from the evolve-loop repo itself.
 	PluginRoot string
@@ -109,6 +125,13 @@ type Options struct {
 	// repairAttempted is the repair ladder's once-per-code-per-Run guard
 	// (repair.go). Lazily initialized by attemptRepair/repairPushRace.
 	repairAttempted map[core.ShipErrorCode]bool
+
+	// shipLock is the test seam for the ADR-0049 S5 integrator lock
+	// (gap G1): the BLOCKING flock acquired around the shared-main
+	// integration critical section (collider scan → ff-merge → push →
+	// post-push verify) in shipFromWorktree. nil → flock.Lock on
+	// <ProjectRoot>/.evolve/ship.lock. Signature mirrors flock.Lock.
+	shipLock func(path string) (release func(), err error)
 }
 
 // Now is a minimal time interface (Unix seconds + RFC3339 formatter) so
@@ -317,7 +340,7 @@ func (o *Options) envStr(key string) string {
 }
 
 func checkPostPushIdempotency(ctx context.Context, opts *Options) (bool, error) {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return false, err

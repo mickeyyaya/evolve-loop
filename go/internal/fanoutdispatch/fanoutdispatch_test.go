@@ -169,6 +169,70 @@ func TestRun_StdoutCapturedPerWorker(t *testing.T) {
 	}
 }
 
+// TestRun_DoesNotMutateProcessEnv pins ADR-0049 S1 / gap G8: Run must inject
+// per-worker budget/cache-prefix into each WORKER's env, never via a
+// process-global os.Setenv — two concurrent DispatchParallel in one process
+// would otherwise clobber each other's budget. Not t.Parallel: it asserts on
+// the shared process env (t.Setenv pins the pre-state and restores it). RED
+// before the fix (os.Setenv leaks "0.33" into the parent), GREEN after.
+func TestRun_DoesNotMutateProcessEnv(t *testing.T) {
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // ensure unset → cfg default would be injected
+	dir := t.TempDir()
+	cmds := filepath.Join(dir, "cmds.tsv")
+	writeFile(t, cmds, "w1\ttrue\n")
+	var b bytes.Buffer
+	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.33"}, &b)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d", rc)
+	}
+	if got := os.Getenv("EVOLVE_MAX_BUDGET_USD"); got != "" {
+		t.Errorf("Run mutated process-global EVOLVE_MAX_BUDGET_USD=%q — G8: must inject per-worker, not os.Setenv", got)
+	}
+}
+
+// TestRun_WorkerReceivesBudgetAndCachePrefix proves the S1 fix PRESERVES the
+// behavior the os.Setenv provided: each worker still sees the budget + cache
+// prefix in its own env (now via cmd.Env, not parent inheritance).
+func TestRun_WorkerReceivesBudgetAndCachePrefix(t *testing.T) {
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // not inherited → cfg default injected
+	dir := t.TempDir()
+	cachePrefix := filepath.Join(dir, "cache-prefix.txt")
+	writeFile(t, cachePrefix, "x") // Run stats this file; must exist
+	cmds := filepath.Join(dir, "cmds.tsv")
+	writeFile(t, cmds, "w1\tprintenv EVOLVE_MAX_BUDGET_USD; printenv EVOLVE_FANOUT_CACHE_PREFIX_FILE\n")
+	var b bytes.Buffer
+	rc := Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.42", CachePrefixFile: cachePrefix}, &b)
+	if rc != ExitOK {
+		t.Fatalf("rc=%d", rc)
+	}
+	out, err := os.ReadFile(filepath.Join(dir, "w1.out"))
+	if err != nil {
+		t.Fatalf("missing .out: %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "0.42") {
+		t.Errorf("worker missing EVOLVE_MAX_BUDGET_USD=0.42; got %q", s)
+	}
+	if !strings.Contains(s, cachePrefix) {
+		t.Errorf("worker missing EVOLVE_FANOUT_CACHE_PREFIX_FILE=%s; got %q", cachePrefix, s)
+	}
+}
+
+// TestRun_PreservesInheritedBudget pins the "unless already set" semantics:
+// an inherited EVOLVE_MAX_BUDGET_USD must win over the cfg default.
+func TestRun_PreservesInheritedBudget(t *testing.T) {
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "9.99") // inherited
+	dir := t.TempDir()
+	cmds := filepath.Join(dir, "cmds.tsv")
+	writeFile(t, cmds, "w1\tprintenv EVOLVE_MAX_BUDGET_USD\n")
+	var b bytes.Buffer
+	Run(Config{CommandsFile: cmds, ResultsFile: filepath.Join(dir, "r.tsv"), Concurrency: 1, TimeoutSecs: 10, PerWorkerBudgetUSD: "0.42"}, &b)
+	out, _ := os.ReadFile(filepath.Join(dir, "w1.out"))
+	if !strings.Contains(string(out), "9.99") || strings.Contains(string(out), "0.42") {
+		t.Errorf("inherited budget must win over cfg default; got %q", out)
+	}
+}
+
 func TestRun_BoundedConcurrency(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

@@ -81,6 +81,24 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
+		// ADR-0049 S5b: a fleet-mode ff-merge divergence (a peer cycle moved main
+		// mid-pipeline) is recovered by rebasing the cycle branch onto the new
+		// main and re-running AUDIT on the merged tree — the test-the-merged-tree
+		// / merge-queue pattern, which produces a FRESH audit binding for the
+		// rebased tree (re-pinning in place would be self-referential). NOT a
+		// retry-ship (it would just diverge again) and NOT the debugger. The
+		// rebase action itself runs in the orchestrator's recoverFromShipError
+		// before this re-audit. Ordered BEFORE transient-retry-ship because this
+		// transient code needs re-audit, not a blind ship retry.
+		name: "fleet-rebase-reaudit",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "GIT_FLEET_REBASE_NEEDED" {
+				return "audit", true
+			}
+			return "", false
+		},
+	},
+	{
 		// Transient I/O / push races → retry ship (orchestrator bounds depth).
 		name: "transient-retry-ship",
 		match: func(b Blocker) (string, bool) {

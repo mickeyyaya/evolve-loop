@@ -71,7 +71,7 @@ func TestPromoteInbox_TriageDecisionWithNoIDs_NoPromoteLog(t *testing.T) {
 }
 
 func TestFindLatestAudit_MissingLedger_NoLedgerShipError(t *testing.T) {
-	_, err := findLatestAudit(filepath.Join(t.TempDir(), "does-not-exist.jsonl"))
+	_, err := findLatestAudit(filepath.Join(t.TempDir(), "does-not-exist.jsonl"), "")
 	if err == nil {
 		t.Fatal("missing ledger must error")
 	}
@@ -84,7 +84,7 @@ func TestFindLatestAudit_AlienAndNonAuditorLinesSkipped(t *testing.T) {
 		"not valid json at all\n"+
 			`{"role":"builder","kind":"agent_subprocess"}`+"\n"+
 			`{"role":"auditor","kind":"agent_subprocess","exit_code":0}`+"\n")
-	e, err := findLatestAudit(ledger)
+	e, err := findLatestAudit(ledger, "")
 	if err != nil {
 		t.Fatalf("want the auditor entry, got err %v", err)
 	}

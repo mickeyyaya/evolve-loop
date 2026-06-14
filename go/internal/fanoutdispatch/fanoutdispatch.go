@@ -114,13 +114,11 @@ func Run(cfg Config, stderr io.Writer) int {
 		return ExitOK
 	}
 
-	// Inject per-worker budget if not already set.
-	if os.Getenv("EVOLVE_MAX_BUDGET_USD") == "" {
-		_ = os.Setenv("EVOLVE_MAX_BUDGET_USD", cfg.PerWorkerBudgetUSD)
-	}
-	if cfg.CachePrefixFile != "" {
-		_ = os.Setenv("EVOLVE_FANOUT_CACHE_PREFIX_FILE", cfg.CachePrefixFile)
-	}
+	// Per-worker budget + cache-prefix are injected into each worker's OWN
+	// env in runWorker (cfg.workerEnv), NOT via process-global os.Setenv:
+	// the process environment is a single MT-Unsafe global, so two concurrent
+	// DispatchParallel in one process would clobber each other (ADR-0049 S1 /
+	// gap G8). See workerEnv for the "inject-unless-inherited" semantics.
 
 	// Per-worker state.
 	type result struct {
@@ -229,11 +227,30 @@ func Run(cfg Config, stderr io.Writer) int {
 
 // runWorker executes a single worker command with timeout. Stdout → name.out,
 // stderr → name.err. Returns the exit code (124 for timeout, 143 for SIGTERM).
+// workerEnv builds the explicit environment for a fan-out worker subprocess —
+// the parent env plus per-worker budget/cache-prefix. Injecting per-child
+// (exec.Cmd.Env) rather than mutating the process-global env (os.Setenv) keeps
+// two concurrent DispatchParallel calls in one process from clobbering each
+// other (ADR-0049 S1 / gap G8). Budget is added only when not already
+// inherited (preserving the prior "unless set" semantics); cache-prefix is
+// appended when configured (a later duplicate key wins in exec, as before).
+func (cfg Config) workerEnv() []string {
+	env := os.Environ()
+	if os.Getenv("EVOLVE_MAX_BUDGET_USD") == "" {
+		env = append(env, "EVOLVE_MAX_BUDGET_USD="+cfg.PerWorkerBudgetUSD)
+	}
+	if cfg.CachePrefixFile != "" {
+		env = append(env, "EVOLVE_FANOUT_CACHE_PREFIX_FILE="+cfg.CachePrefixFile)
+	}
+	return env
+}
+
 func (cfg Config) runWorker(parent context.Context, name, command, resultsDir string) int {
 	ctx, cancel := context.WithTimeout(parent, time.Duration(cfg.TimeoutSecs)*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	cmd.Env = cfg.workerEnv() // per-worker env snapshot (ADR-0049 S1 / G8)
 	outF, _ := os.Create(filepath.Join(resultsDir, name+".out"))
 	errF, _ := os.Create(filepath.Join(resultsDir, name+".err"))
 	if outF != nil {

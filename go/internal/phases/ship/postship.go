@@ -50,7 +50,7 @@ func postShip(ctx context.Context, opts *Options, res *RunResult) error {
 // ran_cycle = last_before + 1 = the SAME cycle just shipped → 5-repeat
 // circuit-breaker fired prematurely on legitimate runs.
 func advanceLastCycleNumber(opts *Options, res *RunResult) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	stPath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
 	csMap, err := readStateMap(csPath)
 	if err != nil {
@@ -61,12 +61,24 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 		// No cycle_id → nothing to advance. Bash silently skips.
 		return nil
 	}
-	stMap, err := readStateMap(stPath)
-	if err != nil {
-		return err
+	// ADR-0049 S2 / G2: serialize the state.json RMW under the shared lock so
+	// it can't lose (or be lost to) a concurrent allocator/UpdateState write.
+	// Preserve the pre-lock contract: a READ error propagates (fail ship);
+	// only a write/lock error is the non-fatal WARN.
+	var readErr error
+	lockErr := withStateLock(stPath, func() error {
+		stMap, err := readStateMap(stPath)
+		if err != nil {
+			readErr = err
+			return err
+		}
+		stMap["lastCycleNumber"] = cid
+		return writeStateMap(stPath, stMap)
+	})
+	if readErr != nil {
+		return readErr
 	}
-	stMap["lastCycleNumber"] = cid
-	if err := writeStateMap(stPath, stMap); err != nil {
+	if lockErr != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: could not advance lastCycleNumber (state.json write failed)")
 		return nil // WARN — don't fail ship
 	}
@@ -80,7 +92,7 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 // don't block ship (Layer 1 idempotency catches residual in next cycle's
 // Triage).
 func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return err
@@ -228,20 +240,23 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	stMap, err := readStateMap(statePath)
-	if err != nil {
-		return err
-	}
-	expected := stateString(stMap, "expected_ship_sha")
-	if expected == postSHA {
+	// ADR-0049 S2 / G2: serialize the whole read→check→write under the shared
+	// state.json lock. Any error (lock/read/write) propagates, as before.
+	return withStateLock(statePath, func() error {
+		stMap, err := readStateMap(statePath)
+		if err != nil {
+			return err
+		}
+		if stateString(stMap, "expected_ship_sha") == postSHA {
+			return nil
+		}
+		pluginVer := pluginVersion(opts.PluginRoot)
+		stMap["expected_ship_sha"] = postSHA
+		stMap["expected_ship_version"] = pluginVer
+		if err := writeStateMap(statePath, stMap); err != nil {
+			return err
+		}
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] TOFU: post-cycle self-update (ship binary changed in this commit) — pinned ship binary SHA + plugin version='%s'", pluginVer))
 		return nil
-	}
-	pluginVer := pluginVersion(opts.PluginRoot)
-	stMap["expected_ship_sha"] = postSHA
-	stMap["expected_ship_version"] = pluginVer
-	if err := writeStateMap(statePath, stMap); err != nil {
-		return err
-	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] TOFU: post-cycle self-update (ship binary changed in this commit) — pinned ship binary SHA + plugin version='%s'", pluginVer))
-	return nil
+	})
 }

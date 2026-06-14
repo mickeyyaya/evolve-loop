@@ -55,6 +55,7 @@ var commands = []subcommand{
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: runPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: runServePhase},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
+	{Name: "fleet", Summary: "Launch N concurrent cycles (ADR-0049 S6)", Run: runFleet},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},

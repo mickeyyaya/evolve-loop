@@ -72,6 +72,15 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	pluginVer := pluginVersion(opts.PluginRoot)
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
+	// ADR-0049 S2 / G2: hold the shared state.json lock across the whole TOFU
+	// read→decide→repin so a concurrent allocator/UpdateState write can't
+	// interleave (stale-pin / lost-update). No-op under the whole-cycle lock.
+	release, lockErr := lockStateFile(statePath)
+	if lockErr != nil {
+		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifySelfSHA,
+			"ship: lock state.json: "+lockErr.Error(), "path", statePath)
+	}
+	defer release()
 	stateMap, err := readStateMap(statePath)
 	if err != nil {
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifySelfSHA,

@@ -211,7 +211,7 @@ func TestFindLatestAudit_SkipsUnparseableLine(t *testing.T) {
 	// the unmarshal error and still find the auditor entry below it.
 	mustWrite(t, ledger, strings.TrimRight(string(raw), "\n")+"\nthis-is-not-json\n")
 
-	entry, err := findLatestAudit(ledger)
+	entry, err := findLatestAudit(ledger, "")
 	if err != nil {
 		t.Fatalf("findLatestAudit must skip the alien line, got %v", err)
 	}

@@ -22,10 +22,24 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
+
+// acquireShipLock acquires the ADR-0049 S5 integrator lock (gap G1): the
+// BLOCKING flock serializing the shared-main integration critical section so
+// two concurrent ships can't corrupt main's index/ref/origin. nil seam →
+// flock.Lock on <ProjectRoot>/.evolve/ship.lock. No-op under the whole-cycle
+// project lock (uncontended); load-bearing once that lock is scoped per-run.
+func (o *Options) acquireShipLock() (release func(), err error) {
+	p := filepath.Join(o.ProjectRoot, ".evolve", "ship.lock")
+	if o.shipLock != nil {
+		return o.shipLock(p)
+	}
+	return flock.Lock(p)
+}
 
 // atomicShip is the single entry point for "do the actual git work."
 // Returns nil on success (commit + push completed, or DryRun skipped them).
@@ -143,12 +157,31 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 // readActiveWorktree extracts cycle-state.json:active_worktree. Empty
 // when absent — caller should fall through to the direct ship path.
 func readActiveWorktree(opts *Options) string {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
-	csMap, err := readStateMap(csPath)
+	csMap, err := readStateMap(opts.cycleStateFile())
 	if err != nil {
 		return ""
 	}
 	return stateString(csMap, "active_worktree")
+}
+
+// cycleStateFile returns the file ship reads run-defining inputs (active_worktree,
+// cycle_id) from. It prefers the per-run run.json mirror under the run workspace
+// (ADR-0049 S3 / gap G3) — a full cycle-state.json mirror (CB.4, only
+// CycleState-modeled keys) — so a concurrent cycle's host-global cycle-state.json
+// cannot make ship integrate the WRONG run's worktree/number. Falls back to the
+// global file when WorkspacePath is unset (standalone `evolve ship`) or the
+// mirror is absent. A no-op for the live loop: with one cycle running, run.json
+// and the global file hold identical content. (cycle_size_estimate is NOT a
+// CycleState field, so verifyTrivial — a standalone-only path — keeps reading the
+// global file directly.)
+func (o *Options) cycleStateFile() string {
+	if o.WorkspacePath != "" {
+		runJSON := filepath.Join(o.WorkspacePath, core.RunStateFile)
+		if _, err := os.Stat(runJSON); err == nil {
+			return runJSON
+		}
+	}
+	return filepath.Join(o.ProjectRoot, ".evolve", "cycle-state.json")
 }
 
 // shipDirect: the non-worktree path.
@@ -271,6 +304,23 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			"ship: empty cycle branch from worktree "+worktree, "worktree", worktree)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
+
+	// ADR-0049 S5 / gap G1: hold the integrator lock across the entire
+	// shared-main critical section that follows — the collider scan (which
+	// reads main's working tree, a TOCTOU with the merge it feeds), the
+	// go/evolve discard, the ff-merge, the push, and the post-push tree
+	// verification. flock is BLOCKING; two concurrent ships serialize here
+	// instead of racing main's index/ref/origin. Skipped on dry-run (mutates
+	// nothing). No-op under the whole-cycle project lock (uncontended); the
+	// keystone of floor-removal once that lock is scoped per-run.
+	if !opts.DryRun {
+		release, lockErr := opts.acquireShipLock()
+		if lockErr != nil {
+			return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+				"ship: acquire integrator lock (.evolve/ship.lock): "+lockErr.Error())
+		}
+		defer release()
+	}
 
 	// Collider pre-flight check (v12.2 / Task 2). detectColliders is the
 	// single source of truth — the repair ladder (repair.go) re-derives the
@@ -401,6 +451,18 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	// ff-merge cycle branch into main.
 	exit, err = opts.Runner(ctx, "git", []string{"merge", "--ff-only", cycleBranch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
+		// ADR-0049 S5b: under fleet mode a ff-merge divergence is EXPECTED — a
+		// peer cycle moved main while this cycle was mid-pipeline (the colliders
+		// were already cleared above, so this is the moved-main case). Signal the
+		// orchestrator to rebase onto the new main and re-verify the merged tree
+		// (test-the-merged-tree) rather than aborting: a transient
+		// GIT_FLEET_REBASE_NEEDED, not the terminal GIT_FF_MERGE_DIVERGED. The
+		// sequential loop is unaffected (it never has a moving main mid-cycle).
+		if opts.envBool("EVOLVE_FLEET") {
+			return shipErr(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip,
+				fmt.Sprintf("ship: fleet ff-merge %s into %s diverged (a peer cycle moved %s mid-pipeline); rebase + re-verify the merged tree, then re-ship", cycleBranch, branch, branch),
+				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)
+		}
 		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
 			fmt.Sprintf("ship: ff-merge %s into %s failed (rc=%d; divergent history): %v", cycleBranch, branch, exit, err),
 			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)
@@ -447,7 +509,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 // writeShipBinding emits .evolve/runs/cycle-<N>/ship-binding.json for
 // post-ship audit. Best-effort; failure is a WARN, not a ship failure.
 func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return err

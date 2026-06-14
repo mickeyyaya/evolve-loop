@@ -1665,14 +1665,35 @@ func failureLearningSummary(cycle int, failed Phase, err error) string {
 	return fmt.Sprintf("cycle %d failed during %s: %s", cycle, failed, msg)
 }
 
+// fleetMode reports whether this cycle runs under the `evolve fleet` supervisor
+// (EVOLVE_FLEET=1). In fleet mode the whole-cycle global project lock is not
+// taken (ADR-0049 S6 / root-cause R1) so concurrent fleet cycles don't refuse
+// each other; per-resource flocks + per-run isolation keep them safe. Default
+// off — the single-driver loop keeps the coarse lock.
+func fleetMode(env map[string]string) bool {
+	return envchain.BoolValue(env["EVOLVE_FLEET"], false)
+}
+
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
-// summary of what ran. The lock is acquired up front and released on
-// every exit path. State is updated incrementally so a crash leaves an
-// inspectable trail in .evolve/.
+// summary of what ran. The lock is acquired up front (except in fleet mode,
+// see fleetMode) and released on every exit path. State is updated
+// incrementally so a crash leaves an inspectable trail in .evolve/.
 func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleResult, error) {
-	release, err := o.storage.AcquireLock(ctx)
-	if err != nil {
-		return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
+	// ADR-0049 S6 / root-cause R1: under the fleet supervisor (EVOLVE_FLEET=1)
+	// skip the whole-cycle global project lock (LOCK_NB) so M cycles run
+	// concurrently instead of refusing each other. Safe because every shared
+	// resource is now serialized by its OWN flock — state.json (UpdateState /
+	// withStateLock, S2), the ledger chain (CA.1), the .evolve/ship.lock
+	// integrator (S5) — and each cycle is isolated by its per-run worktree +
+	// workspace with run-scoped ship reads (S3) and audit binding (S4). Default
+	// off → the live sequential loop keeps the global lock, byte-identical.
+	release := func() error { return nil }
+	if !fleetMode(req.Env) {
+		acquired, err := o.storage.AcquireLock(ctx)
+		if err != nil {
+			return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
+		}
+		release = acquired
 	}
 	defer func() { _ = release() }()
 
@@ -2937,6 +2958,17 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s); aborting\n", depth, se.Code, se.Class)
 		return "", false
 	}
+	// ADR-0049 S5b: a fleet ff-merge divergence (a peer cycle moved main) is
+	// recovered by rebasing the cycle branch onto the new main BEFORE the
+	// re-audit (the router routes this code to audit). A clean rebase replays
+	// this cycle's patches onto the peer's changes → re-audit re-binds the merged
+	// tree → re-ship fast-forwards. A rebase CONFLICT is genuinely overlapping
+	// work the advisor's partition should have kept apart — abort loud rather
+	// than auto-resolve.
+	if se.Code == CodeGitFleetRebaseNeeded && !rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase onto main failed; aborting\n", cycle)
+		return "", false
+	}
 	// Recovery is deterministic Chain-of-Responsibility (no LLM); both routing
 	// strategies just delegate to the pure router.Recover, so call it directly.
 	// This keeps recovery available even when no routing Strategy was wired
@@ -2959,6 +2991,23 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) → recovery routes to %s (%s)\n", se.Code, se.Class, cand, dec.Reason)
 	return cand, true
+}
+
+// rebaseCycleBranchOntoMain rebases the cycle's worktree branch onto the current
+// main so a fleet cycle whose ff-merge diverged (a peer moved main) can re-audit
+// + re-ship the merged tree (ADR-0049 S5b). Returns false on conflict/abort or
+// an empty worktree; on any rebase failure it aborts the in-progress rebase so
+// the worktree is left clean (no half-applied rebase) for the caller's abort.
+func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) bool {
+	if worktree == "" {
+		return false
+	}
+	if _, exit, err := gitCapture(ctx, worktree, "rebase", "main"); err != nil || exit != 0 {
+		_, _, _ = gitCapture(ctx, worktree, "rebase", "--abort")
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed (exit=%d, err=%v); rebase aborted\n", worktree, exit, err)
+		return false
+	}
+	return true
 }
 
 // decideAfterDebugger maps the debugger phase's recovery decision (surfaced on

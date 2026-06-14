@@ -115,6 +115,14 @@ type Deps struct {
 	// via Runner; on other OSes always false (no Keychain). Tests inject a
 	// deterministic stub.
 	KeychainProbe func(service string) bool
+	// MkScratchDir creates a fresh private scratch directory under dir
+	// (signature mirrors os.MkdirTemp(dir, pattern); default os.MkdirTemp,
+	// which creates the dir 0o700). It gives each dispatch a per-invocation
+	// directory for transient files that must NOT collide when two same-phase
+	// dispatches share one workspace — currently the macOS SBPL sandbox
+	// profile (ADR-0049 S0 / gap G6). Tests inject a stub to drive the
+	// mkdir-error fallback branch deterministically.
+	MkScratchDir func(dir, pattern string) (string, error)
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision — the bridge
@@ -167,7 +175,11 @@ func (d Deps) withDefaults() Deps {
 		// envInt reads via d.LookupEnv, defaulted just above.
 		d.Reviewer = newDeterministicReviewer(envInt(d, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
 	}
+	if d.MkScratchDir == nil {
+		d.MkScratchDir = os.MkdirTemp
+	}
 	if d.SandboxWrap == nil {
+		// defaultSandboxWrap captures d, so MkScratchDir must be defaulted first.
 		d.SandboxWrap = defaultSandboxWrap(d)
 	}
 	if d.KeychainProbe == nil {

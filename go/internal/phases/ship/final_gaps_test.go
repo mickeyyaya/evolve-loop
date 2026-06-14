@@ -86,8 +86,13 @@ func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 		Stderr:         io.Discard,
 	}
 	err := verifySelfSHA(context.Background(), opts, &RunResult{})
-	if err == nil || !strings.Contains(err.Error(), "write state.json") {
-		t.Fatalf("want 'write state.json' error, got %v", err)
+	// With the ADR-0049 S2 shared state.json lock, a read-only .evolve dir now
+	// fails at lock-acquire (the .lock file can't be created) BEFORE the write —
+	// both are the same fail-safe STATE_IO refusal on an unwritable state dir.
+	// Assert the contract (a STATE_IO refusal, not silent pass), not the site.
+	var se *core.ShipError
+	if err == nil || !errors.As(err, &se) || se.Code != core.CodeStateIO {
+		t.Fatalf("want a STATE_IO refusal on read-only .evolve, got %v", err)
 	}
 }
 

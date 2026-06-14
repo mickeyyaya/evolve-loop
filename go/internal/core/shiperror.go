@@ -103,10 +103,17 @@ const (
 	CodeGitStageFailed     ShipErrorCode = "GIT_STAGE_FAILED"
 	CodeGitCommitFailed    ShipErrorCode = "GIT_COMMIT_FAILED"
 	CodeGitFFMergeDiverged ShipErrorCode = "GIT_FF_MERGE_DIVERGED"
-	CodeGitPushRejected    ShipErrorCode = "GIT_PUSH_REJECTED"
-	CodeCommitPrefixGate   ShipErrorCode = "COMMIT_PREFIX_GATE"
-	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
-	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
+	// CodeGitFleetRebaseNeeded (ADR-0049 S5b): under fleet mode a ff-merge
+	// divergence is EXPECTED — a peer cycle moved main while this cycle was
+	// mid-pipeline. NOT a terminal failure: the cycle must rebase onto the new
+	// main and re-verify the merged tree (test-the-merged-tree / merge-queue
+	// pattern) before re-shipping. Transient so the failure floor routes it to
+	// recovery rather than aborting the cycle.
+	CodeGitFleetRebaseNeeded ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
+	CodeGitPushRejected      ShipErrorCode = "GIT_PUSH_REJECTED"
+	CodeCommitPrefixGate     ShipErrorCode = "COMMIT_PREFIX_GATE"
+	CodeWorktreeResolve      ShipErrorCode = "WORKTREE_RESOLVE"
+	CodeIntegrityTreeDrift   ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
 	// generic / fallthrough
 	CodeArgs    ShipErrorCode = "ARGS"
