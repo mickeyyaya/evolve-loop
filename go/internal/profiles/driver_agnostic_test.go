@@ -58,6 +58,46 @@ func TestSpineProfilesAreDriverAgnostic(t *testing.T) {
 	}
 }
 
+func TestSpineSubstitutabilityAtParity(t *testing.T) {
+	catalog := modelcatalog.Catalog{
+		CLIs: map[string]modelcatalog.CLIEntry{
+			"codex": {TierModels: map[string]string{
+				"fast":     "gpt-5.4-mini",
+				"balanced": "gpt-5.4",
+				"deep":     "gpt-5.5",
+			}},
+			"agy": {TierModels: map[string]string{
+				"fast":     "gemini-flash-low",
+				"balanced": "gemini-flash-high",
+				"deep":     "claude-opus",
+			}},
+			"ollama": {TierModels: map[string]string{
+				"fast":     "phi4",
+				"balanced": "llama3.3",
+				"deep":     "gemma4:31b-cloud",
+			}},
+		},
+	}
+
+	spine := []string{"scout", "triage", "tdd-engineer", "builder", "auditor", "router", "reflector"}
+	altDrivers := []string{"codex", "agy", "ollama"}
+	loader := NewFromDir(realProfilesDir(t))
+
+	for _, name := range spine {
+		p, err := loader.Get(name)
+		if err != nil {
+			t.Fatalf("load profile %s: %v", name, err)
+		}
+		for _, driver := range altDrivers {
+			model, ok := catalog.Lookup(driver, p.ModelTierDefault)
+			if !ok || model == "" {
+				t.Errorf("%s: modelcatalog.Lookup(%q,%q) = (%q,%v), want non-empty model at equal capability tier",
+					name, driver, p.ModelTierDefault, model, ok)
+			}
+		}
+	}
+}
+
 func TestAllProfilesAreDriverAgnostic(t *testing.T) {
 	canonical := make(map[string]bool, len(modelcatalog.CanonicalTiers))
 	for _, tier := range modelcatalog.CanonicalTiers {

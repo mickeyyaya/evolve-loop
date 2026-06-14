@@ -21,7 +21,7 @@ Each profile is a JSON object. All fields listed below.
 
 | Field | Type | Description |
 |---|---|---|
-| `model_tier_default` | string | Default model tier: `haiku`, `sonnet`, `opus`. Builder defaults to `sonnet`; Auditor to `opus` (cross-family sycophancy guard). |
+| `model_tier_default` | string | Default capability tier from `modelcatalog.CanonicalTiers`: `fast`, `balanced`, `deep`. Builder defaults to `balanced`; Auditor to `deep`. Claude-specific tier labels are forbidden because they miss for non-Claude CLIs. |
 | `model_tier_overrides` | object | Named condition → tier overrides. Keys: `ultrathink_strategy`, `m_complex_5plus_files`, `audit_retry_2plus`, `s_complex_with_cache`. |
 | `model_tier_envelope` | object | `{ min, default, max }` — runtime may auto-escalate/downgrade within this envelope. |
 | `cross_family_with` | string | Role name whose model family MUST differ (breaks same-model-judge sycophancy). |
