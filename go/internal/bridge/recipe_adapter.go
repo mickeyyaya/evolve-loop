@@ -90,7 +90,8 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, d.launchCmd, true)
 	fmt.Fprintf(d.deps.Stderr, "[recipe] launching: %s\n", d.launchCmd)
-	for elapsed := 0; elapsed < tmuxREPLBootTimeoutS; elapsed++ {
+	bootDeadlineS := envInt(d.deps, "EVOLVE_BOOT_TIMEOUT_S", tmuxREPLBootTimeoutS) // CI boot-budget override (same as primary driver)
+	for elapsed := 0; elapsed < bootDeadlineS; elapsed++ {
 		d.deps.Sleep(time.Second)
 		if d.ar != nil {
 			d.ar.tick(ctx, d.session) // dismiss boot trust modals (codex/agy); no-op otherwise
@@ -101,7 +102,7 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("REPL prompt %q never appeared after %ds", d.marker, tmuxREPLBootTimeoutS)
+	return fmt.Errorf("REPL prompt %q never appeared after %ds", d.marker, bootDeadlineS)
 }
 
 func (d *recipeSessionDriver) Capture(ctx context.Context) (string, error) {

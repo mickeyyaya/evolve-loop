@@ -274,6 +274,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if interval <= 0 {
 			interval = 1
 		}
+		// Boot-wait deadline (seconds), overridable via EVOLVE_BOOT_TIMEOUT_S so a
+		// loaded CI runner can raise the fake-CLI/tmux handshake budget — the fixed
+		// 60s intermittently flaked the integration tier ("REPL prompt never
+		// appeared after 60s"). Mirrors EVOLVE_ARTIFACT_TIMEOUT_S below.
+		bootDeadlineS := envInt(deps, "EVOLVE_BOOT_TIMEOUT_S", tmuxREPLBootTimeoutS)
 		// ADR-0043 A0: accumulate the cold-boot wait. Seeded with the two fixed
 		// deps.Sleep(time.Second) readiness waits above (post new-session, post
 		// cd); each poll iteration adds its interval. Derived from the Sleep-driven
@@ -283,7 +288,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		const fixedReadinessWaits = 2
 		bootWaitMS := int64(fixedReadinessWaits) * 1000
 		promptSeen := false
-		for elapsed := 0; elapsed < tmuxREPLBootTimeoutS; elapsed += interval {
+		for elapsed := 0; elapsed < bootDeadlineS; elapsed += interval {
 			deps.Sleep(time.Duration(interval) * time.Second)
 			bootWaitMS += int64(interval) * 1000
 			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
@@ -323,7 +328,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 		}
 		if !promptSeen {
-			fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", pfx, tmuxREPLBootTimeoutS)
+			fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", pfx, bootDeadlineS)
 			return ExitREPLBootTimeout, nil
 		}
 		// ADR-0043 A0: report cold-boot latency to the prompt marker. Only the
