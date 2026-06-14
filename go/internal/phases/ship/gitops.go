@@ -451,6 +451,18 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	// ff-merge cycle branch into main.
 	exit, err = opts.Runner(ctx, "git", []string{"merge", "--ff-only", cycleBranch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
+		// ADR-0049 S5b: under fleet mode a ff-merge divergence is EXPECTED — a
+		// peer cycle moved main while this cycle was mid-pipeline (the colliders
+		// were already cleared above, so this is the moved-main case). Signal the
+		// orchestrator to rebase onto the new main and re-verify the merged tree
+		// (test-the-merged-tree) rather than aborting: a transient
+		// GIT_FLEET_REBASE_NEEDED, not the terminal GIT_FF_MERGE_DIVERGED. The
+		// sequential loop is unaffected (it never has a moving main mid-cycle).
+		if opts.envBool("EVOLVE_FLEET") {
+			return shipErr(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip,
+				fmt.Sprintf("ship: fleet ff-merge %s into %s diverged (a peer cycle moved %s mid-pipeline); rebase + re-verify the merged tree, then re-ship", cycleBranch, branch, branch),
+				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)
+		}
 		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
 			fmt.Sprintf("ship: ff-merge %s into %s failed (rc=%d; divergent history): %v", cycleBranch, branch, exit, err),
 			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)
