@@ -110,10 +110,17 @@ const (
 	// pattern) before re-shipping. Transient so the failure floor routes it to
 	// recovery rather than aborting the cycle.
 	CodeGitFleetRebaseNeeded ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
-	CodeGitPushRejected      ShipErrorCode = "GIT_PUSH_REJECTED"
-	CodeCommitPrefixGate     ShipErrorCode = "COMMIT_PREFIX_GATE"
-	CodeWorktreeResolve      ShipErrorCode = "WORKTREE_RESOLVE"
-	CodeIntegrityTreeDrift   ShipErrorCode = "INTEGRITY_TREE_DRIFT"
+	// CodeGitFleetRebaseConflict (ADR-0049 G13a): the fleet rebase onto main hit a
+	// genuine MERGE CONFLICT — two concurrent cycles edited the same lines, which
+	// the advisor's disjoint-file partition should have kept apart. Unlike
+	// RebaseNeeded (a clean replay → re-audit), a conflict cannot be re-audited
+	// away, so it is an INTEGRITY-class blocker routed to the debugger for triage
+	// (recommend sequential retry / partition split), not a silent abort.
+	CodeGitFleetRebaseConflict ShipErrorCode = "GIT_FLEET_REBASE_CONFLICT"
+	CodeGitPushRejected        ShipErrorCode = "GIT_PUSH_REJECTED"
+	CodeCommitPrefixGate       ShipErrorCode = "COMMIT_PREFIX_GATE"
+	CodeWorktreeResolve        ShipErrorCode = "WORKTREE_RESOLVE"
+	CodeIntegrityTreeDrift     ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
 	// generic / fallthrough
 	CodeArgs    ShipErrorCode = "ARGS"
