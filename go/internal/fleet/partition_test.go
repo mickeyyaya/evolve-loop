@@ -144,6 +144,58 @@ func TestPartition_NormalizesPaths(t *testing.T) {
 	}
 }
 
+// TestPlanCycles_DisjointScopesPlusDeferred: PlanCycles maps the partition into
+// concurrent cycle specs, each carrying a DISJOINT, non-empty Scope and the
+// EVOLVE_FLEET_SCOPE env the launched cycle reads; bridging todos defer.
+func TestPlanCycles_DisjointScopesPlusDeferred(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"a.go"}},
+		{ID: "b", Files: []string{"b.go"}},
+		{ID: "c", Files: []string{"a.go", "b.go"}}, // bridges 0 and 1 -> deferred
+	}
+	specs, deferred := PlanCycles(todos, 2)
+	if len(specs) != 2 {
+		t.Fatalf("specs=%d want 2", len(specs))
+	}
+	seen := map[string]bool{}
+	for i, s := range specs {
+		if len(s.Scope) == 0 {
+			t.Errorf("spec %d has empty Scope", i)
+		}
+		if s.Env[fleetScopeEnvKey] == "" {
+			t.Errorf("spec %d missing %s env", i, fleetScopeEnvKey)
+		}
+		for _, id := range s.Scope {
+			if seen[id] {
+				t.Errorf("id %q assigned to two cycles", id)
+			}
+			seen[id] = true
+		}
+	}
+	if len(deferred) != 1 || deferred[0].ID != "c" {
+		t.Errorf("deferred=%v, want [c]", bucketIDs(deferred))
+	}
+}
+
+// TestPlanCycles_SkipsEmptyBuckets: when the backlog can't fill `count` cycles
+// (all work clusters), empty buckets produce NO spec — fewer cycles, not idle ones.
+func TestPlanCycles_SkipsEmptyBuckets(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"h.go"}},
+		{ID: "b", Files: []string{"h.go"}},
+	}
+	specs, _ := PlanCycles(todos, 3)
+	if len(specs) != 1 {
+		t.Fatalf("specs=%d, want 1 (2 empty buckets skipped)", len(specs))
+	}
+	if len(specs[0].Scope) != 2 {
+		t.Errorf("scope=%v, want both a,b clustered", specs[0].Scope)
+	}
+	if specs[0].Env[fleetScopeEnvKey] != "a,b" {
+		t.Errorf("EVOLVE_FLEET_SCOPE=%q, want a,b", specs[0].Env[fleetScopeEnvKey])
+	}
+}
+
 // TestPartition_NLessThanOne_DefaultsToOne keeps a degenerate n safe.
 func TestPartition_NLessThanOne_DefaultsToOne(t *testing.T) {
 	buckets, deferred := Partition([]Todo{{ID: "a"}}, 0)

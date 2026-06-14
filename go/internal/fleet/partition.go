@@ -1,12 +1,41 @@
 package fleet
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+)
+
+// PlanCycles partitions a backlog into at most `count` concurrent cycle specs,
+// each scoped to a DISJOINT set of todos, plus the deferred todos that could not
+// be co-scheduled this wave (run them in a later wave). It is the single adapter
+// from the advisor's backlog to fleet's launch specs (ADR-0049 E): each spec
+// carries its todo IDs in Scope and in Env[fleetScopeEnvKey] (comma-joined) so
+// the launched cycle's triage selects only its subset. Empty buckets yield NO
+// spec — when the backlog can't fill `count` cycles, fewer launch (not idle ones).
+func PlanCycles(todos []Todo, count int) (specs []CycleSpec, deferred []Todo) {
+	buckets, deferred := Partition(todos, count)
+	for _, b := range buckets {
+		if len(b) == 0 {
+			continue
+		}
+		ids := make([]string, len(b))
+		for i, td := range b {
+			ids[i] = td.ID
+		}
+		specs = append(specs, CycleSpec{
+			Scope: ids,
+			Env:   map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
+		})
+	}
+	return specs, deferred
+}
 
 // Todo is one unit of backlog work plus the repo files it would touch. The
 // advisor supplies the file scope (from the task's plan / changed-file estimate).
+// JSON tags match the `evolve fleet --plan` backlog file: [{"id","files"}].
 type Todo struct {
-	ID    string
-	Files []string
+	ID    string   `json:"id"`
+	Files []string `json:"files"`
 }
 
 // Partition assigns todos to n concurrent cycle buckets such that every repo
