@@ -612,20 +612,20 @@ func TestExtractParallelSubtasks_NoField(t *testing.T) {
 	}
 }
 
-func TestExtractBoolField(t *testing.T) {
+func TestMatchParallelEligibleField(t *testing.T) {
 	tests := []struct {
-		body, field string
-		want        bool
+		body string
+		want string
 	}{
-		{`{"parallel_eligible":true}`, "parallel_eligible", true},
-		{`{"parallel_eligible":false}`, "parallel_eligible", false},
-		{`{"other":1}`, "parallel_eligible", false},
-		{`{"parallel_eligible":  true }`, "parallel_eligible", true},
-		{`{"parallel_eligible":"true"}`, "parallel_eligible", false}, // string not bool
+		{`{"parallel_eligible":true}`, "true"},
+		{`{"parallel_eligible":false}`, "false"},
+		{`{"other":1}`, ""},
+		{`{"parallel_eligible":  true }`, "true"},
+		{`{"parallel_eligible":"true"}`, ""}, // string not bool
 	}
 	for _, tc := range tests {
-		if got := extractBoolField(tc.body, tc.field); got != tc.want {
-			t.Errorf("body=%q got %v want %v", tc.body, got, tc.want)
+		if got := matchField(tc.body, reFieldParallelEligible); got != tc.want {
+			t.Errorf("body=%q got %q want %q", tc.body, got, tc.want)
 		}
 	}
 }

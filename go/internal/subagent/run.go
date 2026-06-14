@@ -195,7 +195,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		cli, source = llm.CLI, llm.Source
 		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
 	} else {
-		cli = extractProfileString(profileBody, "cli")
+		cli = matchField(profileBody, reFieldCLI)
 		source = "profile"
 	}
 	if cli == "antigravity" {
@@ -249,7 +249,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	if worker != "" {
 		artifactPath = filepath.Join(req.WorkspacePath, "workers", req.Agent+".md")
 	} else {
-		template := extractProfileString(profileBody, "output_artifact")
+		template := matchField(profileBody, reFieldOutputArtifact)
 		artifactPath = resolveArtifactPath(template, req.Cycle, req.ProjectRoot)
 	}
 	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {

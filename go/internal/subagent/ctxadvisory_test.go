@@ -85,25 +85,23 @@ func TestCheckCtxAdvisory_MissingProfileReturnsError(t *testing.T) {
 	}
 }
 
-func TestExtractInt(t *testing.T) {
+func TestMatchContextTokenField(t *testing.T) {
 	tests := []struct {
-		name  string
-		body  string
-		field string
-		want  int
-		ok    bool
+		name string
+		body string
+		want string
 	}{
-		{"present", `{"n":42}`, "n", 42, true},
-		{"with whitespace", `{"n" : 7}`, "n", 7, true},
-		{"absent", `{"x":1}`, "n", 0, false},
-		{"non-integer value", `{"n":"oops"}`, "n", 0, false},
-		{"trailing zero", `{"n":0}`, "n", 0, true},
+		{"present", `{"context_clear_trigger_tokens":42}`, "42"},
+		{"with whitespace", `{"context_clear_trigger_tokens" : 7}`, "7"},
+		{"absent", `{"x":1}`, ""},
+		{"non-integer value", `{"context_clear_trigger_tokens":"oops"}`, ""},
+		{"trailing zero", `{"context_clear_trigger_tokens":0}`, "0"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := extractInt(tc.body, tc.field)
-			if ok != tc.ok || got != tc.want {
-				t.Errorf("got (%d, %v), want (%d, %v)", got, ok, tc.want, tc.ok)
+			got := matchField(tc.body, reFieldCtxTokens)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
 	}

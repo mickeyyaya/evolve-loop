@@ -105,7 +105,7 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	if err != nil {
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: profile not found: %s", profilePath)
 	}
-	if !extractBoolField(profileBody, "parallel_eligible") {
+	if matchField(profileBody, reFieldParallelEligible) != "true" {
 		return DispatchParallelResult{},
 			fmt.Errorf("dispatch-parallel: agent %s not parallel_eligible (single-writer invariant)", req.Agent)
 	}
@@ -118,7 +118,7 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	}
 
 	// Step 4: resolve quality tier (via capability).
-	cli := extractProfileString(profileBody, "cli")
+	cli := matchField(profileBody, reFieldCLI)
 	if cli == "" {
 		cli = "claude"
 	}
@@ -153,7 +153,7 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	}
 
 	// Step 6: aggregate path resolution.
-	aggTemplate := extractProfileString(profileBody, "output_artifact")
+	aggTemplate := matchField(profileBody, reFieldOutputArtifact)
 	var aggPath string
 	if aggTemplate != "" {
 		aggPath = resolveArtifactPath(aggTemplate, req.Cycle, req.ProjectRoot)
@@ -388,17 +388,6 @@ func capabilityExtractArray(body, name string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// extractBoolField returns the JSON bool value for `"<field>": true/false`.
-// Default: false (matches bash `.parallel_eligible // false`).
-func extractBoolField(body, field string) bool {
-	re := regexp.MustCompile(fmt.Sprintf(`"%s"\s*:\s*(true|false)`, regexp.QuoteMeta(field)))
-	m := re.FindStringSubmatch(body)
-	if len(m) < 2 {
-		return false
-	}
-	return m[1] == "true"
 }
 
 // renderSubtaskPrompt substitutes {cycle}/{agent}/{worker}/{workspace} in

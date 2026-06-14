@@ -3,7 +3,6 @@ package subagent
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 )
 
@@ -28,9 +27,13 @@ func CheckCtxAdvisory(profilePath string, tokens int) (CheckCtxAdvisoryResult, e
 	if err != nil {
 		return CheckCtxAdvisoryResult{}, fmt.Errorf("subagent/ctxadvisory: read profile %s: %w", profilePath, err)
 	}
-	threshold, ok := extractInt(string(body), "context_clear_trigger_tokens")
-	if !ok {
+	rawThreshold := matchField(string(body), reFieldCtxTokens)
+	if rawThreshold == "" {
 		// Profile doesn't declare the trigger; bash exit 0 without printing.
+		return CheckCtxAdvisoryResult{Emit: false}, nil
+	}
+	threshold, err := strconv.Atoi(rawThreshold)
+	if err != nil {
 		return CheckCtxAdvisoryResult{Emit: false}, nil
 	}
 	res := CheckCtxAdvisoryResult{Threshold: threshold}
@@ -42,19 +45,4 @@ func CheckCtxAdvisory(profilePath string, tokens int) (CheckCtxAdvisoryResult, e
 		)
 	}
 	return res, nil
-}
-
-// extractInt looks for `"<field>": <int>` in body and returns (value, true)
-// on match. Kept jq-free for the same reason as extractProfileString.
-func extractInt(body, field string) (int, bool) {
-	re := regexp.MustCompile(fmt.Sprintf(`"%s"\s*:\s*([0-9]+)`, regexp.QuoteMeta(field)))
-	m := re.FindStringSubmatch(body)
-	if len(m) < 2 {
-		return 0, false
-	}
-	n, err := strconv.Atoi(m[1])
-	if err != nil {
-		return 0, false
-	}
-	return n, true
 }

@@ -85,9 +85,9 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 		return "", fmt.Errorf("subagent/modeltier: read profile %s: %w", req.ProfilePath, err)
 	}
 
-	role := extractProfileString(profileBody, "role")
+	role := matchField(profileBody, reFieldRole)
 	if role == "" {
-		role = extractProfileString(profileBody, "name")
+		role = matchField(profileBody, reFieldName)
 	}
 
 	if role == "auditor" {
@@ -112,7 +112,7 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 	}
 
 	// Rule 3 (and auditor 2d): profile.model_tier_default.
-	defaultTier := extractProfileString(profileBody, "model_tier_default")
+	defaultTier := matchField(profileBody, reFieldTierDefault)
 	if defaultTier == "" {
 		return "", fmt.Errorf("subagent/modeltier: profile %s missing model_tier_default", req.ProfilePath)
 	}
@@ -139,14 +139,20 @@ func readConsecutiveSuccesses(reader func(string) (string, error), projectRoot s
 	return n
 }
 
-var consecutiveSuccessesRE = regexp.MustCompile(`"consecutiveSuccesses"\s*:\s*([0-9]+)`)
+var (
+	consecutiveSuccessesRE  = regexp.MustCompile(`"consecutiveSuccesses"\s*:\s*([0-9]+)`)
+	reFieldCLI              = regexp.MustCompile(`"cli"\s*:\s*"([^"]*)"`)
+	reFieldOutputArtifact   = regexp.MustCompile(`"output_artifact"\s*:\s*"([^"]*)"`)
+	reFieldRole             = regexp.MustCompile(`"role"\s*:\s*"([^"]*)"`)
+	reFieldName             = regexp.MustCompile(`"name"\s*:\s*"([^"]*)"`)
+	reFieldTierDefault      = regexp.MustCompile(`"model_tier_default"\s*:\s*"([^"]*)"`)
+	reFieldParallelEligible = regexp.MustCompile(`"parallel_eligible"\s*:\s*(true|false)`)
+	reFieldCtxTokens        = regexp.MustCompile(`"context_clear_trigger_tokens"\s*:\s*([0-9]+)`)
+)
 
-// extractProfileString parses `"<field>":"<value>"` out of profile JSON
-// without depending on the encoding/json package — keeps the resolver fast
-// and tolerant of minor profile drift. Returns "" on miss.
-func extractProfileString(body, field string) string {
-	pattern := regexp.MustCompile(fmt.Sprintf(`"%s"\s*:\s*"([^"]*)"`, regexp.QuoteMeta(field)))
-	m := pattern.FindStringSubmatch(body)
+// matchField returns the first capture from a precompiled JSON-field regexp.
+func matchField(body string, re *regexp.Regexp) string {
+	m := re.FindStringSubmatch(body)
 	if len(m) < 2 {
 		return ""
 	}

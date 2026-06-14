@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -291,22 +292,25 @@ func TestResolveModelTier_DefaultsExerciseRealFilesystem(t *testing.T) {
 	}
 }
 
-func TestExtractProfileString(t *testing.T) {
+func TestMatchStringFields(t *testing.T) {
 	tests := []struct {
-		name, body, field, want string
+		name string
+		body string
+		re   *regexp.Regexp
+		want string
 	}{
-		{"present", `{"role":"auditor"}`, "role", "auditor"},
-		{"absent", `{"role":"auditor"}`, "name", ""},
-		{"whitespace in body", `{"role"  :  "scout"}`, "role", "scout"},
-		{"escaped quote in field name", `{"weird/key":"x"}`, "weird/key", "x"},
-		{"empty value", `{"role":""}`, "role", ""},
-		{"non-JSON noise around value", `prefix"role":"hidden"suffix`, "role", "hidden"},
+		{"role present", `{"role":"auditor"}`, reFieldRole, "auditor"},
+		{"name absent", `{"role":"auditor"}`, reFieldName, ""},
+		{"role whitespace", `{"role"  :  "scout"}`, reFieldRole, "scout"},
+		{"empty role", `{"role":""}`, reFieldRole, ""},
+		{"role in loose text", `prefix"role":"hidden"suffix`, reFieldRole, "hidden"},
+		{"tier default", `{"model_tier_default":"sonnet"}`, reFieldTierDefault, "sonnet"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := extractProfileString(tc.body, tc.field)
+			got := matchField(tc.body, tc.re)
 			if got != tc.want {
-				t.Errorf("extractProfileString(%q, %q) = %q, want %q", tc.body, tc.field, got, tc.want)
+				t.Errorf("matchField(%q) = %q, want %q", tc.body, got, tc.want)
 			}
 		})
 	}

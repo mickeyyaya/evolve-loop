@@ -127,7 +127,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
 	} else {
 		// Fall through to profile.
-		cli = extractProfileString(profileBody, "cli")
+		cli = matchField(profileBody, reFieldCLI)
 		source = "profile"
 		resolvedModel = ""
 	}
@@ -146,7 +146,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 
 	model := resolvedModel
 	if model == "" {
-		model = extractProfileString(profileBody, "model_tier_default")
+		model = matchField(profileBody, reFieldTierDefault)
 	}
 
 	capDir := req.CapabilityDir
@@ -185,7 +185,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 
 	// Build adapter env. Mirrors lines 575-589 of subagent-run.sh — every
 	// VALIDATE_ONLY=1 invocation expects this exact env surface.
-	artifactTemplate := extractProfileString(profileBody, "output_artifact")
+	artifactTemplate := matchField(profileBody, reFieldOutputArtifact)
 	artifactPath := resolveArtifactPath(artifactTemplate, 0, req.ProjectRoot)
 	worktreePath := req.WorktreePath
 	if worktreePath == "" {
