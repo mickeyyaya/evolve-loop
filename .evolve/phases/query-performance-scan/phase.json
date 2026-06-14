@@ -1,0 +1,46 @@
+{
+  "name": "query-performance-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-query-performance-scan",
+  "categories": [
+    "database"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "build.diff_loc"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/query-performance-scan-report.md"
+    ],
+    "signals": [
+      "query.severity_max",
+      "query.n_plus_one_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Queries Touched",
+      "Performance Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "database"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

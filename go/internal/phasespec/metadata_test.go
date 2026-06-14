@@ -75,6 +75,7 @@ func TestUnknownCategories(t *testing.T) {
 		{"all known", []string{"bugfix", "feature", "refactor", "security", "performance", "release", "docs"}, nil},
 		{"domain goal types known", []string{"project-management", "business-strategy", "accounting-close", "product-discovery", "ops-incident"}, nil},
 		{"adversarial-pipeline goal types known", []string{"concurrency", "api-design", "data-migration", "observability", "supply-chain", "agent-instruction", "accessibility", "frontend-ui", "i18n"}, nil},
+		{"wave-5 goal types known", []string{"database", "caching", "resilience", "messaging", "infrastructure", "data-pipeline"}, nil},
 		{"empty", nil, nil},
 		{"one unknown", []string{"bugfix", "foo"}, []string{"foo"}},
 		{"case-sensitive", []string{"Bugfix"}, []string{"Bugfix"}},

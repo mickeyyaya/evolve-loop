@@ -237,6 +237,80 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Localized Surfaces", "## Formatting Findings", "## Verdict"},
 			hasVerdict: true,
 		},
+		// Wave 5 — coverage expansion + plan/evaluate design pairing (2026-06-14,
+		// micro-phase-catalog.md §9). 9 evaluate gates (hasVerdict true, end in
+		// ## Verdict) + 5 plan design phases (hasVerdict false, no ## Verdict —
+		// ADR-0035 leaves plan verdict_on_pass inert, risk-register precedent).
+		"query-performance-scan": {
+			artifact:   "query-performance-scan-report.md",
+			sections:   []string{"## Queries Touched", "## Performance Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"cache-strategy-scan": {
+			artifact:   "cache-strategy-scan-report.md",
+			sections:   []string{"## Cache Sites Touched", "## Coherence Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"resilience-gap-scan": {
+			artifact:   "resilience-gap-scan-report.md",
+			sections:   []string{"## External Call Sites", "## Resilience Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"idempotency-check": {
+			artifact:   "idempotency-check-report.md",
+			sections:   []string{"## Message Handlers Touched", "## Idempotency Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"error-handling-scan": {
+			artifact:   "error-handling-scan-report.md",
+			sections:   []string{"## Error Paths Reviewed", "## Swallowed-Error Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"container-hardening-scan": {
+			artifact:   "container-hardening-scan-report.md",
+			sections:   []string{"## Container & Manifest Changes", "## Hardening Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"cicd-pipeline-audit": {
+			artifact:   "cicd-pipeline-audit-report.md",
+			sections:   []string{"## Workflow Changes", "## Supply-Chain & Secret Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"type-safety-audit": {
+			artifact:   "type-safety-audit-report.md",
+			sections:   []string{"## Type Surfaces Changed", "## Type-Safety Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"data-integrity-check": {
+			artifact:   "data-integrity-check-report.md",
+			sections:   []string{"## Pipeline Stages Touched", "## Integrity Findings", "## Verdict"},
+			hasVerdict: true,
+		},
+		"resilience-design": {
+			artifact:   "resilience-design-report.md",
+			sections:   []string{"## Failure Modes", "## Resilience Strategy", "## Fallback & Degradation"},
+			hasVerdict: false,
+		},
+		"data-model-design": {
+			artifact:   "data-model-design-report.md",
+			sections:   []string{"## Entities & Relationships", "## Schema & Indexes", "## Access Patterns"},
+			hasVerdict: false,
+		},
+		"caching-strategy-design": {
+			artifact:   "caching-strategy-design-report.md",
+			sections:   []string{"## Cacheable Surfaces", "## Cache Strategy", "## Invalidation & TTL"},
+			hasVerdict: false,
+		},
+		"observability-design": {
+			artifact:   "observability-design-report.md",
+			sections:   []string{"## Critical Paths", "## Instrumentation Plan", "## SLOs & Alerts"},
+			hasVerdict: false,
+		},
+		"rollout-plan": {
+			artifact:   "rollout-plan-report.md",
+			sections:   []string{"## Deploy Strategy", "## Feature Flags & Kill Switch", "## Rollback Triggers"},
+			hasVerdict: false,
+		},
 	}
 
 	for name, w := range cases {

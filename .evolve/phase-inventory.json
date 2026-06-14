@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-06-14T21:02:48.207414+08:00",
   "project_root": "/Users/danleemh/ai/claude/evolve-loop-phase-plugin",
-  "phase_count": 65,
+  "phase_count": 79,
   "phases": [
     {
       "name": "accessibility-audit",
@@ -185,7 +185,7 @@
       "tier": "auto",
       "agent": "evolve-bug-reproduction",
       "description": "Produce a FAIL_TO_PASS reproduction that demonstrably fails on the current tree, BEFORE any patch.",
-      "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build — reproduce-first anchors the fix and raises resolution rates.",
+      "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build \u2014 reproduce-first anchors the fix and raises resolution rates.",
       "categories": [
         "bugfix"
       ],
@@ -215,6 +215,47 @@
       "tier": "auto",
       "agent": "evolve-build-planner",
       "artifact": "build-plan.md"
+    },
+    {
+      "name": "cache-strategy-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-cache-strategy-scan",
+      "categories": [
+        "caching"
+      ],
+      "artifact": "cache-strategy-scan-report.md",
+      "required_sections": [
+        "## Cache Sites Touched",
+        "## Coherence Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "caching-strategy-design",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-caching-strategy-design",
+      "categories": [
+        "caching"
+      ],
+      "artifact": "caching-strategy-design-report.md",
+      "required_sections": [
+        "## Cacheable Surfaces",
+        "## Cache Strategy",
+        "## Invalidation & TTL"
+      ],
+      "after": "triage"
     },
     {
       "name": "capacity-plan",
@@ -250,6 +291,27 @@
         "## Verdict"
       ],
       "after": "ship"
+    },
+    {
+      "name": "cicd-pipeline-audit",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-cicd-pipeline-audit",
+      "categories": [
+        "infrastructure"
+      ],
+      "artifact": "cicd-pipeline-audit-report.md",
+      "required_sections": [
+        "## Workflow Changes",
+        "## Supply-Chain & Secret Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "cleanup-sweep",
@@ -302,6 +364,27 @@
       "required_sections": [
         "## Exported Surface Diff",
         "## Breaking Changes",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "container-hardening-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-container-hardening-scan",
+      "categories": [
+        "infrastructure"
+      ],
+      "artifact": "container-hardening-scan-report.md",
+      "required_sections": [
+        "## Container & Manifest Changes",
+        "## Hardening Findings",
         "## Verdict"
       ],
       "emits_verdict": true,
@@ -367,6 +450,47 @@
       "after": "build"
     },
     {
+      "name": "data-integrity-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-data-integrity-check",
+      "categories": [
+        "data-pipeline"
+      ],
+      "artifact": "data-integrity-check-report.md",
+      "required_sections": [
+        "## Pipeline Stages Touched",
+        "## Integrity Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "data-model-design",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-data-model-design",
+      "categories": [
+        "database"
+      ],
+      "artifact": "data-model-design-report.md",
+      "required_sections": [
+        "## Entities & Relationships",
+        "## Schema & Indexes",
+        "## Access Patterns"
+      ],
+      "after": "triage"
+    },
+    {
       "name": "dependency-audit",
       "source": "user",
       "root": ".evolve/phases",
@@ -409,6 +533,27 @@
       "tier": "auto",
       "agent": "evolve-doc-sync",
       "artifact": "doc-sync-report.md"
+    },
+    {
+      "name": "error-handling-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-error-handling-scan",
+      "categories": [
+        "bugfix"
+      ],
+      "artifact": "error-handling-scan-report.md",
+      "required_sections": [
+        "## Error Paths Reviewed",
+        "## Swallowed-Error Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
     },
     {
       "name": "fault-localization",
@@ -506,6 +651,27 @@
       "after": "build"
     },
     {
+      "name": "idempotency-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-idempotency-check",
+      "categories": [
+        "messaging"
+      ],
+      "artifact": "idempotency-check-report.md",
+      "required_sections": [
+        "## Message Handlers Touched",
+        "## Idempotency Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "incident-postmortem",
       "source": "user",
       "root": ".evolve/phases",
@@ -549,7 +715,7 @@
       "artifact": "license-provenance-audit-report.md",
       "required_sections": [
         "## New Dependencies",
-        "## License \u0026 Provenance Findings",
+        "## License & Provenance Findings",
         "## Verdict"
       ],
       "emits_verdict": true,
@@ -661,6 +827,26 @@
       ],
       "emits_verdict": true,
       "after": "test-amplification"
+    },
+    {
+      "name": "observability-design",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-observability-design",
+      "categories": [
+        "observability"
+      ],
+      "artifact": "observability-design-report.md",
+      "required_sections": [
+        "## Critical Paths",
+        "## Instrumentation Plan",
+        "## SLOs & Alerts"
+      ],
+      "after": "triage"
     },
     {
       "name": "okr-draft",
@@ -803,6 +989,27 @@
       "after": "build"
     },
     {
+      "name": "query-performance-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-query-performance-scan",
+      "categories": [
+        "database"
+      ],
+      "artifact": "query-performance-scan-report.md",
+      "required_sections": [
+        "## Queries Touched",
+        "## Performance Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "race-condition-scan",
       "source": "user",
       "root": ".evolve/phases",
@@ -818,6 +1025,47 @@
       "required_sections": [
         "## Concurrent Surfaces Touched",
         "## Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
+      "name": "resilience-design",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-resilience-design",
+      "categories": [
+        "resilience"
+      ],
+      "artifact": "resilience-design-report.md",
+      "required_sections": [
+        "## Failure Modes",
+        "## Resilience Strategy",
+        "## Fallback & Degradation"
+      ],
+      "after": "triage"
+    },
+    {
+      "name": "resilience-gap-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-resilience-gap-scan",
+      "categories": [
+        "resilience"
+      ],
+      "artifact": "resilience-gap-scan-report.md",
+      "required_sections": [
+        "## External Call Sites",
+        "## Resilience Findings",
         "## Verdict"
       ],
       "emits_verdict": true,
@@ -868,6 +1116,26 @@
         "## Verdict"
       ],
       "after": "audit"
+    },
+    {
+      "name": "rollout-plan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-rollout-plan",
+      "categories": [
+        "release"
+      ],
+      "artifact": "rollout-plan-report.md",
+      "required_sections": [
+        "## Deploy Strategy",
+        "## Feature Flags & Kill Switch",
+        "## Rollback Triggers"
+      ],
+      "after": "triage"
     },
     {
       "name": "runbook-draft",
@@ -1071,6 +1339,27 @@
       "artifact": "triage-report.md"
     },
     {
+      "name": "type-safety-audit",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-type-safety-audit",
+      "categories": [
+        "refactor"
+      ],
+      "artifact": "type-safety-audit-report.md",
+      "required_sections": [
+        "## Type Surfaces Changed",
+        "## Type-Safety Findings",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "variance-analysis",
       "source": "user",
       "root": ".evolve/phases",
@@ -1103,13 +1392,25 @@
     ],
     "bugfix": [
       "bug-reproduction",
+      "error-handling-scan",
       "flake-rerun-scan"
+    ],
+    "caching": [
+      "cache-strategy-scan",
+      "caching-strategy-design"
     ],
     "concurrency": [
       "race-condition-scan"
     ],
     "data-migration": [
       "migration-safety-check"
+    ],
+    "data-pipeline": [
+      "data-integrity-check"
+    ],
+    "database": [
+      "data-model-design",
+      "query-performance-scan"
     ],
     "feature": [
       "coverage-gate",
@@ -1121,8 +1422,26 @@
     "i18n": [
       "locale-format-check"
     ],
+    "infrastructure": [
+      "cicd-pipeline-audit",
+      "container-hardening-scan"
+    ],
+    "messaging": [
+      "idempotency-check"
+    ],
     "observability": [
+      "observability-design",
       "telemetry-coverage-check"
+    ],
+    "refactor": [
+      "type-safety-audit"
+    ],
+    "release": [
+      "rollout-plan"
+    ],
+    "resilience": [
+      "resilience-design",
+      "resilience-gap-scan"
     ],
     "security": [
       "authz-gap-scan",

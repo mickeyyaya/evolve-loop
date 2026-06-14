@@ -35,6 +35,11 @@ var knownCategories = map[string]bool{
 	"concurrency": true, "api-design": true, "data-migration": true,
 	"observability": true, "supply-chain": true, "agent-instruction": true,
 	"accessibility": true, "frontend-ui": true, "i18n": true,
+	// Wave 5 (skills-derived coverage expansion + plan/evaluate design pairing):
+	// data/query, cache, fault-tolerance, delivery-semantics, infra-config and
+	// stream/batch request classes the advisor classifies and routes.
+	"database": true, "caching": true, "resilience": true,
+	"messaging": true, "infrastructure": true, "data-pipeline": true,
 }
 
 // UnknownCategories returns the entries of s.Categories that are not in the

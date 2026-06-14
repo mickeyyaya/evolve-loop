@@ -1,0 +1,45 @@
+{
+  "name": "resilience-design",
+  "archetype": "plan",
+  "agent": "evolve-resilience-design",
+  "categories": [
+    "resilience"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md"
+    ],
+    "signals": [
+      "scout.goal_type",
+      "scout.cycle_size"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/resilience-design-report.md"
+    ],
+    "signals": [
+      "resiliencedesign.failure_modes_count",
+      "resiliencedesign.unguarded_dependency_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Failure Modes",
+      "Resilience Strategy",
+      "Fallback & Degradation"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "resilience"
+      }
+    ]
+  },
+  "after": "triage",
+  "optional": true
+}
