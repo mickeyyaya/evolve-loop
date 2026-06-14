@@ -73,6 +73,8 @@ func TestUnknownCategories(t *testing.T) {
 		want []string
 	}{
 		{"all known", []string{"bugfix", "feature", "refactor", "security", "performance", "release", "docs"}, nil},
+		{"domain goal types known", []string{"project-management", "business-strategy", "accounting-close", "product-discovery", "ops-incident"}, nil},
+		{"adversarial-pipeline goal types known", []string{"concurrency", "api-design", "data-migration", "observability", "supply-chain", "agent-instruction", "accessibility", "frontend-ui", "i18n"}, nil},
 		{"empty", nil, nil},
 		{"one unknown", []string{"bugfix", "foo"}, []string{"foo"}},
 		{"case-sensitive", []string{"Bugfix"}, []string{"Bugfix"}},

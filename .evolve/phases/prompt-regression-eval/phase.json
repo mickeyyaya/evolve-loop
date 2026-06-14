@@ -1,0 +1,46 @@
+{
+  "name": "prompt-regression-eval",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-prompt-regression-eval",
+  "categories": [
+    "agent-instruction"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/prompt-regression-eval-report.md"
+    ],
+    "signals": [
+      "prompteval.severity_max",
+      "prompteval.regressed_criteria"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Instruction Changes",
+      "Behavioral Rubric Scores",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "agent-instruction"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

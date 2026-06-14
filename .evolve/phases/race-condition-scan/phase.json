@@ -1,0 +1,47 @@
+{
+  "name": "race-condition-scan",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-race-condition-scan",
+  "categories": [
+    "concurrency"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/race-condition-scan-report.md"
+    ],
+    "signals": [
+      "race.severity_max",
+      "race.leak_count",
+      "race.data_race_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Concurrent Surfaces Touched",
+      "Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "concurrency"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}

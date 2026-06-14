@@ -50,13 +50,22 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | fault-localization → bug-reproduction → [tdd, build] → (regression via existing tdd/audit) |
-| feature | problem-reflection (spec-verify card) → api-contract-design → [tdd, build] → test-amplification → tester |
-| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → cleanup-sweep |
-| security | threat-model → [tdd, build] → security-scan + dependency-audit (existing) → fuzz-probe |
+| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → coverage-gate → flake-rerun-scan |
+| feature | premise-challenge → spec-verify → api-contract-design → [tdd, build] → test-amplification → coverage-gate → secret-leak-scan |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → mutation-gate → coverage-gate → cleanup-sweep |
+| security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
 | performance | benchmark baseline capture → [build] → benchmark-gate |
 | release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | docs / trivial | spine only (no insertions) |
+| concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
+| api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
+| data-migration | rollback-plan → [tdd, build] → migration-safety-check → coverage-gate |
+| observability | [build] → telemetry-coverage-check → adversarial-review |
+| supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
+| agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
+| accessibility | scope-baseline → [build] → accessibility-audit → adversarial-review |
+| frontend-ui | prd-draft → [build] → frontend-design-review → accessibility-audit |
+| i18n | scope-baseline → [build] → locale-format-check |
 | project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
 | business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
 | accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
@@ -116,6 +125,21 @@ something plausible.
 | `post-ship-monitor` | integration failures from the ship accumulating unseen — `evolve doctor` + dry-run probe one cycle after ship |
 | `api-contract-design` | building a new exported surface with no explicit interface contract — contract-first design before build |
 | `context-condense` | downstream phases exhausting context budget on long run-dir artifacts — digest-based compression preserving verdicts and signals |
+| `premise-challenge` | building the wrong thing well — adversarially falsifies the goal, success criteria, and simpler-approach assumptions before any code (Core Rules 1–3 as a gate) |
+| `coverage-gate` | a change shipping with newly-uncovered lines — gates the coverage delta of changed code vs the pre-cycle baseline (regression, not strength) |
+| `secret-leak-scan` | a hardcoded credential/token/key reaching the tree — entropy + known-pattern scan of added diff lines, fixture-aware |
+| `flake-rerun-scan` | a non-deterministic test passing once and lying — re-runs touched tests under -count/-shuffle, rules out the t.Setenv+parallel false alarm |
+| `race-condition-scan` | a data race or goroutine leak in changed concurrent code — orchestrates `go test -race` + leak detection on touched packages |
+| `authz-gap-scan` | an authenticated-but-unauthorized access path — RBAC/ABAC/object-level/JWT/session gaps the general SAST lens misses |
+| `compat-surface-check` | a silent breaking change to a public signature/CLI flag/env var/JSON field — apidiff of the realized surface vs the prior release |
+| `contract-fuzz-probe` | an untrusted boundary accepting malformed input — asserts validation/strict-parse/schema-compat (not merely non-crashing) |
+| `migration-safety-check` | an irreversible or non-idempotent data/schema migration — verifies a reversible forward+rollback pair, blocks unguarded destructive ops |
+| `telemetry-coverage-check` | a new code path that is unobservable in production — gates structured logs/metrics/traces/error-context on new branches before ship |
+| `license-provenance-audit` | a license-incompatible or unverifiable-provenance dependency — license + SLSA/SBOM provenance lens dependency-audit (CVE-only) lacks |
+| `prompt-regression-eval` | a persona/skill/prompt edit silently regressing agent behavior — scores instruction changes against a behavioral rubric vs the prior instruction |
+| `accessibility-audit` | a WCAG 2.1/2.2 AA violation on a user-facing path — semantics/ARIA/contrast/keyboard/focus/screen-reader review mapped to success criteria |
+| `frontend-design-review` | a UI shipping with broken layout/responsiveness or off-design-system polish — senior-design-reviewer critique distinct from a11y compliance |
+| `locale-format-check` | hardcoded copy or non-locale-aware formatting blocking a market — i18n anti-pattern + plural/RTL/date/number/currency review |
 
 Selecting a phase whose persona/runner/profile is not dispatchable crashes the
 cycle (see knowledge-base/research/dynamic-advisor-first-run-retrospective-2026-06-05.md);

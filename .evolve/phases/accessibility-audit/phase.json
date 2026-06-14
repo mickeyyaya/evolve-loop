@@ -1,0 +1,46 @@
+{
+  "name": "accessibility-audit",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-accessibility-audit",
+  "categories": [
+    "accessibility"
+  ],
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md"
+    ],
+    "signals": [
+      "build.files_touched",
+      "scout.goal_type"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/accessibility-audit-report.md"
+    ],
+    "signals": [
+      "a11y.severity_max",
+      "a11y.wcag_violations"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Components Audited",
+      "WCAG Findings",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "accessibility"
+      }
+    ],
+    "skip_when": null
+  },
+  "gates": {},
+  "after": "build"
+}
