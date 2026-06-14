@@ -1,0 +1,80 @@
+  - End it with this machine-readable line (use your real verdict, one of PASS|FAIL|WARN|SKIPPED):
+    <!-- evolve-verdict: {"phase":"mutation-gate","verdict":"PASS","schema_version":1} -->
+  - Before you finish, run:  evolve phase verify mutation-gate --workspace <your workspace dir>
+    Fix every violation it reports. Do not declare done until it exits 0.
+
+  ---
+
+
+  # Evolve Mutation Gate Agent
+
+  You are the **Mutation Gate** evaluator in the Evolve Loop. Your job is to run diff-scoped mutation testing on changed Go packages.
+
+  ## Workflow
+
+  1. **Extract packages from build-report.md:**
+     - Read `build-report.md` to identify the Go source files that were modified.
+     - Extract the package paths containing those modified files.
+
+  2. **Tooling Discovery & Installation:**
+     - Attempt to run the primary mutation tool `gremlins`. If it is missing, try to install it (`go install github.com/go-gremlins/gremlins@latest` or equivalent).
+     - If `gremlins` is unavailable, fall back to `go-mutesting` (try to install via `go install github.com/zimmski/go-mutesting/...@latest` or equivalent).
+     - If both tools fail or cannot be installed, fall back to **manual mutation fallback** (also referred to as **manual sampling** or **manual mutation**) to manually analyze the package diffs, simulate mutant
+  injections, and estimate the results.
+
+  3. **Calculate Score:**
+     - Compute the mutation score based on the count of killed mutants and surviving mutants.
+     - The score formula is: `killed / (killed + survivors) * 100` (representing the percentage of killed mutants vs survivors).
+
+  4. **Emit Signals:**
+     - Write the `mutation-gate-report.md` deliverable containing sections: `## Summary`, `## Survivors`, and `## Verdict`.
+     - Log the namespaced signals `mutation.score` and `mutation.survivors` at the end of the report using the standard evolve-signal prefix.
+
+
+  ## Cycle Context
+  - cycle: 336
+  - goal_hash: 501f3ab74de7713090b2f993160cfef4015e2381850fc48c8110c8c9eb690bf2
+  - project_root: /Users/danleemh/ai/claude/evolve-loop
+  - workspace: /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336
+  - goal: Reduce code size and token usage across the evolve-loop Go codebase while preserving behavior, quality, and test/audit effectiveness. Prefer small, complete, behavior-preserving simplifications that fully pass
+  the adversarial audit: DRY duplicated logic into a single source, collapse index-coupled parallel slices into one slice of a struct, remove dead code and no-op loop-variable shadowing (module is Go 1.23), hoist per-
+  call regexp.MustCompile to package-level vars, simplify over-complex helpers, prune redundant comments, and add small defensive guards (e.g. empty-token) at chokepoints. Each cycle delivers ONE complete simplification
+  with tests proving identical behavior (no regression) and a net reduction in lines/tokens.
+
+
+  DELIVERABLE PATH: /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336/mutation-gate-report.md
+
+
+• I’ll run the mutation-gate workflow against the cycle workspace, starting from build-report.md to scope the changed Go packages, then I’ll write only the required report path and verify it with the native phase
+  verifier.
+
+• Ran pwd && rg --files /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336 | rg 'build-report\.md$|team-context\.md$|cycle-state\.json$'
+  └ /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-336
+
+• Explored
+  └ Read platform-compatibility.md
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The Codex overlay confirms this runtime is allowed to run in degraded/hybrid modes, but the phase gates still come from the Go binary. I didn’t find the report path with the first file scan, so I’m checking the cycle
+  directory layout next.
+
+• Explored
+  └ List cycle-336
+
+• Ran command -v gremlins || true; command -v go-mutesting || true; command -v evolve || true; go version
+  └ go version go1.26.4 darwin/arm64
+
+• Ran git status --short && git diff --name-only HEAD -- go '*.go'
+  └  M go/internal/aggregator/aggregator.go
+    ?? go/acs/cycle336/
+    go/internal/aggregator/aggregator.go
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Working (24s • esc to interrupt)
+
+
+› Use /skills to list available skills
+
+  gpt-5.5 medium · ~/ai/claude/evolve-loop/.evolve/worktrees/cycle-336 · gpt-5.5 · cycle-336 · cycle-336
