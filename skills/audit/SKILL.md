@@ -45,7 +45,7 @@ Default ON: each sub-auditor's prompt prepends "ADVERSARIAL AUDIT MODE — requi
 |---|---|
 | Phase | `audit` (evaluate archetype, mandatory) |
 | Persona | `agents/evolve-auditor.md` |
-| Profile | `.evolve/profiles/auditor.json` — CLI `claude-tmux`, tier `sonnet`, fan-out ×4 |
+| Profile | `.evolve/profiles/auditor.json` — CLI `claude-tmux`, tier `deep`, fan-out ×4 |
 | Inputs | `build-report.md` · `tester-report.md` |
 | Artifact | `audit-report.md` (cycle workspace) |
 

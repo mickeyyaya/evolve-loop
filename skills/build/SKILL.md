@@ -42,7 +42,7 @@ This is **why Builder cannot fan-out** even though Scout and Auditor can.
 |---|---|
 | Phase | `build` (build archetype, mandatory) |
 | Persona | `agents/evolve-builder.md` |
-| Profile | `.evolve/profiles/builder.json` — CLI `codex-tmux`, tier `sonnet`, single-writer |
+| Profile | `.evolve/profiles/builder.json` — CLI `codex-tmux`, tier `balanced`, single-writer |
 | Inputs | `scout-report.md` · `triage-report.md` |
 | Artifact | `build-report.md` (cycle workspace) |
 
