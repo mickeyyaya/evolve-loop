@@ -31,19 +31,25 @@ func lookupFor(specs ...phasespec.PhaseSpec) func(string) (phasespec.PhaseSpec, 
 	}
 }
 
-// TestResolveNativeExecutorWithoutOutputsHasNoContract: the ship shape. A
-// native-kind spec with no outputs.files must resolve to a MISS. RED today:
-// the fallback synthesizes ship-report.md and the enforce gate blocks a phase
-// that can never satisfy it.
+// TestResolveNativeExecutorWithoutOutputsHasNoContract: the SYNTHESIS-skip rule
+// (cycle-281). A native-kind spec with no outputs.files must NOT get a
+// convention-invented `<name>-report.md` contract — a deterministic executor
+// has no agent to write it, and the enforce gate would block a phase that can
+// never satisfy it. Example uses a non-built-in native phase: ship — the
+// original cycle-281 case — now resolves to its EXPLICIT built-in NoArtifact
+// contract (TestFor_Ship_NoArtifactContract). That is a strict improvement over
+// fail-open: it satisfies the same operator policy (audit-PASS ⇒ ship completes
+// without depending on a safety valve) by affirmatively knowing ship has no
+// file deliverable, rather than failing open on ambiguity.
 func TestResolveNativeExecutorWithoutOutputsHasNoContract(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
-		Name: "ship", Kind: "native", Role: "orchestrator",
+		Name: "deploy-native", Kind: "native", Role: "orchestrator",
 	}))
-	if c, ok := r.Resolve("ship"); ok {
+	if c, ok := r.Resolve("deploy-native"); ok {
 		t.Fatalf("RED: native executor %q with no declared outputs got a synthesized contract (artifact=%q) — "+
-			"a deterministic executor has no agent to write it; the enforce gate blocks 3× and only the "+
-			"circuit breaker lets the cycle ship (cycle-281)", "ship", c.ArtifactName)
+			"a deterministic executor has no agent to write it; the enforce gate would block a phase it can "+
+			"never satisfy (cycle-281)", "deploy-native", c.ArtifactName)
 	}
 }
 

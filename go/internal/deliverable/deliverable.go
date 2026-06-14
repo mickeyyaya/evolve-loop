@@ -81,6 +81,12 @@ func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.
 		// Ambiguity: we cannot determine what "well-formed" means. Fail OPEN.
 		return Result{}, fmt.Errorf("deliverable: no contract registered for phase %q", phase)
 	}
+	if c.NoArtifact {
+		// No file deliverable (ship: the pushed commit). Trivially well-formed —
+		// the real invariant is enforced by the ship-gate + commit-gate
+		// attestation, not a file-shape check.
+		return Result{Phase: phase, OK: true}, nil
+	}
 	path := c.ArtifactPath(roots)
 	res := Result{Phase: phase, ArtifactPath: path}
 

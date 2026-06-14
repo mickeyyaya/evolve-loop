@@ -71,6 +71,14 @@ type Contract struct {
 	// fix BEFORE audit. Fail-open when no token was minted. scout (the
 	// minter) must never set this — echoing yourself is circular.
 	RequireChallengeToken bool
+	// NoArtifact marks a phase that produces NO file deliverable — its result
+	// is a side effect, not a report (ship: the pushed commit, verified by the
+	// ship-gate + commit-gate attestation, not a file). The verifier treats
+	// such a contract as trivially well-formed. Without ANY registered contract
+	// the gate logged `no contract registered for phase "ship"` and failed open
+	// every cycle; an explicit NoArtifact contract resolves that ambiguity
+	// intentionally (PASS) instead.
+	NoArtifact bool
 }
 
 // ArtifactPath resolves the absolute path the agent must write to, joining the
@@ -147,6 +155,15 @@ var contracts = map[string]Contract{
 		Phase: "orchestrator", AgentName: "orchestrator", ArtifactName: "cycle-state.json",
 		Kind: KindJSON, RequiredKeys: []string{"cycle_id", "phase"},
 		WriteTarget: TargetEvolveDir,
+	},
+	// ship is a native host-side phase (not an LLM agent): its deliverable is
+	// the pushed commit, not a file. NoArtifact makes the contract gate resolve
+	// it explicitly (PASS) instead of fail-open-on-unknown — the real ship
+	// invariant (commit pushed) is enforced by the ship-gate + commit-gate
+	// attestation, not this well-formedness check.
+	"ship": {
+		Phase: "ship", AgentName: "ship", ArtifactName: "",
+		NoArtifact: true, // no file deliverable → WriteTarget is irrelevant (verifier short-circuits)
 	},
 }
 

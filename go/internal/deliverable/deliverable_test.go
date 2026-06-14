@@ -270,3 +270,16 @@ func TestVerify_RouterBareArray_OK(t *testing.T) {
 		t.Errorf("router bare-array routing-plan.json must verify OK; got %+v", res.Violations)
 	}
 }
+
+// A NoArtifact contract (ship — its deliverable is the pushed commit, not a
+// file) must verify OK without looking for any file, and WITHOUT the
+// "no contract registered" fail-open error that logged every cycle.
+func TestVerify_NoArtifactContract_OK(t *testing.T) {
+	res, err := Verify("ship", phasecontract.Roots{Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("ship verify: must not fail-open on a registered no-artifact phase: %v", err)
+	}
+	if !res.OK {
+		t.Errorf("ship NoArtifact contract: want OK=true, got violations %+v", res.Violations)
+	}
+}

@@ -33,6 +33,36 @@ func TestFor_CoversAllEightAgents(t *testing.T) {
 	}
 }
 
+// ship's deliverable is the pushed commit, not a file — but it must still
+// resolve a contract so the contract gate is EXPLICIT (PASS) rather than
+// fail-open-on-unknown, which logged "no contract registered for phase
+// \"ship\"" every cycle. The contract declares NoArtifact so the verifier
+// treats it as trivially well-formed.
+func TestFor_Ship_NoArtifactContract(t *testing.T) {
+	c, ok := For("ship")
+	if !ok {
+		t.Fatal(`For("ship"): want a contract (ship had none → contract-gate fail-open WARN every cycle)`)
+	}
+	if !c.NoArtifact {
+		t.Error("ship contract must declare NoArtifact (its deliverable is the pushed commit)")
+	}
+	if c.ArtifactName != "" {
+		t.Errorf("ship NoArtifact contract should have empty ArtifactName, got %q", c.ArtifactName)
+	}
+}
+
+// Completeness: every mandatory spine phase (scout/build/audit/ship) and the
+// conditional-mandatory tdd must have a registered contract, so a phase added
+// to the spine can never again silently lack one — the exact ship gap that let
+// the contract gate fail open every cycle.
+func TestMandatoryPhasesHaveContracts(t *testing.T) {
+	for _, p := range []string{"scout", "build", "audit", "ship", "tdd"} {
+		if _, ok := For(p); !ok {
+			t.Errorf("mandatory phase %q has no registered contract", p)
+		}
+	}
+}
+
 func TestFor_UnknownPhase(t *testing.T) {
 	if c, ok := For("nope"); ok {
 		t.Errorf("For(unknown): want (_, false), got %+v", c)
@@ -105,14 +135,14 @@ func TestContract_WriteTarget(t *testing.T) {
 
 func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 	all := Contracts()
-	if len(all) != 8 {
-		t.Fatalf("Contracts() len=%d, want 8", len(all))
+	if len(all) != 9 {
+		t.Fatalf("Contracts() len=%d, want 9", len(all))
 	}
 	seen := map[string]bool{}
 	for _, c := range all {
 		seen[c.Phase] = true
 	}
-	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "orchestrator"} {
+	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "orchestrator", "ship"} {
 		if !seen[phase] {
 			t.Errorf("Contracts() missing %q", phase)
 		}
