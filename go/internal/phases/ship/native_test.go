@@ -69,6 +69,7 @@ func tempRepoDir(t *testing.T) string {
 // Returns the absolute repo path. Cleanup is best-effort via tempRepoDir.
 func makeRepo(t *testing.T) string {
 	t.Helper()
+	skipRealGitInShort(t)
 	repo := tempRepoDir(t)
 	mustWrite(t, filepath.Join(repo, ".gitignore"), ".evolve/\n")
 	mustMkdir(t, filepath.Join(repo, ".evolve", "runs", "cycle-1"))
@@ -86,6 +87,13 @@ func makeRepo(t *testing.T) string {
 	runGit(t, repo, "add", "-A")
 	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "initial test repo")
 	return repo
+}
+
+func skipRealGitInShort(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("git subprocess integration test: use non-short runs for full ship coverage")
+	}
 }
 
 // addRemote creates a bare repo to serve as origin and registers it.
