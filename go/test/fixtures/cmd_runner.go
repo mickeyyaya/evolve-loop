@@ -72,6 +72,12 @@ func (f *FakeExec) Run(_ context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	key := execKey(name, args)
 
+	// I/O (stdin drain here, stdout/stderr writes below) runs OUTSIDE f.mu on
+	// purpose: holding the mutex across a caller's Reader/Writer would serialize —
+	// or deadlock on — blocking I/O. The contract that makes this safe under -race:
+	// each Run call owns its stdin Reader and stdout/stderr Writers (every caller
+	// passes a fresh strings.NewReader / *strings.Builder per invocation). Do NOT
+	// share one Reader/Writer across concurrent Run calls.
 	var in string
 	var stdinErr error
 	if stdin != nil {
