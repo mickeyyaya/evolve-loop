@@ -86,6 +86,7 @@ const (
 //   - TruncateInline long input             ⇒ "<head>… (N bytes elided)" (negative/truncated)
 //   - TruncateMiddle short input            ⇒ returned unchanged (positive)
 //   - TruncateMiddle long input             ⇒ "<head>… (N bytes elided) …<tail>" (negative/truncated)
+//
 // RED today: go/internal/textutil does not exist, so the import above does not
 // resolve and the whole cycle335 package fails to compile (the correct RED for a
 // new-package task).
@@ -152,6 +153,7 @@ func TestC335_002_TruncateLocalDefsRemoved(t *testing.T) {
 // MAJOR.MINOR.PATCH integer triple; reject everything else:
 //   - "1.2.3", "0.0.0", "10.20.30" ⇒ true  (positive)
 //   - "v1.2.3", "1.2", "1.2.3.4", "", "abc", "1.2.3-rc1" ⇒ false (negative)
+//
 // The negatives are the anti-no-op axis: a stub returning constant true (or a
 // pattern accepting a "v" prefix / 4 segments / pre-release) fails one of them.
 // RED today: go/internal/semvercheck does not exist, so the import does not

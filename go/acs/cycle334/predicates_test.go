@@ -112,6 +112,7 @@ func assertNoCompileInParseHint(t *testing.T) {
 //   - "5:20am"        @ 14:00          ⇒ Source=parsed, WakeAt rolls to tomorrow
 //   - "garbage no time"                ⇒ Source=default (no match — negative)
 //   - "99:99am"                        ⇒ Source=default (minutes out of range — negative)
+//
 // The two negatives are the anti-no-op axis: a stub that always "matched" or
 // always rejected would fail one of the four. Auxiliary structural half asserts
 // the compile left parseHint's body (RED until Builder hoists).

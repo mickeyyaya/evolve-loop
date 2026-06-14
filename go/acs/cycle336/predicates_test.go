@@ -114,6 +114,7 @@ func runAggregate(t *testing.T, phase string, workers ...string) (int, string) {
 //   - the concat ("## Worker:") and cross-cli-vote ("### Worker:") heading
 //     levels — appendWorkerSections must reproduce BOTH (the only inter-call
 //     variation), so a hard-coded heading regresses one of them.
+//
 // Pre-existing GREEN today (refactor is behavior-preserving); this is the
 // anti-regression lock for Builder.
 // ---------------------------------------------------------------------------
