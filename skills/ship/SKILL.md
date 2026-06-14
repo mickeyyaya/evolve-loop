@@ -42,7 +42,7 @@ Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is
 |---|---|
 | Phase | `ship` (control archetype, mandatory) |
 | Persona | `agents/evolve-orchestrator.md` |
-| Profile | `.evolve/profiles/orchestrator.json` — CLI `claude-tmux`, tier `sonnet`, single-writer |
+| Profile | `.evolve/profiles/orchestrator.json` — CLI `claude-tmux`, tier `balanced`, single-writer |
 | Inputs | `audit-report.md` |
 <!-- GENERATED:phase-facts END -->
 

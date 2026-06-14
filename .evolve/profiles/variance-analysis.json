@@ -5,7 +5,7 @@
   "cli_fallback": [
     "claude-tmux"
   ],
-  "model_tier_default": "sonnet",
+  "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",
     "Grep",

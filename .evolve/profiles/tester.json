@@ -2,12 +2,12 @@
   "name": "tester",
   "role": "builder",
   "cli": "claude-tmux",
-  "model_tier_default": "sonnet",
+  "model_tier_default": "balanced",
   "model_tier_overrides": {
-    "ultrathink_strategy": "opus",
-    "m_complex_5plus_files": "opus",
-    "audit_retry_2plus": "opus",
-    "s_complex_with_cache": "haiku"
+    "ultrathink_strategy": "deep",
+    "m_complex_5plus_files": "deep",
+    "audit_retry_2plus": "deep",
+    "s_complex_with_cache": "fast"
   },
   "allowed_tools": [
     "Read",

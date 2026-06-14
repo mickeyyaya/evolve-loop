@@ -46,7 +46,7 @@ Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, gi
 |---|---|
 | Phase | `intent` (plan archetype, optional, gated by `EVOLVE_REQUIRE_INTENT`) |
 | Persona | `agents/evolve-intent.md` |
-| Profile | `.evolve/profiles/intent.json` — CLI `claude-tmux`, tier `opus`, single-writer |
+| Profile | `.evolve/profiles/intent.json` — CLI `claude-tmux`, tier `deep`, single-writer |
 | Artifact | `intent.md` (cycle workspace) |
 
 ## Output contract

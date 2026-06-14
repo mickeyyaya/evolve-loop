@@ -37,9 +37,27 @@ illustrative projection of what that SSOT holds:
 ### Substitutability acceptance test
 
 Pick any spine phase, point its profile `cli` at codex/agy/ollama, keep the same
-tier — the pipeline still resolves a model. Enforced by
-`TestSpineProfilesAreDriverAgnostic` (rejects any spine profile using a vendor
-model name) plus `modelcatalog` per-CLI lookup tests.
+tier — the pipeline still resolves a model. Enforced by:
+
+- `TestAllProfilesSubstitutabilityAtParity` — the definitive all-profiles parity
+  guard: iterates all profiles via `loader.List()`, checks `model_tier_default`,
+  every `model_tier_overrides` value, and every non-empty `model_tier_envelope`
+  field (min/default/max) against each swappable bridge manifest using real
+  manifests (not a synthetic fixture). Uses `t.Errorf` so any missing tier is a
+  hard failure, not a silent skip.
+- `TestAllProfileDefaultTiersResolveForSwappableDrivers` — companion check that
+  all profiles' default tiers resolve across all swappable driver manifests
+  (codex, codex-tmux, agy, agy-tmux, ollama-tmux).
+- `TestSpineProfilesAreDriverAgnostic` — rejects any spine profile using a vendor
+  model name.
+
+**`allowed_clis` dispatch exceptions:** Three profiles carry intentional
+`allowed_clis` restrictions that limit runtime driver selection: `builder`
+(claude + codex), `tdd-engineer` (claude only), and `tester` (claude only).
+These encode cross-family invariants (TDD ≠ builder floor, adversarial-audit
+floor) — not tier-vocabulary violations. The tier vocabulary
+(`fast`/`balanced`/`deep`) remains fully driver-agnostic for all profiles;
+`allowed_clis` constrains *dispatch eligibility*, not tier resolution.
 
 ## Routing Principles
 
@@ -64,14 +82,15 @@ model name) plus `modelcatalog` per-CLI lookup tests.
 
 ## Migration Status
 
-Driver-agnostic tier vocabulary is enforced for the **7 spine phases above**
-(default + overrides + envelope), guarded by `TestSpineProfilesAreDriverAgnostic`.
+Driver-agnostic tier vocabulary is enforced for the **7 spine phases above** by
+`TestSpineProfilesAreDriverAgnostic` and for the full `.evolve/profiles/*.json`
+fleet by `TestAllProfilesAreDriverAgnostic`. Both guards cover defaults,
+overrides, and tier envelopes.
 
-The ~48 domain/optional phase profiles (`api-contract-design`, `security-scan`,
-`market-sizing`, …) and their overrides **still carry vendor model names** and
-are migrating to canonical tiers via the evolve loop (operator note
-`driver-agnostic-model-routing`). When that migration completes, widen the guard
-test's `spine` set to the full fleet so the invariant covers every profile.
+The domain/optional phase profile migration is complete: profile defaults and
+overrides now use only `fast`, `balanced`, and `deep`. The per-driver concrete
+model remains owned by `modelcatalog`, keeping profiles driver-agnostic at
+parity across Claude, Codex, agy, and other supported bridges.
 
 ## Research Basis
 

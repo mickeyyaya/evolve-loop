@@ -3,7 +3,7 @@
   "role": "debugger",
   "cli": "claude-tmux",
   "cli_fallback": [],
-  "model_tier_default": "opus",
+  "model_tier_default": "deep",
   "allowed_tools": [
     "Read",
     "Bash",

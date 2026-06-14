@@ -2,7 +2,7 @@
   "name": "doc-sync",
   "role": "doc-sync",
   "cli": "claude-tmux",
-  "model_tier_default": "sonnet",
+  "model_tier_default": "balanced",
   "max_turns": 10,
   "output_artifact": ".evolve/runs/cycle-{cycle}/doc-sync-report.md",
   "challenge_token_required": true,

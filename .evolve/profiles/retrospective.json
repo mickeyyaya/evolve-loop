@@ -5,10 +5,10 @@
   "cli_fallback": [
     "codex-tmux"
   ],
-  "model_tier_default": "sonnet",
+  "model_tier_default": "deep",
   "model_tier_overrides": {
-    "systemic_failure": "opus",
-    "first_observation": "sonnet"
+    "systemic_failure": "deep",
+    "first_observation": "balanced"
   },
   "allowed_tools": [
     "Read",
