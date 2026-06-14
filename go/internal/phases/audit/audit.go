@@ -36,6 +36,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -65,6 +66,12 @@ var verdictInlineRE = regexp.MustCompile(`(?m)^[^\S\n]*(?:##[^\S\n]*)?\*{0,2}Ver
 // generation (a pre-staged file is then required, the legacy behavior).
 type hooks struct {
 	genVerdict func(req core.PhaseRequest) error
+	// gofmtCheck reports the worktree's .go files that are not gofmt -s clean.
+	// It is the CI-parity gate that stops a cycle shipping a gofmt regression
+	// to main (cycles 339-341 shipped CI-red because the cycle-scoped audit
+	// never ran gofmt over the generated go/acs/cycle<N>/*.go files). nil = no
+	// gofmt gate (legacy/tests). The registry default wires gofmtCheckDefault.
+	gofmtCheck func(req core.PhaseRequest) ([]string, error)
 }
 
 func (hooks) PhaseName() string                           { return string(core.PhaseAudit) }
@@ -116,6 +123,29 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Message:  fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount),
 		})
 		verdict = core.VerdictFAIL
+	}
+
+	// gofmt CI-parity gate: a cycle whose worktree has any non-gofmt-s-clean
+	// .go file would FAIL the CI `vet + fmt` step, so it must FAIL audit here —
+	// never ship green-locally/red-in-CI (cycles 339-341). An infra error
+	// (gofmt missing, unparseable source) fails OPEN with a loud warning: the
+	// gate's own inability to run must not brick the cycle, but is never
+	// silently treated as clean.
+	if h.gofmtCheck != nil {
+		dirty, gerr := h.gofmtCheck(req)
+		switch {
+		case gerr != nil:
+			diags = append(diags, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("gofmt gate skipped (could not run): %s", gerr.Error()),
+			})
+		case len(dirty) > 0:
+			diags = append(diags, core.Diagnostic{
+				Severity: "error",
+				Message:  fmt.Sprintf("gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. Run `gofmt -w -s .` in go/. Offenders: %s", len(dirty), strings.Join(dirty, ", ")),
+			})
+			verdict = core.VerdictFAIL
+		}
 	}
 
 	if verdict == core.VerdictWARN && req.Env["EVOLVE_STRICT_AUDIT"] == "1" {
@@ -188,6 +218,10 @@ type Config struct {
 	// nil = no generation (legacy: a pre-staged file is required to PASS).
 	// The registry default wires generateACSVerdict (runs acssuite).
 	GenerateVerdict func(req core.PhaseRequest) error
+	// CheckGofmt, when set, reports the worktree .go files that are not
+	// gofmt -s clean; any offender FAILs the audit (CI-parity gate). nil = no
+	// gofmt gate. NewDefault wires gofmtCheckDefault.
+	CheckGofmt func(req core.PhaseRequest) ([]string, error)
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -195,7 +229,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{genVerdict: c.GenerateVerdict},
+			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt},
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
@@ -213,7 +247,27 @@ func New(c Config) *Phase {
 // every cycle (cycle-147). New(Config) stays for tests that pin explicit
 // (nil or fake) generators.
 func NewDefault(br core.Bridge, prm *prompts.Loader) *Phase {
-	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict})
+	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault})
+}
+
+// gofmtCheckDefault is the production gofmt CI-parity gate: it lists the .go
+// files under the cycle worktree's go/ module that are not gofmt -s clean,
+// matching CI's `gofmt -d -s .`. The worktree (where the builder wrote this
+// cycle's changes) is preferred; ProjectRoot is the fallback. When no go/
+// module exists the gate is a no-op (returns nil) rather than an error.
+func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	if root == "" {
+		return nil, nil
+	}
+	target := filepath.Join(root, "go")
+	if _, err := os.Stat(target); err != nil {
+		target = root // no go/ submodule; scan root (no-op when it has no .go files)
+	}
+	return codequality.UnformattedGoFiles(target)
 }
 
 // generateACSVerdict runs the ACS predicate suite for req.Cycle and writes
