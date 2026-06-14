@@ -130,18 +130,25 @@ func pluginVersion(pluginRoot string) string {
 	return p.Version
 }
 
-// withStateLock runs fn while holding the advisory lock that serializes
-// state.json read-modify-writes — the SAME <path>.lock that
-// storage.UpdateState holds (ADR-0049 S2 / gap G2). flock is BLOCKING and
-// per-open-file-description, so ship's map-based RMW and the typed
-// UpdateState/allocator writers never interleave (the lost-update / stale-pin
-// class). fn does the read→modify→write between the lock and its release. A
-// no-op for the live loop (the whole-cycle project lock already serializes
-// ship vs the allocator); this joins the CA.3 lock domain so it stays correct
-// once that coarse lock is scoped per-run. A lock-acquire failure surfaces as
-// a plain error the caller wraps in its phase-appropriate ShipError.
+// lockStateFile acquires the advisory lock that serializes state.json
+// read-modify-writes — the SAME <path>.lock storage.UpdateState holds
+// (ADR-0049 S2 / gap G2). flock is BLOCKING and per-open-file-description, so
+// ship's map-based RMW and the typed UpdateState/allocator writers never
+// interleave (the lost-update / stale-pin class). The single home for the
+// ".lock" suffix. Callers that need a phase-specific ShipError on lock failure
+// use this directly + `defer release()`; the rest use withStateLock. A no-op
+// for the live loop (the whole-cycle project lock already serializes ship vs
+// the allocator); this joins the CA.3 lock domain so it stays correct once the
+// coarse lock is scoped per-run.
+func lockStateFile(statePath string) (release func(), err error) {
+	return flock.Lock(statePath + ".lock")
+}
+
+// withStateLock runs fn while holding lockStateFile(statePath). fn does the
+// read→modify→write between the lock and its release. A lock-acquire failure
+// surfaces as a plain error the caller wraps in its phase-appropriate error.
 func withStateLock(statePath string, fn func() error) error {
-	release, err := flock.Lock(statePath + ".lock")
+	release, err := lockStateFile(statePath)
 	if err != nil {
 		return fmt.Errorf("lock %s: %w", statePath, err)
 	}

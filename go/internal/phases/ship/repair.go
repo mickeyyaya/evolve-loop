@@ -151,14 +151,18 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	stateMap, err := readStateMap(statePath)
-	if err != nil {
-		return repairNone
-	}
 	pluginVer := pluginVersion(opts.PluginRoot)
-	stateMap["expected_ship_sha"] = actualSHA
-	stateMap["expected_ship_version"] = pluginVer
-	if err := writeStateMap(statePath, stateMap); err != nil {
+	// ADR-0049 S2 / G2: serialize the RMW under the shared state.json lock. Any
+	// error (lock/read/write) → repairNone, as before (conservative repair).
+	if err := withStateLock(statePath, func() error {
+		stateMap, err := readStateMap(statePath)
+		if err != nil {
+			return err
+		}
+		stateMap["expected_ship_sha"] = actualSHA
+		stateMap["expected_ship_version"] = pluginVer
+		return writeStateMap(statePath, stateMap)
+	}); err != nil {
 		return repairNone
 	}
 	res.RepairOutcome = "repinned-verified-rebuild"

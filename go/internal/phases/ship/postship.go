@@ -240,20 +240,23 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	stMap, err := readStateMap(statePath)
-	if err != nil {
-		return err
-	}
-	expected := stateString(stMap, "expected_ship_sha")
-	if expected == postSHA {
+	// ADR-0049 S2 / G2: serialize the whole read→check→write under the shared
+	// state.json lock. Any error (lock/read/write) propagates, as before.
+	return withStateLock(statePath, func() error {
+		stMap, err := readStateMap(statePath)
+		if err != nil {
+			return err
+		}
+		if stateString(stMap, "expected_ship_sha") == postSHA {
+			return nil
+		}
+		pluginVer := pluginVersion(opts.PluginRoot)
+		stMap["expected_ship_sha"] = postSHA
+		stMap["expected_ship_version"] = pluginVer
+		if err := writeStateMap(statePath, stMap); err != nil {
+			return err
+		}
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] TOFU: post-cycle self-update (ship binary changed in this commit) — pinned ship binary SHA + plugin version='%s'", pluginVer))
 		return nil
-	}
-	pluginVer := pluginVersion(opts.PluginRoot)
-	stMap["expected_ship_sha"] = postSHA
-	stMap["expected_ship_version"] = pluginVer
-	if err := writeStateMap(statePath, stMap); err != nil {
-		return err
-	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] TOFU: post-cycle self-update (ship binary changed in this commit) — pinned ship binary SHA + plugin version='%s'", pluginVer))
-	return nil
+	})
 }
