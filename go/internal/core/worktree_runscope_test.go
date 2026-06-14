@@ -1,3 +1,5 @@
+//go:build integration
+
 package core
 
 // CB.4 (concurrency campaign): guard hooks inside a cycle worktree must read

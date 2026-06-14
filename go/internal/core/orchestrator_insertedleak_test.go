@@ -1,3 +1,5 @@
+//go:build integration
+
 // orchestrator_insertedleak_test.go — acceptance pin for inbox defect
 // 2026-06-10T09-40-00Z-inserted-phase-treediff-guard-gap (cycle-270 replay).
 //
@@ -62,18 +64,8 @@ func (m leakMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, 
 	return spec, &insertedLeakRunner{name: spec.Name, onRun: m.onRun}, nil
 }
 
-type insertedLeakRunner struct {
-	name  string
-	onRun func(req PhaseRequest)
-}
-
-func (r *insertedLeakRunner) Name() string { return r.name }
-func (r *insertedLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
-	if r.onRun != nil {
-		r.onRun(req)
-	}
-	return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
-}
+// insertedLeakRunner (a no-git fake PhaseRunner) lives untagged in
+// orchestrator_testfakes_test.go so the fast-tier spinegate test can share it.
 
 // initInsertedLeakRepo creates a real git repo (production gitDirtyPaths runs
 // real git against it) with one committed source file, so the leaked test file

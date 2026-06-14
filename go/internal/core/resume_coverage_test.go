@@ -1,3 +1,5 @@
+//go:build integration
+
 // Coverage tests for core.RunCycleFromPhase + helpers — drives 62.1%
 // baseline toward ≥95%. Exercises:
 //   - RunCycleFromPhase happy + error paths (0% baseline)

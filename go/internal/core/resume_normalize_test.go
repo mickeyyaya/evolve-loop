@@ -1,4 +1,7 @@
-// resume_normalize_test.go — RED contract for the resume.go:278 TODO
+//go:build integration
+
+// resume_normalize_test.go (integration tier — uses real git via gitInRepo).
+// RED contract for the resume.go:278 TODO
 // (cycle-156 parity): RunCycle soft-resets a committing builder's worktree
 // commits back to the cycle base after PhaseBuild (normalizeWorktreeToBase)
 // so audit + binding see PENDING changes; the crash-resume path

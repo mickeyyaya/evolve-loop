@@ -1,3 +1,5 @@
+//go:build integration
+
 // Regression test for the cycle-294 resume incident (2026-06-12): ship's
 // verifyAuditBinding reads the latest role=auditor kind=agent_subprocess
 // ledger entry. RunCycle emits it after a shippable audit, but the resume
