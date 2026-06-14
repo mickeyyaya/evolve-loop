@@ -1740,15 +1740,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// artifacts in seconds instead of redoing discovery) and steer
 	// downstream phases via the OLD task selection.
 	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
-	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that
-	// pre-seed workspace files to simulate phase state. The kill switch is
-	// honored from EITHER the request env OR the live process env (a disable
-	// from either source wins): tests set it programmatically via req.Env,
-	// operators via the shell. Reading the live env is a deliberate, narrow
-	// break from per-cycle snapshot isolation — it can only DISABLE a
-	// default-on guard, never enable new mid-cycle behavior.
-	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false) ||
-		envchain.BoolValue(os.Getenv("EVOLVE_DISABLE_WORKSPACE_GUARD"), false)
+	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that pre-seed
+	// workspace files to simulate phase state, and by operators via the shell
+	// (captured into req.Env from filterEvolveEnv(os.Environ()) at cycle launch,
+	// cmd_cycle.go). ADR-0049 N9: read ONLY the per-cycle env SNAPSHOT, never live
+	// os.Getenv — under concurrent fleet cycles a peer's env (or a mid-flight
+	// mutation) must not flip this cycle's guard. The launch snapshot already
+	// carries the operator's shell value, so this is behavior-preserving for the
+	// live loop while restoring per-cycle isolation.
+	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false)
 	if !guardDisabled {
 		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
 			// Best-effort: WARN but don't block the cycle; the failure
@@ -2269,13 +2269,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 					// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 					// try to reconstruct the artifact from stdout.clean.txt before aborting.
-					// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in EITHER
-					// the per-cycle snapshot OR the live process env (same dual-source
-					// disable rationale as the workspace guard above — a "0" from either
-					// source wins, and the live read can only ever disable a default-on
-					// safety net).
-					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true) &&
-						envchain.BoolValue(os.Getenv("EVOLVE_BACKFILL_ENABLED"), true)
+					// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in the
+					// per-cycle env SNAPSHOT (ADR-0049 N9: read the snapshot, not live
+					// os.Getenv, so a concurrent fleet cycle's env can't flip this cycle's
+					// backfill. The snapshot already carries the operator's shell value).
+					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true)
 					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
 						artifactPath := backfillArtifactPath(cs.WorkspacePath, string(next))
 						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
