@@ -37,7 +37,7 @@ type stagingCapture struct {
 }
 
 func (c *stagingCapture) runner() CmdRunner {
-	return func(_ context.Context, name string, args, _ []string, _ string,
+	return func(_ context.Context, name, _ string, args, _ []string,
 		_ io.Reader, _, _ io.Writer) (int, error) {
 		c.calls = append(c.calls, append([]string{name}, args...))
 		if name == "git" && len(args) >= 3 && args[0] == "diff" && args[1] == "--cached" && args[2] == "--quiet" {

@@ -7,22 +7,21 @@ package ship
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const phaseName = string(core.PhaseShip)
 
-// CmdRunner is the subprocess injection seam. Tests override it; the
-// production wiring uses execRunner.
-type CmdRunner func(ctx context.Context, name string, args, env []string, cwd string,
-	stdin io.Reader, stdout, stderr io.Writer) (exitCode int, err error)
+// CmdRunner is the subprocess injection seam. It is an alias of the single
+// canonical command-execution seam (sysexec.RunFunc); production wiring uses
+// sysexec.DefaultRunner, tests inject fixtures.FakeExec. The alias keeps the
+// `ship.CmdRunner` name at call sites while collapsing onto the one seam.
+type CmdRunner = sysexec.RunFunc
 
 type Config struct {
 	Runner CmdRunner
@@ -78,29 +77,10 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	return p.runNative(ctx, req, msg, start)
 }
 
-// execRunner is the production CmdRunner.
-func execRunner(ctx context.Context, name string, args, env []string, cwd string,
-	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = env
-	cmd.Dir = cwd
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode(), nil
-		}
-		return -1, err
-	}
-	return 0, nil
-}
-
 // NewWithDefaultRunner is a convenience constructor for production
-// wiring that uses exec.CommandContext.
+// wiring that uses sysexec.DefaultRunner (exec.CommandContext).
 func NewWithDefaultRunner() *Phase {
-	return New(Config{Runner: execRunner})
+	return New(Config{Runner: sysexec.DefaultRunner})
 }
 
 // runNative dispatches to the native Go ship implementation. Translates
@@ -114,7 +94,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		RunID:         req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
 		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:           req.Env,
-		Runner:        execRunner,
+		Runner:        sysexec.DefaultRunner,
 	}
 	res, err := Run(ctx, opts)
 	durationMS := p.nowFn().Sub(start).Milliseconds()

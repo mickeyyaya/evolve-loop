@@ -1,3 +1,5 @@
+//go:build integration
+
 // remaining_gaps_test.go — targeted coverage for the achievable gaps
 // remaining after 91.5%:
 //
@@ -52,12 +54,12 @@ func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: footer fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name == "git" && argsContain(args, "--name-status") {
 				return -1, errors.New("name-status exploded")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,
@@ -92,7 +94,7 @@ func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {
 func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// Fail git add -A specifically (args[0]=="add").
 			if name == "git" && len(args) > 0 && args[0] == "add" {
@@ -120,7 +122,7 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 
 	opts := &Options{
 		ProjectRoot: repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// verifyTrivial calls: git diff --cached --name-only
 			// then git diff --name-only, then git ls-files ...
@@ -128,7 +130,7 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 			if name == "git" && argsContain(args, "--name-only") && !argsContain(args, "--cached") {
 				return -1, errors.New("diff name-only exploded")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,
@@ -149,12 +151,12 @@ func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 
 	opts := &Options{
 		ProjectRoot: repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name == "git" && argsContain(args, "ls-files") {
 				return -1, errors.New("ls-files exploded")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,

@@ -316,7 +316,7 @@ func checkEGPSGate(path string, res *RunResult) error {
 // model: tracked-file mutations after audit invalidate ship.
 func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	var buf strings.Builder
-	exitCode, err := opts.Runner(ctx, "git", []string{"diff", "HEAD"}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+	exitCode, err := opts.run(ctx, "git", []string{"diff", "HEAD"}, &buf, io.Discard)
 	if err != nil {
 		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: git diff HEAD: "+err.Error(), "git_err", err.Error())

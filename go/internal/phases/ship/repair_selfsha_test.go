@@ -1,3 +1,5 @@
+//go:build integration
+
 // repair_selfsha_test.go — RED contract for repair-ladder mode #1
 // (ADR-0039 §8): SELF_SHA_TAMPERED from a STALE TOFU pin.
 //

@@ -1,3 +1,5 @@
+//go:build integration
+
 // worktree_errors_test.go — fault-injected coverage for shipFromWorktree
 // runner-error branches (gitops.go:153-237) and writeShipBinding early
 // error paths (gitops.go:268,287,291).
@@ -15,27 +17,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// makeWorktreeScenario returns (mainRepo, worktreePath) where:
-//   - mainRepo has a remote, a committed file, and a seeded audit
-//   - worktreePath is a linked worktree on branch "cycle-1"
-//     with one staged change so there are uncommitted changes to ship
-func makeWorktreeScenario(t *testing.T) (string, string) {
-	t.Helper()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	seedAudit(t, repo, "PASS")
-
-	// Create a linked worktree on a new branch.
-	wt := tempRepoDir(t)
-	runGit(t, repo, "worktree", "add", "-b", "cycle-1", wt)
-
-	// Stage a file in the worktree so worktreeCleanNoCommit == false.
-	mustWrite(t, filepath.Join(wt, "wt-change.txt"), "worktree change\n")
-	runGit(t, wt, "add", "wt-change.txt")
-
-	return repo, wt
-}
 
 // --- gitops.go:153-154: worktree git add -A runner error -------------------
 
@@ -68,13 +49,13 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: diff quiet fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// Fail specifically: git diff --cached --quiet (has both flags).
 			if name == "git" && argsContain(args, "--cached") && argsContain(args, "--quiet") {
 				return -1, errors.New("diff quiet injected error")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,
@@ -125,14 +106,14 @@ func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: diff footer fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// buildDiffFooterAtDir calls "git -C <wt> diff --cached --name-status".
 			// Match by --name-status (unique to this call).
 			if name == "git" && argsContain(args, "--name-status") {
 				return -1, errors.New("name-status injected error")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdin:  strings.NewReader(""),
 		Stdout: io.Discard,

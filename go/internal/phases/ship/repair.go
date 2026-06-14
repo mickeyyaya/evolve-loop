@@ -174,12 +174,8 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 // committedBinSHA returns sha256 of the blob at HEAD:<relBin>, or "" when the
 // path is not a blob at HEAD (or git fails). Shared with repinPostCycle.
 func committedBinSHA(ctx context.Context, opts *Options, relBin string) string {
-	runner := opts.Runner
-	if runner == nil {
-		runner = execRunner
-	}
 	var buf strings.Builder
-	exitCode, err := runner(ctx, "git", []string{"show", "HEAD:" + relBin}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+	exitCode, err := opts.run(ctx, "git", []string{"show", "HEAD:" + relBin}, &buf, io.Discard)
 	if err != nil || exitCode != 0 {
 		return ""
 	}
@@ -362,7 +358,7 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 		return repairNone
 	}
 	// Refresh the remote ref; a fetch failure falls back to the local ref.
-	_, _ = opts.Runner(ctx, "git", []string{"fetch", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+	_, _ = opts.run(ctx, "git", []string{"fetch", "origin", branch}, io.Discard, io.Discard)
 	originRef, err := captureGitOutput(ctx, opts, "rev-parse", "origin/"+branch)
 	if err != nil {
 		return repairNone
@@ -378,7 +374,7 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 		if !isAncestor(ctx, opts, originRef, "HEAD") {
 			return repairNone // origin diverged — never rebase, never force-push
 		}
-		exit, pushErr := opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+		exit, pushErr := opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
 		if pushErr != nil || exit != 0 {
 			return repairNone
 		}
@@ -399,7 +395,7 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 
 // isAncestor reports whether anc is an ancestor of desc (git merge-base).
 func isAncestor(ctx context.Context, opts *Options, anc, desc string) bool {
-	exit, err := opts.Runner(ctx, "git", []string{"merge-base", "--is-ancestor", anc, desc}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+	exit, err := opts.run(ctx, "git", []string{"merge-base", "--is-ancestor", anc, desc}, io.Discard, io.Discard)
 	return err == nil && exit == 0
 }
 
@@ -432,7 +428,7 @@ func repairPushRace(ctx context.Context, opts *Options, res *RunResult, branch s
 		return origErr
 	}
 
-	if exit, err := opts.Runner(ctx, "git", []string{"fetch", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard); err != nil || exit != 0 {
+	if exit, err := opts.run(ctx, "git", []string{"fetch", "origin", branch}, io.Discard, io.Discard); err != nil || exit != 0 {
 		return declined()
 	}
 	originRef, err := captureGitOutput(ctx, opts, "rev-parse", "origin/"+branch)
@@ -452,7 +448,7 @@ func repairPushRace(ctx context.Context, opts *Options, res *RunResult, branch s
 		return nil
 	}
 	if isAncestor(ctx, opts, originRef, "HEAD") {
-		exit, pushErr := opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+		exit, pushErr := opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
 		if pushErr == nil && exit == 0 {
 			res.RepairOutcome = "push-retried"
 			res.Logs = append(res.Logs, "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)")

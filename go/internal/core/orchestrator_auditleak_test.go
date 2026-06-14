@@ -1,3 +1,5 @@
+//go:build integration
+
 // orchestrator_auditleak_test.go — cycle-235 task `audit-phase-leak-recover` (RED).
 //
 // Inbox defect (2026-06-06T05-48-00Z-audit-leak-recover): `evolve acs suite`

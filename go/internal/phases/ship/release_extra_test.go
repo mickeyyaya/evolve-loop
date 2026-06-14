@@ -21,7 +21,7 @@ type ghCapture struct {
 }
 
 func (g *ghCapture) runner() CmdRunner {
-	return func(_ context.Context, name string, args, _ []string, _ string,
+	return func(_ context.Context, name, _ string, args, _ []string,
 		_ io.Reader, _, _ io.Writer) (int, error) {
 		if name == "gh" {
 			g.calls = append(g.calls, append([]string{name}, args...))

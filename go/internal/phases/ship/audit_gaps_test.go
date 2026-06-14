@@ -1,3 +1,5 @@
+//go:build integration
+
 // audit_gaps_test.go — covers verifyAuditBinding branches not exercised by
 // the parity matrix: auditor-exit-code>1, dual PASS+FAIL verdict,
 // WARN+STRICT_AUDIT=1, no-verdict, stale audit, GitHEAD mismatch.

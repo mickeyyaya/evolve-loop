@@ -1,3 +1,5 @@
+//go:build integration
+
 // commitgate_test.go — verifyCommitGateAttestation (commitgate.go).
 //
 // The --class manual path is the interactive-commit chokepoint. These tests
@@ -28,13 +30,6 @@ func excludeCommitGate(t *testing.T, repo string) {
 	if err := os.WriteFile(p, []byte(".commit-gate/\n"), 0o644); err != nil {
 		t.Fatalf("write exclude: %v", err)
 	}
-}
-
-func writeAttestation(t *testing.T, repo, treeSHA string) {
-	t.Helper()
-	mustMkdir(t, filepath.Join(repo, ".commit-gate"))
-	body := fmt.Sprintf(`{"tree_state_sha":%q,"ts":"2026-05-27T00:00:00Z","checks_passed":["go:gofmt","go:test"],"reviewers_run":["code-simplifier","code-reviewer","go-reviewer"],"tool":"shasum"}`+"\n", treeSHA)
-	mustWrite(t, filepath.Join(repo, ".commit-gate", "attestation.json"), body)
 }
 
 // Missing attestation → manual ship refuses (ExitIntegrity).

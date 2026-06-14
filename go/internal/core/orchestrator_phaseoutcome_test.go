@@ -1,3 +1,5 @@
+//go:build integration
+
 // orchestrator_phaseoutcome_test.go — ADR-0044 C1 (Slice 1) RED tests:
 // single-source phase-outcome recording.
 //

@@ -1,3 +1,5 @@
+//go:build integration
+
 // dispatch_test.go — covers the PhaseRunner dispatcher's native path
 // (Phase.Run → runNative), the only ship path. native_test.go exercises the
 // full native ship state machine; these tests assert the PhaseResponse

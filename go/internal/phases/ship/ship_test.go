@@ -1,3 +1,5 @@
+//go:build integration
+
 // Tests for the ship phase dispatcher (ship.go). The ship phase now runs
 // the native Go shipper unconditionally (native.go); the full ship state
 // machine is exercised by native_test.go and dispatch_test.go. These tests
@@ -54,7 +56,7 @@ func TestExecRunner_Success(t *testing.T) {
 		t.Skip("no /bin/true")
 	}
 	var stdout, stderr io.Writer = io.Discard, io.Discard
-	code, err := execRunner(context.Background(), "/bin/true", nil, nil, "", nil, stdout, stderr)
+	code, err := execRunner(context.Background(), "/bin/true", "", nil, nil, nil, stdout, stderr)
 	if err != nil {
 		t.Fatalf("execRunner: %v", err)
 	}
@@ -67,7 +69,7 @@ func TestExecRunner_NonZeroExit(t *testing.T) {
 	if _, err := os.Stat("/bin/false"); err != nil {
 		t.Skip("no /bin/false")
 	}
-	code, err := execRunner(context.Background(), "/bin/false", nil, nil, "", nil, io.Discard, io.Discard)
+	code, err := execRunner(context.Background(), "/bin/false", "", nil, nil, nil, io.Discard, io.Discard)
 	if err != nil {
 		t.Errorf("err=%v, want nil (exit-status mapped to code)", err)
 	}
@@ -77,7 +79,7 @@ func TestExecRunner_NonZeroExit(t *testing.T) {
 }
 
 func TestExecRunner_NotFound(t *testing.T) {
-	_, err := execRunner(context.Background(), "/no/such/binary/ever", nil, nil, "", nil, io.Discard, io.Discard)
+	_, err := execRunner(context.Background(), "/no/such/binary/ever", "", nil, nil, nil, io.Discard, io.Discard)
 	if err == nil {
 		t.Errorf("err=nil, want non-nil for missing binary")
 	}

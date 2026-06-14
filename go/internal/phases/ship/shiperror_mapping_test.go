@@ -1,3 +1,5 @@
+//go:build integration
+
 // shiperror_mapping_test.go — focused proof that the ship phase emits the
 // structured core.ShipError protocol end-to-end: each representative failure
 // site is recoverable via core.AsShipError with the correct Code + Class, and

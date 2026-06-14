@@ -1,3 +1,5 @@
+//go:build integration
+
 // final_gaps_test.go — last achievable coverage gaps after 92.5%:
 //
 //   - verifySelfSHA: sha256File error on unreadable binary (verify.go:65)
@@ -103,7 +105,7 @@ func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
 	call := 0
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name != "git" {
 				return 0, nil
@@ -134,13 +136,13 @@ func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
 
 	opts := &Options{
 		ProjectRoot: repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// verifyTrivial's first git call: git diff --cached --name-only.
 			if name == "git" && argsContain(args, "--cached") && argsContain(args, "--name-only") {
 				return -1, errors.New("staged name-only exploded")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,
@@ -191,13 +193,13 @@ func TestVerifyAuditBinding_RevParseHeadRunnerError_Errors(t *testing.T) {
 	seedAudit(t, repo, "PASS")
 
 	opts := auditOpts(t, repo)
-	opts.Runner = func(ctx context.Context, name string, args, env []string, cwd string,
+	opts.Runner = func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if name == "git" && argsContain(args, "rev-parse") && argsContain(args, "HEAD") &&
 			!argsContain(args, "HEAD^{tree}") && !argsContain(args, "--abbrev-ref") {
 			return -1, errors.New("rev-parse HEAD exploded")
 		}
-		return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{})
 	if err == nil {
@@ -217,12 +219,12 @@ func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
 	opts := auditOpts(t, repo)
 	// computeTreeStateSHA calls "git diff HEAD" — fail it while letting
 	// rev-parse HEAD succeed (needed to pass the HEAD binding check first).
-	opts.Runner = func(ctx context.Context, name string, args, env []string, cwd string,
+	opts.Runner = func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if name == "git" && argsContain(args, "diff") && argsContain(args, "HEAD") {
 			return -1, errors.New("git diff HEAD exploded")
 		}
-		return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{})
 	if err == nil {
@@ -321,12 +323,12 @@ func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: write-tree fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name == "git" && argsContain(args, "write-tree") {
 				return -1, errors.New("write-tree exploded")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		// Set a non-empty internalAuditBoundTreeSHA so the pre-commit binding
 		// check runs (and reaches the write-tree call we fault-inject).
@@ -352,12 +354,12 @@ func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: write-tree empty",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name == "git" && argsContain(args, "write-tree") {
 				return 0, nil // exit 0, no stdout written
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		internalAuditBoundTreeSHA: "someboundsha",
 		Stdin:                     strings.NewReader(""),

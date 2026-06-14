@@ -1,3 +1,5 @@
+//go:build integration
+
 // repair_colliders_test.go — RED contract for repair-ladder mode #3
 // (ADR-0039 §8): GIT_FF_MERGE_DIVERGED from untracked main-side colliders.
 //

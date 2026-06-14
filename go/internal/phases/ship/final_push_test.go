@@ -1,3 +1,5 @@
+//go:build integration
+
 // final_push_test.go — targets the remaining achievable gaps after the
 // 89.1% mark:
 //
@@ -140,7 +142,7 @@ func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
 
 	// Inject a runner that returns empty for symbolic-ref on the worktree.
 	base := execRunner
-	hijack := func(ctx context.Context, name string, args, env []string, cwd string,
+	hijack := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		// Detect: git -C <wt> symbolic-ref --short HEAD
 		if name == "git" && len(args) >= 4 && args[0] == "-C" && args[1] == wt {
@@ -151,7 +153,7 @@ func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
 				}
 			}
 		}
-		return base(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		return base(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
 
 	res, err := runShip(t, repo, Options{
@@ -233,9 +235,9 @@ func TestShipFromWorktree_WriteShipBindingWarn_LogsWarn(t *testing.T) {
 	seedAudit(t, repo, "PASS")
 
 	base := execRunner
-	hijack := func(ctx context.Context, name string, args, env []string, cwd string,
+	hijack := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		rc, err := base(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		rc, err := base(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		// After the push succeeds, remove cycle_id from cycle-state.json so
 		// writeShipBinding can't find it.
 		if name == "git" && len(args) > 0 && args[0] == "push" && rc == 0 {
@@ -334,7 +336,7 @@ func manualConfirmRunner(
 	statFn func(stdout, stderr io.Writer) (int, error),
 	diffFn func(stdout, stderr io.Writer) (int, error),
 ) CmdRunner {
-	return func(ctx context.Context, name string, args, env []string, cwd string,
+	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if name != "git" {
 			return 0, nil
