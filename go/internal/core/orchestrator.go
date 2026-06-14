@@ -1824,6 +1824,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	for k, v := range req.Env {
 		envSnap[k] = v
 	}
+	// ADR-0049 N12: pin this cycle's go toolchain to a per-cycle GOCACHE so
+	// concurrent fleet cycles' `go build`/`go test` never race on a shared
+	// build cache (golang/go#43052). Only affects subprocesses THIS cycle
+	// spawns — a developer's local `go test` keeps the default cache. Skipped
+	// for worktree-less / unresolvable workspaces (helper returns ok=false).
+	if gocache, ok := perCycleGOCACHE(cs.WorkspacePath); ok {
+		envSnap["GOCACHE"] = gocache
+	}
 	ctxSnap := make(map[string]string, len(req.Context))
 	for k, v := range req.Context {
 		ctxSnap[k] = v
