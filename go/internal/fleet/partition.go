@@ -112,12 +112,13 @@ func leastLoaded(buckets [][]Todo) int {
 	return best
 }
 
-// only returns the single key of a one-element set.
+// only returns the single key of a one-element set. Called only from the case-1
+// branch (len==1); an empty set is a caller-contract violation — fail loud.
 func only(set map[int]bool) int {
 	for k := range set {
 		return k
 	}
-	return 0
+	panic("fleet.only: called on empty set")
 }
 
 // normalizeFiles returns the todo's files as a normalized set so two spellings
