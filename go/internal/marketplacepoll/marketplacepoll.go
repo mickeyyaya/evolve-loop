@@ -28,6 +28,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Sentinel errors. The cmd layer maps these to bash exit codes.
@@ -67,11 +69,6 @@ type Result struct {
 	FinalVersion   string
 	ReleaseShRunOK bool // true iff release.sh was called and exited 0
 }
-
-// IsSemver matches X.Y.Z with numeric components only.
-var semverRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-
-func IsSemver(s string) bool { return semverRE.MatchString(s) }
 
 // pluginJSONPath returns the canonical plugin.json location under a
 // marketplace directory.
@@ -156,7 +153,7 @@ func Run(opts Options) (Result, error) {
 	res := Result{}
 
 	// Validate semver target.
-	if !IsSemver(opts.Target) {
+	if !semvercheck.IsSemver(opts.Target) {
 		return res, fmt.Errorf("%w: target version not semver: %s", ErrRuntime, opts.Target)
 	}
 	if opts.MaxWait <= 0 {

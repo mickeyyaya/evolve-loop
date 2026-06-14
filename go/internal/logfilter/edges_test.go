@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
 )
 
 // failingWriter induces a synthetic write error to exercise filterStream's
@@ -164,7 +166,7 @@ func TestFormatResult_MalformedJSON(t *testing.T) {
 }
 
 func TestTruncateInline_NotShortened(t *testing.T) {
-	if got := truncateInline("short", 100); got != "short" {
+	if got := textutil.TruncateInline("short", 100); got != "short" {
 		t.Fatalf("short string must pass through unchanged, got %q", got)
 	}
 }
@@ -172,7 +174,7 @@ func TestTruncateInline_NotShortened(t *testing.T) {
 func TestTruncateInline_Shortened(t *testing.T) {
 	// 10-byte string truncated to 4 bytes: keep head + elision marker
 	// reporting the elided byte count (10-4=6).
-	got := truncateInline("0123456789", 4)
+	got := textutil.TruncateInline("0123456789", 4)
 	if !strings.HasPrefix(got, "0123") {
 		t.Fatalf("expected head %q preserved, got %q", "0123", got)
 	}
@@ -182,7 +184,7 @@ func TestTruncateInline_Shortened(t *testing.T) {
 }
 
 func TestTruncateMiddle_NotShortened(t *testing.T) {
-	if got := truncateMiddle("short", 100, 100); got != "short" {
+	if got := textutil.TruncateMiddle("short", 100, 100); got != "short" {
 		t.Fatalf("short string must pass through unchanged, got %q", got)
 	}
 }

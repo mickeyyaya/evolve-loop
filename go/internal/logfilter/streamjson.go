@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
 )
 
 const (
@@ -62,7 +64,7 @@ func formatEvent(eventType string, raw []byte) string {
 		return formatRateLimit(raw)
 	default:
 		// Unknown — keep raw line so we never silently drop signal.
-		return "[unknown:" + eventType + "] " + truncateInline(string(raw), 500)
+		return "[unknown:" + eventType + "] " + textutil.TruncateInline(string(raw), 500)
 	}
 }
 
@@ -80,7 +82,7 @@ type systemEvent struct {
 func formatSystem(raw []byte) string {
 	var s systemEvent
 	if err := json.Unmarshal(raw, &s); err != nil {
-		return "[system] " + truncateInline(string(raw), 500)
+		return "[system] " + textutil.TruncateInline(string(raw), 500)
 	}
 	switch s.Subtype {
 	case "init":
@@ -98,7 +100,7 @@ func formatSystem(raw []byte) string {
 		return "[status] " + s.Status
 	default:
 		// Unknown system subtype — keep one compressed line.
-		return "[system:" + s.Subtype + "] " + truncateInline(string(raw), 400)
+		return "[system:" + s.Subtype + "] " + textutil.TruncateInline(string(raw), 400)
 	}
 }
 
@@ -123,7 +125,7 @@ type assistantContent struct {
 func formatAssistant(raw []byte) string {
 	var a assistantEvent
 	if err := json.Unmarshal(raw, &a); err != nil {
-		return "[assistant] " + truncateInline(string(raw), 500)
+		return "[assistant] " + textutil.TruncateInline(string(raw), 500)
 	}
 	var parts []string
 	for _, c := range a.Message.Content {
@@ -140,7 +142,7 @@ func formatAssistant(raw []byte) string {
 			parts = append(parts, "[thinking] "+c.Thinking)
 		case "tool_use":
 			parts = append(parts, fmt.Sprintf("[tool_use name=%s id=%s] %s",
-				c.Name, c.ID, truncateInline(string(c.Input), toolUseInputBytes)))
+				c.Name, c.ID, textutil.TruncateInline(string(c.Input), toolUseInputBytes)))
 		default:
 			parts = append(parts, "[assistant:"+c.Type+"]")
 		}
@@ -165,7 +167,7 @@ type userContent struct {
 func formatUser(raw []byte) string {
 	var u userEvent
 	if err := json.Unmarshal(raw, &u); err != nil {
-		return "[user] " + truncateInline(string(raw), 500)
+		return "[user] " + textutil.TruncateInline(string(raw), 500)
 	}
 	var parts []string
 	for _, c := range u.Message.Content {
@@ -180,7 +182,7 @@ func formatUser(raw []byte) string {
 			asStr = string(c.Content)
 		}
 		parts = append(parts, fmt.Sprintf("[tool_result id=%s] %s",
-			c.ToolUseID, truncateMiddle(asStr, toolResultHeadBytes, toolResultTailBytes)))
+			c.ToolUseID, textutil.TruncateMiddle(asStr, toolResultHeadBytes, toolResultTailBytes)))
 	}
 	return strings.Join(parts, "\n")
 }
@@ -205,7 +207,7 @@ type resultEvent struct {
 func formatResult(raw []byte) string {
 	var r resultEvent
 	if err := json.Unmarshal(raw, &r); err != nil {
-		return "[result] " + truncateInline(string(raw), 500)
+		return "[result] " + textutil.TruncateInline(string(raw), 500)
 	}
 	header := fmt.Sprintf("[result] subtype=%s error=%t turns=%d cost=$%g duration=%dms tokens(in=%d out=%d cache_r=%d cache_c=%d)",
 		r.Subtype, r.IsError, r.NumTurns, r.TotalCostUSD, r.DurationMS,
@@ -218,26 +220,5 @@ func formatResult(raw []byte) string {
 
 func formatRateLimit(raw []byte) string {
 	// Keep one compact line — rate_limit events are tiny but useful.
-	return "[rate_limit] " + truncateInline(string(raw), 400)
-}
-
-// ----- helpers -----
-
-// truncateInline returns s shortened to at most n bytes, appending an
-// elision marker when shortened.
-func truncateInline(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + fmt.Sprintf("… (%d bytes elided)", len(s)-n)
-}
-
-// truncateMiddle keeps the first head and last tail bytes of s, with an
-// elision marker in the middle. Returns s unchanged when short enough.
-func truncateMiddle(s string, head, tail int) string {
-	if len(s) <= head+tail+32 {
-		return s
-	}
-	elided := len(s) - head - tail
-	return s[:head] + fmt.Sprintf("… (%d bytes elided) …", elided) + s[len(s)-tail:]
+	return "[rate_limit] " + textutil.TruncateInline(string(raw), 400)
 }

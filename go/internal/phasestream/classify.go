@@ -2,10 +2,11 @@ package phasestream
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
 )
 
 const (
@@ -122,7 +123,7 @@ func (c *Classifier) infraEnvelope(marker, source, line string) Envelope {
 	return c.newEnvelope(KindInfraFailure, SeverityIncident, map[string]any{
 		"marker":  marker,
 		"source":  source,
-		"excerpt": truncateInline(line, 400),
+		"excerpt": textutil.TruncateInline(line, 400),
 	})
 }
 
@@ -161,14 +162,14 @@ func (c *Classifier) classifyJSON(typ string, raw []byte) []Envelope {
 		return c.formatUser(raw)
 	case "rate_limit_event":
 		return []Envelope{c.newEnvelope(KindRateLimit, SeverityWarn, map[string]any{
-			"raw": truncateInline(string(raw), 400),
+			"raw": textutil.TruncateInline(string(raw), 400),
 		})}
 	case "system":
 		return c.formatSystem(raw)
 	default:
 		return []Envelope{c.newEnvelope(KindUnknown, SeverityInfo, map[string]any{
 			"type": typ,
-			"raw":  truncateInline(string(raw), unknownExcerptBytes),
+			"raw":  textutil.TruncateInline(string(raw), unknownExcerptBytes),
 		})}
 	}
 }
@@ -222,7 +223,7 @@ func (c *Classifier) formatAssistant(raw []byte) []Envelope {
 	var a assistantEvent
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return []Envelope{c.newEnvelope(KindAssistantText, SeverityInfo, map[string]any{
-			"text": truncateInline(string(raw), unknownExcerptBytes),
+			"text": textutil.TruncateInline(string(raw), unknownExcerptBytes),
 		})}
 	}
 	var out []Envelope
@@ -267,7 +268,7 @@ func (c *Classifier) formatToolUse(blk assistantContent) Envelope {
 		return c.newEnvelope(KindToolUse, SeverityInfo, map[string]any{
 			"name":          blk.Name,
 			"id":            blk.ID,
-			"input_excerpt": truncateInline(string(blk.Input), toolUseInputBytes),
+			"input_excerpt": textutil.TruncateInline(string(blk.Input), toolUseInputBytes),
 		})
 	}
 }
@@ -306,7 +307,7 @@ func (c *Classifier) formatUser(raw []byte) []Envelope {
 		out = append(out, c.newEnvelope(KindToolResult, sev, map[string]any{
 			"tool_use_id": blk.ToolUseID,
 			"is_error":    blk.IsError,
-			"excerpt":     truncateMiddle(asStr, toolResultHeadBytes, toolResultTailBytes),
+			"excerpt":     textutil.TruncateMiddle(asStr, toolResultHeadBytes, toolResultTailBytes),
 		}))
 	}
 	return out
@@ -401,21 +402,4 @@ func isBorderRune(r rune) bool {
 		return true
 	}
 	return false
-}
-
-// ---- truncation helpers (ported from logfilter/streamjson.go) ----
-
-func truncateInline(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + fmt.Sprintf("… (%d bytes elided)", len(s)-n)
-}
-
-func truncateMiddle(s string, head, tail int) string {
-	if len(s) <= head+tail+32 {
-		return s
-	}
-	elided := len(s) - head - tail
-	return s[:head] + fmt.Sprintf("… (%d bytes elided) …", elided) + s[len(s)-tail:]
 }

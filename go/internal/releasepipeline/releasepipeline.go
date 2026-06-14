@@ -38,9 +38,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Sentinel errors. The cmd layer maps these to exit codes.
@@ -49,11 +50,6 @@ var (
 	ErrShipFailed        = errors.New("releasepipeline: ship.sh failed")
 	ErrPostPublishFailed = errors.New("releasepipeline: post-publish step failed")
 )
-
-// IsSemver matches X.Y.Z numeric.
-var semverRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-
-func IsSemver(s string) bool { return semverRE.MatchString(s) }
 
 // Steps is the injectable composition of step functions. Each returns the
 // step status (used for journal logging and overall outcome reporting).
@@ -209,7 +205,7 @@ func Run(opts Options) (Result, error) {
 	}
 
 	// Argument validation (semver target).
-	if !IsSemver(opts.Target) {
+	if !semvercheck.IsSemver(opts.Target) {
 		return res, fmt.Errorf("%w: target version not semver: %s", ErrPrePublishFailed, opts.Target)
 	}
 

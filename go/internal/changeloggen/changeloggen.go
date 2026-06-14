@@ -18,6 +18,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Commit is one commit subject line passed to Classify.
@@ -228,9 +230,7 @@ func VerifyRef(repoRoot, ref string) error {
 }
 
 // IsSemver reports whether s matches X.Y.Z (no leading "v").
-var semverRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-
-func IsSemver(s string) bool { return semverRE.MatchString(s) }
+func IsSemver(s string) bool { return semvercheck.IsSemver(s) }
 
 // ResolveChangelogPath returns <repoRoot>/CHANGELOG.md.
 func ResolveChangelogPath(repoRoot string) string {

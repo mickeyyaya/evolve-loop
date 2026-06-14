@@ -3,6 +3,8 @@ package phasestream
 import (
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
 )
 
 // TestClassifier_NewClassifier_DefaultsClockToNow pins the NewClassifier
@@ -214,7 +216,7 @@ func TestClassifier_Interaction_StringInput(t *testing.T) {
 func TestTruncateInline_TruncatesOversize(t *testing.T) {
 	t.Parallel()
 	in := strings.Repeat("a", 50)
-	got := truncateInline(in, 10)
+	got := textutil.TruncateInline(in, 10)
 	if !strings.HasPrefix(got, strings.Repeat("a", 10)) {
 		t.Errorf("must keep the first 10 bytes, got %q", got)
 	}
@@ -222,7 +224,7 @@ func TestTruncateInline_TruncatesOversize(t *testing.T) {
 		t.Errorf("must annotate elided count, got %q", got)
 	}
 	// Under-limit input is returned unchanged.
-	if truncateInline("short", 10) != "short" {
+	if textutil.TruncateInline("short", 10) != "short" {
 		t.Errorf("under-limit input must be unchanged")
 	}
 }

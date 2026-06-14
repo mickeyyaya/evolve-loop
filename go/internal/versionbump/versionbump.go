@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Result is the JSON-compatible summary version-bump prints to stdout.
@@ -52,11 +53,6 @@ func DefaultPaths(repoRoot string) Paths {
 	}
 }
 
-// IsSemver matches X.Y.Z (no leading "v").
-var semverRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-
-func IsSemver(s string) bool { return semverRE.MatchString(s) }
-
 // MajorMinor extracts "X.Y" from "X.Y.Z".
 func MajorMinor(version string) string {
 	parts := strings.Split(version, ".")
@@ -70,7 +66,7 @@ func MajorMinor(version string) string {
 // When dryRun is true, mutations are skipped but the would-modify list
 // still populates (mirrors bash --dry-run semantics).
 func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error) {
-	if !IsSemver(target) {
+	if !semvercheck.IsSemver(target) {
 		return Result{}, fmt.Errorf("versionbump: target version not semver: %s", target)
 	}
 	res := Result{Target: target, Modified: []string{}}

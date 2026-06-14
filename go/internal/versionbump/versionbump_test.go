@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -21,12 +23,12 @@ func writeFile(t *testing.T, path, content string) {
 
 func TestIsSemver(t *testing.T) {
 	for _, ok := range []string{"1.0.0", "11.7.1", "0.0.1"} {
-		if !IsSemver(ok) {
+		if !semvercheck.IsSemver(ok) {
 			t.Errorf("expected %q valid", ok)
 		}
 	}
 	for _, bad := range []string{"v1.0.0", "1.0", "1.0.0-beta", "abc"} {
-		if IsSemver(bad) {
+		if semvercheck.IsSemver(bad) {
 			t.Errorf("expected %q invalid", bad)
 		}
 	}

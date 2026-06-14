@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // makeMarketplace creates a fake marketplace directory at the given version.
@@ -349,7 +351,7 @@ func TestIsSemver(t *testing.T) {
 		{"garbage", false},
 	}
 	for _, tc := range cases {
-		if got := IsSemver(tc.in); got != tc.want {
+		if got := semvercheck.IsSemver(tc.in); got != tc.want {
 			t.Errorf("IsSemver(%q) = %v, want %v", tc.in, got, tc.want)
 		}
 	}

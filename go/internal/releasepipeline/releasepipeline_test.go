@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // allOkSteps returns Steps where every step succeeds. The defaults that
@@ -385,7 +387,7 @@ func TestIsSemver(t *testing.T) {
 		{"", false},
 	}
 	for _, tc := range cases {
-		if got := IsSemver(tc.in); got != tc.want {
+		if got := semvercheck.IsSemver(tc.in); got != tc.want {
 			t.Errorf("IsSemver(%q) = %v, want %v", tc.in, got, tc.want)
 		}
 	}
