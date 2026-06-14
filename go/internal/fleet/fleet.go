@@ -46,13 +46,29 @@ type Supervisor struct {
 	Concurrency int // max concurrent cycles; <=0 → all at once
 }
 
+// Validate reports a misconfigured supervisor — a nil LaunchFn — so the caller
+// fails loud at check time rather than after N goroutines each return errNoLaunch.
+func (s *Supervisor) Validate() error {
+	if s.Launch == nil {
+		return errNoLaunch
+	}
+	return nil
+}
+
 // Run launches every spec concurrently (bounded by Concurrency), forcing
 // EVOLVE_FLEET=1 on each, waits for all, and returns per-cycle results in input
 // order. The caller's spec.Env is never mutated (each launch gets a copy). A nil
-// Launch yields an error per spec (fail loud, never a silent no-op).
+// Launch is caught up front by Validate — every result carries errNoLaunch and
+// no launch goroutines are spawned (fail loud, never a silent no-op).
 func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 	results := make([]Result, len(specs))
 	if len(specs) == 0 {
+		return results
+	}
+	if err := s.Validate(); err != nil {
+		for i := range results {
+			results[i] = Result{Index: i, ExitCode: -1, Err: err}
+		}
 		return results
 	}
 	limit := s.Concurrency

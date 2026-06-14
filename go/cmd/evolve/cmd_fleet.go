@@ -51,6 +51,10 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		Concurrency: concurrency,
 		Launch:      execCycleLaunch(binPath, simulate, stdout, stderr),
 	}
+	if err := sup.Validate(); err != nil {
+		fmt.Fprintf(stderr, "evolve fleet: %v\n", err)
+		return 1
+	}
 	specs := make([]fleet.CycleSpec, count)
 	for i := range specs {
 		specs[i] = fleet.CycleSpec{GoalHash: goalHash}
