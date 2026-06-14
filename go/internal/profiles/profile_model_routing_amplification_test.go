@@ -104,3 +104,46 @@ func canonicalTierSet() map[string]bool {
 	}
 	return tiers
 }
+
+func TestAllProfilesSubstitutabilityAtParity(t *testing.T) {
+	t.Parallel()
+
+	drivers := swappableDriverManifests()
+	manifests := loadSwappableManifests(t, drivers)
+
+	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
+	names, err := loader.List()
+	if err != nil {
+		t.Fatalf("List real profiles: %v", err)
+	}
+	if len(names) == 0 {
+		t.Fatal("List real profiles returned no profiles")
+	}
+
+	checkTier := func(profileName, field, tier string) {
+		if tier == "" {
+			return
+		}
+		for _, driver := range drivers {
+			if manifests[driver.manifest].ModelTierMap[tier] == "" {
+				t.Errorf("%s [field=%s driver=%s]: tier %q not in manifest", profileName, field, driver.manifest, tier)
+			}
+		}
+	}
+
+	for _, name := range names {
+		profile, err := loader.Get(name)
+		if err != nil {
+			t.Fatalf("Get(%q): %v", name, err)
+		}
+		checkTier(name, "model_tier_default", profile.ModelTierDefault)
+		for k, v := range profile.ModelTierOverrides {
+			checkTier(name, "model_tier_overrides["+k+"]", v)
+		}
+		if env := profile.ModelTierEnvelope; env != nil {
+			checkTier(name, "model_tier_envelope.min", env.Min)
+			checkTier(name, "model_tier_envelope.default", env.Default)
+			checkTier(name, "model_tier_envelope.max", env.Max)
+		}
+	}
+}
