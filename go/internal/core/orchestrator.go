@@ -2958,6 +2958,17 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s); aborting\n", depth, se.Code, se.Class)
 		return "", false
 	}
+	// ADR-0049 S5b: a fleet ff-merge divergence (a peer cycle moved main) is
+	// recovered by rebasing the cycle branch onto the new main BEFORE the
+	// re-audit (the router routes this code to audit). A clean rebase replays
+	// this cycle's patches onto the peer's changes → re-audit re-binds the merged
+	// tree → re-ship fast-forwards. A rebase CONFLICT is genuinely overlapping
+	// work the advisor's partition should have kept apart — abort loud rather
+	// than auto-resolve.
+	if se.Code == CodeGitFleetRebaseNeeded && !rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase onto main failed; aborting\n", cycle)
+		return "", false
+	}
 	// Recovery is deterministic Chain-of-Responsibility (no LLM); both routing
 	// strategies just delegate to the pure router.Recover, so call it directly.
 	// This keeps recovery available even when no routing Strategy was wired
@@ -2980,6 +2991,23 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) → recovery routes to %s (%s)\n", se.Code, se.Class, cand, dec.Reason)
 	return cand, true
+}
+
+// rebaseCycleBranchOntoMain rebases the cycle's worktree branch onto the current
+// main so a fleet cycle whose ff-merge diverged (a peer moved main) can re-audit
+// + re-ship the merged tree (ADR-0049 S5b). Returns false on conflict/abort or
+// an empty worktree; on any rebase failure it aborts the in-progress rebase so
+// the worktree is left clean (no half-applied rebase) for the caller's abort.
+func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) bool {
+	if worktree == "" {
+		return false
+	}
+	if _, exit, err := gitCapture(ctx, worktree, "rebase", "main"); err != nil || exit != 0 {
+		_, _, _ = gitCapture(ctx, worktree, "rebase", "--abort")
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed (exit=%d, err=%v); rebase aborted\n", worktree, exit, err)
+		return false
+	}
+	return true
 }
 
 // decideAfterDebugger maps the debugger phase's recovery decision (surfaced on
