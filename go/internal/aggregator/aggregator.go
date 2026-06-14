@@ -167,15 +167,8 @@ func writeConcat(out, phase string, workers []string, now string, readFile func(
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Aggregated %s Report\n\n", phase)
 	fmt.Fprintf(&b, "_Aggregated by aggregator.sh at %s. Workers: %d._\n\n", now, len(workers))
-	for _, w := range workers {
-		name := strings.TrimSuffix(filepath.Base(w), ".md")
-		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, err := readFile(w)
-		if err != nil {
-			return err
-		}
-		b.Write(body)
-		b.WriteString("\n\n")
+	if err := appendWorkerSections(&b, "## Worker: %s\n\n", workers, readFile); err != nil {
+		return err
 	}
 	return os.WriteFile(out, []byte(b.String()), 0o644)
 }
@@ -187,6 +180,10 @@ var verdictLineRe = regexp.MustCompile(`(?i)^\s*verdict:\s*(\S+)`)
 // extractVerdict reads the first "Verdict: <token>" line from the file and
 // returns the uppercase first word. Returns "" if no verdict line.
 func extractVerdict(path string) string {
+	return strings.ToUpper(scanFirstCapture(path, verdictLineRe))
+}
+
+func scanFirstCapture(path string, re *regexp.Regexp) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -195,9 +192,9 @@ func extractVerdict(path string) string {
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
-		m := verdictLineRe.FindStringSubmatch(scanner.Text())
+		m := re.FindStringSubmatch(scanner.Text())
 		if m != nil {
-			return strings.ToUpper(m[1])
+			return m[1]
 		}
 	}
 	return ""
@@ -205,7 +202,6 @@ func extractVerdict(path string) string {
 
 func writeVerdict(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
 	anyFail := false
-	anyWarn := false
 	allPass := true
 	for _, w := range workers {
 		v := extractVerdict(w)
@@ -216,14 +212,11 @@ func writeVerdict(out string, workers []string, now string, readFile func(string
 			anyFail = true
 			allPass = false
 		case "WARN":
-			anyWarn = true
 			allPass = false
 		default:
-			anyWarn = true
 			allPass = false
 		}
 	}
-	_ = anyWarn
 	verdict := "WARN"
 	if anyFail {
 		verdict = "FAIL"
@@ -236,15 +229,8 @@ func writeVerdict(out string, workers []string, now string, readFile func(string
 	fmt.Fprintf(&b, "# Aggregated Audit Report\n\n")
 	fmt.Fprintf(&b, "_Aggregated by aggregator.sh at %s. Workers: %d. Aggregate verdict: %s._\n\n",
 		now, len(workers), verdict)
-	for _, w := range workers {
-		name := strings.TrimSuffix(filepath.Base(w), ".md")
-		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, err := readFile(w)
-		if err != nil {
-			return ExitUsageErr, err
-		}
-		b.Write(body)
-		b.WriteString("\n\n")
+	if err := appendWorkerSections(&b, "## Worker: %s\n\n", workers, readFile); err != nil {
+		return ExitUsageErr, err
 	}
 	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
 		return ExitUsageErr, err
@@ -317,21 +303,11 @@ func writeLessons(out string, workers []string, now string, readFile func(string
 var scoreLineRe = regexp.MustCompile(`(?i)^\s*score:\s*([0-9]*\.?[0-9]+)`)
 
 func extractScore(path string) float64 {
-	f, err := os.Open(path)
+	v, err := strconv.ParseFloat(scanFirstCapture(path, scoreLineRe), 64)
 	if err != nil {
 		return 0
 	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if m := scoreLineRe.FindStringSubmatch(scanner.Text()); m != nil {
-			v, perr := strconv.ParseFloat(m[1], 64)
-			if perr == nil {
-				return v
-			}
-		}
-	}
-	return 0
+	return v
 }
 
 func writePlanReview(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
@@ -369,15 +345,8 @@ func writePlanReview(out string, workers []string, now string, readFile func(str
 	fmt.Fprintf(&b, "# Aggregated Plan-Review Report\n\n")
 	fmt.Fprintf(&b, "_Aggregated by aggregator.sh at %s. Lenses: %d. Average: %.2f. Verdict: %s._\n\n",
 		now, len(workers), avg, verdict)
-	for _, w := range workers {
-		name := strings.TrimSuffix(filepath.Base(w), ".md")
-		fmt.Fprintf(&b, "## Worker: %s\n\n", name)
-		body, err := readFile(w)
-		if err != nil {
-			return ExitUsageErr, err
-		}
-		b.Write(body)
-		b.WriteString("\n\n")
+	if err := appendWorkerSections(&b, "## Worker: %s\n\n", workers, readFile); err != nil {
+		return ExitUsageErr, err
 	}
 	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
 		return ExitUsageErr, err
@@ -443,15 +412,8 @@ func writeCrossCLIVote(out string, workers []string, now string, readFile func(s
 	fmt.Fprintf(&b, "**Per-CLI verdicts**: %s\n\n", strings.Join(perCLI, ", "))
 	fmt.Fprintf(&b, "**Protocol**: MAJORITY-PASS with FAIL-VETO. Any FAIL forces consensus FAIL (defends against false-positive PASS from sycophantic same-vendor agreement). >= quorum PASS with no FAIL → consensus PASS. Otherwise WARN.\n\n")
 	fmt.Fprintf(&b, "## Per-CLI Audit Reports\n\n")
-	for _, w := range workers {
-		name := strings.TrimSuffix(filepath.Base(w), ".md")
-		fmt.Fprintf(&b, "### Worker: %s\n\n", name)
-		body, err := readFile(w)
-		if err != nil {
-			return ExitUsageErr, err
-		}
-		b.Write(body)
-		b.WriteString("\n\n")
+	if err := appendWorkerSections(&b, "### Worker: %s\n\n", workers, readFile); err != nil {
+		return ExitUsageErr, err
 	}
 	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
 		return ExitUsageErr, err
@@ -460,6 +422,20 @@ func writeCrossCLIVote(out string, workers []string, now string, readFile func(s
 		return ExitVerdictBad, nil
 	}
 	return ExitOK, nil
+}
+
+func appendWorkerSections(b *strings.Builder, heading string, workers []string, readFile func(string) ([]byte, error)) error {
+	for _, w := range workers {
+		name := strings.TrimSuffix(filepath.Base(w), ".md")
+		fmt.Fprintf(b, heading, name)
+		body, err := readFile(w)
+		if err != nil {
+			return err
+		}
+		b.Write(body)
+		b.WriteString("\n\n")
+	}
+	return nil
 }
 
 // ErrUnknownPhase is returned when phase doesn't match any merge mode.
