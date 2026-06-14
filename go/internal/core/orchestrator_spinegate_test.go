@@ -55,7 +55,7 @@ func TestSpineGate_EnforceBlocksOnCleanAbsence(t *testing.T) {
 	o, wt, _ := spineGateOrch(t, config.StageEnforce, nil)
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(), GoalHash: "g", Budget: BudgetEnvelope{MaxUSD: 100},
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err == nil {
 		t.Fatalf("RED (cycle-283): missing mandatory handoff at enforce did not block — cycle completed (phases=%v)", res.PhasesRun)
@@ -74,7 +74,7 @@ func TestSpineGate_ShadowKeepsFailOpen(t *testing.T) {
 	o, _, _ := spineGateOrch(t, config.StageShadow, nil)
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(), GoalHash: "g", Budget: BudgetEnvelope{MaxUSD: 100},
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err != nil {
 		t.Fatalf("shadow must keep today's fail-open behavior (the block ships dormant): %v", err)
@@ -108,7 +108,7 @@ func TestSpineGate_EnforceFailsOpenOnDegradedDigest(t *testing.T) {
 	}}
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(), GoalHash: "g", Budget: BudgetEnvelope{MaxUSD: 100},
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err != nil {
 		t.Fatalf("a DEGRADED digest (read error ≠ absence) must fail open even at enforce: %v (phases=%v)", err, res.PhasesRun)
@@ -124,7 +124,7 @@ func TestSpineGate_ConfigWaiverSkipsAnchor(t *testing.T) {
 	o, _, _ := spineGateOrch(t, config.StageEnforce, []string{"ship"})
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(), GoalHash: "g", Budget: BudgetEnvelope{MaxUSD: 100},
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err != nil {
 		t.Fatalf("config-waived anchors must not block (the R5.3 escape): %v (phases=%v)", err, res.PhasesRun)

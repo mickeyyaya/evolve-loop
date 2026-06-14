@@ -30,10 +30,6 @@ func benchRequest() core.PhaseRequest {
 			"intent":  strings.Repeat("intent body ", 64),
 			"history": strings.Repeat("history line ", 32),
 		},
-		Budget: core.BudgetEnvelope{
-			MaxUSD:      10.00,
-			BatchCapUSD: 20.00,
-		},
 	}
 }
 

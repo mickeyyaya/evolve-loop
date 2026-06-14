@@ -44,16 +44,6 @@ var invariantChecks = map[string]invariantFn{
 			t.Errorf("InsertPhases=%d exceeds cap %d: %v", len(got.InsertPhases), in.Cfg.MaxInsertions, got.InsertPhases)
 		}
 	},
-	"budget-zero-no-content-insert": func(t *testing.T, in router.RouteInput, _ *router.Proposal, got router.RouterDecision) {
-		if in.BudgetRemaining > 0 {
-			return
-		}
-		for _, p := range got.InsertPhases {
-			if _, isContent := in.Cfg.Triggers[p]; isContent {
-				t.Errorf("content phase %q inserted with budget<=0", p)
-			}
-		}
-	},
 	"determinism": func(t *testing.T, in router.RouteInput, proposal *router.Proposal, _ router.RouterDecision) {
 		a := router.Route(in, proposal)
 		b := router.Route(in, proposal)

@@ -1,5 +1,5 @@
-// Tests for the build phase. Verifies cost-threshold wiring and the
-// "## Files Modified" verdict trigger.
+// Tests for the build phase. Verifies the "## Files Modified" verdict
+// trigger and cost telemetry passthrough.
 package build
 
 import (
@@ -128,78 +128,6 @@ func TestClassifyArtifact_HeadingVariants(t *testing.T) {
 	}
 }
 
-func TestRun_CostExceedsThreshold_Advisory_PASSWithDiagnostic(t *testing.T) {
-	// Advisory mode (EVOLVE_BUILDER_COST_GUARD_STRICT not set): emit a
-	// diagnostic but still PASS so the cycle continues. Audit sees the
-	// diagnostic and can react.
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{
-		writeArtifact: body,
-		resp:          core.BridgeResponse{CostUSD: 3.50},
-	}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_COST_THRESHOLD": "2.00"},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if resp.Verdict != core.VerdictPASS {
-		t.Errorf("Verdict=%q, want PASS (advisory)", resp.Verdict)
-	}
-	foundCostDiag := false
-	for _, d := range resp.Diagnostics {
-		if strings.Contains(d.Message, "cost") && strings.Contains(d.Message, "3.5") {
-			foundCostDiag = true
-			break
-		}
-	}
-	if !foundCostDiag {
-		t.Errorf("expected cost-overrun diagnostic; got %+v", resp.Diagnostics)
-	}
-}
-
-func TestRun_CostExceedsThreshold_Strict_FAIL(t *testing.T) {
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{
-		writeArtifact: body,
-		resp:          core.BridgeResponse{CostUSD: 3.50},
-	}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
-		Env: map[string]string{
-			"EVOLVE_BUILDER_COST_THRESHOLD":    "2.00",
-			"EVOLVE_BUILDER_COST_GUARD_STRICT": "1",
-		},
-	})
-	if resp.Verdict != core.VerdictFAIL {
-		t.Errorf("Verdict=%q, want FAIL (strict cost guard)", resp.Verdict)
-	}
-}
-
-func TestRun_CostBelowThreshold_NoDiagnostic(t *testing.T) {
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{
-		writeArtifact: body,
-		resp:          core.BridgeResponse{CostUSD: 1.50},
-	}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_COST_THRESHOLD": "2.00"},
-	})
-	if resp.Verdict != core.VerdictPASS {
-		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
-	}
-	for _, d := range resp.Diagnostics {
-		if strings.Contains(d.Message, "cost") {
-			t.Errorf("unexpected cost diagnostic at cost below threshold: %v", d)
-		}
-	}
-}
-
 func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: ""}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -313,28 +241,5 @@ func TestName(t *testing.T) {
 	p := New(Config{})
 	if p.Name() != "build" {
 		t.Errorf("Name=%q, want build", p.Name())
-	}
-}
-
-func TestRun_InvalidThresholdEnv_FallsBackToDefault(t *testing.T) {
-	// Malformed threshold parses as 0, but the package default (2.00)
-	// kicks in via parseFloatOrDefault.
-	body := "# Build Report\n## Files Modified\n- a.go\n"
-	fb := &fakeBridge{
-		writeArtifact: body,
-		resp:          core.BridgeResponse{CostUSD: 1.50},
-	}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_COST_THRESHOLD": "not-a-number"},
-	})
-	if resp.Verdict != core.VerdictPASS {
-		t.Errorf("Verdict=%q, want PASS (default threshold 2.00, cost 1.50)", resp.Verdict)
-	}
-	for _, d := range resp.Diagnostics {
-		if strings.Contains(d.Message, "cost") {
-			t.Errorf("unexpected cost diagnostic: %v", d)
-		}
 	}
 }

@@ -46,7 +46,6 @@ type Dispatch struct {
 	DisallowedTools   []string                    `json:"disallowed_tools,omitempty"`
 	PermissionMode    string                      `json:"permission_mode,omitempty"`
 	Sandbox           *profiles.SandboxConfig     `json:"sandbox,omitempty"`
-	MaxBudgetUSD      float64                     `json:"max_budget_usd,omitempty"`
 	EffortLevel       string                      `json:"effort_level,omitempty"`
 	// SystemPrompt is the per-agent launch-time rules block ("persona"). Inline
 	// only here — a minted phase carries its persona in-band, so it needs no
@@ -89,7 +88,7 @@ func (c PhaseConfig) ProfileName() string {
 // sandbox/persona/budget/effort) so a minted PhaseConfig dispatches through the
 // unchanged runner/llmroute path. It is intentionally PARTIAL: Profile fields
 // not modeled in Dispatch (MaxTurns, ParallelEligible, OutputArtifact,
-// ResearchQuota, BudgetTiers, ModelTierOverrides, AddDir, …) take their zero
+// ResearchQuota, ModelTierOverrides, AddDir, …) take their zero
 // value, which is a safe conservative default for a minted phase (e.g.
 // ParallelEligible=false honors the single-writer invariant; OutputArtifact is
 // derived from spec.Outputs by specrunner). The Stage-2 Registrar overlays this
@@ -109,7 +108,6 @@ func (c PhaseConfig) ToProfile() profiles.Profile {
 		ModelTierEnvelope: d.ModelTierEnvelope,
 		AllowedTools:      d.AllowedTools,
 		DisallowedTools:   d.DisallowedTools,
-		MaxBudgetUSD:      d.MaxBudgetUSD,
 		Sandbox:           d.Sandbox,
 		EffortLevel:       d.EffortLevel,
 		PermissionMode:    d.PermissionMode,

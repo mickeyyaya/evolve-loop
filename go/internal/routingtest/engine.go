@@ -73,25 +73,17 @@ func buildConfig(s ScenarioSpec) config.RoutingConfig {
 	return cfg
 }
 
-func budgetOf(s ScenarioSpec) float64 {
-	if s.BudgetUSD == 0 {
-		return 100
-	}
-	return s.BudgetUSD
-}
-
 // --- PureKernel ---
 
 func runPure(t *testing.T, s ScenarioSpec) {
 	in := router.RouteInput{
-		Current:         s.Current,
-		Verdict:         s.Verdict,
-		Signals:         s.Signals.Signals(),
-		Cfg:             buildConfig(s),
-		BudgetRemaining: budgetOf(s),
-		Completed:       s.Completed,
-		Strict:          s.Env["EVOLVE_STRICT_AUDIT"] == "1",
-		Now:             fixedNow,
+		Current:   s.Current,
+		Verdict:   s.Verdict,
+		Signals:   s.Signals.Signals(),
+		Cfg:       buildConfig(s),
+		Completed: s.Completed,
+		Strict:    s.Env["EVOLVE_STRICT_AUDIT"] == "1",
+		Now:       fixedNow,
 	}
 	// Thread the advisor's CLAMPED whole-cycle plan exactly as the orchestrator
 	// does: clamp the scripted (unclamped) plan to the integrity floor, then hand
@@ -167,7 +159,6 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	res, err := o.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      core.BudgetEnvelope{MaxUSD: budgetOf(s)},
 		Env:         env,
 	})
 	if err != nil {

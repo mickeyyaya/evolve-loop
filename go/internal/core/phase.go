@@ -76,12 +76,6 @@ func IsVerdict(s string) bool {
 	return false
 }
 
-// BudgetEnvelope is the per-call budget envelope passed to each phase.
-type BudgetEnvelope struct {
-	MaxUSD      float64 `json:"max_usd"`
-	BatchCapUSD float64 `json:"batch_cap_usd"`
-}
-
 // TokenUsage records the LLM token counts attributed to a phase run.
 type TokenUsage struct {
 	Input      int `json:"input"`
@@ -128,7 +122,6 @@ type PhaseRequest struct {
 	RunID         string            `json:"run_id,omitempty"`
 	GoalHash      string            `json:"goal_hash"`
 	Context       map[string]string `json:"context,omitempty"`
-	Budget        BudgetEnvelope    `json:"budget"`
 	PreviousPhase string            `json:"previous_phase,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
 

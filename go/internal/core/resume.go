@@ -259,7 +259,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// the run-record id, so session names stay run-scoped).
 			RunID:         cs.RunID,
 			GoalHash:      req.GoalHash,
-			Budget:        req.Budget,
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       ctxSnap,

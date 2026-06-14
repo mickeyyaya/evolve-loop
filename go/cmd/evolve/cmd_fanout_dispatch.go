@@ -53,7 +53,6 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 		CancelOnConsensus:   os.Getenv("EVOLVE_FANOUT_CANCEL_ON_CONSENSUS") == "1",
 		ConsensusK:          atoiOr(os.Getenv("EVOLVE_FANOUT_CONSENSUS_K"), 0),
 		ConsensusPollSecs:   atoiOr(os.Getenv("EVOLVE_FANOUT_CONSENSUS_POLL_S"), 0),
-		PerWorkerBudgetUSD:  os.Getenv("EVOLVE_FANOUT_PER_WORKER_BUDGET_USD"),
 		TrackWorkers:        envBoolDefault("EVOLVE_FANOUT_TRACK_WORKERS", true),
 		CycleStateHelperBin: locateCycleStateHelper(),
 	}, stderr)

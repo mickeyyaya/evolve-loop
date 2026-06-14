@@ -184,7 +184,7 @@ func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, time
 	prompt := stripFrontmatter(string(personaMD)) +
 		"\n\n---\n# This cycle\n\n" +
 		"## Cycle\n- cycle: 0\n- just_completed: start\n- completed_phases: \n" +
-		"- mandatory_spine: scout, build, audit, ship\n- budget_remaining_usd: 5.00\n\n" +
+		"- mandatory_spine: scout, build, audit, ship\n\n" +
 		"## Objective signals (digested from handoff artifacts)\n" +
 		"- scout: cycle_size_estimate=small item_count=2 carryover=0 backlog=0\n\n" +
 		fmt.Sprintf("Now write your whole-cycle plan as a strict JSON array of "+

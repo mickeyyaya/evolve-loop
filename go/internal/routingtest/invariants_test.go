@@ -53,15 +53,6 @@ func TestInvariant_InsertLECap(t *testing.T) {
 	})
 }
 
-func TestInvariant_BudgetZeroNoContentInsert(t *testing.T) {
-	RunAll(t, []ScenarioSpec{
-		Scenario("exhausted budget blocks trigger-driven tester insert",
-			Pure(), At("build"), Done("scout", "tdd", "build"), RedBuild(2), Budget(-1),
-			ExpectInvariants("budget-zero-no-content-insert"),
-		),
-	})
-}
-
 func TestInvariant_Determinism(t *testing.T) {
 	RunAll(t, []ScenarioSpec{
 		Scenario("same input produces same decision",

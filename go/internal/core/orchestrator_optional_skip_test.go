@@ -85,7 +85,6 @@ func TestOptionalPhaseInfraTimeoutSkipsAndCycleShips(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {
@@ -152,7 +151,6 @@ func TestOptionalPhaseNonInfraErrorStaysCycleFatal(t *testing.T) {
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	var clf *ErrCycleLevelFailure

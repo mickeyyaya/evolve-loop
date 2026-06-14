@@ -69,7 +69,6 @@ func TestOrchestrator_AdvisoryPlanVetoSurvivesSpineDecline(t *testing.T) {
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
-		Budget:      BudgetEnvelope{MaxUSD: 100},
 		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
 	})
 	if err != nil {
