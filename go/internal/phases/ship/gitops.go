@@ -22,10 +22,24 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
+
+// acquireShipLock acquires the ADR-0049 S5 integrator lock (gap G1): the
+// BLOCKING flock serializing the shared-main integration critical section so
+// two concurrent ships can't corrupt main's index/ref/origin. nil seam →
+// flock.Lock on <ProjectRoot>/.evolve/ship.lock. No-op under the whole-cycle
+// project lock (uncontended); load-bearing once that lock is scoped per-run.
+func (o *Options) acquireShipLock() (release func(), err error) {
+	p := filepath.Join(o.ProjectRoot, ".evolve", "ship.lock")
+	if o.shipLock != nil {
+		return o.shipLock(p)
+	}
+	return flock.Lock(p)
+}
 
 // atomicShip is the single entry point for "do the actual git work."
 // Returns nil on success (commit + push completed, or DryRun skipped them).
@@ -271,6 +285,23 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			"ship: empty cycle branch from worktree "+worktree, "worktree", worktree)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship]   cycle branch: %s", cycleBranch))
+
+	// ADR-0049 S5 / gap G1: hold the integrator lock across the entire
+	// shared-main critical section that follows — the collider scan (which
+	// reads main's working tree, a TOCTOU with the merge it feeds), the
+	// go/evolve discard, the ff-merge, the push, and the post-push tree
+	// verification. flock is BLOCKING; two concurrent ships serialize here
+	// instead of racing main's index/ref/origin. Skipped on dry-run (mutates
+	// nothing). No-op under the whole-cycle project lock (uncontended); the
+	// keystone of floor-removal once that lock is scoped per-run.
+	if !opts.DryRun {
+		release, lockErr := opts.acquireShipLock()
+		if lockErr != nil {
+			return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+				"ship: acquire integrator lock (.evolve/ship.lock): "+lockErr.Error())
+		}
+		defer release()
+	}
 
 	// Collider pre-flight check (v12.2 / Task 2). detectColliders is the
 	// single source of truth — the repair ladder (repair.go) re-derives the

@@ -109,6 +109,13 @@ type Options struct {
 	// repairAttempted is the repair ladder's once-per-code-per-Run guard
 	// (repair.go). Lazily initialized by attemptRepair/repairPushRace.
 	repairAttempted map[core.ShipErrorCode]bool
+
+	// shipLock is the test seam for the ADR-0049 S5 integrator lock
+	// (gap G1): the BLOCKING flock acquired around the shared-main
+	// integration critical section (collider scan → ff-merge → push →
+	// post-push verify) in shipFromWorktree. nil → flock.Lock on
+	// <ProjectRoot>/.evolve/ship.lock. Signature mirrors flock.Lock.
+	shipLock func(path string) (release func(), err error)
 }
 
 // Now is a minimal time interface (Unix seconds + RFC3339 formatter) so
