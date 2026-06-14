@@ -218,14 +218,14 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 // prompt with EVOLVE_SHIP_AUTO_CONFIRM bypass.
 func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) error {
 	// Stage everything so diff --cached reflects what will ship.
-	exitCode, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+	exitCode, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
 	if err != nil || exitCode != 0 {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exitCode, err),
 			"git_rc", fmt.Sprintf("%d", exitCode), "git_err", errStr(err))
 	}
 	// Check if there's anything staged.
-	exitCode, err = opts.Runner(ctx, "git", []string{"diff", "--cached", "--quiet"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+	exitCode, err = opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)
 	if err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: git diff --cached --quiet failed: "+err.Error(), "git_err", err.Error())
@@ -245,7 +245,7 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	// Print the diff stat + first 80 lines of diff.
 	fmt.Fprintln(opts.Stderr)
 	fmt.Fprintln(opts.Stderr, "=== git diff --cached --stat ===")
-	if _, err := opts.Runner(ctx, "git", []string{"diff", "--cached", "--stat"}, os.Environ(), opts.ProjectRoot, nil, opts.Stderr, opts.Stderr); err != nil {
+	if _, err := opts.run(ctx, "git", []string{"diff", "--cached", "--stat"}, opts.Stderr, opts.Stderr); err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: diff stat: "+err.Error(), "git_err", err.Error())
 	}
@@ -253,7 +253,7 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	fmt.Fprintln(opts.Stderr, "=== git diff --cached (first 80 lines) ===")
 	// Capture into a buffer, truncate to 80 lines.
 	var diffBuf strings.Builder
-	if _, err := opts.Runner(ctx, "git", []string{"diff", "--cached"}, os.Environ(), opts.ProjectRoot, nil, &diffBuf, io.Discard); err != nil {
+	if _, err := opts.run(ctx, "git", []string{"diff", "--cached"}, &diffBuf, io.Discard); err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: diff: "+err.Error(), "git_err", err.Error())
 	}
@@ -391,7 +391,7 @@ func verifyTrivial(ctx context.Context, opts *Options, res *RunResult) error {
 // Used for the trivial-class critical-paths check; an empty repo is fine.
 func captureGitOutput(ctx context.Context, opts *Options, args ...string) (string, error) {
 	var buf strings.Builder
-	exitCode, err := opts.Runner(ctx, "git", args, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+	exitCode, err := opts.run(ctx, "git", args, &buf, io.Discard)
 	if err != nil {
 		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
 			fmt.Sprintf("ship: git %v: %v", args, err), "git_args", fmt.Sprintf("%v", args), "git_err", err.Error())

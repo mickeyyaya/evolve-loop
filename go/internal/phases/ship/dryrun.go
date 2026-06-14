@@ -71,7 +71,7 @@ func writeDryRunJournal(ctx context.Context, opts *Options, res *RunResult, exit
 // tryGitOneShot is a fire-and-forget git probe. Empty on any error/exit.
 func tryGitOneShot(ctx context.Context, opts *Options, args ...string) string {
 	var buf strings.Builder
-	exit, err := opts.Runner(ctx, "git", args, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+	exit, err := opts.run(ctx, "git", args, &buf, io.Discard)
 	if err != nil || exit != 0 {
 		return ""
 	}

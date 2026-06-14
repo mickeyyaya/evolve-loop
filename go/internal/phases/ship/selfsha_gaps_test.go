@@ -323,7 +323,7 @@ func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 // returns a non-nil error (not just a non-zero exit code), captureGitOutput
 // must propagate it wrapped in "ship: git <args>".
 func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
-	errRunner := func(ctx context.Context, name string, args, env []string, cwd string,
+	errRunner := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		return -1, errors.New("runner exploded")
 	}

@@ -207,7 +207,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 			}
 		} else {
 			_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
-			exit, err := opts.Runner(ctx, "git", []string{"add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+			exit, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
 			if err != nil || exit != 0 {
 				return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
 					fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exit, err),
@@ -218,7 +218,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 
 	// Check for staged changes. git diff --cached --quiet exits 0 if no
 	// diff, 1 if diff. (We use io.Discard for stdout — there's no output.)
-	exit, err := opts.Runner(ctx, "git", []string{"diff", "--cached", "--quiet"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+	exit, err := opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)
 	if err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
 			"ship: git diff --cached --quiet failed: "+err.Error(), "git_err", err.Error())
@@ -256,7 +256,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	}
 
 	// git commit -m <msg>
-	exit, err = opts.Runner(ctx, "git", []string{"commit", "-m", msg}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+	exit, err = opts.run(ctx, "git", []string{"commit", "-m", msg}, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
 			fmt.Sprintf("ship: git commit failed (rc=%d): %v", exit, err),
@@ -266,7 +266,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 
 	// git push origin <branch> — a rejection gets ONE inline fetch+ff-retry
 	// (repairPushRace); a diverged origin reclassifies to needs-reaudit.
-	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+	exit, err = opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
 			fmt.Sprintf("ship: git push failed (rc=%d): %v", exit, err),
@@ -337,7 +337,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 	if !opts.DryRun {
 		_ = discardBinaryChurn(ctx, opts, worktree)
-		exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "add", "-A"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+		exit, err := opts.run(ctx, "git", []string{"-C", worktree, "add", "-A"}, io.Discard, opts.Stderr)
 		if err != nil || exit != 0 {
 			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
 				fmt.Sprintf("ship: worktree git add -A failed (rc=%d): %v", exit, err),
@@ -346,7 +346,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	}
 
 	// Check staged changes in worktree.
-	exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "diff", "--cached", "--quiet"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+	exit, err := opts.run(ctx, "git", []string{"-C", worktree, "diff", "--cached", "--quiet"}, io.Discard, io.Discard)
 	if err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
 			"ship: worktree diff --cached --quiet failed: "+err.Error(), "git_err", err.Error(), "worktree", worktree)
@@ -416,8 +416,8 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 		if opts.DryRun {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   [DRY-RUN] would commit in worktree on %s", cycleBranch))
 		} else {
-			exit, err := opts.Runner(ctx, "git", []string{"-C", worktree, "-c", "commit.gpgsign=false", "commit", "-m", msg},
-				os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+			exit, err := opts.run(ctx, "git", []string{"-C", worktree, "-c", "commit.gpgsign=false", "commit", "-m", msg},
+				opts.Stdout, opts.Stderr)
 			if err != nil || exit != 0 {
 				return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
 					fmt.Sprintf("ship: git commit in worktree failed (rc=%d): %v", exit, err),
@@ -444,12 +444,12 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	// a vendored deployment), so it cannot discard real cycle work. A non-zero
 	// exit is surfaced as a WARN (not fatal) so an operator sees why the ff-merge
 	// may still trip on go/evolve in a non-standard layout (e.g. a symlink).
-	if ce, cerr := opts.Runner(ctx, "git", []string{"checkout", "HEAD", "--", "go/evolve"}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard); ce != 0 || cerr != nil {
+	if ce, cerr := opts.run(ctx, "git", []string{"checkout", "HEAD", "--", "go/evolve"}, io.Discard, io.Discard); ce != 0 || cerr != nil {
 		fmt.Fprintf(opts.Stderr, "[ship] WARN: could not reset go/evolve to HEAD (exit=%d, err=%v); ff-merge may still fail if it is dirty\n", ce, cerr)
 	}
 
 	// ff-merge cycle branch into main.
-	exit, err = opts.Runner(ctx, "git", []string{"merge", "--ff-only", cycleBranch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+	exit, err = opts.run(ctx, "git", []string{"merge", "--ff-only", cycleBranch}, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		// ADR-0049 S5b: under fleet mode a ff-merge divergence is EXPECTED — a
 		// peer cycle moved main while this cycle was mid-pipeline (the colliders
@@ -471,7 +471,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 	// Push — same inline fetch+ff-retry policy as shipDirect; the healed
 	// path falls through to the post-push tree verification + sidecar.
-	exit, err = opts.Runner(ctx, "git", []string{"push", "origin", branch}, os.Environ(), opts.ProjectRoot, nil, opts.Stdout, opts.Stderr)
+	exit, err = opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		headOut, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
@@ -553,7 +553,7 @@ func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
 // currentBranch returns the short ref name (e.g. "main") or "" when detached.
 func currentBranch(ctx context.Context, opts *Options) (string, error) {
 	var buf strings.Builder
-	exit, err := opts.Runner(ctx, "git", []string{"symbolic-ref", "--short", "HEAD"}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+	exit, err := opts.run(ctx, "git", []string{"symbolic-ref", "--short", "HEAD"}, &buf, io.Discard)
 	if err != nil {
 		return "", fmt.Errorf("ship: symbolic-ref --short HEAD: %w", err)
 	}
@@ -576,14 +576,14 @@ func buildDiffFooterAtDir(ctx context.Context, opts *Options, cwd string) (strin
 	if cwd != opts.ProjectRoot {
 		args1 = append([]string{"-C", cwd}, args1...)
 	}
-	if _, err := opts.Runner(ctx, "git", args1, os.Environ(), opts.ProjectRoot, nil, &files, io.Discard); err != nil {
+	if _, err := opts.run(ctx, "git", args1, &files, io.Discard); err != nil {
 		return "", fmt.Errorf("ship: diff --name-status: %w", err)
 	}
 	args2 := []string{"diff", "--cached", "--shortstat"}
 	if cwd != opts.ProjectRoot {
 		args2 = append([]string{"-C", cwd}, args2...)
 	}
-	if _, err := opts.Runner(ctx, "git", args2, os.Environ(), opts.ProjectRoot, nil, &shortStat, io.Discard); err != nil {
+	if _, err := opts.run(ctx, "git", args2, &shortStat, io.Discard); err != nil {
 		return "", fmt.Errorf("ship: diff --shortstat: %w", err)
 	}
 
@@ -646,8 +646,8 @@ func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] creating GitHub release %s...", tag))
-	exit, err := opts.Runner(ctx, "gh", []string{"release", "create", tag, "--title", tag, "--notes-file", "-"},
-		os.Environ(), opts.ProjectRoot, strings.NewReader(notes), opts.Stdout, opts.Stderr)
+	exit, err := opts.runStdin(ctx, "gh", []string{"release", "create", tag, "--title", tag, "--notes-file", "-"},
+		strings.NewReader(notes), opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: gh release create failed (release may already exist; rc=%d)", exit))
 		return nil
@@ -699,7 +699,7 @@ func stageReleaseSet(ctx context.Context, opts *Options) error {
 	if len(args) == 2 {
 		return nil // nothing exists to stage; the staged-diff check decides
 	}
-	exit, err := opts.Runner(ctx, "git", args, os.Environ(), opts.ProjectRoot, nil, io.Discard, opts.Stderr)
+	exit, err := opts.run(ctx, "git", args, io.Discard, opts.Stderr)
 	if err != nil || exit != 0 {
 		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
 			fmt.Sprintf("ship: git add (release set) failed (rc=%d): %v", exit, err),
@@ -745,10 +745,10 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 		}
 		// Check if it is tracked in the repository context of dir
 		var buf strings.Builder
-		exitCode, err := opts.Runner(ctx, "git", []string{"-C", dir, "ls-files", p}, os.Environ(), opts.ProjectRoot, nil, &buf, io.Discard)
+		exitCode, err := opts.run(ctx, "git", []string{"-C", dir, "ls-files", p}, &buf, io.Discard)
 		if err == nil && exitCode == 0 && strings.TrimSpace(buf.String()) != "" {
 			// Revert the changes
-			_, _ = opts.Runner(ctx, "git", []string{"-C", dir, "checkout", "--", p}, os.Environ(), opts.ProjectRoot, nil, io.Discard, io.Discard)
+			_, _ = opts.run(ctx, "git", []string{"-C", dir, "checkout", "--", p}, io.Discard, io.Discard)
 		} else {
 			// Untracked: remove the file
 			_ = os.Remove(absPath)

@@ -25,13 +25,13 @@ import (
 // exit 1 (simulated transient rejection) and delegating everything else.
 func failFirstPushRunner() CmdRunner {
 	failed := false
-	return func(ctx context.Context, name string, args, env []string, cwd string,
+	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if name == "git" && !failed && hasArg(args, "push") {
 			failed = true
 			return 1, nil
 		}
-		return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Class enumerates the four commit lifecycles. Matches ship.sh --class.
@@ -206,7 +207,7 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		opts.PluginRoot = opts.ProjectRoot
 	}
 	if opts.Runner == nil {
-		opts.Runner = execRunner
+		opts.Runner = sysexec.DefaultRunner
 	}
 	if opts.NowFn == nil {
 		opts.NowFn = defaultNow

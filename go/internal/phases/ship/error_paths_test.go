@@ -19,7 +19,7 @@ import (
 // faultRunner returns (exit, failErr) for the git subcommand matching
 // failKey (e.g. "git commit") and delegates every other call to execRunner.
 func faultRunner(failKey string, exit int, failErr error) CmdRunner {
-	return func(ctx context.Context, name string, args, env []string, cwd string,
+	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		key := name
 		for i := 0; i < len(args); i++ {
@@ -35,7 +35,7 @@ func faultRunner(failKey string, exit int, failErr error) CmdRunner {
 		if key == failKey {
 			return exit, failErr
 		}
-		return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+		return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
 }
 

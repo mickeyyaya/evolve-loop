@@ -39,7 +39,7 @@ func (s *scriptedRunner) runner() CmdRunner {
 			err    error
 		}{}
 	}
-	return func(ctx context.Context, name string, args, env []string, cwd string,
+	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		// Scan past leading flags (-C path, -c foo=bar) to find the
 		// git subcommand, so test keys read as "git symbolic-ref" rather
@@ -363,7 +363,7 @@ func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
 func TestScriptedRunner_DefaultExitZero(t *testing.T) {
 	r := &scriptedRunner{}
 	var stdout bytes.Buffer
-	exit, err := r.runner()(context.Background(), "git", []string{"status"}, nil, "", nil, &stdout, nil)
+	exit, err := r.runner()(context.Background(), "git", "", []string{"status"}, nil, nil, &stdout, nil)
 	if err != nil || exit != 0 {
 		t.Errorf("unscripted call should return (0, nil); got (%d, %v)", exit, err)
 	}

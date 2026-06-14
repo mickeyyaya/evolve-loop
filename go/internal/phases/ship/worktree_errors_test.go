@@ -68,13 +68,13 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: diff quiet fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// Fail specifically: git diff --cached --quiet (has both flags).
 			if name == "git" && argsContain(args, "--cached") && argsContain(args, "--quiet") {
 				return -1, errors.New("diff quiet injected error")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdout: io.Discard,
 		Stderr: io.Discard,
@@ -125,14 +125,14 @@ func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: diff footer fail",
 		ProjectRoot:   repo,
-		Runner: func(ctx context.Context, name string, args, env []string, cwd string,
+		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			// buildDiffFooterAtDir calls "git -C <wt> diff --cached --name-status".
 			// Match by --name-status (unique to this call).
 			if name == "git" && argsContain(args, "--name-status") {
 				return -1, errors.New("name-status injected error")
 			}
-			return execRunner(ctx, name, args, env, cwd, stdin, stdout, stderr)
+			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
 		Stdin:  strings.NewReader(""),
 		Stdout: io.Discard,

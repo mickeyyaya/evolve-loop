@@ -208,7 +208,7 @@ func TestWriteShipBinding_MissingCycleState_Errors(t *testing.T) {
 // TestCurrentBranch_RunnerError_Propagates: when the Runner itself returns
 // an error (not just a non-zero exit code), currentBranch must propagate it.
 func TestCurrentBranch_RunnerError_Propagates(t *testing.T) {
-	errRunner := func(ctx context.Context, name string, args, env []string, cwd string,
+	errRunner := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		// simulate a hard runner failure (not an exit-code failure)
 		if name == "git" {
