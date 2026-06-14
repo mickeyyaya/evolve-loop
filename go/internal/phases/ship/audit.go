@@ -30,6 +30,7 @@ import (
 type auditEntry struct {
 	Role            string `json:"role"`
 	Kind            string `json:"kind"`
+	RunID           string `json:"run_id,omitempty"` // ADR-0049 S4 / G5: run-scope the binding lookup
 	ExitCode        int    `json:"exit_code"`
 	ArtifactPath    string `json:"artifact_path"`
 	ArtifactSHA256  string `json:"artifact_sha256"`
@@ -46,7 +47,7 @@ type auditEntry struct {
 // the artifact) for the gitops layer's pre-merge check.
 func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) error {
 	ledgerPath := filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl")
-	entry, err := findLatestAudit(ledgerPath)
+	entry, err := findLatestAudit(ledgerPath, opts.RunID)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,14 @@ var auditBoundTreeSHARe = regexp.MustCompile(`(?m)^audit_bound_tree_sha:\s*` + "
 // IntegrityError. Any unmarshal error on a candidate line is treated as
 // "not an auditor entry" (forward-compat: alien lines should not crash
 // ship-gate).
-func findLatestAudit(ledgerPath string) (*auditEntry, error) {
+// findLatestAudit returns the auditor ledger entry ship binds to. When runID is
+// set, it prefers the latest auditor entry stamped with THIS run (ADR-0049 S4 /
+// gap G5), so a concurrent run's later auditor entry can't be bound; it falls
+// back to the latest auditor entry overall when none matches (standalone
+// runID=="" or a legacy/unstamped entry), preserving pre-S4 behavior with zero
+// regression. No-op for the live loop: today's single run's entry IS the latest,
+// so the exact match returns the same entry.
+func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -194,6 +202,7 @@ func findLatestAudit(ledgerPath string) (*auditEntry, error) {
 			"ship: read ledger: "+err.Error(), "ledger_path", ledgerPath)
 	}
 	lines := strings.Split(string(raw), "\n")
+	var latestAny *auditEntry // latest auditor entry regardless of run (fallback)
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
@@ -203,9 +212,20 @@ func findLatestAudit(ledgerPath string) (*auditEntry, error) {
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue
 		}
-		if e.Kind == "agent_subprocess" && e.Role == "auditor" {
-			return &e, nil
+		if e.Kind != "agent_subprocess" || e.Role != "auditor" {
+			continue
 		}
+		if runID == "" || e.RunID == runID {
+			entry := e
+			return &entry, nil
+		}
+		if latestAny == nil {
+			entry := e
+			latestAny = &entry
+		}
+	}
+	if latestAny != nil {
+		return latestAny, nil
 	}
 	return nil, shipErr(core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, core.StageVerifyClass,
 		"no Auditor ledger entry found — independent review missing", "ledger_path", ledgerPath)

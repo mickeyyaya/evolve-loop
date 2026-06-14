@@ -111,6 +111,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		CommitMessage: msg,
 		ProjectRoot:   req.ProjectRoot,
 		WorkspacePath: req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
+		RunID:         req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
 		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:           req.Env,
 		Runner:        execRunner,

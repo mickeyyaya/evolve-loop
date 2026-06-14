@@ -83,6 +83,13 @@ type Options struct {
 	// PhaseRunner from PhaseRequest.Workspace.
 	WorkspacePath string
 
+	// RunID is this run's event-sourced identity (CA.5). When set, the
+	// audit→ship binding lookup (findLatestAudit) prefers the auditor ledger
+	// entry stamped with THIS RunID over a concurrent run's later entry
+	// (ADR-0049 S4 / gap G5). Empty (standalone / legacy) → latest auditor
+	// entry, as before. Set by the ship PhaseRunner from PhaseRequest.RunID.
+	RunID string
+
 	// PluginRoot is the read-only side — where .claude-plugin/plugin.json lives.
 	// May equal ProjectRoot when running from the evolve-loop repo itself.
 	PluginRoot string

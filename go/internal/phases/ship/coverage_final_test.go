@@ -297,7 +297,7 @@ func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
 	dir := t.TempDir()
 	// Pass a directory path (not a file) — os.ReadFile returns "is a directory"
 	// which is NOT os.ErrNotExist.
-	_, err := findLatestAudit(dir)
+	_, err := findLatestAudit(dir, "")
 	if err == nil {
 		t.Fatal("read error must propagate")
 	}
