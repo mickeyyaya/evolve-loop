@@ -238,23 +238,39 @@ var ErrAutoResumeExhausted = errors.New("checkpoint: auto-resume attempts exhaus
 func init() {
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		cycleStatePath := filepath.Join(projectRoot, ".evolve", "cycle-state.json")
-		yield, err := hasEscalationCheckpoint(cycleStatePath)
-		if err != nil {
-			return err
-		}
-		if yield {
-			// phase-complete is the lowest-priority reason: never clobber an
-			// escalation checkpoint (quota-likely, batch-cap-near,
-			// operator-requested, stall-inactivity) — those must survive until
-			// their consumer (e.g. detectQuotaPause after RunCycle) reads them.
-			return nil
-		}
-		return ApplyToStateFile(cycleStatePath, Compose(cs, ReasonPhaseComplete, 0, "", now))
+		// ADR-0049 N17: check-and-act under ONE lock. The escalation guard read
+		// used to be UNLOCKED and the phase-complete write took the cycle-state
+		// lock SEPARATELY — a TOCTOU. Under fleet mode concurrent cycles share the
+		// host-global cycle-state.json, so a peer could write an escalation
+		// checkpoint in the window between our read and our write, which this
+		// lowest-priority phase-complete write then clobbered (lost escalation).
+		// Folding the read + write into a single flock.WithPathLock critical
+		// section closes the window: both serialized orders converge on the
+		// escalation. applyWithHooks (the lock-free inner of ApplyToStateFile) is
+		// called DIRECTLY — flock is non-reentrant, so re-calling ApplyToStateFile
+		// here would self-deadlock on the same sidecar lock.
+		return flock.WithPathLock(cycleStatePath, func() error {
+			yield, err := hasEscalationCheckpoint(cycleStatePath)
+			if err != nil {
+				return err
+			}
+			if yield {
+				// phase-complete is the lowest-priority reason: never clobber an
+				// escalation checkpoint (quota-likely, batch-cap-near,
+				// operator-requested, stall-inactivity) — those must survive until
+				// their consumer (e.g. detectQuotaPause after RunCycle) reads them.
+				return nil
+			}
+			return applyWithHooks(defaultHooks(), cycleStatePath, Compose(cs, ReasonPhaseComplete, 0, "", now))
+		})
 	}
 }
 
 // hasEscalationCheckpoint reports whether path already holds a checkpoint
-// block with a canonical reason other than phase-complete.
+// block with a canonical reason other than phase-complete. It reads WITHOUT
+// taking the cycle-state lock, so the caller MUST already hold
+// flock.WithPathLock(path) (ADR-0049 N17) — otherwise the check and the
+// caller's subsequent write straddle the lock and a peer escalation is lost.
 func hasEscalationCheckpoint(path string) (bool, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
