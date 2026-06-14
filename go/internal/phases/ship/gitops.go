@@ -157,12 +157,31 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 // readActiveWorktree extracts cycle-state.json:active_worktree. Empty
 // when absent — caller should fall through to the direct ship path.
 func readActiveWorktree(opts *Options) string {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
-	csMap, err := readStateMap(csPath)
+	csMap, err := readStateMap(opts.cycleStateFile())
 	if err != nil {
 		return ""
 	}
 	return stateString(csMap, "active_worktree")
+}
+
+// cycleStateFile returns the file ship reads run-defining inputs (active_worktree,
+// cycle_id) from. It prefers the per-run run.json mirror under the run workspace
+// (ADR-0049 S3 / gap G3) — a full cycle-state.json mirror (CB.4, only
+// CycleState-modeled keys) — so a concurrent cycle's host-global cycle-state.json
+// cannot make ship integrate the WRONG run's worktree/number. Falls back to the
+// global file when WorkspacePath is unset (standalone `evolve ship`) or the
+// mirror is absent. A no-op for the live loop: with one cycle running, run.json
+// and the global file hold identical content. (cycle_size_estimate is NOT a
+// CycleState field, so verifyTrivial — a standalone-only path — keeps reading the
+// global file directly.)
+func (o *Options) cycleStateFile() string {
+	if o.WorkspacePath != "" {
+		runJSON := filepath.Join(o.WorkspacePath, core.RunStateFile)
+		if _, err := os.Stat(runJSON); err == nil {
+			return runJSON
+		}
+	}
+	return filepath.Join(o.ProjectRoot, ".evolve", "cycle-state.json")
 }
 
 // shipDirect: the non-worktree path.

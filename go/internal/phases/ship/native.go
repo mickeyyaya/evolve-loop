@@ -74,6 +74,15 @@ type Options struct {
 	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
 
+	// WorkspacePath is this run's per-cycle workspace (<ProjectRoot>/.evolve/runs/
+	// cycle-<N>/). When set, ship reads run-defining inputs (active_worktree,
+	// cycle_id) from <WorkspacePath>/run.json — the per-run mirror of
+	// cycle-state.json (CB.4) — instead of the host-global cycle-state.json, so a
+	// concurrent cycle can't make ship integrate the WRONG run (ADR-0049 S3 / gap
+	// G3). Empty (standalone `evolve ship`) → the global file. Set by the ship
+	// PhaseRunner from PhaseRequest.Workspace.
+	WorkspacePath string
+
 	// PluginRoot is the read-only side — where .claude-plugin/plugin.json lives.
 	// May equal ProjectRoot when running from the evolve-loop repo itself.
 	PluginRoot string

@@ -110,6 +110,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		Class:         ClassCycle, // PhaseRunner only invokes for cycle commits
 		CommitMessage: msg,
 		ProjectRoot:   req.ProjectRoot,
+		WorkspacePath: req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
 		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:           req.Env,
 		Runner:        execRunner,
