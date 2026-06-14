@@ -50,7 +50,7 @@ func postShip(ctx context.Context, opts *Options, res *RunResult) error {
 // ran_cycle = last_before + 1 = the SAME cycle just shipped → 5-repeat
 // circuit-breaker fired prematurely on legitimate runs.
 func advanceLastCycleNumber(opts *Options, res *RunResult) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	stPath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
 	csMap, err := readStateMap(csPath)
 	if err != nil {
@@ -92,7 +92,7 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 // don't block ship (Layer 1 idempotency catches residual in next cycle's
 // Triage).
 func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return err

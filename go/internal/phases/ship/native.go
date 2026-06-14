@@ -333,7 +333,7 @@ func (o *Options) envStr(key string) string {
 }
 
 func checkPostPushIdempotency(ctx context.Context, opts *Options) (bool, error) {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return false, err

@@ -497,7 +497,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 // writeShipBinding emits .evolve/runs/cycle-<N>/ship-binding.json for
 // post-ship audit. Best-effort; failure is a WARN, not a ship failure.
 func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
-	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
+	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return err

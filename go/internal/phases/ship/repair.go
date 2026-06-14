@@ -217,7 +217,7 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 		return repairNone
 	}
 
-	csMap, err := readStateMap(filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json"))
+	csMap, err := readStateMap(opts.cycleStateFile()) // ADR-0049 S3 / G3: run-scoped (cycle_id)
 	if err != nil {
 		return repairNone
 	}
