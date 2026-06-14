@@ -80,55 +80,8 @@ func TestSkills_CheckDetectsDrift(t *testing.T) {
 	}
 }
 
-// TestSpliceGeneratedRegion_Idempotent pins replace-in-place semantics: a
-// second splice of the same block is a byte-level no-op, and content outside
-// the markers survives verbatim.
-func TestSpliceGeneratedRegion_Idempotent(t *testing.T) {
-	doc := "---\nname: x\n---\n\nintro prose\n\n## Composition\n\ntail\n"
-	block := skillFactsBegin + " test -->\nBODY\n" + skillFactsEnd + "\n"
-
-	once, err := spliceGeneratedRegion(doc, block)
-	if err != nil {
-		t.Fatalf("first splice: %v", err)
-	}
-	if !strings.Contains(once, "intro prose") || !strings.Contains(once, "tail") {
-		t.Fatalf("hand prose lost:\n%s", once)
-	}
-	if !strings.Contains(once, "BODY") {
-		t.Fatalf("block not inserted:\n%s", once)
-	}
-	// Block must land before ## Composition on first insert.
-	if strings.Index(once, "BODY") > strings.Index(once, "## Composition") {
-		t.Errorf("block inserted after Composition:\n%s", once)
-	}
-
-	twice, err := spliceGeneratedRegion(once, block)
-	if err != nil {
-		t.Fatalf("second splice: %v", err)
-	}
-	if twice != once {
-		t.Errorf("splice not idempotent:\n--- once ---\n%s\n--- twice ---\n%s", once, twice)
-	}
-}
-
-// TestSpliceGeneratedRegion_CorruptMarkers errors on BEGIN without END rather
-// than guessing.
-func TestSpliceGeneratedRegion_CorruptMarkers(t *testing.T) {
-	doc := "intro\n" + skillFactsBegin + " broken -->\nno end marker\n"
-	if _, err := spliceGeneratedRegion(doc, "block\n"); err == nil {
-		t.Fatal("want error for BEGIN without END, got nil")
-	}
-}
-
-// TestSpliceGeneratedRegion_MultiplePairs errors when a second BEGIN exists
-// (e.g. a botched manual merge) instead of leaving an orphaned stale region.
-func TestSpliceGeneratedRegion_MultiplePairs(t *testing.T) {
-	pair := skillFactsBegin + " a -->\nold\n" + skillFactsEnd + "\n"
-	doc := "intro\n" + pair + "middle\n" + pair + "tail\n"
-	if _, err := spliceGeneratedRegion(doc, "block\n"); err == nil {
-		t.Fatal("want error for two marker pairs, got nil")
-	}
-}
+// The spliceGeneratedRegion idempotency/corruption tests moved with the splice
+// logic to internal/skillcheck/skillcheck_test.go.
 
 func copyFileForTest(t *testing.T, src, dst string) {
 	t.Helper()

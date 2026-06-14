@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 const (
@@ -48,7 +49,7 @@ func flagsRun(docPath string, write bool, stdout, stderr io.Writer) int {
 		return 1
 	}
 	block := flagIndexBegin + "\n\n## Generated Flag Index\n\n" + flagregistry.RenderIndex() + "\n" + flagIndexEnd
-	next, err := spliceMarkedRegion(string(doc), block, flagIndexBegin, flagIndexEnd, "")
+	next, err := skillcheck.SpliceMarkedRegion(string(doc), block, flagIndexBegin, flagIndexEnd, "")
 	if err != nil {
 		fmt.Fprintf(stderr, "splice %s: %v\n", docPath, err)
 		return 1

@@ -42,6 +42,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 // verdictCanonicalRE matches the canonical two-line heading
@@ -72,6 +73,13 @@ type hooks struct {
 	// never ran gofmt over the generated go/acs/cycle<N>/*.go files). nil = no
 	// gofmt gate (legacy/tests). The registry default wires gofmtCheckDefault.
 	gofmtCheck func(req core.PhaseRequest) ([]string, error)
+	// skillsDriftCheck reports the worktree's SKILL.md files whose generated
+	// phase-facts region has drifted from its SSOTs (profiles/registry/
+	// phasecontract). A cycle that edits .evolve/profiles/*.json without
+	// regenerating would FAIL the CI TestSkills_NoDrift gate (cycle 339), so the
+	// drift must FAIL audit. nil = no skills gate. NewDefault wires
+	// skillsDriftCheckDefault (in-process skillcheck.Check — no subprocess).
+	skillsDriftCheck func(req core.PhaseRequest) ([]string, error)
 }
 
 func (hooks) PhaseName() string                           { return string(core.PhaseAudit) }
@@ -143,6 +151,28 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			diags = append(diags, core.Diagnostic{
 				Severity: "error",
 				Message:  fmt.Sprintf("gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. Run `gofmt -w -s .` in go/. Offenders: %s", len(dirty), strings.Join(dirty, ", ")),
+			})
+			verdict = core.VerdictFAIL
+		}
+	}
+
+	// SKILL.md phase-facts drift gate: a cycle that edits .evolve/profiles/*.json
+	// (or any SSOT projected into SKILL.md) without regenerating would FAIL the
+	// CI TestSkills_NoDrift gate — so it must FAIL audit here (cycle 339 shipped
+	// this drift CI-red). Runs in-process (skillcheck.Check); an infra error
+	// (e.g. the worktree can't load the registry) fails OPEN with a warning.
+	if h.skillsDriftCheck != nil {
+		drift, derr := h.skillsDriftCheck(req)
+		switch {
+		case derr != nil:
+			diags = append(diags, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("skills-drift gate skipped (could not run): %s", derr.Error()),
+			})
+		case len(drift) > 0:
+			diags = append(diags, core.Diagnostic{
+				Severity: "error",
+				Message:  fmt.Sprintf("SKILL.md drift: %d region(s) stale vs their SSOTs — CI TestSkills_NoDrift would FAIL. Run `evolve skills generate`. Drifted: %s", len(drift), strings.Join(drift, ", ")),
 			})
 			verdict = core.VerdictFAIL
 		}
@@ -222,6 +252,11 @@ type Config struct {
 	// gofmt -s clean; any offender FAILs the audit (CI-parity gate). nil = no
 	// gofmt gate. NewDefault wires gofmtCheckDefault.
 	CheckGofmt func(req core.PhaseRequest) ([]string, error)
+	// CheckSkillsDrift, when set, reports the worktree SKILL.md files whose
+	// phase-facts region drifted from its SSOTs; any drift FAILs the audit
+	// (CI TestSkills_NoDrift parity). nil = no skills gate. NewDefault wires
+	// skillsDriftCheckDefault.
+	CheckSkillsDrift func(req core.PhaseRequest) ([]string, error)
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -229,7 +264,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt},
+			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift},
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
@@ -247,7 +282,23 @@ func New(c Config) *Phase {
 // every cycle (cycle-147). New(Config) stays for tests that pin explicit
 // (nil or fake) generators.
 func NewDefault(br core.Bridge, prm *prompts.Loader) *Phase {
-	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault})
+	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault})
+}
+
+// skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs the
+// same projection check the CI TestSkills_NoDrift gate runs (skillcheck.Check)
+// against the cycle worktree (where the builder's profile/SSOT edits live),
+// in-process — no subprocess, so no fork-bomb under `go test`. The worktree is
+// preferred; ProjectRoot is the fallback; an empty root is a no-op.
+func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	if root == "" {
+		return nil, nil
+	}
+	return skillcheck.Check(root)
 }
 
 // gofmtCheckDefault is the production gofmt CI-parity gate: it lists the .go

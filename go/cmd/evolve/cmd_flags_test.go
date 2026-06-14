@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 const flagsDocSeed = `# Control Flags Reference
@@ -91,7 +93,7 @@ func TestFlagsCheck_DriftExitsTwo(t *testing.T) {
 // TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF pins the flags-path splice
 // contract directly: no markers + no fallback anchor ⇒ block appended at EOF.
 func TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF(t *testing.T) {
-	out, err := spliceMarkedRegion("# Doc\n\nprose\n", "BEGIN\nblock\nEND", "BEGIN", "END", "")
+	out, err := skillcheck.SpliceMarkedRegion("# Doc\n\nprose\n", "BEGIN\nblock\nEND", "BEGIN", "END", "")
 	if err != nil {
 		t.Fatal(err)
 	}
