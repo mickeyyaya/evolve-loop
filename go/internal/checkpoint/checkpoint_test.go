@@ -212,7 +212,13 @@ func TestApplyToStateFile_AtomicReplace(t *testing.T) {
 // TestApplyToStateFile_MissingFile_Errors — checkpoint can't be applied
 // without an existing cycle-state.json (bash:486 same precondition).
 func TestApplyToStateFile_MissingFile_Errors(t *testing.T) {
-	err := ApplyToStateFile("/no/such/file", Checkpoint{Reason: ReasonBatchCapNear})
+	// A missing cycle-state.json inside an existing (writable) dir — the realistic
+	// precondition. ADR-0049 G7 wraps the apply in the cycle-state sidecar lock,
+	// which creates "<file>.lock" in the (present) dir, then the read of the absent
+	// data file surfaces ErrNotExist. (Production always calls under .evolve/, so a
+	// nonexistent parent dir is not a real path.)
+	missing := filepath.Join(t.TempDir(), core.CycleStateFile)
+	err := ApplyToStateFile(missing, Checkpoint{Reason: ReasonBatchCapNear})
 	if err == nil {
 		t.Error("ApplyToStateFile(missing): want error")
 	}

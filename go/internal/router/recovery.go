@@ -47,6 +47,21 @@ var shipLocalCodes = map[string]bool{
 // an integrity breach that also looks like a binding precondition still blocks.
 var recoveryChain = []recoveryHandler{
 	{
+		// ADR-0049 G13a: a fleet rebase CONFLICT is genuinely overlapping work the
+		// advisor's disjoint-file partition should have separated. It carries the
+		// integrity class, but unlike a tamper/drift breach it is RECOVERABLE by
+		// triage — route to the LLM debugger (recommend sequential retry / partition
+		// split), NOT a blind block. Ordered FIRST so this specific code wins over
+		// the generic integrity-block below (the one integrity code that recovers).
+		name: "fleet-rebase-conflict-debugger",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "GIT_FLEET_REBASE_CONFLICT" {
+				return "debugger", true
+			}
+			return "", false
+		},
+	},
+	{
 		// Integrity breaches never auto-recover — block loudly.
 		name: "integrity-block",
 		match: func(b Blocker) (string, bool) {

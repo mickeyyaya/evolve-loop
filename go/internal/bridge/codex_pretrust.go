@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
 // tomlKeyEscaper escapes the characters TOML basic strings prohibit
@@ -41,16 +43,18 @@ var tomlKeyEscaper = strings.NewReplacer(
 // The merge is APPEND-ONLY and idempotent: if a `[projects."<path>"]`
 // section is already present, the path is skipped (no duplicate).
 //
-// Concurrency: a per-call PID-suffixed temp filename
-// (config.toml.tmp.<pid>) ensures two simultaneous driver launches
-// (different cycles, possibly different paths) cannot clobber each
-// other's temp file mid-rename. The Rename ordering is still last-
-// writer-wins (an inherent property of POSIX rename), but each writer's
-// snapshot is internally consistent — codex's TOML parser tolerates
-// duplicate sections (last-wins per its parser), and the next cycle's
-// pretrust call re-adds any entry that lost the rename race. Best-
-// effort semantics absorb the residual risk. Per cycle-122 review
-// HIGH-1 finding.
+// Concurrency (ADR-0049 N10): under `evolve fleet` the whole-cycle project
+// lock is skipped, so several cycles' codex Preflights pre-trust DISTINCT
+// paths into this one host-global file at once. A unique CreateTemp keeps each
+// writer's temp private, but the read-merge-write-RENAME was last-writer-wins:
+// two cycles that each read a config WITHOUT the other's entry each rename
+// their own snapshot, so the final file keeps only the last writer's trust
+// entries. The cycle whose entry was dropped then hits the "Press enter to
+// confirm" modal that hung cycle-122. The whole RMW now runs under
+// flock.WithPathLock(configPath) so the append-only merges serialize and
+// compose losslessly — every path stays trusted. (The lock pairs with, it does
+// not replace, the atomic CreateTemp+Rename: the lock prevents lost updates,
+// the rename keeps lock-free readers tear-free.)
 //
 // No-ops when cfg.Worktree AND cfg.Workspace are both empty. Returns nil
 // (best-effort: a pretrust failure must NOT block phase launch — the
@@ -67,51 +71,52 @@ func pretrustCodexProjects(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("resolve codex config path: %w", err)
 	}
+	// MkdirAll at 0o700 BEFORE the lock: PathLock's own MkdirAll uses 0o755, so
+	// creating the dir here first preserves codex's stricter permission.
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
 		return fmt.Errorf("ensure codex config dir: %w", err)
 	}
-	existing, err := os.ReadFile(configPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read codex config: %w", err)
-	}
-	merged := appendCodexTrustEntries(string(existing), paths)
-	// cycle-142: also suppress codex's "Approaching rate limits / Switch to
-	// <mini>?" model-switch modal, which is undismissable by the auto-responder
-	// and stalls the phase until the artifact-wait deadline.
-	merged = appendCodexNotice(merged)
-	if merged == string(existing) {
-		return nil // every path already trusted + notice already present
-	}
-	// os.CreateTemp guarantees a unique filename — required for safe
-	// concurrent driver launches (HIGH-1 + MEDIUM-1 from cycle-122
-	// review): same-process goroutines share PID, so a PID-suffixed
-	// name would collide between goroutines and one Rename would
-	// clobber the other's WriteFile-in-progress.
-	dir := filepath.Dir(configPath)
-	base := filepath.Base(configPath)
-	f, err := os.CreateTemp(dir, base+".tmp.*")
-	if err != nil {
-		return fmt.Errorf("create codex config tmp: %w", err)
-	}
-	tmp := f.Name()
-	if _, err := f.Write([]byte(merged)); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return fmt.Errorf("write codex config tmp: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("close codex config tmp: %w", err)
-	}
-	// CreateTemp defaults to 0o600 on POSIX, matching the original
-	// WriteFile perm choice — no Chmod needed.
-	if err := os.Rename(tmp, configPath); err != nil {
-		// Best-effort cleanup; the .tmp.* file is harmless if Remove
-		// also fails (user-owned dir, dropped on next pretrust attempt).
-		_ = os.Remove(tmp)
-		return fmt.Errorf("rename codex config: %w", err)
-	}
-	return nil
+	return flock.WithPathLock(configPath, func() error {
+		existing, err := os.ReadFile(configPath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read codex config: %w", err)
+		}
+		merged := appendCodexTrustEntries(string(existing), paths)
+		// cycle-142: also suppress codex's "Approaching rate limits / Switch to
+		// <mini>?" model-switch modal, which is undismissable by the auto-responder
+		// and stalls the phase until the artifact-wait deadline.
+		merged = appendCodexNotice(merged)
+		if merged == string(existing) {
+			return nil // every path already trusted + notice already present
+		}
+		// os.CreateTemp guarantees a unique filename so lock-free readers never
+		// observe a partial write (the lock above serializes our own writers).
+		dir := filepath.Dir(configPath)
+		base := filepath.Base(configPath)
+		f, err := os.CreateTemp(dir, base+".tmp.*")
+		if err != nil {
+			return fmt.Errorf("create codex config tmp: %w", err)
+		}
+		tmp := f.Name()
+		if _, err := f.Write([]byte(merged)); err != nil {
+			_ = f.Close()
+			_ = os.Remove(tmp)
+			return fmt.Errorf("write codex config tmp: %w", err)
+		}
+		if err := f.Close(); err != nil {
+			_ = os.Remove(tmp)
+			return fmt.Errorf("close codex config tmp: %w", err)
+		}
+		// CreateTemp defaults to 0o600 on POSIX, matching the original
+		// WriteFile perm choice — no Chmod needed.
+		if err := os.Rename(tmp, configPath); err != nil {
+			// Best-effort cleanup; the .tmp.* file is harmless if Remove
+			// also fails (user-owned dir, dropped on next pretrust attempt).
+			_ = os.Remove(tmp)
+			return fmt.Errorf("rename codex config: %w", err)
+		}
+		return nil
+	})
 }
 
 // codexPretrustPaths returns the non-empty subset of cfg.Worktree +

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
@@ -918,9 +919,23 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 	if cfg.RunID != "" {
 		runTok = sessionrecord.RunScopeToken(cfg.RunID) + "-"
 	}
-	s := fmt.Sprintf("%s%sc%d-%s-pid%d-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), deps.Now().Unix())
+	// ADR-0049 N15: a per-process monotonic nonce GUARANTEES uniqueness even
+	// when two ephemeral sessions are minted in the same wall-clock second
+	// (concurrent fleet cycles, or a same-phase retry within a cycle). The
+	// second-granularity timestamp alone collided; pid covers cross-process and
+	// the nonce covers within-process. It sits BEFORE the timestamp so
+	// truncate64 (tmux's 64-char ceiling) degrades the recency hint, never the
+	// uniqueness — for a long agent like build-planner the tail timestamp may be
+	// clipped, but n<nonce> always survives.
+	nonce := strconv.FormatUint(ephemeralSessionNonce.Add(1), 36)
+	s := fmt.Sprintf("%s%sc%d-%s-pid%d-n%s-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), nonce, deps.Now().Unix())
 	return truncate64(s), false
 }
+
+// ephemeralSessionNonce is the process-global counter behind resolveSession's
+// per-session nonce (ADR-0049 N15). atomic so concurrent fleet dispatches in
+// one process never read the same value.
+var ephemeralSessionNonce atomic.Uint64
 
 func truncate64(s string) string {
 	if len(s) > 64 {

@@ -50,6 +50,10 @@ func TestRecover_Branches(t *testing.T) {
 		// transient retry-ship — the dedicated handler is ordered before it.
 		{"fleet rebase needed → reaudit", &Blocker{Code: "GIT_FLEET_REBASE_NEEDED", Class: "transient", Stage: "ship"}, "audit", "recover:fleet-rebase-reaudit"},
 
+		// ADR-0049 G13a: a fleet rebase CONFLICT (genuine overlapping work) cannot
+		// be re-audited away → route to the debugger, never back to audit/ship.
+		{"fleet rebase conflict → debugger", &Blocker{Code: "GIT_FLEET_REBASE_CONFLICT", Class: "integrity", Stage: "ship"}, "debugger", "recover:fleet-rebase-conflict-debugger"},
+
 		// transient → retry ship.
 		{"transient push rejected", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 		{"transient git io", &Blocker{Code: "GIT_IO", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
