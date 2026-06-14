@@ -176,7 +176,7 @@ func TestC341_006_PolicyDocCitesAllProfilesSubstitutabilityTest(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	policyDoc := filepath.Join(root, "docs", "architecture", "model-routing-policy.md")
 	if !acsassert.FileContains(t, policyDoc, "TestAllProfilesSubstitutabilityAtParity") {
-		t.Errorf("RED: docs/architecture/model-routing-policy.md does not cite TestAllProfilesSubstitutabilityAtParity\n"+
+		t.Errorf("RED: docs/architecture/model-routing-policy.md does not cite TestAllProfilesSubstitutabilityAtParity\n" +
 			"Builder must update the 'Substitutability acceptance test' paragraph to reference the new all-profiles parity guard")
 	}
 }
@@ -191,9 +191,9 @@ func TestC341_007_PolicyDocDocumentsAllowedClisExceptions(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	policyDoc := filepath.Join(root, "docs", "architecture", "model-routing-policy.md")
 	if !acsassert.FileContains(t, policyDoc, "allowed_clis") {
-		t.Errorf("RED: docs/architecture/model-routing-policy.md does not document allowed_clis dispatch exceptions\n"+
-			"Builder must add a note explaining that builder/tdd-engineer/tester have intentional\n"+
-			"allowed_clis restrictions (cross-family floor, TDD ≠ builder invariant) — tier vocabulary\n"+
+		t.Errorf("RED: docs/architecture/model-routing-policy.md does not document allowed_clis dispatch exceptions\n" +
+			"Builder must add a note explaining that builder/tdd-engineer/tester have intentional\n" +
+			"allowed_clis restrictions (cross-family floor, TDD ≠ builder invariant) — tier vocabulary\n" +
 			"is driver-agnostic but dispatch eligibility is constrained by design")
 	}
 }
@@ -219,7 +219,7 @@ func TestC341_008_PolicyDocSubstitutabilitySectionHasNoVendorTierNames(t *testin
 	text := string(raw)
 	start := strings.Index(text, "### Substitutability acceptance test")
 	if start == -1 {
-		t.Fatalf("RED: 'Substitutability acceptance test' section not found in model-routing-policy.md\n"+
+		t.Fatalf("RED: 'Substitutability acceptance test' section not found in model-routing-policy.md\n" +
 			"Builder must keep or add this section header when updating T2")
 	}
 	// Extract section until the next heading or end of file.
