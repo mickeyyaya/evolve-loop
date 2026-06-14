@@ -24,10 +24,12 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		count       int
 		goalHash    string
 		concurrency int
+		simulate    bool
 	)
 	fs.IntVar(&count, "count", 0, "number of concurrent cycles to launch (required)")
 	fs.StringVar(&goalHash, "goal-hash", "", "goal hash passed to each cycle (required)")
 	fs.IntVar(&concurrency, "concurrency", 0, "max concurrent cycles (0 = count)")
+	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: each cycle returns PASS without calling out — validates the fleet concurrency plumbing (lock-skip, distinct cycle numbers, isolated worktrees, serialized ship) deterministically")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
@@ -47,7 +49,7 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	sup := &fleet.Supervisor{
 		Concurrency: concurrency,
-		Launch:      execCycleLaunch(binPath, stdout, stderr),
+		Launch:      execCycleLaunch(binPath, simulate, stdout, stderr),
 	}
 	specs := make([]fleet.CycleSpec, count)
 	for i := range specs {
@@ -73,9 +75,19 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // execCycleLaunch returns a fleet.LaunchFn that runs one `evolve cycle run` in a
 // child process. The child inherits the parent env plus the supervisor's
 // per-spec overlay (which already forced EVOLVE_FLEET=1).
-func execCycleLaunch(binPath string, stdout, stderr io.Writer) fleet.LaunchFn {
+// cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
+// testable; --simulate threads the no-LLM -simulate flag through.
+func cycleRunArgs(goalHash string, simulate bool) []string {
+	args := []string{"cycle", "run", "--goal-hash", goalHash}
+	if simulate {
+		args = append(args, "-simulate")
+	}
+	return args
+}
+
+func execCycleLaunch(binPath string, simulate bool, stdout, stderr io.Writer) fleet.LaunchFn {
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
-		cmd := exec.CommandContext(ctx, binPath, "cycle", "run", "--goal-hash", spec.GoalHash)
+		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, simulate)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr

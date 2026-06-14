@@ -48,17 +48,33 @@ func (s *simulatePhase) Run(_ context.Context, req core.PhaseRequest) (core.Phas
 // replaced by a simulatePhase. Storage + ledger remain real so the
 // state machine state mutates correctly — that's the whole point of
 // the simulate path (drive transitions without spending money).
-func wireSimulateOrchestrator(_, evolveDir string) *core.Orchestrator {
-	phases := []core.Phase{
+// simulatePhases is the set of phases the no-LLM `-simulate` harness registers a
+// PASS runner for. It must cover every phase the canonical order
+// (phaseorder.HardcodedOrder) or the core phase set can route to — the list was
+// stale (missing build-planner/swarm-plan/plan-review/tester/retrospective/memo),
+// so a full-cycle walk hit "no runner registered for phase build-planner". Extra
+// runners are harmless. TestSimulatePhases_CoversCanonicalOrder guards this.
+func simulatePhases() []core.Phase {
+	return []core.Phase{
 		core.PhaseIntent,
 		core.PhaseScout,
 		core.PhaseTriage,
+		core.Phase("plan-review"),
 		core.PhaseTDD,
+		core.PhaseBuildPlanner,
+		core.PhaseSwarmPlan,
 		core.PhaseBuild,
+		core.Phase("tester"),
 		core.PhaseAudit,
 		core.PhaseShip,
 		core.PhaseRetro,
+		core.Phase("retrospective"),
+		core.Phase("memo"),
 	}
+}
+
+func wireSimulateOrchestrator(_, evolveDir string) *core.Orchestrator {
+	phases := simulatePhases()
 	runners := make(map[core.Phase]core.PhaseRunner, len(phases))
 	for _, p := range phases {
 		runners[p] = &simulatePhase{name: p}
