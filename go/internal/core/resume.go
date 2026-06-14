@@ -171,6 +171,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	o.currentRunID.Store(cs.RunID)
 	defer o.currentRunID.Store("")
 
+	// ADR-0049 G16: re-establish the per-run .lease for the resumed (still-live)
+	// cycle so gc does not reap its run dir while resume runs. Same heartbeat as
+	// the fresh path; no-op for worktree-less cycles.
+	stopLease := startRunLease(cs.WorkspacePath, cs.RunID, o.now, leaseRefreshInterval())
+	defer stopLease()
+
 	// Snapshot env/context (same discipline as RunCycle).
 	envSnap := make(map[string]string, len(req.Env)+1)
 	for k, v := range req.Env {

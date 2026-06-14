@@ -1803,6 +1803,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
 	}
 
+	// ADR-0049 G16: write + heartbeat the per-run .lease so gc's liveness check
+	// (runlease.Fresh) never reaps a concurrent fleet sibling's run dir mid-cycle.
+	// startRunLease creates the run dir itself; no-op for worktree-less / test
+	// cycles (empty WorkspacePath). Stopped on every exit (deferred).
+	stopLease := startRunLease(cs.WorkspacePath, runID, o.now, leaseRefreshInterval())
+	defer stopLease()
+
 	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
 	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
 	if o.catalogRefresh != nil {
