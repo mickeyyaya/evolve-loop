@@ -66,7 +66,7 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 		opts.PathExists = defaultPathExists
 	}
 
-	statePath := filepath.Join(evolveDir, "cycle-state.json")
+	statePath := filepath.Join(evolveDir, CycleStateFile)
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

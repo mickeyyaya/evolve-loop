@@ -134,14 +134,15 @@ func pluginVersion(pluginRoot string) string {
 // read-modify-writes — the SAME <path>.lock storage.UpdateState holds
 // (ADR-0049 S2 / gap G2). flock is BLOCKING and per-open-file-description, so
 // ship's map-based RMW and the typed UpdateState/allocator writers never
-// interleave (the lost-update / stale-pin class). The single home for the
-// ".lock" suffix. Callers that need a phase-specific ShipError on lock failure
+// interleave (the lost-update / stale-pin class). Projects through
+// flock.PathLock — the single home for the "<file>.lock" sidecar suffix.
+// Callers that need a phase-specific ShipError on lock failure
 // use this directly + `defer release()`; the rest use withStateLock. A no-op
 // for the live loop (the whole-cycle project lock already serializes ship vs
 // the allocator); this joins the CA.3 lock domain so it stays correct once the
 // coarse lock is scoped per-run.
 func lockStateFile(statePath string) (release func(), err error) {
-	return flock.Lock(statePath + ".lock")
+	return flock.PathLock(statePath)
 }
 
 // withStateLock runs fn while holding lockStateFile(statePath). fn does the

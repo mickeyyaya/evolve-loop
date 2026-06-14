@@ -40,7 +40,7 @@ import (
 // re-entrant call). A panicking mutate still releases the lock (deferred).
 func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.State)) (core.State, error) {
 	path := filepath.Join(s.evolveDir, "state.json")
-	release, err := flock.Lock(path + ".lock")
+	release, err := flock.PathLock(path) // CA.3: "<state.json>.lock" sidecar
 	if err != nil {
 		return core.State{}, fmt.Errorf("update state: %w", err)
 	}

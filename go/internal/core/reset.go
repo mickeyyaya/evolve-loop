@@ -75,7 +75,7 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		gitHead = defaultCurrentHead
 	}
 
-	csPath := filepath.Join(opts.EvolveDir, "cycle-state.json")
+	csPath := filepath.Join(opts.EvolveDir, CycleStateFile)
 	raw, err := os.ReadFile(csPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

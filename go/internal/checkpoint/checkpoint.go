@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -170,8 +171,17 @@ func defaultHooks() hooks {
 // ApplyToStateFile reads a cycle-state.json, splices the checkpoint
 // block into it (preserving every existing field), and atomically
 // writes back. Mirrors bash cycle_state_checkpoint at cycle-state.sh:479.
+//
+// ADR-0049 G7: the read-modify-write holds the SAME cycle-state.json sidecar
+// lock storage.WriteCycleState holds, so a concurrent fleet cycle's phase write
+// (which owns "phase" and preserves "checkpoint") and this checkpoint write
+// (which owns "checkpoint" and preserves "phase") serialize instead of clobbering
+// each other's key. flock.WithPathLock is the single home for the "<file>.lock"
+// convention shared across packages.
 func ApplyToStateFile(path string, cp Checkpoint) error {
-	return applyWithHooks(defaultHooks(), path, cp)
+	return flock.WithPathLock(path, func() error {
+		return applyWithHooks(defaultHooks(), path, cp)
+	})
 }
 
 func applyWithHooks(h hooks, path string, cp Checkpoint) error {
