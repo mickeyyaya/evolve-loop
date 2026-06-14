@@ -1665,14 +1665,35 @@ func failureLearningSummary(cycle int, failed Phase, err error) string {
 	return fmt.Sprintf("cycle %d failed during %s: %s", cycle, failed, msg)
 }
 
+// fleetMode reports whether this cycle runs under the `evolve fleet` supervisor
+// (EVOLVE_FLEET=1). In fleet mode the whole-cycle global project lock is not
+// taken (ADR-0049 S6 / root-cause R1) so concurrent fleet cycles don't refuse
+// each other; per-resource flocks + per-run isolation keep them safe. Default
+// off — the single-driver loop keeps the coarse lock.
+func fleetMode(env map[string]string) bool {
+	return envchain.BoolValue(env["EVOLVE_FLEET"], false)
+}
+
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
-// summary of what ran. The lock is acquired up front and released on
-// every exit path. State is updated incrementally so a crash leaves an
-// inspectable trail in .evolve/.
+// summary of what ran. The lock is acquired up front (except in fleet mode,
+// see fleetMode) and released on every exit path. State is updated
+// incrementally so a crash leaves an inspectable trail in .evolve/.
 func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleResult, error) {
-	release, err := o.storage.AcquireLock(ctx)
-	if err != nil {
-		return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
+	// ADR-0049 S6 / root-cause R1: under the fleet supervisor (EVOLVE_FLEET=1)
+	// skip the whole-cycle global project lock (LOCK_NB) so M cycles run
+	// concurrently instead of refusing each other. Safe because every shared
+	// resource is now serialized by its OWN flock — state.json (UpdateState /
+	// withStateLock, S2), the ledger chain (CA.1), the .evolve/ship.lock
+	// integrator (S5) — and each cycle is isolated by its per-run worktree +
+	// workspace with run-scoped ship reads (S3) and audit binding (S4). Default
+	// off → the live sequential loop keeps the global lock, byte-identical.
+	release := func() error { return nil }
+	if !fleetMode(req.Env) {
+		acquired, err := o.storage.AcquireLock(ctx)
+		if err != nil {
+			return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
+		}
+		release = acquired
 	}
 	defer func() { _ = release() }()
 
