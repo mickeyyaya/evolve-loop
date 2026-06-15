@@ -165,14 +165,44 @@ func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 	// A CycleInputs with the WRONG goal (as if assembled from a wrong key).
 	drift := phaseio.NewCycleInputs(phaseio.CycleInputsInit{Goal: "wrong", ChallengeToken: "tok"})
 	ms := compareCycleInputsShadow(drift, nil, ctx)
+	var goalMismatch *phaseIOMismatch
+	for i := range ms {
+		if ms[i].Field == "cycle_inputs.goal" {
+			goalMismatch = &ms[i]
+		}
+	}
+	if goalMismatch == nil {
+		t.Fatalf("expected cycle_inputs.goal drift, got %+v", ms)
+	}
+	// Assert orientation too (want=legacy ground truth, got=typed getter) so a
+	// swapped Want/Got in the mismatch struct is detectable.
+	if goalMismatch.Want != "real-goal" || goalMismatch.Got != "wrong" {
+		t.Fatalf("want/got orientation wrong: %+v", *goalMismatch)
+	}
+}
+
+// TestCompareCycleInputsShadow_ErrorContext exercises the comparator's typed
+// ErrorContext path (the ship-failure recovery case): a matching ErrorContext
+// yields no mismatch; a diverging one surfaces the offending field with correct
+// want/got.
+func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
+	ctx := map[string]string{
+		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
+		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
+	}
+	if ms := compareCycleInputsShadow(assembleCycleInputs(ctx), assembleErrorContext(ctx), ctx); len(ms) != 0 {
+		t.Fatalf("matching ErrorContext should yield no mismatch, got %+v", ms)
+	}
+	diverge := &phaseio.ErrorContext{Code: "WRONG", Class: "transient", Stage: "ship", Debug: "non-ff"}
+	ms := compareCycleInputsShadow(assembleCycleInputs(ctx), diverge, ctx)
 	found := false
 	for _, m := range ms {
-		if m.Field == "cycle_inputs.goal" {
+		if m.Field == "error_context.code" && m.Want == "E_PUSH" && m.Got == "WRONG" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected cycle_inputs.goal drift, got %+v", ms)
+		t.Fatalf("expected error_context.code divergence (want E_PUSH got WRONG), got %+v", ms)
 	}
 }
 
