@@ -1555,42 +1555,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		}
 	}
 
-	postCycleHEAD, _ := o.gitHEAD()
-	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
-
-	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
-	// HEAD advancing and without an audit-advisory "would-have-blocked" record —
-	// i.e. work may have been produced and then discarded with the worktree
-	// (cycle-148: a genuine PASS mis-graded FAIL routed audit→retro→end). The
-	// outcome label alone is advisory and easily missed in a batch summary, so
-	// surface it loudly here. Not an error — some cycles legitimately produce no
-	// change — but always worth an operator's eyes.
-	if result.FinalVerdict == CycleOutcomeSkippedUnknown {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but HEAD did not advance and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
-	}
-
-	// R9.1: a shipped cycle's committed floors are observed throughput —
-	// record them into the rolling window before the state write below
-	// persists it (nil seam ⇒ byte-identical no-op).
-	if o.throughputRecorder != nil && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
-		o.throughputRecorder(&state, cycle, cs.WorkspacePath)
-	}
-
-	// A completed cycle that FAILED its verdict keeps its worktree for salvage
-	// (inbox preserve-worktree-on-verdict-fail). The exit defer prunes only
-	// when !preserveWorktree, so set the flag before marking completion. This
-	// MUST stay AFTER finalizeOutcome above (line ~2735): it reads the FINAL
-	// verdict, so a SKIPPED/SHIPPED_VIA_BUILD reclassification has already
-	// happened — moving it earlier would preserve on a pre-reclassification
-	// raw FAIL. L3 gc (internal/gc) reclaims preserved worktrees on retention;
-	// `evolve cycle reset` / `evolve loop --resume` reclaim them explicitly.
-	if preserveOnVerdict(result.FinalVerdict) {
+	// Post-loop finalization (verdict reclassification, silent-no-ship warn,
+	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
+	// preserveWorktree is threaded back so the exit defer (registered above)
+	// observes it; cycleCompletedNormally is set only on a clean persist.
+	preserve, ferr := o.finalizeCycle(ctx, cs, cycle, preCycleHEAD, &result, &state)
+	if preserve {
 		preserveWorktree = true
 	}
-
-	state.LastCycleNumber = cycle
-	if err := o.persistCycleEndState(ctx, state); err != nil {
-		return result, fmt.Errorf("write state: %w", err)
+	if ferr != nil {
+		return result, ferr
 	}
 	cycleCompletedNormally = true
 	return result, nil
