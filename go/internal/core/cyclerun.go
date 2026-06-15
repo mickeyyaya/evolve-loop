@@ -75,6 +75,8 @@ type dispatchResult struct {
 	treeGuard      *treediff.Guard // pre-phase guard; consumed by the post-phase tree-diff check
 	beforeDirty    []string        // pre-phase dirty snapshot
 	snapshotFailed bool            // pre-phase snapshot failed
+	runner         PhaseRunner     // resolved runner; reviewAndGuard re-dispatches it in the correction ladder
+	phaseReq       PhaseRequest    // the phase request; reviewAndGuard mutates CorrectionDirective for re-dispatch
 }
 
 // recordFailureLearning replaces RunCycle's inline closure: it builds the
