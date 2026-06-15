@@ -110,7 +110,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// EVOLVE_PHASE_IO=off (default) this is skipped entirely — byte-identical
 	// dispatch. It never affects phaseReq or the dispatch result.
 	if cr.o.cfg.PhaseIO >= config.StageShadow {
-		cr.emitPhaseIOShadow(next)
+		cr.emitPhaseIOShadow(next, phaseCtx)
 	}
 	// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
 	// goroutine BEFORE runner.Run and cancel it AFTER. noopObserver

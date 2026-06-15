@@ -2,11 +2,12 @@ package phaseio
 
 // CycleInputsInit is the construction DTO for NewCycleInputs.
 type CycleInputsInit struct {
-	Goal           string
-	Strategy       string
-	CommitMessage  string
-	FleetScope     string
-	ChallengeToken string
+	Goal            string
+	Strategy        string
+	CommitMessage   string
+	FleetScope      string
+	ChallengeToken  string
+	PreviousVerdict string
 }
 
 // CycleInputs is the sealed, getters-only view of the cycle-scoped inputs a
@@ -15,21 +16,23 @@ type CycleInputsInit struct {
 // values are set once at construction and exposed read-only, so no phase can
 // mutate what a sibling observes (P4/P5). The zero value is valid and empty.
 type CycleInputs struct {
-	goal           string
-	strategy       string
-	commitMessage  string
-	fleetScope     string
-	challengeToken string
+	goal            string
+	strategy        string
+	commitMessage   string
+	fleetScope      string
+	challengeToken  string
+	previousVerdict string
 }
 
 // NewCycleInputs builds a sealed CycleInputs from init.
 func NewCycleInputs(init CycleInputsInit) CycleInputs {
 	return CycleInputs{
-		goal:           init.Goal,
-		strategy:       init.Strategy,
-		commitMessage:  init.CommitMessage,
-		fleetScope:     init.FleetScope,
-		challengeToken: init.ChallengeToken,
+		goal:            init.Goal,
+		strategy:        init.Strategy,
+		commitMessage:   init.CommitMessage,
+		fleetScope:      init.FleetScope,
+		challengeToken:  init.ChallengeToken,
+		previousVerdict: init.PreviousVerdict,
 	}
 }
 
@@ -49,3 +52,7 @@ func (c CycleInputs) FleetScope() string { return c.fleetScope }
 // req.Context["challengeToken"] — camelCase key; "challenge_token" is the
 // wire-JSON field name, not the Context key).
 func (c CycleInputs) ChallengeToken() string { return c.challengeToken }
+
+// PreviousVerdict returns the prior phase's verdict, set for the retro phase
+// (formerly req.Context["previous_verdict"]). Empty for non-retro phases.
+func (c CycleInputs) PreviousVerdict() string { return c.previousVerdict }
