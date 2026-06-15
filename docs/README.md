@@ -24,11 +24,12 @@ docs/
 ├── guides/                    ← how-to (operational tasks)
 ├── reference/                 ← per-agent technique manuals
 ├── architecture/              ← cross-role system design (reference)
+│   └── adr/                   ← runtime/engine ADRs (0001-0051, canonical corpus)
 ├── research/                  ← agent-readable research records (load on demand)
 ├── operations/                ← release process, ops history
 ├── incidents/                 ← forensic post-mortems (incl. cycle-61 v10.7 case study)
 ├── reports/                   ← eval results, benchmarks
-├── adr/                       ← architecture decision records
+├── adr/                       ← plugin-layer ADRs (0001-0009) — distinct from architecture/adr/
 ├── private/                   ← AGENT-CONTEXT EXCLUDED (kernel-blocked)
 └── MOVED.md                   ← (transitional) old→new path index for v9.1.x refactor
 ```
@@ -60,8 +61,11 @@ different questions:
 And then there is one *non-agent* bucket:
 
 - **`private/`** — research backlog, exploratory notes. Public-readable on GitHub but
-  **structurally excluded from agent context** at three defense layers (OS sandbox,
-  CLI permission gate, kernel filter in `legacy/scripts/lifecycle/role-context-builder.sh`).
+  **structurally excluded from agent context** at two surviving defense layers: the OS
+  sandbox and the CLI permission gate, both driven by `docs/private` in each profile's
+  `sandbox.deny_subpaths` (`.evolve/profiles/{scout,auditor,orchestrator,...}.json`).
+  (A third, bash-only context-builder filter existed before the v12.0.0 legacy/ removal;
+  it has no current Go reimplementation — see `architecture/private-context-policy.md`.)
   "Private" here means "private from the agent's reasoning context", not "secret from humans".
 
 The single bright line: **`docs/private/*` is the only path agents cannot read.** Everything
@@ -71,17 +75,20 @@ else under `docs/` is fair game when an agent has reason to look.
 
 evolve-loop has two flavors of agent doc access:
 
-1. **Auto-loaded by `legacy/scripts/lifecycle/role-context-builder.sh`** — a small set of per-phase
+1. **Auto-loaded by the bridge/runner context-assembly path** — a small set of per-phase
    artifacts (intent.md, scout-report.md, build-report.md, etc.) and the role's persona file.
-   These are bundled into every prompt for that phase.
+   These are bundled into every prompt for that phase. (Pre-v12.0.0 this assembly lived in
+   `legacy/scripts/lifecycle/role-context-builder.sh`, removed at the FLAG DAY native-Go cutover.)
 
 2. **On-demand via `Read` / `Grep` / `Glob` tool calls** — anything else under `docs/` except
    `docs/private/`. The agent has the *capability* but uses it only when its persona / skill
    instructions cite a specific reference.
 
-`docs/private/` is the structural exception: a 3-layer filter blocks both auto-loading and
-on-demand access. See `private/README.md` and `architecture/private-context-policy.md` for the
-mechanism.
+`docs/private/` is the structural exception: the OS sandbox and the CLI permission gate
+(both fed by each profile's `sandbox.deny_subpaths`) block both auto-loading and on-demand
+access. See `private/README.md` and `architecture/private-context-policy.md` for the
+mechanism. (Note: that policy doc still describes a third, bash-only filter layer from before
+the v12.0.0 legacy/ removal; it is equally stale and has no current Go reimplementation.)
 
 `knowledge-base/research/` (sibling to `docs/`) is the **archival** counterpart: research dossiers
 that informed design decisions but are too voluminous to load into agent context. It's NOT

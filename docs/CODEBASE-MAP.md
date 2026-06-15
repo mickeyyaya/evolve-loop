@@ -7,32 +7,67 @@
 
 ## Top-level directories
 
+### `go/`
+
+The sole runtime. All loop behavior, gates, the orchestrator, and the CLI
+live here as Go packages — there is no bash dispatcher.
+
+- `go/cmd/` — entry points. `go/cmd/evolve/` is the `evolve` CLI (loop,
+  cycle, ship, guard, doctor, release, …); `go/cmd/apicover/` is the
+  public-API coverage tool.
+- `go/internal/` — 99 internal packages implementing the pipeline.
+  Phase-1 modularization leaf packages: `go/internal/gitexec`
+  (git-CLI isolation leaf, depends only on `go/internal/sysexec`),
+  `go/internal/log` (unified Console logger), and `go/internal/envchain`
+  (typed env knobs). `go/internal/research` holds the KB package
+  (`NewFileKB`, `EVOLVE_KB_SEARCH_PATHS`).
+- `go/test/fixtures/` — shared test fixtures, including the `StressN`
+  concurrency stress-barrier helper.
+
+See `go/README.md` for Go package layout and conventions.
+
+### `go/acs/`
+
+EGPS acceptance-criteria predicate tests, organized by cycle. Subdirectories:
+`go/acs/cycle<N>/` (per-cycle predicates authored by TDD-Engineer),
+`go/acs/regression/cycle<N>/` (promoted permanent regression predicates),
+and `go/acs/redteam/` (adversarial predicates). The harness that runs them is
+`go/internal/acssuite`. See `go/acs/README.md` for predicate scopes and
+quality rules.
+
 ### `agents/`
 
 Agent persona files (`evolve-<role>.md`) and reference files
 (`evolve-<role>-reference.md`). Each file is the system prompt for a
 specific pipeline role. See `agents/AGENTS.md` for authoring conventions.
 
-### `acs/`
+### `adapters/`
 
-Acceptance criteria predicate scripts, organized by cycle and regression suite.
-`acs/cycle-N/` holds predicates authored by TDD-Engineer for cycle N.
-`acs/regression-suite/` holds promoted permanent regression predicates.
-See `acs/AGENTS.md` for predicate quality rules.
+CLI/model adapter definitions and capability metadata for the LLM drivers
+the loop can dispatch to (claude, codex, gemini, …).
 
-### `legacy/scripts/`
+### `commit-gate/`
 
-All pipeline shell scripts. Subdirectories by function:
-`dispatch/` (subagent spawning), `lifecycle/` (phase transitions),
-`guards/` (kernel hooks), `failure/` (failure adaptation),
-`observability/` (ledger/metrics), `verification/` (eval quality gates),
-`research/` (KB search), `utility/` (shared helpers).
-See `legacy/scripts/AGENTS.md` for bash 3.2 compliance rules.
+Ship-gate assets: attestation schema and the commit-gate runner support
+used by the sanctioned `evolve ship` path.
+
+### `schemas/`
+
+JSON schemas for the loop's structured artifacts and contracts.
+
+### `examples/`
+
+Example configurations and sample inputs for the loop.
+
+### `knowledge/`
+
+Curated knowledge assets (distinct from `knowledge-base/`, which holds
+gitignore-scoped archival dossiers).
 
 ### `skills/`
 
 Claude Code plugin skills. Each skill lives at `skills/<name>/SKILL.md` with
-optional `legacy/scripts/`, `references/`, and `assets/` subdirectories.
+optional `scripts/`, `references/`, and `assets/` subdirectories.
 `.agents/skills/<name>/` entries are symlinks to `../../skills/<name>/`
 for cross-CLI auto-discovery. Git tracks content at the canonical path.
 
@@ -48,7 +83,8 @@ and agent-context-eligible. Never delete — archive to `knowledge-base/`.
 
 Long-form archival dossiers excluded from agent context by `.gitignore` scope.
 Subdirectories: `knowledge-base/research/` (deep research), `knowledge-base/research/archived-YYYY-MM-DD/`
-(superseded docs). Use `legacy/scripts/research/kb-search.sh` to query.
+(superseded docs). The loop queries it via the `go/internal/research` KB
+package (`NewFileKB`, roots from `EVOLVE_KB_SEARCH_PATHS`).
 
 ### `.evolve/`
 
@@ -71,15 +107,17 @@ Defines the `/evolve-loop` skill entry point, permissions, and plugin metadata.
 
 ### `bin/`
 
-User-facing CLI entry points and capability-check scripts (`check-caps`).
-Thin wrappers that delegate to `legacy/scripts/dispatch/`.
+Standalone operator helper scripts: capability checks (`check-caps`) and
+read-only status/observability wrappers (`status`, `health`, `cost`,
+`preflight`, `verify-chain`). These are convenience entry points, separate
+from the `evolve` CLI in `go/cmd/evolve/`.
 
 ### `tests/`
 
 Integration and trust-kernel test scripts. One-off test scripts written by
 Builder for a specific cycle live here until cleaned up. Not the same as
-`acs/` — `tests/` is for infrastructure validation, `acs/` is for behavioral
-acceptance criteria.
+`go/acs/` — `tests/` is for infrastructure validation, `go/acs/` is for
+behavioral acceptance criteria.
 
 ## Key files at repo root
 

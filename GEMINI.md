@@ -15,7 +15,7 @@ To invoke the primary skill: `/evolve-loop` (registered via the plugin's slash-c
 `.claude-plugin/plugin.json:compatibility.tiers` declares `gemini-cli: tier-1-hybrid`:
 
 - **Skill content** is portable. The same SKILL.md works in Gemini CLI and Claude Code.
-- **Runtime execution** delegates to the `claude` binary via `legacy/scripts/cli_adapters/gemini.sh`. Gemini CLI lacks non-interactive prompt mode (`gemini -p`), `--max-budget-usd`, and subagent dispatch primitives that the kernel hooks require for structural enforcement. The hybrid adapter routes runtime work to `claude -p` while Gemini hosts the skill activation.
+- **Runtime execution** runs through the native Go binary (`go/bin/evolve`). In HYBRID mode Gemini routes runtime work to the `claude` binary while Gemini hosts the skill activation (per AGENTS.md). Gemini CLI lacks the non-interactive prompt mode (`gemini -p`) and subagent dispatch primitives the kernel hooks require for structural enforcement, so the runtime path delegates to `claude` rather than running natively. The shell shim lives at `adapters/gemini.sh`.
 
 You need `claude` installed and authenticated for the runtime path. If only `gemini` is available, only skill text is usable — no autonomous cycle execution.
 
@@ -37,14 +37,14 @@ Full table: [skills/loop/reference/gemini-tools.md](skills/loop/reference/gemini
 
 ## Invariants (apply to Gemini context too)
 
-The 8 cross-CLI invariants and 12 Core Agent Rules in [AGENTS.md](AGENTS.md) apply unchanged. Most-relevant for Gemini operators:
+The 9 cross-CLI invariants and 12 Core Agent Rules in [AGENTS.md](AGENTS.md) apply unchanged. Most-relevant for Gemini operators:
 
 - Pipeline ordering: Scout → Builder → Auditor → Ship
-- Subagents via `subagent-run.sh`, never `activate_skill`-as-subagent
-- Commits via `legacy/scripts/lifecycle/ship.sh`, never bare git
+- Subagents via the native bridge (`evolve subagent run <agent> <cycle> <workspace>`), never `activate_skill`-as-subagent
+- Commits via `evolve ship`, never bare git
 - Builder writes inside its worktree only
 - EGPS v10.0+: `acs-verdict.json:red_count == 0` gates ship
-- Ledger tamper-evidence (v8.37.0+) — `verify-ledger-chain.sh` works identically
+- Ledger tamper-evidence (v8.37.0+) — `evolve ledger verify` / `evolve guard chain` works identically
 
 ## Session conventions (Gemini-specific notes)
 

@@ -1,6 +1,8 @@
 # Migration: bash → Go (v11.0.0 cutover)
 
-> **Status:** v11.0.0 introduces the Go binary as the **primary** runtime entrypoint. The bash scripts under `legacy/scripts/` continue to work and remain on disk. Set `EVOLVE_USE_LEGACY_BASH=1` to opt back into the bash-first dispatch.
+> **⚠️ HISTORICAL — documents the v11.0.0 transitional state, when bash and Go coexisted.** The bash trees (`scripts/`, `legacy/scripts/`) and the `EVOLVE_USE_LEGACY_BASH` rollback hatch were **subsequently removed entirely** in the Go-only consolidation. On current `main` the `evolve` Go binary is the *sole* runtime — there is no bash fallback, and the `EVOLVE_USE_LEGACY_BASH` / `legacy/scripts/` instructions below **no longer apply**. This page is retained only for the port history that [README.md](../README.md) and [AGENTS.md](../AGENTS.md) point to.
+
+> **Status (as of v11.0.0):** v11.0.0 introduced the Go binary as the **primary** runtime entrypoint. The bash scripts under `legacy/scripts/` continued to work and remained on disk. `EVOLVE_USE_LEGACY_BASH=1` opted back into the bash-first dispatch.
 >
 > **Audience:** Operators upgrading from v10.x. New users should read [README.md](../README.md) first.
 

@@ -70,11 +70,11 @@ Behavioral rules every agent must follow regardless of CLI. Where the kernel hoo
 
 This file covers the universal contract. CLI-specific runtime details live in companion files:
 
-- **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. Skills at `skills/<name>/SKILL.md`, plugin manifest at `.claude-plugin/plugin.json`. Slash commands at `.claude-plugin/commands/`. Kernel hooks fire as PreToolUse hooks per `.claude/settings.json`.
+- **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. Skills at `skills/<name>/SKILL.md` are the only invocation/slash-command surface (per ADR-0040; they carry `argument-hint`), with the plugin manifest at `.claude-plugin/plugin.json` declaring only `agents` and `skills` (no `commands[]` array). Kernel hooks fire as PreToolUse hooks per `.claude/settings.json`.
 
 - **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Driven by the native codex bridge driver (`go/internal/bridge/driver_codex*.go`): NATIVE when `codex` is on PATH and supports non-interactive prompts, HYBRID (delegates to `claude`) otherwise, DEGRADED as a last resort (pipeline still completes; reduced isolation). Capability tier visible via `evolve bridge probe`.
 
-- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. Driven by the native gemini bridge driver (`go/internal/bridge/driver_gemini*.go`): NATIVE when `gemini` is on PATH, HYBRID (delegates to the `claude` binary) otherwise.
+- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. `gemini` is a distinct CLI identity with its own adapter metadata (`adapters/gemini.sh`, `gemini.capabilities.json`); there is **no** dedicated `driver_gemini*.go` bridge driver. A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`, documented in-code as "Gemini-backed"), but `gemini` and `agy`/`antigravity` are separate CLI identities — only `antigravity → agy` is name-resolved (see the Antigravity bullet below).
 
 - **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. Driven by the native agy bridge driver (`go/internal/bridge/driver_agy*.go`): NATIVE mode (`agy -p`) when the agy binary is on PATH; HYBRID when claude on PATH; DEGRADED otherwise. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
 

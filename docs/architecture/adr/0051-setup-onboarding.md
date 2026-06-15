@@ -1,4 +1,6 @@
-# ADR-0027: Setup onboarding — `evolve setup` + `/setup`
+# ADR-0051: Setup onboarding — `evolve setup` + `/setup`
+
+> **Renumbered from 0027** (2026-06-15): ADR number 0027 had been dual-assigned to both this ADR and [ADR-0027 commit-as-evidence](./0027-commit-as-evidence.md). This onboarding ADR is renumbered to 0051 (the next free slot) so each number maps to exactly one decision; commit-as-evidence keeps 0027. Inbound references were repointed accordingly.
 
 > Status: **Accepted** (2026-05-27). Adds a first-launch onboarding flow: detect available LLM CLIs/subscriptions, propose + validate a per-phase model config, and explain the pipeline. Builds on `bridge.Doctor` (ADR-era doctor), `resolvellm` (ADR-0001), profile envelopes (`dynamic-model-routing.md`), and the routing engine's "model proposes, kernel disposes" pattern ([[dynamic-phase-routing]], ADR-0024).
 
