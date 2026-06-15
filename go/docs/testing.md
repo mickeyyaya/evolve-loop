@@ -80,6 +80,11 @@ load-bearing pieces:
   the pure-bool existence check for genuine skip preconditions (do **not** use
   `acsassert.FileExists`, which logs an `Errorf`, as a skip guard).
 - **`NewLedgerEntry(opts...)`** — Object-Mother for valid `core.LedgerEntry`s.
+- **`StressN(t, n, k, fn)`** — concurrency-stress harness: launch `n` goroutines
+  × `k` iterations of `fn(g, i)`, released simultaneously by a closed-channel
+  barrier (so contention is maximized, not accidentally serialized by staggered
+  startup), joined before return. Pair it with an invariant assertion under
+  `-race`; it is the canonical primitive for the mutex/flock stress backfill.
 
 **Import-cycle note:** `fixtures` imports `core`, so a white-box `package core`
 test cannot import it (cycle). Such tests use `package core_test` (black-box) —
@@ -236,6 +241,14 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
 5. **Skip, don't fail, on missing environment.** Tier tests that need git or
    on-disk fixtures `t.Skip` when the environment is absent (e.g. a source
    tarball with no git) rather than failing on a machine-specific path.
+6. **Concurrency tests assert an invariant, not "didn't crash."** Use
+   `fixtures.StressN(t, n, k, fn)` (closed-channel barrier — maximizes real
+   overlap) and assert the protected invariant holds *after* the storm: the
+   ledger hash-chain still verifies, a quota never overspends, a sidecar writer
+   emits no torn lines. Name them `Test<Unit>_Concurrent<Action>_NoRace<Invariant>`
+   (e.g. `TestLedger_ConcurrentAppend_NoRaceChainIntact`) and run under `-race`.
+   Every `sync.Mutex`/`RWMutex`/flock owner should have one — the Phase-2
+   `TestEveryMutexHasStressTest` guard enforces it.
 
 ## G3 — Invariant → test → knowledge-doc map
 
