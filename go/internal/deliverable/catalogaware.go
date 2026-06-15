@@ -27,6 +27,16 @@ import (
 // to built-in-only resolution WITH a stderr WARN — built-in phases always
 // verify, a catalog glitch never hard-fails the check, but a degrade on the
 // reconcile path can flip a user phase's outcome and must be visible.
+//
+// PhaseIO (ADR-0050 §3.8): this reconcile-on-timeout rung is deliberately left
+// at StageOff (VerifyWith, not VerifyWithStage). The host gate and the salvage
+// rung ARE threaded with cfg.PhaseIO (NewReviewerWithCatalogStage /
+// NewVerifierWithCatalogStage); this third path is not, so at PhaseIO=enforce a
+// build/scout/triage FAIL-without-block artifact reconciled on a timeout race
+// passes here but is still BLOCKED by the downstream host gate (an extra
+// correction round-trip, never a silent pass). Byte-identical at off/shadow/
+// advisory (the enforce-gated clause never fires). TODO(3.10): thread the stage
+// here when the default flips to enforce — 3.10 already wires cfg.PhaseIO broadly.
 func VerifyCatalogAware(phase string, roots phasecontract.Roots) (Result, error) {
 	if roots.EvolveDir == "" {
 		return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})

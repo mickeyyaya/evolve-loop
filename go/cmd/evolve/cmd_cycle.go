@@ -339,6 +339,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Make the bridge catalog-aware so user/minted phases get their spec-derived
 	// Deliverable Contract block + exact-path footer injected (WS-A, ADR-0034).
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
+	// ADR-0050 §3.8b: at EVOLVE_PHASE_IO>=advisory the injected contract block
+	// instructs build/scout/triage to self-report failure via a structured
+	// sentinel; default (off) leaves the dispatched prompt byte-identical.
+	br.SetPhaseIOStage(cfg.PhaseIO)
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
@@ -435,7 +439,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// Catalog-aware so user/minted phases get spec-derived contracts (WS-A):
 		// the host gate enforces the SAME well-formedness the agent's
 		// `evolve phase verify` self-check derives from the phase.json.
-		reviewers = append(reviewers, deliverable.NewReviewerWithCatalog(cfg.ContractGate, catalog))
+		reviewers = append(reviewers, deliverable.NewReviewerWithCatalogStage(cfg.ContractGate, catalog, cfg.PhaseIO))
 	}
 	if cfg.TriageCapGate != config.StageOff {
 		// R9.2 triage capacity clamp (internal/triagecap): committed coverage
@@ -454,7 +458,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// rung and the gate can never disagree about "well-formed". Wired at
 		// every contract-gate stage (shadow needs it for would-salvage soak
 		// telemetry); execution stays gated on EVOLVE_PHASE_RECOVERY=enforce.
-		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalog(catalog)))
+		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(catalog, cfg.PhaseIO)))
 	}
 	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
 	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.

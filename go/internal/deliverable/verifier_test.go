@@ -46,7 +46,7 @@ func TestLadder_RungRechecksAreBreakerNeutral(t *testing.T) {
 	}
 
 	// Control: the GATE on the same input does count.
-	r := newReviewer(config.StageEnforce, phasecontract.BuiltinResolver{})
+	r := newReviewer(config.StageEnforce, phasecontract.BuiltinResolver{}, config.StageOff)
 	r.breakerPath = breaker
 	if rr := r.Review(context.Background(), in); rr.Approve {
 		t.Fatal("control: enforce gate must block the missing artifact")

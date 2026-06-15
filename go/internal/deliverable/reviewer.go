@@ -34,6 +34,7 @@ const defaultBreakerThreshold = 3
 // override breakerPath/threshold/logf directly.
 type Reviewer struct {
 	stage       config.Stage
+	phaseIO     config.Stage // EVOLVE_PHASE_IO rollout stage; gates the RequireFailureContextPhaseIO check (ADR-0050 §3.8). Default StageOff → byte-identical.
 	threshold   int
 	breakerPath string // override for the consecutive-block counter file (tests); "" → derive under .evolve
 	logf        func(format string, args ...any)
@@ -47,20 +48,31 @@ const breakerFile = "contract-gate-breaker.json"
 // contracts. Callers wire it via core.WithReviewer (chained after evalgate)
 // only when stage != StageOff.
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
-	return newReviewer(stage, phasecontract.BuiltinResolver{})
+	return newReviewer(stage, phasecontract.BuiltinResolver{}, config.StageOff)
 }
 
 // NewReviewerWithCatalog builds the contract gate resolving built-in contracts
 // first and falling back to spec-derived contracts (FromSpec) for the catalog's
-// user/minted phases. This is what gives a config-only phase host-side
-// well-formedness enforcement with no Go change.
+// user/minted phases. PhaseIO defaults to StageOff (byte-identical); production
+// wires the real dial via NewReviewerWithCatalogStage.
 func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog) core.DeliverableReviewer {
-	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get))
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), config.StageOff)
 }
 
-func newReviewer(stage config.Stage, resolver phasecontract.Resolver) *Reviewer {
+// NewReviewerWithCatalogStage is NewReviewerWithCatalog threaded with the
+// EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.8). The stage gates only the
+// additive RequireFailureContextPhaseIO check for build/scout/triage (blocks at
+// StageEnforce, and only when the ContractGate stage is also enforce); every
+// other gate behavior is unchanged, so passing StageOff equals the legacy
+// constructor.
+func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phaseIO config.Stage) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
+}
+
+func newReviewer(stage config.Stage, resolver phasecontract.Resolver, phaseIO config.Stage) *Reviewer {
 	return &Reviewer{
 		stage:     stage,
+		phaseIO:   phaseIO,
 		threshold: defaultBreakerThreshold,
 		logf:      func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 		resolver:  resolver,
@@ -76,7 +88,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	// r.resolver is always set by newReviewer (the single construction point):
 	// BuiltinResolver for NewReviewer, a CatalogResolver for
 	// NewReviewerWithCatalog. No nil guard needed.
-	res, err := VerifyWith(in.Phase, roots, r.resolver)
+	res, err := VerifyWithStage(in.Phase, roots, r.resolver, r.phaseIO)
 	if err != nil {
 		// Ambiguity / infra — fail OPEN (never brick the loop on the gate's own
 		// inability to decide). Does not touch the breaker.

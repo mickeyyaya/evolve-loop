@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -22,6 +23,7 @@ import (
 // Verifier is the stateless breaker-neutral re-checker.
 type Verifier struct {
 	resolver phasecontract.Resolver
+	phaseIO  config.Stage // EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.8); default StageOff → byte-identical to pre-3.8.
 }
 
 // NewVerifier resolves built-in contracts only.
@@ -32,8 +34,18 @@ func NewVerifier() core.ContractVerifier {
 // NewVerifierWithCatalog falls back to spec-derived contracts for user/minted
 // phases — the same resolution the catalog-aware Reviewer uses, so the rung
 // re-check and the gate can never disagree about what "well-formed" means.
+// PhaseIO defaults to StageOff; production wires the dial via
+// NewVerifierWithCatalogStage.
 func NewVerifierWithCatalog(cat phasespec.Catalog) core.ContractVerifier {
 	return &Verifier{resolver: phasecontract.NewCatalogResolver(cat.Get)}
+}
+
+// NewVerifierWithCatalogStage threads the EVOLVE_PHASE_IO rollout stage so the
+// ladder re-check applies the same RequireFailureContextPhaseIO gating the host
+// gate does — the rung re-check and the gate must never disagree about what
+// "well-formed" means.
+func NewVerifierWithCatalogStage(cat phasespec.Catalog, phaseIO config.Stage) core.ContractVerifier {
+	return &Verifier{resolver: phasecontract.NewCatalogResolver(cat.Get), phaseIO: phaseIO}
 }
 
 // rootsFor maps a core.ReviewInput onto the contract roots — the ONE
@@ -47,11 +59,13 @@ func rootsFor(in core.ReviewInput) phasecontract.Roots {
 	}
 }
 
-// VerifyDeliverable implements core.ContractVerifier: VerifyWith only, no
-// breaker, no stage logic. The error keeps deliverable.Verify's fail-open
-// contract (ambiguity ⇒ error ⇒ the ladder skips the rung, never acts blind).
+// VerifyDeliverable implements core.ContractVerifier: VerifyWithStage only, no
+// breaker. It threads the verifier's PhaseIO stage so the rung re-check matches
+// the host gate (default StageOff = the pre-3.8 VerifyWith). The error keeps
+// deliverable.Verify's fail-open contract (ambiguity ⇒ error ⇒ the ladder skips
+// the rung, never acts blind).
 func (v *Verifier) VerifyDeliverable(_ context.Context, in core.ReviewInput) (core.ContractVerification, error) {
-	res, err := VerifyWith(in.Phase, rootsFor(in), v.resolver)
+	res, err := VerifyWithStage(in.Phase, rootsFor(in), v.resolver, v.phaseIO)
 	if err != nil {
 		return core.ContractVerification{}, err
 	}

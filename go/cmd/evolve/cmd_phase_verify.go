@@ -5,8 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
@@ -63,7 +66,7 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	}
 
 	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
-	res, err := deliverable.VerifyWith(phase, roots, resolver)
+	res, err := deliverable.VerifyWithStage(phase, roots, resolver, phaseVerifyPhaseIO())
 	if err != nil {
 		// Ambiguity/infra — fail OPEN at the call site.
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
@@ -85,6 +88,17 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return 1
+}
+
+// phaseVerifyPhaseIO resolves the EVOLVE_PHASE_IO rollout stage the SAME way the
+// host gate does (config.Load over the phase registry + env), so the agent's
+// self-check and the gate apply identical PhaseIO-gated checks — the package's
+// no-drift invariant (ADR-0050 §3.8). A registry that cannot be read degrades to
+// env + code defaults, never a hard failure.
+func phaseVerifyPhaseIO() config.Stage {
+	registryPath := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), "docs", "architecture", "phase-registry.json")
+	cfg, _ := config.Load(registryPath, filterEvolveEnv(os.Environ()))
+	return cfg.PhaseIO
 }
 
 // phaseVerifyResolver builds a contract resolver from the merged phase catalog

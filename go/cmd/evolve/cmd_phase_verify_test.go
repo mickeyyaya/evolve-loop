@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Layer 3 CLI: `evolve phase verify` — the agent-callable self-check. Same
@@ -102,6 +104,41 @@ func TestPhaseVerify_Advisor_EvolveDirDefault(t *testing.T) {
 	if code != 0 {
 		t.Errorf("exit=%d want 0; stderr=%s", code, errb)
 	}
+}
+
+// TestPhaseVerify_FailureContextPhaseIO_RespectsStage — Phase 3.8 (ADR-0050):
+// the self-check runs the SAME PhaseIO-gated logic the host gate does (the
+// package's no-drift invariant). A build report that self-reports FAIL without a
+// structured failure block is a confirmed violation (exit 1) at
+// EVOLVE_PHASE_IO=enforce, and dormant (exit 0) at the default (off).
+func TestPhaseVerify_FailureContextPhaseIO_RespectsStage(t *testing.T) {
+	failNoBlock := "## Changes\n- x\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
+
+	t.Run("default-off-dormant", func(t *testing.T) {
+		ws := t.TempDir()
+		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, _, errb := runVerify(t, "build", "--workspace="+ws)
+		if code != 0 {
+			t.Fatalf("default (off): failure-context check must be dormant, want exit 0, got %d; stderr=%s", code, errb)
+		}
+	})
+
+	t.Run("enforce-blocks", func(t *testing.T) {
+		t.Setenv("EVOLVE_PHASE_IO", "enforce")
+		ws := t.TempDir()
+		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, _, errb := runVerify(t, "build", "--workspace="+ws)
+		if code != 1 {
+			t.Fatalf("EVOLVE_PHASE_IO=enforce: want exit 1 (failure_context_missing), got %d; stderr=%s", code, errb)
+		}
+		if !strings.Contains(errb, "failure") {
+			t.Errorf("stderr should name the failure-context correction; got %q", errb)
+		}
+	})
 }
 
 // TestPhaseVerify_StrayInWorktree_Exit1 — test-plan P0 #4: an artifact

@@ -28,6 +28,43 @@ func newTestReviewer(stage config.Stage, breakerPath string, threshold int) *Rev
 	return r
 }
 
+func newTestReviewerPhaseIO(stage, phaseIO config.Stage, breakerPath string, threshold int) *Reviewer {
+	r := newTestReviewer(stage, breakerPath, threshold)
+	r.phaseIO = phaseIO
+	return r
+}
+
+// Phase 3.8 (ADR-0050): the generalized failure-context check blocks at the
+// gate ONLY when BOTH ContractGate==enforce AND PhaseIO==enforce. A build report
+// that self-reports FAIL without a structured failure block is blocked there,
+// and approved (dormant) at every lower PhaseIO stage even while ContractGate
+// enforces — so the rollout cannot false-block before the cutover.
+func TestReviewer_FailureContextPhaseIO_BlocksOnlyAtBothEnforce(t *testing.T) {
+	report := failReport("build", "## Changes", false)
+	for _, tc := range []struct {
+		phaseIO   config.Stage
+		wantBlock bool
+	}{
+		{config.StageOff, false},
+		{config.StageShadow, false},
+		{config.StageAdvisory, false},
+		{config.StageEnforce, true},
+	} {
+		t.Run(tc.phaseIO.String(), func(t *testing.T) {
+			ws := t.TempDir()
+			writeFile(t, ws, "build-report.md", report)
+			r := newTestReviewerPhaseIO(config.StageEnforce, tc.phaseIO, filepath.Join(t.TempDir(), "b.json"), 3)
+			got := r.Review(context.Background(), reviewInput("build", ws, t.TempDir()))
+			if tc.wantBlock && got.Approve {
+				t.Fatalf("PhaseIO=%s, ContractGate=enforce: want BLOCK, got approve", tc.phaseIO)
+			}
+			if !tc.wantBlock && !got.Approve {
+				t.Fatalf("PhaseIO=%s: failure-context check must be dormant, want approve, got block (%s)", tc.phaseIO, got.Reason)
+			}
+		})
+	}
+}
+
 func TestReviewer_Off_ApprovesEverything(t *testing.T) {
 	// Even a missing artifact is approved when the gate is off.
 	r := newTestReviewer(config.StageOff, filepath.Join(t.TempDir(), "b.json"), 3)
