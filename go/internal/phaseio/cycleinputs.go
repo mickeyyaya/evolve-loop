@@ -8,13 +8,15 @@ type CycleInputsInit struct {
 	FleetScope      string
 	ChallengeToken  string
 	PreviousVerdict string
+	Carryover       string
 }
 
 // CycleInputs is the sealed, getters-only view of the cycle-scoped inputs a
-// phase needs (goal/strategy/commit-message/fleet-scope/challenge-token). It
-// replaces the ad-hoc, mutable req.Context["goal"]/["strategy"]/… string map:
-// values are set once at construction and exposed read-only, so no phase can
-// mutate what a sibling observes (P4/P5). The zero value is valid and empty.
+// phase needs (goal/strategy/commit-message/fleet-scope/challenge-token/
+// carryover). It replaces the ad-hoc, mutable req.Context["goal"]/["strategy"]/…
+// string map: values are set once at construction and exposed read-only, so no
+// phase can mutate what a sibling observes (P4/P5). The zero value is valid and
+// empty.
 type CycleInputs struct {
 	goal            string
 	strategy        string
@@ -22,6 +24,7 @@ type CycleInputs struct {
 	fleetScope      string
 	challengeToken  string
 	previousVerdict string
+	carryover       string
 }
 
 // NewCycleInputs builds a sealed CycleInputs from init.
@@ -33,6 +36,7 @@ func NewCycleInputs(init CycleInputsInit) CycleInputs {
 		fleetScope:      init.FleetScope,
 		challengeToken:  init.ChallengeToken,
 		previousVerdict: init.PreviousVerdict,
+		carryover:       init.Carryover,
 	}
 }
 
@@ -56,3 +60,8 @@ func (c CycleInputs) ChallengeToken() string { return c.challengeToken }
 // PreviousVerdict returns the prior phase's verdict, set for the retro phase
 // (formerly req.Context["previous_verdict"]). Empty for non-retro phases.
 func (c CycleInputs) PreviousVerdict() string { return c.previousVerdict }
+
+// Carryover returns the carried-over backlog summary the triage phase reads
+// (formerly req.Context["carryover_summary"] — note the legacy Context key is
+// carryover_summary, not carryover). Empty when there is no carryover.
+func (c CycleInputs) Carryover() string { return c.carryover }

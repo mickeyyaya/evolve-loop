@@ -102,8 +102,9 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 
 // assembleCycleInputs builds the typed CycleInputs from the legacy per-phase
 // Context map (ctxSnap/phaseCtx), reading the SAME keys the phases read today
-// (ADR-0050 Phase 3.5). Note challengeToken is camelCase (the live Context key),
-// not the snake_case wire-JSON field name.
+// (ADR-0050 Phase 3.5/3.6). Note challengeToken is camelCase (the live Context
+// key), not the snake_case wire-JSON field name; carryover reads the legacy
+// carryover_summary key (triage), not carryover.
 func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
 	return phaseio.NewCycleInputs(phaseio.CycleInputsInit{
 		Goal:            ctx["goal"],
@@ -112,6 +113,7 @@ func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
 		FleetScope:      ctx["fleet_scope"],
 		ChallengeToken:  ctx["challengeToken"],
 		PreviousVerdict: ctx["previous_verdict"],
+		Carryover:       ctx["carryover_summary"],
 	})
 }
 
@@ -144,6 +146,7 @@ func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, 
 	add("cycle_inputs.fleet_scope", ctx["fleet_scope"], ci.FleetScope())
 	add("cycle_inputs.challenge_token", ctx["challengeToken"], ci.ChallengeToken())
 	add("cycle_inputs.previous_verdict", ctx["previous_verdict"], ci.PreviousVerdict())
+	add("cycle_inputs.carryover", ctx["carryover_summary"], ci.Carryover())
 
 	var gotCode, gotClass, gotStage, gotDebug string
 	if ec != nil {
