@@ -1,12 +1,13 @@
 package swarm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // WorkerProvisioner creates and removes the per-worker git worktrees + the
@@ -43,6 +44,31 @@ type gitWorkerProvisioner struct {
 	// the swarm package does not import core; cmd wiring supplies core's
 	// equivalent. Nil = skip (tests / non-hooked environments).
 	LinkGuardDeps func(worktree, projectRoot string)
+
+	// newGit builds the gitexec.Git for a given -C dir. Nil => production
+	// gitexec.Default. Injected by tests to fake every git call. A factory (not a
+	// single Git) because one provision op spans two dirs: the worktree's own dir
+	// for the reuse rev-parse probe, the project root for worktree add/remove.
+	newGit func(dir string) gitexec.Git
+}
+
+// git returns the gitexec.Git rooted at dir, defaulting to the production
+// runner when newGit is unset.
+func (g gitWorkerProvisioner) git(dir string) gitexec.Git {
+	if g.newGit != nil {
+		return g.newGit(dir)
+	}
+	return gitexec.Default(dir)
+}
+
+// gitFailReason renders a one-line failure reason from a gitexec.Capture result
+// known to be a failure (err != nil || code != 0): the unrecoverable error if
+// present, else the non-zero exit code. Shared by provision + mergetrain.
+func gitFailReason(code int, err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("exit %d", code)
 }
 
 // NewGitWorkerProvisioner returns the production provisioner. linkGuardDeps may
@@ -97,19 +123,16 @@ func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, bran
 	// a rev-parse to reject a corrupt/orphaned .git entry.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		_, gitEntryErr := os.Stat(filepath.Join(wt, ".git"))
-		if gitEntryErr == nil && exec.CommandContext(ctx, "git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
+		if gitEntryErr == nil && g.git(wt).Run(ctx, "rev-parse", "--git-dir") == nil {
 			g.link(wt, projectRoot)
 			return wt, nil
 		}
-		_ = exec.CommandContext(ctx, "git", "-C", projectRoot, "worktree", "remove", "--force", wt).Run()
+		_ = g.git(projectRoot).Run(ctx, "worktree", "remove", "--force", wt)
 		_ = os.RemoveAll(wt)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "-C", projectRoot, "worktree", "add", "-B", branch, wt, base)
-	var eb bytes.Buffer
-	cmd.Stderr = &eb
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git worktree add -B %s %s %s: %v: %s", branch, wt, base, err, eb.String())
+	if _, stderr, code, err := g.git(projectRoot).Capture(ctx, "worktree", "add", "-B", branch, wt, base); err != nil || code != 0 {
+		return "", fmt.Errorf("git worktree add -B %s %s %s: %s: %s", branch, wt, base, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	g.link(wt, projectRoot)
 	return wt, nil
@@ -125,12 +148,9 @@ func (g gitWorkerProvisioner) Cleanup(ctx context.Context, projectRoot, worktree
 	if worktree == "" {
 		return nil
 	}
-	var eb bytes.Buffer
-	cmd := exec.CommandContext(ctx, "git", "-C", projectRoot, "worktree", "remove", "--force", worktree)
-	cmd.Stderr = &eb
-	if err := cmd.Run(); err != nil {
+	if _, stderr, code, err := g.git(projectRoot).Capture(ctx, "worktree", "remove", "--force", worktree); err != nil || code != 0 {
 		// Best-effort but surfaced: a failed remove leaves an orphan worktree.
-		fmt.Fprintf(os.Stderr, "[swarm] WARN worktree remove %s failed: %v: %s\n", worktree, err, eb.String())
+		fmt.Fprintf(os.Stderr, "[swarm] WARN worktree remove %s failed: %s: %s\n", worktree, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	_ = os.RemoveAll(worktree)
 	return nil

@@ -19,16 +19,17 @@ package cycleclassify
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -334,16 +335,25 @@ func shippedAfterVerdict(reportData []byte) bool {
 	return false
 }
 
-// gitLogFn is a test seam — production runs `git -C . log --grep="cycle N" main`
-// and reports whether any matching commit exists. Tests substitute a
-// stub to drive the branch without spinning up a fixture repo.
+// gitLogFn is a test seam — production runs `git log --grep="cycle N"
+// --format=%H main` in the caller's cwd and reports whether any matching commit
+// exists. Tests substitute a stub to drive the branch without spinning up a
+// fixture repo. The default delegates to gitLogMatchesCycle, which is
+// unit-testable via the gitexec seam (see classify_git_test.go).
 var gitLogFn = func(cycleNum string) bool {
-	cmd := exec.Command("git", "log", "--grep=cycle "+cycleNum, "--format=%H", "main")
-	out, err := cmd.Output()
+	return gitLogMatchesCycle(context.Background(), gitexec.Default(""), cycleNum)
+}
+
+// gitLogMatchesCycle reports whether any commit on main matches "cycle N",
+// running git through the injectable gitexec seam. Any non-zero exit or error
+// (e.g. not a git repo) yields false — matching the original .Output() form,
+// which returned false on err.
+func gitLogMatchesCycle(ctx context.Context, g gitexec.Git, cycleNum string) bool {
+	out, err := g.Output(ctx, "log", "--grep=cycle "+cycleNum, "--format=%H", "main")
 	if err != nil {
 		return false
 	}
-	return len(bytes.TrimSpace(out)) > 0
+	return out != ""
 }
 
 // globFn is a test seam for the filepath.Glob error branch. A literal
