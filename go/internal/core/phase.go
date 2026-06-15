@@ -125,6 +125,13 @@ type PhaseRequest struct {
 	PreviousPhase string            `json:"previous_phase,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
 
+	// BuildPlan is the build phase's upstream build-plan.md body, served via the
+	// typed envelope instead of an ad-hoc disk read inside the phase (ADR-0050
+	// Phase 3.7). Populated once at the dispatch seam, and only at
+	// EVOLVE_PHASE_IO>=advisory with the planner enabled; empty at off/shadow so
+	// the build phase reads disk exactly as before (byte-identical dispatch).
+	BuildPlan string `json:"build_plan,omitempty"`
+
 	// CorrectionDirective is set by the orchestrator's contract-correction loop
 	// on a re-dispatch after a deliverable reject; the runner copies it into the
 	// BridgeRequest. Empty on the first dispatch.
