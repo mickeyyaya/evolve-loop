@@ -27,24 +27,28 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 
 	if done["scout"] {
 		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
+			raw = unwrapPayload(raw)
 			sig.Scout = extractScout(raw)
 			sig.foldGeneric("scout", raw)
 		}
 	}
 	if done["triage"] {
 		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
+			raw = unwrapPayload(raw)
 			sig.Triage = extractTriage(raw)
 			sig.foldGeneric("triage", raw)
 		}
 	}
 	if done["build"] {
 		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
+			raw = unwrapPayload(raw)
 			sig.Build = extractBuild(raw)
 			sig.foldGeneric("build", raw)
 		}
 	}
 	if done["audit"] {
 		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-audit.json", "handoff-auditor.json"); ok {
+			raw = unwrapPayload(raw)
 			sig.Audit = extractAudit(raw)
 			sig.foldGeneric("audit", raw)
 		}
@@ -56,6 +60,30 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
+}
+
+// unwrapPayload returns the inner `payload` object bytes of the canonical
+// ADR-0050 Phase-3 envelope (schema_version 2: a wrapper carrying the exact
+// per-phase payload bytes plus promoted top-level verdict/signals/failure), or
+// the input unchanged when there is no payload wrapper — the Postel-compatible
+// flat fallback. This keeps Digest reading byte-identically whether a handoff is
+// written flat (legacy/today) or payload-wrapped (the unified envelope), which
+// is the golden-equivalence invariant the shadow stage relies on.
+//
+// AUTHORITY CONTRACT: the inner payload is the single source of truth. Digest
+// (and foldGeneric) read the UNWRAPPED payload, so the wrapper's promoted
+// top-level signals/verdict/failure are defined to be a COPY of the payload's,
+// never an independent source — a wrapper that carried signals absent from its
+// payload would have them ignored. The envelope writer (Phase 3.4+) must uphold
+// this; TestDigest_PayloadWrapped_FoldsInnerSignals pins the read side.
+func unwrapPayload(raw []byte) []byte {
+	var env struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &env); err == nil && len(env.Payload) > 0 {
+		return env.Payload
+	}
+	return raw
 }
 
 // foldFailureSentinel surfaces a phase's self-reported failure as

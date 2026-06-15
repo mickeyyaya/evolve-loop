@@ -3,6 +3,7 @@ package routingtest
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -109,6 +110,27 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 	if s.auditPresent() {
 		out["handoff-audit.json"] = mustJSON(map[string]interface{}{
 			"verdict": s.AuditVerdict, "confidence": s.AuditConf, "red_count": s.AuditRedCount,
+		})
+	}
+	return out
+}
+
+// WrappedHandoffFiles renders the fixture as the canonical ADR-0050 Phase-3
+// payload-wrapped envelope (schema_version 2): each flat handoff JSON from
+// HandoffFiles becomes the `payload` of an outer wrapper. router.Digest must
+// yield identical RoutingSignals from these as from the flat HandoffFiles — the
+// wrapped/flat equivalence invariant that lets the unified envelope replace the
+// flat one without changing any routing decision.
+func (s SignalSpec) WrappedHandoffFiles() map[string]string {
+	flat := s.HandoffFiles()
+	out := make(map[string]string, len(flat))
+	for name, body := range flat {
+		phase := strings.TrimSuffix(strings.TrimPrefix(name, "handoff-"), ".json")
+		out[name] = mustJSON(map[string]interface{}{
+			"schema_version": 2,
+			"phase":          phase,
+			"payload":        json.RawMessage(body),
+			"signals":        map[string]interface{}{},
 		})
 	}
 	return out
