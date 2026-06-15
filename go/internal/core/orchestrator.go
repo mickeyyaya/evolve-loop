@@ -491,6 +491,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	}
 
 	// Bounded loop guards against any transition-table cycle bug.
+	// Labeled so the extracted sub-methods can signal loop termination
+	// (loopBreak → `break OuterLoop`) from inside the switch ladder below —
+	// a bare `break` there would exit the switch, not the loop (H15).
+OuterLoop:
 	for safety := 0; safety < 32; safety++ {
 		var next Phase
 		// fromSchedule marks an iteration whose `next` came from scheduledNext —
@@ -1212,103 +1216,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			}
 		}
 
-		if err := o.ledger.Append(ctx, LedgerEntry{
-			TS:       o.now().UTC().Format(time.RFC3339),
-			Cycle:    cr.cycle,
-			Role:     string(next),
-			Kind:     "phase",
-			ExitCode: 0,
-		}); err != nil {
-			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
-			// ADR-0044 C1: the phase completed; a persistence failure must
-			// not erase its outcome from the timing/usage record.
-			o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, lerr.Error()))
-			return cr.result, lerr
-		}
-
-		o.emitPhaseBindings(ctx, cr.cycle, req.ProjectRoot, cr.cs, next, resp.Verdict)
-
-		// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
-		// following evolve-builder.md:235) leaves its work in a worktree
-		// commit, but audit + binding inspect `git diff HEAD` (empty after a
-		// commit). Soft-reset the build's commits to the cycle base so the
-		// work is pending again before audit runs (next iteration). No-op for
-		// non-committing builders. See the cycle-156 incident doc.
-		o.normalizeBuildWorktree(ctx, next, cr.cs)
-
-		cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
-		if err := o.storage.WriteCycleState(ctx, cr.cs); err != nil {
-			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-			o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, werr.Error()))
-			return cr.result, werr
-		}
-
-		if PhaseBoundaryCheckpointer != nil {
-			if err := PhaseBoundaryCheckpointer(cr.cs, req.ProjectRoot, o.now()); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase boundary checkpoint failed: %v\n", err)
-			}
-		}
-
-		cr.result.FinalVerdict = resp.Verdict
-		o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, ""))
-		cr.current = next
-		cr.lastVerdict = resp.Verdict
-
-		// Retro is the one phase whose successor isn't verdict-driven;
-		// the failure-adapter consults cycle history (state.FailedAt) and
-		// the retro verdict to pick {ship | tdd | end}. Set scheduledNext
-		// so the next loop iteration runs the chosen phase.
-		if cr.current == PhaseRetro {
-			var branch Phase
-			var extraEnv map[string]string
-			var reason string
-			if o.cfg.Stage >= config.StageAdvisory {
-				// Failure floor Phase 3: the failure branch is advisor-
-				// decidable (clamped) and leaves a routing-decision artifact.
-				cr.routingSeq++
-				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cr.cycle, cr.cs, cr.routingSeq, resp.Verdict, cr.state.FailedAt, router.RouteInput{
-					Cfg:            o.cfg,
-					Completed:      cr.cs.CompletedPhases,
-					Strict:         envchain.BoolValue(cr.envSnap["EVOLVE_STRICT_AUDIT"], false),
-					Workspace:      cr.cs.WorkspacePath,
-					ProjectRoot:    req.ProjectRoot,
-					Cycle:          cr.cycle,
-					Env:            cr.envSnap,
-					Plan:           cr.clampedPlan,
-					IntentRequired: cr.cs.IntentRequired,
-					PSMASEnabled:   envchain.BoolValue(cr.envSnap["EVOLVE_PSMAS_SKIP"], false),
-				})
-			} else {
-				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, cr.state.FailedAt)
-			}
-			for k, v := range extraEnv {
-				cr.envSnap[k] = v
-			}
-			cr.result.RetroDecision = reason
-			if branch == PhaseEnd {
-				break
-			}
-			if !o.sm.CanTransition(PhaseRetro, branch) {
-				return cr.result, fmt.Errorf("retro→%s not allowed by state machine", branch)
-			}
-			cr.scheduledNext = branch
-		}
-
-		// The debugger phase is decision-driven (RESHIP / RERUN_PHASE / BLOCK),
-		// not verdict-driven — mirror the retro branch. The debugger runner
-		// surfaces its decision on PhaseResponse.Signals; decideAfterDebugger
-		// maps it to the next phase, which the next iteration runs via
-		// scheduledNext (bypassing the routing override, like retro).
-		if cr.current == PhaseDebugger {
-			branch := o.decideAfterDebugger(resp)
-			o.recordDebuggerDecision(ctx, cr.cycle, cr.cs, resp)
-			if branch == PhaseEnd {
-				break
-			}
-			if !o.sm.CanTransition(PhaseDebugger, branch) {
-				return cr.result, fmt.Errorf("debugger→%s not allowed by state machine", branch)
-			}
-			cr.scheduledNext = branch
+		// End-of-iteration record + branch (success ledger, bindings, normalize,
+		// CompletedPhases persist, checkpoint, outcome record + cursor advance,
+		// retro/debugger non-verdict-driven branches) → recordAndBranch.
+		switch act, berr := cr.recordAndBranch(next, dispatchResult{resp: resp, attemptCount: attemptCount}); act {
+		case loopAbort:
+			return cr.result, berr
+		case loopBreak:
+			break OuterLoop
 		}
 	}
 
