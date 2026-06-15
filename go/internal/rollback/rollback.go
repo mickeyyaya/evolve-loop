@@ -25,6 +25,7 @@
 package rollback
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // Sentinel errors.
@@ -329,21 +332,34 @@ func defaultGhDeleteRelease(tag string) string {
 }
 
 func defaultDeleteRemoteTag(repoRoot, tag string) string {
-	out, _ := exec.Command("git", "-C", repoRoot, "ls-remote", "--tags", "origin", "refs/tags/"+tag).Output()
-	if !strings.Contains(string(out), tag) {
+	return deleteRemoteTagWith(gitexec.Default(repoRoot), tag)
+}
+
+// deleteRemoteTagWith is the testable core of step 2, with the git CLI injected
+// via gitexec (the production wrapper passes gitexec.Default(repoRoot)).
+func deleteRemoteTagWith(g gitexec.Git, tag string) string {
+	ctx := context.Background()
+	out, _, _, _ := g.Capture(ctx, "ls-remote", "--tags", "origin", "refs/tags/"+tag)
+	if !strings.Contains(out, tag) {
 		// Best-effort local cleanup even when not on remote.
-		_ = exec.Command("git", "-C", repoRoot, "tag", "-d", tag).Run()
+		_ = g.Run(ctx, "tag", "-d", tag)
 		return "not-present"
 	}
-	if err := exec.Command("git", "-C", repoRoot, "push", "origin", ":refs/tags/"+tag).Run(); err != nil {
+	if err := g.Run(ctx, "push", "origin", ":refs/tags/"+tag); err != nil {
 		return "failed"
 	}
-	_ = exec.Command("git", "-C", repoRoot, "tag", "-d", tag).Run()
+	_ = g.Run(ctx, "tag", "-d", tag)
 	return "deleted"
 }
 
 func defaultRevertAndShip(repoRoot, commitSHA, reason, version string) string {
-	if err := exec.Command("git", "-C", repoRoot, "revert", "--no-edit", commitSHA).Run(); err != nil {
+	return revertAndShipWith(gitexec.Default(repoRoot), repoRoot, commitSHA, reason, version)
+}
+
+// revertAndShipWith is the testable core of step 3: the git revert is injected
+// via gitexec; the evolve-binary ship (not git) stays a direct exec.
+func revertAndShipWith(g gitexec.Git, repoRoot, commitSHA, reason, version string) string {
+	if err := g.Run(context.Background(), "revert", "--no-edit", commitSHA); err != nil {
 		return "failed"
 	}
 	msg := fmt.Sprintf("revert: %s [rollback of v%s]", reason, version)
