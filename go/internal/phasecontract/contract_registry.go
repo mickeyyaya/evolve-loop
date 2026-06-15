@@ -62,6 +62,15 @@ type Contract struct {
 	// forever. Set for built-ins that extract a verdict; user phases opt in
 	// via classify.require_failure_context.
 	RequireFailureContext bool
+	// RequireFailureContextPhaseIO is the PhaseIO-gated generalization of
+	// RequireFailureContext to phases that classify on section presence and emit
+	// no verdict today (build/scout/triage). The SAME FAIL/WARN-sentinel-without-
+	// failure-block check applies, but ONLY at EVOLVE_PHASE_IO>=enforce
+	// (ADR-0050 §3.8): off/shadow/advisory stay byte-identical, so a phase that
+	// has not yet adopted the structured sentinel cannot be false-blocked before
+	// the cutover. Distinct from RequireFailureContext (unconditional, audit) so
+	// audit's existing enforcement is untouched.
+	RequireFailureContextPhaseIO bool
 	// RequireChallengeToken makes a report that fails to echo the minted
 	// <workspace>/challenge-token.txt token a violation (cycle-269: the
 	// proof-of-read protocol was audit-enforced only — unrecoverable — and
@@ -112,11 +121,12 @@ var contracts = map[string]Contract{
 		Phase: "build", AgentName: "builder", ArtifactName: "build-report.md",
 		Kind: KindMarkdown, Sections: Build.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace, RequireChallengeToken: true,
+		RequireFailureContextPhaseIO: true,
 	},
 	"scout": {
 		Phase: "scout", AgentName: "scout", ArtifactName: "scout-report.md",
 		Kind: KindMarkdown, Sections: Scout.Sections, Verdicts: nil,
-		WriteTarget: TargetWorkspace,
+		WriteTarget: TargetWorkspace, RequireFailureContextPhaseIO: true,
 	},
 	"tdd": {
 		Phase: "tdd", AgentName: "tdd-engineer", ArtifactName: "test-report.md",
@@ -136,7 +146,7 @@ var contracts = map[string]Contract{
 	"triage": {
 		Phase: "triage", AgentName: "triage", ArtifactName: "triage-report.md",
 		Kind: KindMarkdown, Sections: Triage.Sections, Verdicts: nil,
-		WriteTarget: TargetWorkspace,
+		WriteTarget: TargetWorkspace, RequireFailureContextPhaseIO: true,
 	},
 	// The routing brain (PhaseAdvisor) dispatches with Agent="router" (persona
 	// agents/evolve-router.md, profile router.json) and writes routing-plan.json

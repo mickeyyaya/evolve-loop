@@ -64,6 +64,64 @@ func TestReviewerWithCatalog_ApprovesWellFormedUserPhase(t *testing.T) {
 	}
 }
 
+// Phase 3.8 (ADR-0050): the catalog-aware ...Stage constructors actually thread
+// the EVOLVE_PHASE_IO dial onto the gate/verifier. A build report that
+// self-reports FAIL without a structured failure block is blocked at enforce and
+// approved (dormant) at off — proving the phaseIO param is wired, not dropped.
+func TestNewReviewerWithCatalogStage_ThreadsPhaseIO(t *testing.T) {
+	root := t.TempDir()
+	ws := filepath.Join(root, "ws")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, ws, "build-report.md", failReport("build", "## Changes", false))
+	in := core.ReviewInput{Phase: "build", Workspace: ws, ProjectRoot: root}
+	for _, tc := range []struct {
+		phaseIO   config.Stage
+		wantBlock bool
+	}{
+		{config.StageOff, false},
+		{config.StageEnforce, true},
+	} {
+		rev := NewReviewerWithCatalogStage(config.StageEnforce, userCatalogWithFoo(), tc.phaseIO).(*Reviewer)
+		rev.breakerPath = filepath.Join(t.TempDir(), "breaker.json")
+		rev.logf = func(string, ...any) {}
+		got := rev.Review(context.Background(), in)
+		if tc.wantBlock && got.Approve {
+			t.Errorf("phaseIO=%s: want BLOCK, got approve", tc.phaseIO)
+		}
+		if !tc.wantBlock && !got.Approve {
+			t.Errorf("phaseIO=%s: want approve (dormant), got block (%s)", tc.phaseIO, got.Reason)
+		}
+	}
+}
+
+func TestNewVerifierWithCatalogStage_ThreadsPhaseIO(t *testing.T) {
+	root := t.TempDir()
+	ws := filepath.Join(root, "ws")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, ws, "build-report.md", failReport("build", "## Changes", false))
+	in := core.ReviewInput{Phase: "build", Workspace: ws, ProjectRoot: root}
+
+	offRes, err := NewVerifierWithCatalogStage(userCatalogWithFoo(), config.StageOff).VerifyDeliverable(context.Background(), in)
+	if err != nil {
+		t.Fatalf("off: unexpected error: %v", err)
+	}
+	if !offRes.OK {
+		t.Errorf("off: ladder re-check must be dormant; got %+v", offRes.Violations)
+	}
+
+	enfRes, err := NewVerifierWithCatalogStage(userCatalogWithFoo(), config.StageEnforce).VerifyDeliverable(context.Background(), in)
+	if err != nil {
+		t.Fatalf("enforce: unexpected error: %v", err)
+	}
+	if enfRes.OK {
+		t.Errorf("enforce: ladder re-check must surface failure_context_missing; got OK")
+	}
+}
+
 func TestNewReviewer_BackCompatBuiltins(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")

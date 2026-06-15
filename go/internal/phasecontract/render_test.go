@@ -33,6 +33,44 @@ func TestRenderContractBlock_Audit_MentionsVerdictSentinel(t *testing.T) {
 	}
 }
 
+// Phase 3.8b (ADR-0050): build/scout/triage emit no verdict today. When the
+// PhaseIO rollout activates the instruction (includePhaseIOFailureContext=true,
+// i.e. EVOLVE_PHASE_IO>=advisory), their contract block gains a self-report-
+// failure instruction: on a self-reported FAIL/WARN, emit a sentinel carrying a
+// structured failure block. When false (the default), the block is byte-identical
+// to the pre-3.8b RenderContractBlock — production (off) prompts never change.
+func TestRenderContractBlockStage_BuildFailureInstructionGated(t *testing.T) {
+	c := mustContract(t, "build")
+
+	off := RenderContractBlockStage(c, false)
+	if off != RenderContractBlock(c) {
+		t.Fatalf("RenderContractBlockStage(c,false) must byte-equal RenderContractBlock(c)")
+	}
+	if strings.Contains(off, "evolve-verdict") {
+		t.Errorf("default (off): build block must NOT instruct a verdict sentinel; got:\n%s", off)
+	}
+
+	on := RenderContractBlockStage(c, true)
+	if !strings.Contains(on, "evolve-verdict") {
+		t.Errorf("activated: build block must instruct the failure sentinel; got:\n%s", on)
+	}
+	if !strings.Contains(on, "FAIL") || !strings.Contains(on, "failure") {
+		t.Errorf("activated: build block must explain the FAIL/WARN failure block; got:\n%s", on)
+	}
+}
+
+// Audit's unconditional RequireFailureContext means its block already instructs
+// the failure sentinel; the PhaseIO bool must not change or double-add it.
+func TestRenderContractBlockStage_AuditUnchangedByPhaseIO(t *testing.T) {
+	c := mustContract(t, "audit")
+	if RenderContractBlockStage(c, false) != RenderContractBlock(c) {
+		t.Errorf("audit: stage(false) must equal RenderContractBlock")
+	}
+	if RenderContractBlockStage(c, true) != RenderContractBlock(c) {
+		t.Errorf("audit already instructs the sentinel unconditionally; the PhaseIO bool must not double-add it")
+	}
+}
+
 func mustContract(t *testing.T, phase string) Contract {
 	t.Helper()
 	c, ok := For(phase)

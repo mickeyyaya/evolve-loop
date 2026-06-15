@@ -14,6 +14,7 @@ import (
 	"errors"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -70,6 +71,11 @@ type Adapter struct {
 	// catalog-aware resolver so user/minted phases get their spec-derived
 	// contract block + exact-path footer (WS-A, ADR-0034).
 	resolver phasecontract.Resolver
+	// phaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.8b). At
+	// >=StageAdvisory the injected contract block instructs build/scout/triage to
+	// self-report failure via a structured sentinel; default StageOff keeps the
+	// dispatched prompt byte-identical to pre-3.8b.
+	phaseIO config.Stage
 }
 
 // New constructs an Adapter backed by the native-Go bridge.Engine. Tests
@@ -107,6 +113,14 @@ func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
 		r = phasecontract.BuiltinResolver{}
 	}
 	a.resolver = r
+}
+
+// SetPhaseIOStage wires the EVOLVE_PHASE_IO rollout stage so the injected
+// contract block activates the build/scout/triage self-report-failure
+// instruction at >=StageAdvisory (ADR-0050 §3.8b). Default (unset) is StageOff:
+// the dispatched prompt is byte-identical to pre-3.8b.
+func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
+	a.phaseIO = stage
 }
 
 // Launch injects the resolved interactive policy into the prompt body and
@@ -225,7 +239,13 @@ func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
 	if !ok {
 		return prompt
 	}
-	return phasecontract.RenderContractBlock(c) + prompt + phasecontract.RenderContractFooter(c, artifactPath)
+	// ADR-0050 §3.8b: at >=StageAdvisory, instruct build/scout/triage to
+	// self-report failure via a structured sentinel. Gated >=advisory (NOT
+	// enforce) so the advisory soak exercises the emitted sentinels before the
+	// enforce flip; off/shadow keep the prompt byte-identical (the classifier's
+	// always-on Pass 0 must not see new sentinels in production).
+	includePhaseIO := a.phaseIO >= config.StageAdvisory
+	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractFooter(c, artifactPath)
 }
 
 // injectRulesPrefix prepends a "## Rules" block carrying the per-agent

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -43,6 +44,41 @@ func TestLaunch_InjectsContract_ForUserPhase(t *testing.T) {
 	}
 	if !strings.Contains(got, "## Findings") {
 		t.Errorf("expected the canonical required-section heading injected; prompt=%q", got)
+	}
+}
+
+// TestLaunch_PhaseIOFailureInstruction_GatedByStage — Phase 3.8b (ADR-0050):
+// when EVOLVE_PHASE_IO>=advisory the dispatched build prompt instructs the agent
+// to self-report failure via a FAIL/WARN sentinel carrying a structured block.
+// At off/shadow (default) the prompt is byte-identical (no such instruction) —
+// the classifier (Pass 0) is NOT PhaseIO-gated, so a sentinel emitted at off
+// would change cycle classification. build has no Verdicts, so "evolve-verdict"
+// appears in its prompt ONLY via this instruction — a clean discriminator.
+func TestLaunch_PhaseIOFailureInstruction_GatedByStage(t *testing.T) {
+	launchBuild := func(stage config.Stage) string {
+		fe := &fakeEngine{}
+		a := withEngine(fe)
+		a.SetPhaseIOStage(stage)
+		if _, err := a.Launch(context.Background(), core.BridgeRequest{
+			CLI: "claude-tmux", Profile: "/p", Prompt: "BODY",
+			Workspace: t.TempDir(), ArtifactPath: "/ws/build-report.md", Agent: "build",
+		}); err != nil {
+			t.Fatalf("Launch: %v", err)
+		}
+		return fe.gotReq.Prompt
+	}
+
+	off := launchBuild(config.StageOff)
+	if strings.Contains(off, "evolve-verdict") {
+		t.Errorf("PhaseIO=off: build prompt must NOT carry the failure-sentinel instruction; got:\n%s", off)
+	}
+	if launchBuild(config.StageShadow) != off {
+		t.Error("PhaseIO=shadow must be byte-identical to off for the contract block")
+	}
+	for _, s := range []config.Stage{config.StageAdvisory, config.StageEnforce} {
+		if on := launchBuild(s); !strings.Contains(on, "evolve-verdict") {
+			t.Errorf("PhaseIO=%s: build prompt must carry the failure-sentinel instruction; got:\n%s", s, on)
+		}
 	}
 }
 

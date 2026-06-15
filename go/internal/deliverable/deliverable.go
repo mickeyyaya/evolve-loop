@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -75,7 +76,17 @@ func Verify(phase string, roots phasecontract.Roots) (Result, error) {
 // through the given Resolver. A CatalogResolver lets user/minted phases be
 // verified against a spec-derived contract (FromSpec) with no Go change, while
 // built-ins stay authoritative. See the package doc for the return contract.
+// It is VerifyWithStage pinned to StageOff — the byte-identical default that
+// keeps every existing caller (and any path with no PhaseIO dial) unchanged.
 func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (Result, error) {
+	return VerifyWithStage(phase, roots, resolver, config.StageOff)
+}
+
+// VerifyWithStage is VerifyWith threaded with the EVOLVE_PHASE_IO rollout stage
+// (ADR-0050 §3.8). The stage gates only the additive RequireFailureContextPhaseIO
+// check for build/scout/triage (fires at StageEnforce); every other check is
+// stage-independent, so VerifyWithStage(..., StageOff) == the pre-3.8 VerifyWith.
+func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver, phaseIO config.Stage) (Result, error) {
 	c, ok := resolver.Resolve(phase)
 	if !ok {
 		// Ambiguity: we cannot determine what "well-formed" means. Fail OPEN.
@@ -114,13 +125,13 @@ func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.
 	case phasecontract.KindJSON:
 		verifyJSON(&res, c, content)
 	default:
-		verifyMarkdown(&res, c, content, roots)
+		verifyMarkdown(&res, c, content, roots, phaseIO)
 	}
 	res.finish()
 	return res, nil
 }
 
-func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots phasecontract.Roots) {
+func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots phasecontract.Roots, phaseIO config.Stage) {
 	for _, s := range c.Sections {
 		if !s.Present(content) {
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
@@ -129,11 +140,15 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts) {
 		res.add(CodeBadVerdict, fmt.Sprintf("no parseable verdict; expected one of %v", c.Verdicts))
 	}
-	// ADR-0039 §7: a sentinel-declared FAIL/WARN on a RequireFailureContext
-	// contract must carry the structured failure block. Applies ONLY to
-	// sentinel verdicts — legacy prose-only artifacts stay legal forever.
-	// The message is the correction directive (re-dispatched verbatim).
-	if c.RequireFailureContext {
+	// ADR-0039 §7 / ADR-0050 §3.8: a sentinel-declared FAIL/WARN must carry the
+	// structured failure block. RequireFailureContext (audit) enforces this
+	// unconditionally; RequireFailureContextPhaseIO (build/scout/triage) enforces
+	// it only once the PhaseIO rollout reaches enforce — off/shadow/advisory stay
+	// byte-identical, so a phase that has not yet adopted the sentinel cannot be
+	// false-blocked before the cutover. Applies ONLY to sentinel verdicts —
+	// legacy prose-only artifacts stay legal forever. The message is the
+	// correction directive (re-dispatched verbatim).
+	if c.RequireFailureContext || (c.RequireFailureContextPhaseIO && phaseIO >= config.StageEnforce) {
 		if s, ok := phasecontract.ParseVerdictSentinelFull(content); ok &&
 			(s.Verdict == "FAIL" || s.Verdict == "WARN") &&
 			(s.Failure == nil || s.Failure.Class == "") {

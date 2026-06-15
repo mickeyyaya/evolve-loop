@@ -27,8 +27,20 @@ import (
 const FooterMarker = "DELIVERABLE PATH:"
 
 // RenderContractBlock returns the invariant instruction block for a contract.
-// Deterministic; contains no absolute path (cache-safety).
+// Deterministic; contains no absolute path (cache-safety). It is
+// RenderContractBlockStage with the PhaseIO instruction OFF — the byte-identical
+// default that keeps non-loop callers (and EVOLVE_PHASE_IO=off) unchanged.
 func RenderContractBlock(c Contract) string {
+	return RenderContractBlockStage(c, false)
+}
+
+// RenderContractBlockStage renders the contract block, optionally adding the
+// PhaseIO self-report-failure instruction (ADR-0050 §3.8b). includePhaseIO is
+// set by the dispatch path when EVOLVE_PHASE_IO>=advisory; it instructs
+// build/scout/triage — phases that emit no verdict by default — to self-report a
+// FAIL/WARN via a sentinel carrying a structured failure block. A false value is
+// byte-identical to the pre-3.8b block, so production (off) prompts never change.
+func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Deliverable Contract (%s)\n\n", c.Phase)
 	b.WriteString("Your phase is judged ONLY on the deliverable below. Produce it exactly:\n")
@@ -51,11 +63,15 @@ func RenderContractBlock(c Contract) string {
 		}
 		if c.RequireFailureContext {
 			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n",
-				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", &FailureBlock{
-					Class:         "code-" + c.Phase + "-fail",
-					Defects:       []string{"<one line per defect>"},
-					EvidencePaths: []string{"<artifact path>"},
-				}))
+				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
+		} else if c.RequireFailureContextPhaseIO && includePhaseIO {
+			// build/scout/triage emit no verdict by default. When the PhaseIO
+			// rollout activates (stage>=advisory), give them a self-report-failure
+			// channel: a FAIL/WARN sentinel carrying a structured block. A
+			// successful run emits nothing — no forced verdict (matching the gate,
+			// which only bites on a FAIL/WARN sentinel that lacks the block).
+			fmt.Fprintf(&b, "- If this phase fails or you must flag a blocking problem, emit a machine-readable verdict line declaring FAIL (or WARN) that ALSO carries your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n  A successful run needs no verdict line.\n",
+				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		}
 	}
 
@@ -68,6 +84,17 @@ func RenderContractBlock(c Contract) string {
 // as the last line of the prompt.
 func RenderContractFooter(c Contract, artifactPath string) string {
 	return fmt.Sprintf("\n\n%s %s\n", FooterMarker, artifactPath)
+}
+
+// failureExemplar is the placeholder failure block shown in the prompt so the
+// agent sees the exact shape to emit. Shared by the audit (unconditional) and
+// PhaseIO (build/scout/triage) instruction branches so they can never drift.
+func failureExemplar(phase string) *FailureBlock {
+	return &FailureBlock{
+		Class:         "code-" + phase + "-fail",
+		Defects:       []string{"<one line per defect>"},
+		EvidencePaths: []string{"<artifact path>"},
+	}
 }
 
 func sectionNames(sections []Section) string {
