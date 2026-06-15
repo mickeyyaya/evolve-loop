@@ -4,11 +4,12 @@ import "testing"
 
 func TestCycleInputs_Getters_ReturnConstructedValues(t *testing.T) {
 	c := NewCycleInputs(CycleInputsInit{
-		Goal:           "reduce dispatch latency",
-		Strategy:       "profile-first",
-		CommitMessage:  "perf(core): cache HEAD",
-		FleetScope:     "core,bridge",
-		ChallengeToken: "tok-123",
+		Goal:            "reduce dispatch latency",
+		Strategy:        "profile-first",
+		CommitMessage:   "perf(core): cache HEAD",
+		FleetScope:      "core,bridge",
+		ChallengeToken:  "tok-123",
+		PreviousVerdict: "FAIL",
 	})
 
 	cases := []struct {
@@ -21,6 +22,7 @@ func TestCycleInputs_Getters_ReturnConstructedValues(t *testing.T) {
 		{"CommitMessage", c.CommitMessage(), "perf(core): cache HEAD"},
 		{"FleetScope", c.FleetScope(), "core,bridge"},
 		{"ChallengeToken", c.ChallengeToken(), "tok-123"},
+		{"PreviousVerdict", c.PreviousVerdict(), "FAIL"},
 	}
 	for _, tc := range cases {
 		if tc.got != tc.want {
@@ -31,7 +33,7 @@ func TestCycleInputs_Getters_ReturnConstructedValues(t *testing.T) {
 
 func TestCycleInputs_Zero_AllGettersEmpty(t *testing.T) {
 	var c CycleInputs // zero value must be safe and empty
-	if c.Goal() != "" || c.Strategy() != "" || c.CommitMessage() != "" || c.FleetScope() != "" || c.ChallengeToken() != "" {
+	if c.Goal() != "" || c.Strategy() != "" || c.CommitMessage() != "" || c.FleetScope() != "" || c.ChallengeToken() != "" || c.PreviousVerdict() != "" {
 		t.Fatalf("zero CycleInputs not empty: %+v", c)
 	}
 }

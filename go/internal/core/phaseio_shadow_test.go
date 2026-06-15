@@ -107,6 +107,105 @@ func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
 	}
 }
 
+// TestAssembleCycleInputs_FromContext: the typed CycleInputs is populated from
+// the exact legacy ctxSnap keys the phases read today (incl. the camelCase
+// challengeToken key, not snake_case).
+func TestAssembleCycleInputs_FromContext(t *testing.T) {
+	ctx := map[string]string{
+		"goal":             "cut latency",
+		"strategy":         "profile-first",
+		"commit_message":   "perf: cache",
+		"fleet_scope":      "core",
+		"challengeToken":   "tok-9",
+		"previous_verdict": "FAIL",
+	}
+	ci := assembleCycleInputs(ctx)
+	if ci.Goal() != "cut latency" || ci.Strategy() != "profile-first" || ci.CommitMessage() != "perf: cache" ||
+		ci.FleetScope() != "core" || ci.ChallengeToken() != "tok-9" || ci.PreviousVerdict() != "FAIL" {
+		t.Fatalf("assembleCycleInputs mismapped: %+v", ci)
+	}
+}
+
+// TestAssembleErrorContext_PresentAndAbsent: the ship_error_* keys assemble into
+// a typed ErrorContext, or nil when none are set.
+func TestAssembleErrorContext_PresentAndAbsent(t *testing.T) {
+	if ec := assembleErrorContext(map[string]string{}); ec != nil {
+		t.Fatalf("no ship_error_* keys → want nil, got %+v", ec)
+	}
+	ec := assembleErrorContext(map[string]string{
+		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
+		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
+	})
+	if ec == nil || ec.Code != "E_PUSH" || ec.Class != "transient" || ec.Stage != "ship" || ec.Debug != "non-ff" {
+		t.Fatalf("assembleErrorContext mismapped: %+v", ec)
+	}
+}
+
+// TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext is the named 3.5
+// anchor: for the retro phase, the typed CycleInputs.PreviousVerdict() must
+// equal the legacy req.Context["previous_verdict"] the retro phase reads — and
+// the shadow comparator must report ZERO mismatch when they agree.
+func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
+	// Mirrors the dispatch retro-clone: phaseCtx carries previous_verdict.
+	phaseCtx := map[string]string{"goal": "g", "previous_verdict": VerdictFAIL}
+	ci := assembleCycleInputs(phaseCtx)
+	if ci.PreviousVerdict() != phaseCtx["previous_verdict"] {
+		t.Fatalf("typed PreviousVerdict()=%q != Context[previous_verdict]=%q", ci.PreviousVerdict(), phaseCtx["previous_verdict"])
+	}
+	if ms := compareCycleInputsShadow(ci, assembleErrorContext(phaseCtx), phaseCtx); len(ms) != 0 {
+		t.Fatalf("typed == legacy must yield no mismatch, got %+v", ms)
+	}
+}
+
+// TestCompareCycleInputsShadow_KeyDrift: the comparator catches a typed view
+// whose value diverges from the legacy Context key (the key-drift bug class —
+// e.g. an assembler reading the wrong key name).
+func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
+	ctx := map[string]string{"goal": "real-goal", "challengeToken": "tok"}
+	// A CycleInputs with the WRONG goal (as if assembled from a wrong key).
+	drift := phaseio.NewCycleInputs(phaseio.CycleInputsInit{Goal: "wrong", ChallengeToken: "tok"})
+	ms := compareCycleInputsShadow(drift, nil, ctx)
+	var goalMismatch *phaseIOMismatch
+	for i := range ms {
+		if ms[i].Field == "cycle_inputs.goal" {
+			goalMismatch = &ms[i]
+		}
+	}
+	if goalMismatch == nil {
+		t.Fatalf("expected cycle_inputs.goal drift, got %+v", ms)
+	}
+	// Assert orientation too (want=legacy ground truth, got=typed getter) so a
+	// swapped Want/Got in the mismatch struct is detectable.
+	if goalMismatch.Want != "real-goal" || goalMismatch.Got != "wrong" {
+		t.Fatalf("want/got orientation wrong: %+v", *goalMismatch)
+	}
+}
+
+// TestCompareCycleInputsShadow_ErrorContext exercises the comparator's typed
+// ErrorContext path (the ship-failure recovery case): a matching ErrorContext
+// yields no mismatch; a diverging one surfaces the offending field with correct
+// want/got.
+func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
+	ctx := map[string]string{
+		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
+		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
+	}
+	if ms := compareCycleInputsShadow(assembleCycleInputs(ctx), assembleErrorContext(ctx), ctx); len(ms) != 0 {
+		t.Fatalf("matching ErrorContext should yield no mismatch, got %+v", ms)
+	}
+	diverge := &phaseio.ErrorContext{Code: "WRONG", Class: "transient", Stage: "ship", Debug: "non-ff"}
+	ms := compareCycleInputsShadow(assembleCycleInputs(ctx), diverge, ctx)
+	found := false
+	for _, m := range ms {
+		if m.Field == "error_context.code" && m.Want == "E_PUSH" && m.Got == "WRONG" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected error_context.code divergence (want E_PUSH got WRONG), got %+v", ms)
+	}
+}
+
 // TestWritePhaseIOShadowFile_Parseable: the shadow artifact is written as
 // parseable JSON capturing the assembled upstream presence + any mismatches.
 func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {

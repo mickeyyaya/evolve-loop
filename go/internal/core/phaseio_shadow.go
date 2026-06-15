@@ -100,6 +100,62 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 	return ms
 }
 
+// assembleCycleInputs builds the typed CycleInputs from the legacy per-phase
+// Context map (ctxSnap/phaseCtx), reading the SAME keys the phases read today
+// (ADR-0050 Phase 3.5). Note challengeToken is camelCase (the live Context key),
+// not the snake_case wire-JSON field name.
+func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
+	return phaseio.NewCycleInputs(phaseio.CycleInputsInit{
+		Goal:            ctx["goal"],
+		Strategy:        ctx["strategy"],
+		CommitMessage:   ctx["commit_message"],
+		FleetScope:      ctx["fleet_scope"],
+		ChallengeToken:  ctx["challengeToken"],
+		PreviousVerdict: ctx["previous_verdict"],
+	})
+}
+
+// assembleErrorContext builds the typed ErrorContext from the ship_error_* keys
+// the recovery path injects, or nil when none are present (no upstream error).
+func assembleErrorContext(ctx map[string]string) *phaseio.ErrorContext {
+	code, class := ctx["ship_error_code"], ctx["ship_error_class"]
+	stage, debug := ctx["ship_error_stage"], ctx["ship_error_debug"]
+	if code == "" && class == "" && stage == "" && debug == "" {
+		return nil
+	}
+	return &phaseio.ErrorContext{Code: code, Class: class, Stage: stage, Debug: debug}
+}
+
+// compareCycleInputsShadow compares the typed CycleInputs + ErrorContext against
+// the legacy Context map, field-by-field. "want" is the legacy value keyed by
+// what the phases ACTUALLY read (the ground truth) and "got" is the typed
+// getter — so an assembler that drifts to a wrong key (e.g. snake_case
+// challenge_token vs the live camelCase challengeToken) surfaces as a mismatch.
+func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, ctx map[string]string) []phaseIOMismatch {
+	var ms []phaseIOMismatch
+	add := func(field, want, got string) {
+		if want != got {
+			ms = append(ms, phaseIOMismatch{Field: field, Want: want, Got: got})
+		}
+	}
+	add("cycle_inputs.goal", ctx["goal"], ci.Goal())
+	add("cycle_inputs.strategy", ctx["strategy"], ci.Strategy())
+	add("cycle_inputs.commit_message", ctx["commit_message"], ci.CommitMessage())
+	add("cycle_inputs.fleet_scope", ctx["fleet_scope"], ci.FleetScope())
+	add("cycle_inputs.challenge_token", ctx["challengeToken"], ci.ChallengeToken())
+	add("cycle_inputs.previous_verdict", ctx["previous_verdict"], ci.PreviousVerdict())
+
+	var gotCode, gotClass, gotStage, gotDebug string
+	if ec != nil {
+		gotCode, gotClass, gotStage, gotDebug = ec.Code, ec.Class, ec.Stage, ec.Debug
+	}
+	add("error_context.code", ctx["ship_error_code"], gotCode)
+	add("error_context.class", ctx["ship_error_class"], gotClass)
+	add("error_context.stage", ctx["ship_error_stage"], gotStage)
+	add("error_context.debug", ctx["ship_error_debug"], gotDebug)
+	return ms
+}
+
 // summarizePhaseIOMismatches renders mismatches into a human-readable ledger
 // Message (e.g. `build.present(want="true" got="false"); ...`).
 func summarizePhaseIOMismatches(ms []phaseIOMismatch) string {
@@ -151,11 +207,12 @@ func writePhaseIOShadowFile(workspace, phase string, h phaseio.Handoffs, cycle i
 
 // emitPhaseIOShadow is the dispatch-time shadow hook (active only at
 // EVOLVE_PHASE_IO>=shadow). It Digests the upstream ONCE, projects the typed
-// Upstream view, compares the two, writes the shadow artifact, and on any
-// divergence emits a WARN + a phaseio_shadow_mismatch ledger entry. It NEVER
+// Upstream view, assembles the typed CycleInputs/ErrorContext from phaseCtx,
+// compares BOTH against the legacy sources, writes the shadow artifact, and on
+// any divergence emits a WARN + a phaseio_shadow_mismatch ledger entry. It NEVER
 // returns an error or affects dispatchResult — at EVOLVE_PHASE_IO=off it is not
 // called at all, so the live loop stays byte-identical.
-func (cr *cycleRun) emitPhaseIOShadow(phase Phase) {
+func (cr *cycleRun) emitPhaseIOShadow(phase Phase, phaseCtx map[string]string) {
 	sig, err := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phaseio shadow digest failed for %s: %v\n", phase, err)
@@ -163,6 +220,11 @@ func (cr *cycleRun) emitPhaseIOShadow(phase Phase) {
 	}
 	h := router.HandoffsFromSignals(sig)
 	ms := comparePhaseIOShadow(h, sig)
+	// Phase 3.5: also assemble + compare the typed CycleInputs/ErrorContext
+	// against the legacy Context map (the key-drift guard).
+	ci := assembleCycleInputs(phaseCtx)
+	ec := assembleErrorContext(phaseCtx)
+	ms = append(ms, compareCycleInputsShadow(ci, ec, phaseCtx)...)
 	if werr := writePhaseIOShadowFile(cr.cs.WorkspacePath, string(phase), h, cr.cycle, ms); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phaseio shadow write failed for %s: %v\n", phase, werr)
 	}
