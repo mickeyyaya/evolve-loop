@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
 // Entry is one benched CLI family.
@@ -130,12 +132,12 @@ func (s *Store) Load() (map[string]Entry, error) {
 		if os.IsNotExist(err) {
 			return map[string]Entry{}, nil
 		}
-		fmt.Fprintf(os.Stderr, "[clihealth] WARN read %s: %v (treating as empty)\n", s.path, err)
+		log.Default().Warnf("[clihealth] WARN read %s: %v (treating as empty)\n", s.path, err)
 		return map[string]Entry{}, nil
 	}
 	var f fileSchema
 	if err := json.Unmarshal(b, &f); err != nil {
-		fmt.Fprintf(os.Stderr, "[clihealth] WARN corrupt %s: %v (treating as empty)\n", s.path, err)
+		log.Default().Warnf("[clihealth] WARN corrupt %s: %v (treating as empty)\n", s.path, err)
 		return map[string]Entry{}, nil
 	}
 	if f.Benches == nil {

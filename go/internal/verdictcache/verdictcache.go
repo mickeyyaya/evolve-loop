@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
 // schemaVersion is the on-disk format version of .evolve/verdict-cache.json.
@@ -68,12 +70,12 @@ func (s *Store) Load() (map[string]Entry, error) {
 		if os.IsNotExist(err) {
 			return map[string]Entry{}, nil
 		}
-		fmt.Fprintf(os.Stderr, "[verdictcache] WARN read %s: %v (treating as empty)\n", s.path, err)
+		log.Default().Warnf("[verdictcache] WARN read %s: %v (treating as empty)\n", s.path, err)
 		return map[string]Entry{}, nil
 	}
 	var f fileSchema
 	if err := json.Unmarshal(b, &f); err != nil {
-		fmt.Fprintf(os.Stderr, "[verdictcache] WARN corrupt %s: %v (treating as empty)\n", s.path, err)
+		log.Default().Warnf("[verdictcache] WARN corrupt %s: %v (treating as empty)\n", s.path, err)
 		return map[string]Entry{}, nil
 	}
 	if f.Verdicts == nil {
