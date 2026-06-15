@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasewatchdog"
 )
 
@@ -38,18 +39,26 @@ func runPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "[phase-watchdog] ERROR: cycle must be a positive integer, got: %s\n", pos[2])
 		return phasewatchdog.ExitInvalidArg
 	}
-	return phasewatchdog.Run(phasewatchdog.Config{
-		Workspace:      pos[0],
-		TargetPGID:     pgid,
-		Cycle:          cycle,
-		CycleStatePath: pos[3],
-		ProjectRoot:    os.Getenv("EVOLVE_PROJECT_ROOT"),
-		ThresholdS:     atoiOr(os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S"), 0),
-		PollS:          atoiOr(os.Getenv("EVOLVE_INACTIVITY_POLL_S"), 0),
-		WarnPct:        atoiOr(os.Getenv("EVOLVE_INACTIVITY_WARN_PCT"), 0),
-		GraceS:         atoiOr(os.Getenv("EVOLVE_INACTIVITY_GRACE_S"), 0),
-		Disabled:       os.Getenv("EVOLVE_INACTIVITY_DISABLE") == "1",
-	}, stderr)
+	cfg := watchdogEnvConfig()
+	cfg.Workspace = pos[0]
+	cfg.TargetPGID = pgid
+	cfg.Cycle = cycle
+	cfg.CycleStatePath = pos[3]
+	return phasewatchdog.Run(cfg, stderr)
+}
+
+// watchdogEnvConfig reads the EVOLVE_INACTIVITY_* / EVOLVE_PROJECT_ROOT knobs
+// through envchain. The ints default to 0 (phasewatchdog's "use built-in
+// default" sentinel); Disabled is a default-off `== "1"` flag.
+func watchdogEnvConfig() phasewatchdog.Config {
+	return phasewatchdog.Config{
+		ProjectRoot: os.Getenv("EVOLVE_PROJECT_ROOT"),
+		ThresholdS:  envchain.Int("EVOLVE_INACTIVITY_THRESHOLD_S", nil, 0),
+		PollS:       envchain.Int("EVOLVE_INACTIVITY_POLL_S", nil, 0),
+		WarnPct:     envchain.Int("EVOLVE_INACTIVITY_WARN_PCT", nil, 0),
+		GraceS:      envchain.Int("EVOLVE_INACTIVITY_GRACE_S", nil, 0),
+		Disabled:    envchain.Bool("EVOLVE_INACTIVITY_DISABLE", nil, false),
+	}
 }
 
 func atoiOr(s string, fallback int) int {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
@@ -44,26 +44,27 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 		fmt.Fprintln(stderr, "[fanout-dispatch] usage: fanout-dispatch [--cache-prefix-file=PATH] <commands.tsv> <results.tsv>")
 		return fanoutdispatch.ExitSetupErr
 	}
-	return fanoutdispatch.Run(fanoutdispatch.Config{
-		CommandsFile:        pos[0],
-		ResultsFile:         pos[1],
-		CachePrefixFile:     cachePrefix,
-		Concurrency:         atoiOr(os.Getenv("EVOLVE_FANOUT_CONCURRENCY"), 0),
-		TimeoutSecs:         atoiOr(os.Getenv("EVOLVE_FANOUT_TIMEOUT"), 0),
-		CancelOnConsensus:   os.Getenv("EVOLVE_FANOUT_CANCEL_ON_CONSENSUS") == "1",
-		ConsensusK:          atoiOr(os.Getenv("EVOLVE_FANOUT_CONSENSUS_K"), 0),
-		ConsensusPollSecs:   atoiOr(os.Getenv("EVOLVE_FANOUT_CONSENSUS_POLL_S"), 0),
-		TrackWorkers:        envBoolDefault("EVOLVE_FANOUT_TRACK_WORKERS", true),
-		CycleStateHelperBin: locateCycleStateHelper(),
-	}, stderr)
+	cfg := fanoutEnvConfig()
+	cfg.CommandsFile = pos[0]
+	cfg.ResultsFile = pos[1]
+	cfg.CachePrefixFile = cachePrefix
+	cfg.CycleStateHelperBin = locateCycleStateHelper()
+	return fanoutdispatch.Run(cfg, stderr)
 }
 
-func envBoolDefault(k string, dflt bool) bool {
-	v := os.Getenv(k)
-	if v == "" {
-		return dflt
+// fanoutEnvConfig reads the EVOLVE_FANOUT_* knobs through the envchain
+// precedence chain so the truthy/falsy/default vocabulary is uniform (P2). The
+// int knobs default to 0 (the package's "use built-in default" sentinel);
+// CancelOnConsensus is a default-off `== "1"` flag, TrackWorkers default-on.
+func fanoutEnvConfig() fanoutdispatch.Config {
+	return fanoutdispatch.Config{
+		Concurrency:       envchain.Int("EVOLVE_FANOUT_CONCURRENCY", nil, 0),
+		TimeoutSecs:       envchain.Int("EVOLVE_FANOUT_TIMEOUT", nil, 0),
+		CancelOnConsensus: envchain.Bool("EVOLVE_FANOUT_CANCEL_ON_CONSENSUS", nil, false),
+		ConsensusK:        envchain.Int("EVOLVE_FANOUT_CONSENSUS_K", nil, 0),
+		ConsensusPollSecs: envchain.Int("EVOLVE_FANOUT_CONSENSUS_POLL_S", nil, 0),
+		TrackWorkers:      envchain.Bool("EVOLVE_FANOUT_TRACK_WORKERS", nil, true),
 	}
-	return v == "1" || v == "true"
 }
 
 // locateCycleStateHelper returns the path to the bash cycle-state helper
@@ -78,6 +79,3 @@ func locateCycleStateHelper() string {
 	}
 	return ""
 }
-
-// re-using atoiOr from cmd_phase_watchdog.go
-var _ = strconv.Atoi

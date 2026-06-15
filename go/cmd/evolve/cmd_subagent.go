@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -190,7 +191,7 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 			WorktreePath:           worktree,
 			ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
 			AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-			DiffComplexityDisabled: os.Getenv("EVOLVE_DIFF_COMPLEXITY_DISABLE") == "1",
+			DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
 		},
 		subagent.ResolveModelTierOptions{},
 	)
@@ -327,8 +328,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		promptReader = os.Stdin
 	}
 
-	cachePrefixV2 := os.Getenv("EVOLVE_CACHE_PREFIX_V2") != "0"
-	adversarialAudit := os.Getenv("ADVERSARIAL_AUDIT") != "0"
+	flags := readSubagentRunFlags()
 
 	res, err := subagent.Run(context.Background(), subagent.RunRequest{
 		Agent:                  agent,
@@ -344,10 +344,10 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		PromptReader:           promptReader,
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
 		AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-		DiffComplexityDisabled: os.Getenv("EVOLVE_DIFF_COMPLEXITY_DISABLE") == "1",
-		CachePrefixV2:          cachePrefixV2,
-		AdversarialAudit:       adversarialAudit,
-		LegacyAgentDispatch:    os.Getenv("LEGACY_AGENT_DISPATCH") == "1",
+		DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
+		CachePrefixV2:          flags.cachePrefixV2,
+		AdversarialAudit:       flags.adversarialAudit,
+		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
 		ChallengeTokenOverride: os.Getenv("EVOLVE_FANOUT_WORKER_TOKEN"),
 	}, subagent.RunOptions{})
@@ -392,12 +392,7 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 
 	layout := paths.ResolveFromEnv()
 
-	concurrency := 2
-	if v := os.Getenv("EVOLVE_FANOUT_CONCURRENCY"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			concurrency = n
-		}
-	}
+	flags := readDispatchParallelFlags()
 
 	res, err := subagent.DispatchParallel(context.Background(), subagent.DispatchParallelRequest{
 		Agent:              agent,
@@ -410,9 +405,9 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 		PluginRoot:         layout.PluginRoot,
 		LedgerPath:         layout.LedgerFile,
 		WorktreePath:       os.Getenv("WORKTREE_PATH"),
-		Concurrency:        concurrency,
-		CachePrefixEnabled: os.Getenv("EVOLVE_FANOUT_CACHE_PREFIX") != "0",
-		TrackWorkers:       os.Getenv("EVOLVE_FANOUT_TRACK_WORKERS") != "0",
+		Concurrency:        flags.concurrency,
+		CachePrefixEnabled: flags.cachePrefixEnabled,
+		TrackWorkers:       flags.trackWorkers,
 		TestExecutor:       os.Getenv("EVOLVE_FANOUT_TEST_EXECUTOR"),
 		DispatchDepth:      subagent.ReadDispatchDepth(os.Getenv),
 	}, subagent.DispatchParallelOptions{})
@@ -451,4 +446,40 @@ func envOrCwd(env string) string {
 		return cwd // os.Getwd is already absolute
 	}
 	return "."
+}
+
+// subagentRunFlags holds the run-specific env-derived boolean knobs for
+// `subagent run`, read through envchain so the truthy/falsy/default vocabulary
+// is uniform (P2). CachePrefixV2 / AdversarialAudit are default-on (`!= "0"`);
+// LegacyAgentDispatch is default-off (`== "1"`). DiffComplexityDisabled is read
+// inline (shared with the resolve-tier handler), not via this struct.
+type subagentRunFlags struct {
+	cachePrefixV2       bool
+	adversarialAudit    bool
+	legacyAgentDispatch bool
+}
+
+func readSubagentRunFlags() subagentRunFlags {
+	return subagentRunFlags{
+		cachePrefixV2:       envchain.Bool("EVOLVE_CACHE_PREFIX_V2", nil, true),
+		adversarialAudit:    envchain.Bool("ADVERSARIAL_AUDIT", nil, true),
+		legacyAgentDispatch: envchain.Bool("LEGACY_AGENT_DISPATCH", nil, false),
+	}
+}
+
+// dispatchParallelFlags holds the env-derived knobs for `subagent
+// dispatch-parallel`. concurrency defaults to 2 and ignores values < 1 (the
+// legacy `n > 0` guard), expressed via envchain.IntMin.
+type dispatchParallelFlags struct {
+	concurrency        int
+	cachePrefixEnabled bool
+	trackWorkers       bool
+}
+
+func readDispatchParallelFlags() dispatchParallelFlags {
+	return dispatchParallelFlags{
+		concurrency:        envchain.IntMin("EVOLVE_FANOUT_CONCURRENCY", nil, 2, 1),
+		cachePrefixEnabled: envchain.Bool("EVOLVE_FANOUT_CACHE_PREFIX", nil, true),
+		trackWorkers:       envchain.Bool("EVOLVE_FANOUT_TRACK_WORKERS", nil, true),
+	}
 }
