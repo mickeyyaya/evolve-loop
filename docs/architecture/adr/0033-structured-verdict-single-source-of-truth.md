@@ -1,6 +1,6 @@
 # ADR-0033: Structured Verdicts from a Single Source of Truth (kill classifier↔template drift)
 
-**Status:** Proposed | **Date:** 2026-06-03 | **PR:** _pending_ | **Supersedes:** N/A | **Builds on:** the existing `phasespec.ClassifyRules` (`phasespec.go:37`) and `core.VerdictReason`/`Taxonomy` (`verdict.go`)
+**Status:** Accepted (as-built; see Implementation note) | **Date:** 2026-06-03 | **Supersedes:** N/A | **Superseded-by/extended-by:** [ADR-0034](0034-unified-deliverable-contract.md) | **Builds on:** the existing `phasespec.ClassifyRules` (`phasespec.go:37`) and `core.VerdictReason`/`Taxonomy` (`verdict.go`)
 
 ---
 

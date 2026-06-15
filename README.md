@@ -2,7 +2,7 @@
 
 **Current (v18.12)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
-> **v11.2.0 breaking change**: the `scripts/` symlink has been removed. Operator integrations that hardcode `scripts/...` paths must update to `legacy/scripts/...`. Go binary remains the primary runtime; bash continues to work from `legacy/scripts/`. See [docs/migration-from-bash.md](docs/migration-from-bash.md).
+> **Breaking change (Go-only consolidation):** The bash trees (`scripts/` and `legacy/scripts/`) and the `EVOLVE_USE_LEGACY_BASH` rollback hatch have been removed — there is no bash fallback. The `evolve` Go binary (`go/bin/evolve`) is the sole runtime entrypoint; every operation is a native `evolve <subcommand>`. Operator integrations that hardcode `scripts/...` or `legacy/scripts/...` paths must move to the equivalent `evolve` subcommand. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the bash→Go port history.
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
@@ -19,7 +19,7 @@ If you've used `/goal` and wanted "but make it safe to merge without re-reading 
 ## Table of Contents
 
 1. [The Self-Evolving Loop](#the-self-evolving-loop) — concept
-2. [Pipeline Design](#pipeline-design) — the 8 phases
+2. [Pipeline Design](#pipeline-design) — the phase spine
 3. [The 3-Layer Trust Architecture](#the-3-layer-trust-architecture) — anti-gaming
 4. [Error Recovery](#error-recovery) — how work survives failures
 5. [Why Self-Evolving Works](#why-self-evolving-works) — Reflexion + double-loop learning
@@ -37,7 +37,7 @@ If you've used `/goal` and wanted "but make it safe to merge without re-reading 
 
 ## The Self-Evolving Loop
 
-The framework runs your codebase through a sequence of 8 phases plus a meta-cycle. Every phase produces an artifact that the next phase must read. The model picks tasks; the framework enforces the pipeline.
+The framework runs your codebase through the canonical phase spine — Calibrate → Intent → Scout → Triage → Build → Audit → Ship → Learn/Memo — plus two opt-in phases (Plan-Review, TDD). Every phase produces an artifact that the next phase must read. The model picks tasks; the framework enforces the pipeline. (Canonical phase set: [docs/architecture/phase-registry.json](docs/architecture/phase-registry.json).)
 
 The defining property: **failures become instincts**.
 
@@ -53,7 +53,7 @@ That lesson came from cycle 59's failure. Cycle 60+ Scouts won't make the same m
 
 ## Pipeline Design
 
-Each cycle runs eight phases. The trust kernel enforces them in order at the OS layer — phases cannot be skipped, reordered, or shortcutted via prompt instructions.
+Each cycle runs the required phase spine (Calibrate → Intent → Scout → Triage → Build → Audit → Ship → Learn/Memo) with Plan-Review and TDD bracketed as opt-in. The trust kernel enforces them in order at the OS layer — phases cannot be skipped, reordered, or shortcutted via prompt instructions.
 
 ```
 INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ MEMO/RETRO
@@ -61,7 +61,7 @@ INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD
    │        │        │            │             │        │        │       │           └─ PASS → memo (carryover);
    │        │        │            │             │        │        │       │              FAIL/WARN → retrospective (lessons)
    │        │        │            │             │        │        │       │              auto-on v8.45.0+
-   │        │        │            │             │        │        │       └─ Commit + push via ship.sh
+   │        │        │            │             │        │        │       └─ Commit + push via `evolve ship`
    │        │        │            │             │        │        │          (gated on acs-verdict.json:red_count == 0)
    │        │        │            │             │        │        └─ Adversarial cross-check; predicate suite runs;
    │        │        │            │             │        │           verdict from bash exit codes (EGPS v10)
@@ -89,7 +89,7 @@ INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD
 | Plan-Review (opt-in) | plan-reviewer fan-out | `plan-review.md` (4-lens aggregate) |
 | Build | builder | `build-report.md` + `acs/cycle-N/*.sh` predicates |
 | Audit | auditor | `audit-report.md` + `acs-verdict.json` (binary PASS/FAIL) |
-| Ship | ship.sh | git commit on main + ledger entry |
+| Ship | `evolve ship` | git commit on main + ledger entry |
 | Memo / Retro | memo OR retrospective | `carryover-todos.json` OR `retrospective-report.md` + lesson YAMLs |
 
 ### Four specialized agents (+ orchestrator)
@@ -114,19 +114,19 @@ The threat is not malicious humans — it's the LLM doing what LLMs do: confabul
 
 | Tier | Mechanism | Default | Catches |
 |---|---|---|---|
-| **1 — Structural Integrity** | `phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`, SHA-chained ledger | **Always on. No bypass.** | Reward hacking, phase-skipping, integrity breach |
+| **1 — Structural Integrity** | `evolve guard phase`, `evolve guard role`, `evolve guard ship`, SHA-chained ledger | **Always on. No bypass.** | Reward hacking, phase-skipping, integrity breach |
 | **2 — OS Isolation** | `sandbox-exec` (macOS) / `bwrap` (Linux), per-cycle git worktree | On (always present) | Cross-cycle leakage, compromised builder, scope escape |
 | **3 — Workflow Defaults** | Intent capture, fan-out, mutation testing, adversarial audit, scout grounding, audit citation binding | Opt-in via env flags | Vague goals, sycophantic audits, tautological evals, scope sprawl |
 
-### Tier 1 — Three shell hooks block deviations structurally
+### Tier 1 — Three kernel guards block deviations structurally
 
 | Hook | Watches | Denies |
 |---|---|---|
-| `phase-gate-precondition.sh` | every `subagent-run.sh` invocation | Out-of-order phases, in-process `Agent` tool when `cycle-state.json` exists |
-| `role-gate.sh` | every `Edit`/`Write` tool call | Writes outside the active phase's allowlist, writes outside worktree for write-bound roles |
-| `ship-gate.sh` | every `Bash` with git/gh verbs | Direct `git commit`/`git push` not routed through `legacy/scripts/lifecycle/ship.sh` |
+| `evolve guard phase` | every `evolve subagent run` invocation | Out-of-order phases, in-process `Agent` tool when `cycle-state.json` exists |
+| `evolve guard role` | every `Edit`/`Write` tool call | Writes outside the active phase's allowlist, writes outside worktree for write-bound roles |
+| `evolve guard ship` | every `Bash` with git/gh verbs | Direct `git commit`/`git push` not routed through `evolve ship` |
 
-Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` — every entry records `prev_hash`. Modifying any past entry invalidates every subsequent `prev_hash`. Verify with `bash legacy/scripts/observability/verify-ledger-chain.sh`.
+Plus a tamper-evident SHA-chained `.evolve/ledger.jsonl` — every entry records `prev_hash`. Modifying any past entry invalidates every subsequent `prev_hash`. Verify with `evolve ledger verify` (or `evolve guard chain`).
 
 ### Tier 2 — OS sandboxing + per-cycle worktree
 
@@ -134,7 +134,7 @@ When `EVOLVE_SANDBOX=1` (or profile `sandbox.enabled: true`), every `claude -p` 
 
 Per-cycle git worktree at `$EVOLVE_WORKTREE_BASE/cycle-N` isolates Builder's edits from other cycles. Lives on a temporary branch (`evolve/cycle-N`) deleted post-ship.
 
-Capability detection (`legacy/scripts/dispatch/preflight-environment.sh`) auto-adapts to nested-Claude environments, falling back gracefully without losing Tier 1.
+Capability detection (the Go preflight in `go/internal/preflight`, surfaced by `evolve doctor`) auto-adapts to nested-Claude environments, falling back gracefully without losing Tier 1.
 
 ### Tier 3 — Workflow defaults (opt-in but recommended)
 
@@ -162,7 +162,7 @@ Four recovery layers, each catching a different failure mode at a different cost
 |---|---|---|---|
 | **1. failedApproaches[]** | Audit FAIL/WARN OR run-cycle rc=1 | Raw failure record | 30 days default |
 | **2. Retrospective YAML lessons** | Audit FAIL/WARN (auto-on v8.45.0+) | Structured root-cause + prevention rule | Permanent (tracked) |
-| **3. Checkpoint-resume (v9.1.0+)** | Cumulative cost ≥95% OR quota signature | Full mid-cycle state — worktree + state.json | Until `--resume` |
+| **3. Checkpoint-resume (v9.1.0+)** | Quota signature (quota-likely / stall / phase-complete / operator / batch-cap-near) | Full mid-cycle state — worktree + state.json | Until `--resume` |
 | **4. Worktree preservation** | Recoverable failure (infrastructure/audit-fail) | Worktree edits survive cleanup | Until next reset |
 
 The cycle 11 incident (subscription quota wall mid-audit) was the canonical motivator for v9.1.0. Pre-v9.1.0: 30 minutes of Builder work discarded. Post-v9.1.0: worktree preserved, ~5 min of audit work lost, operator runs `--resume` after quota reset.
@@ -218,7 +218,7 @@ The framework separates *what work happens* from *who does it* from *what model 
 
 ### The CLI router
 
-`legacy/scripts/dispatch/resolve-llm.sh` is a pure function that returns which CLI + model should run each phase. Operators override via `.evolve/llm_config.json`:
+The Go resolver (`go/internal/resolvellm`) is a pure function that returns which CLI + model should run each phase. Operators override via `.evolve/llm_config.json`:
 
 ```json
 {
@@ -236,7 +236,7 @@ Three adapters ship: `claude.sh` (native), `gemini.sh` (native v10.7+), `codex.s
 
 After the cycle, `## CLI Resolution` in `orchestrator-report.md` is auto-rendered from ledger entries — showing exactly which CLI ran each phase, including fallbacks. This is the structural answer to cycle-61's B6 (orchestrator narrative hallucinated routing). The auto-rendered table is ledger-truth, not LLM-narrated.
 
-Common configurations:
+Common configurations (the cost figures below are historical display-only telemetry — the token-budget *cost* gates were removed, so cost no longer drives any gate; see [Run](#run)):
 
 | Config | Pattern | ~Cost per cycle | Source |
 |---|---|---|---|
@@ -246,7 +246,7 @@ Common configurations:
 | Gemini-only | All phases on gemini-3.1-pro-preview | $0.50-2.00 | cycle 61 historic |
 | Cost-optimized mixed | Haiku read-only, Sonnet Builder, Opus Auditor | $0.50-1.50 | extrapolated |
 
-Real per-cycle cost data from the v10.17.0 batch (5 consecutive adversarial-mode cycles): cycle 94 $6.85, cycle 96 $7.40, cycle 98 $5.94 — full breakdown in [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md) §2. Per-phase token attribution: [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md).
+Historical per-cycle cost telemetry from the v10.17.0 batch (5 consecutive adversarial-mode cycles): cycle 94 $6.85, cycle 96 $7.40, cycle 98 $5.94 — full breakdown in [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md) §2. These figures are display-only telemetry, not budget-gating inputs. Per-phase token attribution: [docs/architecture/token-economics-2026.md](docs/architecture/token-economics-2026.md).
 
 Per-agent context tuning (v10.10.0+): each phase profile declares `context_mode: "digest" | "full"`. Orchestrator runs `digest` by default (~6 K tokens saved per cycle); Builder/Auditor run `full` for evidence access. FAIL-path auto-promotes digest → full to prevent under-feeding recovery. See [docs/architecture/orchestrator-context-modes.md](docs/architecture/orchestrator-context-modes.md).
 
@@ -286,7 +286,7 @@ Honest head-to-head with the autonomous-agent skills shipping in the Claude Code
 
 Evolve Loop is **not always the right choice.**
 
-- **Higher friction.** 8 phases per cycle → 15-30 min wall-clock + $5-8 in adversarial mode (cycles 94-98 actuals; haiku-only is $0.15-0.30). `/goal` is 3-10 min + $0.30-1.50.
+- **Higher friction.** Full phase spine per cycle → 15-30 min wall-clock; adversarial mode historically logged ~$5-8/cycle (cycles 94-98 telemetry; haiku-only ~$0.15-0.30), though cost is display-only telemetry now and gates nothing. `/goal` is 3-10 min.
 - **Higher learning curve.** Trust kernel, EGPS predicates, CLI router, recovery mechanisms require understanding. `/goal` is "type `/goal`, wait, done."
 - **Anthropic-deep, not vendor-neutral.** Gemini/codex adapters exist as peers, but kernel hooks assume Anthropic-CLI-style permissions.
 - **Optimized for trust, not speed.** Fastest autonomous coding → `/goal`. Safest commit → evolve-loop.
@@ -352,7 +352,9 @@ Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The r
 /plugin install evolve-loop@evolve-loop
 ```
 
-**Option B: Plugin + Go binary (v11.0.0+, faster structural paths)**
+**Option B: Plugin + Go binary (required runtime)**
+
+The `evolve` Go binary is the sole runtime entrypoint, so build it after installing the plugin:
 
 ```bash
 /plugin marketplace add mickeyyaya/evolve-loop
@@ -360,7 +362,7 @@ Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The r
 cd go && make build   # produces ./go/bin/evolve
 ```
 
-Set `EVOLVE_GO_BIN=$(pwd)/go/bin/evolve` (or drop the binary on `PATH`). The plugin manifest declares the binary as `tier-1` primary; bash remains as the fallback when the binary is absent or `EVOLVE_USE_LEGACY_BASH=1` is set.
+Set `EVOLVE_GO_BIN=$(pwd)/go/bin/evolve` (or drop the binary on `PATH`). The Go binary is the sole runtime entrypoint (Go-only consolidation) — there is no bash `legacy/scripts/` fallback, matching the Runtime note in AGENTS.md.
 
 **Option C: Manual**
 
@@ -387,27 +389,26 @@ Setup is optional — the loop runs with sensible all-Claude defaults if you ski
 
 ### Run
 
-The v9.1.0 syntax is **budget-first** (cost-driven), with cycle-count and resume as alternatives:
+The recommended run mode is **cycle-count** (`--cycles N`, alias `--max-cycles`), with resume as the alternative:
 
 ```bash
-# Budget mode (recommended) — run cycles until cumulative spend ≥ $N
-/evolve-loop --budget-usd 5 "improve test coverage"
-
-# Cycle mode — run exactly N cycles regardless of cost
+# Cycle mode (recommended) — run exactly N cycles
 /evolve-loop --cycles 3 "add dark mode"
 
 # Resume a previously paused cycle (v9.1.0+)
 /evolve-loop --resume
 
 # Strategy presets (positional, after flags)
-/evolve-loop --budget-usd 10 innovate "explore concurrency primitives"
+/evolve-loop --cycles 5 innovate "explore concurrency primitives"
 /evolve-loop --cycles 5 harden                    # stability + tests
 /evolve-loop --cycles 3 repair "fix auth bug"     # fix-only, smallest diff
 /evolve-loop --cycles 1 ultrathink "refactor X"   # tier-1 forced
 /evolve-loop --cycles 5 autoresearch              # hypothesis testing, embraces failure
 ```
 
-> Legacy positional integer (`/evolve-loop 5`) still parses as cycles with a deprecation WARN — v10.0.0 candidate will consider flipping bare-positional to dollars.
+> The budget flags (`--budget-usd` / `--budget` / `--batch-cap-usd`) are **deprecated no-ops** — they are still accepted for script compatibility but ignored, because the token-budget *cost* gates were removed and cost is now display-only telemetry. Use `--cycles N` instead.
+>
+> Legacy positional integer (`/evolve-loop 5`) still parses as cycles with a deprecation WARN.
 
 ### Resume after a pause (v9.1.0+)
 
@@ -444,16 +445,13 @@ Reset never deletes history — it archives the workspace + a `cycle-state.json`
 
 ```
 ./bin/status                            current cycle + recent ledger summary
-./bin/cost <cycle>                      per-cycle token + cost breakdown (--json available)
+./bin/cost <cycle>                      per-cycle token + cost breakdown (--json available; display-only telemetry)
 ./bin/health <cycle> <workspace>        anomaly fingerprint for any past cycle
-./bin/verify-chain                      tamper-evident ledger chain check
-./bin/preflight                         full pipeline dry-run (regression + simulate + release-pipeline dry-run)
+evolve ledger verify                    tamper-evident ledger chain check (or: evolve guard chain)
+./bin/preflight                         full pipeline dry-run (regression + simulate)
 ./bin/check-caps [cli]                  show resolved capability tier per adapter
 evolve eval diversity-check <evalsDir>  adversarial-diversity score for an eval suite (v13.0.0+)
 evolve setup detect [--json]            onboarding digest: CLIs + per-phase routing (read-only)
-bash legacy/scripts/observability/show-context-monitor.sh <cycle>   per-cycle context usage (v9.1.0+)
-bash legacy/scripts/observability/show-context-monitor.sh --watch   live-tail latest cycle (3s refresh)
-bash legacy/scripts/observability/render-cli-resolution.sh <cycle>  per-phase CLI/model from ledger truth (v10.7+)
 ```
 
 For a hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
@@ -533,7 +531,10 @@ The README is the surface. Real depth lives in `docs/`:
 
 ### ADRs (architecture decisions)
 
-`docs/adr/0001-*.md` through `docs/adr/0007-*.md` — every architectural decision with context, choice, and consequence.
+- [`docs/architecture/adr/0001-*.md` through `0051-*.md`](docs/architecture/adr/) — the runtime/engine architecture decisions and the active ADR corpus (the canonical decision index; latest decision is ADR-0050 modularization-and-unified-phase-io, 2026-06-15; ADR-0051 is the renumbered setup-onboarding, freed from a 0027 collision).
+- [`docs/adr/0001-*.md`..`0007-*.md` plus `0009-*.md`](docs/adr/) — the earlier Claude-Code plugin-layer decisions (0008 is unused).
+
+Each ADR records context, choice, and consequence.
 
 ---
 
@@ -604,44 +605,11 @@ Active milestones (cycles that shipped substantive structural changes):
 | v10.15 | 2026-05-19 | Research-as-tool full stack (cycle 87-89); doc-stewardship hooks |
 | v10.16 | 2026-05-20 | Trust-kernel hardening (cycle 93); pre-merge tree-SHA verify |
 | v10.17 | 2026-05-20 | Token-economics roadmap batch (cycles 94-98): P1 + P2 + L1 + P3 foundation |
-| v10.18 | May 21 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v11.7 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v11.8 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v11.9 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v12.0 | May 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v12.1 | May 25 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v12.2 | May 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v12.3 | May 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v13.0 | May 27 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v14.0 | May 31 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v15.0 | Jun 2 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.0 | Jun 2 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.1 | Jun 2 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.2 | Jun 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.3 | Jun 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.4 | Jun 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.5 | Jun 4 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.6 | Jun 6 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.7 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.8 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v16.9 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v17.0 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v17.1 | Jun 7 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.0 | Jun 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.1 | Jun 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.2 | Jun 9 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.3 | Jun 10 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.4 | Jun 11 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.5 | Jun 11 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.6 | Jun 12 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.7 | Jun 13 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.8 | Jun 14 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.9 | Jun 14 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.10 | Jun 14 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.11 | Jun 14 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v18.12 | Jun 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| … | May 21 – Jun 13 | v10.18 → v18.10 — see [CHANGELOG.md](CHANGELOG.md) for each release's filled Added/Fixed/Changed entries |
+| v18.11 | 2026-06-14 | Token-budget removal — cost gates dropped; cost is now display-only telemetry |
+| v18.12 | 2026-06-15 | Phase-1 modularization (ADR-0050): `internal/gitexec` leaf, public-API coverage harness, `fixtures.StressN`, unified `internal/log.Console`, broadened `internal/envchain` adoption in `cmd/*` |
 
-Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology: [CHANGELOG.md](CHANGELOG.md). Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
+Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology (source of truth): [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`. Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 
 ---
 
@@ -649,10 +617,9 @@ Per-version release notes: [docs/operations/release-notes/](docs/operations/rele
 
 ```
 evolve-loop/
-├── .claude-plugin/              # Plugin manifest + slash commands
+├── .claude-plugin/              # Plugin + marketplace manifests
 │   ├── plugin.json              # Canonical version + components list
-│   ├── marketplace.json         # Marketplace registry entry
-│   └── commands/                # User-facing /commands (one per UX entry point)
+│   └── marketplace.json         # Marketplace registry entry
 ├── .evolve/                     # Runtime state (mostly gitignored)
 │   ├── state.json               # Authoritative cross-cycle state
 │   ├── ledger.jsonl             # SHA-chained audit log
@@ -669,22 +636,26 @@ evolve-loop/
 │   └── regression-suite/cycle-*/  # Permanent regression predicates (tracked)
 ├── agents/                      # Persona files (tri-layer "who")
 ├── skills/                      # Skill workflows (tri-layer "how")
-├── legacy/scripts/                     # Trust kernel + adapters + utilities
-│   ├── dispatch/                # Dispatcher + subagent-run + router
-│   ├── lifecycle/               # phase-gate.sh + ship.sh + cycle-state.sh
-│   ├── guards/                  # PreToolUse shell hooks (Tier 1)
-│   ├── cli_adapters/            # claude.sh / gemini.sh / codex.sh
-│   ├── verification/            # validate-predicate.sh + verify-eval.sh
-│   ├── observability/           # render-cli-resolution.sh + verify-ledger-chain.sh
-│   ├── failure/                 # failure-adapter.sh
-│   ├── utility/                 # release.sh + promote-acs.sh + probe-tool.sh
-│   └── tests/                   # Integration + unit tests
+├── go/                          # Go runtime (sole entrypoint; build → go/bin/evolve)
+│   ├── cmd/evolve/              # `evolve` CLI (every subcommand)
+│   ├── cmd/apicover/            # public-API coverage harness
+│   └── internal/               # core, phases, bridge, guards, gitexec, log, ...
+│       ├── core/               # orchestrator, failure-adapter, dispatch
+│       ├── phases/             # per-phase logic (scout/build/audit/ship/...)
+│       ├── bridge/             # native subagent launcher
+│       ├── guards/             # Tier-1 kernel hooks (phase/role/ship/chain)
+│       ├── gitexec/            # git CLI behind sysexec
+│       └── log/                # unified Console logger
+├── adapters/                    # CLI adapter shells + capability JSON
+│   ├── claude.sh / gemini.sh / codex.sh   # native CLI adapters
+│   └── *.capabilities.json      # per-adapter capability tiers
 ├── docs/                        # Documentation (this directory tree)
 │   ├── concepts/                # Teaching-first
 │   ├── architecture/            # Reference-first
+│   │   └── adr/                 # Runtime/engine ADRs 0001-0051 (active corpus)
 │   ├── comparisons/             # vs other projects
 │   ├── incidents/               # Postmortems
-│   ├── adr/                     # Architecture decisions
+│   ├── adr/                     # Earlier plugin-layer ADRs (0001-0007, 0009)
 │   └── getting-started/         # Hands-on tutorials
 ├── knowledge-base/research/     # Research dossiers (tracked, agent-excluded)
 ├── bin/                         # Operator CLI shortcuts (status, cost, health, ...)

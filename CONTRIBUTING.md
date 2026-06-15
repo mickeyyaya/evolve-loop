@@ -16,7 +16,7 @@ cd evolve-loop
 
 Agent definitions live in `agents/` as Markdown files with YAML frontmatter. See `docs/writing-agents.md` for the full guide.
 
-Current agents: Scout, Builder, Auditor, Operator.
+Current agents: Scout, Builder, Auditor, Orchestrator. (The Operator in `agents/evolve-operator.md` is a post-cycle health monitor, not one of the four pipeline agents.)
 
 ### 2. Phases
 
@@ -41,18 +41,20 @@ Eval definitions and the eval runner live in `skills/loop/eval-runner.md`.
 
 evolve-loop maintains two content surfaces:
 
-- `docs/research/` — actively cited by personas/skills/scripts; **loaded** into agent context during cycles
-- `docs/private/research/` — developer-only reference; **NOT loaded** into agent context (kernel-blocked across all CLIs)
+- `docs/research/` — runtime references actively cited by personas/skills/scripts; **loaded** into agent context during cycles
+- `knowledge-base/research/` — archival research dossiers; **NOT loaded** into agent context (excluded to keep prompts focused)
+
+> The older `docs/private/research/` name (and its `knowledge-base/` → `docs/private/` relocation in `docs/MOVED.md` / `docs/architecture/private-context-policy.md`) is superseded — `knowledge-base/research/` is the live archival surface.
 
 **Decision rule when filing a new research note:**
 
 > Will any persona, skill, or script reference this doc?
 > - **YES** → `docs/research/`
-> - **NO**  → `docs/private/research/`
+> - **NO**  → `knowledge-base/research/`
 
 Cross-references count even if the doc isn't loaded into every cycle's context — what matters is whether any runtime artifact *could* read it. See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full convention.
 
-**For agents writing research citations during cycles:** the stewardship rule (v9.1.x+) requires that every learned/applied/verified citation be persisted to `docs/private/research/` if not already present. Scout adds the entry; Builder cross-references it from build-report.md; Auditor verifies it exists.
+**For agents writing research citations during cycles:** the Knowledge Stewardship Rule (AGENTS.md §9) requires that every learned/applied/verified citation be persisted — runtime references to `docs/research/`, archival dossiers to `knowledge-base/research/` — if not already present. Scout adds the entry; Builder cross-references it from build-report.md; Auditor verifies it exists.
 
 ## Pull Request Process
 

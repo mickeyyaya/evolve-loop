@@ -91,7 +91,7 @@ yield identical `RoutingSignals`.
 
 | Leaf | Role | State | Migration |
 |------|------|-------|-----------|
-| `internal/gitexec` (new) | `Git{Dir, Run sysexec.RunFunc}` with `Capture/Output/Run/DirtyPaths/HEAD` + pure `PorcelainPath/PorcelainOldPath`. Isolates the git CLI. | to build (1.1) | leaf callers first (rollback, versionbump, changeloggen, swarm, cycleclassify, preflight); `core`'s 4 git files LAST (Phase 4.5). |
+| `internal/gitexec` (new) | `Git{Dir, Exec sysexec.RunFunc}` + `Default(dir)` constructor, with `Capture/Output/Run/HEAD/DirtyPaths` + pure `PorcelainPath/PorcelainOldPath`. Isolates the git CLI. (Seam field renamed `Run`→`Exec` on landing to avoid the clash with the `(g Git) Run(...)` method — see decision-log row 1.1.) | to build (1.1) | leaf callers first (rollback, changeloggen, swarm, cycleclassify); versionbump/preflight excluded — no git exec (versionbump edits via `atomicwrite`; preflight only PATH-probes git), see decision-log 1.2b; `core`'s 4 git files LAST (Phase 4.5). |
 | `internal/envchain` | typed env registry (`BoolValue` etc.) | partially adopted (core done) | remaining `cmd/*` + leaves (1.3). |
 | `internal/paths` | `.evolve` layout from a `Layout` | partial | `bridge/manifest.go`, `research/kb.go`, `ship/gitops.go` (1.4). |
 | `internal/log` | unified logger; add `Console{Out,Err,Quiet}` + `Infof/Warnf/Errorf` + `Default()` (additive) | to promote (1.5) | non-core printers first; orchestrator's ~115 sites in Phase 4, per-section. |

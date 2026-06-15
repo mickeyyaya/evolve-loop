@@ -14,6 +14,8 @@
 | DEAD | No production reader; safe to remove from docs |
 | INTERNAL | Set by the runner for subprocess injection; not operator-facing |
 
+> **The hand-maintained cluster tables below are a legacy annotation layer.** The authoritative flag status is the [Generated Flag Index](#generated-flag-index) (SSOT = `go/internal/flagregistry`, regenerated via `evolve flags generate`). When a cluster table's Status disagrees with the Generated Flag Index, **the Generated Flag Index wins.**
+
 ---
 
 ## Core Infrastructure (never consolidate)
@@ -22,7 +24,7 @@
 |------|--------|---------|
 | `EVOLVE_PROJECT_ROOT` | ACTIVE | Writable project directory (dual-root pattern) |
 | `EVOLVE_PLUGIN_ROOT` | ACTIVE | Read-only plugin install location |
-| `EVOLVE_CYCLE_STATE_FILE` | ACTIVE | Override cycle-state.json path (test seam) |
+| `EVOLVE_CYCLE_STATE_FILE` | DEAD | Override cycle-state.json path (test seam) — no reader on any surface (2026-06-11 inventory) |
 | `EVOLVE_TESTING` | ACTIVE | Test harness mode — disables real CLI calls |
 | `EVOLVE_RESOLVE_ROOTS_LOADED` | ACTIVE | Idempotency guard for resolve-roots.sh sourcing |
 | `EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | ACTIVE | Idempotency guard for failure-classifications.sh |
@@ -107,9 +109,9 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_FANOUT_ENABLED` | ACTIVE | Master switch for fan-out |
-| `EVOLVE_FANOUT_SCOUT` | ACTIVE | Enable fan-out for scout phase |
+| `EVOLVE_FANOUT_SCOUT` | DEAD | Enable fan-out for scout phase — no reader on any surface (2026-06-11 inventory) |
 | `EVOLVE_FANOUT_AUDITOR` | ACTIVE (wired v10.19) | Enable fan-out for auditor phase (orchestrator picks `dispatch-parallel auditor`; reads `auditor.json:parallel_subtasks[]`) |
-| `EVOLVE_FANOUT_RETROSPECTIVE` | ACTIVE | Enable fan-out for retrospective phase |
+| `EVOLVE_FANOUT_RETROSPECTIVE` | DEAD | Enable fan-out for retrospective phase — no reader on any surface (2026-06-11 inventory) |
 | `EVOLVE_FANOUT_CONCURRENCY` | ACTIVE | Max parallel workers in flight (default 2) |
 | `EVOLVE_FANOUT_TIMEOUT` | ACTIVE | Per-worker timeout in fanout |
 | `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | ACTIVE | Cancel remaining workers on K-agreement |

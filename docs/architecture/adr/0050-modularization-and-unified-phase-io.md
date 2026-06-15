@@ -74,4 +74,4 @@ All of this must change **without ever altering the trust kernel** — the ship-
 
 ## Decision-log & traceability
 
-Every slice appends one row to `docs/architecture/decision-log-modularization.md` *in the same commit*, references this ADR ID, and carries its `apicover` + `-race` evidence in the per-module Definition-of-Done. The full detailed contract lives in `docs/superpowers/specs/2026-06-15-modularization-unified-phase-io-design.md`.
+Every slice appends one row to `docs/architecture/decision-log-modularization.md` (rows batched into a per-phase docs slice — Phase 0 → commit `56456200`, Phase 1 → PR #112 / commit `64095c18` — that lands separately from the row-less code slices, since per-slice appends collide on the shared table across the parallel code PRs), references this ADR ID, and carries its `apicover` + `-race` evidence in the per-module Definition-of-Done. The full detailed contract lives in `docs/superpowers/specs/2026-06-15-modularization-unified-phase-io-design.md`.

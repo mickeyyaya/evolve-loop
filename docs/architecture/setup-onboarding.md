@@ -2,7 +2,7 @@
 
 > **Status:** Shipped 2026-05-27. Step-9b migration (2026-06-02) repointed the durable per-phase override from the removed `llm_config.json` to `.evolve/policy.json` `pins`. First-launch onboarding: detect CLIs, propose per-phase CLI/model pins, verify them against the floor, explain the pipeline.
 > **Audience:** Operators onboarding a new checkout; anyone changing per-phase model routing.
-> **Source:** `go/internal/setup/setup.go`, `go/cmd/evolve/cmd_setup.go`, `skills/setup/SKILL.md`. Design: [adr/0027-setup-onboarding.md](adr/0027-setup-onboarding.md).
+> **Source:** `go/internal/setup/setup.go`, `go/cmd/evolve/cmd_setup.go`, `skills/setup/SKILL.md`. Design: [adr/0051-setup-onboarding.md](adr/0051-setup-onboarding.md).
 
 ## TL;DR
 

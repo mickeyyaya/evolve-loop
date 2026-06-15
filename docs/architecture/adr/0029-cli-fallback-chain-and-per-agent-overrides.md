@@ -1,6 +1,6 @@
 # ADR-0029: CLI Fallback Chain + Per-Agent Overrides (any-CLI / any-model / any-phase)
 
-**Status:** Accepted | **Date:** 2026-05-28 | **PR:** [#26](https://github.com/mickeyyaya/evolve-loop/pull/26) `9d02630` | **Supersedes:** N/A | **Builds on:** [ADR-0022 LaunchIntent→Realizer](./0022-launch-intent-realizer.md), [ADR-0027 commit-as-evidence + setup-onboarding](./0027-commit-as-evidence.md)
+**Status:** Accepted | **Date:** 2026-05-28 | **PR:** [#26](https://github.com/mickeyyaya/evolve-loop/pull/26) `9d02630` | **Supersedes:** N/A | **Builds on:** [ADR-0022 LaunchIntent→Realizer](./0022-launch-intent-realizer.md), [ADR-0027 commit-as-evidence](./0027-commit-as-evidence.md), [ADR-0051 setup-onboarding](./0051-setup-onboarding.md)
 
 **Amended 2026-05-28 (cycle-122 remediation, commit 3):** the default `cli_fallback_on_exit` trigger list was extended from `[80, 127]` to `[80, 81, 124, 127]` to close the WS-B↔WS-G integration gap. See [cycle-122 incident report](../../incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md) and [ADR-0030 phase-observer auto-spawn](./0030-phase-observer-autospawn-in-evolve-loop.md) for the companion fixes. References below to `[80, 127]` are kept verbatim for historical record; the live default is enforced by `go/internal/phases/runner/cli_chain.go:defaultFallbackOnExit`.
 
@@ -163,5 +163,5 @@ After that, ANY profile can name them in `cli` or `cli_fallback` and `--cli phas
 - **Codex 0.134 root-cause dossier:** [../../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
 - **Ollama control-surface dossier:** [../../../knowledge-base/research/ollama-control-surface-2026.md](../../../knowledge-base/research/ollama-control-surface-2026.md)
 - **Builds on ADR-0022** (LaunchIntent→Realizer) — the per-CLI realization layer this ADR's chain dispatches into.
-- **Builds on ADR-0027** (setup-onboarding) — the `allowed_clis` envelope constraint that gates which CLIs can appear in a profile's chain.
+- **Builds on ADR-0051** (setup-onboarding) — the `allowed_clis` envelope constraint that gates which CLIs can appear in a profile's chain.
 - **Related ADR-0024** (dynamic phase routing) — orthogonal axis; PhaseAdvisor chooses WHICH phases run; ADR-0029 chooses WHICH CLI runs a chosen phase.

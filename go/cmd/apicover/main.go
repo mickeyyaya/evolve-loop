@@ -3,7 +3,8 @@
 // named by a _test AST AND >0% in `go tool cover -func` — flagging uncovered
 // symbols and named-but-0% false-greens. //apicover:ignore reason=... suppresses
 // a symbol (reason mandatory). It is warning-only by default; -enforce makes it
-// exit non-zero. See docs/architecture/adr/0050 and the decision log.
+// exit non-zero. See docs/architecture/adr/0050-modularization-and-unified-phase-io.md
+// and the decision log (docs/architecture/decision-log-modularization.md).
 package main
 
 import (
