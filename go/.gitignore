@@ -5,6 +5,8 @@
 *.out
 coverage.html
 coverage.txt
+coverage.func.txt
+apicover-report.txt
 
 # Local dev
 .envrc.local

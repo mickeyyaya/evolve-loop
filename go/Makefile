@@ -28,7 +28,7 @@ DIST_TARGETS := \
     $(DIST_DIR)/evolve-linux-arm64
 
 .PHONY: build test test-component test-integration test-e2e test-all \
-        test-latency cover lint tidy clean help dist dist-clean \
+        test-latency cover apicover lint tidy clean help dist dist-clean \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64
 
 # FAST_PKGS is every non-acs package. The default (no build tags) compiles
@@ -89,6 +89,17 @@ cover: ## Per-package coverage report (incl. integration tier); fails if any int
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage HTML: coverage.html"
+
+# APICOVER_PKGS scopes the public-API-coverage measurement. Default is all
+# internal packages; override (e.g. APICOVER_PKGS=./internal/paths/...) to focus.
+APICOVER_PKGS ?= ./internal/...
+
+apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scope, -enforce in Phase 5)
+	@mkdir -p $(BIN_DIR)
+	@$(GO) build -o $(BIN_DIR)/apicover ./cmd/apicover
+	@$(GO) test -count=1 -coverprofile=coverage.txt $(APICOVER_PKGS) >/dev/null
+	@$(GO) tool cover -func=coverage.txt > coverage.func.txt
+	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
 
 lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
