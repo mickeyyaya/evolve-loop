@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
@@ -101,6 +102,15 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		PreviousPhase: string(cr.current),
 		Env:           cr.envSnap,
 		Context:       phaseCtx,
+	}
+	// ADR-0050 Phase 3.4: the unified-phase-I/O SHADOW stage. When
+	// EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the same
+	// upstream this phase is about to receive, compare it to the legacy routing
+	// digest, and record any divergence (shadow artifact + ledger). At
+	// EVOLVE_PHASE_IO=off (default) this is skipped entirely — byte-identical
+	// dispatch. It never affects phaseReq or the dispatch result.
+	if cr.o.cfg.PhaseIO >= config.StageShadow {
+		cr.emitPhaseIOShadow(next)
 	}
 	// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
 	// goroutine BEFORE runner.Run and cancel it AFTER. noopObserver
