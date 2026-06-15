@@ -32,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
@@ -353,7 +354,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				}, fmt.Errorf("%s: %w", phase, verr)
 			}
 			pin = &p
-			fmt.Fprintf(os.Stderr, "[runner] phase=%s policy pin: cli=%q model=%q\n", phase, p.CLI, p.Model)
+			log.Diag().Infof("[runner] phase=%s policy pin: cli=%q model=%q\n", phase, p.CLI, p.Model)
 		}
 	}
 
@@ -400,7 +401,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		preCandidates := plan.Candidates
 		plan = llmroute.Probe(plan, nil)
 		if !sameCandidates(preCandidates, plan.Candidates) {
-			fmt.Fprintf(os.Stderr, "[runner] phase=%s capability probe reordered chain: %v -> %v\n",
+			log.Diag().Infof("[runner] phase=%s capability probe reordered chain: %v -> %v\n",
 				phase, preCandidates, plan.Candidates)
 		}
 	}
@@ -414,10 +415,10 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// invoked and why (an output stream saying `model: claude-sonnet-4-6` could
 	// otherwise be misread as "codex delegating to claude").
 	if len(plan.Candidates) > 1 {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
+		log.Diag().Infof("[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
 			phase, profileName, cli, plan.PrimarySource, profilePath, plan.Candidates[1:], plan.Triggers)
 	} else {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
+		log.Diag().Infof("[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
 			phase, profileName, cli, plan.PrimarySource, profilePath)
 	}
 	model := plan.Model
@@ -447,7 +448,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	var attemptLog []string
 	for i, candidateCLI := range plan.Candidates {
 		if i > 0 {
-			fmt.Fprintf(os.Stderr,
+			log.Diag().Infof(
 				"[runner] phase=%s fallback %d/%d: trying cli=%s (previous=%s exit=%d)\n",
 				phase, i+1, len(plan.Candidates), candidateCLI, plan.Candidates[i-1], bres.ExitCode)
 		}
@@ -472,7 +473,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
 		// and we want it to describe what actually happened last.
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle); err != nil {
-			fmt.Fprintf(os.Stderr, "[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
+			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))
 		// CLI-health bench: an exit-85 with a fresh benchable escalation
@@ -497,7 +498,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// trigger exit + more candidates → loop continues
 	}
 	if len(attemptLog) > 1 {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
+		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
 	durationMS := b.nowFn().Sub(start).Milliseconds()
 
@@ -601,7 +602,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// cyclecost / phaseobserver still read it directly.
 	if envchain.Resolve("EVOLVE_STDOUT_FILTER", req.Env, "", "on") != "off" {
 		if err := b.stdoutFilter(req.Workspace, phase); err != nil {
-			fmt.Fprintf(os.Stderr, "[runner] WARN stdout filter phase=%s: %v\n", phase, err)
+			log.Diag().Warnf("[runner] WARN stdout filter phase=%s: %v\n", phase, err)
 		}
 	}
 
@@ -634,7 +635,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			Severity: "warning",
 			Message:  fmt.Sprintf("bridge timed out (exit 81) but deliverable %s is well-formed; reconciled to %s from the agent's own report", artifactPath, verdict),
 		})
-		fmt.Fprintf(os.Stderr, "[runner] RECONCILED phase=%s exit=81 verdict=%s deliverable=%s\n", phase, verdict, artifactPath)
+		log.Diag().Infof("[runner] RECONCILED phase=%s exit=81 verdict=%s deliverable=%s\n", phase, verdict, artifactPath)
 	}
 	return resp, nil
 }

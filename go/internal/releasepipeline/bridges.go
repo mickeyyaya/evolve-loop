@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/marketplacepoll"
 	"github.com/mickeyyaya/evolve-loop/go/internal/releaseconsistency"
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
@@ -36,7 +37,7 @@ func runChangelogGenLib(repoRoot, fromRef, toRef, target string, dryRun bool) er
 	clPath := changeloggen.ResolveChangelogPath(repoRoot)
 	if body, err := os.ReadFile(clPath); err == nil {
 		if changeloggen.HasEntry(string(body), target) {
-			fmt.Fprintf(os.Stderr, "[changelog-gen] CHANGELOG.md already has [%s] entry — preserving (idempotent skip)\n", target)
+			log.Diag().Infof("[changelog-gen] CHANGELOG.md already has [%s] entry — preserving (idempotent skip)\n", target)
 			return nil
 		}
 	}
@@ -53,7 +54,7 @@ func runChangelogGenLib(repoRoot, fromRef, toRef, target string, dryRun bool) er
 	buckets := changeloggen.ClassifyAll(commits)
 	entry := changeloggen.RenderEntry(target, fromRef, toRef, time.Now(), buckets)
 	if dryRun {
-		fmt.Fprintf(os.Stderr, "[changelog-gen] DRY-RUN: would prepend to %s\n", clPath)
+		log.Diag().Infof("[changelog-gen] DRY-RUN: would prepend to %s\n", clPath)
 		return nil
 	}
 	_, _, err = changeloggen.WriteEntry(clPath, target, entry)
