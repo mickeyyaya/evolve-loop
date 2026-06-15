@@ -10,15 +10,81 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
 func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, projectRoot string, cs CycleState, phase Phase, verdict string) {
-	if phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN) {
-		o.recordAuditBinding(ctx, cycle, projectRoot, cs.WorkspacePath, cs.ActiveWorktree, verdict)
+	in := bindingInputs{
+		cycle:       cycle,
+		projectRoot: projectRoot,
+		workspace:   cs.WorkspacePath,
+		worktree:    cs.ActiveWorktree,
+		verdict:     verdict,
 	}
-	if phase == PhaseBuild && verdict != VerdictSKIPPED {
-		o.recordBuildBinding(ctx, cycle, projectRoot, cs.WorkspacePath)
+	switch {
+	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN):
+		o.recordPhaseBinding(ctx, phase, in)
+	case phase == PhaseBuild && verdict != VerdictSKIPPED:
+		o.recordPhaseBinding(ctx, phase, in)
+	case o.cfg.PhaseIO >= config.StageEnforce && phase != PhaseAudit && phase != PhaseBuild:
+		// Phase 3.9: phase-agnostic binding for user/inserted phases. Dormant
+		// until EVOLVE_PHASE_IO=enforce, so the default-off loop emits exactly
+		// the audit/build bindings it did before (byte-identical ledger).
+		o.recordPhaseBinding(ctx, phase, in)
+	}
+}
+
+// phaseRole maps a phase to the agent role its provenance ledger entry records.
+// audit→auditor and build→builder are the exact role strings ship's audit-binding
+// (findLatestAudit) and the rt-001-ledger-role-completeness red-team predicate
+// require; every other phase binds under its own name (identity), so a
+// user-defined phase gets a stable, predictable role and the identity fallback
+// never renames a known agent role. It is a TOTAL map over all phases (so direct
+// callers and TestPhaseRole pin the canonical vocabulary); recordPhaseBinding
+// itself only routes non-audit/non-build phases through it.
+func phaseRole(phase Phase) string {
+	switch phase {
+	case PhaseAudit:
+		return "auditor"
+	case PhaseBuild:
+		return "builder"
+	default:
+		return string(phase)
+	}
+}
+
+// bindingInputs is the filesystem + cycle context a provenance binding needs.
+// phaseio.PhaseOutput carries the wire result (verdict/SHAs) but not the
+// projectRoot/workspace/worktree the git probes and artifact reads require, so
+// the binding takes them explicitly rather than via the typed output.
+type bindingInputs struct {
+	cycle       int
+	projectRoot string
+	workspace   string
+	worktree    string
+	// verdict is consumed only by the audit recorder (verdict→exit_code: WARN→1);
+	// build and generic bindings always record exit_code 0.
+	verdict string
+}
+
+// recordPhaseBinding is the phase-agnostic entry point for provenance bindings.
+// audit and build DELEGATE to their specialized recorders UNCHANGED, so their
+// ledger bytes stay byte-identical to before (the role vocabulary + fields ship
+// depends on — Risk #1). The bodies are genuinely asymmetric (audit alone
+// computes a worktree-tree SHA, reads its artifact fatally, derives exit code
+// from the verdict, and projects into the verdict cache), so the collapse is at
+// the dispatch/role-naming layer, NOT a merged body. Any other phase records a
+// generic builder-shaped entry under its identity role; the caller
+// (emitPhaseBindings) gates that path to EVOLVE_PHASE_IO=enforce.
+func (o *Orchestrator) recordPhaseBinding(ctx context.Context, phase Phase, in bindingInputs) {
+	switch phase {
+	case PhaseAudit:
+		o.recordAuditBinding(ctx, in.cycle, in.projectRoot, in.workspace, in.worktree, in.verdict)
+	case PhaseBuild:
+		o.recordBuildBinding(ctx, in.cycle, in.projectRoot, in.workspace)
+	default:
+		o.recordGenericBinding(ctx, phase, in)
 	}
 }
 
@@ -161,6 +227,46 @@ func (o *Orchestrator) recordBuildBinding(ctx context.Context, cycle int, projec
 	}
 	if err := o.ledger.Append(ctx, entry); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-binding ledger append: %v\n", err)
+	}
+}
+
+// recordGenericBinding writes a provenance entry for a phase that has no
+// specialized recorder — role = phaseRole(phase) (the phase's identity name).
+// It mirrors recordBuildBinding's best-effort shape (git_head + tree_state_sha +
+// optional <phase>-report.md artifact), minus the worktree-tree SHA and verdict-
+// cache projection that are audit-specific. Reached only at EVOLVE_PHASE_IO=
+// enforce (gated by emitPhaseBindings), so user/inserted phases can carry the
+// same kind=agent_subprocess provenance audit and build already do. Best-effort:
+// any failure WARNs and is swallowed, never blocking the cycle.
+func (o *Orchestrator) recordGenericBinding(ctx context.Context, phase Phase, in bindingInputs) {
+	head, _, err := gitCapture(ctx, in.projectRoot, "rev-parse", "HEAD")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s-binding: git rev-parse HEAD failed: %v\n", phase, err)
+		return
+	}
+	diff, code, derr := gitCapture(ctx, in.projectRoot, "diff", "HEAD")
+	if derr != nil || code > 1 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s-binding: git diff HEAD failed (rc=%d): %v\n", phase, code, derr)
+		return
+	}
+	treeSum := sha256.Sum256([]byte(diff))
+	artPath := filepath.Join(in.workspace, string(phase)+"-report.md")
+	entry := LedgerEntry{
+		TS:           o.now().UTC().Format(time.RFC3339),
+		Cycle:        in.cycle,
+		Role:         phaseRole(phase),
+		Kind:         "agent_subprocess",
+		ExitCode:     0,
+		GitHEAD:      strings.TrimSpace(head),
+		TreeStateSHA: hex.EncodeToString(treeSum[:]),
+		ArtifactPath: artPath,
+	}
+	if artBytes, rerr := os.ReadFile(artPath); rerr == nil {
+		s := sha256.Sum256(artBytes)
+		entry.ArtifactSHA256 = hex.EncodeToString(s[:])
+	}
+	if err := o.ledger.Append(ctx, entry); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s-binding ledger append: %v\n", phase, err)
 	}
 }
 
