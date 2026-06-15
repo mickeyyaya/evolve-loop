@@ -15,14 +15,17 @@ func AssembleHandoffs(workspace string, completed []string) (phaseio.Handoffs, e
 	if err != nil {
 		return phaseio.Handoffs{}, err
 	}
-	return handoffsFromSignals(sig), nil
+	return HandoffsFromSignals(sig), nil
 }
 
-// handoffsFromSignals maps the objective RoutingSignals digest into the typed
-// phaseio views. The only non-trivial conversion is severity: RoutingSignals
-// encodes it as the ordinal router.Severity, while the dependency-free phaseio
-// views use the canonical severity word (Severity.String()).
-func handoffsFromSignals(sig RoutingSignals) phaseio.Handoffs {
+// HandoffsFromSignals maps an already-computed RoutingSignals digest into the
+// typed phaseio views, without re-reading disk. Exported so the orchestrator's
+// EVOLVE_PHASE_IO shadow stage (Phase 3.4) can Digest once and project, rather
+// than calling AssembleHandoffs (a second Digest read) alongside its own Digest.
+// The only non-trivial conversion is severity: RoutingSignals encodes it as the
+// ordinal router.Severity, while the dependency-free phaseio views use the
+// canonical severity word (Severity.String()).
+func HandoffsFromSignals(sig RoutingSignals) phaseio.Handoffs {
 	init := phaseio.HandoffsInit{Generic: sig.Generic, Degraded: sig.DigestDegraded}
 	if sig.Scout.Present {
 		init.Scout = &phaseio.ScoutView{
