@@ -190,6 +190,20 @@ type RolloutStages struct {
 	// composition-root/orchestrator view, set from the same env var by
 	// applyEnv. Default StageShadow per ADR-0044 (behavior-neutral first ship).
 	PhaseRecovery Stage
+
+	// PhaseIO is the ADR-0050 Phase-3 unified-phase-I/O rollout dial. Unlike the
+	// gate dials above (off/shadow/enforce trichotomy) it uses the FULL
+	// off→shadow→advisory→enforce ladder, like the dynamic-routing Stage:
+	//   StageOff      — the unified phaseio envelope is dormant; byte-identical
+	//                   legacy dispatch (the default).
+	//   StageShadow   — the envelope is assembled and compared against the
+	//                   legacy disk reads; mismatches log + ledger only.
+	//   StageAdvisory — the envelope is populated and read alongside the legacy
+	//                   path (legacy still wins; the two are compared).
+	//   StageEnforce  — the typed envelope is authoritative.
+	// Default StageOff (set in defaults()); a typo falls back to off via
+	// parseStage, never silently enabling the new envelope.
+	PhaseIO Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -371,7 +385,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageOff},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -409,7 +423,7 @@ func readRegistry(path string) (registryDoc, bool) {
 func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	c := doc.Config
 	if c.DynamicRouting != "" {
-		cfg.Stage = parseStage(c.DynamicRouting, ws)
+		cfg.Stage = parseStage(c.DynamicRouting, "dynamic_routing", ws)
 	}
 	if c.RoutingMode != "" {
 		cfg.Mode = parseMode(c.RoutingMode, ws)
@@ -443,7 +457,7 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 
 func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_DYNAMIC_ROUTING"]; v != "" {
-		cfg.Stage = parseStage(v, ws)
+		cfg.Stage = parseStage(v, "dynamic_routing", ws)
 	}
 	if v := env["EVOLVE_ROUTING_MODE"]; v != "" {
 		cfg.Mode = parseMode(v, ws)
@@ -483,6 +497,13 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// program. Same trichotomy; a typo defaults to off, never silently
 		// enabling a kill-path. Default (no env) is shadow, set in defaults().
 		cfg.PhaseRecovery = parseEvidenceStage(v, "EVOLVE_PHASE_RECOVERY", ws)
+	}
+	if v := env["EVOLVE_PHASE_IO"]; v != "" {
+		// ADR-0050 Phase 3 — the unified phase-I/O rollout dial. Reuses
+		// parseStage (the 4-value off→shadow→advisory→enforce ladder) so a typo
+		// defaults to off, never silently enabling the new envelope. Default
+		// (no env) is off, set in defaults().
+		cfg.PhaseIO = parseStage(v, "EVOLVE_PHASE_IO", ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
@@ -556,7 +577,12 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 	}
 }
 
-func parseStage(v string, ws *[]Warning) Stage {
+// parseStage parses a full off→shadow→advisory→enforce dial (the 4-value
+// ladder, unlike parseEvidenceStage's off/shadow/enforce trichotomy). varName
+// names the offending key in the unknown-value warning; an unknown value
+// defaults to off (a typo must never silently enable a kill-path or a staged
+// rollout). Shared by EVOLVE_DYNAMIC_ROUTING and EVOLVE_PHASE_IO (ADR-0050).
+func parseStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
 		return StageOff
@@ -567,7 +593,7 @@ func parseStage(v string, ws *[]Warning) Stage {
 	case "enforce":
 		return StageEnforce
 	default:
-		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("dynamic_routing=%q unknown, defaulting to off", v)})
+		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("%s=%q unknown, defaulting to off", varName, v)})
 		return StageOff
 	}
 }

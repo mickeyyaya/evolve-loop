@@ -292,3 +292,34 @@ func TestLoad_PhaseRecoveryStage(t *testing.T) {
 		t.Error("typo EVOLVE_PHASE_RECOVERY should warn unknown-value")
 	}
 }
+
+// TestPhaseIOStage pins the EVOLVE_PHASE_IO dial (ADR-0050 Phase 3): the unified
+// phase I/O rollout uses the FULL off→shadow→advisory→enforce ladder (4-value,
+// unlike the 3-value gate dials), defaults OFF (dormant, byte-identical live
+// loop), and a typo falls back to off with a warning (never silently enabling
+// the new envelope). Covers DefaultOff / Shadow / Advisory / Enforce / TypoDefaultsOff.
+func TestPhaseIOStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	// DefaultOff: no env ⇒ the envelope ships dormant.
+	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseIO != StageOff {
+		t.Errorf("default PhaseIO = %v, want StageOff", cfg.PhaseIO)
+	}
+	// The full 4-value ladder (advisory is the middle state the gates omit).
+	for v, want := range map[string]Stage{
+		"off": StageOff, "0": StageOff, "shadow": StageShadow,
+		"advisory": StageAdvisory, "enforce": StageEnforce,
+	} {
+		if cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_IO": v}); cfg.PhaseIO != want {
+			t.Errorf("EVOLVE_PHASE_IO=%q → %v, want %v", v, cfg.PhaseIO, want)
+		}
+	}
+	// TypoDefaultsOff: an unknown value never silently enables the envelope.
+	cfg, ws := Load(absent, map[string]string{"EVOLVE_PHASE_IO": "banana"})
+	if cfg.PhaseIO != StageOff {
+		t.Errorf("typo EVOLVE_PHASE_IO → %v, want StageOff", cfg.PhaseIO)
+	}
+	if !hasWarning(ws, "unknown-value") {
+		t.Error("typo EVOLVE_PHASE_IO should warn unknown-value")
+	}
+}
