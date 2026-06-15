@@ -408,136 +408,34 @@ func fleetMode(env map[string]string) bool {
 // see fleetMode) and released on every exit path. State is updated
 // incrementally so a crash leaves an inspectable trail in .evolve/.
 func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleResult, error) {
-	// ADR-0049 S6 / root-cause R1: under the fleet supervisor (EVOLVE_FLEET=1)
-	// skip the whole-cycle global project lock (LOCK_NB) so M cycles run
-	// concurrently instead of refusing each other. Safe because every shared
-	// resource is now serialized by its OWN flock — state.json (UpdateState /
-	// withStateLock, S2), the ledger chain (CA.1), the .evolve/ship.lock
-	// integrator (S5) — and each cycle is isolated by its per-run worktree +
-	// workspace with run-scoped ship reads (S3) and audit binding (S4). Default
-	// off → the live sequential loop keeps the global lock, byte-identical.
-	release := func() error { return nil }
-	if !fleetMode(req.Env) {
-		acquired, err := o.storage.AcquireLock(ctx)
-		if err != nil {
-			return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
-		}
-		release = acquired
-	}
-	defer func() { _ = release() }()
-
-	state, err := o.storage.ReadState(ctx)
+	// Resource setup (lock, state read, cycle allocation, run-ID mint, CycleState,
+	// workspace-pollution guard, source worktree, cycle-state persist, run lease)
+	// → newCycleRun. It returns a single cleanup closure carrying the four exit
+	// actions (lock release, run-ID clear, worktree prune/preserve, lease stop);
+	// RunCycle defers it in its OWN frame so the actions fire here at cycle exit,
+	// LIFO, exactly as the original inline defers did. The worktree branch reads
+	// preserveWorktree/cycleCompletedNormally at defer-execution time — RunCycle
+	// passes its locals' LATE values (R2 late-visibility).
+	init, cleanup, err := o.newCycleRun(ctx, req)
 	if err != nil {
-		return CycleResult{}, fmt.Errorf("read state: %w", err)
+		return CycleResult{}, err
 	}
-	// CA.4: mint the cycle number through the allocation lease when the
-	// storage supports the serialized RMW (legacy +1 otherwise). A crashed
-	// run burns its number; resume re-enters via RunCycleFromPhase with the
-	// run record's cycle and never re-allocates.
-	cycle, err := o.allocateCycle(ctx, &state)
-	if err != nil {
-		return CycleResult{}, fmt.Errorf("allocate cycle: %w", err)
-	}
-
-	startedAt := o.now().UTC().Format(time.RFC3339)
-	// IntentRequired is the gate for the start→intent vs start→scout
-	// edge. Source priority: explicit Context["intent_required"]=="true"
-	// from the caller > env EVOLVE_REQUIRE_INTENT=="1" > false. This
-	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
-	intentRequired := req.Context["intent_required"] == "true" ||
-		envchain.BoolValue(req.Env["EVOLVE_REQUIRE_INTENT"], false)
-	// CA.5: one ULID per run — persisted in the cycle state; the
-	// construction-time stampingLedger stamps it on every ledger entry for
-	// as long as it is the current id (cleared on every exit path).
-	runID := MintRunID(o.now())
-	o.currentRunID.Store(runID)
-	defer o.currentRunID.Store("")
-	cs := CycleState{
-		CycleID:        cycle,
-		Phase:          string(PhaseStart),
-		StartedAt:      startedAt,
-		PhaseStartedAt: startedAt,
-		WorkspacePath:  RunWorkspacePath(req.ProjectRoot, cycle),
-		IntentRequired: intentRequired,
-		RunID:          runID,
-	}
-	// Guard against workspace pollution from a prior killed attempt at
-	// the same cycle number. If `<workspace>/` exists and has files,
-	// rename to `<workspace>.polluted-<UTCnano>/` BEFORE any phase runs.
-	// Without this, leftover scout-report.md / build-report.md from the
-	// killed attempt cause Scout to short-circuit (read pre-existing
-	// artifacts in seconds instead of redoing discovery) and steer
-	// downstream phases via the OLD task selection.
-	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
-	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that pre-seed
-	// workspace files to simulate phase state, and by operators via the shell
-	// (captured into req.Env from filterEvolveEnv(os.Environ()) at cycle launch,
-	// cmd_cycle.go). ADR-0049 N9: read ONLY the per-cycle env SNAPSHOT, never live
-	// os.Getenv — under concurrent fleet cycles a peer's env (or a mid-flight
-	// mutation) must not flip this cycle's guard. The launch snapshot already
-	// carries the operator's shell value, so this is behavior-preserving for the
-	// live loop while restoring per-cycle isolation.
-	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false)
-	if !guardDisabled {
-		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
-			// Best-effort: WARN but don't block the cycle; the failure
-			// mode it prevents is bad-data steering, not safety.
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN workspace archive failed: %v\n", err)
-		}
-	}
-	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
-	// here, isolated from the live tree. cs.ActiveWorktree gates source writes
-	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
-	// the source phases are denied by the role-gate (loud, not silent). Cleaned
-	// up on cycle exit (after ship has merged the worktree→main).
-	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
-	// cycle base. After the build phase we soft-reset to it so a committing
-	// builder's work becomes pending again (see normalizeWorktreeToBase + the
-	// cycle-156 incident). Persisted in CycleState so the crash-resume path
-	// can run the same normalize.
-	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure
-	// is recorded and cleared only when a later ship attempt succeeds. While
-	// set, the exit cleanup below SKIPS pruning so audited (possibly
-	// uncommitted) work survives for recovery — `evolve loop --resume` or an
-	// explicit `evolve cycle reset` reclaims it. Cycle 7 lost its entire
-	// PASS work to this prune; cycle 12 survived only via operator snapshot.
-	preserveWorktree := false
+	state := init.state
+	cs := init.cs
+	cycle := init.cycle
 	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
 	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
 	// relocates paths the build introduced, never the operator's pre-existing work.
-	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
+	mainDirtyBaseline := init.mainDirtyBaseline
+	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure is
+	// recorded and cleared only when a later ship attempt succeeds. While set, the
+	// exit cleanup SKIPS pruning so audited (possibly uncommitted) work survives
+	// for recovery — `evolve loop --resume` or `evolve cycle reset` reclaims it.
+	// cycleCompletedNormally is set only on a clean finalize. Both are read by the
+	// cleanup closure below at defer-execution time.
+	preserveWorktree := false
 	cycleCompletedNormally := false
-	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
-	} else {
-		cs.ActiveWorktree = wtPath
-		if base, _, berr := gitCapture(ctx, wtPath, "rev-parse", "HEAD"); berr == nil {
-			cs.WorktreeBaseSHA = strings.TrimSpace(base)
-		} else {
-			// Fail loudly: an empty base disables the cycle-156 normalize, so a
-			// committing builder's work would again be discarded by the audit —
-			// the exact symptom Option C fixes. WARN rather than abort (the
-			// source phases still run; normalize just degrades to a no-op).
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD at worktree creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
-		}
-		defer func() {
-			if preserveWorktree || !cycleCompletedNormally {
-				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
-				return
-			}
-			_ = o.worktree.Cleanup(req.ProjectRoot, wtPath)
-		}()
-	}
-	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-		return CycleResult{}, fmt.Errorf("init cycle-state: %w", err)
-	}
-
-	// ADR-0049 G16: write + heartbeat the per-run .lease so gc's liveness check
-	// (runlease.Fresh) never reaps a concurrent fleet sibling's run dir mid-cycle.
-	// startRunLease creates the run dir itself; no-op for worktree-less / test
-	// cycles (empty WorkspacePath). Stopped on every exit (deferred).
-	stopLease := startRunLease(cs.WorkspacePath, runID, o.now, leaseRefreshInterval())
-	defer stopLease()
+	defer func() { cleanup(preserveWorktree, cycleCompletedNormally) }()
 
 	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
 	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
