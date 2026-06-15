@@ -99,6 +99,10 @@ node_modules/
 .claude/evolve/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+# Campaign/dev git worktrees (e.g. .worktrees/modularize-unify-phaseio) — isolated
+# checkouts of this repo created via `git worktree add .worktrees/<name>`. Never
+# part of the tracked tree; ignored so the parent worktree's `git status` stays clean.
+.worktrees/
 .clone/
 .ruff_cache/
 *.pyc
