@@ -91,9 +91,23 @@ jobs:
           # Phase 1 build: warning-only until task #17 lands all packages.
           # Gate flips to hard fail once orchestrator phases (Phase 2) settle.
           exit 0
+      - name: api-coverage report (apicover; warning-only, Phase 0)
+        # cmd/apicover: every exported symbol must be named by a _test AST AND
+        # show >0% executed coverage; named-but-0% are false-greens a bare line
+        # number hides. Warning-only here (mirrors the >=85% gate above); flips
+        # to -enforce per package in Phase 5. Reuses coverage.txt from the test
+        # step, so no second test run.
+        run: |
+          go build -o bin/apicover ./cmd/apicover
+          go tool cover -func=coverage.txt > coverage.func.txt
+          bin/apicover -cover coverage.func.txt $(go list -f '{{.Dir}}' ./internal/...) > apicover-report.txt || true
+          grep -E '^(== |summary:)' apicover-report.txt | tail -80 || true
+          echo "::notice::apicover is warning-only in Phase 0 (full report in the coverage artifact)"
+          exit 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: coverage-${{ matrix.os }}
           path: |
             go/coverage.txt
+            go/apicover-report.txt
