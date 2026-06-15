@@ -32,14 +32,17 @@ func TestSubagentRun_NoInProcessFallbackSignal(t *testing.T) {
 	}
 
 	// Every surviving mention of LEGACY_AGENT_DISPATCH must either mark it as
-	// retired (help/usage text) or be the env read that feeds the hard error.
+	// retired (help/usage text) or be the env read that feeds the hard error
+	// (os.Getenv, or the envchain.* getter it was migrated onto in Phase 1.3).
 	// It must NEVER be advertised as an honored/supported env var — that
 	// duplicated-and-stale advertisement is exactly what the auditor caught.
 	for i, line := range strings.Split(src, "\n") {
 		if !strings.Contains(line, "LEGACY_AGENT_DISPATCH") {
 			continue
 		}
-		ok := strings.Contains(line, "retired") || strings.Contains(line, "os.Getenv")
+		ok := strings.Contains(line, "retired") ||
+			strings.Contains(line, "os.Getenv") ||
+			strings.Contains(line, "envchain.")
 		if !ok {
 			t.Errorf("cmd_subagent.go:%d advertises LEGACY_AGENT_DISPATCH as honored (must be retired-note or env-read only): %q", i+1, strings.TrimSpace(line))
 		}

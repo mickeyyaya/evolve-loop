@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
@@ -62,43 +63,45 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		close(shutdown)
 	}()
 
-	return phaseobserver.Run(phaseobserver.Config{
-		Workspace:    pos[0],
-		SubagentPGID: pgid,
-		Cycle:        cycle,
-		Phase:        pos[3],
-		Agent:        pos[4],
-		CycleState:   cycleState,
-		Scope:        scope,
-		Enforce:      enforce,
-		PollS:        atoiOr(os.Getenv("EVOLVE_OBSERVER_POLL_S"), 0),
-		StallS:       atoiOr(envOr("EVOLVE_OBSERVER_STALL_S", os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S")), 0),
-		// Cycle-124 Task 6 / operator redirect: bridge has full tmux
-		// control and SHOULD nudge a soft-stalled agent BEFORE the hard
-		// SIGTERM. Default promoted from 0 (opt-in) to 300 (half of
-		// StallS=600) so every standalone phase-observer run sends one
-		// nudge envelope when the agent emits no fresh output for 5+
-		// minutes. Opt-out is still possible: set
-		// EVOLVE_OBSERVER_NUDGE_S=0. Body overridable via
-		// EVOLVE_OBSERVER_NUDGE_BODY. See CLAUDE.md env-var table row +
-		// docs/architecture/adr/0023 facet A.
-		NudgeS:      atoiOr(os.Getenv("EVOLVE_OBSERVER_NUDGE_S"), 300),
-		NudgeBody:   os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
-		EOFGraceS:   atoiOr(os.Getenv("EVOLVE_OBSERVER_EOF_GRACE_S"), 0),
-		ShutdownSig: shutdown,
-		// ADR-0044 C3: the chain-backed stall policy executes ONLY at
-		// enforce (the observer subprocess reads the program's one dial from
-		// env, same pattern as the bridge). off/shadow/unset ⇒ nil policy ⇒
-		// byte-identical legacy Enforce branch — shadow observability for
-		// stalls already exists via the INCIDENT events themselves.
-		StallPolicy: stallPolicyFromEnv(),
-		// R3.4: the process-liveness probe is wired unconditionally — it is
-		// deterministic ground truth (signal-0), not policy; nil in Run
-		// means probe-off (fixture Configs). The ACTION on a dead group
-		// stays policy/Enforce-gated; at shadow the INCIDENT is pure soak
-		// telemetry (pane echo ≠ liveness, cycles 274/277).
-		ProcessAlive: phaseobserver.DefaultProcessAlive,
-	}, "", stderr)
+	cfg := observerEnvConfig()
+	cfg.Workspace = pos[0]
+	cfg.SubagentPGID = pgid
+	cfg.Cycle = cycle
+	cfg.Phase = pos[3]
+	cfg.Agent = pos[4]
+	cfg.CycleState = cycleState
+	cfg.Scope = scope
+	cfg.Enforce = enforce
+	cfg.ShutdownSig = shutdown
+	// ADR-0044 C3: the chain-backed stall policy executes ONLY at enforce (the
+	// observer subprocess reads the program's one dial from env, same pattern as
+	// the bridge). off/shadow/unset ⇒ nil policy ⇒ byte-identical legacy Enforce
+	// branch — shadow observability for stalls already exists via the INCIDENT
+	// events themselves.
+	cfg.StallPolicy = stallPolicyFromEnv()
+	// R3.4: the process-liveness probe is wired unconditionally — it is
+	// deterministic ground truth (signal-0), not policy; nil in Run means
+	// probe-off (fixture Configs). The ACTION on a dead group stays
+	// policy/Enforce-gated; at shadow the INCIDENT is pure soak telemetry
+	// (pane echo ≠ liveness, cycles 274/277).
+	cfg.ProcessAlive = phaseobserver.DefaultProcessAlive
+	return phaseobserver.Run(cfg, "", stderr)
+}
+
+// observerEnvConfig reads the EVOLVE_OBSERVER_* knobs through envchain. StallS
+// keeps its two-key fallback (EVOLVE_OBSERVER_STALL_S else the legacy
+// EVOLVE_INACTIVITY_THRESHOLD_S) via envOr+atoiOr — a precedence envchain.Int
+// cannot express without diverging on an explicit "0"/invalid primary. NudgeS
+// defaults to 300 (the pre-SIGTERM nudge, promoted from opt-in; 0 disables it,
+// body overridable via EVOLVE_OBSERVER_NUDGE_BODY — see ADR-0023 facet A).
+func observerEnvConfig() phaseobserver.Config {
+	return phaseobserver.Config{
+		PollS:     envchain.Int("EVOLVE_OBSERVER_POLL_S", nil, 0),
+		StallS:    atoiOr(envOr("EVOLVE_OBSERVER_STALL_S", os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S")), 0),
+		NudgeS:    envchain.Int("EVOLVE_OBSERVER_NUDGE_S", nil, 300),
+		NudgeBody: os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
+		EOFGraceS: envchain.Int("EVOLVE_OBSERVER_EOF_GRACE_S", nil, 0),
+	}
 }
 
 // stallPolicyFromEnv resolves the ADR-0044 stage for the observer
@@ -109,7 +112,7 @@ func stallPolicyFromEnv() recovery.StallPolicy {
 	if strings.ToLower(strings.TrimSpace(os.Getenv("EVOLVE_PHASE_RECOVERY"))) != "enforce" {
 		return nil
 	}
-	return recovery.NewChainStallPolicy(atoiOr(os.Getenv("EVOLVE_ARTIFACT_MAX_EXTENDS"), 0))
+	return recovery.NewChainStallPolicy(envchain.Int("EVOLVE_ARTIFACT_MAX_EXTENDS", nil, 0))
 }
 
 func envOr(primary, fallback string) string {
