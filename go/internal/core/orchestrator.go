@@ -412,53 +412,59 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// actions (lock release, run-ID clear, worktree prune/preserve, lease stop);
 	// RunCycle defers it in its OWN frame so the actions fire here at cycle exit,
 	// LIFO, exactly as the original inline defers did. The worktree branch reads
-	// preserveWorktree/cycleCompletedNormally at defer-execution time — RunCycle
-	// passes its locals' LATE values (R2 late-visibility).
+	// cr.preserveWorktree/cr.cycleCompletedNormally at defer-execution time — the
+	// cycleRun method object holds those late-mutated fields (R2 late-visibility).
 	init, cleanup, err := o.newCycleRun(ctx, req)
 	if err != nil {
 		return CycleResult{}, err
 	}
-	state := init.state
-	cs := init.cs
-	cycle := init.cycle
-	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
-	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
-	// relocates paths the build introduced, never the operator's pre-existing work.
-	mainDirtyBaseline := init.mainDirtyBaseline
-	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure is
-	// recorded and cleared only when a later ship attempt succeeds. While set, the
-	// exit cleanup SKIPS pruning so audited (possibly uncommitted) work survives
-	// for recovery — `evolve loop --resume` or `evolve cycle reset` reclaims it.
-	// cycleCompletedNormally is set only on a clean finalize. Both are read by the
-	// cleanup closure below at defer-execution time.
-	preserveWorktree := false
-	cycleCompletedNormally := false
-	defer func() { cleanup(preserveWorktree, cycleCompletedNormally) }()
+	// cycleRun method object: the ONE addressable home for the dispatch loop's
+	// shared + loop-carried state, so the sub-methods' late mutations are visible
+	// to the exit defers and the next iteration (pointer receivers throughout).
+	cr := &cycleRun{
+		o:                 o,
+		ctx:               ctx,
+		req:               req,
+		cycle:             init.cycle,
+		mainDirtyBaseline: init.mainDirtyBaseline,
+		state:             init.state,
+		cs:                init.cs,
+		result:            CycleResult{Cycle: init.cycle, FinalVerdict: VerdictPASS},
+		current:           PhaseStart,
+		lastVerdict:       VerdictPASS,
+		// scheduledNext "", routingSeq 0, recoveryDepth 0, preserveWorktree false,
+		// cycleCompletedNormally false — zero-valued by construction.
+	}
+	// Cleanup defer registered FIRST (fires LAST, LIFO) and BEFORE planCycle —
+	// byte-identical registration order to the inline version. Reads the LATE
+	// field values at exit (R2 late-visibility): the single most important
+	// state-promotion of the method-object refactor.
+	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
 
 	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
 	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle
 	// advisory plan) → planCycle. Outputs thread into every routing decision in
 	// the dispatch loop below.
-	plan := o.planCycle(ctx, req, state, cs, cycle)
-	envSnap := plan.envSnap
-	ctxSnap := plan.ctxSnap
-	preCycleHEAD := plan.preCycleHEAD
-	benchedCLIs := plan.benchedCLIs
-	clampedPlan := plan.clampedPlan
+	plan := o.planCycle(ctx, req, cr.state, cr.cs, cr.cycle)
+	cr.envSnap = plan.envSnap
+	cr.ctxSnap = plan.ctxSnap
+	cr.preCycleHEAD = plan.preCycleHEAD
+	cr.benchedCLIs = plan.benchedCLIs
+	cr.clampedPlan = plan.clampedPlan
 
-	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
-	var phaseTimings []phaseTimingEntry
 	// Deferred write of phase-timing.json runs even when RunCycle returns an
 	// error so partial timing data is preserved for operator inspection.
+	// Registered SECOND (fires FIRST, LIFO); reads cr.phaseTimings live so the
+	// grown slice header is observed.
 	defer func() {
-		if len(phaseTimings) > 0 {
-			writePhaseTimings(cs.WorkspacePath, phaseTimings)
+		if len(cr.phaseTimings) > 0 {
+			writePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
 		}
 		// ADR-0045 I1: roll every per-phase interaction ledger (bridge
 		// subprocess + orchestrator producers alike) into
 		// interaction-summary.json. Best-effort, abort paths included —
 		// an interaction that isn't recorded with its outcome doesn't exist.
-		if werr := interaction.WriteRollup(cs.WorkspacePath); werr != nil {
+		if werr := interaction.WriteRollup(cr.cs.WorkspacePath); werr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
 		}
 	}()
@@ -476,40 +482,12 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// match (correctly — there is nothing to reuse before any work runs). A
 	// richer post-build probe (same-tree-already-audited within a normal cycle)
 	// is an enforce-stage decision, deliberately out of the shadow increment.
-	if cs.ActiveWorktree != "" {
-		if sha := worktreeContentSHA(ctx, cs.ActiveWorktree); sha != "" {
+	if cr.cs.ActiveWorktree != "" {
+		if sha := worktreeContentSHA(ctx, cr.cs.ActiveWorktree); sha != "" {
 			if e, ok := verdictcache.NewStore(req.ProjectRoot, o.now).Lookup(sha); ok {
 				fmt.Fprintf(os.Stderr, "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
 			}
 		}
-	}
-
-	current := PhaseStart
-	lastVerdict := VerdictPASS
-	// scheduledNext, when non-empty, overrides the state machine for
-	// the next iteration. Set by the retro branch to inject the
-	// failure-adapter's decision.
-	var scheduledNext Phase
-	// routingSeq names the per-cycle routing-decision artifacts
-	// (routing-decision-<seq>.json). Incremented only when routing runs.
-	routingSeq := 0
-	// recoveryDepth bounds advisor-driven ship-error recovery across the whole
-	// cycle (maxRecoveryDepth). Persists across loop iterations.
-	recoveryDepth := 0
-	recordFailureLearning := func(failed Phase, failErr error, attempt int) {
-		o.recordFailureLearning(ctx, failureLearningRequest{
-			CycleRequest: req,
-			Cycle:        cycle,
-			Failed:       failed,
-			Err:          failErr,
-			Attempt:      attempt,
-			State:        &state,
-			CycleState:   &cs,
-			Context:      ctxSnap,
-			Env:          envSnap,
-			Result:       &result,
-			Timings:      &phaseTimings,
-		})
 	}
 
 	// Bounded loop guards against any transition-table cycle bug.
@@ -522,22 +500,22 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// !fromSchedule (generalizing the prior current!=PhaseRetro guard).
 		fromSchedule := false
 		switch {
-		case scheduledNext != "":
-			next = scheduledNext
-			scheduledNext = ""
+		case cr.scheduledNext != "":
+			next = cr.scheduledNext
+			cr.scheduledNext = ""
 			fromSchedule = true
-		case current == PhaseStart:
+		case cr.current == PhaseStart:
 			// First edge is gated by intent_required, not by verdict.
-			next = o.sm.NextFromStart(cs.IntentRequired)
-		case !current.IsValid():
+			next = o.sm.NextFromStart(cr.cs.IntentRequired)
+		case !cr.current.IsValid():
 			// current is a user-defined phase (only reachable when dynamic
 			// routing selected it). The static successor is simply the next
 			// entry in the configured order; the routing block below refines it.
-			next = o.nextInOrder(current)
+			next = o.nextInOrder(cr.current)
 		default:
-			n, err := o.sm.Next(current, lastVerdict)
+			n, err := o.sm.Next(cr.current, cr.lastVerdict)
 			if err != nil {
-				return result, fmt.Errorf("transition from %s: %w", current, err)
+				return cr.result, fmt.Errorf("transition from %s: %w", cr.current, err)
 			}
 			next = n
 		}
@@ -556,31 +534,31 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// floor (ClampPlanToFloor, applied to the upfront plan) decides what ship
 		// still requires regardless of how small the operator makes that set.
 		if o.cfg.Stage != config.StageOff {
-			routingSeq++
-			signals, _ := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
+			cr.routingSeq++
+			signals, _ := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
 			dec := o.strategy.Decide(router.RouteInput{
-				Current:   string(current),
-				Verdict:   lastVerdict,
+				Current:   string(cr.current),
+				Verdict:   cr.lastVerdict,
 				Signals:   signals,
-				History:   entriesFromRecords(state.FailedAt),
+				History:   entriesFromRecords(cr.state.FailedAt),
 				Cfg:       o.cfg,
-				Completed: cs.CompletedPhases,
-				Strict:    envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
+				Completed: cr.cs.CompletedPhases,
+				Strict:    envchain.BoolValue(cr.envSnap["EVOLVE_STRICT_AUDIT"], false),
 				Now:       o.now(),
 				// Proposer context (DynamicLLM only; ignored by pure Route).
-				Workspace:   cs.WorkspacePath,
+				Workspace:   cr.cs.WorkspacePath,
 				ProjectRoot: req.ProjectRoot,
-				Cycle:       cycle,
-				Env:         envSnap,
-				BenchedCLIs: benchedCLIs,
+				Cycle:       cr.cycle,
+				Env:         cr.envSnap,
+				BenchedCLIs: cr.benchedCLIs,
 				// Clamped whole-cycle plan (Stage>=Advisory). nil below Advisory
 				// or on planner failure ⇒ shouldRun runs the legacy trigger path.
-				Plan:           clampedPlan,
-				IntentRequired: cs.IntentRequired,
-				PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
+				Plan:           cr.clampedPlan,
+				IntentRequired: cr.cs.IntentRequired,
+				PSMASEnabled:   envchain.BoolValue(cr.envSnap["EVOLVE_PSMAS_SKIP"], false),
 			})
 			if o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
-				if forced, ok := o.enforceNext(current, next, signals, dec, planRunsShip(clampedPlan)); ok {
+				if forced, ok := o.enforceNext(cr.current, next, signals, dec, planRunsShip(cr.clampedPlan)); ok {
 					next = forced
 				}
 				// Full spine-integrity check on the SELECTED next (static OR
@@ -603,7 +581,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// never a "clean absence", so it fails open like a
 					// degraded read (review F6: a missing workspace must not
 					// masquerade as a spine gap at enforce).
-					fresh, derr := router.Digest(cs.WorkspacePath, cs.CompletedPhases)
+					fresh, derr := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
 					cleanAbsence := derr == nil && len(fresh.DigestDegraded) == 0
 					switch {
 					case derr == nil && o.sm.SpineSatisfiedUpTo(next, fresh, o.cfg):
@@ -612,9 +590,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						// record only; the gate, not Decide, owns blocking.)
 					case o.cfg.PhaseRecovery == config.StageEnforce && cleanAbsence:
 						spineErr := fmt.Errorf("spine gate: next=%s blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-283 class)", next)
-						o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, PhaseResponse{Phase: string(next)}, 0, spineErr.Error()))
-						recordFailureLearning(next, spineErr, 1)
-						return result, spineErr
+						o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, PhaseResponse{Phase: string(next)}, 0, spineErr.Error()))
+						cr.recordFailureLearning(next, spineErr, 1)
+						return cr.result, spineErr
 					default:
 						// Two fail-open sources, deliberately identical in
 						// behavior: (a) dial below enforce (shadow default —
@@ -637,7 +615,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					}
 				}
 			}
-			o.recordRoutingDecision(ctx, cycle, cs, routingSeq, dec)
+			o.recordRoutingDecision(ctx, cr.cycle, cr.cs, cr.routingSeq, dec)
 		}
 
 		if next == PhaseEnd {
@@ -656,19 +634,19 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// drift (built-ins always have factories; only registry/user
 			// phases can be known to routing yet unregistered).
 			if next.IsValid() || isConfiguredMandatory(o.cfg, string(next)) {
-				return result, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
+				return cr.result, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s selected but no runner is registered — skipping (register a runner or remove it from the registry order)\n", next)
-			current = next
+			cr.current = next
 			continue
 		}
 
 		phaseStarted := o.now().UTC()
-		cs.Phase = string(next)
-		cs.PhaseStartedAt = phaseStarted.Format(time.RFC3339)
-		cs.ActiveAgent = string(next)
-		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
+		cr.cs.Phase = string(next)
+		cr.cs.PhaseStartedAt = phaseStarted.Format(time.RFC3339)
+		cr.cs.ActiveAgent = string(next)
+		if err := o.storage.WriteCycleState(ctx, cr.cs); err != nil {
+			return cr.result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
 		// CB.1 (concurrency campaign W4): EVERY phase runs with cwd = the cycle
@@ -680,7 +658,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// touches main at all. cwd is NOT write permission: the write axis
 		// (role-gate / tree-diff guard / normalize) still keys off worktreePhase.
 		// Empty when provisioning failed — the pre-existing degraded mode.
-		phaseWorktree := cs.ActiveWorktree
+		phaseWorktree := cr.cs.ActiveWorktree
 		// Workstream B: snapshot the main-tree dirty set BEFORE a source-
 		// writing phase runs. After it runs we re-snapshot and compare —
 		// any newly-dirty MAIN-tree path is a leak that escaped the bridge
@@ -703,23 +681,23 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				beforeDirty = snap
 			}
 		}
-		phaseCtx := ctxSnap
+		phaseCtx := cr.ctxSnap
 		if next == PhaseRetro {
-			phaseCtx = make(map[string]string, len(ctxSnap)+1)
-			for k, v := range ctxSnap {
+			phaseCtx = make(map[string]string, len(cr.ctxSnap)+1)
+			for k, v := range cr.ctxSnap {
 				phaseCtx[k] = v
 			}
-			phaseCtx["previous_verdict"] = lastVerdict
+			phaseCtx["previous_verdict"] = cr.lastVerdict
 		}
 		phaseReq := PhaseRequest{
-			Cycle:         cycle,
+			Cycle:         cr.cycle,
 			ProjectRoot:   req.ProjectRoot,
-			Workspace:     cs.WorkspacePath,
+			Workspace:     cr.cs.WorkspacePath,
 			Worktree:      phaseWorktree,
-			RunID:         cs.RunID,
+			RunID:         cr.cs.RunID,
 			GoalHash:      req.GoalHash,
-			PreviousPhase: string(current),
-			Env:           envSnap,
+			PreviousPhase: string(cr.current),
+			Env:           cr.envSnap,
 			Context:       phaseCtx,
 		}
 		// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
@@ -760,7 +738,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if resp.Reconciled {
 					if lerr := o.ledger.Append(ctx, LedgerEntry{
 						TS:       o.now().UTC().Format(time.RFC3339),
-						Cycle:    cycle,
+						Cycle:    cr.cycle,
 						Role:     string(next),
 						Kind:     "reconciled_timeout",
 						ExitCode: 81,
@@ -778,18 +756,18 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// per-cycle env SNAPSHOT (ADR-0049 N9: read the snapshot, not live
 					// os.Getenv, so a concurrent fleet cycle's env can't flip this cycle's
 					// backfill. The snapshot already carries the operator's shell value).
-					backfillEnabled := envchain.BoolValue(envSnap["EVOLVE_BACKFILL_ENABLED"], true)
+					backfillEnabled := envchain.BoolValue(cr.envSnap["EVOLVE_BACKFILL_ENABLED"], true)
 					if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
-						artifactPath := backfillArtifactPath(cs.WorkspacePath, string(next))
-						if ok, berr := backfill.TryExtract(cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
+						artifactPath := backfillArtifactPath(cr.cs.WorkspacePath, string(next))
+						if ok, berr := backfill.TryExtract(cr.cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
 							fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
 						} else if ok {
 							fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
-							resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
+							resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
 							err = nil
 							if lerr := o.ledger.Append(ctx, LedgerEntry{
 								TS:       o.now().UTC().Format(time.RFC3339),
-								Cycle:    cycle,
+								Cycle:    cr.cycle,
 								Role:     string(next),
 								Kind:     "backfill",
 								ExitCode: 81,
@@ -808,17 +786,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// in failure-learning and the ledger — recovered, never silent.
 					if o.optionalInfraSkip(next, err) {
 						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: optional phase exhausted infra retries (%v); degrading to WARN and advancing (optional_infra_skip)\n", next, err)
-						recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
+						cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 						if lerr := o.ledger.Append(ctx, LedgerEntry{
 							TS:       o.now().UTC().Format(time.RFC3339),
-							Cycle:    cycle,
+							Cycle:    cr.cycle,
 							Role:     string(next),
 							Kind:     "optional_infra_skip",
 							ExitCode: bridgeExitCode(err),
 						}); lerr != nil {
 							fmt.Fprintf(os.Stderr, "[orchestrator] WARN optional_infra_skip ledger append: %v\n", lerr)
 						}
-						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cs.WorkspacePath}
+						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
 						err = nil
 						break
 					}
@@ -833,20 +811,20 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						// Preserve the worktree from the exit cleanup while a
 						// ship failure is unresolved (ADR-0039 §8 / D10) —
 						// cleared when a later ship attempt succeeds.
-						preserveWorktree = true
-						if rec, recovering := o.recoverFromShipError(ctx, cycle, cs, se, recoveryDepth); recovering {
-							ctxSnap["ship_error_code"] = string(se.Code)
-							ctxSnap["ship_error_class"] = string(se.Class)
-							ctxSnap["ship_error_stage"] = string(se.Stage)
-							ctxSnap["ship_error_debug"] = se.DebugString()
+						cr.preserveWorktree = true
+						if rec, recovering := o.recoverFromShipError(ctx, cr.cycle, cr.cs, se, cr.recoveryDepth); recovering {
+							cr.ctxSnap["ship_error_code"] = string(se.Code)
+							cr.ctxSnap["ship_error_class"] = string(se.Class)
+							cr.ctxSnap["ship_error_stage"] = string(se.Stage)
+							cr.ctxSnap["ship_error_debug"] = se.DebugString()
 							// ADR-0044 C1: the failed ship attempt ran and burned
 							// budget — record it before routing to recovery. A
 							// later successful ship records its own outcome.
-							o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
+							o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
 								fmt.Sprintf("ship error %s: recovering via %s", se.Code, rec)))
-							recoveryDepth++
-							scheduledNext = rec
-							current = PhaseShip // ship ran (and failed); keep forensics accurate
+							cr.recoveryDepth++
+							cr.scheduledNext = rec
+							cr.current = PhaseShip // ship ran (and failed); keep forensics accurate
 							shipRecovered = true
 							break
 						}
@@ -856,20 +834,20 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					// failure-learning retro so the timing record stays
 					// chronological (failed phase, then retro). No canonical
 					// agent verdict exists on this path → synthesized FAIL.
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error()))
-					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, err, attempt, o.now)
+					o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error()))
+					writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt, o.now)
 					// ADR-0044 C3: enforce-only, best-effort — classify the
 					// unclassified pane via the LLM tail and promote, so the
 					// NEXT occurrence is deterministic. Never alters the abort.
-					o.adviseOnUnclassifiedFailure(ctx, cycle, cs.WorkspacePath, req.ProjectRoot, next, err, envSnap)
-					recordFailureLearning(next, phaseErr, attempt)
-					return result, wrapCycleLevelError(next, phaseErr)
+					o.adviseOnUnclassifiedFailure(ctx, cr.cycle, cr.cs.WorkspacePath, req.ProjectRoot, next, err, cr.envSnap)
+					cr.recordFailureLearning(next, phaseErr, attempt)
+					return cr.result, wrapCycleLevelError(next, phaseErr)
 				}
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
 				// Emit structured audit trail for the self-heal retry.
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
 					TS:       o.now().UTC().Format(time.RFC3339),
-					Cycle:    cycle,
+					Cycle:    cr.cycle,
 					Role:     string(next),
 					Kind:     "phase_retry",
 					ExitCode: bridgeExitCode(err),
@@ -884,16 +862,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 					// ADR-0044 C1: a non-canonical verdict is never recorded
 					// raw and never upgraded — phaseOutcomeFrom synthesizes FAIL.
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error()))
-					writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, ferr, attempt, o.now)
-					recordFailureLearning(next, ferr, attempt)
-					return result, wrapCycleLevelError(next, ferr)
+					o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error()))
+					writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt, o.now)
+					cr.recordFailureLearning(next, ferr, attempt)
+					return cr.result, wrapCycleLevelError(next, ferr)
 				}
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
 				// Emit structured audit trail for the self-heal retry.
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
 					TS:       o.now().UTC().Format(time.RFC3339),
-					Cycle:    cycle,
+					Cycle:    cr.cycle,
 					Role:     string(next),
 					Kind:     "phase_retry",
 					ExitCode: 0,
@@ -920,7 +898,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			rin := ReviewInput{
 				Phase:       string(next),
 				Response:    resp,
-				Workspace:   cs.WorkspacePath,
+				Workspace:   cr.cs.WorkspacePath,
 				Worktree:    phaseWorktree,
 				ProjectRoot: req.ProjectRoot,
 			}
@@ -937,10 +915,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// re-dispatch records an outcome resolved by its verdict + the
 			// re-review. The I2 ladder's salvage/live-fix rungs will join
 			// this same decision when they ship.
-			irec := interaction.NewRecorder(cs.WorkspacePath)
+			irec := interaction.NewRecorder(cr.cs.WorkspacePath)
 			decisionID := ""
 			if !rr.Approve && (maxCorrections > 0 || o.contractVerifier != nil) {
-				decisionID = fmt.Sprintf("%s-c%d-%d", next, cycle, o.now().UnixNano())
+				decisionID = fmt.Sprintf("%s-c%d-%d", next, cr.cycle, o.now().UnixNano())
 			}
 			// ADR-0045 I2: graduated correction ladder. The DECISION is the
 			// pure interaction.NextCorrection CoR (salvage → live_fix →
@@ -964,7 +942,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			for !rr.Approve {
 				act := interaction.NextCorrection(interaction.CorrectionInput{
 					Phase:      string(next),
-					Workspace:  cs.WorkspacePath,
+					Workspace:  cr.cs.WorkspacePath,
 					Worktree:   phaseWorktree,
 					Violation:  rr.Reason,
 					NamedREPL:  false, // v1: no named-session request plumbing yet
@@ -980,7 +958,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					salvEv := interaction.Event{
 						Kind:       interaction.KindSalvage,
 						Phase:      string(next),
-						Cycle:      cycle,
+						Cycle:      cr.cycle,
 						Trigger:    "contract_reject",
 						Rung:       interaction.RungSalvage,
 						DecisionID: decisionID,
@@ -1028,7 +1006,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					next, corr, maxCorrections, rr.Reason)
 				if lerr := o.ledger.Append(ctx, LedgerEntry{
 					TS:       o.now().UTC().Format(time.RFC3339),
-					Cycle:    cycle,
+					Cycle:    cr.cycle,
 					Role:     string(next),
 					Kind:     "contract_correction",
 					ExitCode: 0,
@@ -1041,7 +1019,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				corrEv := interaction.Event{
 					Kind:       interaction.KindCorrectionRedispatch,
 					Phase:      string(next),
-					Cycle:      cycle,
+					Cycle:      cr.cycle,
 					Trigger:    "contract_reject",
 					Rung:       "redispatch",
 					DecisionID: decisionID,
@@ -1079,9 +1057,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if err != nil {
 					recordCorrection(interaction.ResultDispatchFailed)
 					phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, err)
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-					recordFailureLearning(next, phaseErr, corr)
-					return result, wrapCycleLevelError(next, phaseErr)
+					o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+					cr.recordFailureLearning(next, phaseErr, corr)
+					return cr.result, wrapCycleLevelError(next, phaseErr)
 				}
 				// A correction re-dispatch must produce a canonical verdict to be
 				// evaluable, same invariant the outer attempt loop enforces before
@@ -1091,9 +1069,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 				if !IsVerdict(resp.Verdict) {
 					recordCorrection(interaction.ResultNonCanonicalVerdict)
 					phaseErr := fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, resp.Verdict)
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-					recordFailureLearning(next, phaseErr, corr)
-					return result, wrapCycleLevelError(next, phaseErr)
+					o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+					cr.recordFailureLearning(next, phaseErr, corr)
+					return cr.result, wrapCycleLevelError(next, phaseErr)
 				}
 				// rin.Response is refreshed for reviewer consistency; the deliverable
 				// reviewer reads the filesystem (workspace/worktree), not this field.
@@ -1114,14 +1092,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 					phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
 					// ADR-0044 C1: the phase ran and produced its own verdict;
 					// the reject is recorded as the abort reason, not a rewrite.
-					o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-					recordFailureLearning(next, phaseErr, 1)
-					return result, wrapCycleLevelError(next, phaseErr)
+					o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+					cr.recordFailureLearning(next, phaseErr, 1)
+					return cr.result, wrapCycleLevelError(next, phaseErr)
 				}
 				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
-				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-				recordFailureLearning(next, phaseErr, maxCorrections)
-				return result, wrapCycleLevelError(next, phaseErr)
+				o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+				cr.recordFailureLearning(next, phaseErr, maxCorrections)
+				return cr.result, wrapCycleLevelError(next, phaseErr)
 			}
 		}
 
@@ -1130,7 +1108,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			// worktree is merged, normal exit cleanup applies. Deliberately
 			// AFTER the review gate: a review-rejected ship abort must still
 			// preserve the worktree for triage (ADR-0039 §8 / D10).
-			preserveWorktree = false
+			cr.preserveWorktree = false
 		}
 
 		// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger
@@ -1148,12 +1126,12 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// pure-untracked leaks. On recovery FAILURE we abort explicitly — the
 		// tree-diff guard only backstops tracked leaks, so a failed recovery
 		// of an untracked leak must not slip past into audit.
-		if WorktreePhase(next) && cs.ActiveWorktree != "" {
-			if !recoverBuildLeak(ctx, req.ProjectRoot, cs.ActiveWorktree, mainDirtyBaseline) {
+		if WorktreePhase(next) && cr.cs.ActiveWorktree != "" {
+			if !recoverBuildLeak(ctx, req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline) {
 				phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
-				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-				recordFailureLearning(next, phaseErr, 1)
-				return result, phaseErr
+				o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+				cr.recordFailureLearning(next, phaseErr, 1)
+				return cr.result, phaseErr
 			}
 		}
 
@@ -1221,14 +1199,14 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 						// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
 						// and burned tokens before the guard caught its main-tree
 						// leak. The abort is correct; erasing the outcome was not.
-						o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
-						recordFailureLearning(next, phaseErr, 1)
+						o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, phaseErr.Error()))
+						cr.recordFailureLearning(next, phaseErr, 1)
 						// After abort, check if go/bin/evolve is absent
 						evolveBinPath := filepath.Join(req.ProjectRoot, "go/bin/evolve")
 						if _, err := os.Stat(evolveBinPath); os.IsNotExist(err) {
 							fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL: go/bin/evolve absent after cycle abort — trust-kernel guards degraded\n")
 						}
-						return result, phaseErr
+						return cr.result, phaseErr
 					}
 				}
 			}
@@ -1236,7 +1214,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 
 		if err := o.ledger.Append(ctx, LedgerEntry{
 			TS:       o.now().UTC().Format(time.RFC3339),
-			Cycle:    cycle,
+			Cycle:    cr.cycle,
 			Role:     string(next),
 			Kind:     "phase",
 			ExitCode: 0,
@@ -1244,11 +1222,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
 			// ADR-0044 C1: the phase completed; a persistence failure must
 			// not erase its outcome from the timing/usage record.
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, lerr.Error()))
-			return result, lerr
+			o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, lerr.Error()))
+			return cr.result, lerr
 		}
 
-		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
+		o.emitPhaseBindings(ctx, cr.cycle, req.ProjectRoot, cr.cs, next, resp.Verdict)
 
 		// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
 		// following evolve-builder.md:235) leaves its work in a worktree
@@ -1256,64 +1234,64 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// commit). Soft-reset the build's commits to the cycle base so the
 		// work is pending again before audit runs (next iteration). No-op for
 		// non-committing builders. See the cycle-156 incident doc.
-		o.normalizeBuildWorktree(ctx, next, cs)
+		o.normalizeBuildWorktree(ctx, next, cr.cs)
 
-		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
-		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
+		cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
+		if err := o.storage.WriteCycleState(ctx, cr.cs); err != nil {
 			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, werr.Error()))
-			return result, werr
+			o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, werr.Error()))
+			return cr.result, werr
 		}
 
 		if PhaseBoundaryCheckpointer != nil {
-			if err := PhaseBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
+			if err := PhaseBoundaryCheckpointer(cr.cs, req.ProjectRoot, o.now()); err != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase boundary checkpoint failed: %v\n", err)
 			}
 		}
 
-		result.FinalVerdict = resp.Verdict
-		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, ""))
-		current = next
-		lastVerdict = resp.Verdict
+		cr.result.FinalVerdict = resp.Verdict
+		o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount, ""))
+		cr.current = next
+		cr.lastVerdict = resp.Verdict
 
 		// Retro is the one phase whose successor isn't verdict-driven;
 		// the failure-adapter consults cycle history (state.FailedAt) and
 		// the retro verdict to pick {ship | tdd | end}. Set scheduledNext
 		// so the next loop iteration runs the chosen phase.
-		if current == PhaseRetro {
+		if cr.current == PhaseRetro {
 			var branch Phase
 			var extraEnv map[string]string
 			var reason string
 			if o.cfg.Stage >= config.StageAdvisory {
 				// Failure floor Phase 3: the failure branch is advisor-
 				// decidable (clamped) and leaves a routing-decision artifact.
-				routingSeq++
-				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cycle, cs, routingSeq, resp.Verdict, state.FailedAt, router.RouteInput{
+				cr.routingSeq++
+				branch, extraEnv, reason = o.decideAfterRetroRouted(ctx, cr.cycle, cr.cs, cr.routingSeq, resp.Verdict, cr.state.FailedAt, router.RouteInput{
 					Cfg:            o.cfg,
-					Completed:      cs.CompletedPhases,
-					Strict:         envchain.BoolValue(envSnap["EVOLVE_STRICT_AUDIT"], false),
-					Workspace:      cs.WorkspacePath,
+					Completed:      cr.cs.CompletedPhases,
+					Strict:         envchain.BoolValue(cr.envSnap["EVOLVE_STRICT_AUDIT"], false),
+					Workspace:      cr.cs.WorkspacePath,
 					ProjectRoot:    req.ProjectRoot,
-					Cycle:          cycle,
-					Env:            envSnap,
-					Plan:           clampedPlan,
-					IntentRequired: cs.IntentRequired,
-					PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
+					Cycle:          cr.cycle,
+					Env:            cr.envSnap,
+					Plan:           cr.clampedPlan,
+					IntentRequired: cr.cs.IntentRequired,
+					PSMASEnabled:   envchain.BoolValue(cr.envSnap["EVOLVE_PSMAS_SKIP"], false),
 				})
 			} else {
-				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, state.FailedAt)
+				branch, extraEnv, reason = o.decideAfterRetro(resp.Verdict, cr.state.FailedAt)
 			}
 			for k, v := range extraEnv {
-				envSnap[k] = v
+				cr.envSnap[k] = v
 			}
-			result.RetroDecision = reason
+			cr.result.RetroDecision = reason
 			if branch == PhaseEnd {
 				break
 			}
 			if !o.sm.CanTransition(PhaseRetro, branch) {
-				return result, fmt.Errorf("retro→%s not allowed by state machine", branch)
+				return cr.result, fmt.Errorf("retro→%s not allowed by state machine", branch)
 			}
-			scheduledNext = branch
+			cr.scheduledNext = branch
 		}
 
 		// The debugger phase is decision-driven (RESHIP / RERUN_PHASE / BLOCK),
@@ -1321,16 +1299,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		// surfaces its decision on PhaseResponse.Signals; decideAfterDebugger
 		// maps it to the next phase, which the next iteration runs via
 		// scheduledNext (bypassing the routing override, like retro).
-		if current == PhaseDebugger {
+		if cr.current == PhaseDebugger {
 			branch := o.decideAfterDebugger(resp)
-			o.recordDebuggerDecision(ctx, cycle, cs, resp)
+			o.recordDebuggerDecision(ctx, cr.cycle, cr.cs, resp)
 			if branch == PhaseEnd {
 				break
 			}
 			if !o.sm.CanTransition(PhaseDebugger, branch) {
-				return result, fmt.Errorf("debugger→%s not allowed by state machine", branch)
+				return cr.result, fmt.Errorf("debugger→%s not allowed by state machine", branch)
 			}
-			scheduledNext = branch
+			cr.scheduledNext = branch
 		}
 	}
 
@@ -1338,13 +1316,13 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
 	// preserveWorktree is threaded back so the exit defer (registered above)
 	// observes it; cycleCompletedNormally is set only on a clean persist.
-	preserve, ferr := o.finalizeCycle(ctx, cs, cycle, preCycleHEAD, &result, &state)
+	preserve, ferr := o.finalizeCycle(ctx, cr.cs, cr.cycle, cr.preCycleHEAD, &cr.result, &cr.state)
 	if preserve {
-		preserveWorktree = true
+		cr.preserveWorktree = true
 	}
 	if ferr != nil {
-		return result, ferr
+		return cr.result, ferr
 	}
-	cycleCompletedNormally = true
-	return result, nil
+	cr.cycleCompletedNormally = true
+	return cr.result, nil
 }

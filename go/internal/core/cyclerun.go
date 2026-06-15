@@ -12,8 +12,89 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
+
+// loopAction signals how the slim RunCycle driver proceeds after a dispatch-loop
+// sub-method returns. err is non-nil ONLY when action == loopAbort.
+type loopAction int
+
+const (
+	loopNext     loopAction = iota // proceed to the next sub-step in the iteration
+	loopContinue                   // `continue` the outer loop now (optional-runner skip, ship-recovery, debugger fall-through)
+	loopBreak                      // terminate the loop → fall to finalizeCycle (PhaseEnd, retro→End, debugger→End)
+	loopAbort                      // `return cr.result, err` immediately
+)
+
+// cycleRun is the method object (Replace Method with Method Object) for
+// RunCycle's dispatch loop. ONE addressable struct; every sub-method takes a
+// *cycleRun receiver so late mutations (preserveWorktree, cs, the loop cursors)
+// are visible to RunCycle's exit defers (the R2 late-visibility contract) and to
+// the next loop iteration. Field grouping mirrors the original inline locals.
+type cycleRun struct {
+	// engine handles (immutable for the cycle)
+	o   *Orchestrator
+	ctx context.Context // same ctx the inline closure/dispatch captured
+
+	// per-cycle constants (set once at construction, never reassigned)
+	req               CycleRequest
+	cycle             int
+	mainDirtyBaseline map[string]bool
+	envSnap           map[string]string   // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
+	ctxSnap           map[string]string   // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
+	preCycleHEAD      string              // read post-loop by finalizeCycle
+	benchedCLIs       []router.BenchedCLI // CLI-health snapshot; read in selectNext Decide
+	clampedPlan       *router.PhasePlan   // clamped whole-cycle plan; nil ⇒ static spine
+
+	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
+	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle
+	cs           CycleState         // the ONE authoritative CycleState the loop drives
+	result       CycleResult        // accumulating result; mutated via &cr.result; returned on every abort
+	phaseTimings []phaseTimingEntry // appended via &cr.phaseTimings; read by RunCycle's exit defer (live header)
+
+	// loop-carried state-machine cursor (produced end of iter N, consumed start of iter N+1)
+	current       Phase  // SM cursor
+	lastVerdict   string // loop-carried verdict
+	scheduledNext Phase  // authoritative next-phase injection (retro/debugger/ship-recovery)
+	routingSeq    int    // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
+	recoveryDepth int    // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
+
+	// late-visibility exit-defer flags (R2 contract; highest hazard)
+	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
+	cycleCompletedNormally bool // set true only post-loop; read by the same cleanup defer at exit
+}
+
+// dispatchResult carries the per-phase locals dispatch produces and
+// reviewAndGuard/recordAndBranch consume. These are PER-ITERATION values, NOT
+// cycleRun fields (each iteration re-derives them).
+type dispatchResult struct {
+	resp           PhaseResponse   // runner result; resp.Verdict → result.FinalVerdict + lastVerdict
+	attemptCount   int             // attempt-loop count; read by phaseOutcomeFrom at the record sites
+	phaseWorktree  string          // cs.ActiveWorktree snapshot; ReviewInput.Worktree + correction directives
+	treeGuard      *treediff.Guard // pre-phase guard; consumed by the post-phase tree-diff check
+	beforeDirty    []string        // pre-phase dirty snapshot
+	snapshotFailed bool            // pre-phase snapshot failed
+}
+
+// recordFailureLearning replaces RunCycle's inline closure: it builds the
+// failureLearningRequest from cr's fields, preserving the exact pointer targets
+// (&cr.state, &cr.cs, &cr.result, &cr.phaseTimings) the closure captured.
+func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt int) {
+	cr.o.recordFailureLearning(cr.ctx, failureLearningRequest{
+		CycleRequest: cr.req,
+		Cycle:        cr.cycle,
+		Failed:       failed,
+		Err:          failErr,
+		Attempt:      attempt,
+		State:        &cr.state,
+		CycleState:   &cr.cs,
+		Context:      cr.ctxSnap,
+		Env:          cr.envSnap,
+		Result:       &cr.result,
+		Timings:      &cr.phaseTimings,
+	})
+}
 
 // cyclerun.go — methods extracted from the RunCycle engine (orchestrator.go) to
 // keep RunCycle a readable coordinator. Each extraction is behavior-preserving;
