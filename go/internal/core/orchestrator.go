@@ -2,8 +2,6 @@ package core
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -437,133 +435,16 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	cycleCompletedNormally := false
 	defer func() { cleanup(preserveWorktree, cycleCompletedNormally) }()
 
-	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
-	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
-	if o.catalogRefresh != nil {
-		if err := o.catalogRefresh(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
-		}
-	}
-
-	// One snapshot per cycle — operator mutation post-call must not
-	// retroactively change what phases saw.
-	envSnap := make(map[string]string, len(req.Env))
-	for k, v := range req.Env {
-		envSnap[k] = v
-	}
-	ctxSnap := make(map[string]string, len(req.Context))
-	for k, v := range req.Context {
-		ctxSnap[k] = v
-	}
-
-	// ADR-0049 E: when `evolve fleet --plan` launched this cycle, EVOLVE_FLEET_SCOPE
-	// carries its assigned (disjoint) task IDs. Surface it to triage via
-	// Context["fleet_scope"] so the cycle selects ONLY its subset and concurrent
-	// cycles never pick work touching the same files. Read from the env SNAPSHOT
-	// (not live os.Getenv) so it stays per-cycle. Empty/unset ⇒ legacy behavior.
-	if scope := envSnap["EVOLVE_FLEET_SCOPE"]; scope != "" {
-		ctxSnap["fleet_scope"] = scope
-	}
-
-	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
-	// ONCE per cycle, at orchestrator start, BEFORE any phase runs. Surface
-	// it to every phase via Context["challengeToken"] (scout's ComposePrompt
-	// reads it at scout.go:64) AND persist it to <workspace>/challenge-
-	// token.txt so the agent-templates.md PR 5 fallback source is populated.
-	// Pre-PR-6, no Go code injected the token; scout invented its own
-	// (cycle 134 audit C1: "no-token-manual-run-cycle-134"; cycle 135 audit
-	// C1: scout minted `59576594e2e8d5c3` instead of using `5b96ecb69a0c848f`
-	// from challenge-token.txt). The mint is the same 8-byte-hex shape as
-	// bridge.defaultChallengeToken so post-cycle ledger entries are
-	// indistinguishable from the bridge-minted ones used pre-cycle-135.
-	if _, alreadySet := ctxSnap["challengeToken"]; !alreadySet {
-		var tokBytes [8]byte
-		if _, err := rand.Read(tokBytes[:]); err == nil {
-			tok := hex.EncodeToString(tokBytes[:])
-			ctxSnap["challengeToken"] = tok
-			// Best-effort workspace write — phase agents per agent-templates.md
-			// PR 5 read this as fallback source #2 when inputs.challengeToken
-			// is empty. Failure is logged but not fatal (the Context path is
-			// the primary route; phases that can't read the file just rely on
-			// Context).
-			_ = os.MkdirAll(cs.WorkspacePath, 0o755)
-			if err := os.WriteFile(filepath.Join(cs.WorkspacePath, "challenge-token.txt"), []byte(tok+"\n"), 0o644); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge-token.txt write failed: %v (Context route still works)\n", err)
-			}
-		} else {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge token mint failed: %v (phase agents will fall back to their own protocol)\n", err)
-		}
-	}
-
-	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.
-	preCycleHEAD, _ := o.gitHEAD()
-
-	// Upfront whole-cycle plan (ADR-0024 §2). At Stage>=Advisory with a planner,
-	// ask the advisor once which phases to run, CLAMP the answer to the integrity
-	// floor (ship⇒build∧audit∧tdd), persist it, and thread the clamped plan into
-	// every routing decision below. The clamp is the non-bypassable kernel floor:
-	// it can only COMPLETE the ship-chain, never weaken it, so a hallucinated or
-	// adversarial plan cannot reach ship without a real build+audit. Any
-	// failure leaves clampedPlan nil ⇒ routing falls back to the configurable
-	// never-skip spine (fail-safe to static). Below Advisory, no plan is computed.
-	// This is the SINGLE gate for the upfront plan: Stage>=Advisory (the advisor
-	// drives) AND Mode==DynamicLLM (static mode makes no LLM calls) AND a planner
-	// is wired. The composition root passes WithPlanner unconditionally; the
-	// Mode check lives here so the invariant ("LLM plan iff DynamicLLM+Advisory")
-	// has one source of truth rather than two gates that could drift.
-	// CLI-health snapshot, taken ONCE at cycle start and threaded to both the
-	// whole-cycle plan input and every per-transition Decide: the advisor and
-	// the dispatcher must reason from the SAME bench state (review H2 — two
-	// reads could diverge when a bench expires mid-planning).
-	benchedCLIs := benchedCLIsForRouting(req.ProjectRoot)
-	var clampedPlan *router.PhasePlan
-	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
-		// WS2 recall memory: thread the most recent failure's reason + matching KB
-		// lessons into the plan prompt so the advisor plans WITH the benefit of
-		// what went wrong before. No-op when no KB is wired or no failure history.
-		lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
-		planIn := router.RouteInput{
-			Current:     string(PhaseStart),
-			Signals:     router.RoutingSignals{}, // no handoffs exist yet at cycle start
-			Cfg:         o.cfg,
-			Now:         o.now(),
-			Workspace:   cs.WorkspacePath,
-			ProjectRoot: req.ProjectRoot,
-			Cycle:       cycle,
-			Env:         envSnap,
-			LastReason:  lastReason,
-			Lessons:     lessons,
-			Catalog:     phaseCardsFromCatalog(o.catalog),
-			// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
-			// Scout reads; NOT Context["strategy"], which is the strategy MODE like
-			// "balanced"/"harden") lets the advisor reason about WHAT the cycle is for
-			// — selecting a design phase or minting when the work warrants it, instead
-			// of planning blind. Reading a nil/absent map key is safe (empty ⇒ no Goal
-			// section in the prompt).
-			GoalText:       req.Context["goal"],
-			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
-			BenchedCLIs:    benchedCLIs,
-			IntentRequired: cs.IntentRequired,
-			PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
-		}
-		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
-		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
-		// the conservative (more-mandatory) side at plan time. The floor is the
-		// user-resolved set (WS4) or the safe default; the router self-seals the
-		// non-removable evaluator regardless.
-		if raw, perr := o.planner.Plan(planIn); perr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
-		} else if raw != nil {
-			var clamps []router.Clamp
-			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
-			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
-			// Register advisor-minted phases (Steps 11/12) into runners +
-			// catalog + routing BEFORE the dispatch loop, so a minted phase the
-			// plan selected is dispatchable + routable through the same path as a
-			// built-in. The trust-kernel clamp is enforced inside the registrar.
-			o.registerMintedPhases(clampedPlan)
-		}
-	}
+	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
+	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle
+	// advisory plan) → planCycle. Outputs thread into every routing decision in
+	// the dispatch loop below.
+	plan := o.planCycle(ctx, req, state, cs, cycle)
+	envSnap := plan.envSnap
+	ctxSnap := plan.ctxSnap
+	preCycleHEAD := plan.preCycleHEAD
+	benchedCLIs := plan.benchedCLIs
+	clampedPlan := plan.clampedPlan
 
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
 	var phaseTimings []phaseTimingEntry
