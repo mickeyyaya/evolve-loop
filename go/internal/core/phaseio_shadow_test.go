@@ -112,16 +112,18 @@ func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
 // challengeToken key, not snake_case).
 func TestAssembleCycleInputs_FromContext(t *testing.T) {
 	ctx := map[string]string{
-		"goal":             "cut latency",
-		"strategy":         "profile-first",
-		"commit_message":   "perf: cache",
-		"fleet_scope":      "core",
-		"challengeToken":   "tok-9",
-		"previous_verdict": "FAIL",
+		"goal":              "cut latency",
+		"strategy":          "profile-first",
+		"commit_message":    "perf: cache",
+		"fleet_scope":       "core",
+		"challengeToken":    "tok-9",
+		"previous_verdict":  "FAIL",
+		"carryover_summary": "carried: tighten the digest fallback",
 	}
 	ci := assembleCycleInputs(ctx)
 	if ci.Goal() != "cut latency" || ci.Strategy() != "profile-first" || ci.CommitMessage() != "perf: cache" ||
-		ci.FleetScope() != "core" || ci.ChallengeToken() != "tok-9" || ci.PreviousVerdict() != "FAIL" {
+		ci.FleetScope() != "core" || ci.ChallengeToken() != "tok-9" || ci.PreviousVerdict() != "FAIL" ||
+		ci.Carryover() != "carried: tighten the digest fallback" {
 		t.Fatalf("assembleCycleInputs mismapped: %+v", ci)
 	}
 }
@@ -157,27 +159,148 @@ func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
+// ── ADR-0050 Phase 3.6: named per-reader equivalence anchors ──────────────────
+// One named test per remaining Context reader (scout/triage/intent/ship/debugger),
+// each pinning that the typed CycleInputs/ErrorContext getter reproduces the exact
+// legacy req.Context key the live phase still reads — the per-field key-drift guard
+// the soak relies on. Each test asserts ONLY its own field so a failure localizes
+// to the reader it names (the comparator's drift behaviour, incl. clean and
+// diverging paths, is proven once over ALL fields in
+// TestCompareCycleInputsShadow_KeyDrift). The phase code keeps reading req.Context
+// until the 3.10 enforce cutover; these prove the typed envelope is a faithful
+// shadow of every reader before that cutover is permitted.
+//
+// These tests run unconditionally — they exercise the assembler directly. At
+// EVOLVE_PHASE_IO=off the production shadow hook (emitPhaseIOShadow, gated at
+// cyclerun_dispatch.go:112) is never called, but the unit tests remain always-on.
+
+// TestScout_Strategy_FromCycleInputs_MatchesContext: scout reads
+// req.Context["strategy"] (scout.go ComposePrompt + Classify).
+func TestScout_Strategy_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
+	if got := assembleCycleInputs(phaseCtx).Strategy(); got != phaseCtx["strategy"] {
+		t.Fatalf("typed Strategy()=%q != Context[strategy]=%q", got, phaseCtx["strategy"])
+	}
+}
+
+// TestScout_Goal_FromCycleInputs_MatchesContext: scout reads req.Context["goal"]
+// (scout.go ComposePrompt — the operator --goal-text constraint).
+func TestScout_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
+	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
+		t.Fatalf("typed Goal()=%q != Context[goal]=%q", got, phaseCtx["goal"])
+	}
+}
+
+// TestScout_ChallengeToken_FromCycleInputs_MatchesContext: scout reads the
+// camelCase req.Context["challengeToken"] (scout.go ComposePrompt). The typed
+// getter must read the SAME camelCase key, not the snake_case wire-JSON name.
+func TestScout_ChallengeToken_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
+	if got := assembleCycleInputs(phaseCtx).ChallengeToken(); got != phaseCtx["challengeToken"] {
+		t.Fatalf("typed ChallengeToken()=%q != Context[challengeToken]=%q", got, phaseCtx["challengeToken"])
+	}
+}
+
+// TestTriage_FleetScope_FromCycleInputs_MatchesContext: triage reads
+// req.Context["fleet_scope"] (triage.go ComposePrompt).
+func TestTriage_FleetScope_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"fleet_scope": "core,bridge", "carryover_summary": "carried: x"}
+	if got := assembleCycleInputs(phaseCtx).FleetScope(); got != phaseCtx["fleet_scope"] {
+		t.Fatalf("typed FleetScope()=%q != Context[fleet_scope]=%q", got, phaseCtx["fleet_scope"])
+	}
+}
+
+// TestTriage_Carryover_FromCycleInputs_MatchesContext: triage reads
+// req.Context["carryover_summary"] (triage.go:63). The typed getter is
+// Carryover() — note the legacy key is carryover_summary, not carryover.
+// (3.6's genuinely-new field; this is the RED that drives the leaf addition.)
+func TestTriage_Carryover_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"fleet_scope": "core", "carryover_summary": "carried: finish the digest fallback"}
+	if got := assembleCycleInputs(phaseCtx).Carryover(); got != phaseCtx["carryover_summary"] {
+		t.Fatalf("typed Carryover()=%q != Context[carryover_summary]=%q", got, phaseCtx["carryover_summary"])
+	}
+}
+
+// TestIntent_Goal_FromCycleInputs_MatchesContext: intent reads req.Context["goal"]
+// (intent.go:54).
+func TestIntent_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"goal": "add a typed envelope"}
+	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
+		t.Fatalf("typed Goal()=%q != Context[goal]=%q", got, phaseCtx["goal"])
+	}
+}
+
+// TestShip_CommitMessage_FromCycleInputs_MatchesContext: ship reads
+// req.Context["commit_message"] (ship.go:72).
+func TestShip_CommitMessage_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{"commit_message": "feat(core): unified phase I/O"}
+	if got := assembleCycleInputs(phaseCtx).CommitMessage(); got != phaseCtx["commit_message"] {
+		t.Fatalf("typed CommitMessage()=%q != Context[commit_message]=%q", got, phaseCtx["commit_message"])
+	}
+}
+
+// TestDebugger_ErrorContext_FromCycleInputs_MatchesContext: the debugger reads the
+// ship_error_* keys (debugger.go ComposePrompt) carried in by the recovery path;
+// the typed ErrorContext must reproduce all four.
+func TestDebugger_ErrorContext_FromCycleInputs_MatchesContext(t *testing.T) {
+	phaseCtx := map[string]string{
+		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
+		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
+	}
+	ec := assembleErrorContext(phaseCtx)
+	if ec == nil || ec.Code != phaseCtx["ship_error_code"] || ec.Class != phaseCtx["ship_error_class"] ||
+		ec.Stage != phaseCtx["ship_error_stage"] || ec.Debug != phaseCtx["ship_error_debug"] {
+		t.Fatalf("typed ErrorContext != Context ship_error_*: %+v", ec)
+	}
+}
+
 // TestCompareCycleInputsShadow_KeyDrift: the comparator catches a typed view
 // whose value diverges from the legacy Context key (the key-drift bug class —
-// e.g. an assembler reading the wrong key name).
+// e.g. an assembler reading the wrong key name). Table-driven over EVERY
+// cycle_inputs field so each comparator line — incl. the 3.6 carryover line —
+// has genuine drift coverage: each row supplies the ground-truth Context key the
+// live phase reads + a CycleInputs whose corresponding getter is drifted, and
+// asserts the comparator reports exactly that field with want/got in the right
+// orientation (want=legacy ground truth, got=typed getter). The empty want/got
+// guards against a swapped mismatch struct.
 func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
-	ctx := map[string]string{"goal": "real-goal", "challengeToken": "tok"}
-	// A CycleInputs with the WRONG goal (as if assembled from a wrong key).
-	drift := phaseio.NewCycleInputs(phaseio.CycleInputsInit{Goal: "wrong", ChallengeToken: "tok"})
-	ms := compareCycleInputsShadow(drift, nil, ctx)
-	var goalMismatch *phaseIOMismatch
-	for i := range ms {
-		if ms[i].Field == "cycle_inputs.goal" {
-			goalMismatch = &ms[i]
-		}
+	const real, wrong = "real-value", "wrong-value"
+	cases := []struct {
+		name      string
+		ctxKey    string                  // the legacy Context key the phase reads
+		field     string                  // the comparator field name
+		driftInit phaseio.CycleInputsInit // a CycleInputs whose getter is drifted to `wrong`
+	}{
+		{"goal", "goal", "cycle_inputs.goal", phaseio.CycleInputsInit{Goal: wrong}},
+		{"strategy", "strategy", "cycle_inputs.strategy", phaseio.CycleInputsInit{Strategy: wrong}},
+		{"commit_message", "commit_message", "cycle_inputs.commit_message", phaseio.CycleInputsInit{CommitMessage: wrong}},
+		{"fleet_scope", "fleet_scope", "cycle_inputs.fleet_scope", phaseio.CycleInputsInit{FleetScope: wrong}},
+		// challenge_token: the comparator field name is snake_case, the live
+		// Context key is camelCase challengeToken — the canonical key-drift trap.
+		{"challenge_token", "challengeToken", "cycle_inputs.challenge_token", phaseio.CycleInputsInit{ChallengeToken: wrong}},
+		{"previous_verdict", "previous_verdict", "cycle_inputs.previous_verdict", phaseio.CycleInputsInit{PreviousVerdict: wrong}},
+		// carryover: the comparator field name is carryover, the live Context key
+		// is carryover_summary (triage) — the 3.6 key-drift trap.
+		{"carryover", "carryover_summary", "cycle_inputs.carryover", phaseio.CycleInputsInit{Carryover: wrong}},
 	}
-	if goalMismatch == nil {
-		t.Fatalf("expected cycle_inputs.goal drift, got %+v", ms)
-	}
-	// Assert orientation too (want=legacy ground truth, got=typed getter) so a
-	// swapped Want/Got in the mismatch struct is detectable.
-	if goalMismatch.Want != "real-goal" || goalMismatch.Got != "wrong" {
-		t.Fatalf("want/got orientation wrong: %+v", *goalMismatch)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := map[string]string{tc.ctxKey: real}
+			ms := compareCycleInputsShadow(phaseio.NewCycleInputs(tc.driftInit), nil, ctx)
+			var got *phaseIOMismatch
+			for i := range ms {
+				if ms[i].Field == tc.field {
+					got = &ms[i]
+				}
+			}
+			if got == nil {
+				t.Fatalf("expected %s drift, got %+v", tc.field, ms)
+			}
+			if got.Want != real || got.Got != wrong {
+				t.Fatalf("want/got orientation wrong for %s: %+v", tc.field, *got)
+			}
+		})
 	}
 }
 
