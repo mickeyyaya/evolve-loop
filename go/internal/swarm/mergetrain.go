@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // ErrMergeConflict is returned by a GitMerger when a merge could not be applied
@@ -135,14 +137,20 @@ type ExecGitMerger struct {
 
 // Merge implements GitMerger.
 func (m ExecGitMerger) Merge(ctx context.Context, _ /*integrationBranch*/, fromBranch string) error {
-	dir := m.IntegrationWorktree
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "merge", "--no-ff", "--no-edit", fromBranch)
-	var eb bytes.Buffer
-	cmd.Stderr = &eb
-	if err := cmd.Run(); err != nil {
+	return mergeWith(ctx, gitexec.Default(m.IntegrationWorktree), fromBranch)
+}
+
+// mergeWith is the gitexec-backed core behind ExecGitMerger.Merge. On any
+// failure (unrecoverable error OR non-zero exit, e.g. a merge conflict) it
+// aborts so the integration branch is left at its prior tip, then returns an
+// error wrapping ErrMergeConflict with the git stderr — matching the original
+// exec.CommandContext form.
+func mergeWith(ctx context.Context, g gitexec.Git, fromBranch string) error {
+	_, stderr, code, err := g.Capture(ctx, "merge", "--no-ff", "--no-edit", fromBranch)
+	if err != nil || code != 0 {
 		// Abort so the integration branch is left clean for the next attempt.
-		_ = exec.CommandContext(ctx, "git", "-C", dir, "merge", "--abort").Run()
-		return fmt.Errorf("%w: merge %s: %v: %s", ErrMergeConflict, fromBranch, err, eb.String())
+		_ = g.Run(ctx, "merge", "--abort")
+		return fmt.Errorf("%w: merge %s: %s: %s", ErrMergeConflict, fromBranch, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	return nil
 }

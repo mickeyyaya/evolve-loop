@@ -10,15 +10,16 @@
 package changeloggen
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
@@ -197,14 +198,20 @@ func WriteEntry(changelogPath, version, entry string) (bool, bool, error) {
 var ErrNoCommits = errors.New("changeloggen: no commits in range")
 
 func ReadGitLog(repoRoot, fromRef, toRef string) ([]Commit, error) {
+	return ReadGitLogWith(context.Background(), gitexec.Default(repoRoot), fromRef, toRef)
+}
+
+// ReadGitLogWith is the gitexec-backed core behind ReadGitLog; the public
+// wrapper injects gitexec.Default(repoRoot). Exposed (and ctx-first) so the git
+// invocation is unit-testable via fixtures.FakeExec rather than only against a
+// real repo.
+func ReadGitLogWith(ctx context.Context, g gitexec.Git, fromRef, toRef string) ([]Commit, error) {
 	const sep = "\x1f"
-	cmd := exec.Command("git", "log", "--pretty=format:%H"+sep+"%s", fromRef+".."+toRef)
-	cmd.Dir = repoRoot
-	out, err := cmd.Output()
+	out, err := g.Output(ctx, "log", "--pretty=format:%H"+sep+"%s", fromRef+".."+toRef)
 	if err != nil {
 		return nil, fmt.Errorf("changeloggen: git log: %w", err)
 	}
-	body := strings.TrimSpace(string(out))
+	body := strings.TrimSpace(out)
 	if body == "" {
 		return nil, ErrNoCommits
 	}
@@ -221,9 +228,13 @@ func ReadGitLog(repoRoot, fromRef, toRef string) ([]Commit, error) {
 
 // VerifyRef reports whether the given git ref resolves inside repoRoot.
 func VerifyRef(repoRoot, ref string) error {
-	cmd := exec.Command("git", "rev-parse", "--verify", ref)
-	cmd.Dir = repoRoot
-	if err := cmd.Run(); err != nil {
+	return VerifyRefWith(context.Background(), gitexec.Default(repoRoot), ref)
+}
+
+// VerifyRefWith is the gitexec-backed core behind VerifyRef; the public wrapper
+// injects gitexec.Default(repoRoot).
+func VerifyRefWith(ctx context.Context, g gitexec.Git, ref string) error {
+	if err := g.Run(ctx, "rev-parse", "--verify", ref); err != nil {
 		return fmt.Errorf("changeloggen: ref does not exist: %s", ref)
 	}
 	return nil
