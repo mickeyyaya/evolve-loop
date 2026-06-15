@@ -103,6 +103,11 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		Env:           cr.envSnap,
 		Context:       phaseCtx,
 	}
+	// ADR-0050 Phase 3.7: at advisory+, serve the build phase's upstream
+	// build-plan via the typed envelope (read once here at the seam) instead of
+	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
+	// reads disk as before (byte-identical dispatch).
+	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.envSnap, cr.cs.WorkspacePath)
 	// ADR-0050 Phase 3.4: the unified-phase-I/O SHADOW stage. When
 	// EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the same
 	// upstream this phase is about to receive, compare it to the legacy routing
