@@ -169,3 +169,23 @@
 ./internal/rollback
 ./internal/routingtest
 ./internal/skillinventory
+
+# Phase 5 gap=4 tail batch (2026-06-16): 8 packages each with FOUR exported
+# symbols never named in a test (all already >=93% cover). One meaningful
+# apicover_named_test.go per package — config routing structs via Load JSON
+# field-mapping; bridge/channel Policy/Producer/Supervisor via real producers
+# (OnEvent/Run/Ask); evalqualitycheck Result/ClassifiedLine/Diversity via
+# Check/CheckDiversity; failurelog consts via Prune/Record consumers + structs
+# full-equality; guards Chain/DocDelete/Quota/Ship via core.Guard satisfaction +
+# Decide; looppreflight consts/var via resolve() + MarshalJSON methods invoked
+# directly; recovery Decision/PhaseOutcome/StallAction/StallPolicy via Recover/
+# Decide; reflection consts via Validate/AcceptedByAggregator + structs. No dead
+# exports in this tier.
+./internal/bridge/channel
+./internal/config
+./internal/evalqualitycheck
+./internal/failurelog
+./internal/guards
+./internal/looppreflight
+./internal/recovery
+./internal/reflection
