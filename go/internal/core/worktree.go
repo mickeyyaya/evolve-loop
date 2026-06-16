@@ -1,12 +1,13 @@
 package core
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // worktree.go — per-cycle git worktree provisioning for the Go orchestrator.
@@ -56,11 +57,12 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// git rejects; reusing it would make every commit inside fail. Verify, and
 	// tear down a stale stub before recreating.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
-		if exec.Command("git", "-C", wt, "rev-parse", "--git-dir").Run() == nil {
+		valid := gitexec.Git{Dir: wt, Exec: gitRunner}.Run(context.Background(), "rev-parse", "--git-dir") == nil
+		if valid {
 			linkGuardDeps(wt, projectRoot, cycle)
 			return wt, nil
 		}
-		_ = exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt).Run()
+		_ = gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Run(context.Background(), "worktree", "remove", "--force", wt)
 		_ = os.RemoveAll(wt)
 	}
 	// Named branch (NOT --detach): worktree-aware ship resolves the cycle branch
@@ -68,11 +70,9 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// HEAD yields an empty branch and ship fails. -B creates or resets cycle-<N>
 	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle.
 	branch := "cycle-" + strconv.Itoa(cycle)
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", "-B", branch, wt, "HEAD")
-	var eb bytes.Buffer
-	cmd.Stderr = &eb
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git worktree add -B %s %s: %v: %s", branch, wt, err, eb.String())
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, "HEAD")
+	if err != nil || code != 0 {
+		return "", fmt.Errorf("git worktree add -B %s %s: rc=%d err=%v: %s", branch, wt, code, err, stderr)
 	}
 	linkGuardDeps(wt, projectRoot, cycle)
 	return wt, nil
@@ -133,13 +133,11 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 	if worktree == "" {
 		return nil
 	}
-	var eb bytes.Buffer
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", worktree)
-	cmd.Stderr = &eb
-	if err := cmd.Run(); err != nil {
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "remove", "--force", worktree)
+	if err != nil || code != 0 {
 		// Best-effort, but surface it: a failed remove leaves an orphaned
 		// worktree that would accumulate silently.
-		fmt.Fprintf(os.Stderr, "[worktree] WARN remove %s failed: %v: %s\n", worktree, err, eb.String())
+		fmt.Fprintf(os.Stderr, "[worktree] WARN remove %s failed (rc=%d): %v: %s\n", worktree, code, err, stderr)
 	}
 	_ = os.RemoveAll(worktree) // clear any leftover stub git left behind
 	return nil

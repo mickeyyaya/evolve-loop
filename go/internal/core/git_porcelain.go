@@ -2,21 +2,31 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
+// gitRunner is core's git-execution seam: every git invocation in this package
+// — defaultGitHEAD, gitCapture and the ~25 callers that funnel through it, plus
+// the per-cycle worktree/resume/correction git calls — routes through it, so
+// the fast test tier fakes git via a sysexec.RunFunc instead of shelling out.
+// Tests swap it (see git_seam_test.go); production uses sysexec.DefaultRunner.
+// S4.5 (ADR-0050) replaced this package's hardcoded exec.Command calls with the
+// internal/gitexec leaf driven by this seam.
+var gitRunner sysexec.RunFunc = sysexec.DefaultRunner
+
 func defaultGitHEAD() (string, error) {
-	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	head, err := gitexec.Git{Exec: gitRunner}.HEAD(context.Background())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN git HEAD probe failed (cycle outcome labels degraded): %v\n", err)
 		return "", nil
 	}
-	return strings.TrimSpace(string(out)), nil
+	return head, nil
 }
 
 // emitPhaseBindings writes the per-agent provenance ledger entries ship's
@@ -51,27 +61,11 @@ func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
 	return set
 }
 
-// porcelainPath extracts the path from a `git status --porcelain` line. Lines are
-// "XY <path>"; a rename/copy is "XY <old> -> <new>" (take the new path). Quotes
-// (paths with special chars) are trimmed best-effort.
-func porcelainPath(line string) string {
-	p := strings.TrimSpace(line[3:])
-	if i := strings.Index(p, " -> "); i >= 0 {
-		p = p[i+4:]
-	}
-	return strings.Trim(p, "\"")
-}
-
-// porcelainOldPath extracts the rename/copy SOURCE from a porcelain line
-// ("XY <old> -> <new>"), or "" for non-rename lines.
-func porcelainOldPath(line string) string {
-	p := strings.TrimSpace(line[3:])
-	i := strings.Index(p, " -> ")
-	if i < 0 {
-		return ""
-	}
-	return strings.Trim(p[:i], "\"")
-}
+// porcelainPath / porcelainOldPath delegate to the gitexec leaf, which owns the
+// canonical `git status --porcelain` line parsing (S4.5 dedup — the logic lived
+// in two places). Thin wrappers keep the existing call sites stable.
+func porcelainPath(line string) string    { return gitexec.PorcelainPath(line) }
+func porcelainOldPath(line string) string { return gitexec.PorcelainOldPath(line) }
 
 // recoverBuildLeak relocates build-phase writes that escaped into the main tree
 // back into the worktree, then restores the main tree — the self-heal for the
@@ -118,19 +112,23 @@ func porcelainOldPath(line string) string {
 // unrecoverable (the guard kills the cycle, forcing human review; an auditor
 // cannot safely review the file that redefines the auditor).
 
+// gitCapture runs `git -C dir <args...>` through the gitRunner seam and returns
+// (stdout, exitCode, err). Per the sysexec contract a non-zero exit is reported
+// via exitCode (NOT err) — load-bearing for callers that branch on the code
+// (`git diff --quiet` rc=1, `merge-base --is-ancestor` rc=1). stdout is returned
+// UNTRIMMED (callers parse it themselves). git's stderr is surfaced to the
+// process stderr for triage (fatal: not a repo, …) as the pre-S4.5 form did —
+// now emitted once on completion rather than streamed live, immaterial for the
+// short git commands routed here.
 func gitCapture(ctx context.Context, dir string, args ...string) (string, int, error) {
-	var buf strings.Builder
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
-	cmd.Stdout = &buf
-	cmd.Stderr = os.Stderr // surface git diagnostics (fatal: not a repo, …) for triage
-	if err := cmd.Run(); err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			return buf.String(), ee.ExitCode(), nil
-		}
+	stdout, stderr, code, err := gitexec.Git{Dir: dir, Exec: gitRunner}.Capture(ctx, args...)
+	if stderr != "" {
+		fmt.Fprint(os.Stderr, stderr)
+	}
+	if err != nil {
 		return "", -1, err
 	}
-	return buf.String(), 0, nil
+	return stdout, code, nil
 }
 
 // defaultGitDirtyPaths runs `git status --porcelain -uall` in repoRoot and

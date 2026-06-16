@@ -25,10 +25,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 const (
@@ -210,12 +211,14 @@ func gitStatusNames(worktree string, max int) []string {
 	if worktree == "" {
 		return nil
 	}
-	out, err := exec.Command("git", "-C", worktree, "status", "--porcelain").Output()
-	if err != nil {
+	// Capture (not gitexec Output) keeps stdout UNTRIMMED — porcelain lines carry
+	// a leading status field (" M path"); trimming would corrupt the first line.
+	out, _, code, err := gitexec.Git{Dir: worktree, Exec: gitRunner}.Capture(context.Background(), "status", "--porcelain")
+	if err != nil || code != 0 {
 		return nil
 	}
 	var names []string
-	for _, ln := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+	for _, ln := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 		if ln == "" {
 			continue
 		}
