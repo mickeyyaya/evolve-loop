@@ -110,30 +110,32 @@ func TestPhaseVerify_Advisor_EvolveDirDefault(t *testing.T) {
 // the self-check runs the SAME PhaseIO-gated logic the host gate does (the
 // package's no-drift invariant). A build report that self-reports FAIL without a
 // structured failure block is a confirmed violation (exit 1) at
-// EVOLVE_PHASE_IO=enforce, and dormant (exit 0) at the default (off).
+// EVOLVE_PHASE_IO=enforce (now the default since the 3.10 cutover), and dormant
+// (exit 0) only when explicitly rolled back to off.
 func TestPhaseVerify_FailureContextPhaseIO_RespectsStage(t *testing.T) {
 	failNoBlock := "## Changes\n- x\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
 
-	t.Run("default-off-dormant", func(t *testing.T) {
+	t.Run("explicit-off-dormant", func(t *testing.T) {
+		t.Setenv("EVOLVE_PHASE_IO", "off") // 3.10: enforce is now the default, so off must be explicit
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		code, _, errb := runVerify(t, "build", "--workspace="+ws)
 		if code != 0 {
-			t.Fatalf("default (off): failure-context check must be dormant, want exit 0, got %d; stderr=%s", code, errb)
+			t.Fatalf("explicit off: failure-context check must be dormant, want exit 0, got %d; stderr=%s", code, errb)
 		}
 	})
 
-	t.Run("enforce-blocks", func(t *testing.T) {
-		t.Setenv("EVOLVE_PHASE_IO", "enforce")
+	t.Run("default-enforce-blocks", func(t *testing.T) {
+		// No t.Setenv: enforce is the 3.10 default, so the check blocks out of the box.
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		code, _, errb := runVerify(t, "build", "--workspace="+ws)
 		if code != 1 {
-			t.Fatalf("EVOLVE_PHASE_IO=enforce: want exit 1 (failure_context_missing), got %d; stderr=%s", code, errb)
+			t.Fatalf("default (enforce): want exit 1 (failure_context_missing), got %d; stderr=%s", code, errb)
 		}
 		if !strings.Contains(errb, "failure") {
 			t.Errorf("stderr should name the failure-context correction; got %q", errb)

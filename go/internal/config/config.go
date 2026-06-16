@@ -195,14 +195,15 @@ type RolloutStages struct {
 	// gate dials above (off/shadow/enforce trichotomy) it uses the FULL
 	// off→shadow→advisory→enforce ladder, like the dynamic-routing Stage:
 	//   StageOff      — the unified phaseio envelope is dormant; byte-identical
-	//                   legacy dispatch (the default).
+	//                   legacy dispatch (the rollback escape hatch).
 	//   StageShadow   — the envelope is assembled and compared against the
 	//                   legacy disk reads; mismatches log + ledger only.
 	//   StageAdvisory — the envelope is populated and read alongside the legacy
 	//                   path (legacy still wins; the two are compared).
 	//   StageEnforce  — the typed envelope is authoritative.
-	// Default StageOff (set in defaults()); a typo falls back to off via
-	// parseStage, never silently enabling the new envelope.
+	// Default StageEnforce as of the 3.10 cutover (set in defaults()); set
+	// EVOLVE_PHASE_IO=off to roll back. A typo falls back to off via parseStage
+	// (fail-safe — never leaves the dial in an unintended state).
 	PhaseIO Stage
 }
 
@@ -385,7 +386,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageOff},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -501,8 +502,9 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_PHASE_IO"]; v != "" {
 		// ADR-0050 Phase 3 — the unified phase-I/O rollout dial. Reuses
 		// parseStage (the 4-value off→shadow→advisory→enforce ladder) so a typo
-		// defaults to off, never silently enabling the new envelope. Default
-		// (no env) is off, set in defaults().
+		// falls back to off (fail-safe), never leaving the dial in an unintended
+		// state. Default (no env) is enforce as of the 3.10 cutover, set in
+		// defaults(); set EVOLVE_PHASE_IO=off to roll back.
 		cfg.PhaseIO = parseStage(v, "EVOLVE_PHASE_IO", ws)
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {

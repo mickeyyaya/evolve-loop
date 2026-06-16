@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // TestPhaseVerify_UserPhaseParity proves the agent self-check resolves a
@@ -41,7 +43,11 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(ws, "widget-check-report.md"), []byte("## Findings\n- ok\n\nVerdict: PASS\n"), 0o644); err != nil {
+	// 3.10 cutover: at the enforce default a verdict-declaring deliverable must
+	// carry the machine-readable sentinel — the prose-verdict fallback is gated off
+	// (parity with built-in evaluate phases, which all emit the sentinel).
+	deliverable := "## Findings\n- ok\n" + phasecontract.RenderVerdictSentinel("widget-check", "PASS") + "\n"
+	if err := os.WriteFile(filepath.Join(ws, "widget-check-report.md"), []byte(deliverable), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
