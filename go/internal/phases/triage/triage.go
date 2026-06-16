@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -122,6 +123,9 @@ type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
+	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
+	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
+	PhaseIO config.Stage
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -133,6 +137,7 @@ func New(c Config) *Phase {
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
+			PhaseIO: c.PhaseIO,
 		}),
 	}
 }

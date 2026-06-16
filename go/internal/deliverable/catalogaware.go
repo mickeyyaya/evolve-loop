@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
@@ -28,23 +29,31 @@ import (
 // verify, a catalog glitch never hard-fails the check, but a degrade on the
 // reconcile path can flip a user phase's outcome and must be visible.
 //
-// PhaseIO (ADR-0050 §3.8): this reconcile-on-timeout rung is deliberately left
-// at StageOff (VerifyWith, not VerifyWithStage). The host gate and the salvage
-// rung ARE threaded with cfg.PhaseIO (NewReviewerWithCatalogStage /
-// NewVerifierWithCatalogStage); this third path is not, so at PhaseIO=enforce a
-// build/scout/triage FAIL-without-block artifact reconciled on a timeout race
-// passes here but is still BLOCKED by the downstream host gate (an extra
-// correction round-trip, never a silent pass). Byte-identical at off/shadow/
-// advisory (the enforce-gated clause never fires). TODO(3.10): thread the stage
-// here when the default flips to enforce — 3.10 already wires cfg.PhaseIO broadly.
+// PhaseIO (ADR-0050 §3.10): as of Slice 1 this reconcile-on-timeout rung is
+// stage-aware via VerifyCatalogAwareStage, so it honors the SAME stage-gated
+// failure-context requirement as the host gate (NewReviewerWithCatalogStage) and
+// the salvage rung (NewVerifierWithCatalogStage). VerifyCatalogAware is retained
+// as the byte-identical back-compat wrapper (StageOff) for callers that pass no
+// stage.
 func VerifyCatalogAware(phase string, roots phasecontract.Roots) (Result, error) {
+	return VerifyCatalogAwareStage(phase, roots, config.StageOff)
+}
+
+// VerifyCatalogAwareStage is VerifyCatalogAware threaded with the EVOLVE_PHASE_IO
+// rollout stage (ADR-0050 §3.10). The stage flows through to VerifyWithStage at
+// every resolution branch (catalog-resolved, builtin fallback, and the degraded
+// catalog-load path); at StageOff it is byte-identical to the pre-3.10 path, and
+// at >=StageEnforce a build/scout/triage FAIL-without-block artifact reconciled on
+// a timeout race is now caught here too (the reconcile rung reaches the same
+// verdict as the host gate, not just deferring to it).
+func VerifyCatalogAwareStage(phase string, roots phasecontract.Roots, phaseIO config.Stage) (Result, error) {
 	if roots.EvolveDir == "" {
-		return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})
+		return VerifyWithStage(phase, roots, phasecontract.BuiltinResolver{}, phaseIO)
 	}
 	cat, _, _, err := phasespec.MergedCatalog(filepath.Dir(roots.EvolveDir))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[deliverable] WARN catalog load failed (%v) — contract resolution degraded to built-in-only; user/minted phases will not resolve\n", err)
-		return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})
+		return VerifyWithStage(phase, roots, phasecontract.BuiltinResolver{}, phaseIO)
 	}
-	return VerifyWith(phase, roots, phasecontract.NewCatalogResolver(cat.Get))
+	return VerifyWithStage(phase, roots, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
 }

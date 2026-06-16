@@ -262,17 +262,33 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	})
 	prm := newPromptsLoader(projectRoot)
 
+	// Composition root: the SOLE reader of routing env+config. config.Load
+	// maps the central registry + contained env overrides into one immutable
+	// RoutingConfig; router.Select picks the brain once. With
+	// dynamic_routing=0 (Stage:Off, the escape hatch; advisory is the
+	// default since 2026-06-06) NewOrchestrator behaves exactly as before. A nil proposer means DynamicLLM degrades to the deterministic
+	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
+	// Loaded BEFORE the runners map so cfg.PhaseIO can thread into the
+	// build/scout/triage reconcile rung (ADR-0050 §3.10 Slice 1).
+	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
+	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))
+	for _, w := range warnings {
+		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
+	}
+
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
 		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
 		// Decorator so EVOLVE_SWARM_STAGE=advisory|enforce dispatches them across N
 		// parallel workers (reader fan-out / writer merge-train). Default (stage
 		// unset) = byte-identical delegate to the inner runner — zero behavior change.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm}), br, swarm.ModeReader),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm}),
+		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
+		// (the shipping default) keeps these byte-identical.
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeReader),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm}), br, swarm.ModeWriter),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeWriter),
 		core.PhaseAudit:        audit.NewDefault(br, prm),
 		core.PhaseShip:         ship.NewWithDefaultRunner(),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
@@ -280,18 +296,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
 		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
-	}
-
-	// Composition root: the SOLE reader of routing env+config. config.Load
-	// maps the central registry + contained env overrides into one immutable
-	// RoutingConfig; router.Select picks the brain once. With
-	// dynamic_routing=0 (Stage:Off, the escape hatch; advisory is the
-	// default since 2026-06-06) NewOrchestrator behaves exactly as before. A nil proposer means DynamicLLM degrades to the deterministic
-	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
-	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
-	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))
-	for _, w := range warnings {
-		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
 	}
 
 	// User policy (.evolve/policy.json): merge mandatory_phases into the routing
