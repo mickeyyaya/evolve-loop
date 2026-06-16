@@ -92,3 +92,36 @@ func TestUnformattedGoFiles_SkipsNonGo(t *testing.T) {
 		t.Fatalf("want non-Go files ignored, got %v", got)
 	}
 }
+
+func TestFirstLine_NoNewline(t *testing.T) {
+	s := "single line without newline"
+	if got := firstLine(s); got != s {
+		t.Errorf("firstLine(%q) = %q, want %q", s, got, s)
+	}
+}
+
+func TestFirstLine_Empty(t *testing.T) {
+	if got := firstLine(""); got != "" {
+		t.Errorf("firstLine(%q) = %q, want empty", "", got)
+	}
+}
+
+func TestFirstLine_WithNewline(t *testing.T) {
+	if got := firstLine("first line\nsecond line"); got != "first line" {
+		t.Errorf("firstLine with newline: got %q, want %q", got, "first line")
+	}
+}
+
+func TestUnformattedGoFiles_GofmtMissing(t *testing.T) {
+	t.Setenv("PATH", "")
+	dir := t.TempDir()
+	write(t, dir, "any.go", "package p\n")
+
+	got, err := UnformattedGoFiles(dir)
+	if err == nil {
+		t.Fatal("want error when gofmt binary is missing; got nil")
+	}
+	if got != nil {
+		t.Errorf("want nil file list when gofmt missing; got %v", got)
+	}
+}

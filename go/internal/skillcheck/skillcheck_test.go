@@ -156,3 +156,98 @@ func copyTree(t *testing.T, src, dst string) {
 		t.Fatalf("copy tree %s: %v", src, err)
 	}
 }
+
+// prepareSkillsTree copies the minimal SSOT files needed by Run/Check into a
+// new temp dir and returns the dir. All TestRun_* tests use this to share setup.
+func prepareSkillsTree(t *testing.T) string {
+	t.Helper()
+	root := repoRoot(t)
+	tmp := t.TempDir()
+	copyFile(t, filepath.Join(root, "docs", "architecture", "phase-registry.json"),
+		filepath.Join(tmp, "docs", "architecture", "phase-registry.json"))
+	for _, dir := range []string{"skills", "agents", filepath.Join(".evolve", "profiles")} {
+		copyTree(t, filepath.Join(root, dir), filepath.Join(tmp, dir))
+	}
+	return tmp
+}
+
+// mutateBuildSkill mutates the skills/build/SKILL.md in the given root to
+// create a detectable drift, returning the path. Skips when the heading is absent.
+func mutateBuildSkill(t *testing.T, root string) string {
+	t.Helper()
+	target := filepath.Join(root, "skills", "build", "SKILL.md")
+	raw, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read %s: %v", target, err)
+	}
+	mutated := strings.Replace(string(raw), "## Output contract", "## Output contracts", 1)
+	if mutated == string(raw) {
+		t.Skip("fixture mutation anchor not found — skills/build/SKILL.md may have changed")
+	}
+	if err := os.WriteFile(target, []byte(mutated), 0o644); err != nil {
+		t.Fatalf("write mutated fixture: %v", err)
+	}
+	return target
+}
+
+func TestRun_CheckMode_NoDrift(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	var stdout, stderr strings.Builder
+	code := Run(tmp, false, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run check no-drift: exit %d; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "check OK") {
+		t.Errorf("want 'check OK' on stdout; got %q", stdout.String())
+	}
+}
+
+func TestRun_CheckMode_Drift(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	mutateBuildSkill(t, tmp)
+
+	var stdout, stderr strings.Builder
+	code := Run(tmp, false, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("Run check drift: exit %d, want 2; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "DRIFT:") {
+		t.Errorf("want 'DRIFT:' on stderr; got %q", stderr.String())
+	}
+}
+
+func TestRun_WriteMode_RewritesDrift(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	target := mutateBuildSkill(t, tmp)
+	original := func() []byte {
+		// capture the pre-mutation content by reading from the real repo
+		root := repoRoot(t)
+		b, err := os.ReadFile(filepath.Join(root, "skills", "build", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read original: %v", err)
+		}
+		return b
+	}()
+
+	var stdout, stderr strings.Builder
+	code := Run(tmp, true, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run write mode: exit %d; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	after, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read after write: %v", err)
+	}
+	if string(after) != string(original) {
+		t.Error("SKILL.md was not rewritten to original content by write mode")
+	}
+}
+
+func TestRun_InvalidRoot(t *testing.T) {
+	tmp := t.TempDir() // empty dir — no phase-registry.json
+	var stdout, stderr strings.Builder
+	code := Run(tmp, false, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("Run invalid root: exit %d, want 1; stderr=%q", code, stderr.String())
+	}
+}
