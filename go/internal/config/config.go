@@ -205,6 +205,20 @@ type RolloutStages struct {
 	// EVOLVE_PHASE_IO=off to roll back. A typo falls back to off via parseStage
 	// (fail-safe — never leaves the dial in an unintended state).
 	PhaseIO Stage
+
+	// RouterReplan is the ADR-0052 advisor-maximization post-scout re-plan
+	// rollout dial (WS2). It uses the off→shadow→advisory subset of the Stage
+	// ladder (enforce is unused for this axis):
+	//   StageOff      — no post-scout re-plan; the upfront plan stands.
+	//   StageShadow   — the re-plan is computed + logged (replan-plan.json), but
+	//                   the upfront clamped plan still drives (DEFAULT).
+	//   StageAdvisory — the re-plan replaces the clamped plan after the floor
+	//                   re-clamps it (opt-in, post-soak).
+	// PRECEDENCE NOTE: like the other rollout dials this is the composition-root
+	// view, set from EVOLVE_ROUTER_REPLAN by applyEnv; the re-plan call site
+	// (WS2-S3) reads it. Default StageShadow (set in defaults()); a typo falls
+	// back to off via parseStage (fail-safe — never silently enables the re-plan).
+	RouterReplan Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -386,7 +400,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -507,6 +521,14 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// defaults(); set EVOLVE_PHASE_IO=off to roll back.
 		cfg.PhaseIO = parseStage(v, "EVOLVE_PHASE_IO", ws)
 	}
+	if v := env["EVOLVE_ROUTER_REPLAN"]; v != "" {
+		// ADR-0052 advisor-maximization — the post-scout re-plan rollout dial
+		// (WS2). Reuses parseStage (off→shadow→advisory→enforce); the dial only
+		// documents off/shadow/advisory but enforce parses harmlessly. A typo
+		// falls back to off (fail-safe). Default (no env) is shadow, set in
+		// defaults(). Behavior wires in WS2-S3; this reserves the parse + view.
+		cfg.RouterReplan = parseStage(v, "EVOLVE_ROUTER_REPLAN", ws)
+	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
 		case SandboxModeAuto, SandboxModeOn, SandboxModeOff:
@@ -583,7 +605,8 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 // ladder, unlike parseEvidenceStage's off/shadow/enforce trichotomy). varName
 // names the offending key in the unknown-value warning; an unknown value
 // defaults to off (a typo must never silently enable a kill-path or a staged
-// rollout). Shared by EVOLVE_DYNAMIC_ROUTING and EVOLVE_PHASE_IO (ADR-0050).
+// rollout). Shared by EVOLVE_DYNAMIC_ROUTING, EVOLVE_PHASE_IO (ADR-0050), and
+// EVOLVE_ROUTER_REPLAN (ADR-0052).
 func parseStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
