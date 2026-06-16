@@ -33,7 +33,6 @@ import (
 
 const (
 	ExitOK          = 0
-	ExitFatal       = 1
 	ExitInvalidArgs = 10
 )
 
