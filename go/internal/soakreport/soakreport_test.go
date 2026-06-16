@@ -121,3 +121,49 @@ func TestRender_TableCarriesBarsAndCounts(t *testing.T) {
 		}
 	}
 }
+
+// TestReport_RenderFromConstructedRows builds a Report directly (rather than
+// via Collect) to pin Render's contract on fully-controlled input: the
+// per-cycle CycleRow table line, an evidence count, and the per-component NOTE
+// rendering — the last is a branch the Collect-driven tests above never reach
+// (a readable-but-empty workspace records no note).
+func TestReport_RenderFromConstructedRows(t *testing.T) {
+	t.Parallel()
+	rep := Report{
+		Cycles: []CycleRow{
+			{Cycle: 41, Outcome: "SHIPPED", Detail: "clean"},
+			{Cycle: 42, Outcome: "FAILED_EXPLAINED", Detail: "audit FAIL"},
+		},
+		Components: []ComponentEvidence{{
+			Component: "C2",
+			Bar:       bars["C2"],
+			Counts:    map[string]int{"would_fast_fail": 3},
+			Notes:     []string{"cycle-42 workspace unreadable — no evidence collected"},
+		}},
+	}
+	out := rep.Render()
+	for _, want := range []string{
+		"| cycle-41 | SHIPPED | clean |",
+		"| cycle-42 | FAILED_EXPLAINED | audit FAIL |",
+		"| would_fast_fail | 3 |",
+		"> NOTE: cycle-42 workspace unreadable", // the Notes branch
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Render() missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestAppendOnce_DedupesNotes pins appendOnce's de-duplication: a note already
+// present is not re-appended (so repeated unreadable-workspace cycles do not
+// stutter the report), while a new note is.
+func TestAppendOnce_DedupesNotes(t *testing.T) {
+	t.Parallel()
+	got := appendOnce([]string{"a", "b"}, "b") // duplicate → unchanged
+	if len(got) != 2 {
+		t.Errorf("appendOnce kept a duplicate: %v", got)
+	}
+	if got = appendOnce(got, "c"); len(got) != 3 || got[2] != "c" {
+		t.Errorf("appendOnce dropped a new note: %v", got)
+	}
+}
