@@ -15,7 +15,6 @@ package fanoutdispatch
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -351,6 +350,3 @@ func checkFailConsensus(resultsDir string, k int) bool {
 	}
 	return count >= k
 }
-
-// ErrUsage is returned for argument-validation failures.
-var ErrUsage = errors.New("fanoutdispatch: usage error")

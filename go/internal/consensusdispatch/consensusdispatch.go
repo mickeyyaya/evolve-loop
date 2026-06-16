@@ -13,7 +13,6 @@ package consensusdispatch
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -353,6 +352,3 @@ func exitCodeFromErr(ps *os.ProcessState) int {
 	}
 	return ps.ExitCode()
 }
-
-// MissingInputError represents a structural input error (compat alias).
-var MissingInputError = errors.New("consensusdispatch: missing required input")

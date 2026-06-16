@@ -1,5 +1,5 @@
 // Package dispatchevents writes abnormal-events.jsonl entries from the
-// dispatcher level — counter-non-advance, same-cycle-streak, verify
+// dispatcher level — counter-non-advance, circuit-breaker trips, verify
 // failures, classifier verdicts. Port of the inline JSONL emission at
 // archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:983-993 plus the
 // post-classifier records added in cycle-61 follow-ups.
@@ -37,7 +37,6 @@ type EventType string
 
 const (
 	EventCounterNonAdvance     EventType = "counter-non-advance"
-	EventSameCycleStreak       EventType = "same-cycle-streak"
 	EventCircuitBreakerTripped EventType = "circuit-breaker-tripped"
 	EventVerifyFailed          EventType = "verify-failed"
 	EventClassification        EventType = "classification"
