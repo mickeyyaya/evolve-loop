@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -283,7 +284,7 @@ func TestParseVerdicts_BareHeadingLine(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pass, warn, fail := parseVerdicts(tc.body)
+			pass, warn, fail := parseVerdicts(tc.body, config.StageOff)
 			if pass != tc.pass || warn != tc.warn || fail != tc.fail {
 				t.Errorf("parseVerdicts = (pass=%v warn=%v fail=%v), want (pass=%v warn=%v fail=%v)",
 					pass, warn, fail, tc.pass, tc.warn, tc.fail)
