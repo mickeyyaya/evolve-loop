@@ -1,6 +1,7 @@
 # ADR-0050: Modularization, Dedup, and Unified Phase I/O — Campaign Charter
 
-- **Status:** Accepted — campaign charter. Tracks the multi-PR program executed from plan `happy-petting-wreath.md`. Each slice lands as its own small, TDD'd, dual-reviewed, ship-gated PR with a decision-log line; this ADR's status advances to **Implemented** in Phase 6. No code-behavior change ships outside an explicit flag (`EVOLVE_PHASE_IO`, default `off`).
+- **Status:** Accepted — campaign charter. Tracks the multi-PR program executed from plan `happy-petting-wreath.md`. Each slice lands as its own small, TDD'd, dual-reviewed, ship-gated PR with a decision-log line; this ADR's status advances to **Implemented** in Phase 6.
+- **Progress (2026-06-16):** Phases 1–4 landed (releases **v18.12.0 → v18.15.0**; see the decision log). The D3 phase-I/O rollout completed its `off→shadow→advisory→enforce` ladder: after the **Phase 3.10 cutover** the `EVOLVE_PHASE_IO` default is **`enforce`** — the typed envelope is authoritative across the loop and `=off` is the rollback escape hatch (so the byte-identity guarantee below now reads "with `=off`" rather than "by default"). Phase 4 god-splits are effectively complete (orchestrator via #100/#101; the `internal/core`→`gitexec` migration via #132). **Remaining:** Phase 5 (per-package `apicover` hard-fail) + Phase 6 (finalization → v19.0.0). No code-behavior change shipped outside the `EVOLVE_PHASE_IO` ladder.
 - **Date:** 2026-06-15
 - **Driver:** an operator request to *"modularize, dedup, and make every basic component an independent dependency-injected module unit-tested in isolation with 100% public-API coverage; re-architect phase I/O into a unified isolated envelope so phases are true pipes-and-filters; keep the trust kernel byte-identical."*
 - **Evidence:** plan `happy-petting-wreath.md` (the executable slice list) + `docs/architecture/audit-2026-06-15-package-map.md` (the package inventory / dependency graph / dedup register produced in Phase 0.3).
@@ -53,7 +54,7 @@ All of this must change **without ever altering the trust kernel** — the ship-
 
 ## Rollout & trust-kernel invariants
 
-- **One flag** `EVOLVE_PHASE_IO` with stages `off` (default) → `shadow` (golden-equivalence) → `advisory` (old path wins, compared) → `enforce`; circuit-breaker auto-demotes `enforce→advisory` after N blocks. Rollback at any stage = `EVOLVE_PHASE_IO=off` (or prior release tag after cutover).
+- **One flag** `EVOLVE_PHASE_IO` with stages `off` → `shadow` (golden-equivalence) → `advisory` (old path wins, compared) → `enforce` (**the default since the Phase 3.10 cutover**, 2026-06-16); circuit-breaker auto-demotes `enforce→advisory` after N blocks. Rollback = `EVOLVE_PHASE_IO=off` (or the prior release tag).
 - **Byte-identity guarantees** (each gated on a dedicated test before it lands):
   1. With `EVOLVE_PHASE_IO=off`, the dispatch path is byte-identical to pre-change.
   2. The ledger only *adds* files (`handoff-*.json`, shadow files); it never rewrites a ledger line. The phase→role binding (`audit→auditor`, `build→builder`) keeps the exact role vocabulary ship depends on, proven by `TestRecordPhaseBinding_*_ByteIdenticalTo*`.
@@ -74,4 +75,4 @@ All of this must change **without ever altering the trust kernel** — the ship-
 
 ## Decision-log & traceability
 
-Every slice appends one row to `docs/architecture/decision-log-modularization.md` (rows batched into a per-phase docs slice — Phase 0 → commit `56456200`, Phase 1 → PR #112 / commit `64095c18` — that lands separately from the row-less code slices, since per-slice appends collide on the shared table across the parallel code PRs), references this ADR ID, and carries its `apicover` + `-race` evidence in the per-module Definition-of-Done. The full detailed contract lives in `docs/superpowers/specs/2026-06-15-modularization-unified-phase-io-design.md`.
+Every slice appends one row to `docs/architecture/decision-log-modularization.md` (rows batched into a per-phase docs slice — Phase 0 → commit `56456200`, Phase 1 → PR #112 / commit `64095c18`, Phases 2–4 → the `234.docs` catch-up PR — that lands separately from the row-less code slices, since per-slice appends collide on the shared table across the parallel code PRs), references this ADR ID, and carries its `apicover` + `-race` evidence in the per-module Definition-of-Done. The full detailed contract lives in `docs/superpowers/specs/2026-06-15-modularization-unified-phase-io-design.md`.
