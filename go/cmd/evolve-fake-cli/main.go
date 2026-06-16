@@ -318,7 +318,11 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		if verdict == "FAIL" {
 			redCount = 1
 		}
-		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n", verdict, verdict)
+		// Emit BOTH the prose heading and the machine-readable sentinel: at
+		// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
+		// is mandatory for the audit verdict parse, so a prose-only fake report
+		// would fail audit and the happy-path pipeline would never reach ship.
+		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"%s\",\"schema_version\":1} -->\n", verdict, verdict, verdict)
 		acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
 		out[acsPath] = fmt.Sprintf(`{"red_count": %d, "yellow_count": 0, "green_count": 1}`, redCount) + "\n"
 	case "retro":
