@@ -73,3 +73,20 @@
 # nil-resolver fallback tests (SetContractResolver(nil) restores built-in-only
 # resolution; zero-value Adapter degrades to built-in instead of nil-panicking).
 ./internal/adapters/bridge
+
+# Phase 5 named-return-type batch (2026-06-16): 10 packages already at 100% line
+# coverage whose single flagged export is a type RETURNED by a constructor but
+# never NAMED in a test (Result/Phase/PhaseConfig/AutoModel/VerifyContext/Guard).
+# Each gets one meaningful test that names the type via a `want := T{...}` /
+# `var x T = New(...)` binding AND asserts a real contract (full-struct equality,
+# phase identity, leak detection, auto-model expansion).
+./internal/verifyeval
+./internal/pruneephemeral
+./internal/posteditvalidate
+./internal/phases/swarmplan
+./internal/phases/build
+./internal/phaseconfig
+./internal/llmroute
+./internal/ledgerverify
+./internal/guards/treediff
+./internal/detectcli
