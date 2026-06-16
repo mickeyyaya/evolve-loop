@@ -17,3 +17,42 @@
 ./internal/skillcheck
 ./internal/flagregistry
 ./internal/soakreport
+
+# Phase 5 batch graduation (2026-06-16): 35 packages already at the public-API
+# DoD (0 uncovered, 0 false-green, godoc complete, >=85% cover, every .go <800).
+# Verified with integration-tagged coverage (matches CI's measurement).
+./internal/acsrunner
+./internal/adapters/flock
+./internal/adapters/runner
+./internal/adapters/storage
+./internal/atomicwrite
+./internal/backfill
+./internal/bedrock
+./internal/bridge/keyspec
+./internal/bridge/panestream
+./internal/changedpkgs
+./internal/codequality
+./internal/detectnested
+./internal/evalgate
+./internal/gitexec
+./internal/goalhash
+./internal/logfilter
+./internal/paths
+./internal/phaseio
+./internal/phaseorder
+./internal/phases/debugger
+./internal/phases/registry
+./internal/phases/specrunner
+./internal/phasewatchdog
+./internal/policy
+./internal/projecthash
+./internal/quotareset
+./internal/redteamcheck
+./internal/releaseconsistency
+./internal/runlease
+./internal/sessionrecord
+./internal/setup
+./internal/sysexec
+./internal/systemprompt
+./internal/textutil
+./internal/triagecap
