@@ -4,6 +4,9 @@ package flagregistry
 // repo-wide inventory + control-flags.md tables; hand-maintained since.
 // KEEP SORTED BY NAME (Lookup binary-searches; the test enforces order).
 
+// All is the complete EVOLVE_* flag registry, sorted by Name. It is the SSOT
+// projected into control-flags.md; Lookup binary-searches it, so it must stay
+// sorted (TestAll_SortedByName enforces this).
 var All = []Flag{
 	{Name: "EVOLVE_ACS_GO_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ACS_PREDICATE_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
