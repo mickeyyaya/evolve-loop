@@ -149,3 +149,23 @@
 ./internal/releasepreflight
 ./internal/research
 ./internal/profiles
+
+# Phase 5 gap=3 tail batch (2026-06-16): 10 packages each with THREE exported
+# symbols never named in a test (all already >=90% cover). Each gets one
+# meaningful apicover_named_test.go — types via full-struct equality / interface
+# satisfaction+exercise (Skipper, InlinePromptProvider, BaseRunner), JSON-tag
+# round-trips (Journal/LedgerEntry), output structs via their real producer
+# (ClaimResult/PromoteResult/RecoverResult, Result/PrefixManifest/PrefixRule via
+# Run), consts via consumer (ExitMissingBin/DefaultTTL/FullOrchestrator), funcs
+# by invocation (NewWithDefaultRunnerStage/NewForProject/ApplyArchetypeDefaults/
+# Roots), methods invoked (Class.IsValid). No dead exports in this tier.
+./internal/bridge/capabilities
+./internal/commitprefixgate
+./internal/inboxmover
+./internal/phases/runner
+./internal/phases/ship
+./internal/phasespec
+./internal/prompts
+./internal/rollback
+./internal/routingtest
+./internal/skillinventory
