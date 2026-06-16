@@ -15,7 +15,6 @@ package checkpoint
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -168,12 +167,6 @@ func applyWithHooks(h hooks, path string, cp Checkpoint) error {
 	}
 	return nil
 }
-
-// Sentinel kept exported so callers can wrap; not currently used by
-// any branch above but reserved for the auto-resume layer to surface
-// EVOLVE_AUTO_RESUME_MAX_ATTEMPTS exhaustion (bash exit rc=2). Phase 2
-// out-of-scope; Phase 3 wires it.
-var ErrAutoResumeExhausted = errors.New("checkpoint: auto-resume attempts exhausted")
 
 func init() {
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {

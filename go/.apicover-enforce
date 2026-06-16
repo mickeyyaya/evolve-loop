@@ -120,3 +120,32 @@
 ./internal/releasepipeline
 ./internal/resolvellm
 ./internal/verdictcache
+
+# Phase 5 gap=2 tail batch (2026-06-16): 19 packages each with TWO exported
+# symbols never named in a test (all already >=90% cover). 15 get meaningful
+# tests that name AND exercise each symbol (types via want:=T{...}/var x T=New(),
+# consts/vars via their real consumer, funcs/methods by direct invocation). The
+# other 4 packages had a DEAD exported error sentinel / unwired enum member
+# (ErrAutoResumeExhausted/MissingInputError/ErrUsage — zero refs; the real paths
+# return exit codes — and EventSameCycleStreak — emitted by nothing, the breaker
+# uses EventCircuitBreakerTripped); those were DELETED (YAGNI) rather than pinned
+# with a meaningless test.
+./internal/adapters/sandbox
+./internal/checkpoint
+./internal/clihealth
+./internal/consensusdispatch
+./internal/core/evidence
+./internal/cyclecost
+./internal/dispatchevents
+./internal/failureadapter
+./internal/fanoutdispatch
+./internal/modelquery
+./internal/panetrust
+./internal/phaseinventory
+./internal/phases/audit
+./internal/phases/buildplanner
+./internal/phasestream
+./internal/preflight
+./internal/releasepreflight
+./internal/research
+./internal/profiles
