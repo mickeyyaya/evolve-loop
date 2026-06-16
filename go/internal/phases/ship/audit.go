@@ -23,7 +23,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // auditEntry is the subset of LedgerEntry fields ship cares about.
@@ -84,7 +86,7 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: read audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
 	}
-	pass, warn, fail := parseVerdicts(string(body))
+	pass, warn, fail := parseVerdicts(string(body), opts.PhaseIO)
 
 	if fail && pass {
 		return shipErr(core.CodeAuditBindingDualVerdict, core.ShipClassPrecondition, core.StageVerifyClass,
@@ -236,7 +238,31 @@ func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 //
 //  1. Inline `Verdict: <X>` (case-insensitive, optional asterisks)
 //  2. Heading-style: `# Verdict\n**X**` (within 5 lines)
-func parseVerdicts(body string) (pass, warn, fail bool) {
+func parseVerdicts(body string, stage config.Stage) (pass, warn, fail bool) {
+	if stage >= config.StageEnforce {
+		// ADR-0050 §3.10 Slice 6: sentinel-first at enforce. The machine-readable
+		// verdict is authoritative and single-valued, so the prose regex below
+		// (which can match multiple verdict words and trip the dual-verdict guard at
+		// audit.go) is gated off. No usable sentinel → all false →
+		// CodeAuditBindingMalformed, i.e. the sentinel becomes mandatory.
+		//
+		// The sentinel MUST be the audit phase's own: this is a ship gate, so a
+		// foreign-phase sentinel (e.g. a build-report sentinel quoted into the
+		// audit artifact) must not be allowed to satisfy it. ParseVerdictSentinelFull
+		// surfaces the phase field; only an exact "audit" phase is trusted. SKIPPED
+		// and any out-of-vocab verdict also fall through to all-false (malformed).
+		if s, ok := phasecontract.ParseVerdictSentinelFull(body); ok && s.Phase == string(core.PhaseAudit) {
+			switch s.Verdict {
+			case core.VerdictPASS:
+				pass = true
+			case core.VerdictWARN:
+				warn = true
+			case core.VerdictFAIL:
+				fail = true
+			}
+		}
+		return
+	}
 	pass = hasVerdict(body, "PASS")
 	warn = hasVerdict(body, "WARN")
 	fail = hasVerdict(body, "FAIL")

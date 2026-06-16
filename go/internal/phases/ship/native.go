@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -105,6 +106,11 @@ type Options struct {
 	// EVOLVE_SHIP_AUTO_CONFIRM, EVOLVE_STRICT_AUDIT, EVOLVE_SHIP_RELEASE_NOTES,
 	// EVOLVE_BYPASS_PREFIX_GATE.
 	Env map[string]string
+
+	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
+	// parse (ADR-0050 §3.10 Slice 6). At >= StageEnforce parseVerdicts is
+	// sentinel-first; the zero value (StageOff) keeps the prose parse — byte-identical.
+	PhaseIO config.Stage
 
 	// Stdin/Stdout/Stderr default to the real streams when nil.
 	Stdin  io.Reader

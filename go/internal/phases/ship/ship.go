@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -26,12 +27,17 @@ type CmdRunner = sysexec.RunFunc
 type Config struct {
 	Runner CmdRunner
 	NowFn  func() time.Time
+	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
+	// parse (ADR-0050 §3.10 Slice 6). Zero value (StageOff) = byte-identical
+	// (prose parse). Set by the composition root (cmd_cycle.go) from cfg.PhaseIO.
+	PhaseIO config.Stage
 }
 
 // Phase implements core.PhaseRunner for the ship stage.
 type Phase struct {
-	runner CmdRunner
-	nowFn  func() time.Time
+	runner  CmdRunner
+	nowFn   func() time.Time
+	phaseIO config.Stage
 }
 
 func New(c Config) *Phase {
@@ -39,7 +45,7 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn}
+	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -87,7 +93,15 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 // NewWithDefaultRunner is a convenience constructor for production
 // wiring that uses sysexec.DefaultRunner (exec.CommandContext).
 func NewWithDefaultRunner() *Phase {
-	return New(Config{Runner: sysexec.DefaultRunner})
+	return NewWithDefaultRunnerStage(config.StageOff)
+}
+
+// NewWithDefaultRunnerStage is NewWithDefaultRunner plus the EVOLVE_PHASE_IO stage
+// (ADR-0050 §3.10 Slice 6). The composition root (cmd_cycle.go) passes cfg.PhaseIO
+// so the audit-binding verdict parse is sentinel-first at >= StageEnforce.
+// NewWithDefaultRunner stays as the StageOff (byte-identical) convenience.
+func NewWithDefaultRunnerStage(stage config.Stage) *Phase {
+	return New(Config{Runner: sysexec.DefaultRunner, PhaseIO: stage})
 }
 
 // runNative dispatches to the native Go ship implementation. Translates
@@ -101,6 +115,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		RunID:         req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
 		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:           req.Env,
+		PhaseIO:       p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
 		Runner:        sysexec.DefaultRunner,
 	}
 	res, err := Run(ctx, opts)
