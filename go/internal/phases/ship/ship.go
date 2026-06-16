@@ -69,7 +69,14 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	// (cycle-150). Defaulting here covers all current and future callers; the
 	// manual `evolve ship` CLI always passes an explicit message and is
 	// unaffected.
+	// ADR-0050 §3.10 Slice 4: read commit_message from the typed envelope at
+	// enforce, the legacy Context map below it (byte-identical — Active() is false
+	// unless enforce). The empty→defaultCommitMessage fallback below covers both
+	// paths, so an active envelope with no commit message still synthesizes one.
 	msg := req.Context["commit_message"]
+	if req.Input.Active() {
+		msg = req.Input.CycleInputs().CommitMessage()
+	}
 	if msg == "" {
 		msg = defaultCommitMessage(req)
 	}
