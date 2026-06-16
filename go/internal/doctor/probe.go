@@ -10,7 +10,6 @@ package doctor
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -152,7 +151,3 @@ func EmitJSON(r Result) ([]byte, error) {
 	}
 	return buf, nil
 }
-
-// ErrUnknown is returned by the CLI layer when an unrecognised doctor
-// subcommand reaches the dispatcher.
-var ErrUnknown = errors.New("doctor: unknown subcommand")

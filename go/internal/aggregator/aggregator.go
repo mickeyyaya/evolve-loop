@@ -15,7 +15,6 @@ package aggregator
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -437,6 +436,3 @@ func appendWorkerSections(b *strings.Builder, heading string, workers []string, 
 	}
 	return nil
 }
-
-// ErrUnknownPhase is returned when phase doesn't match any merge mode.
-var ErrUnknownPhase = errors.New("aggregator: unknown phase")

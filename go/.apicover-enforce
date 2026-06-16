@@ -90,3 +90,33 @@
 ./internal/ledgerverify
 ./internal/guards/treediff
 ./internal/detectcli
+
+# Phase 5 gap=1 tail batch (2026-06-16): 21 packages each with ONE exported symbol
+# never named in a test (all already >=85% cover). 18 get one meaningful test that
+# names AND exercises the symbol: a TYPE (want := T{...} / var x T = New(...)), a
+# CONST asserted via its real consumer (SkipExitCode/SealKind/SeverityFatal), or a
+# VAR (CanonicalTiers filter). The other 3 had a DEAD exported error sentinel
+# (ErrUnknownPhase/ErrCycleNonPositive/ErrUnknown — zero references tree-wide, the
+# real failure path returns exit codes); those were DELETED (YAGNI) rather than
+# pinned with a meaningless errors.Is test.
+./internal/acssuite
+./internal/adapters/ledger
+./internal/adapters/observer
+./internal/aggregator
+./internal/bridge/inbox
+./internal/capability
+./internal/cycleclassify
+./internal/cyclehealth
+./internal/cyclesimulator
+./internal/doctor
+./internal/fleet
+./internal/log
+./internal/marketplacepoll
+./internal/modelcatalog
+./internal/phaseregistrar
+./internal/phases/retro
+./internal/phases/swarmrunner
+./internal/phases/tdd
+./internal/releasepipeline
+./internal/resolvellm
+./internal/verdictcache
