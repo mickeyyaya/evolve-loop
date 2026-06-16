@@ -189,3 +189,18 @@
 ./internal/looppreflight
 ./internal/recovery
 ./internal/reflection
+
+# Phase 5 gap=5-7 tail batch (2026-06-16): 5 packages (5-7 unnamed exports
+# each, all >=95% cover). phaseobserver: Scope enum + DefaultProcessAlive (live
+# pgid probe) + ExitFatal exit-code-vocabulary contract. deliverable: 4 Verify
+# error codes via real fixtures + NewVerifier/NewVerifierWithCatalog. subagent:
+# 5 *Result structs bound from their producers + TierHaiku via ResolveModelTier.
+# bridge/recipe: Result/StepResult/StepStatus/SessionDriver/SendKind/AwaitKind/
+# OnTimeoutAbort via Engine.Run. envchain: 7 Key/Def/Max env consts driven
+# through their real IntMin/Int getters (resolver contract reproduced; envchain
+# cannot import its core/cyclehealth consumers). No dead exports.
+./internal/phaseobserver
+./internal/deliverable
+./internal/subagent
+./internal/bridge/recipe
+./internal/envchain
