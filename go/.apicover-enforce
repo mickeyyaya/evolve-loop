@@ -223,3 +223,17 @@
 ./internal/router
 ./internal/interaction
 ./internal/swarm
+
+# Phase 5 FINAL — internal/core graduation (2026-06-17): the central package
+# (193 exports). 3 cohesive test files name + exercise the last 62 uncovered
+# symbols: apicover_shiperror_test.go (4 ShipError protocol types + 34 ship-error
+# /stage consts, table-driven through NewShipError+AsShipError with per-code Class
+# transcribed from the live ship call-sites); apicover_ports_test.go (Bridge/Guard
+# /Ledger/Storage ports via the in-package fakes + GuardInput/GuardDecision/
+# BatchAccrual/TriageThroughputEntry DTOs + LedgerEntry.UnmarshalJSON); and
+# apicover_misc_test.go (Failure/PhaseAdvisor + their Option seams, Observer/
+# StateMachine/StateUpdater/WorktreeProvisioner/ThroughputRecorder, SealResult,
+# VerdictReason, Orchestrator.FailureAdviserWired, PhaseBoundaryCheckpointer var,
+# CycleStateFile/PhaseSwarmPlan consts). This completes the tail: ALL internal
+# packages are now in the apicover hard-fail gate.
+./internal/core
