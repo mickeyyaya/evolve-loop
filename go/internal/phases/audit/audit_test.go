@@ -14,6 +14,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -29,7 +30,7 @@ import (
 // drift apart.
 func TestExtractHonorsPhaseContract(t *testing.T) {
 	canonical := phasecontract.Audit.Sections[0].Canonical
-	got, found := extractAuditVerdict(canonical + ": PASS\n")
+	got, found := extractAuditVerdict(canonical+": PASS\n", config.StageOff)
 	if !found || got != core.VerdictPASS {
 		t.Fatalf("extract under contract canonical %q = (%q,%v), want (PASS,true)", canonical, got, found)
 	}
@@ -41,12 +42,12 @@ func TestExtractHonorsPhaseContract(t *testing.T) {
 func TestExtractPrefersSentinel(t *testing.T) {
 	// Sentinel says FAIL even though prose says PASS — sentinel must win.
 	body := "## Verdict\n**PASS**\n" + phasecontract.RenderVerdictSentinel("audit", "FAIL") + "\n"
-	got, found := extractAuditVerdict(body)
+	got, found := extractAuditVerdict(body, config.StageOff)
 	if !found || got != core.VerdictFAIL {
 		t.Fatalf("sentinel-first: got (%q,%v), want (FAIL,true)", got, found)
 	}
 	// No sentinel → legacy regex still parses prose.
-	got, found = extractAuditVerdict("## Verdict\n**WARN**\n")
+	got, found = extractAuditVerdict("## Verdict\n**WARN**\n", config.StageOff)
 	if !found || got != core.VerdictWARN {
 		t.Fatalf("regex fallback: got (%q,%v), want (WARN,true)", got, found)
 	}
@@ -573,7 +574,7 @@ func TestExtractAuditVerdict_Formats(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, found := extractAuditVerdict(tc.content)
+			got, found := extractAuditVerdict(tc.content, config.StageOff)
 			if found != tc.wantFound {
 				t.Fatalf("found=%v, want %v (verdict=%q)", found, tc.wantFound, got)
 			}

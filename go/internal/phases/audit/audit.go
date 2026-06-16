@@ -37,6 +37,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -80,6 +81,11 @@ type hooks struct {
 	// drift must FAIL audit. nil = no skills gate. NewDefault wires
 	// skillsDriftCheckDefault (in-process skillcheck.Check — no subprocess).
 	skillsDriftCheck func(req core.PhaseRequest) ([]string, error)
+	// phaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
+	// §3.10 Slice 5). At >= StageEnforce the evolve-verdict sentinel is mandatory —
+	// the legacy prose/regex fallbacks are gated off. Zero value (StageOff) keeps
+	// every path active, byte-identical.
+	phaseIO config.Stage
 }
 
 func (hooks) PhaseName() string                           { return string(core.PhaseAudit) }
@@ -97,7 +103,7 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	verdict, verdictFound := extractAuditVerdict(artifact)
+	verdict, verdictFound := extractAuditVerdict(artifact, h.phaseIO)
 	if !verdictFound {
 		verdict = core.VerdictFAIL
 	}
@@ -209,18 +215,23 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 // worth a loud diagnostic) from an explicit "FAIL". A real FAIL/WARN/SKIPPED
 // declaration is captured verbatim, so broadening the accepted FORMATS never
 // turns a real non-PASS verdict into a PASS.
-func extractAuditVerdict(content string) (string, bool) {
+func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 	// Layer-5 strangler: the machine-readable sentinel wins when present; the
 	// legacy regex-on-prose remains the fallback for reports written against the
 	// older templates.
 	if v, ok := phasecontract.ParseVerdictSentinel(content); ok {
 		return v, true
 	}
-	if m := verdictCanonicalRE.FindStringSubmatch(content); m != nil {
-		return m[1], true
-	}
-	if m := verdictInlineRE.FindStringSubmatch(content); m != nil {
-		return m[1], true
+	// ADR-0050 §3.10 Slice 5: the regex-on-prose fallbacks serve reports written
+	// against older templates; at enforce the sentinel above is mandatory, so gate
+	// them off (>= StageEnforce). Below enforce they stay active — byte-identical.
+	if stage < config.StageEnforce {
+		if m := verdictCanonicalRE.FindStringSubmatch(content); m != nil {
+			return m[1], true
+		}
+		if m := verdictInlineRE.FindStringSubmatch(content); m != nil {
+			return m[1], true
+		}
 	}
 	return "", false
 }
@@ -257,6 +268,9 @@ type Config struct {
 	// (CI TestSkills_NoDrift parity). nil = no skills gate. NewDefault wires
 	// skillsDriftCheckDefault.
 	CheckSkillsDrift func(req core.PhaseRequest) ([]string, error)
+	// PhaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
+	// §3.10 Slice 5). Zero value (StageOff) = byte-identical (prose fallbacks active).
+	PhaseIO config.Stage
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -264,7 +278,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift},
+			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift, phaseIO: c.PhaseIO},
 			Bridge:  c.Bridge,
 			Prompts: c.Prompts,
 			NowFn:   c.NowFn,
@@ -282,7 +296,15 @@ func New(c Config) *Phase {
 // every cycle (cycle-147). New(Config) stays for tests that pin explicit
 // (nil or fake) generators.
 func NewDefault(br core.Bridge, prm *prompts.Loader) *Phase {
-	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault})
+	return NewDefaultWithStage(br, prm, config.StageOff)
+}
+
+// NewDefaultWithStage is NewDefault plus the EVOLVE_PHASE_IO stage (ADR-0050 §3.10
+// Slice 5). The composition root (cmd_cycle.go) passes cfg.PhaseIO so the audit
+// verdict extraction enforces the sentinel at >= StageEnforce. NewDefault stays as
+// the StageOff (byte-identical) convenience for the registry init() and tests.
+func NewDefaultWithStage(br core.Bridge, prm *prompts.Loader, stage config.Stage) *Phase {
+	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault, PhaseIO: stage})
 }
 
 // skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs the

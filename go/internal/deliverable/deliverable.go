@@ -137,7 +137,7 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
 		}
 	}
-	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts) {
+	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts, phaseIO) {
 		res.add(CodeBadVerdict, fmt.Sprintf("no parseable verdict; expected one of %v", c.Verdicts))
 	}
 	// ADR-0039 §7 / ADR-0050 §3.8: a sentinel-declared FAIL/WARN must carry the
@@ -218,7 +218,7 @@ func verifyJSON(res *Result, c phasecontract.Contract, content string) {
 // verdictPresent reports whether the deliverable declares an allowed verdict.
 // Layer-5 strangler: the machine-readable sentinel is checked first; the prose
 // scan is the fallback for reports written against older templates.
-func verdictPresent(content string, verdicts []string) bool {
+func verdictPresent(content string, verdicts []string, phaseIO config.Stage) bool {
 	if v, ok := phasecontract.ParseVerdictSentinel(content); ok {
 		for _, allowed := range verdicts {
 			if v == allowed {
@@ -226,11 +226,19 @@ func verdictPresent(content string, verdicts []string) bool {
 			}
 		}
 		// A sentinel with an out-of-vocabulary verdict is not a valid declaration;
-		// fall through to the prose scan rather than trusting it.
+		// fall through to the prose scan rather than trusting it. ADR-0050 §3.10
+		// Slice 5: below enforce that fall-through reaches the prose scan; at
+		// enforce the prose scan is gated off, so an out-of-vocab sentinel resolves
+		// to false (CodeBadVerdict) with no prose rescue.
 	}
-	for _, v := range verdicts {
-		if strings.Contains(content, v) {
-			return true
+	// ADR-0050 §3.10 Slice 5: the prose substring scan is the legacy fallback for
+	// older templates; at enforce the sentinel is mandatory, so gate it off
+	// (>= StageEnforce). Below enforce it stays active — byte-identical.
+	if phaseIO < config.StageEnforce {
+		for _, v := range verdicts {
+			if strings.Contains(content, v) {
+				return true
+			}
 		}
 	}
 	return false
