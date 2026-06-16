@@ -6,10 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // ResumePoint describes a checkpointed cycle that can be resumed.
@@ -331,10 +332,17 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 // --- helpers ---
 
 func defaultCurrentHead(projectRoot string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = projectRoot
-	out, err := cmd.Output()
-	return string(out), err
+	// Capture (not gitexec HEAD/Output) preserves the historical UNTRIMMED return
+	// — callers receive the raw `git rev-parse HEAD` stdout (trailing newline and
+	// all), as the pre-S4.5 cmd.Output() form did.
+	out, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if code != 0 {
+		return out, fmt.Errorf("git rev-parse HEAD: rc=%d: %s", code, strings.TrimSpace(stderr))
+	}
+	return out, nil
 }
 
 func defaultPathExists(path string) bool {
