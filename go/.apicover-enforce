@@ -204,3 +204,22 @@
 ./internal/subagent
 ./internal/bridge/recipe
 ./internal/envchain
+
+# Phase 5 heavy tier batch (2026-06-17): the 5 highest-gap packages (11-14
+# unnamed exports each). bridge: FakeTmuxController.PaneCommand/JiggleWindow
+# (false-green fixed by real invocation) + PaneCommander + Report/ArtifactRef/
+# FileRef via BuildReport + DoctorReport/DoctorResult/AuthInfo/BinaryInfo/
+# DeepProbe via Engine.Doctor. phasecontract: render/sentinel consts via their
+# producers + SynthesizesContract + CatalogResolver + VerdictSentinel + the 5
+# builtin Report vars (Audit/Build/Intent/Scout/Triage) wired into the registry.
+# router: DefaultShipFloor/FailureInsertPhases/IsFailureInsert/HandoffsFromSignals
+# + BenchedCLI/CarryoverTodo/MintSpec/PhaseCard/PhasePolicy/Planner/RoutingStrategy
+# via the strategy engine + clamp. interaction: 9 Result consts via the Rollup
+# producer->consumer path + Rollup + CorrectionAction + InteractionRule. swarm:
+# 14 merge-train/kill/registry interface seams + report structs via their real
+# impls/producers. No dead exports.
+./internal/bridge
+./internal/phasecontract
+./internal/router
+./internal/interaction
+./internal/swarm
