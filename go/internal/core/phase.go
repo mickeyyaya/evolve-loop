@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
@@ -131,6 +132,16 @@ type PhaseRequest struct {
 	// EVOLVE_PHASE_IO>=advisory with the planner enabled; empty at off/shadow so
 	// the build phase reads disk exactly as before (byte-identical dispatch).
 	BuildPlan string `json:"build_plan,omitempty"`
+
+	// Input is the unified typed phase-I/O envelope (ADR-0050 Phase 3.10). It is
+	// assembled once at the dispatch seam and ONLY at EVOLVE_PHASE_IO>=enforce; the
+	// zero value at off/shadow/advisory keeps dispatch byte-identical (no phase
+	// consumes it until the enforce cutover migrates readers off the Context map).
+	// Excluded from JSON: PhaseInput seals its channels behind unexported fields so
+	// it is not wire-serializable — the subprocess override path keeps using
+	// Context, and in-core phases read this envelope when composing prompts before
+	// any subprocess launch.
+	Input phaseio.PhaseInput `json:"-"`
 
 	// CorrectionDirective is set by the orchestrator's contract-correction loop
 	// on a re-dispatch after a deliverable reject; the runner copies it into the

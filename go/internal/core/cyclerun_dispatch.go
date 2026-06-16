@@ -108,14 +108,17 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
 	// reads disk as before (byte-identical dispatch).
 	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.envSnap, cr.cs.WorkspacePath)
-	// ADR-0050 Phase 3.4: the unified-phase-I/O SHADOW stage. When
+	// ADR-0050 Phase 3.4 (SHADOW) + Phase 3.10 (ENFORCE input). When
 	// EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the same
 	// upstream this phase is about to receive, compare it to the legacy routing
-	// digest, and record any divergence (shadow artifact + ledger). At
-	// EVOLVE_PHASE_IO=off (default) this is skipped entirely — byte-identical
-	// dispatch. It never affects phaseReq or the dispatch result.
+	// digest, and record any divergence (shadow artifact + ledger). At >=enforce,
+	// the same pass also returns the authoritative typed PhaseInput the phase
+	// consumes in place of the legacy Context map. At EVOLVE_PHASE_IO=off (default)
+	// this is skipped entirely and phaseReq.Input stays the zero value —
+	// byte-identical dispatch; below enforce the assembled Input is still zero, so
+	// only the flip to enforce changes what a phase observes.
 	if cr.o.cfg.PhaseIO >= config.StageShadow {
-		cr.emitPhaseIOShadow(next, phaseCtx)
+		phaseReq.Input = cr.assemblePhaseIO(next, phaseWorktree, phaseCtx)
 	}
 	// Cycle-122 Fix 3 / ADR-0030: attach the per-phase observer
 	// goroutine BEFORE runner.Run and cancel it AFTER. noopObserver
