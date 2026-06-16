@@ -295,15 +295,16 @@ func TestLoad_PhaseRecoveryStage(t *testing.T) {
 
 // TestPhaseIOStage pins the EVOLVE_PHASE_IO dial (ADR-0050 Phase 3): the unified
 // phase I/O rollout uses the FULL off→shadow→advisory→enforce ladder (4-value,
-// unlike the 3-value gate dials), defaults OFF (dormant, byte-identical live
-// loop), and a typo falls back to off with a warning (never silently enabling
-// the new envelope). Covers DefaultOff / Shadow / Advisory / Enforce / TypoDefaultsOff.
+// unlike the 3-value gate dials), defaults ENFORCE as of the 3.10 cutover (the
+// typed envelope is now authoritative; set EVOLVE_PHASE_IO=off to roll back), and
+// a typo falls back to off with a warning (never silently leaving the dial in an
+// unintended state). Covers DefaultEnforce / Off / Shadow / Advisory / Enforce / TypoDefaultsOff.
 func TestPhaseIOStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// DefaultOff: no env ⇒ the envelope ships dormant.
-	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseIO != StageOff {
-		t.Errorf("default PhaseIO = %v, want StageOff", cfg.PhaseIO)
+	// DefaultEnforce: no env ⇒ the typed envelope is authoritative (3.10 cutover).
+	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseIO != StageEnforce {
+		t.Errorf("default PhaseIO = %v, want StageEnforce", cfg.PhaseIO)
 	}
 	// The full 4-value ladder (advisory is the middle state the gates omit).
 	for v, want := range map[string]Stage{
@@ -321,5 +322,16 @@ func TestPhaseIOStage(t *testing.T) {
 	}
 	if !hasWarning(ws, "unknown-value") {
 		t.Error("typo EVOLVE_PHASE_IO should warn unknown-value")
+	}
+}
+
+// TestDefaults_PhaseIO_Enforce pins the 3.10 cutover at the struct-default level:
+// the baked-in RolloutStages default is StageEnforce, so the typed envelope is
+// authoritative on every production path that doesn't explicitly override the dial.
+// This is the byte-behavior flip — guard it explicitly so a future default edit
+// can't silently roll the cutover back to off.
+func TestDefaults_PhaseIO_Enforce(t *testing.T) {
+	if got := defaults().RolloutStages.PhaseIO; got != StageEnforce {
+		t.Errorf("default RolloutStages.PhaseIO = %v, want StageEnforce (3.10 cutover)", got)
 	}
 }
