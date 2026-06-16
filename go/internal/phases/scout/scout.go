@@ -51,15 +51,23 @@ func (hooks) DefaultModel() string                        { return "auto" }
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
-	if s := req.Context["strategy"]; s != "" {
-		fmt.Fprintf(&b, "- strategy: %s\n", s)
+	// ADR-0050 §3.10 Slice 3: read strategy/goal/challengeToken from the typed
+	// envelope at enforce, the legacy Context map below it (byte-identical —
+	// Active() is false unless enforce, and the typed getters mirror these keys).
+	strategy, goal, tok := req.Context["strategy"], req.Context["goal"], req.Context["challengeToken"]
+	if req.Input.Active() {
+		ci := req.Input.CycleInputs()
+		strategy, goal, tok = ci.Strategy(), ci.Goal(), ci.ChallengeToken()
+	}
+	if strategy != "" {
+		fmt.Fprintf(&b, "- strategy: %s\n", strategy)
 	}
 	// Goal text propagates via Context["goal"] when the operator
 	// passed --goal-text. Scout reads it as a CONSTRAINT — its
 	// backlog-vs-goal selection should treat the goal as canonical.
 	// (Pre-fix, Scout had only the hash and read backlog regardless.)
-	if g := req.Context["goal"]; g != "" {
-		fmt.Fprintf(&b, "- goal: %s\n", g)
+	if goal != "" {
+		fmt.Fprintf(&b, "- goal: %s\n", goal)
 	}
 	// Cycle-135 fix (PR 6): plumb the cycle's challenge token into the
 	// Cycle Context block so scout doesn't have to mint its own. Per
@@ -72,14 +80,21 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// when this line was absent. Pairs with the runner-side write of
 	// `<workspace>/challenge-token.txt` so the fallback source (per
 	// agent-templates.md PR 5 precedence step 2) is also populated.
-	if tok := req.Context["challengeToken"]; tok != "" {
+	if tok != "" {
 		fmt.Fprintf(&b, "- challenge_token: %s\n", tok)
 	}
 	return b.String()
 }
 
 func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	return classify(artifact, req.Context["strategy"]), nil, string(core.PhaseTriage)
+	// ADR-0050 §3.10 Slice 3: the strategy gate is verdict-affecting
+	// (convergence-confirmation → SKIPPED), so Classify reads the typed envelope at
+	// enforce too. Byte-identical below enforce (Active() == false).
+	strategy := req.Context["strategy"]
+	if req.Input.Active() {
+		strategy = req.Input.CycleInputs().Strategy()
+	}
+	return classify(artifact, strategy), nil, string(core.PhaseTriage)
 }
 
 func classify(content, strategy string) string {
