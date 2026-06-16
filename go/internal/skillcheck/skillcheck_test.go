@@ -251,3 +251,26 @@ func TestRun_InvalidRoot(t *testing.T) {
 		t.Fatalf("Run invalid root: exit %d, want 1; stderr=%q", code, stderr.String())
 	}
 }
+
+// TestRun_CheckMode_FrontmatterNameDrift — a skill whose SKILL.md name !=
+// dir name must surface as a DRIFT: message on stderr (exit 2).
+func TestRun_CheckMode_FrontmatterNameDrift(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	// Add an extra skill whose frontmatter name does not match the dir name.
+	extraDir := filepath.Join(tmp, "skills", "extra-skill")
+	if err := os.MkdirAll(extraDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: different-name\n---\n\n# Extra Skill\n"
+	if err := os.WriteFile(filepath.Join(extraDir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr strings.Builder
+	code := Run(tmp, false, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("Run: exit %d, want 2 (name drift must fail check); stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "DRIFT:") {
+		t.Errorf("want 'DRIFT:' on stderr for frontmatter name mismatch; got %q", stderr.String())
+	}
+}

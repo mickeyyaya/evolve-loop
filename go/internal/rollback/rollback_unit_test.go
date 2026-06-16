@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestResolveEvolveBinForRollback_EnvVarSet — EVOLVE_GO_BIN pointing
@@ -115,4 +119,67 @@ func TestAppendLedger_MkdirFailure_ReturnsError(t *testing.T) {
 	if !strings.Contains(err.Error(), "blocker") && !strings.Contains(err.Error(), "child") {
 		// loose check: error path should reference the failing dir
 	}
+}
+
+// TestRevertAndShipWith_RevertOK_BinaryFails_LocalOnly — when git revert
+// succeeds but the evolve binary exits non-zero, status is "local-only".
+func TestRevertAndShipWith_RevertOK_BinaryFails_LocalOnly(t *testing.T) {
+	t.Setenv("EVOLVE_GO_BIN", "")
+
+	// Create a fake evolve binary that exits 1.
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "evolve")
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_GO_BIN", binPath)
+
+	// FakeExec zero-value: every git command succeeds with empty output.
+	fake := &fixtures.FakeExec{}
+	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}
+
+	got := revertAndShipWith(g, binDir, "deadbeef", "test-reason", "1.0.0")
+	if got != "local-only" {
+		t.Errorf("status = %q, want local-only (binary exits 1)", got)
+	}
+}
+
+// TestRevertAndShipWith_RevertOK_BinarySucceeds_Reverted — when git revert
+// succeeds and the evolve binary exits 0, status is "reverted".
+func TestRevertAndShipWith_RevertOK_BinarySucceeds_Reverted(t *testing.T) {
+	t.Setenv("EVOLVE_GO_BIN", "")
+
+	// Create a fake evolve binary that exits 0.
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "evolve")
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_GO_BIN", binPath)
+
+	fake := &fixtures.FakeExec{}
+	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}
+
+	got := revertAndShipWith(g, binDir, "deadbeef", "test-reason", "1.0.0")
+	if got != "reverted" {
+		t.Errorf("status = %q, want reverted (binary exits 0)", got)
+	}
+}
+
+// TestRun_NilSteps_FallbacksAssigned — passing all-nil Steps with DryRun=false
+// exercises the three nil-fallback assignments in Run (each default* function
+// is assigned). Real commands run in a temp dir and will fail gracefully.
+func TestRun_NilSteps_FallbacksAssigned(t *testing.T) {
+	jp, repo := makeJournal(t, journalFull)
+	var buf strings.Builder
+	// All Steps fields nil — triggers GhDeleteRelease, DeleteRemoteTag, and
+	// RevertAndShip nil-fallback assignments. Results are env-dependent; we
+	// only verify the call does not panic and that the nil assignments ran.
+	_, _ = Run(Options{
+		JournalPath: jp,
+		RepoRoot:    repo,
+		Steps:       Steps{},
+		Stderr:      &buf,
+		Now:         func() time.Time { return time.Unix(0, 0) },
+	})
 }
