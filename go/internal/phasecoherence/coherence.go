@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
+// Violation is one persona/profile coherence drift finding, carrying the
+// affected persona, the drift Kind, a Severity, and an eval-vocabulary Message.
 type Violation struct {
 	Persona  string // base name, e.g. "builder" (evolve- prefix stripped)
 	Kind     string // "disallowed" | "undeclared" (tools checks) | "unpaired" (missing profile)
@@ -18,12 +20,18 @@ type Violation struct {
 	Message  string // eval vocabulary: contradiction|mismatch|disallowed|undeclared
 }
 
+// Options configures a coherence check: the filesystem containing agents/,
+// the profiles filesystem, and optional per-persona path overrides.
 type Options struct {
 	AgentsFS   fs.FS             // root CONTAINING agents/ (prompts.Loader layout)
 	ProfilesFS fs.FS             // profiles dir root: <name>.json at top level (profiles.Loader layout)
 	Overrides  map[string]string // persona name → OS file path substituting agents/evolve-<name>.md
 }
 
+// Check verifies that each evolve-<name>.md persona is paired with a profile
+// and that the persona's declared tools agree with the profile's allowed_tools.
+// It returns one Violation per drift (unpaired profile, disallowed tool, or
+// undeclared tool) and a non-nil error only on configuration or I/O failure.
 func Check(opts Options) ([]Violation, error) {
 	if opts.AgentsFS == nil {
 		return nil, errors.New("missing AgentsFS")

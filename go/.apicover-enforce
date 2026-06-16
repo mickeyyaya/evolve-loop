@@ -56,3 +56,14 @@
 ./internal/systemprompt
 ./internal/textutil
 ./internal/triagecap
+
+# Phase 5 godoc batch (2026-06-16)
+./internal/gc
+./internal/faillearn
+./internal/semvercheck
+./internal/versionbump
+./internal/changeloggen
+./internal/phases/scout
+./internal/phases/intent
+./internal/phases/triage
+./internal/phasecoherence

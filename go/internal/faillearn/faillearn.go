@@ -22,9 +22,12 @@ import (
 type Scope string
 
 const (
+	// ScopePhase selects a mid-cycle phase failure.
 	ScopePhase Scope = "phase" // mid-cycle phase failure
+	// ScopeReset selects an operator-initiated `evolve cycle reset`.
 	ScopeReset Scope = "reset" // operator `evolve cycle reset`
-	ScopeLoop  Scope = "loop"  // loop-runner fatal exit
+	// ScopeLoop selects a loop-runner fatal exit.
+	ScopeLoop Scope = "loop" // loop-runner fatal exit
 )
 
 // summaryMaxRunes caps the rendered summary/description. Rune-based so

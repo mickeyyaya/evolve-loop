@@ -11,6 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
+// CheckArtifactNames verifies that each persona's declared output-artifact
+// (its first .md token) matches the output_artifact named in the paired
+// profile. It returns a "mismatch" Violation per disagreement and a non-nil
+// error only on configuration or I/O failure.
 func CheckArtifactNames(opts Options) ([]Violation, error) {
 	if opts.AgentsFS == nil {
 		return nil, errors.New("missing AgentsFS")
