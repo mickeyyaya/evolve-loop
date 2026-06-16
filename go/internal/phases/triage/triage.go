@@ -61,8 +61,16 @@ func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Dia
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
-	if s := req.Context["carryover_summary"]; s != "" {
-		fmt.Fprintf(&b, "- carryover_summary: %s\n", s)
+	// ADR-0050 §3.10 Slice 2: typed envelope at enforce, legacy Context below it
+	// (byte-identical — Active() is false unless enforce).
+	carryover := req.Context["carryover_summary"]
+	fleetScope := req.Context["fleet_scope"]
+	if req.Input.Active() {
+		carryover = req.Input.CycleInputs().Carryover()
+		fleetScope = req.Input.CycleInputs().FleetScope()
+	}
+	if carryover != "" {
+		fmt.Fprintf(&b, "- carryover_summary: %s\n", carryover)
 	}
 	// ADR-0049 E: under `evolve fleet --plan` this cycle is one of several running
 	// concurrently, each assigned a DISJOINT set of tasks. Steer selection to ONLY
@@ -70,7 +78,7 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// ids come from the advisor's (LLM-authored) backlog, so strip control chars
 	// before injecting into the prompt — a newline in an id would otherwise forge a
 	// new context bullet (prompt injection via the data channel).
-	if scope := sanitizePromptValue(req.Context["fleet_scope"]); scope != "" {
+	if scope := sanitizePromptValue(fleetScope); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
 	return b.String()

@@ -159,11 +159,23 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// Ship-failure envelope, carried in via PhaseRequest.Context by the
 	// orchestrator (string keys: ship_error_code/class/stage/debug). Each key is
 	// optional; only render what is present so a partial envelope still produces
-	// a clean prompt.
+	// a clean prompt. ADR-0050 §3.10 Slice 2: at enforce the typed ErrorContext
+	// channel replaces those keys (byte-identical — Active() is false unless
+	// enforce, and the zero ErrorContext renders nothing, matching an empty map).
 	b.WriteString("\n## Ship Failure Envelope\n")
-	for _, k := range []string{"ship_error_code", "ship_error_class", "ship_error_stage", "ship_error_debug"} {
-		if v := req.Context[k]; v != "" {
-			fmt.Fprintf(&b, "- %s: %s\n", k, v)
+	code, class, stage, dbg := req.Context["ship_error_code"], req.Context["ship_error_class"], req.Context["ship_error_stage"], req.Context["ship_error_debug"]
+	if req.Input.Active() {
+		ec, _ := req.Input.ErrorContext() // zero ErrorContext when no upstream error
+		code, class, stage, dbg = ec.Code, ec.Class, ec.Stage, ec.Debug
+	}
+	for _, f := range []struct{ k, v string }{
+		{"ship_error_code", code},
+		{"ship_error_class", class},
+		{"ship_error_stage", stage},
+		{"ship_error_debug", dbg},
+	} {
+		if f.v != "" {
+			fmt.Fprintf(&b, "- %s: %s\n", f.k, f.v)
 		}
 	}
 	return b.String()

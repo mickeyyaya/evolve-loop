@@ -152,6 +152,16 @@ func (in PhaseInput) Upstream() Handoffs { return in.upstream }
 // CycleInputs returns the sealed cycle-scoped inputs (goal/strategy/…).
 func (in PhaseInput) CycleInputs() CycleInputs { return in.cycleInputs }
 
+// Active reports whether this is a populated (authoritative) envelope rather than
+// the zero value. The dispatch seam assembles a PhaseInput only at
+// EVOLVE_PHASE_IO>=enforce, always stamping the Phase field; the zero value (off/
+// shadow/advisory) leaves it empty. Phases gate on Active() to read the typed
+// envelope at enforce while falling back to the legacy Context map below it —
+// byte-identical until the cutover. (Phase is the populated-marker because it is
+// always set on assembly and never on the zero value — a positive signal, not a
+// fragile whole-struct zero comparison.)
+func (in PhaseInput) Active() bool { return in.Phase != "" }
+
 // ErrorContext returns the upstream error channel by value and ok=false when no
 // error was piped in.
 func (in PhaseInput) ErrorContext() (ErrorContext, bool) {
