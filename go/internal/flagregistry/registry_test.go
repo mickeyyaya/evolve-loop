@@ -97,3 +97,28 @@ func TestRenderIndex_StableAndComplete(t *testing.T) {
 		t.Error("rendered index missing table header")
 	}
 }
+
+// TestRenderDoc_FoldsAndEscapes constructs a Flag directly to pin the
+// purpose-column contract RenderIndex depends on: ReplacedBy/RemoveIn fold into
+// the Doc, and a literal pipe is GFM-escaped so it cannot break the table. The
+// table-wide test above only exercises this through whatever real registry rows
+// happen to contain those fields; this names the Flag type and asserts the
+// contract on a row crafted to hit every branch.
+func TestRenderDoc_FoldsAndEscapes(t *testing.T) {
+	got := renderDoc(Flag{
+		Name:       "EVOLVE_EXAMPLE",
+		Status:     StatusDeprecated,
+		Doc:        "Old knob | with a pipe.",
+		ReplacedBy: "EVOLVE_NEW",
+		RemoveIn:   "v20.0.0",
+	})
+	if strings.Contains(got, " | ") || !strings.Contains(got, "\\|") {
+		t.Errorf("renderDoc did not GFM-escape the pipe in Doc: %q", got)
+	}
+	if !strings.Contains(got, "Replaced by `EVOLVE_NEW`.") {
+		t.Errorf("renderDoc missing ReplacedBy fold: %q", got)
+	}
+	if !strings.Contains(got, "Remove in v20.0.0.") {
+		t.Errorf("renderDoc missing RemoveIn fold: %q", got)
+	}
+}
