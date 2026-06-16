@@ -20,7 +20,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -417,6 +416,3 @@ func jsonCompact(m map[string]any) (string, error) {
 	b.WriteByte('}')
 	return b.String(), nil
 }
-
-// ErrCycleNonPositive is returned when the simulator receives a non-positive cycle.
-var ErrCycleNonPositive = errors.New("cyclesimulator: cycle must be positive")
