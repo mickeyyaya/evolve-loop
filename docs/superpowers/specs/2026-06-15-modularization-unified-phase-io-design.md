@@ -5,8 +5,8 @@
 > single chronological audit trail is `docs/architecture/decision-log-modularization.md`; the
 > measured package inventory is `docs/architecture/audit-2026-06-15-package-map.md`.
 >
-> Date: 2026-06-15 · Status: accepted design, leaf→core execution · Gate: `EVOLVE_PHASE_IO`
-> (`off`→`shadow`→`advisory`→`enforce`, default `off`).
+> Date: 2026-06-15 · Status: **fully implemented** (campaign complete, released as v19.0.0 on 2026-06-17) · Gate: `EVOLVE_PHASE_IO`
+> (`off`→`shadow`→`advisory`→`enforce`; default **`enforce`** since the Phase 3.10 cutover — `=off` is the rollback escape hatch). The Phase-5 public-API gate (§7) is now live over all 128 internal packages.
 
 ---
 
