@@ -67,3 +67,9 @@
 ./internal/phases/intent
 ./internal/phases/triage
 ./internal/phasecoherence
+
+# Phase 5 adapters/bridge graduation (2026-06-16): the lone apicover-clean adapter
+# that sat just under the floor (84.6%); lifted to 88.5% with two meaningful
+# nil-resolver fallback tests (SetContractResolver(nil) restores built-in-only
+# resolution; zero-value Adapter degrades to built-in instead of nil-panicking).
+./internal/adapters/bridge
