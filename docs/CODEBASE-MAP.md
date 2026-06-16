@@ -14,8 +14,10 @@ live here as Go packages — there is no bash dispatcher.
 
 - `go/cmd/` — entry points. `go/cmd/evolve/` is the `evolve` CLI (loop,
   cycle, ship, guard, doctor, release, …); `go/cmd/apicover/` is the
-  public-API coverage tool.
-- `go/internal/` — 99 internal packages implementing the pipeline.
+  public-API coverage tool — all 128 internal packages are graduated into
+  its hard-fail enforce gate (SSOT list: `go/.apicover-enforce`; ADR-0050
+  Phase 5, complete as of v19.0.0).
+- `go/internal/` — 128 internal packages implementing the pipeline.
   Phase-1 modularization leaf packages: `go/internal/gitexec`
   (git-CLI isolation leaf, depends only on `go/internal/sysexec`),
   `go/internal/log` (unified Console logger), and `go/internal/envchain`
