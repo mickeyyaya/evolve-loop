@@ -208,19 +208,17 @@ func writePhaseIOShadowFile(workspace, phase string, h phaseio.Handoffs, cycle i
 	return os.WriteFile(filepath.Join(workspace, "phaseio-shadow-"+phase+".json"), data, 0o644)
 }
 
-// emitPhaseIOShadow is the dispatch-time shadow hook (active only at
-// EVOLVE_PHASE_IO>=shadow). It Digests the upstream ONCE, projects the typed
-// Upstream view, assembles the typed CycleInputs/ErrorContext from phaseCtx,
-// compares BOTH against the legacy sources, writes the shadow artifact, and on
-// any divergence emits a WARN + a phaseio_shadow_mismatch ledger entry. It NEVER
-// returns an error or affects dispatchResult — at EVOLVE_PHASE_IO=off it is not
-// called at all, so the live loop stays byte-identical.
-func (cr *cycleRun) emitPhaseIOShadow(phase Phase, phaseCtx map[string]string) {
-	sig, err := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phaseio shadow digest failed for %s: %v\n", phase, err)
-		return
-	}
+// emitPhaseIOShadowWithSig is the dispatch-time shadow comparison (active only at
+// EVOLVE_PHASE_IO>=shadow). Given the already-computed routing digest, it projects
+// the typed Upstream view, assembles the typed CycleInputs/ErrorContext from
+// phaseCtx, compares BOTH against the legacy sources, writes the shadow artifact,
+// and on any divergence emits a WARN + a phaseio_shadow_mismatch ledger entry. It
+// NEVER returns an error or affects dispatchResult — at EVOLVE_PHASE_IO=off it is
+// not called at all, so the live loop stays byte-identical. The caller
+// (assemblePhaseIO) owns the single router.Digest so the enforce stage can reuse
+// the same sig to assemble the authoritative PhaseInput without a second
+// workspace read.
+func (cr *cycleRun) emitPhaseIOShadowWithSig(phase Phase, phaseCtx map[string]string, sig router.RoutingSignals) {
 	h := router.HandoffsFromSignals(sig)
 	ms := comparePhaseIOShadow(h, sig)
 	// Phase 3.5: also assemble + compare the typed CycleInputs/ErrorContext
