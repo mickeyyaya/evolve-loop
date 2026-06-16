@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -142,6 +143,13 @@ type Options struct {
 	// defaults to deliverable.Verify. Per-instance (not a package global) so
 	// t.Parallel() tests stay race-free, mirroring StdoutFilter.
 	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	// PhaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.10). When VerifyFn
+	// is nil, it is threaded into the catalog-aware reconcile default so the
+	// reconcile-on-timeout rung honors the same stage-gated failure-context
+	// requirement as the host gate. Zero value (StageOff) keeps every existing
+	// Options{} literal byte-identical — only build/scout/triage set it (the
+	// phases with a RequireFailureContextPhaseIO contract).
+	PhaseIO config.Stage
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
@@ -189,8 +197,14 @@ func New(opts Options) *BaseRunner {
 		// Catalog-aware so the reconcile check resolves user/minted phases
 		// under the SAME policy as the host gate and the agent self-check —
 		// a builtin-only default left an inserted phase's surviving artifact
-		// unresolvable on timeout, synthesizing FAIL.
-		verifyFn = deliverable.VerifyCatalogAware
+		// unresolvable on timeout, synthesizing FAIL. Stage-threaded (3.10
+		// Slice 1) so the rung also reaches the host gate's verdict at enforce;
+		// opts.PhaseIO's zero value (StageOff) is byte-identical to the prior
+		// VerifyCatalogAware default.
+		stage := opts.PhaseIO
+		verifyFn = func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+			return deliverable.VerifyCatalogAwareStage(phase, roots, stage)
+		}
 	}
 	return &BaseRunner{
 		hooks:          opts.Hooks,
