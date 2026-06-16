@@ -171,6 +171,8 @@ func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 
 var skillHeadingRE = regexp.MustCompile(`(?m)^# Evolve Loop v([0-9]+\.[0-9]+)(?:\.[0-9]+)?`)
 
+// CurrentSkillHeading returns the "X.Y" from the SKILL.md "# Evolve Loop
+// vX.Y[.Z]" heading, or "" on miss.
 func CurrentSkillHeading(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -183,6 +185,10 @@ func CurrentSkillHeading(path string) (string, error) {
 	return m[1], nil
 }
 
+// BumpSkillHeading rewrites the first SKILL.md "# Evolve Loop vX.Y" heading
+// to majorMinor. Idempotent and missing-file tolerant: returns (false, nil)
+// when already at majorMinor, the heading is absent, or the file is missing.
+// Atomic via .tmp + rename.
 func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 	current, err := CurrentSkillHeading(path)
 	if err != nil {
@@ -221,6 +227,8 @@ func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 
 var readmeCurrentRE = regexp.MustCompile(`Current \(v([0-9]+\.[0-9]+)\)`)
 
+// CurrentReadmeCurrent returns the "X.Y" from the README "Current (vX.Y)"
+// cell, or "" on miss.
 func CurrentReadmeCurrent(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -233,6 +241,10 @@ func CurrentReadmeCurrent(path string) (string, error) {
 	return m[1], nil
 }
 
+// BumpReadmeCurrent rewrites the README "Current (vX.Y)" cell to majorMinor.
+// Idempotent and missing-file tolerant: returns (false, nil) when already at
+// majorMinor, the cell is absent, or the file is missing. Atomic via .tmp +
+// rename.
 func BumpReadmeCurrent(path, majorMinor string, dryRun bool) (bool, error) {
 	current, err := CurrentReadmeCurrent(path)
 	if err != nil {

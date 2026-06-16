@@ -92,6 +92,8 @@ type Config struct {
 // *Phase from New.
 type Phase struct{ *runner.BaseRunner }
 
+// New constructs an intent Phase from c, wiring the intent hooks, bridge,
+// prompts, and clock into a runner.BaseRunner.
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{

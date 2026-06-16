@@ -127,6 +127,9 @@ func hasTopNItems(trimmed string) bool {
 	return listItemRE.MatchString(body)
 }
 
+// Config holds the dependencies for constructing a triage Phase: the bridge
+// used to dispatch the agent, the prompt loader, an optional clock, and the
+// PhaseIO stage.
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
@@ -136,8 +139,12 @@ type Config struct {
 	PhaseIO config.Stage
 }
 
+// Phase is the triage cycle-scope task-selection phase, a runner.BaseRunner
+// specialized with the triage-specific hooks.
 type Phase struct{ *runner.BaseRunner }
 
+// New constructs a triage Phase from c, wiring the triage hooks, bridge,
+// prompts, clock, and PhaseIO stage into a runner.BaseRunner.
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{

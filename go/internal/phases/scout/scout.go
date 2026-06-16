@@ -112,6 +112,9 @@ func classify(content, strategy string) string {
 	return core.VerdictPASS
 }
 
+// Config holds the dependencies for constructing a scout Phase: the bridge
+// used to dispatch the agent, the prompt loader, an optional clock, and the
+// PhaseIO stage.
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
@@ -121,8 +124,12 @@ type Config struct {
 	PhaseIO config.Stage
 }
 
+// Phase is the scout discovery-and-planning phase, a runner.BaseRunner
+// specialized with the scout-specific hooks.
 type Phase struct{ *runner.BaseRunner }
 
+// New constructs a scout Phase from c, wiring the scout hooks, bridge,
+// prompts, clock, and PhaseIO stage into a runner.BaseRunner.
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{

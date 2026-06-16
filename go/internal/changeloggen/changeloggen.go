@@ -192,11 +192,12 @@ func WriteEntry(changelogPath, version, entry string) (bool, bool, error) {
 	return true, false, nil
 }
 
-// ReadGitLog runs `git log --pretty=format:%H<SEP>%s <from>..<to>` and
-// parses output into Commits. Returns ErrNoCommits when the range is
-// empty (caller can decide to write a placeholder entry or skip).
+// ErrNoCommits is returned by ReadGitLog when the commit range is empty.
 var ErrNoCommits = errors.New("changeloggen: no commits in range")
 
+// ReadGitLog runs `git log --pretty=format:%H<SEP>%s <from>..<to>` in
+// repoRoot and parses the output into Commits. Returns ErrNoCommits when the
+// range is empty (caller can decide to write a placeholder entry or skip).
 func ReadGitLog(repoRoot, fromRef, toRef string) ([]Commit, error) {
 	return ReadGitLogWith(context.Background(), gitexec.Default(repoRoot), fromRef, toRef)
 }

@@ -91,8 +91,12 @@ type RunDir struct {
 type Action string
 
 const (
+	// ActionArchive moves a path under <evolve>/archive/runs/ rather than
+	// removing it — the retention ladder's intermediate, recoverable step.
 	ActionArchive Action = "archive"
-	ActionDelete  Action = "delete"
+	// ActionDelete removes a path recursively (os.RemoveAll). Delete wins
+	// over archive when a run matches both age thresholds.
+	ActionDelete Action = "delete"
 )
 
 // Item is one planned action. Rule names which policy rule fired — the
