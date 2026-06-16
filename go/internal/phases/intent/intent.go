@@ -51,8 +51,14 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// operator passes --goal-text "...", the dispatcher routes it
 	// through Context["goal"] so intent.md gets structured around the
 	// real goal instead of inferred from leftover workspace artifacts.
-	if g := req.Context["goal"]; g != "" {
-		fmt.Fprintf(&b, "- goal: %s\n", g)
+	// ADR-0050 §3.10 Slice 2: read from the typed envelope at enforce, the legacy
+	// Context map below it (byte-identical — Active() is false unless enforce).
+	goal := req.Context["goal"]
+	if req.Input.Active() {
+		goal = req.Input.CycleInputs().Goal()
+	}
+	if goal != "" {
+		fmt.Fprintf(&b, "- goal: %s\n", goal)
 	}
 	if isDeltaMode(req) {
 		b.WriteString("- mode: delta (emit intent-delta.md or [intent-unchanged] stub if goal_hash matches state.json:currentBatch.goalHash)\n")
