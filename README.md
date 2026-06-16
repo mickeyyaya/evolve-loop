@@ -1,6 +1,6 @@
 # Evolve Loop
 
-**Current (v18.14)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
+**Current (v18.15)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
 > **Breaking change (Go-only consolidation):** The bash trees (`scripts/` and `legacy/scripts/`) and the `EVOLVE_USE_LEGACY_BASH` rollback hatch have been removed — there is no bash fallback. The `evolve` Go binary (`go/bin/evolve`) is the sole runtime entrypoint; every operation is a native `evolve <subcommand>`. Operator integrations that hardcode `scripts/...` or `legacy/scripts/...` paths must move to the equivalent `evolve` subcommand. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the bash→Go port history.
 
@@ -610,6 +610,7 @@ Active milestones (cycles that shipped substantive structural changes):
 | v18.12 | 2026-06-15 | Phase-1 modularization (ADR-0050): `internal/gitexec` leaf, public-API coverage harness, `fixtures.StressN`, unified `internal/log.Console`, broadened `internal/envchain` adoption in `cmd/*` |
 | v18.13 | Jun 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v18.14 | Jun 16 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v18.15 | Jun 16 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 Per-version release notes: [docs/operations/release-notes/](docs/operations/release-notes/index.md). Full chronology (source of truth): [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`. Latest batch retrospective: [knowledge-base/research/v10-17-0-release-debrief.md](knowledge-base/research/v10-17-0-release-debrief.md).
 
