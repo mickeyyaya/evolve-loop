@@ -94,9 +94,10 @@ jobs:
       - name: api-coverage report (apicover; warning-only, Phase 0)
         # cmd/apicover: every exported symbol must be named by a _test AST AND
         # show >0% executed coverage; named-but-0% are false-greens a bare line
-        # number hides. Warning-only here (mirrors the >=85% gate above); flips
-        # to -enforce per package in Phase 5. Reuses coverage.txt from the test
-        # step, so no second test run.
+        # number hides. Warning-only here (mirrors the >=85% gate above) for
+        # not-yet-graduated packages; the per-package -enforce gate (Phase 5)
+        # runs in the next step over go/.apicover-enforce. Reuses coverage.txt
+        # from the test step, so no second test run.
         run: |
           go build -o bin/apicover ./cmd/apicover
           go tool cover -func=coverage.txt > coverage.func.txt
@@ -104,6 +105,20 @@ jobs:
           grep -E '^(== |summary:)' apicover-report.txt | tail -80 || true
           echo "::notice::apicover is warning-only in Phase 0 (full report in the coverage artifact)"
           exit 0
+      - name: api-coverage enforce (apicover; per-package hard-fail, Phase 5)
+        # Packages in go/.apicover-enforce have reached the Phase 5 public-API
+        # DoD; a regression (a new unnamed or never-asserted export) fails the
+        # build. Self-contained: rebuilds apicover + coverage.func.txt from the
+        # test step's coverage.txt (the warning step above is best-effort and
+        # must not gate this). The warning sweep still reports everything else.
+        run: |
+          pkgs=$(grep -vE '^[[:space:]]*(#|$)' .apicover-enforce || true)
+          if [ -z "$pkgs" ]; then echo "no enforced packages — skipping"; exit 0; fi
+          go build -o bin/apicover ./cmd/apicover
+          go tool cover -func=coverage.txt > coverage.func.txt
+          dirs=$(echo "$pkgs" | xargs go list -f '{{.Dir}}')
+          echo "enforcing apicover (-enforce) on:"; echo "$dirs"
+          echo "$dirs" | xargs bin/apicover -enforce -cover coverage.func.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

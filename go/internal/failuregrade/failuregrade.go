@@ -40,6 +40,8 @@ const (
 	TierRepair
 )
 
+// String returns the lower-case tier name ("abort", "correct", "quarantine",
+// "repair"); an out-of-range Tier renders as "abort" (the fail-closed floor).
 func (t Tier) String() string {
 	switch t {
 	case TierCorrect:

@@ -1,0 +1,16 @@
+# apicover enforced packages (ADR-0050 Phase 5).
+#
+# One `go list` package pattern per line. Packages listed here have reached the
+# Phase 5 public-API Definition of Done — 0 uncovered exported symbols, no
+# false-greens (named-but-0%), >=85% line coverage, godoc on every export,
+# every .go < 800 LOC — and are gated HARD in CI: a regression that adds an
+# unnamed or never-asserted export fails the `go` workflow.
+#
+# The warning-only full sweep (.github/workflows/go.yml) still reports every
+# other internal/* package; graduate one by bringing it to DoD, then add its
+# pattern here. Blank lines and `#` comments are ignored.
+#
+# This file is the single source of truth: the CI enforce step (and any future
+# acs ship-gate predicate) read it, so the two enforcement surfaces cannot drift.
+
+./internal/failuregrade
