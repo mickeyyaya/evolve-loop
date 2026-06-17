@@ -59,6 +59,7 @@ type cycleRun struct {
 	scheduledNext Phase  // authoritative next-phase injection (retro/debugger/ship-recovery)
 	routingSeq    int    // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
 	recoveryDepth int    // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
+	replanDepth   int    // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
 
 	// late-visibility exit-defer flags (R2 contract; highest hazard)
 	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
@@ -346,6 +347,42 @@ type cyclePlan struct {
 	clampedPlan  *router.PhasePlan
 }
 
+// advisorPlanInput builds the RouteInput for a whole-cycle advisor decision —
+// shared by the initial Plan (current=start, empty signals) and the post-scout
+// RePlan (current=scout, measured signals), so both reason from the SAME goal
+// text, recall memory, catalog, carryover, and CLI-health bench. The two callers
+// differ ONLY in current + signals (research P1/P2: identical context, one extra
+// signal-conditioned call). Single source for the RouteInput shape — a field
+// added here reaches both decisions, so they can never silently diverge.
+func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, signals router.RoutingSignals, req CycleRequest, state State, cs CycleState, cycle int, env map[string]string, benchedCLIs []router.BenchedCLI) router.RouteInput {
+	// WS2 recall memory: the most recent failure's reason + matching KB lessons,
+	// so the advisor plans WITH the benefit of what went wrong before. No-op when
+	// no KB is wired or no failure history.
+	lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
+	return router.RouteInput{
+		Current: current,
+		Signals: signals,
+		Cfg:     o.cfg,
+		Now:     o.now(),
+		// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
+		// Scout reads; NOT Context["strategy"], the strategy MODE) lets the advisor
+		// reason about WHAT the cycle is for. A nil/absent map key is safe (empty ⇒
+		// no Goal section).
+		Workspace:      cs.WorkspacePath,
+		ProjectRoot:    req.ProjectRoot,
+		Cycle:          cycle,
+		Env:            env,
+		LastReason:     lastReason,
+		Lessons:        lessons,
+		Catalog:        phaseCardsFromCatalog(o.catalog),
+		GoalText:       req.Context["goal"],
+		CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
+		BenchedCLIs:    benchedCLIs,
+		IntentRequired: cs.IntentRequired,
+		PSMASEnabled:   envchain.BoolValue(env["EVOLVE_PSMAS_SKIP"], false),
+	}
+}
+
 // planCycle runs RunCycle's pre-loop planning (extracted behavior-preserving):
 // refresh the live model catalog, take the per-cycle env/ctx snapshots, surface
 // the fleet scope, mint the challenge token, capture pre-cycle HEAD, and compute
@@ -433,34 +470,11 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	benchedCLIs := benchedCLIsForRouting(req.ProjectRoot)
 	var clampedPlan *router.PhasePlan
 	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
-		// WS2 recall memory: thread the most recent failure's reason + matching KB
-		// lessons into the plan prompt so the advisor plans WITH the benefit of
-		// what went wrong before. No-op when no KB is wired or no failure history.
-		lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
-		planIn := router.RouteInput{
-			Current:     string(PhaseStart),
-			Signals:     router.RoutingSignals{}, // no handoffs exist yet at cycle start
-			Cfg:         o.cfg,
-			Now:         o.now(),
-			Workspace:   cs.WorkspacePath,
-			ProjectRoot: req.ProjectRoot,
-			Cycle:       cycle,
-			Env:         envSnap,
-			LastReason:  lastReason,
-			Lessons:     lessons,
-			Catalog:     phaseCardsFromCatalog(o.catalog),
-			// The goal TEXT (Context["goal"] — the same key the dispatcher sets and
-			// Scout reads; NOT Context["strategy"], which is the strategy MODE like
-			// "balanced"/"harden") lets the advisor reason about WHAT the cycle is for
-			// — selecting a design phase or minting when the work warrants it, instead
-			// of planning blind. Reading a nil/absent map key is safe (empty ⇒ no Goal
-			// section in the prompt).
-			GoalText:       req.Context["goal"],
-			CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
-			BenchedCLIs:    benchedCLIs,
-			IntentRequired: cs.IntentRequired,
-			PSMASEnabled:   envchain.BoolValue(envSnap["EVOLVE_PSMAS_SKIP"], false),
-		}
+		// The initial plan runs with EMPTY signals (no handoffs exist yet at cycle
+		// start); the post-scout RePlan (WS2-S3) calls the SAME builder with
+		// current="scout" + measured signals, so both reason from the same goal,
+		// recall, catalog, carryover, and bench — one signal-conditioned call apart.
+		planIn := o.advisorPlanInput(ctx, string(PhaseStart), router.RoutingSignals{}, req, state, cs, cycle, envSnap, benchedCLIs)
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
 		// the conservative (more-mandatory) side at plan time. The floor is the

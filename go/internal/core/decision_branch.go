@@ -282,25 +282,34 @@ func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs C
 	}
 }
 
-// recordPhasePlan persists the advisor's CLAMPED whole-cycle plan to
-// <workspace>/phase-plan.json (a bare PhasePlanEntry array, symmetric with the
-// advisor's wire format) and appends a hash-bound phase_plan ledger entry. Any
-// integrity-floor clamps that fired are logged for operator visibility (rich
-// per-clamp forensics land in a later slice). Best-effort: a marshal/write/
-// append failure WARNs and is swallowed — plan forensics must never abort a
-// cycle. Called once per cycle, only at Stage>=Advisory with a non-nil plan.
+// recordPhasePlan persists the advisor's CLAMPED INITIAL whole-cycle plan. It is
+// the back-compat entry point (kind "plan" → phase-plan.json); the post-scout
+// re-plan records via recordPhasePlanKind with kind "replan".
 func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp) {
+	o.recordPhasePlanKind(ctx, cycle, cs, plan, clamps, "plan")
+}
+
+// recordPhasePlanKind persists a CLAMPED whole-cycle plan to
+// <workspace>/phase-<kind>.json (a bare PhasePlanEntry array, symmetric with the
+// advisor's wire format) and appends a hash-bound phase_<kind> ledger entry, then
+// hash-binds the WS3-S1 capture artifacts for that kind (advisor-{prompt,response}
+// -<kind>.txt). kind is "plan" (the initial Plan) or "replan" (the WS2 post-scout
+// re-plan), so the two decisions land in distinct, separately-diffable artifacts.
+// Any integrity-floor clamps that fired are logged for operator visibility.
+// Best-effort: a marshal/write/append failure WARNs and is swallowed — plan
+// forensics must never abort a cycle.
+func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp, kind string) {
 	ts := o.now().UTC().Format(time.RFC3339)
-	artifactPath := filepath.Join(cs.WorkspacePath, "phase-plan.json")
+	artifactPath := filepath.Join(cs.WorkspacePath, "phase-"+kind+".json")
 	sha := ""
 	if buf, err := json.MarshalIndent(plan.Entries, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan marshal: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s marshal: %v\n", kind, err)
 		artifactPath = ""
 	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan mkdir: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s mkdir: %v\n", kind, err)
 		artifactPath = ""
 	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan write: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s write: %v\n", kind, err)
 		artifactPath = ""
 	} else {
 		sum := sha256.Sum256(buf)
@@ -310,10 +319,10 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 		fmt.Fprintf(os.Stderr, "[orchestrator] integrity-floor clamp: %s (%s → %s)\n", c.Rule, c.Proposed, c.Forced)
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
-		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_plan",
+		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_" + kind,
 		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_plan ledger append: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_%s ledger append: %v\n", kind, err)
 	}
 
 	// WS3-S2: hash-bind the WS3-S1 capture artifacts so a post-hoc mutation of
@@ -322,8 +331,8 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 	// the ArtifactPath+ArtifactSHA256 shape. Fail-open: a capture that never
 	// landed (WS3-S1 is best-effort, or a pre-WS3 cycle) binds nothing.
 	for _, cap := range []struct{ kind, file string }{
-		{"advisor_prompt", "advisor-prompt-plan.txt"},
-		{"advisor_response", "advisor-response-plan.txt"},
+		{"advisor_prompt", "advisor-prompt-" + kind + ".txt"},
+		{"advisor_response", "advisor-response-" + kind + ".txt"},
 	} {
 		path := filepath.Join(cs.WorkspacePath, cap.file)
 		capSHA := bindArtifactSHA(path)

@@ -272,6 +272,13 @@ type RoutingConfig struct {
 	// clamps, so there is no shadow/advisory distinction. Composition-root view
 	// set by applyEnv; composePlanPrompt reads it. Typo/unknown → false (fail-safe).
 	ReconDigest bool
+	// RePlanMaxDepth caps how many post-scout re-plans a single cycle may run
+	// (ADR-0052 WS2-S5; research P4 — cap depth, escalate not loop). Default 1
+	// (set in defaults()): one measured re-plan per cycle, then escalate to the
+	// debugger rather than thrash. Set via EVOLVE_ROUTER_REPLAN_DEPTH (a
+	// cycle-scoped counter cr.replanDepth, NOT env, tracks the live depth — env
+	// can reset across subprocesses). A non-positive/typo value falls back to 1.
+	RePlanMaxDepth int
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -433,9 +440,11 @@ func defaults() RoutingConfig {
 		// applyRegistry (cycles 263/264: the advisory router skipped the
 		// scope-clamp). Tests constructing RoutingConfig directly keep this
 		// 4-phase baseline.
-		Mandatory:     []string{"scout", "build", "audit", "ship"},
-		Conditional:   map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
-		MaxInsertions: 4,
+		Mandatory:      []string{"scout", "build", "audit", "ship"},
+		Conditional:    map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
+		MaxInsertions:  4,
+		RePlanMaxDepth: 1, // ADR-0052 WS2-S5: one measured re-plan/cycle, then escalate
+
 		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing
 		// behavior even when the registry file is absent (e.g. tests): triage
 		// and tdd run by default; build-planner is opt-in (shadow). These are
@@ -590,6 +599,18 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		default:
 			*ws = append(*ws, Warning{"unknown-value",
 				fmt.Sprintf("EVOLVE_ROUTER_RECON_DIGEST=%q unknown (want on|off), defaulting to off", v)})
+		}
+	}
+	if v := env["EVOLVE_ROUTER_REPLAN_DEPTH"]; v != "" {
+		// ADR-0052 advisor-maximization WS2-S5 — the post-scout re-plan depth cap.
+		// A positive int; a non-positive/unparseable value falls back to the
+		// default 1 (fail-safe — never an unbounded or zero cap). The live depth is
+		// the cycle-scoped cr.replanDepth, not env (env can reset across subprocs).
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			cfg.RePlanMaxDepth = n
+		} else {
+			*ws = append(*ws, Warning{"unknown-value",
+				fmt.Sprintf("EVOLVE_ROUTER_REPLAN_DEPTH=%q invalid (want a positive int), defaulting to 1", v)})
 		}
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {

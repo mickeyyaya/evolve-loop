@@ -55,6 +55,27 @@ func ValidatePlan(in RouteInput, plan *PhasePlan) []PlanRejection {
 	return rej
 }
 
+// PlanMismatch reports whether the MEASURED signals materially diverge from what
+// the plan scheduled (ADR-0052 WS2-S4; research P4 TAPE — mismatch-triggered
+// replanning). It is true ONLY when an optional phase whose insert_when trigger
+// now FIRES on the measured signals is NOT scheduled in the plan — i.e. the
+// initial plan (composed with empty signals) missed a need the post-scout
+// measurement reveals. It reuses triggerFires (the exact insert_when eval the
+// kernel walks), so the mismatch threshold can never disagree with the trigger.
+// A fired trigger the plan ALREADY covers is not a mismatch (re-planning would be
+// churn); a nil plan ⇒ no mismatch. PURE.
+func PlanMismatch(in RouteInput, plan *PhasePlan) bool {
+	if plan == nil {
+		return false
+	}
+	for phase, block := range in.Cfg.Triggers {
+		if triggerFires(in.Signals, block) && !planRuns(plan, phase) {
+			return true
+		}
+	}
+	return false
+}
+
 // knownPhaseSet is the set of phase names a plan may legitimately reference: the
 // built-in canonical order, the configured walk order + mandatory + trigger +
 // conditional phases (which already include any catalog phases spliced in at the
