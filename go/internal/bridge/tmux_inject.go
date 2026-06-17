@@ -17,8 +17,8 @@ import (
 // emitChannelBreadcrumb writes one structured channel marker to w. The producer's
 // correlator parses these to bracket an injected ask's answer span (ADR-0037).
 // Empty corrID is a no-op so non-correlated injects add no noise. The caller
-// chooses w: the <agent>-breadcrumbs.live file when EVOLVE_CHANNEL=1, else
-// io.Discard (the producer tails the FILE — RT2 moved these off the in-memory
+// chooses w: the <agent>-breadcrumbs.live file when the channel is on (enforce),
+// else io.Discard (the producer tails the FILE — RT2 moved these off the in-memory
 // stderr stream a discarded producer never read).
 func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 	if corrID == "" {
@@ -29,17 +29,10 @@ func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 
 // channelEnabled reports whether the live bidirectional channel (ADR-0037) is
 // on. ADR-0045 I6 folded the rollout into EVOLVE_PHASE_RECOVERY: the channel is
-// implied by the stage (enforce → on; off/shadow → off, byte-identical), and
-// the legacy EVOLVE_CHANNEL flag is deprecated — honored one release with a
-// one-time WARN. channel.Enabled is the single source for both this driver and
-// the observer adapter.
+// implied by the stage (enforce → on; off/shadow → off, byte-identical).
+// channel.Enabled is the single source for both this driver and the observer adapter.
 func channelEnabled(deps Deps) bool {
-	explicit, _ := lookupEnv(deps, "EVOLVE_CHANNEL")
-	on, deprecated := channel.Enabled(recoveryStageFromEnv(deps), explicit)
-	if deprecated {
-		fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_CHANNEL is deprecated and will be removed next release — the live channel now rides EVOLVE_PHASE_RECOVERY (enforce implies it). See docs/architecture/control-flags.md.\n")
-	}
-	return on
+	return channel.Enabled(recoveryStageFromEnv(deps))
 }
 
 // injectEnvelope delivers one live-injection envelope into the running REPL.

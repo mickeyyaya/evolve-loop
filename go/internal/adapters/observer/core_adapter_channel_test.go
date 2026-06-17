@@ -17,8 +17,8 @@ func TestCoreAdapter_SpawnsProducer_WhenChannelOn(t *testing.T) {
 	os.WriteFile(filepath.Join(ws, "build-stdout.log"),
 		[]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"), 0o644)
 	a := &CoreAdapter{EnvLookup: func(k string) string {
-		if k == "EVOLVE_CHANNEL" {
-			return "1"
+		if k == "EVOLVE_PHASE_RECOVERY" {
+			return "enforce"
 		}
 		return ""
 	}}

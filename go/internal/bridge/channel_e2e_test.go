@@ -53,7 +53,7 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 	}
 	deps := covDeps()
 	deps.Stderr = io.Discard
-	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_CHANNEL": "1"})
+	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "enforce"})
 
 	tmux := &paneScriptTmux{pane: thinking} // boot marker ❯ present → REPL boots
 	deps.Tmux = tmux

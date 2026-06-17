@@ -342,7 +342,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		cursor.SetOffset(fi.Size())
 	}
 
-	// --- Live bidirectional channel (ADR-0037), opt-in via EVOLVE_CHANNEL=1.
+	// --- Live bidirectional channel (ADR-0037), implied by EVOLVE_PHASE_RECOVERY=enforce.
 	// When on, the driver is the SOLE writer of two live files the Producer
 	// tails: <agent>-pane.live (newly-stabilized capture-pane content, extracted
 	// per CLI by panestream.PaneDelta) and <agent>-breadcrumbs.live

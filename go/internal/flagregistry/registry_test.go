@@ -59,7 +59,6 @@ func TestLookup_SpotChecks(t *testing.T) {
 		{"EVOLVE_CONTRACT_GATE", StatusActive},
 		{"EVOLVE_TRIAGE_CAP_GATE", StatusActive}, // added this wave (R9.2)
 		{"EVOLVE_PHASE_RECOVERY", StatusActive},
-		{"EVOLVE_CHANNEL", StatusDeprecated}, // ADR-0045 I6 fold
 		{"EVOLVE_SANDBOX", StatusActive},
 		// cycle-353: Observer cluster flags promoted from StatusInternal (inventory
 		// placeholder) to StatusActive (operator-configurable). RED until Builder

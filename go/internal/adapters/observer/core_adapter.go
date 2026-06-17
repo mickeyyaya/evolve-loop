@@ -131,16 +131,12 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 	}()
 
 	// ADR-0037 + ADR-0045 I6: spawn the live channel producer beside the
-	// observer when the channel is on. The channel now rides the one
-	// EVOLVE_PHASE_RECOVERY dial (enforce implies it); the legacy
-	// EVOLVE_CHANNEL flag is honored one release with a WARN. channel.Enabled
-	// is the single source shared with the bridge driver. Off → byte-identical
-	// to pre-channel behavior (no producer, no feed file).
+	// observer when the channel is on. The channel rides EVOLVE_PHASE_RECOVERY
+	// (enforce implies it). channel.Enabled is the single source shared with the
+	// bridge driver. Off → byte-identical to pre-channel behavior (no producer,
+	// no feed file).
 	var prodCancel func()
-	chOn, chDeprecated := channel.Enabled(channel.ResolveStage(a.envGet("EVOLVE_PHASE_RECOVERY")), a.envGet("EVOLVE_CHANNEL"))
-	if chDeprecated {
-		fmt.Fprintf(os.Stderr, "[observer] WARN: EVOLVE_CHANNEL is deprecated and will be removed next release — the live channel now rides EVOLVE_PHASE_RECOVERY (enforce implies it). See docs/architecture/control-flags.md.\n")
-	}
+	chOn := channel.Enabled(channel.ResolveStage(a.envGet("EVOLVE_PHASE_RECOVERY")))
 	if chOn {
 		// Transport-aware source (ADR-0037 RT3): a tmux-family driver streams its
 		// live answer to <agent>-pane.live and breadcrumbs to
