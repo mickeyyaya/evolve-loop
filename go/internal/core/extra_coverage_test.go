@@ -359,19 +359,19 @@ func TestDecideAfterRetro(t *testing.T) {
 func TestPhaseAdvisorOptions(t *testing.T) {
 	t.Parallel()
 	p := NewPhaseAdvisor(nil, WithProposerCLI("codex-tmux"), WithProposerModel("opus"))
-	if p.cli != "codex-tmux" {
-		t.Errorf("cli = %q, want codex-tmux", p.cli)
+	if p.identity.CLI != "codex-tmux" {
+		t.Errorf("cli = %q, want codex-tmux", p.identity.CLI)
 	}
-	if p.model != "opus" {
-		t.Errorf("model = %q, want opus", p.model)
+	if p.identity.Model != "opus" {
+		t.Errorf("model = %q, want opus", p.identity.Model)
 	}
 	// Empty values must NOT override the defaults. The model default is opus
 	// (deep): composing the cycle + minting phases is deep-reasoning work, not
 	// lightweight routing. The composition root normally overrides both from the
 	// router profile + EVOLVE_ROUTER_CLI/_MODEL so the brain is CLI/model-configurable.
 	d := NewPhaseAdvisor(nil, WithProposerCLI(""), WithProposerModel(""))
-	if d.cli != "claude-tmux" || d.model != "opus" {
-		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.cli, d.model)
+	if d.identity.CLI != "claude-tmux" || d.identity.Model != "opus" {
+		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.identity.CLI, d.identity.Model)
 	}
 }
 

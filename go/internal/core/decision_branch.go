@@ -240,25 +240,76 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	}
 }
 
-// recordPhasePlan persists the advisor's CLAMPED whole-cycle plan to
-// <workspace>/phase-plan.json (a bare PhasePlanEntry array, symmetric with the
-// advisor's wire format) and appends a hash-bound phase_plan ledger entry. Any
-// integrity-floor clamps that fired are logged for operator visibility (rich
-// per-clamp forensics land in a later slice). Best-effort: a marshal/write/
-// append failure WARNs and is swallowed — plan forensics must never abort a
-// cycle. Called once per cycle, only at Stage>=Advisory with a non-nil plan.
-func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp) {
-	ts := o.now().UTC().Format(time.RFC3339)
-	artifactPath := filepath.Join(cs.WorkspacePath, "phase-plan.json")
+// recordPlanRejections persists the WS2-S1 ValidatePlan findings to
+// advisor-rejections.json (ADR-0052 WS2-S2). STANDALONE telemetry — decoupled
+// from the WS3-S3 decision span and from phase-plan.json — and best-effort /
+// fail-open: a capture failure WARNs but never affects the cycle. It NEVER
+// mutates the plan; the integrity floor (ClampPlanToFloorWith) remains the sole
+// disposer. An empty finding set still writes ("[]" = validated-clean, distinct
+// from "validation never ran"); nil ⇒ [] so the artifact is always well-formed.
+// The artifact is hash-bound into the ledger like every sibling decision
+// artifact (recordPhasePlan / recordRoutingDecision), so a post-hoc mutation is
+// tamper-evident — "standalone" means a separate file, not outside the chain.
+func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection) {
+	if cs.WorkspacePath == "" {
+		return
+	}
+	if rejections == nil {
+		rejections = []router.PlanRejection{}
+	}
+	buf, err := json.MarshalIndent(rejections, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections marshal (cycle %d): %v\n", cycle, err)
+		return
+	}
+	artifactPath := filepath.Join(cs.WorkspacePath, "advisor-rejections.json")
 	sha := ""
-	if buf, err := json.MarshalIndent(plan.Entries, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan marshal: %v\n", err)
-		artifactPath = ""
-	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan mkdir: %v\n", err)
+	if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections mkdir: %v\n", err)
 		artifactPath = ""
 	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-plan write: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections write: %v\n", err)
+		artifactPath = ""
+	} else {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: o.now().UTC().Format(time.RFC3339), Cycle: cycle, Role: "orchestrator",
+		Kind: "plan_rejections", ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN plan_rejections ledger append: %v\n", err)
+	}
+}
+
+// recordPhasePlan persists the advisor's CLAMPED INITIAL whole-cycle plan. It is
+// the back-compat entry point (kind "plan" → phase-plan.json); the post-scout
+// re-plan records via recordPhasePlanKind with kind "replan".
+func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp) {
+	o.recordPhasePlanKind(ctx, cycle, cs, plan, clamps, "plan")
+}
+
+// recordPhasePlanKind persists a CLAMPED whole-cycle plan to
+// <workspace>/phase-<kind>.json (a bare PhasePlanEntry array, symmetric with the
+// advisor's wire format) and appends a hash-bound phase_<kind> ledger entry, then
+// hash-binds the WS3-S1 capture artifacts for that kind (advisor-{prompt,response}
+// -<kind>.txt). kind is "plan" (the initial Plan) or "replan" (the WS2 post-scout
+// re-plan), so the two decisions land in distinct, separately-diffable artifacts.
+// Any integrity-floor clamps that fired are logged for operator visibility.
+// Best-effort: a marshal/write/append failure WARNs and is swallowed — plan
+// forensics must never abort a cycle.
+func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp, kind string) {
+	ts := o.now().UTC().Format(time.RFC3339)
+	artifactPath := filepath.Join(cs.WorkspacePath, "phase-"+kind+".json")
+	sha := ""
+	if buf, err := json.MarshalIndent(plan.Entries, "", "  "); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s marshal: %v\n", kind, err)
+		artifactPath = ""
+	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s mkdir: %v\n", kind, err)
+		artifactPath = ""
+	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s write: %v\n", kind, err)
 		artifactPath = ""
 	} else {
 		sum := sha256.Sum256(buf)
@@ -268,10 +319,10 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 		fmt.Fprintf(os.Stderr, "[orchestrator] integrity-floor clamp: %s (%s → %s)\n", c.Rule, c.Proposed, c.Forced)
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
-		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_plan",
+		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_" + kind,
 		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_plan ledger append: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_%s ledger append: %v\n", kind, err)
 	}
 
 	// WS3-S2: hash-bind the WS3-S1 capture artifacts so a post-hoc mutation of
@@ -280,8 +331,8 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 	// the ArtifactPath+ArtifactSHA256 shape. Fail-open: a capture that never
 	// landed (WS3-S1 is best-effort, or a pre-WS3 cycle) binds nothing.
 	for _, cap := range []struct{ kind, file string }{
-		{"advisor_prompt", "advisor-prompt-plan.txt"},
-		{"advisor_response", "advisor-response-plan.txt"},
+		{"advisor_prompt", "advisor-prompt-" + kind + ".txt"},
+		{"advisor_response", "advisor-response-" + kind + ".txt"},
 	} {
 		path := filepath.Join(cs.WorkspacePath, cap.file)
 		capSHA := bindArtifactSHA(path)
