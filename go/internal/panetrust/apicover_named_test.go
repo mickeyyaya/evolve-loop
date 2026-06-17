@@ -1,10 +1,26 @@
 package panetrust_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 )
+
+// TestRedactSecrets_NamesExportedWrapper exercises the WS3-S1 exported redaction
+// entry point (ADR-0052): a secret-shaped token is replaced with the marker and
+// clean text is returned unchanged. It names panetrust.RedactSecrets for the
+// public-API coverage gate; the redaction policy is proven by the Digest suite,
+// so this pins that the wrapper delegates to the same core.
+func TestRedactSecrets_NamesExportedWrapper(t *testing.T) {
+	t.Parallel()
+	if got := panetrust.RedactSecrets("key sk-livesecret0123456789ABCDEF end"); strings.Contains(got, "sk-livesecret") || !strings.Contains(got, "[REDACTED]") {
+		t.Errorf("RedactSecrets must redact a secret-shaped token, got %q", got)
+	}
+	if got := panetrust.RedactSecrets("no secrets here"); got != "no secrets here" {
+		t.Errorf("RedactSecrets must leave clean text unchanged, got %q", got)
+	}
+}
 
 // TestExtractKind_QuestionConstant names the ExtractKind type and pins the only
 // allowlisted kind's wire value. The string value is load-bearing: it is the

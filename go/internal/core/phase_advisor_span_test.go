@@ -59,3 +59,24 @@ func TestPhasePlan_RecordsDecisionSpanMetadata(t *testing.T) {
 		t.Error("response_sha must equal sha256 of advisor-response-plan.txt (S1/S2/S3 must agree)")
 	}
 }
+
+// TestAdvisorSpan_JSONTagsAreOTelGenAI names the AdvisorSpan type directly and
+// pins its OTel-GenAI wire keys via a typed round-trip — the contract a
+// collector ingests. (The test above asserts the on-disk artifact; this asserts
+// the type's own marshaling, independent of the capture path.)
+func TestAdvisorSpan_JSONTagsAreOTelGenAI(t *testing.T) {
+	t.Parallel()
+	buf, err := json.Marshal(AdvisorSpan{Model: "opus", System: "claude", PromptSHA: "p", ResponseSHA: "r", DurationMS: 5})
+	if err != nil {
+		t.Fatalf("marshal AdvisorSpan: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(buf, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	for _, k := range []string{"gen_ai.request.model", "gen_ai.system", "prompt_sha", "response_sha", "duration_ms"} {
+		if _, ok := m[k]; !ok {
+			t.Errorf("AdvisorSpan must marshal OTel key %q: %s", k, buf)
+		}
+	}
+}
