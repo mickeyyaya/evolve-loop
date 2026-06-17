@@ -98,8 +98,6 @@ var All = []Flag{
 	{Name: "EVOLVE_DISPATCH_PLAN_LOG", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_DISPATCH_POLICY", Status: StatusActive, Cluster: "Workflow Defaults", Doc: "Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast)"},
 	{Name: "EVOLVE_DISPATCH_REPEAT_THRESHOLD", Status: StatusActive, Cluster: "Workflow Defaults", Doc: "Threshold for repeat-cycle detection"},
-	{Name: "EVOLVE_DISPATCH_STOP_ON_FAIL", Status: StatusDeprecated, Cluster: "Workflow Defaults", Doc: "Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+"},
-	{Name: "EVOLVE_DISPATCH_VERIFY", Status: StatusDeprecated, Cluster: "Workflow Defaults", Doc: "Bridged to `EVOLVE_DISPATCH_POLICY=off` (when `=0`); emits stderr WARN; removal target v8.61+"},
 	{Name: "EVOLVE_DOCS_CONTRACT_STRICT", Status: StatusTestSeam, Doc: "Read only by _test.go files."},
 	{Name: "EVOLVE_DRY_RUN_PROVISION_WORKTREE", Status: StatusDead, Cluster: "Worktree / Workspace", Doc: "Dry-run worktree provisioning [no reader on any surface as of 2026-06-11 inventory]"},
 	{Name: "EVOLVE_DYNAMIC_ROUTING", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN"},

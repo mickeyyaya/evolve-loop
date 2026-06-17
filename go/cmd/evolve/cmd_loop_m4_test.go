@@ -100,10 +100,6 @@ func TestResolveDispatchPolicy(t *testing.T) {
 		{"explicit off", map[string]string{"EVOLVE_DISPATCH_POLICY": "off"}, dispatchPolicyOff},
 		{"explicit stop", map[string]string{"EVOLVE_DISPATCH_POLICY": "stop"}, dispatchPolicyStop},
 		{"unknown → verify (fallback)", map[string]string{"EVOLVE_DISPATCH_POLICY": "bogus"}, dispatchPolicyVerify},
-		{"legacy STOP_ON_FAIL=1 bridges to stop", map[string]string{"EVOLVE_DISPATCH_STOP_ON_FAIL": "1"}, dispatchPolicyStop},
-		{"legacy VERIFY=0 bridges to off", map[string]string{"EVOLVE_DISPATCH_VERIFY": "0"}, dispatchPolicyOff},
-		{"both legacy + new — new wins", map[string]string{"EVOLVE_DISPATCH_POLICY": "verify", "EVOLVE_DISPATCH_STOP_ON_FAIL": "1"}, dispatchPolicyVerify},
-		{"both legacy → STOP_ON_FAIL wins (most restrictive)", map[string]string{"EVOLVE_DISPATCH_STOP_ON_FAIL": "1", "EVOLVE_DISPATCH_VERIFY": "0"}, dispatchPolicyStop},
 	}
 	for _, tc := range tests {
 		tc := tc
@@ -127,9 +123,7 @@ func TestResolveDispatchPolicy(t *testing.T) {
 // envKeys is the set t.Setenv-clears for policy tests. Centralized so
 // adding a new env var only requires one update.
 var envKeys = map[string]struct{}{
-	"EVOLVE_DISPATCH_POLICY":       {},
-	"EVOLVE_DISPATCH_STOP_ON_FAIL": {},
-	"EVOLVE_DISPATCH_VERIFY":       {},
+	"EVOLVE_DISPATCH_POLICY": {},
 }
 
 func TestResolveCircuitBreakerThreshold(t *testing.T) {

@@ -358,8 +358,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_DISPATCH_PLAN_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_DISPATCH_POLICY` | active | — | — | Workflow Defaults | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
 | `EVOLVE_DISPATCH_REPEAT_THRESHOLD` | active | — | — | Workflow Defaults | Threshold for repeat-cycle detection |
-| `EVOLVE_DISPATCH_STOP_ON_FAIL` | deprecated | — | — | Workflow Defaults | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
-| `EVOLVE_DISPATCH_VERIFY` | deprecated | — | — | Workflow Defaults | Bridged to `EVOLVE_DISPATCH_POLICY=off` (when `=0`); emits stderr WARN; removal target v8.61+ |
 | `EVOLVE_DOCS_CONTRACT_STRICT` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | dead | — | — | Worktree / Workspace | Dry-run worktree provisioning [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_DYNAMIC_ROUTING` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |

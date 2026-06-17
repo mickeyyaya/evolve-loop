@@ -25,20 +25,15 @@ type dispatchPolicy int
 
 const (
 	dispatchPolicyVerify dispatchPolicy = iota // default — verify + continue on recoverable, STOP on breach
-	dispatchPolicyOff                          // skip ledger pipeline verification entirely (LEGACY)
+	dispatchPolicyOff                          // skip ledger pipeline verification entirely
 	dispatchPolicyStop                         // verify + STOP on any failure (legacy fail-fast)
 )
 
 const defaultCircuitBreakerThreshold = 5
 
-// resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and bridges the
-// deprecated EVOLVE_DISPATCH_VERIFY / EVOLVE_DISPATCH_STOP_ON_FAIL
-// flags, mirroring the bash precedence at
-// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:1130-1148.
-//
-// Precedence: EVOLVE_DISPATCH_POLICY wins. If unset, STOP_ON_FAIL=1
-// maps to dispatchPolicyStop and VERIFY=0 maps to dispatchPolicyOff
-// (STOP_ON_FAIL wins on conflict because it's the more restrictive).
+// resolveDispatchPolicy reads EVOLVE_DISPATCH_POLICY and returns the
+// corresponding dispatch policy. Unknown values default to
+// dispatchPolicyVerify with a WARN logged to stderr.
 func resolveDispatchPolicy(stderr io.Writer) dispatchPolicy {
 	if p := os.Getenv("EVOLVE_DISPATCH_POLICY"); p != "" {
 		switch p {
@@ -52,16 +47,6 @@ func resolveDispatchPolicy(stderr io.Writer) dispatchPolicy {
 			fmt.Fprintf(stderr, "[loop] WARN: unknown EVOLVE_DISPATCH_POLICY=%q — defaulting to verify\n", p)
 			return dispatchPolicyVerify
 		}
-	}
-	legacyStop := os.Getenv("EVOLVE_DISPATCH_STOP_ON_FAIL") == "1"
-	legacyVerify := os.Getenv("EVOLVE_DISPATCH_VERIFY") == "0"
-	if legacyStop {
-		fmt.Fprintln(stderr, "[loop] WARN: EVOLVE_DISPATCH_STOP_ON_FAIL is deprecated; use EVOLVE_DISPATCH_POLICY=stop")
-		return dispatchPolicyStop
-	}
-	if legacyVerify {
-		fmt.Fprintln(stderr, "[loop] WARN: EVOLVE_DISPATCH_VERIFY=0 is deprecated; use EVOLVE_DISPATCH_POLICY=off")
-		return dispatchPolicyOff
 	}
 	return dispatchPolicyVerify
 }
