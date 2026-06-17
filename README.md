@@ -6,13 +6,24 @@
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
+### The pitch, in one sentence
+
+> **Any agent can write code overnight. Evolve Loop is the layer that decides whether that code is safe to merge — adversarially, structurally, and with memory that compounds across runs.**
+
+The mental model is **CI/CD for AI-written code**. Every change runs a pipeline — but two things are unlike a normal CI run:
+
+- The **reviewer is a different model family** from the author, prompted to *refute* the work rather than rubber-stamp it.
+- The **merge gate is a deterministic predicate suite** (bash exit codes), not a model saying "looks good."
+
+**The problem this solves.** Autonomous agents are now good enough to write a feature, fix a bug, or refactor a module unattended. The bottleneck moved — it's no longer *can the agent write the code?* but *can you merge what it wrote without re-reading every diff?* The industry's default answer is "ask another LLM if it looks done." That judge is the weakest link: a single model grading code — often a sibling of the one that wrote it — shares the same blind spots, prefers its own style, and rewards confident prose over correctness. ([Why single-model verification fails →](#why-single-model-verification-fails))
+
 Three things distinguish it from `/goal`, `superpowers`, `self-improving-agent`, and similar long-running skills:
 
 1. **Verdicts are bash exit codes, not LLM judgments.** EGPS predicates are executable scripts; their exit code IS the verdict. The model can write prose all day; only `acs-verdict.json:red_count == 0` ships.
 2. **Three layers of structural anti-gaming.** Tier 1: PreToolUse shell hooks + SHA-chained ledger. Tier 2: OS sandboxing + per-cycle git worktree. Tier 3: workflow defaults (adversarial audit, intent capture, mutation testing). Tier 1 is non-negotiable.
 3. **Cross-cycle learning is durable.** Failures produce YAML lesson files that get merged into `state.json:instinctSummary[]`. The next cycle's Scout reads them automatically. This is the Reflexion loop (Shinn et al. 2023), wired through evidence-bound storage.
 
-If you've used `/goal` and wanted "but make it safe to merge without re-reading every diff," this is that.
+If you've used `/goal` — or any single-LLM "do this task" loop — and wanted "but make it safe to merge without re-reading every diff," this is that. ([Single-LLM loop vs. the adversarial loop →](#single-llm-goal-loop-vs-the-adversarial-loop))
 
 ---
 
@@ -20,11 +31,11 @@ If you've used `/goal` and wanted "but make it safe to merge without re-reading 
 
 1. [The Self-Evolving Loop](#the-self-evolving-loop) — concept
 2. [Pipeline Design](#pipeline-design) — the phase spine
-3. [The 3-Layer Trust Architecture](#the-3-layer-trust-architecture) — anti-gaming
+3. [The 3-Layer Trust Architecture](#the-3-layer-trust-architecture) — anti-gaming + why single-model verdicts fail
 4. [Error Recovery](#error-recovery) — how work survives failures
 5. [Why Self-Evolving Works](#why-self-evolving-works) — Reflexion + double-loop learning
 6. [Pluggability](#pluggability) — every phase swappable, every LLM routable
-7. [How Evolve Loop Compares](#how-evolve-loop-compares) — vs /goal, superpowers, etc.
+7. [How Evolve Loop Compares](#how-evolve-loop-compares) — vs single-LLM loops, /goal, & famous OSS agents (Devin, OpenHands, …)
 8. [Real Incident: Cycle 61](#real-incident-cycle-61) — the framework caught its own bugs
 9. [Quick Start](#quick-start) — install + first cycle
 10. [Architecture Deep-Dives](#architecture-deep-dives) — link index
@@ -54,6 +65,15 @@ That lesson came from cycle 59's failure. Cycle 60+ Scouts won't make the same m
 ## Pipeline Design
 
 Each cycle runs the required phase spine (Calibrate → Intent → Scout → Triage → Build → Audit → Ship → Learn/Memo) with Plan-Review and TDD bracketed as opt-in. The trust kernel enforces them in order at the OS layer — phases cannot be skipped, reordered, or shortcutted via prompt instructions.
+
+### The design idea: AI for judgment, code for the verdict
+
+The whole architecture rests on one split: **LLMs do the qualitative work; deterministic Go code owns every gate.**
+
+- **AI-driven** (non-deterministic, judgment): Scout decides *what* to build, Builder decides *how*, Auditor decides *what looks wrong*, Retrospective decides *what the lesson is*. Only a model does these well.
+- **Code-driven** (deterministic, enforcement): phase ordering, write-path scoping, ship gating, the EGPS verdict, ledger hashing, failure classification, CLI routing — all in the Go kernel (`go/internal/...`), where the model has no vote.
+
+That line is what makes the pipeline trustworthy: a model can be wrong, biased, or adversarial, but it cannot reorder phases, write outside its worktree, ship without a green verdict, or forge the ledger — those aren't prompts, they're code. (This is rule 5 of the [12 Core Agent Rules](AGENTS.md): *reserve judgment tasks for AI; deterministic work goes in the kernel*.)
 
 ```
 INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD ─→ AUDIT ─→ SHIP ─→ MEMO/RETRO
@@ -111,6 +131,21 @@ Deep-dive: [docs/architecture/phase-architecture.md](docs/architecture/phase-arc
 ## The 3-Layer Trust Architecture
 
 The threat is not malicious humans — it's the LLM doing what LLMs do: confabulating "looks done" verdicts, hallucinating evidence, shortcutting to path-of-least-resistance. The fix is structural enforcement, not better prompts.
+
+### Why single-model verification fails
+
+The hardest part of autonomous development isn't writing code — it's *trusting the verdict on that code*. The common pattern (one LLM writes, the same or a sibling model reviews, ship if it says "looks good") fails for reasons that are now well-documented in the LLM-as-judge literature:
+
+| Failure mode | What goes wrong | Evolve Loop's structural answer |
+|---|---|---|
+| **Self-preference bias** | An LLM rates outputs in its own style higher; a judge sharing the author's family shares its blind spots. | Auditor runs a **different model family** from Builder (Builder=Sonnet → Auditor=Opus by default), prompted to *refute*. |
+| **Length & style bias** | Judges reward confident, verbose, well-formatted prose over correctness. | The ship verdict is **not prose** — it's `acs-verdict.json:red_count == 0`, computed from bash exit codes. |
+| **Missing-domain errors** | A judge without the relevant knowledge silently passes real bugs. | Predicates are **executable tests**, not opinions; mutation testing rejects tautological (`echo PASS`) predicates. |
+| **Compounding hallucination** | In multi-agent setups, hallucinated code *and* hallucinated tests propagate and reinforce each other. | TDD-engineer writes RED predicates **before** Builder writes code, as a **separate agent** (tier-1 by default vs Builder's tier-2) — separating the test author from the implementer. |
+
+*The cross-family guarantee is a default, not a hard floor: on trivial diffs (≤3 files, ≤100 lines, no security paths) the Auditor auto-downgrades to Sonnet to save cost — force Opus with `MODEL_TIER_HINT=opus`. See [AGENTS.md §8](AGENTS.md).*
+
+This is the research consensus: a lone LLM judge carries systematic biases (self-preference, length, style), which is exactly why human evaluation uses *multiple* annotators to cancel individual bias — and why multi-agent setups that instantiate adversarial roles (attacker / defender / judge) surface vulnerabilities a single judge misses. Evolve Loop operationalizes that insight, but goes one step further: the *final* gate is handed to deterministic code, not to another model. (Sources in [Citations](#citations).)
 
 | Tier | Mechanism | Default | Catches |
 |---|---|---|---|
@@ -256,6 +291,32 @@ Deep-dive: [docs/concepts/pluggability.md](docs/concepts/pluggability.md). Addin
 
 ## How Evolve Loop Compares
 
+### Single-LLM goal loop vs. the adversarial loop
+
+Most "autonomous" coding tools — `/goal`, a plain agent loop, or a single-agent framework — collapse to one model doing everything and grading its own homework:
+
+```
+        ┌──────────── same model (or same family) ────────────┐
+USER ─→  write code  ─→  "does this look done?"  ─→  ship
+        └────────────── one judgment, one blind spot ─────────┘
+```
+
+Evolve Loop splits the roles and hands the final verdict to code, not a model:
+
+```
+USER ─→ Scout ─→ [TDD: model A writes failing tests] ─→ Builder: model B writes code
+                                                            │
+                            Auditor: model C (different family, told to refute)
+                                                            │
+                                acs-verdict.json:red_count == 0   ← bash exit codes, not prose
+                                                            │
+                                        ship ─→ Retrospective writes a durable lesson
+```
+
+The single-LLM loop is faster and simpler. The adversarial loop is what you want when a bad merge is expensive — because the thing that decides "ship" is no longer the thing that wrote the code, and it isn't even a model.
+
+### vs. long-running Claude Code skills
+
 Honest head-to-head with the autonomous-agent skills shipping in the Claude Code ecosystem as of 2026-05-20 (v10.17). Sources: each project's README + marketplace entry as of that date. We re-audit this table each minor release; if you find it stale, please file an issue.
 
 | Project | Verdict source | Long-term memory | Multi-CLI | Recovery | Anti-gaming |
@@ -281,6 +342,21 @@ Honest head-to-head with the autonomous-agent skills shipping in the Claude Code
 | Adversarial cross-CLI review (Builder ≠ Auditor model family) | **Evolve Loop** |
 | Long unattended runs with quota-wall recovery | **Evolve Loop** |
 | Simple `/goal "do thing"` and 5-second mental model | **/goal** |
+
+### vs. the famous open-source coding agents
+
+Devin, OpenHands, SWE-agent, Aider, AutoGPT, and MetaGPT are **code-writing agents** — they optimize *how well the agent solves the task* (usually benchmarked on SWE-bench). Evolve Loop sits on a different axis: it's a **trust-and-governance pipeline** that can *drive* those agents (it already routes Claude / Gemini / Codex per phase) and adds the verification, learning, and recovery layer on top — deciding whether the code is safe to merge **unattended**, not competing on raw coding ability.
+
+| Project | Category | Optimizes for | Verdict / merge gate | Cross-run memory |
+|---|---|---|---|---|
+| **Devin** (Cognition, closed) | Managed autonomous SWE | Hands-off ticket→PR; Jira/Linear/Slack integration | Internal checks + human PR review | Per session |
+| **OpenHands** (OSS) | Single-agent repo surgery | Raw SWE-bench accuracy; model flexibility | Tests + human review | Per session |
+| **SWE-agent** (OSS) | Benchmark / research agent | Issue resolution on SWE-bench | Benchmark harness | None (eval-focused) |
+| **Aider** (OSS) | Terminal pair-programmer | Human-in-the-loop edits; git-native | Human reviews every diff | Repo map, per session |
+| **AutoGPT / MetaGPT** (OSS) | General autonomous / SOP multi-agent | Broad task automation / role-play teams | Role convention | Varies |
+| **Evolve Loop** (OSS) | **Trust & governance pipeline over coding agents** | **Safe-to-merge-unattended** | **Bash exit codes (EGPS) + adversarial cross-family audit** | **YAML lessons + `state.json` instincts (durable)** |
+
+Benchmarks move every release (OpenHands + Claude has reported ~72% on SWE-bench Verified; managed-agent figures are contested and often measured on subsets) — so we deliberately compare on **category and trust properties**, not a leaderboard number Evolve Loop doesn't compete on. Pick the agent that fits your single biggest constraint: **control** (OpenHands), **hands-off autonomy** (Devin), **human-in-the-loop speed** (Aider), or **unattended trust** (Evolve Loop).
 
 ### The honest tradeoffs
 
@@ -735,5 +811,7 @@ The framework's design draws on:
 - **Mitigation survey** — Weng, L. (2024) "Reward Hacking in Reinforcement Learning" — Lil'Log
 - **Tri-layer (Skill/Persona/Command)** — addyosmani/agent-skills (foundational inspiration)
 - **Anthropic Secure Deployment Guide (2026)** — `--allowedTools` is "a permission gate, not a sandbox"
+- **LLM-as-judge bias** — single-model evaluators exhibit self-preference, length, and style biases, and multi-annotator / multi-agent setups exist to cancel them. See "When AIs Judge AIs: The Rise of Agent-as-a-Judge Evaluation for LLMs" ([arXiv:2508.02994](https://arxiv.org/html/2508.02994v1)) and "Efficient LLM Safety Evaluation through Multi-Agent Debate" ([arXiv:2511.06396](https://arxiv.org/html/2511.06396v1))
+- **Competitive landscape (2026)** — autonomous-coding-agent surveys (OpenHands / Devin / SWE-agent / Aider): SWE-bench Verified figures and category positioning, e.g. the [2026 AI coding-agent showdown](https://www.birjob.com/blog/ai-coding-agents-2026) and [OpenHands vs Devin vs SWE-Agent](https://aicoolies.com/comparisons/openhands-vs-devin-vs-swe-agent)
 
 For a full bibliography, see [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).
