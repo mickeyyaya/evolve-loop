@@ -99,8 +99,21 @@ func (cr *cycleRun) postScoutReplan() {
 	cr.replanDepth++
 	clamped, clamps := router.ClampPlanToFloorWith(in, raw, cr.o.resolvedShipFloor(), cr.cs.IntentRequired)
 	cr.o.recordPhasePlanKind(cr.ctx, cr.cycle, cr.cs, clamped, clamps, "replan")
-	// SHADOW: record for soak diffing, but DO NOT swap cr.clampedPlan — the
-	// initial plan still drives. WS2-S6 adds the advisory swap here.
+
+	// WS2-S6 advisory flip (the one behavior change, opt-in): at
+	// EVOLVE_ROUTER_REPLAN=advisory the re-plan REPLACES the drive plan — but only
+	// the CLAMPED re-plan. ClampPlanToFloorWith ran just above and re-asserts the
+	// integrity floor (ship⇒build∧audit∧tdd) on the re-plan path, so a re-plan can
+	// NEVER weaken ship; the clamp is the sole trust boundary (ADR-0052 D1).
+	// registerMintedPhases is idempotent — its runner-existence guard skips any
+	// phase the stage-1 plan already wired (runners/catalog/routing all gated on
+	// that check), so re-minting A while minting B leaves A once and adds B once.
+	// Below advisory (shadow, the default) the re-plan is recorded only — static
+	// still drives, so nothing flips silently.
+	if cr.o.cfg.RouterReplan == config.StageAdvisory {
+		cr.clampedPlan = clamped
+		cr.o.registerMintedPhases(clamped)
+	}
 }
 
 // recordReplanEscalation appends a forensic marker (ADR-0052 WS2-S5) when the

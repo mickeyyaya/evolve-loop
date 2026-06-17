@@ -214,3 +214,113 @@ func TestRePlan_FailOpenToStage1Plan(t *testing.T) {
 		t.Errorf("a failed re-plan must not consume a depth slot; replanDepth=%d", cr.replanDepth)
 	}
 }
+
+func planEntryRuns(p *router.PhasePlan, phase string) bool {
+	for _, e := range p.Entries {
+		if e.Phase == phase {
+			return e.Run
+		}
+	}
+	return false
+}
+
+func countOccurrences(xs []string, want string) int {
+	n := 0
+	for _, x := range xs {
+		if x == want {
+			n++
+		}
+	}
+	return n
+}
+
+// TestRePlan_AdvisoryReplacesPlanAfterClamp pins WS2-S6: at
+// EVOLVE_ROUTER_REPLAN=advisory the re-plan REPLACES the drive plan — with the
+// CLAMPED re-plan. The re-plan ships without scheduling audit; the floor must
+// force audit, and the swapped drive plan must carry that forced audit.
+func TestRePlan_AdvisoryReplacesPlanAfterClamp(t *testing.T) {
+	t.Parallel()
+	ws := scoutWorkspace(t)
+	pl := &replanPlanner{plan: &router.PhasePlan{Entries: []router.PhasePlanEntry{
+		{Phase: "scout", Run: true}, {Phase: "build", Run: true}, {Phase: "ship", Run: true}, // no audit
+	}}}
+	o := replanOrchestrator(t, &fakeLedger{}, pl)
+	o.cfg.RouterReplan = config.StageAdvisory
+	initial := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}}
+	cr := &cycleRun{
+		o: o, ctx: context.Background(), req: CycleRequest{ProjectRoot: ws}, cycle: 3,
+		cs:      CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout"}},
+		envSnap: map[string]string{}, clampedPlan: initial,
+	}
+
+	cr.postScoutReplan()
+
+	if cr.clampedPlan == initial {
+		t.Fatal("advisory re-plan must REPLACE the initial drive plan")
+	}
+	if !planEntryRuns(cr.clampedPlan, "audit") {
+		t.Error("the swapped plan must be the CLAMPED re-plan (floor forced audit)")
+	}
+	if !planEntryRuns(cr.clampedPlan, "ship") {
+		t.Error("the swapped plan should still ship")
+	}
+}
+
+// TestRePlan_NeverWeakensFloorOnReplace proves the swap can never let a re-plan
+// reach ship without build+audit — the clamp re-asserts the floor on the re-plan
+// path (the clamp, not the advisor, is the trust boundary).
+func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
+	t.Parallel()
+	ws := scoutWorkspace(t)
+	pl := &replanPlanner{plan: &router.PhasePlan{Entries: []router.PhasePlanEntry{
+		{Phase: "scout", Run: true}, {Phase: "ship", Run: true}, // ship with neither build nor audit
+	}}}
+	o := replanOrchestrator(t, &fakeLedger{}, pl)
+	o.cfg.RouterReplan = config.StageAdvisory
+	initial := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}}
+	cr := &cycleRun{
+		o: o, ctx: context.Background(), req: CycleRequest{ProjectRoot: ws}, cycle: 3,
+		cs:      CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout"}},
+		envSnap: map[string]string{}, clampedPlan: initial,
+	}
+
+	cr.postScoutReplan()
+
+	p := cr.clampedPlan
+	// The swap MUST have fired and MUST ship — otherwise the floor assertion is
+	// vacuous (a skipped re-plan leaves {scout}, which never ships, so the check
+	// below would pass without proving anything).
+	if p == initial {
+		t.Fatal("advisory re-plan must replace the initial plan")
+	}
+	if !planEntryRuns(p, "ship") {
+		t.Fatal("the re-plan ships, so the swapped plan must ship (else the floor check is vacuous)")
+	}
+	if !planEntryRuns(p, "build") || !planEntryRuns(p, "audit") {
+		t.Errorf("re-plan reached ship without build+audit — floor weakened: %+v", p.Entries)
+	}
+}
+
+// TestRePlan_MintRegistrationIdempotent is the must-fix: stage-1 mints A; the
+// re-plan re-mints A and adds B. Each name must appear EXACTLY ONCE in runners
+// and in cfg.Order — registerMintedPhases's runner-existence guard gates all
+// three splices, so a re-mint of an already-wired phase is a no-op.
+func TestRePlan_MintRegistrationIdempotent(t *testing.T) {
+	t.Parallel()
+	o := mintOrchestrator(t, fakeMinter{})
+	o.registerMintedPhases(mintPlan("phase-a"))            // stage-1: A
+	o.registerMintedPhases(mintPlan("phase-a", "phase-b")) // re-plan: re-mint A + new B
+
+	if _, ok := o.runners[Phase("phase-a")]; !ok {
+		t.Error("phase-a must be registered (stage-1 mint)")
+	}
+	if _, ok := o.runners[Phase("phase-b")]; !ok {
+		t.Error("phase-b must be registered (re-plan mint)")
+	}
+	if n := countOccurrences(o.cfg.Order, "phase-a"); n != 1 {
+		t.Errorf("phase-a appears %d times in cfg.Order, want exactly 1 (idempotent re-mint)", n)
+	}
+	if n := countOccurrences(o.cfg.Order, "phase-b"); n != 1 {
+		t.Errorf("phase-b appears %d times in cfg.Order, want exactly 1", n)
+	}
+}
