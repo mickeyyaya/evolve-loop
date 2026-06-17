@@ -61,6 +61,13 @@ func TestLookup_SpotChecks(t *testing.T) {
 		{"EVOLVE_PHASE_RECOVERY", StatusActive},
 		{"EVOLVE_CHANNEL", StatusDeprecated}, // ADR-0045 I6 fold
 		{"EVOLVE_SANDBOX", StatusActive},
+		// cycle-353: Observer cluster flags promoted from StatusInternal (inventory
+		// placeholder) to StatusActive (operator-configurable). RED until Builder
+		// updates registry_table.go.
+		{"EVOLVE_OBSERVER_STALL_S", StatusActive},
+		{"EVOLVE_OBSERVER_POLL_S", StatusActive},
+		{"EVOLVE_OBSERVER_NUDGE_S", StatusActive},
+		{"EVOLVE_OBSERVER_NUDGE_BODY", StatusActive},
 	}
 	for _, tt := range tests {
 		f, ok := Lookup(tt.name)

@@ -449,10 +449,10 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_OBSERVER_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_OBSERVER_ENFORCE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_OBSERVER_EOF_GRACE_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_OBSERVER_NUDGE_BODY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_OBSERVER_NUDGE_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_OBSERVER_POLL_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_OBSERVER_STALL_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
+| `EVOLVE_OBSERVER_NUDGE_BODY` | active | string | — | Observer | Override body for the soft-stall nudge message injected by the observer (ADR-0023 facet A). |
+| `EVOLVE_OBSERVER_NUDGE_S` | active | int | 300 | Observer | Soft-stall nudge threshold (seconds); default 300 (opt-out via =0). When >0 and idle reaches this before STALL_S, appends ONE nudge envelope to the agent inbox before hard SIGTERM. |
+| `EVOLVE_OBSERVER_POLL_S` | active | int | 5 | Observer | Stat-poll interval (seconds) for the auto-spawned observer's stdout-log growth check (ADR-0030). |
+| `EVOLVE_OBSERVER_STALL_S` | active | int | 600 | Observer | Primary stall threshold (seconds) for phase-observer (manual subcommand and auto-spawned adapter per ADR-0030). Bridges from EVOLVE_INACTIVITY_THRESHOLD_S (DEPRECATED). |
 | `EVOLVE_OBSERVER_TEST_KEY` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_OLLAMA_BASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PASS_CONFIDENCE_THRESHOLD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
