@@ -22,7 +22,6 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 			fmt.Fprintln(stdout, "Usage: evolve fanout-dispatch [--cache-prefix-file=PATH] <commands.tsv> <results.tsv>")
 			fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY (2), EVOLVE_FANOUT_TIMEOUT (600)")
 			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_CANCEL_ON_CONSENSUS, EVOLVE_FANOUT_CONSENSUS_K (2)")
-			fmt.Fprintln(stdout, "     EVOLVE_FANOUT_PER_WORKER_BUDGET_USD (0.20)")
 			return 0
 		case a == "--cache-prefix-file":
 			if i+1 >= len(args) {

@@ -173,8 +173,7 @@ Parse `$ARGUMENTS` (v9.0.5+ — budget-first guidance, both modes supported):
   CYCLES becomes a safety upper bound (default 50). This is the
   recommended mode — costs are predictable; cycle counts are not.
 - **`--cycles N`** → cycle-driven mode: run exactly N cycles regardless
-  of cost. `EVOLVE_BATCH_BUDGET_CAP` (default \$20) remains a hard system
-  ceiling.
+  of cost.
 - **Strategy** (positional, after flags): `balanced` (default) | `innovate` |
   `harden` | `repair` | `ultrathink` | `autoresearch`.
 - **Goal** (positional, after strategy): free-form text; quote it when it
@@ -203,9 +202,9 @@ QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M
 ```
 
 This is the Claude Code subscription quota wall: the cycle ran far enough
-to consume ≥80% of `EVOLVE_BATCH_BUDGET_CAP`, then a phase failed with
-empty stderr (the quota-likely signature). `subagent-run.sh` wrote a
-checkpoint and `cycle-state.json` carries the wake-at timestamp.
+to hit the quota ceiling, then a phase failed with empty stderr (the
+quota-likely signature). `subagent-run.sh` wrote a checkpoint and
+`cycle-state.json` carries the wake-at timestamp.
 
 **Auto-resume is always on.** When you (the model) see `DISPATCH_RC=5` /
 `QUOTA-PAUSE:` in dispatcher output, do this:

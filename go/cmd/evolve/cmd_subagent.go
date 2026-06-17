@@ -47,7 +47,6 @@ Subcommands:
                      ( dispatch-parallel <agent> <cycle> <workspace_path> )
                      Refuses if profile.parallel_eligible != true.
                      Honors EVOLVE_FANOUT_CONCURRENCY,
-                     EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,
                      EVOLVE_FANOUT_CACHE_PREFIX,
                      EVOLVE_FANOUT_TEST_EXECUTOR.
 `
@@ -373,8 +372,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent dispatch-parallel <agent> <cycle> <workspace_path>")
-		fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_PER_WORKER_BUDGET_USD,")
-		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_CACHE_PREFIX, EVOLVE_FANOUT_TRACK_WORKERS,")
+		fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_CACHE_PREFIX,")
+		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TRACK_WORKERS,")
 		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TEST_EXECUTOR, WORKTREE_PATH")
 		return 0
 	}

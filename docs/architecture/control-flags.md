@@ -291,8 +291,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_AUTO_RESUME_MAX_ATTEMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BACKFILL_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BASH_PARITY` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BATCH_BUDGET_CAP` | dead | — | — | Budget Cluster | DEPRECATED no-op (token-budget cost gates removed; cost calculation was unreliable across LLM models). Accepted but ignored. |
-| `EVOLVE_BATCH_BUDGET_DISABLE` | dead | — | — | Budget Cluster | DEPRECATED no-op (batch budget tripwire removed with the token-budget cost gates). Accepted but ignored. |
 | `EVOLVE_BRIDGE_CATALOG_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_GO` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_INTEGRATION_LIVE` | test-seam | — | — | — | Read only by _test.go files. |
@@ -302,12 +300,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_BRIDGE_MANIFEST_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_PIDFILE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_RECIPE_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BUDGET_CAP` | dead | — | — | Budget Cluster | DEPRECATED no-op (deprecation bridge removed with the token-budget cost gates). Accepted but ignored. |
-| `EVOLVE_BUDGET_ENFORCE` | dead | — | — | Budget Cluster | DEPRECATED no-op (budget enforcement removed with the token-budget cost gates). Accepted but ignored. |
-| `EVOLVE_BUDGET_MAX_CYCLES` | dead | — | — | Budget Cluster | DEPRECATED no-op: --budget-usd no longer drives cycle count (token-budget removal). Use --cycles N. Accepted but ignored. |
 | `EVOLVE_BUILD` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILDER_COST_GUARD_STRICT` | dead | — | — | Budget Cluster | DEPRECATED no-op (builder cost guard removed with the token-budget cost gates). Accepted but ignored. |
-| `EVOLVE_BUILDER_COST_THRESHOLD` | dead | — | — | Budget Cluster | DEPRECATED no-op (builder cost guard removed with the token-budget cost gates). Accepted but ignored. |
 | `EVOLVE_BUILDER_INTERACTIVE_POLICY` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BUILDER_ISOLATION_STRICT` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BUILDER_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
@@ -335,12 +328,10 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CACHE_PREFIX_V2` | active | — | — | Observability / Prompt Tuning | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering. |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | dead | — | — | Observability / Prompt Tuning | Carryover todos threshold [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_CHANNEL` | deprecated | — | — | Bridge / Channel | Folded into channel.Enabled (ADR-0045 I6); honored via bridge with WARN. Replaced by `EVOLVE_PHASE_RECOVERY dial family`. Remove in v18.x (one release after I6). |
-| `EVOLVE_CHECKPOINT_AT_PCT` | dead | — | — | Budget Cluster | DEPRECATED no-op: the cost-percentage checkpoint trigger was removed with the token-budget cost gates. Accepted but ignored. |
 | `EVOLVE_CHECKPOINT_DISABLE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CHECKPOINT_REASON` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CHECKPOINT_REQUEST` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CHECKPOINT_TRIGGERED` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | dead | — | — | Budget Cluster | DEPRECATED no-op: the cost-percentage checkpoint WARN was removed with the token-budget cost gates. Accepted but ignored. |
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
 | `EVOLVE_CODEX_CLAUDE_PATH` | dead | — | — | Platform / CLI Hybrid | Codex hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
@@ -400,7 +391,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FANOUT_CYCLE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FANOUT_ENABLED` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Master switch for fan-out |
 | `EVOLVE_FANOUT_PARENT_AGENT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD` | dead | — | — | Budget Cluster | DEPRECATED no-op (per-worker cost cap removed with the token-budget cost gates; fanout no longer reads or injects it). Accepted but ignored. |
 | `EVOLVE_FANOUT_RETROSPECTIVE` | dead | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Enable fan-out for retrospective phase [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_FANOUT_SCOUT` | dead | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Enable fan-out for scout phase [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_FANOUT_TEST_EXECUTOR` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Escape hatch: override the fanout worker command to bypass the LLM in test harnesses (read in production code, not test-only) |
@@ -437,7 +427,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS` | active | int | 1 | Workflow Defaults | Consecutive verdict-FAIL cycles a batch absorbs before stopping (default 1 = stop on first FAIL). A PASS/SHIPPED resets the streak; the cap still halts a broken run. rc=3 when any FAIL was absorbed. |
 | `EVOLVE_MANDATORY_PHASES` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN |
 | `EVOLVE_MARKETPLACE_DIR` | active | — | — | Observability / Prompt Tuning | Override marketplace dir (test/release seam) |
-| `EVOLVE_MAX_BUDGET_USD` | dead | — | — | Budget Cluster | DEPRECATED no-op: the adapters no longer resolve or enforce a cost cap (token-budget cost gates removed); claude.sh always passes an unlimited --max-budget-usd sentinel. Accepted but ignored. |
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Cap on optional phases the router may insert |
 | `EVOLVE_MODELCATALOG_AUTOREFRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_MODELCATALOG_CLASSIFIER_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -458,7 +447,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PASS_CONFIDENCE_THRESHOLD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PERSONA_OVERRIDE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PHASE_BUILD_BIN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_PHASE_COST_CEILING` | dead | — | — | Budget Cluster | DEPRECATED no-op: the cyclehealth cost_envelope anomaly was removed with the token-budget cost gates. Accepted but ignored. |
 | `EVOLVE_PHASE_IO` | active | — | — | Phase I/O (ADR-0050) | ADR-0050 Phase-3 unified-phase-I/O rollout dial. FULL off→shadow→advisory→enforce ladder (4-value, unlike the 3-value gate dials). off = dormant legacy dispatch, byte-identical (the rollback escape hatch); shadow = typed envelope assembled + compared against legacy disk reads (mismatch → ledger phaseio_shadow_mismatch); advisory = envelope populated + read alongside legacy (legacy still wins); enforce = the typed envelope is AUTHORITATIVE — phase readers consume it and the audit/ship verdict parse is sentinel-mandatory. DEFAULT enforce as of the 3.10 cutover (was off through 18.14.0); set EVOLVE_PHASE_IO=off to roll back. A typo falls back to off (fail-safe, never leaves the dial in an unintended state). |
 | `EVOLVE_PHASE_LATENCY_CEILING` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PHASE_LATENCY_CEILING_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

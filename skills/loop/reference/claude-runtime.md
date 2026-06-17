@@ -54,7 +54,6 @@ Optional but recommended:
 |---|---|
 | `EVOLVE_SANDBOX=1` | Enable kernel-level sandbox-exec / bwrap wrapping (default in profiles with `sandbox.enabled: true`) |
 | `EVOLVE_TASK_MODE=research` (or `deep`) | Select a budget tier from the profile's `budget_tiers` map |
-| `EVOLVE_MAX_BUDGET_USD=1.50` | Override the per-invocation budget (highest precedence) |
 
 ## Trust boundary
 

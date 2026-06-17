@@ -15,10 +15,6 @@ var (
 	// .evolve/ledger.jsonl entries cannot be reproduced.
 	ErrLedgerChainBroken = errors.New("core: ledger hash chain broken")
 
-	// ErrBudgetExceeded is returned when --budget-usd or
-	// EVOLVE_BATCH_BUDGET_CAP would be exceeded by the next call.
-	ErrBudgetExceeded = errors.New("core: budget cap exceeded")
-
 	// ErrLockHeld is returned when .evolve/.lock is held by another
 	// concurrent runner (multi-project safety).
 	ErrLockHeld = errors.New("core: project lock held by another process")

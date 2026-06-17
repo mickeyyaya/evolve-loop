@@ -283,14 +283,13 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 // ============================================================================
 
 // TestRunLoop_DeprecatedCostEnvVarsInert verifies the former budget env-vars
-// (EVOLVE_CHECKPOINT_DISABLE / EVOLVE_BATCH_BUDGET_DISABLE) no longer change
-// behavior: cost is always summarized as display-only telemetry, no BATCH-BUDGET
-// output is ever emitted, and the loop exits 0 regardless of cost.
+// (EVOLVE_CHECKPOINT_DISABLE) no longer change behavior: cost is always
+// summarized as display-only telemetry, no BATCH-BUDGET output is ever emitted,
+// and the loop exits 0 regardless of cost.
 func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 	t.Setenv("EVOLVE_CHECKPOINT_DISABLE", "1")
-	t.Setenv("EVOLVE_BATCH_BUDGET_DISABLE", "1")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

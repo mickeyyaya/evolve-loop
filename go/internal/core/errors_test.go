@@ -8,13 +8,12 @@ import (
 
 // Sentinel errors must round-trip through errors.Is when wrapped via %w.
 // This is the contract the orchestrator and adapters rely on to make
-// branching decisions ("if errors.Is(err, ErrBudgetExceeded) { … }").
+// branching decisions on error type.
 func TestSentinels_ErrorsIs(t *testing.T) {
 	t.Parallel()
 	sentinels := []error{
 		ErrPhaseGateFailed,
 		ErrLedgerChainBroken,
-		ErrBudgetExceeded,
 		ErrLockHeld,
 		ErrSubprocessNonZero,
 		ErrPhaseInvalid,
@@ -42,7 +41,7 @@ func TestSentinels_ErrorsIs(t *testing.T) {
 func TestSentinels_MessagesArePresent(t *testing.T) {
 	t.Parallel()
 	sentinels := []error{
-		ErrPhaseGateFailed, ErrLedgerChainBroken, ErrBudgetExceeded,
+		ErrPhaseGateFailed, ErrLedgerChainBroken,
 		ErrLockHeld, ErrSubprocessNonZero, ErrPhaseInvalid, ErrTransitionInvalid,
 	}
 	for _, s := range sentinels {

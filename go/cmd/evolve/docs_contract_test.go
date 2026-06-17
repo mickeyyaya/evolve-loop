@@ -83,7 +83,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_OBSERVER_EOF_GRACE_S":      true, // phase-observer
 	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
 	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
-	"EVOLVE_PHASE_COST_CEILING":        true, // cyclehealth signal
 	"EVOLVE_PLATFORM":                  true, // platform-detect override
 	"EVOLVE_PLUGIN_ROOT":               true, // dispatcher root resolve
 	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override

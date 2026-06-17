@@ -224,7 +224,7 @@ For detailed Phase 3 implementation, see [phase3-build.md](phase3-build.md).
 
 ### Phase Boundary: BUILD -> AUDIT
 
-Enforced in-process by `core.Orchestrator` + `evolve guard phase`. The orchestrator confirms build-report.md exists with a "## Files Modified" section before emitting the audit phase request. Builder cost overrun is detected by `runner.CostGuardDecorator` (EVOLVE_BUILDER_COST_THRESHOLD, default 2.00 USD).
+Enforced in-process by `core.Orchestrator` + `evolve guard phase`. The orchestrator confirms build-report.md exists with a "## Files Modified" section before emitting the audit phase request.
 
 ### Phase 4: AUDIT (Parallel)
 
