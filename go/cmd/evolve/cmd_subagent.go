@@ -448,6 +448,30 @@ func envOrCwd(env string) string {
 	return "."
 }
 
+// sourceRoot resolves the root for reading SOURCE/DOC artifacts that are part
+// of a cycle's committed deliverable — generated-from-source docs such as
+// docs/architecture/control-flags.md (from the flagregistry) or skills/*/SKILL.md
+// (from phase facts). These live in the WORKTREE the cycle commits to, not the
+// main checkout.
+//
+// This is the source half of the dual-root pattern. EVOLVE_PROJECT_ROOT is the
+// STATE root: the ACS suite pins it to MAIN so predicates resolve `.evolve/`
+// runtime data there (issue #12). But a generated SOURCE doc must be validated
+// against the worktree, so acssuite also exports EVOLVE_WORKTREE_ROOT=<worktree>.
+// Precedence: EVOLVE_WORKTREE_ROOT (the active worktree, exported by the ACS
+// suite) > EVOLVE_PROJECT_ROOT (explicit root in CI/dev) > cwd. Outside the
+// suite EVOLVE_WORKTREE_ROOT is conventionally unset, making this byte-identical
+// to envOrCwd("EVOLVE_PROJECT_ROOT"); if it is present in a developer's shell
+// from a prior session it takes precedence (unset it if a command reads the
+// wrong root). Root-cause fix for the cycle-355 trap, where `flags check` read
+// main's stale control-flags.md and red-failed correct work.
+func sourceRoot() string {
+	if v := os.Getenv("EVOLVE_WORKTREE_ROOT"); v != "" {
+		return paths.AbsoluteRoot("EVOLVE_WORKTREE_ROOT", v, nil)
+	}
+	return envOrCwd("EVOLVE_PROJECT_ROOT")
+}
+
 // subagentRunFlags holds the run-specific env-derived boolean knobs for
 // `subagent run`, read through envchain so the truthy/falsy/default vocabulary
 // is uniform (P2). CachePrefixV2 / AdversarialAudit are default-on (`!= "0"`);

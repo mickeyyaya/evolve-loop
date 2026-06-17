@@ -107,3 +107,42 @@ func TestFlagsUnknownSubcommand(t *testing.T) {
 		t.Errorf("unknown subcommand rc=%d, want 10", rc)
 	}
 }
+
+// TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot is the cycle-355
+// regression guard. Under the ACS suite a predicate runs with
+// EVOLVE_PROJECT_ROOT pinned to the MAIN checkout so it can read `.evolve/`
+// runtime STATE (issue #12). But a generated SOURCE doc like control-flags.md
+// is part of the cycle's committed deliverable and lives in the WORKTREE — so
+// `flags check` must validate the WORKTREE doc, not main's stale working copy.
+// acssuite exports EVOLVE_WORKTREE_ROOT=<worktree>; flags resolution must
+// prefer it over EVOLVE_PROJECT_ROOT. Before the fix, `flags check` read the
+// stale main root and red-failed correct work (the cycle-355 audit FAIL).
+func TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot(t *testing.T) {
+	worktree := seedFlagsProject(t) // brought in sync with the registry
+	mainRoot := seedFlagsProject(t) // stays the bare seed → stale vs registry
+
+	// Bring ONLY the worktree's doc in sync, via the known-good generate path.
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", worktree)
+	if rc := runFlags([]string{"generate"}, nil, io.Discard, io.Discard); rc != 0 {
+		t.Fatalf("seed generate rc=%d, want 0", rc)
+	}
+
+	// Point PROJECT_ROOT at the stale main and WORKTREE_ROOT at the synced
+	// worktree. check must resolve the worktree (in sync) → exit 0.
+	t.Setenv("EVOLVE_PROJECT_ROOT", mainRoot)
+	t.Setenv("EVOLVE_WORKTREE_ROOT", worktree)
+	if rc := runFlags([]string{"check"}, nil, io.Discard, io.Discard); rc != 0 {
+		t.Fatalf("check rc=%d, want 0 — flags check must resolve EVOLVE_WORKTREE_ROOT "+
+			"(in-sync worktree), not EVOLVE_PROJECT_ROOT (stale main)", rc)
+	}
+
+	// Falsifiability: with WORKTREE unset, resolution falls back to the stale
+	// PROJECT_ROOT and MUST report drift — proving the assertion above exercises
+	// the worktree redirect, not an unrelated path.
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+	if rc := runFlags([]string{"check"}, nil, io.Discard, io.Discard); rc != 2 {
+		t.Fatalf("check rc=%d with WORKTREE unset + stale PROJECT_ROOT, want 2 (drift); "+
+			"test is not exercising the worktree redirect", rc)
+	}
+}

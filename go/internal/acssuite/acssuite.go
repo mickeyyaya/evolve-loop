@@ -169,15 +169,25 @@ func (v *Verdict) record(r Result) {
 	v.Results = append(v.Results, r)
 }
 
-// predicateEnv builds the env exported to BOTH lanes: EVOLVE_PROJECT_ROOT (so
-// predicates resolve `.evolve/` runtime data to MAIN even from a worktree, issue
-// #12) and CHANGED_PACKAGES (so a predicate can scope `go test` to the cycle's
-// touched packages, cycle-200). With no extras it equals os.Environ() — the
-// prior inherit behavior.
-func predicateEnv(projectRoot string, changedPkgs []string) []string {
+// predicateEnv builds the env exported to BOTH lanes. The dual-root pattern:
+//   - EVOLVE_PROJECT_ROOT (STATE root) → MAIN, so predicates resolve `.evolve/`
+//     runtime data to main even from a worktree (issue #12).
+//   - EVOLVE_WORKTREE_ROOT (SOURCE root) → the cycle's worktree, so predicates
+//     that validate a generated-from-source doc (e.g. `evolve flags check` /
+//     `evolve skills check`) read the WORKTREE artifact the cycle commits — not
+//     main's stale working copy. Without this, such a predicate red-fails correct
+//     work because the doc only reaches main at ship, after audit (cycle-355).
+//   - CHANGED_PACKAGES → the cycle's touched packages, so a predicate can scope
+//     `go test` (cycle-200).
+//
+// With no extras it equals os.Environ() — the prior inherit behavior.
+func predicateEnv(projectRoot, worktreeRoot string, changedPkgs []string) []string {
 	env := os.Environ()
 	if projectRoot != "" {
 		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
+	}
+	if worktreeRoot != "" {
+		env = append(env, "EVOLVE_WORKTREE_ROOT="+worktreeRoot)
 	}
 	if len(changedPkgs) > 0 {
 		// Space-joining is safe: go package patterns never contain spaces.
@@ -320,7 +330,10 @@ func runGoTest(opts Options) ([]Result, error) {
 	}
 
 	changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
-	env := predicateEnv(opts.ProjectRoot, changed)
+	// opts.Root is the cycle's worktree (resolveACSSuiteRoot → active_worktree);
+	// export it as EVOLVE_WORKTREE_ROOT so source/doc predicates validate the
+	// committed worktree artifact, not main's stale copy (cycle-355 fix).
+	env := predicateEnv(opts.ProjectRoot, opts.Root, changed)
 
 	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, nil))
 	defer cancel()

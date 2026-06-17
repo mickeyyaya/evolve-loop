@@ -89,3 +89,34 @@ so the inverted idiom red-fails on the **correct** (absent) state — the `if` b
 is skipped but the internal `Errorf` still fails the test (the cycle-352
 broken-predicate incident). `FileNotContains` returns true and logs nothing when
 `X` is absent, and fails only when `X` is present.
+
+### Generated-from-source docs — the dual-root pattern
+
+A cycle that edits a doc generated from source (e.g.
+`docs/architecture/control-flags.md` from the `flagregistry`, or
+`skills/*/SKILL.md` from phase facts) is editing a **worktree** artifact: the
+change reaches main only at *ship*, after audit. The ACS suite runs predicates
+with two roots so both kinds of read resolve correctly (the dual-root pattern):
+
+- **`EVOLVE_PROJECT_ROOT` → main** (the STATE root): `.evolve/` runtime data
+  (history, baselines, the current build-report) lives on main, not the worktree
+  (issue #12). `cmd_acs.go` follows `git --git-common-dir` back to the main
+  checkout to compute it.
+- **`EVOLVE_WORKTREE_ROOT` → the cycle's worktree** (the SOURCE root): generated
+  SOURCE docs live in the worktree, so `evolve flags check` / `evolve skills
+  check` (and any reader via `sourceRoot()`) validate the **committed worktree
+  artifact**, not main's stale working copy.
+
+Because of this, shelling `evolve flags check` from a predicate now validates the
+**worktree** doc and greens on correct work — no manual regen of main, no
+operator-prepared state. (Before the dual-root fix it read main's stale copy and
+red-failed correct work; the cycle-355 incident. "Greening" it by hand-regenerating
+main is gaming — non-durable state outside the cycle's commit, which the audit
+catches.)
+
+The most robust predicate, however, takes no subprocess and no binary dependency:
+in a `go test`, regenerate the expected output from the worktree's source-of-truth
+(import the SSOT package directly) and assert it matches the worktree's committed
+doc, resolving paths under `acsassert.RepoRoot(t)` (the worktree). Prefer that
+when authoring a new generated-doc predicate; the `flags check` / `skills check`
+subprocess path is the safety net the dual-root pattern keeps correct.

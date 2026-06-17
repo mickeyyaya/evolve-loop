@@ -306,5 +306,6 @@ var All = []Flag{
 	{Name: "EVOLVE_USE_PHASE_REGISTRY", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "Set `0` to skip reading `phase-registry.json` (built-in defaults only)"},
 	{Name: "EVOLVE_WORKTREE_BASE", Status: StatusActive, Cluster: "Worktree / Workspace", Doc: "Per-cycle worktree base path"},
 	{Name: "EVOLVE_WORKTREE_PATH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
+	{Name: "EVOLVE_WORKTREE_ROOT", Status: StatusActive, Cluster: "Worktree / Workspace", Doc: "SOURCE root for generated-doc predicates (dual-root pattern); ACS suite exports the cycle's worktree so `flags check`/`skills check` validate the worktree artifact (cycle-355)."},
 	{Name: "EVOLVE_X", Status: StatusTestSeam, Doc: "Read only by _test.go files."},
 }

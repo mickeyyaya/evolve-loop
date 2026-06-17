@@ -152,7 +152,7 @@ func TestExcerpt_AllBranches(t *testing.T) {
 // TestPredicateEnv_AllBranches — adversarial: verify every env injection path.
 func TestPredicateEnv_AllBranches(t *testing.T) {
 	t.Run("empty projectRoot and nil pkgs: neither var injected", func(t *testing.T) {
-		env := predicateEnv("", nil)
+		env := predicateEnv("", "", nil)
 		for _, e := range env {
 			if strings.HasPrefix(e, "CHANGED_PACKAGES=") {
 				t.Errorf("nil pkgs must not inject CHANGED_PACKAGES; got %q", e)
@@ -164,10 +164,13 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 					t.Errorf("empty projectRoot must not inject EVOLVE_PROJECT_ROOT; got %q", e)
 				}
 			}
+			if strings.HasPrefix(e, "EVOLVE_WORKTREE_ROOT=") {
+				t.Errorf("empty worktreeRoot must not inject EVOLVE_WORKTREE_ROOT; got %q", e)
+			}
 		}
 	})
 	t.Run("non-empty projectRoot injects EVOLVE_PROJECT_ROOT", func(t *testing.T) {
-		env := predicateEnv("/the/root", nil)
+		env := predicateEnv("/the/root", "", nil)
 		var found bool
 		for _, e := range env {
 			if e == "EVOLVE_PROJECT_ROOT=/the/root" {
@@ -178,9 +181,27 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 			t.Error("EVOLVE_PROJECT_ROOT=/the/root not found in env")
 		}
 	})
+	t.Run("non-empty worktreeRoot injects EVOLVE_WORKTREE_ROOT (dual-root)", func(t *testing.T) {
+		env := predicateEnv("/main", "/the/worktree", nil)
+		var gotProject, gotWorktree bool
+		for _, e := range env {
+			switch e {
+			case "EVOLVE_PROJECT_ROOT=/main":
+				gotProject = true
+			case "EVOLVE_WORKTREE_ROOT=/the/worktree":
+				gotWorktree = true
+			}
+		}
+		if !gotProject {
+			t.Error("EVOLVE_PROJECT_ROOT=/main not found in env")
+		}
+		if !gotWorktree {
+			t.Error("EVOLVE_WORKTREE_ROOT=/the/worktree not found in env (source root not exported)")
+		}
+	})
 	t.Run("non-empty changedPkgs injects CHANGED_PACKAGES space-joined", func(t *testing.T) {
 		pkgs := []string{"./internal/core", "./internal/bridge"}
-		env := predicateEnv("/root", pkgs)
+		env := predicateEnv("/root", "", pkgs)
 		var found string
 		for _, e := range env {
 			if strings.HasPrefix(e, "CHANGED_PACKAGES=") {

@@ -18,18 +18,24 @@ func runSkills(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: evolve skills <generate|check|publish>")
 		return 10
 	}
-	project := envOrCwd("EVOLVE_PROJECT_ROOT")
 	switch args[0] {
 	case "generate":
-		return skillsRun(project, true, stdout, stderr)
+		// SKILL.md is a generated SOURCE doc (ADR-0040 projection), part of a
+		// cycle's committed deliverable — resolve it from the worktree under the
+		// ACS suite, not main's stale copy (cycle-355 fix; see sourceRoot).
+		return skillsRun(sourceRoot(), true, stdout, stderr)
 	case "check":
-		return skillsRun(project, false, stdout, stderr)
+		return skillsRun(sourceRoot(), false, stdout, stderr)
 	case "publish":
 		cfg, ok := parsePublishFlags(args[1:], stderr)
 		if !ok {
 			return 10
 		}
-		return runSkillsPublish(project, cfg, stdout, stderr)
+		// publish is a main/release operation: it reads the shipped skills and
+		// stages them into `.evolve/publish/` STATE. Both belong on the STATE
+		// root, never a worktree — resolve via EVOLVE_PROJECT_ROOT explicitly so
+		// it cannot inherit a worktree root from EVOLVE_WORKTREE_ROOT.
+		return runSkillsPublish(envOrCwd("EVOLVE_PROJECT_ROOT"), cfg, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown subcommand %q (want generate|check|publish)\n", args[0])
 		return 10
