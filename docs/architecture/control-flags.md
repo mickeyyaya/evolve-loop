@@ -130,12 +130,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_PLATFORM` | ACTIVE | Override platform detection |
-| `EVOLVE_GEMINI_CLAUDE_PATH` | DEAD | Gemini hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_GEMINI_REQUIRE_FULL` | DEAD | Require Gemini full-mode (not degraded) [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_CODEX_CLAUDE_PATH` | DEAD | Codex hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_CODEX_REQUIRE_FULL` | ACTIVE | Require Codex full-mode |
-| `EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | DEAD | Opt-in to interactive-mode fallback [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_FORCE_BARE` | DEAD | Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Worktree / Workspace
 
@@ -274,7 +269,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_AGY_REQUIRE_FULL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_ALLOW_DEEP_RESEARCH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ALLOW_DOC_DELETE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | dead | — | — | Platform / CLI Hybrid | Opt-in to interactive-mode fallback [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_ANCHOR_EXTRACT` | dead | — | — | Observability / Prompt Tuning | v8.63.0 Campaign C (Tier 3 — anchored artifacts). When `1`, role-context-builder.sh extracts only named `<!-- ANCHOR:<name> -->` regions from prior phase artifacts instead of `cat`-ing whole files. Persona templates (scout/builder/auditor/retrospective) emit anchor markers around output sections. Backwards-compat: pre-v8.63 artifacts without anchors fall back to full-file emission once per file (no duplication regression). Auditor reads `diff_summary`+`test_results` from build-report and `proposed_tasks`+`acceptance_criteria` from scout-report; triage reads `proposed_tasks` only. Promoted to default=1 in cycle 24 (v9.4.0). Set `EVOLVE_ANCHOR_EXTRACT=0` to revert to legacy full-file mode. [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_ANTHROPIC_BASE_URL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ARTIFACT_MAX_EXTENDS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -332,7 +326,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CHECKPOINT_TRIGGERED` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
-| `EVOLVE_CODEX_CLAUDE_PATH` | dead | — | — | Platform / CLI Hybrid | Codex hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_CODEX_CONFIG_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CODEX_REQUIRE_FULL` | active | — | — | Platform / CLI Hybrid | Require Codex full-mode |
 | `EVOLVE_CODEX_VERSION_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -397,12 +390,9 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FANOUT_WORKER_TOKEN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FANOUT_WORKSPACE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
-| `EVOLVE_FORCE_BARE` | dead | — | — | Platform / CLI Hybrid | Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FORCE_INNER_SANDBOX` | dead | — | — | Sandbox Cluster | Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_GC` | active | enum | off | GC / Retention | GC shadow stage (L3.4). off=disabled (default); shadow=discover+plan+log manifest to workspace without mutations; enforce=shadow+apply (opt-in; honors quarantine/ledger/live hard rules). |
-| `EVOLVE_GEMINI_CLAUDE_PATH` | dead | — | — | Platform / CLI Hybrid | Gemini hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_GEMINI_REQUIRE_FULL` | dead | — | — | Platform / CLI Hybrid | Require Gemini full-mode (not degraded) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_GO_BIN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_GO_BIN_TEST` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_GUARDS_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

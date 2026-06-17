@@ -66,46 +66,36 @@ func TestC354_Amp_002_WorktreeClusterFlagsNotActive(t *testing.T) {
 	}
 }
 
-// TestC354_Amp_003_AllTenFlagsShowDead verifies all 10 target flags individually
-// show DEAD in the hand-maintained section. C354_004 only requires ≥5 of 10 —
-// a fix that updated 5–9 flags would pass C354_004 but fail here.
-func TestC354_Amp_003_AllTenFlagsShowDead(t *testing.T) {
+// TestC354_Amp_003_RemainingFlagsShowDead verifies the 5 remaining cycle-354 target
+// flags still show DEAD in the hand-maintained section after cycle-359 removed the
+// 5 Platform/CLI Hybrid flags (GEMINI_CLAUDE_PATH, GEMINI_REQUIRE_FULL,
+// CODEX_CLAUDE_PATH, ALLOW_INTERACTIVE_FALLBACK, FORCE_BARE).
+// C354_004 only requires ≥5 of 10 — this test guards the 5 that remain.
+func TestC354_Amp_003_RemainingFlagsShowDead(t *testing.T) {
 	doc := controlFlagsPath(t)
 	deadPatterns := []string{
 		"`EVOLVE_RESOLVE_ROOTS_LOADED` | DEAD",
 		"`EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | DEAD",
-		"`EVOLVE_GEMINI_CLAUDE_PATH` | DEAD",
-		"`EVOLVE_GEMINI_REQUIRE_FULL` | DEAD",
-		"`EVOLVE_CODEX_CLAUDE_PATH` | DEAD",
-		"`EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | DEAD",
-		"`EVOLVE_FORCE_BARE` | DEAD",
 		"`EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD",
 		"`EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD",
 		"`EVOLVE_STRICT_FAILURES` | DEAD",
 	}
 	for _, p := range deadPatterns {
 		if !acsassert.FileContains(t, doc, p) {
-			t.Errorf("RED: all 10 target flags must show DEAD; missing %q in hand-maintained section", p)
+			t.Errorf("RED: remaining cycle-354 target flags must show DEAD; missing %q in hand-maintained section", p)
 		}
 	}
 }
 
-// TestC354_Amp_004_NoDeprecatedForAnyTargetFlag verifies that none of the 10
-// target flags still carry a DEPRECATED status. C354_003 only checked
-// EVOLVE_STRICT_FAILURES (the sole DEPRECATED flag pre-fix); the other 9 were
-// all ACTIVE, not DEPRECATED. This test guards against a regression where a
-// future edit accidentally sets a formerly-ACTIVE flag to DEPRECATED instead of
-// DEAD, which would slip past C354_001 and C354_002.
-func TestC354_Amp_004_NoDeprecatedForAnyTargetFlag(t *testing.T) {
+// TestC354_Amp_004_NoDeprecatedForRemainingTargetFlags verifies that none of the 5
+// remaining cycle-354 target flags carry a DEPRECATED status. Guards against a
+// regression where a future edit sets a formerly-dead flag to DEPRECATED instead
+// of leaving it absent (after cycle-359 removed the 5 Platform/CLI Hybrid flags).
+func TestC354_Amp_004_NoDeprecatedForRemainingTargetFlags(t *testing.T) {
 	doc := controlFlagsPath(t)
 	flagsWithoutDep := []string{
 		"`EVOLVE_RESOLVE_ROOTS_LOADED` | DEPRECATED",
 		"`EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | DEPRECATED",
-		"`EVOLVE_GEMINI_CLAUDE_PATH` | DEPRECATED",
-		"`EVOLVE_GEMINI_REQUIRE_FULL` | DEPRECATED",
-		"`EVOLVE_CODEX_CLAUDE_PATH` | DEPRECATED",
-		"`EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | DEPRECATED",
-		"`EVOLVE_FORCE_BARE` | DEPRECATED",
 		"`EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEPRECATED",
 		"`EVOLVE_PROFILE_WORKTREE_AWARE` | DEPRECATED",
 		"`EVOLVE_STRICT_FAILURES` | DEPRECATED",
