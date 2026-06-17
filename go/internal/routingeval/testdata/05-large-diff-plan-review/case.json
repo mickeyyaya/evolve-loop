@@ -1,0 +1,7 @@
+{
+  "intent_required": false,
+  "tdd_pinned": true,
+  "expect_run_set": ["audit", "build", "plan-review", "scout", "ship", "tdd"],
+  "expect_clamps": [],
+  "forbidden_phases": ["intent"]
+}

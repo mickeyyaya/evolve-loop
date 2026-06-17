@@ -253,6 +253,15 @@ type RoutingConfig struct {
 	// and read by the RecipeVerifier — ending the prior three-source recipe drift.
 	// Registry-sourced only; nil when no registry supplies it (projection renders empty).
 	GoalRecipes map[string][]string
+	// RoutingJudge is the ADR-0052 advisor-maximization WS4 route-quality judge
+	// toggle (EVOLVE_ROUTING_JUDGE). false (DEFAULT) — no judge call,
+	// byte-identical. true — the fast-tier LLM-as-judge scores the emitted route
+	// for forensics, strictly off the build path (never gates ship, never alters
+	// the plan). It is a plain bool, NOT a Stage: the judge cannot move behavior,
+	// so the off→shadow→advisory ladder would be meaningless (shadow≡advisory≡on).
+	// Composition-root view set by applyEnv; the scoring call site reads it. A
+	// typo/unknown value falls back to false (fail-safe — never silently enables).
+	RoutingJudge bool
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -539,6 +548,23 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// falls back to off (fail-safe). Default (no env) is shadow, set in
 		// defaults(). Behavior wires in WS2-S3; this reserves the parse + view.
 		cfg.RouterReplan = parseStage(v, "EVOLVE_ROUTER_REPLAN", ws)
+	}
+	if v := env["EVOLVE_ROUTING_JUDGE"]; v != "" {
+		// ADR-0052 advisor-maximization WS4 — the route-quality judge toggle.
+		// Simple off/on bool (NOT a Stage: the judge is off the build path and
+		// cannot move behavior, so the shadow/advisory ladder is meaningless —
+		// hence no parseStage). A typo falls back to off (fail-safe). Default
+		// (no env) is the false zero value. Behavior wires at the scoring call
+		// site (WS4-S3 GradePlan); this reserves the parse + view.
+		switch strings.TrimSpace(v) {
+		case "1", "on":
+			cfg.RoutingJudge = true
+		case "0", "off":
+			cfg.RoutingJudge = false
+		default:
+			*ws = append(*ws, Warning{"unknown-value",
+				fmt.Sprintf("EVOLVE_ROUTING_JUDGE=%q unknown (want on|off), defaulting to off", v)})
+		}
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {

@@ -48,7 +48,7 @@ All behavior-affecting work lands behind dials at safe defaults, mirroring the p
 | `EVOLVE_ROUTER_REPLAN` | `shadow` | WS2-S3 | Post-scout re-plan dial: off / shadow (compute+log) / advisory (replace after re-clamp). **Registered + parsed in WS0-S1.** |
 | `EVOLVE_ROUTER_RECON_DIGEST` | `off` | WS2-S0b | Inject the deterministic pre-plan recon digest into the initial `Plan()` (off → on; byte-identical off). |
 | `EVOLVE_ROUTER_REPLAN_DEPTH` | `1` | WS2-S5 | Re-plan depth cap (escalate to debugger at cap, never thrash). |
-| `EVOLVE_ROUTING_JUDGE` | `off` | WS4-S3 | Opt-in LLM-as-judge route-quality scoring, off the build path. |
+| `EVOLVE_ROUTING_JUDGE` | `off` | WS4-S3 | Opt-in LLM-as-judge route-quality scoring, off the build path. A plain bool (not a stage — the judge cannot move behavior). **Registered + parsed in WS4-S3** (`RoutingConfig.RoutingJudge`); `core.PlanJudge.GradePlan` is the scorer, and the composition-root scoring call site reads the flag to gate whether it is invoked (behavior wires in WS4-S3). |
 | `EVOLVE_ADVISOR_DEPTH` | unset | WS1-S2 | Defense-in-depth env recursion stamp (primary guard is the mint denylist). |
 | `EVOLVE_ROUTER_PLAN_MODEL` / `EVOLVE_ROUTER_PROPOSE_MODEL` | unset | WS6-S1 | Optional per-decision-type model override (default: deep for plan/replan, fast for propose/judge). |
 
