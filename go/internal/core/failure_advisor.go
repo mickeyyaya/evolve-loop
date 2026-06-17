@@ -30,11 +30,8 @@ const (
 // verdicts get PROMOTED into the deterministic registry
 // (recovery.PromoteAdvice), so each novel state is paid for once.
 type FailureAdvisor struct {
-	bridge  Bridge
-	cli     string
-	model   string
-	profile string // when non-empty, used verbatim; else derived from ProjectRoot
-	persona string // agents/evolve-failure-advisor.md body; empty ⇒ inline framing
+	bridge   Bridge
+	identity AgentIdentity // ADR-0052 WS1-S1: shared dispatch identity (same value object as PhaseAdvisor)
 }
 
 // FailureAdvisorOption customizes a FailureAdvisor (mirrors PhaseAdvisorOption).
@@ -44,7 +41,7 @@ type FailureAdvisorOption func(*FailureAdvisor)
 func WithFailureAdvisorCLI(cli string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if cli != "" {
-			a.cli = cli
+			a.identity.CLI = cli
 		}
 	}
 }
@@ -53,7 +50,7 @@ func WithFailureAdvisorCLI(cli string) FailureAdvisorOption {
 func WithFailureAdvisorModel(model string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if model != "" {
-			a.model = model
+			a.identity.Model = model
 		}
 	}
 }
@@ -63,7 +60,7 @@ func WithFailureAdvisorModel(model string) FailureAdvisorOption {
 func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if body != "" {
-			a.persona = body
+			a.identity.Persona = body
 		}
 	}
 }
@@ -73,7 +70,10 @@ func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 // novel terminal state is judgment work, and the advisor runs OFF the hot
 // loop (only for unclassified states), so depth beats latency here.
 func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvisor {
-	a := &FailureAdvisor{bridge: bridge, cli: "claude-tmux", model: "opus"}
+	a := &FailureAdvisor{
+		bridge:   bridge,
+		identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "failure-advisor"},
+	}
 	for _, o := range opts {
 		o(a)
 	}
@@ -107,20 +107,20 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	if in.Workspace == "" {
 		return nil, fmt.Errorf("failure advisor: empty workspace")
 	}
-	profile := a.profile
+	profile := a.identity.Profile
 	if profile == "" && in.ProjectRoot != "" {
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "failure-advisor.json")
 	}
 	artifact := filepath.Join(in.Workspace, "failure-advice.json")
 	resp, err := a.bridge.Launch(ctx, BridgeRequest{
-		CLI:          a.cli,
+		CLI:          a.identity.CLI,
 		Profile:      profile,
-		Model:        a.model,
+		Model:        a.identity.Model,
 		Prompt:       a.composePrompt(in, artifact),
 		Workspace:    in.Workspace,
 		ArtifactPath: artifact,
 		Completion:   "artifact",
-		Agent:        "failure-advisor",
+		Agent:        a.identity.AgentLabel,
 		Cycle:        in.Cycle,
 		Env:          in.Env,
 	})
@@ -135,8 +135,8 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 // advisor functional before the composition root wires the persona file.
 func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) string {
 	var b strings.Builder
-	if a.persona != "" {
-		b.WriteString(a.persona)
+	if a.identity.Persona != "" {
+		b.WriteString(a.identity.Persona)
 		b.WriteString("\n\n---\n")
 	} else {
 		b.WriteString("You are the evolve-loop failure advisor: classify ONE unrecoverable terminal state from the pane evidence below. ")

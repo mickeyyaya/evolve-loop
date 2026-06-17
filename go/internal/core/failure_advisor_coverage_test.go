@@ -37,7 +37,7 @@ func TestFailureAdvisorOptionsPromptAndParseCoverage(t *testing.T) {
 		WithFailureAdvisorModel(""),
 		WithFailureAdvisorPersona(""),
 	)
-	if a.cli != "codex-tmux" || a.model != "sonnet" || a.persona != "PERSONA" {
+	if a.identity.CLI != "codex-tmux" || a.identity.Model != "sonnet" || a.identity.Persona != "PERSONA" {
 		t.Fatalf("advisor options not applied: %+v", a)
 	}
 	prompt := a.composePrompt(FailureAdviseInput{

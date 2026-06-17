@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
@@ -31,11 +32,8 @@ import (
 // degrades cleanly to the deterministic static path — "model proposes, kernel
 // disposes", fail-safe to the floor.
 type PhaseAdvisor struct {
-	bridge  Bridge
-	cli     string
-	model   string
-	profile string // when non-empty, used verbatim; else derived from RouteInput.ProjectRoot
-	persona string // agents/evolve-router.md body; injected by the composition root (uniform with phase agents). Empty ⇒ legacy inline framing.
+	bridge   Bridge
+	identity AgentIdentity // ADR-0052 WS1-S1: the shared dispatch identity (cli/model/profile/persona/label)
 	// writeArtifact persists the WS3-S1 redacted prompt/response capture.
 	// Injectable so a write failure can be exercised (the capture is fail-open);
 	// NewPhaseAdvisor defaults it to os.WriteFile.
@@ -51,7 +49,7 @@ type PhaseAdvisorOption func(*PhaseAdvisor)
 func WithProposerCLI(cli string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if cli != "" {
-			p.cli = cli
+			p.identity.CLI = cli
 		}
 	}
 }
@@ -61,7 +59,7 @@ func WithProposerCLI(cli string) PhaseAdvisorOption {
 func WithProposerModel(model string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if model != "" {
-			p.model = model
+			p.identity.Model = model
 		}
 	}
 }
@@ -72,7 +70,7 @@ func WithProposerModel(model string) PhaseAdvisorOption {
 func WithPersona(body string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if body != "" {
-			p.persona = body
+			p.identity.Persona = body
 		}
 	}
 }
@@ -84,7 +82,8 @@ func WithPersona(body string) PhaseAdvisorOption {
 // brain is configurable to any CLI/model.
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 	p := &PhaseAdvisor{
-		bridge: bridge, cli: "claude-tmux", model: "opus",
+		bridge:        bridge,
+		identity:      AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"},
 		writeArtifact: writeArtifactAtomically,
 	}
 	for _, o := range opts {
@@ -95,7 +94,7 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 
 // Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
-	resp, err := p.advisorLaunch(in, "routing proposer", "proposal", buildRoutingPrompt(in), "routing-proposal.json", "stdout")
+	resp, err := p.advisorLaunch(in, "routing proposer", "proposal", buildRoutingPrompt(in), "routing-proposal.json", "stdout", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +111,36 @@ func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 // Mirrors Propose's wiring but writes routing-plan.json and parses a JSON array.
 // Any failure returns an error so the caller degrades to the static path.
 func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
-	// The advisor's raw plan artifact (routing-plan.json) is distinct from the
-	// orchestrator's clamped phase-plan.json (written by recordPhasePlan):
-	// keeping them separate preserves both for forensics (advisory vs disposed).
-	resp, err := p.advisorLaunch(in, "phase advisor", "plan", p.composePlanPrompt(in), "routing-plan.json", "artifact")
+	return p.planWith(in, stageInitial)
+}
+
+// RePlan is the post-scout re-plan (ADR-0052 WS1-S3, the re-invokable seam): a
+// SECOND whole-cycle plan computed once scout's handoff has populated in.Signals,
+// so need is MEASURED rather than inferred from goal text (the upfront Plan runs
+// with empty Signals). It shares planWith with the initial Plan — same
+// compose→dispatch→parse path — writes a DISTINCT routing-replan.json artifact,
+// and stamps replan_depth=1 on its decision span. The returned plan is ADVISORY;
+// the kernel clamp re-validates it exactly as it does the initial plan.
+//
+// This slice provides ONLY the entrypoint — RePlan is not yet called by the loop.
+// The WS2 hook point (post-scout, pre-build) and the EVOLVE_ROUTER_REPLAN dial
+// drive it; until then it is byte-identical-off (never invoked).
+func (p *PhaseAdvisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
+	return p.planWith(in, stagePostScout)
+}
+
+// planWith is the shared whole-cycle planning wiring for the initial Plan and the
+// post-scout RePlan. The stage selects the raw artifact name (routing-plan.json
+// vs routing-replan.json), the capture kind, and the re-plan depth on the span;
+// everything else — prompt composition, dispatch, parse — is identical, so a
+// regression in one stage is a regression in both.
+//
+// The advisor's raw plan artifact is distinct from the orchestrator's clamped
+// phase-plan.json (written by recordPhasePlan): keeping them separate preserves
+// both for forensics (advisory vs disposed).
+func (p *PhaseAdvisor) planWith(in router.RouteInput, stage planStage) (*router.PhasePlan, error) {
+	artifact := stage.artifactFile()
+	resp, err := p.advisorLaunch(in, "phase advisor", stage.captureKind(), p.composePlanPrompt(in, artifact), artifact, "artifact", stage.replanDepth())
 	if err != nil {
 		return nil, err
 	}
@@ -126,27 +151,67 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	return plan, nil
 }
 
+// planStage selects which of the advisor's two whole-cycle planning calls is
+// running (ADR-0052 WS1-S3). stageInitial is the cycle-start Plan (zero value =
+// today's behavior); stagePostScout is the re-invokable RePlan. It is kept
+// UNEXPORTED in core — ADR-0052 table 4.2 sketched it as a router.PlanStage, but
+// the advisor's dispatch framing is core's concern and no other package consumes
+// it, so exporting it would add cross-package coupling + an apicover surface with
+// no caller. The router still owns the floor + canonical order it clamps against.
+type planStage int
+
+const (
+	stageInitial planStage = iota
+	stagePostScout
+)
+
+// artifactFile is the raw plan artifact name for the stage.
+func (s planStage) artifactFile() string {
+	if s == stagePostScout {
+		return "routing-replan.json"
+	}
+	return "routing-plan.json"
+}
+
+// captureKind is the <kind> token embedded in the WS3 capture filenames
+// (advisor-{prompt,response,span}-<kind>.*); isSafeArtifactKind confines it.
+func (s planStage) captureKind() string {
+	if s == stagePostScout {
+		return "replan"
+	}
+	return "plan"
+}
+
+// replanDepth is the depth stamped on the decision span: a re-plan is one level
+// deeper than the initial plan. WS2-S5 caps the live re-plan at this depth=1.
+func (s planStage) replanDepth() int {
+	if s == stagePostScout {
+		return 1
+	}
+	return 0
+}
+
 // composePlanPrompt builds the whole-cycle planning prompt the uniform way: the
 // persona body (agents/evolve-router.md — identity, job, mint guidance, output
 // contract) followed by the DYNAMIC per-cycle context (objective digest, recall
 // memory, catalog, decision rubric) appended in Go, exactly as a phase appends
 // its cycle context. When no persona was injected it falls back to the legacy
 // fully-inline framing (buildPlanPrompt) so the advisor still functions.
-func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput) string {
-	if p.persona == "" {
+func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile string) string {
+	if p.identity.Persona == "" {
 		return buildPlanPrompt(in)
 	}
 	var b strings.Builder
-	b.WriteString(p.persona)
+	b.WriteString(p.identity.Persona)
 	b.WriteString("\n\n---\n# This cycle\n\n")
 	writeRoutingContext(&b, in)
 	writeCatalog(&b, in.Catalog)
 	// Instruct the ABSOLUTE artifact path — the same path advisorLaunch tells the
-	// bridge to watch (filepath.Join(in.Workspace, "routing-plan.json")). A relative
-	// path lands in the REPL's cwd (under claude-tmux that is NOT the workspace — it
+	// bridge to watch (filepath.Join(in.Workspace, artifactFile)). A relative path
+	// lands in the REPL's cwd (under claude-tmux that is NOT the workspace — it
 	// varies per cycle), so the bridge never sees it and the artifact-wait times out
 	// → degrade to static (the cycle-210 failure). Absolute path = lands where watched.
-	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, "routing-plan.json"))
+	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, artifactFile))
 	return b.String()
 }
 
@@ -161,26 +226,41 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput) string {
 // as every phase writes its report. Propose still uses completion="stdout"
 // (ADR-0027 REPL-idle scrollback) pending its own unification. Either way, a
 // failure returns an error and the caller degrades cleanly to the static path.
-func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt, artifactFile, completion string) (BridgeResponse, error) {
+func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt, artifactFile, completion string, replanDepth int) (BridgeResponse, error) {
 	if p.bridge == nil {
 		return BridgeResponse{}, fmt.Errorf("%s: nil bridge", errPfx)
 	}
 	if in.Workspace == "" {
 		return BridgeResponse{}, fmt.Errorf("%s: empty workspace", errPfx)
 	}
-	profile := p.profile
+	// WS1-S2 recursion guard (defense-in-depth, ADR-0052 §4.3): refuse to dispatch
+	// when the input env marks this as a NESTED advisor invocation
+	// (EVOLVE_ADVISOR_DEPTH≥1), degrading the cycle to the static path rather than
+	// nesting brains. This is a DEFENSIVE READ only — nothing in the kernel SETS
+	// the stamp, because the PRIMARY guard (the mint denylist in mintConfigsFrom)
+	// already prevents a router/advisor phase from ever being registered or
+	// dispatched, so the nested path is unreachable ("may guard an impossible
+	// path", per the ADR's critic note). We do not stamp the child env here: the
+	// only subprocess advisorLaunch starts is the router's own LLM (it writes a
+	// plan artifact, never re-enters the orchestrator), so a stamp there would
+	// protect nothing. The read exists so that any future/external caller that
+	// DOES mark a nested dispatch is still refused at this boundary.
+	if advisorDepthExceeded(in.Env) {
+		return BridgeResponse{}, fmt.Errorf("%s: recursion guard: EVOLVE_ADVISOR_DEPTH≥1", errPfx)
+	}
+	profile := p.identity.Profile
 	if profile == "" && in.ProjectRoot != "" {
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "router.json")
 	}
 	resp, err := p.bridge.Launch(context.Background(), BridgeRequest{
-		CLI:          p.cli,
+		CLI:          p.identity.CLI,
 		Profile:      profile,
-		Model:        p.model,
+		Model:        p.identity.Model,
 		Prompt:       prompt,
 		Workspace:    in.Workspace,
 		ArtifactPath: filepath.Join(in.Workspace, artifactFile),
 		Completion:   completion,
-		Agent:        "router",
+		Agent:        p.identity.AgentLabel,
 		Cycle:        in.Cycle,
 		Env:          in.Env,
 	})
@@ -190,7 +270,7 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 	// WS3-S1/S3: capture the redacted prompt+response and the decision span
 	// BEFORE the caller parses, so the decision is debuggable + replayable.
 	// Fail-open — never block the path.
-	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS)
+	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS, replanDepth)
 	return resp, nil
 }
 
@@ -199,14 +279,16 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 // semantic conventions so a collector can ingest the file directly. PromptSHA/
 // ResponseSHA bind the REDACTED capture artifacts — the same identity the
 // ledger (WS3-S2) and the replay path (WS3-S5) key off, so all three agree.
-// decision_type/replan_depth are intentionally omitted until WS1-S3/WS2-S5
-// give them varying values (asserting a fixed value would lock surface).
+// ReplanDepth (WS1-S3) now varies: 0 for the initial Plan, 1 for the post-scout
+// RePlan — so it records real behavior, not locked surface. It is always emitted
+// (no omitempty): a depth of 0 is a meaningful "initial plan", not absence.
 type AdvisorSpan struct {
 	Model       string `json:"gen_ai.request.model"`
 	System      string `json:"gen_ai.system"`
 	PromptSHA   string `json:"prompt_sha"`
 	ResponseSHA string `json:"response_sha"`
 	DurationMS  int64  `json:"duration_ms"`
+	ReplanDepth int    `json:"replan_depth"`
 }
 
 // captureRedacted persists the secret-redacted prompt and response plus the
@@ -217,7 +299,7 @@ type AdvisorSpan struct {
 // PERSISTED COPY is redacted; the live prompt the advisor reasoned over is
 // untouched. The response is redacted but not otherwise transformed, so WS3-S5
 // can reparse it to the same plan.
-func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string, durationMS int64) {
+func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string, durationMS int64, replanDepth int) {
 	if p.writeArtifact == nil || workspace == "" || !isSafeArtifactKind(kind) {
 		return
 	}
@@ -226,11 +308,12 @@ func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string,
 	_ = p.writeArtifact(filepath.Join(workspace, "advisor-prompt-"+kind+".txt"), []byte(rp))
 	_ = p.writeArtifact(filepath.Join(workspace, "advisor-response-"+kind+".txt"), []byte(rr))
 	if buf, err := json.Marshal(AdvisorSpan{
-		Model:       p.model,
-		System:      llmroute.Family(p.cli),
+		Model:       p.identity.Model,
+		System:      llmroute.Family(p.identity.CLI),
 		PromptSHA:   sha256OfString(rp),
 		ResponseSHA: sha256OfString(rr),
 		DurationMS:  durationMS,
+		ReplanDepth: replanDepth,
 	}); err == nil {
 		_ = p.writeArtifact(filepath.Join(workspace, "advisor-span-"+kind+".json"), buf)
 	}
@@ -712,6 +795,40 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	return &router.PhasePlan{Entries: entries, MintPhases: mintConfigsFrom(entries)}, nil
 }
 
+// advisorDepthExceeded reports whether the dispatch env marks this as a NESTED
+// advisor invocation (EVOLVE_ADVISOR_DEPTH≥1). A malformed/non-numeric value is
+// treated as 0 — the stamp is defense-in-depth, never a reason to break a valid
+// advisor call. EVOLVE_ADVISOR_DEPTH is registered in flagregistry (WS1-S2).
+func advisorDepthExceeded(env map[string]string) bool {
+	n, err := strconv.Atoi(strings.TrimSpace(env["EVOLVE_ADVISOR_DEPTH"]))
+	return err == nil && n >= 1
+}
+
+// reservedAdvisorNames are the control-plane identities a minted phase may never
+// assume — the WS1-S2 recursion guard (PRIMARY). The advisor composes the
+// executed spine; minting a router/advisor would let a brain schedule a brain,
+// breaking the compose-vs-execute layering (ADR-0052 D1). The AgentLabel values
+// the advisors dispatch under ("router"/"failure-advisor") are the canonical
+// members; aliases cover the persona slug and bare role words.
+var reservedAdvisorNames = map[string]struct{}{
+	"router":                 {},
+	"evolve-router":          {},
+	"advisor":                {},
+	"phase-advisor":          {},
+	"failure-advisor":        {},
+	"evolve-failure-advisor": {},
+}
+
+// reservedAdvisorMintReason returns a non-empty reason when name is a reserved
+// control-plane identity (so a dropped mint is observable), or "" when the name
+// is free to mint. Matched case-insensitively after trimming.
+func reservedAdvisorMintReason(name string) string {
+	if _, ok := reservedAdvisorNames[strings.ToLower(strings.TrimSpace(name))]; ok {
+		return fmt.Sprintf("recursion guard: a minted phase may not assume the control-plane router/advisor identity %q", name)
+	}
+	return ""
+}
+
 // mintConfigsFrom reconstructs a phaseconfig.PhaseConfig for every entry that
 // carries a Mint block. The entry's Phase becomes the phase name (and default
 // agent/profile key); the MintSpec supplies the persona + dispatch knobs. The
@@ -723,10 +840,17 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 // this cycle, which the entry's Run flag governs via the routing loop). A
 // run:false mint thus reserves the phase without executing it. Returns nil (the
 // common no-op path) when no entry mints.
+//
+// WS1-S2: a mint that would assume a reserved control-plane identity is dropped
+// loudly (recursion guard) — the advisor proposes spine phases, never a router.
 func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig {
 	var out []phaseconfig.PhaseConfig
 	for _, e := range entries {
 		if e.Mint == nil {
+			continue
+		}
+		if reason := reservedAdvisorMintReason(e.Phase); reason != "" {
+			fmt.Fprintf(os.Stderr, "[advisor] dropping minted phase %q: %s\n", e.Phase, reason)
 			continue
 		}
 		writesSource := true

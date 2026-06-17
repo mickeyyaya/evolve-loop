@@ -11,6 +11,7 @@ var All = []Flag{
 	{Name: "EVOLVE_ACS_GO_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ACS_PREDICATE_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ADAPTERS_DIR_OVERRIDE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
+	{Name: "EVOLVE_ADVISOR_DEPTH", Status: StatusActive, Kind: "int", Cluster: "Advisor Maximization (ADR-0052)", Doc: "Recursion-depth stamp for the PhaseAdvisor (advisor-maximization WS1-S2), DEFENSE-IN-DEPTH only: when ≥1 the advisor refuses to dispatch and the cycle degrades to the static path, so a brain can never nest another brain. The PRIMARY recursion guard is the mint denylist (mintConfigsFrom drops any minted phase named router/advisor); this env stamp catches the otherwise-unreachable case where such a phase were dispatched anyway. Unset/0/non-numeric = no guard (byte-identical normal path)."},
 	{Name: "EVOLVE_AGY_REQUIRE_FULL", Status: StatusTestSeam, Doc: "Read only by _test.go files."},
 	{Name: "EVOLVE_ALLOW_DEEP_RESEARCH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ALLOW_DOC_DELETE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
