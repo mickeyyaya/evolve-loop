@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
@@ -327,6 +328,33 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 		return
 	}
 	normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
+	normalizeBuildGofmt(cs.ActiveWorktree)
+}
+
+// normalizeBuildGofmt applies the deterministic `gofmt -w -s` normalization to
+// the build worktree's Go module BEFORE the audit gofmt gate inspects it.
+// Formatting is deterministic work and must not depend on the LLM builder
+// remembering to run it: when the builder leaves a non-gofmt-s-clean file
+// (comment alignment, etc.), the audit gate correctly FAILs the whole cycle
+// (cycles 339-341, 350, 351). This closes that class at the source — the gate
+// stays the backstop, but the builder's formatting lapses are normalized away
+// first. Best-effort: a gofmt failure WARNs and lets the audit gate catch
+// anything that slips through; it NEVER aborts the cycle. Scoped to the same
+// module dir the audit gate scans (codequality.ModuleDir), so the two cannot
+// disagree; the worktree is cut from CI-clean main, so only this cycle's
+// changed files are ever dirty.
+func normalizeBuildGofmt(worktree string) {
+	if worktree == "" {
+		return
+	}
+	fixed, err := codequality.FormatGoFiles(codequality.ModuleDir(worktree))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-gofmt: normalize skipped (%v); audit gofmt gate remains the backstop\n", err)
+		return
+	}
+	if len(fixed) > 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] build-gofmt: ran gofmt -s over %d changed file(s) before audit (gate verifies): %s\n", len(fixed), strings.Join(fixed, ", "))
+	}
 }
 
 // porcelainDirtySet returns the set of paths `git status --porcelain` reports

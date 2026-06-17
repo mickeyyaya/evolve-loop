@@ -336,11 +336,10 @@ func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if root == "" {
 		return nil, nil
 	}
-	target := filepath.Join(root, "go")
-	if _, err := os.Stat(target); err != nil {
-		target = root // no go/ submodule; scan root (no-op when it has no .go files)
-	}
-	return codequality.UnformattedGoFiles(target)
+	// ModuleDir is the single source for "where the .go files live", shared with
+	// the post-build gofmt normalizer (normalizeBuildGofmt) so the gate and the
+	// normalizer can never disagree on which tree to verify vs. format.
+	return codequality.UnformattedGoFiles(codequality.ModuleDir(root))
 }
 
 // generateACSVerdict runs the ACS predicate suite for req.Cycle and writes
