@@ -469,6 +469,11 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		if raw, perr := o.planner.Plan(planIn); perr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
+			// WS2-S2: record the WS2-S1 structural validation of the advisor's RAW
+			// plan (pre-clamp, so the advisor's intent is visible) as standalone
+			// telemetry. Report-only — it never alters the plan; the clamp below
+			// remains the sole disposer.
+			o.recordPlanRejections(ctx, cycle, cs, router.ValidatePlan(planIn, raw))
 			var clamps []router.Clamp
 			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)

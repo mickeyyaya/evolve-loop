@@ -528,6 +528,16 @@ OuterLoop:
 		case loopBreak:
 			break OuterLoop
 		}
+
+		// WS2-S0 (ADR-0052): post-scout re-plan hook. Fires once per cycle after
+		// scout's handoff has been recorded (recordAndBranch above) and BEFORE the
+		// next selectNext — gated on the just-completed phase being scout. Firing
+		// here (post-record, pre-select) is what keeps the re-plan from widening the
+		// run-set or bypassing the spine gate. No-op until WS2-S3 wires the shadow
+		// RePlan behind EVOLVE_ROUTER_REPLAN.
+		if next == PhaseScout {
+			cr.postScoutReplan()
+		}
 	}
 
 	// Post-loop finalization (verdict reclassification, silent-no-ship warn,

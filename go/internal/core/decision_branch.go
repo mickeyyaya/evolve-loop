@@ -240,6 +240,48 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	}
 }
 
+// recordPlanRejections persists the WS2-S1 ValidatePlan findings to
+// advisor-rejections.json (ADR-0052 WS2-S2). STANDALONE telemetry — decoupled
+// from the WS3-S3 decision span and from phase-plan.json — and best-effort /
+// fail-open: a capture failure WARNs but never affects the cycle. It NEVER
+// mutates the plan; the integrity floor (ClampPlanToFloorWith) remains the sole
+// disposer. An empty finding set still writes ("[]" = validated-clean, distinct
+// from "validation never ran"); nil ⇒ [] so the artifact is always well-formed.
+// The artifact is hash-bound into the ledger like every sibling decision
+// artifact (recordPhasePlan / recordRoutingDecision), so a post-hoc mutation is
+// tamper-evident — "standalone" means a separate file, not outside the chain.
+func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection) {
+	if cs.WorkspacePath == "" {
+		return
+	}
+	if rejections == nil {
+		rejections = []router.PlanRejection{}
+	}
+	buf, err := json.MarshalIndent(rejections, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections marshal (cycle %d): %v\n", cycle, err)
+		return
+	}
+	artifactPath := filepath.Join(cs.WorkspacePath, "advisor-rejections.json")
+	sha := ""
+	if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections mkdir: %v\n", err)
+		artifactPath = ""
+	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections write: %v\n", err)
+		artifactPath = ""
+	} else {
+		sum := sha256.Sum256(buf)
+		sha = hex.EncodeToString(sum[:])
+	}
+	if err := o.ledger.Append(ctx, LedgerEntry{
+		TS: o.now().UTC().Format(time.RFC3339), Cycle: cycle, Role: "orchestrator",
+		Kind: "plan_rejections", ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN plan_rejections ledger append: %v\n", err)
+	}
+}
+
 // recordPhasePlan persists the advisor's CLAMPED whole-cycle plan to
 // <workspace>/phase-plan.json (a bare PhasePlanEntry array, symmetric with the
 // advisor's wire format) and appends a hash-bound phase_plan ledger entry. Any

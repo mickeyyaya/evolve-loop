@@ -11,9 +11,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -205,6 +207,12 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile stri
 	b.WriteString(p.identity.Persona)
 	b.WriteString("\n\n---\n# This cycle\n\n")
 	writeRoutingContext(&b, in)
+	// WS2-S0b: inject the deterministic pre-plan recon when EVOLVE_ROUTER_RECON_DIGEST
+	// is on. Off (default) ⇒ no gather, no render ⇒ byte-identical prompt. The gather
+	// fails open, so even on, a degraded git only narrows the digest.
+	if in.Cfg.ReconDigest {
+		router.RenderReconDigest(&b, gatherPreplanRecon(in))
+	}
 	writeCatalog(&b, in.Catalog)
 	// Instruct the ABSOLUTE artifact path — the same path advisorLaunch tells the
 	// bridge to watch (filepath.Join(in.Workspace, artifactFile)). A relative path
@@ -948,4 +956,50 @@ func benchedCLIsForRouting(projectRoot string) []router.BenchedCLI {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Family < out[j].Family })
 	return out
+}
+
+// recentChangeCommits bounds the git-log window the pre-plan recon scans for
+// changed files (churn signal). Small + fixed ⇒ cheap and deterministic.
+const recentChangeCommits = "30"
+
+// reconGitTimeout bounds the recon's git subprocess so a hung/huge repo can never
+// stall plan composition — the recon is advisory and fails open, so a timeout
+// just yields no file facts (same as any other git error).
+const reconGitTimeout = 5 * time.Second
+
+// gatherPreplanRecon collects the deterministic pre-plan recon (ADR-0052
+// WS2-S0b) for the whole-cycle plan. The I/O lives HERE (core, the I/O layer),
+// reusing the gitexec seam — never re-rolling git invocation — and FAILS OPEN:
+// a git error yields no changed files, so router.BuildReconDigest simply omits
+// the file-derived facts. The backlog/carryover/goal facts come from the
+// already-threaded RouteInput, so they survive even a git-less environment.
+func gatherPreplanRecon(in router.RouteInput) router.ReconDigest {
+	return router.BuildReconDigest(
+		recentlyChangedFiles(in.ProjectRoot),
+		in.GoalText,
+		in.Signals.Scout.BacklogSize,
+		len(in.CarryoverTodos),
+	)
+}
+
+// recentlyChangedFiles returns the files touched across the last
+// recentChangeCommits commits (duplicates kept — frequency = churn), or nil on
+// any error / empty root (fail-open). One git call; reuses gitexec.
+func recentlyChangedFiles(projectRoot string) []string {
+	if projectRoot == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), reconGitTimeout)
+	defer cancel()
+	out, err := gitexec.Default(projectRoot).Output(ctx, "log", "-n", recentChangeCommits, "--name-only", "--pretty=format:")
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			files = append(files, line)
+		}
+	}
+	return files
 }

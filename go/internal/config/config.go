@@ -262,6 +262,16 @@ type RoutingConfig struct {
 	// Composition-root view set by applyEnv; the scoring call site reads it. A
 	// typo/unknown value falls back to false (fail-safe — never silently enables).
 	RoutingJudge bool
+	// ReconDigest is the ADR-0052 advisor-maximization WS2-S0b toggle for the
+	// deterministic pre-plan recon digest (EVOLVE_ROUTER_RECON_DIGEST). false
+	// (DEFAULT) — the initial Plan prompt is byte-identical to pre-slice. true —
+	// the advisor renders measured repo facts (langs/tests/hotspots, goal-keyword
+	// hits, backlog/carryover) under "## Pre-plan recon (deterministic)" so
+	// upfront selection is grounded in evidence, not goal-text inference alone.
+	// A plain bool (not a Stage): it injects deterministic facts the floor still
+	// clamps, so there is no shadow/advisory distinction. Composition-root view
+	// set by applyEnv; composePlanPrompt reads it. Typo/unknown → false (fail-safe).
+	ReconDigest bool
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -564,6 +574,22 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		default:
 			*ws = append(*ws, Warning{"unknown-value",
 				fmt.Sprintf("EVOLVE_ROUTING_JUDGE=%q unknown (want on|off), defaulting to off", v)})
+		}
+	}
+	if v := env["EVOLVE_ROUTER_RECON_DIGEST"]; v != "" {
+		// ADR-0052 advisor-maximization WS2-S0b — the deterministic pre-plan recon
+		// toggle. Simple off/on bool (NOT a Stage: it injects deterministic facts
+		// the floor still clamps, so off/shadow/advisory are indistinguishable). A
+		// typo falls back to off (fail-safe — byte-identical default). Read by
+		// composePlanPrompt to gate rendering the recon section.
+		switch strings.TrimSpace(v) {
+		case "1", "on":
+			cfg.ReconDigest = true
+		case "0", "off":
+			cfg.ReconDigest = false
+		default:
+			*ws = append(*ws, Warning{"unknown-value",
+				fmt.Sprintf("EVOLVE_ROUTER_RECON_DIGEST=%q unknown (want on|off), defaulting to off", v)})
 		}
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
