@@ -246,6 +246,13 @@ type RoutingConfig struct {
 	// decision. Empty ⇒ the deprecated enable-chain behavior
 	// (EVOLVE_DISABLE_AUTO_RETROSPECTIVE) stands for one more release.
 	AuditFailRoutesTo string
+	// GoalRecipes is the ADR-0052 WS5 recipe SSOT (config.goal_recipes in the
+	// registry): goal type → ordered, verbatim recipe-token list. It is the
+	// single source projected into the persona's "## Goal-Type Recipes" table
+	// (via router.RenderRecipeProjection, locked by TestRouterPersonaRecipeTable_NoDrift)
+	// and read by the RecipeVerifier — ending the prior three-source recipe drift.
+	// Registry-sourced only; nil when no registry supplies it (projection renders empty).
+	GoalRecipes map[string][]string
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -302,11 +309,12 @@ var legacyFlags = map[string]legacyFlag{
 // registryDoc is the subset of phase-registry.json this loader reads.
 type registryDoc struct {
 	Config struct {
-		DynamicRouting        string            `json:"dynamic_routing"`
-		RoutingMode           string            `json:"routing_mode"`
-		MandatoryPhases       []string          `json:"mandatory_phases"`
-		ConditionalMandatory  map[string]string `json:"conditional_mandatory"`
-		MaxOptionalInsertions *int              `json:"max_optional_insertions"`
+		DynamicRouting        string              `json:"dynamic_routing"`
+		RoutingMode           string              `json:"routing_mode"`
+		MandatoryPhases       []string            `json:"mandatory_phases"`
+		ConditionalMandatory  map[string]string   `json:"conditional_mandatory"`
+		MaxOptionalInsertions *int                `json:"max_optional_insertions"`
+		GoalRecipes           map[string][]string `json:"goal_recipes"`
 	} `json:"config"`
 	Phases []struct {
 		Name     string        `json:"name"`
@@ -448,6 +456,9 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	}
 	if c.MaxOptionalInsertions != nil {
 		cfg.MaxInsertions = *c.MaxOptionalInsertions
+	}
+	if len(c.GoalRecipes) > 0 {
+		cfg.GoalRecipes = c.GoalRecipes
 	}
 	for phase, expr := range c.ConditionalMandatory {
 		if rule, err := parseCondRule(expr); err == nil {

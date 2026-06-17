@@ -50,33 +50,35 @@ The advisor classifies the cycle goal (classify-then-route) and composes from th
 
 | Goal type | Recipe (optional insertions around the mandatory spine) |
 |---|---|
-| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → error-handling-scan → coverage-gate → flake-rerun-scan |
-| feature | premise-challenge → spec-verify → api-contract-design → [tdd, build] → test-amplification → coverage-gate → secret-leak-scan |
-| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → type-safety-audit → mutation-gate → coverage-gate → cleanup-sweep |
-| security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
-| performance | benchmark baseline capture → [build] → benchmark-gate |
-| release | rollout-plan → rollback-plan → changelog-sync → [ship] → post-ship-monitor |
-| docs / trivial | spine only (no insertions) |
-| concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
-| api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
-| data-migration | rollback-plan → [tdd, build] → migration-safety-check → coverage-gate |
-| observability | observability-design → [build] → telemetry-coverage-check → adversarial-review |
-| supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
-| agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
+<!-- GENERATED:goal-recipes BEGIN (ADR-0052 WS5 — projected from phase-registry.json:config.goal_recipes via router.RenderRecipeProjection; do not hand-edit) -->
 | accessibility | scope-baseline → [build] → accessibility-audit → adversarial-review |
+| accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
+| agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
+| api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
+| bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → error-handling-scan → coverage-gate → flake-rerun-scan |
+| business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
+| caching | caching-strategy-design → [build] → cache-strategy-scan |
+| concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
+| data-migration | rollback-plan → [tdd, build] → migration-safety-check → coverage-gate |
+| data-pipeline | scope-baseline → [build] → data-integrity-check → migration-safety-check |
+| database | data-model-design → [tdd, build] → query-performance-scan → migration-safety-check |
+| docs / trivial | spine only (no insertions) |
+| feature | premise-challenge → spec-verify → api-contract-design → [tdd, build] → test-amplification → coverage-gate → secret-leak-scan |
 | frontend-ui | prd-draft → [build] → frontend-design-review → accessibility-audit |
 | i18n | scope-baseline → [build] → locale-format-check |
-| database | data-model-design → [tdd, build] → query-performance-scan → migration-safety-check |
-| caching | caching-strategy-design → [build] → cache-strategy-scan |
-| resilience | resilience-design → [tdd, build] → resilience-gap-scan → flake-rerun-scan |
-| messaging | [tdd, build] → idempotency-check → contract-fuzz-probe |
 | infrastructure | [build] → container-hardening-scan → cicd-pipeline-audit → secret-leak-scan |
-| data-pipeline | scope-baseline → [build] → data-integrity-check → migration-safety-check |
-| project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
-| business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
-| accounting-close | account-reconcile → variance-analysis → close-checklist → [build] |
-| product-discovery | opportunity-map → prd-draft → metric-tree → [build] |
+| messaging | [tdd, build] → idempotency-check → contract-fuzz-probe |
+| observability | observability-design → [build] → telemetry-coverage-check → adversarial-review |
 | ops-incident | incident-postmortem → runbook-draft → capacity-plan → [build] |
+| performance | benchmark baseline capture → [build] → benchmark-gate |
+| product-discovery | opportunity-map → prd-draft → metric-tree → [build] |
+| project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
+| refactor | smell-scan → behavior-baseline → [build] → behavior-compare → type-safety-audit → mutation-gate → coverage-gate → cleanup-sweep |
+| release | rollout-plan → rollback-plan → changelog-sync → [ship] → post-ship-monitor |
+| resilience | resilience-design → [tdd, build] → resilience-gap-scan → flake-rerun-scan |
+| security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
+| supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
+<!-- GENERATED:goal-recipes END -->
 
 Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 

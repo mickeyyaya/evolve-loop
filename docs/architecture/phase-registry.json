@@ -7,7 +7,37 @@
     "routing_mode": "llm",
     "mandatory_phases": ["scout", "triage", "build", "audit", "ship"],
     "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
-    "max_optional_insertions": 6
+    "max_optional_insertions": 6,
+    "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type → optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' → '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source — ending three-source recipe drift.",
+    "goal_recipes": {
+      "bugfix": ["premise-challenge", "fault-localization", "bug-reproduction", "[tdd, build]", "error-handling-scan", "coverage-gate", "flake-rerun-scan"],
+      "feature": ["premise-challenge", "spec-verify", "api-contract-design", "[tdd, build]", "test-amplification", "coverage-gate", "secret-leak-scan"],
+      "refactor": ["smell-scan", "behavior-baseline", "[build]", "behavior-compare", "type-safety-audit", "mutation-gate", "coverage-gate", "cleanup-sweep"],
+      "security": ["threat-model", "[tdd, build]", "security-scan + dependency-audit", "authz-gap-scan", "secret-leak-scan", "fuzz-probe"],
+      "performance": ["benchmark baseline capture", "[build]", "benchmark-gate"],
+      "release": ["rollout-plan", "rollback-plan", "changelog-sync", "[ship]", "post-ship-monitor"],
+      "docs / trivial": ["spine only (no insertions)"],
+      "concurrency": ["[tdd, build]", "race-condition-scan", "flake-rerun-scan", "adversarial-review"],
+      "api-design": ["api-contract-design", "[tdd, build]", "compat-surface-check", "contract-fuzz-probe"],
+      "data-migration": ["rollback-plan", "[tdd, build]", "migration-safety-check", "coverage-gate"],
+      "observability": ["observability-design", "[build]", "telemetry-coverage-check", "adversarial-review"],
+      "supply-chain": ["[build]", "dependency-audit", "license-provenance-audit", "secret-leak-scan"],
+      "agent-instruction": ["premise-challenge", "[build]", "prompt-regression-eval", "adversarial-review"],
+      "accessibility": ["scope-baseline", "[build]", "accessibility-audit", "adversarial-review"],
+      "frontend-ui": ["prd-draft", "[build]", "frontend-design-review", "accessibility-audit"],
+      "i18n": ["scope-baseline", "[build]", "locale-format-check"],
+      "database": ["data-model-design", "[tdd, build]", "query-performance-scan", "migration-safety-check"],
+      "caching": ["caching-strategy-design", "[build]", "cache-strategy-scan"],
+      "resilience": ["resilience-design", "[tdd, build]", "resilience-gap-scan", "flake-rerun-scan"],
+      "messaging": ["[tdd, build]", "idempotency-check", "contract-fuzz-probe"],
+      "infrastructure": ["[build]", "container-hardening-scan", "cicd-pipeline-audit", "secret-leak-scan"],
+      "data-pipeline": ["scope-baseline", "[build]", "data-integrity-check", "migration-safety-check"],
+      "project-management": ["risk-register", "scope-baseline", "dependency-map", "[build = the planning deliverable]"],
+      "business-strategy": ["forces-analysis", "market-sizing", "okr-draft", "[build]"],
+      "accounting-close": ["account-reconcile", "variance-analysis", "close-checklist", "[build]"],
+      "product-discovery": ["opportunity-map", "prd-draft", "metric-tree", "[build]"],
+      "ops-incident": ["incident-postmortem", "runbook-draft", "capacity-plan", "[build]"]
+    }
   },
   "phases": [
     {
