@@ -48,6 +48,10 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		defer func() { _ = os.RemoveAll(tmp) }()
 		cfg.Workspace = tmp
 	}
+	// I1: a boot-smoke probe has no worktree; run it in a scratch dir under its
+	// Workspace, never the live checkout (an empty Worktree would else fall back
+	// to os.Getwd() in runTmuxREPL).
+	applyScratchCwd(cfg)
 	deps = deps.withDefaults()
 	// Dead-shell guard is armed by the real driver constructor (guardDeadShell),
 	// so smoke boots get the same cycle-274 rejection a phase launch gets.

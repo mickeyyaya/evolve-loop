@@ -27,6 +27,11 @@ const modelPickerPollTicks = 6
 // accidentally confirmed. The final keystroke is always Esc.
 func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string) (pane string, err error) {
 	deps = deps.withDefaults()
+	// I1 NOTE: the model-query probe is intentionally NOT scratch-cwd'd here. Its
+	// Workspace can resolve to the live checkout (liveRefresh falls back to
+	// os.Getwd() when unset, cmd_models_live.go:88), so a scratch dir would land
+	// IN main. The correct fix is to give that path a temp Workspace first; until
+	// then it keeps the recipe os.Getwd() fallback (pre-existing, no regression).
 	drv, _, derr := newRecipeDriver(cfg, deps, cli)
 	if derr != nil {
 		return "", derr

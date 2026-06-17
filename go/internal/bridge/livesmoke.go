@@ -48,6 +48,9 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		defer func() { _ = os.RemoveAll(tmp) }()
 		cfg.Workspace = tmp
 	}
+	// I1: a health-canary probe has no worktree; run it in a scratch dir under
+	// its Workspace, never the live checkout (avoids the os.Getwd() fallback).
+	applyScratchCwd(cfg)
 	cfg.Artifact = filepath.Join(cfg.Workspace, LiveSmokeArtifact)
 	if cfg.PromptFile == "" {
 		prompt := fmt.Sprintf("Health probe. Write the single word OK to %s and do nothing else.\n", cfg.Artifact)
