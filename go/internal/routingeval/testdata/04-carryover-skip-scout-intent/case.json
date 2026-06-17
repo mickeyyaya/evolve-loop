@@ -1,0 +1,7 @@
+{
+  "intent_required": true,
+  "tdd_pinned": false,
+  "expect_run_set": ["audit", "build", "intent", "ship"],
+  "expect_clamps": ["require-intent"],
+  "forbidden_phases": ["scout", "tdd"]
+}

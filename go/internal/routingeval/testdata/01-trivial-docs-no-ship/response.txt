@@ -1,0 +1,1 @@
+[{"phase":"scout","run":true,"justification":"survey the docs change"},{"phase":"build","run":false,"justification":"docs-only edit, no source build"},{"phase":"tdd","run":false,"justification":"trivial docs change, no tests"},{"phase":"audit","run":false},{"phase":"ship","run":false,"justification":"investigation/convergence cycle, end after scout"}]

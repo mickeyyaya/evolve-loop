@@ -1,0 +1,1 @@
+[{"phase":"scout","run":true,"justification":"locate the failing path"},{"phase":"bug-reproduction","run":true,"justification":"write a failing reproduction before fixing"},{"phase":"tdd","run":true,"justification":"RED test for the bug"},{"phase":"build","run":true,"justification":"implement the fix"},{"phase":"ship","run":true,"justification":"ship the verified fix"}]

@@ -167,6 +167,7 @@
 ./internal/phasespec
 ./internal/prompts
 ./internal/rollback
+./internal/routingeval
 ./internal/routingtest
 ./internal/skillinventory
 

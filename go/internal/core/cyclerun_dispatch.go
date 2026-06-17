@@ -184,7 +184,6 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					} else if ok {
 						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
 						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
-						err = nil
 						if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 							TS:       cr.o.now().UTC().Format(time.RFC3339),
 							Cycle:    cr.cycle,
@@ -217,7 +216,6 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 						fmt.Fprintf(os.Stderr, "[orchestrator] WARN optional_infra_skip ledger append: %v\n", lerr)
 					}
 					resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
-					err = nil
 					break
 				}
 				// Ship-error recovery seam (Component #7): ship is a pure

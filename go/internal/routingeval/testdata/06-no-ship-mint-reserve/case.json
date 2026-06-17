@@ -1,0 +1,6 @@
+{
+  "intent_required": false,
+  "expect_run_set": ["scout"],
+  "expect_clamps": [],
+  "forbidden_phases": ["build", "tdd", "audit", "ship", "intent", "dependency-graph-audit"]
+}

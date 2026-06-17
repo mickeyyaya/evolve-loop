@@ -66,6 +66,7 @@ var commands = []subcommand{
 	{Name: "detect-cli", Summary: "Identify driving AI CLI", Run: runDetectCLI},
 	{Name: "detect-nested-claude", Summary: "Detect nested claude -p", Run: runDetectNested},
 	{Name: "phase-order", Summary: "List phases from registry", Run: runPhaseOrder},
+	{Name: "routing", Summary: "Explain a recorded routing decision (read-only)", Run: runRouting},
 	{Name: "estimate-quota-reset", Summary: "Predict quota reset timestamp", Run: runQuotaReset},
 	{Name: "build-invocation-context", Summary: "Emit subagent bedrock prefix", Run: runBedrock},
 	{Name: "resolve-llm", Summary: "Route phase role → cli + model", Run: runResolveLLM},

@@ -40,6 +40,7 @@ Dispatch helpers (Phase 3a + 3b ports):
   detect-cli                Identify which AI CLI is driving the skill
   detect-nested-claude      Detect nested claude -p execution
   phase-order               List phases from phase-registry.json
+  routing                   Explain/replay a recorded routing decision (read-only)
   estimate-quota-reset      Predict next quota reset timestamp
   build-invocation-context  Emit subagent bedrock prefix for a role
   resolve-llm               Route phase role → cli + model JSON

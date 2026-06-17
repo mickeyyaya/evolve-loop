@@ -1,0 +1,8 @@
+Here is my whole-cycle plan for this large refactor (noisy scrollback on purpose
+so the corpus exercises lastBalancedSpan's prose/fence tolerance):
+
+```json
+[{"phase":"scout","run":true,"justification":"survey the large refactor surface"},{"phase":"plan-review","run":true,"justification":"large diff: gate the approach before building"},{"phase":"tdd","run":true,"justification":"RED tests for the refactor"},{"phase":"build","run":true,"justification":"execute the refactor"},{"phase":"audit","run":true,"justification":"adversarial audit of the large diff"},{"phase":"ship","run":true,"justification":"ship after green audit"}]
+```
+
+That covers the full chain plus an up-front review gate. Done.

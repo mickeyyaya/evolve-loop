@@ -273,6 +273,40 @@ func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleS
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_plan ledger append: %v\n", err)
 	}
+
+	// WS3-S2: hash-bind the WS3-S1 capture artifacts so a post-hoc mutation of
+	// the persisted routing prompt/response is detectable (the ledger's hash
+	// chain carries the tamper-evidence). One bound entry per artifact, reusing
+	// the ArtifactPath+ArtifactSHA256 shape. Fail-open: a capture that never
+	// landed (WS3-S1 is best-effort, or a pre-WS3 cycle) binds nothing.
+	for _, cap := range []struct{ kind, file string }{
+		{"advisor_prompt", "advisor-prompt-plan.txt"},
+		{"advisor_response", "advisor-response-plan.txt"},
+	} {
+		path := filepath.Join(cs.WorkspacePath, cap.file)
+		capSHA := bindArtifactSHA(path)
+		if capSHA == "" {
+			continue // capture absent — nothing to bind
+		}
+		if err := o.ledger.Append(ctx, LedgerEntry{
+			TS: ts, Cycle: cycle, Role: "orchestrator", Kind: cap.kind,
+			ExitCode: 0, ArtifactPath: path, ArtifactSHA256: capSHA,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", cap.kind, err)
+		}
+	}
+}
+
+// bindArtifactSHA returns the hex sha256 of the file at path, or "" if it is
+// absent/unreadable. WS3-S1 capture is best-effort, so a missing artifact is
+// expected and binds nothing — never an error that could abort a cycle.
+func bindArtifactSHA(path string) string {
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(buf)
+	return hex.EncodeToString(sum[:])
 }
 
 // enforceNext maps the router's proposed NextPhase back to a core.Phase and
