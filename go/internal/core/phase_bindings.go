@@ -319,15 +319,30 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 	fmt.Fprintf(os.Stderr, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
 }
 
-// normalizeBuildWorktree runs the cycle-156 build-commit normalize at the
-// PhaseBuild boundary, shared by RunCycle and RunCycleFromPhase (resume).
-// No-op unless the just-completed phase is PhaseBuild with an active
-// worktree; the base comes from the persisted CycleState.WorktreeBaseSHA.
+// normalizeBuildWorktree applies two post-phase normalizations to the active
+// worktree, shared by RunCycle and RunCycleFromPhase (resume). The whole
+// function is a no-op when there is no active worktree.
+//
+//  1. Build-commit soft-reset (cycle-156): runs ONLY after PhaseBuild —
+//     re-exposes a committing builder's work as pending for audit's
+//     `git diff HEAD`. Base comes from the persisted CycleState.WorktreeBaseSHA.
+//  2. gofmt -s normalize (cycle-352): runs after EVERY worktree phase, because
+//     tdd, build, AND test-amplification all author .go that the audit gofmt
+//     gate scans. Cheap no-op when the worktree is already clean.
 func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Phase, cs CycleState) {
-	if completed != PhaseBuild || cs.ActiveWorktree == "" {
+	if cs.ActiveWorktree == "" {
 		return
 	}
-	normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
+	// The build-commit soft-reset (cycle-156) is build-ONLY: it re-exposes a
+	// committing builder's work as pending for audit's `git diff HEAD`.
+	if completed == PhaseBuild {
+		normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
+	}
+	// The gofmt -s normalize runs after EVERY worktree phase, not just build:
+	// tdd, build, AND test-amplification all author .go, and the audit gofmt
+	// gate scans the whole worktree. Cycle 352: test-amplification left
+	// modeltier_amp_test.go dirty AFTER the build-only normalize, re-failing the
+	// gate. Cheap no-op when the worktree is already clean.
 	normalizeBuildGofmt(cs.ActiveWorktree)
 }
 

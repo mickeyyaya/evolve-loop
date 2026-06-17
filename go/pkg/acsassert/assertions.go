@@ -68,6 +68,30 @@ func FileContains(tb TB, path, substring string) bool {
 	return true
 }
 
+// FileNotContains is the correct primitive for an ABSENCE assertion (e.g. "a
+// removed flag no longer appears in this source file"). It returns true and
+// logs nothing when the substring is absent, and logs an Errorf + returns false
+// when the substring is PRESENT (or the file cannot be read).
+//
+// Use this instead of inverting FileContains. FileContains is a POSITIVE
+// assertion that Errorf's "missing" when the substring is absent, so the idiom
+// `if FileContains(tb, f, flag) { tb.Errorf("present") }` red-fails on the
+// CORRECT (absent) state: the FileContains call still fires its internal Errorf
+// even though the if body is skipped (cycle-352 broken-predicate incident).
+func FileNotContains(tb TB, path, substring string) bool {
+	tb.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		tb.Errorf("FileNotContains(%q): %v", path, err)
+		return false
+	}
+	if strings.Contains(string(raw), substring) {
+		tb.Errorf("FileNotContains(%q) unexpectedly contains %q", path, substring)
+		return false
+	}
+	return true
+}
+
 // FileMatchesRegex reports whether path's contents match pattern
 // (Go's RE2 syntax). Logs an Errorf on no match or invalid pattern.
 func FileMatchesRegex(tb TB, path, pattern string) bool {

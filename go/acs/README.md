@@ -78,3 +78,14 @@ func TestCN_001_Slug(t *testing.T) {
 Place it at `go/acs/cycle<N>/predicates_test.go`; the `acssuite` Go lane picks it
 up when the cycle runs. To promote a predicate to the permanent regression set,
 move its package under `go/acs/regression/`.
+
+### Absence checks — use `FileNotContains`, never inverted `FileContains`
+
+To assert something is **absent** (e.g. a removed flag no longer appears in a
+source file), use `acsassert.FileNotContains(t, path, "X")`. Do **NOT** write
+`if acsassert.FileContains(t, path, "X") { t.Errorf(...) }`: `FileContains` is a
+*positive* assertion that fires its own `t.Errorf("missing")` when `X` is absent,
+so the inverted idiom red-fails on the **correct** (absent) state — the `if` body
+is skipped but the internal `Errorf` still fails the test (the cycle-352
+broken-predicate incident). `FileNotContains` returns true and logs nothing when
+`X` is absent, and fails only when `X` is present.

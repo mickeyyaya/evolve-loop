@@ -80,6 +80,44 @@ func TestFileContains_MissingFile(t *testing.T) {
 	}
 }
 
+// FileNotContains — the correct ABSENCE primitive (cycle-352: authors inverted
+// FileContains, which Errorf's "missing" on the absent/correct state) ----------
+func TestFileNotContains_Absent(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("uses EVOLVE_DISPATCH_POLICY only\n"), 0o644)
+	ft := &fakeT{}
+	if !FileNotContains(ft, p, "EVOLVE_DISPATCH_STOP_ON_FAIL") {
+		t.Errorf("FileNotContains reported false when the substring is absent (the correct state)")
+	}
+	if len(ft.errs) != 0 {
+		t.Errorf("absence must log nothing; errs=%v", ft.errs)
+	}
+}
+
+func TestFileNotContains_Present(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	_ = os.WriteFile(p, []byte("still references EVOLVE_DISPATCH_STOP_ON_FAIL\n"), 0o644)
+	ft := &fakeT{}
+	if FileNotContains(ft, p, "EVOLVE_DISPATCH_STOP_ON_FAIL") {
+		t.Errorf("FileNotContains reported true when the substring is present")
+	}
+	if len(ft.errs) == 0 {
+		t.Errorf("presence must log an error")
+	}
+}
+
+func TestFileNotContains_MissingFile(t *testing.T) {
+	ft := &fakeT{}
+	if FileNotContains(ft, "/no/such/path", "anything") {
+		t.Errorf("FileNotContains succeeded on a missing file (cannot verify absence)")
+	}
+	if len(ft.errs) == 0 {
+		t.Errorf("missing file must log an error")
+	}
+}
+
 // FileMatchesRegex ---------------------------------------------------
 func TestFileMatchesRegex_Hit(t *testing.T) {
 	dir := t.TempDir()
