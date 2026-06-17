@@ -20,10 +20,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -372,7 +374,19 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// (claude/opus default, or codex/gpt-5.5-high, agy/gemini, …). Composing the
 	// cycle + minting phases is deep-reasoning work, hence the opus/deep default.
 	// Select consults it only at routing_mode=llm; the kernel clamp is the floor.
-	advCLI, advModel := resolveRouterDispatch(evolveDir)
+	// The advisor's PRIMARY model is the plan/re-plan (deep) dispatch — the
+	// confidence-critical decision. WS6-S1: routed through the per-decision-type
+	// resolver so EVOLVE_ROUTER_PLAN_MODEL can override it; no-op vs the prior
+	// resolveRouterDispatch when unset. WS6-S2: if the resolved family is benched
+	// (the cli-health circuit breaker), fall back to the healthy claude family;
+	// when even that is benched the advisor keeps the benched dispatch and degrades
+	// to the static spine via its existing fail-safe (clihealth IS the breaker).
+	advCLI, advModel, advHealthy := resolveRouterDispatchHealthy(evolveDir, decisionPlan, benchedFamilies(projectRoot))
+	if !advHealthy {
+		// advCLI/advModel are the base (benched) dispatch — usable; the advisor's
+		// dispatch will fail on the benched family and degrade to the static spine.
+		fmt.Fprintf(os.Stderr, "[router] WARN router family and the claude fallback are both benched — advisor will degrade to the static spine\n")
+	}
 	var advPersona string
 	if rp, perr := prm.Agent("evolve-router"); perr == nil {
 		advPersona = rp.Body
@@ -520,6 +534,80 @@ func cycleContext(goalHash, goalText string) map[string]string {
 // overridden by the per-agent env (EVOLVE_ROUTER_CLI / EVOLVE_ROUTER_MODEL). This
 // makes the brain configurable to any LLM CLI (e.g. codex-tmux + deep→gpt-5.5).
 // Fallback is opus on claude-tmux (deep reasoning for composition/minting).
+// routerDecisionType selects which advisor decision a dispatch is resolved for
+// (ADR-0052 WS6-S1). The confidence-critical whole-cycle decisions (plan,
+// re-plan) want the DEEP tier; the lightweight off-critical-path ones (the
+// reactive propose, the route-quality judge) can use the FAST tier (D2).
+type routerDecisionType int
+
+const (
+	decisionPlan    routerDecisionType = iota // initial whole-cycle plan (deep)
+	decisionRePlan                            // post-scout re-plan (deep)
+	decisionPropose                           // reactive per-transition tweak (fast)
+	decisionJudge                             // route-quality judge (fast)
+)
+
+// resolveRouterDispatchFor resolves the (cli, model) for a SPECIFIC advisor
+// decision type (ADR-0052 WS6-S1, optional multi-model). It starts from the
+// single base dispatch (resolveRouterDispatch) and applies a per-type model
+// override: plan/replan honor EVOLVE_ROUTER_PLAN_MODEL, propose/judge honor
+// EVOLVE_ROUTER_PROPOSE_MODEL. With no override set it returns the base value for
+// EVERY type — strictly no-op, single-model — until an operator opts into
+// per-decision models (the D2 recommendation: deep for plan/replan, fast for
+// propose/judge). The CLI is unchanged across types (cross-family floor and
+// health are per-call concerns, WS6-S2); only the model tier differentiates.
+func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType) (cli, model string) {
+	cli, model = resolveRouterDispatch(evolveDir)
+	switch dt {
+	case decisionPlan, decisionRePlan:
+		if v := os.Getenv("EVOLVE_ROUTER_PLAN_MODEL"); v != "" {
+			model = v
+		}
+	case decisionPropose, decisionJudge:
+		if v := os.Getenv("EVOLVE_ROUTER_PROPOSE_MODEL"); v != "" {
+			model = v
+		}
+	}
+	return cli, model
+}
+
+// resolveRouterDispatchHealthy resolves the per-decision dispatch and, if the
+// chosen CLI's family is currently benched (the cli-health circuit breaker —
+// repeated failures bench a family), falls back to the universal claude family
+// (the no-agy-fallback rule: claude is the universal fallback). If the claude
+// fallback is ALSO benched it returns ok=false and the caller degrades to the
+// static spine — the advisor's existing fail-safe, so no separate breaker is
+// minted (clihealth IS the breaker; ADR-0052 WS6-S2). benched is the set of
+// benched family names (clihealth.Store.Active values' Family).
+func resolveRouterDispatchHealthy(evolveDir string, dt routerDecisionType, benched map[string]bool) (cli, model string, ok bool) {
+	cli, model = resolveRouterDispatchFor(evolveDir, dt)
+	if !benched[llmroute.Family(cli)] {
+		return cli, model, true // primary family healthy
+	}
+	if benched["claude"] {
+		// Primary AND the universal claude fallback are benched. Return the base
+		// (benched) dispatch with ok=false: the caller dispatches it and the
+		// advisor degrades to the static spine via its existing fail-safe. We
+		// return a USABLE dispatch (never empty strings) so a caller that ignores
+		// ok still gets a valid CLI rather than a silent misconfiguration.
+		return cli, model, false
+	}
+	return "claude-tmux", model, true // fall back to the healthy claude family
+}
+
+// benchedFamilies returns the set of CLI families currently benched by the
+// cli-health store (the circuit breaker — repeated transient failures bench a
+// family), keyed by family name. An empty/unreadable store ⇒ empty set (no
+// fallback needed). Reuses clihealth.Store (the SAME store the advisor prompt's
+// bench context reads), never a parallel breaker.
+func benchedFamilies(projectRoot string) map[string]bool {
+	out := map[string]bool{}
+	for family := range clihealth.NewStore(projectRoot, nil).Active() {
+		out[family] = true // Active() is keyed by family name
+	}
+	return out
+}
+
 func resolveRouterDispatch(evolveDir string) (cli, model string) {
 	cli, model = "claude-tmux", "opus"
 	if raw, err := os.ReadFile(filepath.Join(evolveDir, "profiles", "router.json")); err == nil {
