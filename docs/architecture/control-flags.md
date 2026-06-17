@@ -26,8 +26,8 @@
 | `EVOLVE_PLUGIN_ROOT` | ACTIVE | Read-only plugin install location |
 | `EVOLVE_CYCLE_STATE_FILE` | DEAD | Override cycle-state.json path (test seam) — no reader on any surface (2026-06-11 inventory) |
 | `EVOLVE_TESTING` | ACTIVE | Test harness mode — disables real CLI calls |
-| `EVOLVE_RESOLVE_ROOTS_LOADED` | ACTIVE | Idempotency guard for resolve-roots.sh sourcing |
-| `EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | ACTIVE | Idempotency guard for failure-classifications.sh |
+| `EVOLVE_RESOLVE_ROOTS_LOADED` | DEAD | Idempotency guard for resolve-roots.sh sourcing [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | DEAD | Idempotency guard for failure-classifications.sh [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Sandbox Cluster
 
@@ -130,12 +130,12 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_PLATFORM` | ACTIVE | Override platform detection |
-| `EVOLVE_GEMINI_CLAUDE_PATH` | ACTIVE | Gemini hybrid: claude binary path |
-| `EVOLVE_GEMINI_REQUIRE_FULL` | ACTIVE | Require Gemini full-mode (not degraded) |
-| `EVOLVE_CODEX_CLAUDE_PATH` | ACTIVE | Codex hybrid: claude binary path |
+| `EVOLVE_GEMINI_CLAUDE_PATH` | DEAD | Gemini hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_GEMINI_REQUIRE_FULL` | DEAD | Require Gemini full-mode (not degraded) [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_CODEX_CLAUDE_PATH` | DEAD | Codex hybrid: claude binary path [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_CODEX_REQUIRE_FULL` | ACTIVE | Require Codex full-mode |
-| `EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | ACTIVE | Opt-in to interactive-mode fallback |
-| `EVOLVE_FORCE_BARE` | ACTIVE | Force bare API mode (no subscription) |
+| `EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | DEAD | Opt-in to interactive-mode fallback [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_FORCE_BARE` | DEAD | Force bare API mode (no subscription) [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Worktree / Workspace
 
@@ -143,8 +143,8 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 |------|--------|---------|
 | `EVOLVE_WORKTREE_BASE` | ACTIVE | Per-cycle worktree base path |
 | `EVOLVE_SKIP_WORKTREE` | ACTIVE | Emergency hatch: skip per-cycle worktree isolation |
-| `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | ACTIVE | Dry-run worktree provisioning |
-| `EVOLVE_PROFILE_WORKTREE_AWARE` | ACTIVE | Mark profile as worktree-aware |
+| `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD | Dry-run worktree provisioning [no reader on any surface as of 2026-06-11 inventory] |
+| `EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD | Mark profile as worktree-aware [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Readiness Gate (pre-batch)
 
@@ -161,7 +161,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_STRICT_AUDIT` | ACTIVE (canonical) | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
-| `EVOLVE_STRICT_FAILURES` | DEPRECATED | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ |
+| `EVOLVE_STRICT_FAILURES` | DEAD | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_TASK_MODE` | ACTIVE | Profile tier selector (default/research/deep) |
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
 | `EVOLVE_REQUIRE_TEAM_CONTEXT` | ACTIVE | Require team context before builder |
