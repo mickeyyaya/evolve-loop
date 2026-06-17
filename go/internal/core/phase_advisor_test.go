@@ -12,10 +12,11 @@ import (
 
 // fakeBridge records the request and returns canned output.
 type fakeBridge struct {
-	stdout string
-	err    error
-	gotReq BridgeRequest
-	calls  int
+	stdout     string
+	err        error
+	durationMS int64
+	gotReq     BridgeRequest
+	calls      int
 }
 
 func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeResponse, error) {
@@ -24,7 +25,7 @@ func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespons
 	if f.err != nil {
 		return BridgeResponse{}, f.err
 	}
-	return BridgeResponse{Stdout: f.stdout, ExitCode: 0}, nil
+	return BridgeResponse{Stdout: f.stdout, ExitCode: 0, DurationMS: f.durationMS}, nil
 }
 func (f *fakeBridge) Probe(_ context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
 

@@ -2,15 +2,19 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -32,6 +36,10 @@ type PhaseAdvisor struct {
 	model   string
 	profile string // when non-empty, used verbatim; else derived from RouteInput.ProjectRoot
 	persona string // agents/evolve-router.md body; injected by the composition root (uniform with phase agents). Empty ⇒ legacy inline framing.
+	// writeArtifact persists the WS3-S1 redacted prompt/response capture.
+	// Injectable so a write failure can be exercised (the capture is fail-open);
+	// NewPhaseAdvisor defaults it to os.WriteFile.
+	writeArtifact func(path string, data []byte) error
 }
 
 // PhaseAdvisorOption customizes a PhaseAdvisor.
@@ -75,7 +83,10 @@ func WithPersona(body string) PhaseAdvisorOption {
 // composition root normally overrides both from the router profile + env so the
 // brain is configurable to any CLI/model.
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
-	p := &PhaseAdvisor{bridge: bridge, cli: "claude-tmux", model: "opus"}
+	p := &PhaseAdvisor{
+		bridge: bridge, cli: "claude-tmux", model: "opus",
+		writeArtifact: writeArtifactAtomically,
+	}
 	for _, o := range opts {
 		o(p)
 	}
@@ -84,7 +95,7 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 
 // Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
-	resp, err := p.advisorLaunch(in, "routing proposer", buildRoutingPrompt(in), "routing-proposal.json", "stdout")
+	resp, err := p.advisorLaunch(in, "routing proposer", "proposal", buildRoutingPrompt(in), "routing-proposal.json", "stdout")
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +115,7 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	// The advisor's raw plan artifact (routing-plan.json) is distinct from the
 	// orchestrator's clamped phase-plan.json (written by recordPhasePlan):
 	// keeping them separate preserves both for forensics (advisory vs disposed).
-	resp, err := p.advisorLaunch(in, "phase advisor", p.composePlanPrompt(in), "routing-plan.json", "artifact")
+	resp, err := p.advisorLaunch(in, "phase advisor", "plan", p.composePlanPrompt(in), "routing-plan.json", "artifact")
 	if err != nil {
 		return nil, err
 	}
@@ -141,14 +152,16 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput) string {
 
 // advisorLaunch is the shared wiring for Propose and Plan: it guards the
 // required fields, resolves the router profile, and launches the bridge under
-// the given completion contract.
+// the given completion contract. kind names the decision ("plan"/"proposal")
+// and is embedded in the WS3 capture filenames (advisor-{prompt,response,span}-
+// <kind>.*), so it MUST stay a confined token — isSafeArtifactKind enforces it.
 //
 // Plan uses completion="artifact" (the uniform, robust contract): the brain
 // WRITES routing-plan.json and the bridge reads it back into resp.Stdout — same
 // as every phase writes its report. Propose still uses completion="stdout"
 // (ADR-0027 REPL-idle scrollback) pending its own unification. Either way, a
 // failure returns an error and the caller degrades cleanly to the static path.
-func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artifactFile, completion string) (BridgeResponse, error) {
+func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt, artifactFile, completion string) (BridgeResponse, error) {
 	if p.bridge == nil {
 		return BridgeResponse{}, fmt.Errorf("%s: nil bridge", errPfx)
 	}
@@ -174,7 +187,95 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, prompt, artif
 	if err != nil {
 		return BridgeResponse{}, fmt.Errorf("%s: bridge launch: %w", errPfx, err)
 	}
+	// WS3-S1/S3: capture the redacted prompt+response and the decision span
+	// BEFORE the caller parses, so the decision is debuggable + replayable.
+	// Fail-open — never block the path.
+	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS)
 	return resp, nil
+}
+
+// AdvisorSpan is the OTel-GenAI decision span (ADR-0052 WS3-S3) persisted per
+// advisor call as advisor-span-<kind>.json. Field keys follow the OTel GenAI
+// semantic conventions so a collector can ingest the file directly. PromptSHA/
+// ResponseSHA bind the REDACTED capture artifacts — the same identity the
+// ledger (WS3-S2) and the replay path (WS3-S5) key off, so all three agree.
+// decision_type/replan_depth are intentionally omitted until WS1-S3/WS2-S5
+// give them varying values (asserting a fixed value would lock surface).
+type AdvisorSpan struct {
+	Model       string `json:"gen_ai.request.model"`
+	System      string `json:"gen_ai.system"`
+	PromptSHA   string `json:"prompt_sha"`
+	ResponseSHA string `json:"response_sha"`
+	DurationMS  int64  `json:"duration_ms"`
+}
+
+// captureRedacted persists the secret-redacted prompt and response plus the
+// decision span for the given decision kind (WS3-S1 + WS3-S3). Best-effort /
+// fail-open: each write's error is intentionally dropped — a forensic-capture
+// failure must never become a routing outage (the advisor would otherwise
+// degrade the whole cycle to the static path over a full disk). Only the
+// PERSISTED COPY is redacted; the live prompt the advisor reasoned over is
+// untouched. The response is redacted but not otherwise transformed, so WS3-S5
+// can reparse it to the same plan.
+func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string, durationMS int64) {
+	if p.writeArtifact == nil || workspace == "" || !isSafeArtifactKind(kind) {
+		return
+	}
+	rp := panetrust.RedactSecrets(prompt)
+	rr := panetrust.RedactSecrets(response)
+	_ = p.writeArtifact(filepath.Join(workspace, "advisor-prompt-"+kind+".txt"), []byte(rp))
+	_ = p.writeArtifact(filepath.Join(workspace, "advisor-response-"+kind+".txt"), []byte(rr))
+	if buf, err := json.Marshal(AdvisorSpan{
+		Model:       p.model,
+		System:      llmroute.Family(p.cli),
+		PromptSHA:   sha256OfString(rp),
+		ResponseSHA: sha256OfString(rr),
+		DurationMS:  durationMS,
+	}); err == nil {
+		_ = p.writeArtifact(filepath.Join(workspace, "advisor-span-"+kind+".json"), buf)
+	}
+}
+
+// sha256OfString returns the hex sha256 of s — the in-memory twin of
+// bindArtifactSHA (which reads a file), so the span's bound SHA equals the
+// ledger's bound SHA for the same redacted bytes.
+func sha256OfString(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// writeArtifactAtomically writes data via a temp file + rename, so a capture
+// artifact on disk is always either absent or COMPLETE — never a truncated
+// half-write (a crash mid-write leaves a stale .tmp, not a corrupt capture).
+// This is what keeps the ledger's disk-read SHA (WS3-S2 bindArtifactSHA) equal
+// to the span's in-memory SHA (WS3-S3 sha256OfString) for the same bytes, and
+// matches the repo's atomic-write convention. Single-writer per (workspace,
+// kind) per cycle, so the fixed .tmp suffix cannot collide.
+func writeArtifactAtomically(path string, data []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// isSafeArtifactKind constrains the <kind> token that names the capture files
+// to a confined charset, so a future caller passing an externally-derived kind
+// (e.g. "../../etc/x") can never escape the workspace via the file path. Today
+// only the literals "plan"/"proposal" flow in; this guards the class, not the
+// current trigger.
+func isSafeArtifactKind(kind string) bool {
+	if kind == "" || len(kind) > 32 {
+		return false
+	}
+	for _, r := range kind {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // buildRoutingPrompt renders the per-transition routing context into a compact,
@@ -639,6 +740,24 @@ func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig 
 		})
 	}
 	return out
+}
+
+// ReplayPlanFromResponse reparses a captured advisor response (WS3-S1's
+// advisor-response-<kind>.txt) through the SAME parse + integrity-floor clamp
+// the live planning path runs (parsePhasePlan → router.ClampPlanToFloorWith,
+// the exact pair cyclerun.go uses), and returns the clamped plan + the clamps
+// that fired. WS3-S5 replay uses it to prove a recorded response still
+// reproduces the recorded phase-plan.json; WS4 builds its golden corpus on the
+// same entry point, so a regression there is caught against the real floor —
+// not a parallel reimplementation. An unparseable response is a loud error
+// (detecting exactly that corruption is the point of replay).
+func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*router.PhasePlan, []router.Clamp, error) {
+	plan, err := parsePhasePlan(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	clamped, clamps := router.ClampPlanToFloorWith(in, plan, floor, in.IntentRequired)
+	return clamped, clamps, nil
 }
 
 // lastBalancedSpan finds the LAST top-level balanced span delimited by open/

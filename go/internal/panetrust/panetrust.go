@@ -80,6 +80,22 @@ func redactSecrets(s string) string {
 	return kvSecretRE.ReplaceAllString(s, "${1}${2}"+redactedToken)
 }
 
+// RedactSecrets is the exported entry point to the secret-redaction pass for
+// callers that persist agent-adjacent text WITHOUT the full Digest treatment.
+// The advisor (ADR-0052 WS3-S1) captures the RAW routing prompt and response
+// for forensics + deterministic replay (WS3-S5): defanging house markers or
+// truncating — what Digest does — would corrupt the replay, so capture redacts
+// secrets ONLY. It delegates to the same unexported core as Digest, so the
+// redaction policy stays single-source (the seam guard in core/seams_test.go
+// still pins the private redactSecrets by name).
+//
+// Consequence of skipping the ANSI strip Digest does: a secret an adversarial
+// agent splits with an ANSI escape (sk-<esc>...) could evade the patterns. Held
+// acceptable — the prompt is pure-Go-synthesized (no ANSI), and the captured
+// response is consumed only as forensics/replay, never re-fed to a privileged
+// decision (the floor clamp re-derives the plan from the parsed JSON).
+func RedactSecrets(s string) string { return redactSecrets(s) }
+
 // Digest returns a neutralized digest of pane text, safe by construction to
 // persist or to embed in an LLM prompt (under the caller's untrusted-content
 // framing): ANSI/OSC stripped, secrets redacted, house markers defanged,
