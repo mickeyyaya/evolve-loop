@@ -12,8 +12,14 @@ import (
 // deliberate architecture property).
 
 func TestAll_NonEmptyAndWellFormed(t *testing.T) {
-	if len(All) < 250 {
-		t.Fatalf("registry has %d flags; the 2026-06 inventory counted 271 — registry is not complete", len(All))
+	// No minimum-count floor: the registry is under intentional reduction (the
+	// flag-reduction campaign), and a count floor would block removing dead /
+	// test-only / duplicate flags. Accidental loss is caught instead by the
+	// reader-completeness guard (go/acs/regression/flagreaders), which fails if
+	// any flag READ in production Go lacks a row. Here we only require the
+	// registry be non-empty and well-formed.
+	if len(All) == 0 {
+		t.Fatal("registry is empty")
 	}
 	// A real flag name never ends in '_' and never has '__' — those shapes
 	// are grep artifacts (bash interpolations like EVOLVE_${PHASE}_MODEL and
@@ -36,6 +42,19 @@ func TestAll_NonEmptyAndWellFormed(t *testing.T) {
 		if f.Status == StatusDeprecated && f.ReplacedBy == "" && !strings.Contains(f.Doc, "remov") {
 			// Deprecated flags should say what replaces them or when they go.
 			t.Logf("note: deprecated %s has no ReplacedBy and no removal note", f.Name)
+		}
+		// Classification-quality invariant (replaces the count floor): an active
+		// operator flag must be documented — non-empty Cluster + Doc, and never
+		// the internal "classify when touched" placeholder. This keeps the
+		// internal-classification wave honest (a promoted flag must gain a real
+		// Doc/Cluster, not just flip status).
+		if f.Status == StatusActive {
+			if f.Cluster == "" || f.Doc == "" {
+				t.Errorf("active flag %s must have a non-empty Cluster and Doc", f.Name)
+			}
+			if strings.Contains(f.Doc, "classify when touched") {
+				t.Errorf("active flag %s still carries the internal 'classify when touched' placeholder Doc", f.Name)
+			}
 		}
 	}
 }
