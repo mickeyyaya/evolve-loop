@@ -3,6 +3,7 @@ package gitexec_test
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -146,6 +147,35 @@ func TestPorcelainPath_RenameAndPlain(t *testing.T) {
 		}
 		if got := gitexec.PorcelainOldPath(c.line); got != c.old {
 			t.Errorf("PorcelainOldPath(%q) = %q, want %q", c.line, got, c.old)
+		}
+	}
+}
+
+func TestWorktreeToken_StableAndDistinct(t *testing.T) {
+	// Cycle worktree BRANCH names embed this token so concurrent `evolve loop`
+	// runs in sibling worktrees of ONE repo (which share a single branch
+	// namespace) never collide on `cycle-<N>` — the collision that silently
+	// dropped a run's phases into the main tree and failed the cycle.
+	a := gitexec.WorktreeToken("/Users/x/ai/evolve-loop-campaign")
+	b := gitexec.WorktreeToken("/Users/x/ai/evolve-loop-dossier")
+	if a == "" || b == "" {
+		t.Fatalf("token must be non-empty: a=%q b=%q", a, b)
+	}
+	if a == b {
+		t.Fatalf("distinct roots must yield distinct tokens; both = %q (would collide)", a)
+	}
+	// Stable across calls: a resumed loop (same root) must reuse the SAME branch.
+	if again := gitexec.WorktreeToken("/Users/x/ai/evolve-loop-campaign"); again != a {
+		t.Fatalf("token not stable for one root: %q then %q", a, again)
+	}
+	// A trailing-slash / uncleaned variant of the SAME dir tokenizes identically.
+	if got := gitexec.WorktreeToken("/Users/x/ai/evolve-loop-campaign/"); got != a {
+		t.Fatalf("uncleaned variant token = %q, want %q (same dir)", got, a)
+	}
+	// Branch-safe: it embeds directly in a git ref, so no separators/whitespace.
+	for _, tok := range []string{a, b} {
+		if strings.ContainsAny(tok, "/ \t\n~^:?*[\\") {
+			t.Errorf("token %q must be a valid git-ref fragment", tok)
 		}
 	}
 }

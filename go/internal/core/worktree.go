@@ -51,7 +51,16 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
 	}
-	wt := filepath.Join(base, "cycle-"+strconv.Itoa(cycle))
+	// The cycle worktree's directory AND branch both embed WorktreeToken(projectRoot)
+	// (NOT a bare "cycle-<N>"). Both a git branch name and a shared
+	// EVOLVE_WORKTREE_BASE directory are GLOBAL across one object store, so two
+	// concurrent `evolve loop` runs in sibling worktrees of the same repo would
+	// otherwise collide on the "cycle-<N>" branch (and, under a shared base, the
+	// "cycle-<N>" path) — every run but the first failing to provision and silently
+	// falling back to the main tree. The token is a stable function of the root, so
+	// a resumed cycle reuses the same directory + branch. Matches swarm's provisioner.
+	name := "cycle-" + gitexec.WorktreeToken(projectRoot) + "-" + strconv.Itoa(cycle)
+	wt := filepath.Join(base, name)
 	// Idempotent reuse across resume/retry — but only if it is still a VALID
 	// git worktree. A pruned ref can leave a stale directory os.Stat sees but
 	// git rejects; reusing it would make every commit inside fail. Verify, and
@@ -67,9 +76,10 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	}
 	// Named branch (NOT --detach): worktree-aware ship resolves the cycle branch
 	// via `git symbolic-ref --short HEAD` and ff-merges it to main — a detached
-	// HEAD yields an empty branch and ship fails. -B creates or resets cycle-<N>
-	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle.
-	branch := "cycle-" + strconv.Itoa(cycle)
+	// HEAD yields an empty branch and ship fails. -B creates or resets the branch
+	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle. The
+	// branch equals the token-namespaced directory name computed above.
+	branch := name
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, "HEAD")
 	if err != nil || code != 0 {
 		return "", fmt.Errorf("git worktree add -B %s %s: rc=%d err=%v: %s", branch, wt, code, err, stderr)

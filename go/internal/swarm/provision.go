@@ -33,9 +33,11 @@ type WorkerProvisioner interface {
 // idempotent + concurrency-safe) and uses NAMED branches (not --detach) so the
 // merge-train and ship can resolve them via `git symbolic-ref --short HEAD`.
 //
-// Branch/worktree naming:
-//   - integration: branch cycle-<N>-integration, worktree <base>/cycle-<N>-integration
-//   - worker:      branch cycle-<N>-<workerID>,  worktree <base>/cycle-<N>-<workerID>
+// Branch/worktree naming (token = gitexec.WorktreeToken(projectRoot), so
+// concurrent runs in sibling worktrees of one repo never collide on a global
+// branch name or a shared-base directory path):
+//   - integration: branch+worktree cycle-<token>-<N>-integration
+//   - worker:      branch+worktree cycle-<token>-<N>-<workerID>
 //
 // base = EVOLVE_WORKTREE_BASE or <root>/.evolve/worktrees (same as core).
 type gitWorkerProvisioner struct {
@@ -91,7 +93,10 @@ func worktreeBase(projectRoot string) (string, error) {
 }
 
 func (g gitWorkerProvisioner) CreateIntegration(ctx context.Context, projectRoot string, cycle int) (string, error) {
-	branch := fmt.Sprintf("cycle-%d-integration", cycle)
+	// Token-prefixed: git worktree branch names are global to one object store, so
+	// concurrent loops in sibling worktrees of the same repo must not share a
+	// "cycle-<N>-integration" branch (see gitexec.WorktreeToken).
+	branch := fmt.Sprintf("cycle-%s-%d-integration", gitexec.WorktreeToken(projectRoot), cycle)
 	return g.addWorktree(ctx, projectRoot, branch, "HEAD")
 }
 
@@ -100,7 +105,9 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 	if base == "" {
 		base = "HEAD"
 	}
-	branch := fmt.Sprintf("cycle-%d-%s", cycle, workerID)
+	// Token-prefixed for the same reason as CreateIntegration: the (root, cycle,
+	// worker) triple must be globally unique across concurrent sibling runs.
+	branch := fmt.Sprintf("cycle-%s-%d-%s", gitexec.WorktreeToken(projectRoot), cycle, workerID)
 	return g.addWorktree(ctx, projectRoot, branch, base)
 }
 
