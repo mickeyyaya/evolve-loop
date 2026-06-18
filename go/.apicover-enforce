@@ -260,3 +260,7 @@
 # leaves; retires the duplicated minting sites. Every export named/exercised by
 # runscope_test.go (table-driven projections + back-compat token pin).
 ./internal/runscope
+
+# Concurrent evolve-loop Layer-2 Slice 3 (2026-06-18): registry-scoped orphan
+# reaping is gated by fresh per-run leases so a dead run cannot reap live peers.
+./internal/sessionreaper

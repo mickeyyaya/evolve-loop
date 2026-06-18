@@ -1,20 +1,20 @@
 package looppreflight
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // minFreeDiskBytes is the low-disk warning threshold (500 MiB). Below this the
 // bridge's per-cycle worktrees + scrollback logs risk an ENOSPC mid-cycle.
 const minFreeDiskBytes uint64 = 500 << 20
-
-// stalePrefix is the tmux session-name prefix the bridge uses; leftover
-// sessions from a SIGKILL'd cycle cause the resource contention that helped
-// trigger the cycle-258 ExitREPLBootTimeout.
-const stalePrefix = "evolve-bridge-"
 
 // checkPipelineStructure (Halt) verifies the loop's static wiring is intact:
 //   - every spine phase has BOTH a registered factory and a deliverable contract
@@ -117,9 +117,9 @@ func checkLLMCLIStatus(o resolved) CheckResult {
 // checkHostCapabilities verifies the host can host the bridge. Halts: tmux
 // absent, or .evolve/ (and .evolve/runs/) not writable — the bridge cannot run
 // at all without these. Warns (degraded but runnable): profiles request
-// sandboxing the host won't provide, free disk below the threshold, or stale
-// evolve-bridge-* tmux sessions linger (the contention that contributed to
-// cycle-258). All accumulate; a halt outranks warnings in the verdict.
+// sandboxing the host won't provide, free disk below the threshold, or the
+// registry-backed orphan sweep cannot safely inspect a run. All accumulate; a
+// halt outranks warnings in the verdict.
 func checkHostCapabilities(o resolved) CheckResult {
 	const name = "host-capabilities"
 	var halts, warns []string
@@ -149,17 +149,12 @@ func checkHostCapabilities(o resolved) CheckResult {
 			free>>20, minFreeDiskBytes>>20, o.evolveDir))
 	}
 
-	if sessions, err := o.tmuxSessions(); err == nil {
-		var stale []string
-		for _, s := range sessions {
-			if strings.HasPrefix(s, stalePrefix) {
-				stale = append(stale, s)
-			}
-		}
-		if len(stale) > 0 {
-			warns = append(warns, fmt.Sprintf("%d stale bridge tmux session(s) (contention risk): %s",
-				len(stale), strings.Join(stale, ", ")))
-		}
+	if _, err := sessionreaper.ReapOrphans(context.Background(), o.evolveDir, sessionreaper.Options{
+		Now:      o.now,
+		LeaseTTL: runlease.DefaultTTL,
+		Kill:     swarm.ExecTmuxKill,
+	}); err != nil {
+		warns = append(warns, fmt.Sprintf("orphan session reap failed: %v", err))
 	}
 
 	switch {
@@ -182,7 +177,7 @@ func checkHostCapabilities(o resolved) CheckResult {
 			Detail:  strings.Join(warns, "\n"),
 		}
 	default:
-		return CheckResult{Name: name, Level: LevelPass, Message: "tmux present; .evolve writable; disk + sessions healthy"}
+		return CheckResult{Name: name, Level: LevelPass, Message: "tmux present; .evolve writable; disk + orphan reaping healthy"}
 	}
 }
 
