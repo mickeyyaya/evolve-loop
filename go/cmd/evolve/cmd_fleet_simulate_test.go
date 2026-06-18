@@ -25,11 +25,11 @@ func TestSimulatePhases_CoversCanonicalOrder(t *testing.T) {
 
 // TestCycleRunArgs_Simulate threads -simulate through to each fleet cycle.
 func TestCycleRunArgs_Simulate(t *testing.T) {
-	base := cycleRunArgs("abc123", false)
+	base := cycleRunArgs("abc123", false, "")
 	if got := join(base); got != "cycle run --goal-hash abc123" {
 		t.Errorf("non-simulate args = %q", got)
 	}
-	sim := cycleRunArgs("abc123", true)
+	sim := cycleRunArgs("abc123", true, "")
 	if got := join(sim); got != "cycle run --goal-hash abc123 -simulate" {
 		t.Errorf("simulate args = %q, want trailing -simulate", got)
 	}

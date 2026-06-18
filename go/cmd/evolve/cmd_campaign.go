@@ -23,8 +23,10 @@ import (
 const campaignUsage = `Usage:
   evolve campaign study --workspace <cycle-workspace>
   evolve campaign replan --workspace <cycle-workspace> --feedback <text>
-  evolve campaign run --plan <campaign-plan.json> [--simulate]
+  evolve campaign run --plan <campaign-plan.json> [--simulate] [--concurrency <n>] [--project-root <path>]
 `
+
+var campaignLaunchFactory = execCycleLaunch
 
 func runCampaign(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -108,12 +110,22 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	planPath := fs.String("plan", "", "campaign-plan.json to execute")
 	simulate := fs.Bool("simulate", false, "exercise wave execution without LLM calls")
+	concurrency := fs.Int("concurrency", campaign.MaxWaveWidth, "max concurrent cycles")
+	projectRoot := fs.String("project-root", "", "project root passed to each cycle")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if *planPath == "" {
 		fmt.Fprintln(stderr, "evolve campaign run: --plan is required")
 		return 2
+	}
+	if *projectRoot != "" {
+		absoluteRoot, err := filepath.Abs(*projectRoot)
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve campaign run: resolve project root: %v\n", err)
+			return 1
+		}
+		*projectRoot = absoluteRoot
 	}
 	plan, err := loadVerifiedCampaignPlan(*planPath)
 	if err != nil {
@@ -131,7 +143,10 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	goalHash := fmt.Sprintf("%x", sha256.Sum256([]byte(plan.Goal)))
-	supervisor := &fleet.Supervisor{Launch: execCycleLaunch(binPath, *simulate, stdout, stderr)}
+	supervisor := &fleet.Supervisor{
+		Concurrency: *concurrency,
+		Launch:      campaignLaunchFactory(binPath, *simulate, *projectRoot, stdout, stderr),
+	}
 	for waveIndex, wave := range waves {
 		for i := range wave {
 			wave[i].GoalHash = goalHash

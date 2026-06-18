@@ -70,7 +70,7 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	sup := &fleet.Supervisor{
 		Concurrency: concurrency,
-		Launch:      execCycleLaunch(binPath, simulate, stdout, stderr),
+		Launch:      execCycleLaunch(binPath, simulate, "", stdout, stderr),
 	}
 	if err := sup.Validate(); err != nil {
 		fmt.Fprintf(stderr, "evolve fleet: %v\n", err)
@@ -130,17 +130,20 @@ func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // per-spec overlay (which already forced EVOLVE_FLEET=1).
 // cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
 // testable; --simulate threads the no-LLM -simulate flag through.
-func cycleRunArgs(goalHash string, simulate bool) []string {
+func cycleRunArgs(goalHash string, simulate bool, projectRoot string) []string {
 	args := []string{"cycle", "run", "--goal-hash", goalHash}
 	if simulate {
 		args = append(args, "-simulate")
 	}
+	if projectRoot != "" {
+		args = append(args, "--project-root", projectRoot)
+	}
 	return args
 }
 
-func execCycleLaunch(binPath string, simulate bool, stdout, stderr io.Writer) fleet.LaunchFn {
+func execCycleLaunch(binPath string, simulate bool, projectRoot string, stdout, stderr io.Writer) fleet.LaunchFn {
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
-		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, simulate)...)
+		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr

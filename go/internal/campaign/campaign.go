@@ -22,6 +22,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
+const (
+	MaxCycles    = 50
+	MaxWaveWidth = 10
+)
+
 // Plan is the decomposition the preliminary-study phase emits: a versioned,
 // dependency-annotated backlog of cycle-tasks plus the research that grounds it.
 type Plan struct {
@@ -80,6 +85,9 @@ func (p *Plan) Verify() error {
 	if len(p.Cycles) == 0 {
 		return fmt.Errorf("campaign: plan has no cycles")
 	}
+	if len(p.Cycles) > MaxCycles {
+		return fmt.Errorf("campaign: %d cycles exceeds max %d", len(p.Cycles), MaxCycles)
+	}
 	seen := make(map[string]bool, len(p.Cycles))
 	for _, c := range p.Cycles {
 		if strings.TrimSpace(c.ID) == "" {
@@ -91,8 +99,14 @@ func (p *Plan) Verify() error {
 		seen[c.ID] = true
 	}
 	// DAG validity (acyclic + every depends_on resolvable) — reuse the wave planner.
-	if _, err := fleet.PlanWaves(p.Cycles); err != nil {
+	waves, err := fleet.PlanWaves(p.Cycles)
+	if err != nil {
 		return fmt.Errorf("campaign: invalid cycle DAG: %w", err)
+	}
+	for i, wave := range waves {
+		if len(wave) > MaxWaveWidth {
+			return fmt.Errorf("campaign: wave %d width %d exceeds max %d", i+1, len(wave), MaxWaveWidth)
+		}
 	}
 	return nil
 }
