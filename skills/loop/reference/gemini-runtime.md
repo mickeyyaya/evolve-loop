@@ -29,22 +29,25 @@ run-cycle.sh spawns the orchestrator subagent via:
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "gemini"  (set by Gemini CLI users via env or profile override)
-  → dispatches to legacy/scripts/cli_adapters/gemini.sh
+  → dispatches through the Go bridge (`evolve subagent run`)
 
   ↓
 
-gemini.sh (HYBRID SHIM):
-  1. Probes for `claude` binary on PATH
-  2. If found: delegates to legacy/scripts/cli_adapters/claude.sh
+The Go bridge's gemini driver (HYBRID SHIM):
+  1. Probes for `claude` binary on PATH (capability.QualityTier)
+  2. If found: delegates to the claude driver
      (Claude binary becomes the actual runtime engine)
   3. If not found: exits 99 with "install Claude CLI" message
 
   ↓
 
-claude.sh wraps `claude -p` in sandbox-exec / bwrap, exactly as for the
-Claude Code runtime path. Builder, Auditor, Scout all run as Claude
+The claude driver wraps `claude -p` in sandbox-exec / bwrap, exactly as for
+the Claude Code runtime path. Builder, Auditor, Scout all run as Claude
 subprocesses with profile-scoped tool permissions.
 ```
+
+(The legacy bash CLI adapters under adapters/*.sh were removed in the
+script→Go migration; the bridge dispatches every driver natively.)
 
 ## Why hybrid
 
@@ -75,9 +78,9 @@ The hybrid shim keeps the entire Claude-Code trust boundary intact: every Builde
 # 1. Confirm both binaries are present
 command -v gemini && command -v claude
 
-# 2. Confirm gemini.sh delegates correctly (validate-only mode)
-VALIDATE_ONLY=1 bash legacy/scripts/cli_adapters/gemini.sh
-# Expected: exit 0, log line "[gemini-adapter] hybrid-mode: delegating to claude.sh"
+# 2. Confirm the gemini driver delegates correctly
+evolve doctor probe gemini
+# Expected: HYBRID tier (claude present) — the bridge delegates to the claude driver
 
 # 3. Smoke-test detection
 bash legacy/scripts/dispatch/detect-cli.sh
@@ -103,7 +106,7 @@ Until then, the hybrid driver is the only supported path.
 
 - [reference/gemini-tools.md](gemini-tools.md) — tool name translation map
 - [reference/platform-detect.md](platform-detect.md) — how the skill identifies its platform
-- [reference/claude-runtime.md](claude-runtime.md) — what gemini.sh delegates to
+- [reference/claude-runtime.md](claude-runtime.md) — what the gemini driver delegates to
 - [docs/incidents/gemini-forgery.md](../../../docs/incidents/gemini-forgery.md) — the historical incident this design responds to
 
 ## Last verified

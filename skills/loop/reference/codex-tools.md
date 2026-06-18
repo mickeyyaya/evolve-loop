@@ -1,6 +1,8 @@
 # Codex CLI Tool Names
 
-> Translation map for Claude Code tool names → Codex CLI (formerly OpenAI Codex CLI). Codex runtime support in evolve-loop is currently a stub (`legacy/scripts/cli_adapters/codex.sh` exits 99). This file exists for content-portability only.
+> Translation map for Claude Code tool names → Codex CLI (formerly OpenAI Codex CLI). Codex dispatches via the native Go bridge drivers (`codex` / `codex-tmux`); the former bash adapter was removed in the script→Go migration (2026-06). This file is the tool-name translation map.
+>
+> **Note:** sections below that reference `legacy/scripts/cli_adapters/codex.sh` describe the removed bash path and are retained as historical context only.
 
 ## Direct equivalents
 

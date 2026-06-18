@@ -29,14 +29,14 @@ run-cycle.sh spawns the orchestrator subagent via:
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "codex"  (set by Codex CLI users via env or profile override)
-  → reads legacy/scripts/cli_adapters/codex.capabilities.json
-  → dispatches to legacy/scripts/cli_adapters/codex.sh
+  → reads adapters/codex.capabilities.json (capability manifest, still in-tree)
+  → dispatches through the Go bridge (`evolve subagent run`)
 
   ↓
 
-codex.sh (HYBRID + DEGRADED, v8.51.0+):
-  1. Probes for `claude` binary on PATH
-  2. If found (HYBRID):    delegates to legacy/scripts/cli_adapters/claude.sh
+The Go bridge's codex driver (HYBRID + DEGRADED, v8.51.0+):
+  1. Probes for `claude` binary on PATH (capability.QualityTier)
+  2. If found (HYBRID):    delegates to the claude driver
                             → full caps via Claude subprocess isolation
   3. If missing (DEGRADED): same-session execution, pipeline still runs
                             → calling LLM (Codex) writes artifacts directly
@@ -45,13 +45,17 @@ codex.sh (HYBRID + DEGRADED, v8.51.0+):
                        → exit 99 if claude is missing
 ```
 
+(The legacy bash CLI adapters under adapters/*.sh were removed in the
+script→Go migration; only the *.capabilities.json manifests remain, read by
+the Go capability package. The bridge dispatches every driver natively.)
+
 ## v8.51 capability model
 
-Codex's adapter declares modes per dimension via `legacy/scripts/cli_adapters/codex.capabilities.json`:
+Codex's driver declares modes per dimension via `adapters/codex.capabilities.json` (read by the Go capability package):
 
 | Capability | Hybrid (claude on PATH) | Degraded (no claude) | Quality impact when degraded |
 |---|---|---|---|
-| `subprocess_isolation` | inherited from claude.sh | same-session execution | Builder + Auditor share session memory |
+| `subprocess_isolation` | inherited from the claude driver | same-session execution | Builder + Auditor share session memory |
 | `budget_cap` | inherited (`--max-budget-usd`) | none | Runaway cycles uncapped; mitigation: `EVOLVE_RUN_TIMEOUT` |
 | `sandbox` | inherited (sandbox-exec / bwrap) | none | OS-level isolation absent; pipeline gates still fire |
 | `profile_permissions` | inherited (`--allowedTools`) | none | Subagents have whatever tools the calling Codex session allows |
@@ -73,7 +77,7 @@ When `claude` is on PATH, the hybrid shim delegates everything to `claude -p` �
 
 ## Why degraded mode is acceptable (v8.51.0+)
 
-Pre-v8.51, missing `claude` → `codex.sh` exited 99 → pipeline blocked. The user directive for v8.51 was: *"the process/pipeline should function regardless of which CLI is used. Missing features should only lower the quality, not block."*
+Pre-v8.51, missing `claude` → the codex driver exited 99 → pipeline blocked. The user directive for v8.51 was: *"the process/pipeline should function regardless of which CLI is used. Missing features should only lower the quality, not block."*
 
 DEGRADED mode runs the cycle in the same session (Codex itself produces artifacts via its file-write tools rather than spawning a Claude subprocess). The pipeline-level kernel hooks still gate every git/gh operation, the ledger SHA chain still enforces tamper-evident provenance, and the v7.9.0+ forgery defenses still validate artifact content. So even without subprocess isolation, the cycle cannot silently fabricate state.
 
@@ -126,8 +130,8 @@ Tracked in `docs/architecture/platform-compatibility.md` under v8.54.0 roadmap. 
 
 - [reference/codex-tools.md](codex-tools.md) — tool name translation map
 - [reference/platform-detect.md](platform-detect.md) — how the skill identifies its platform
-- [reference/claude-runtime.md](claude-runtime.md) — what codex.sh delegates to in HYBRID mode
-- [reference/gemini-runtime.md](gemini-runtime.md) — sister hybrid pattern; codex.sh mirrors gemini.sh
+- [reference/claude-runtime.md](claude-runtime.md) — what the codex driver delegates to in HYBRID mode
+- [reference/gemini-runtime.md](gemini-runtime.md) — sister hybrid pattern; the codex driver mirrors the gemini driver
 - [docs/architecture/platform-compatibility.md](../../../docs/architecture/platform-compatibility.md) — full capability matrix
 - [docs/incidents/gemini-forgery.md](../../../docs/incidents/gemini-forgery.md) — historical incident motivating pipeline-level structural defenses
 

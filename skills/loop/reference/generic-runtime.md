@@ -10,7 +10,7 @@ You can invoke `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh ...
 
 ## What does NOT work
 
-- **Subagent isolation.** The dispatcher will try to invoke `subagent-run.sh`, which dispatches to `legacy/scripts/cli_adapters/<cli>.sh`. If your CLI's adapter is a stub (codex.sh) or doesn't exist, you'll get exit 99 ("provider not supported"). The hybrid pattern used for Gemini is one viable workaround; see `reference/gemini-runtime.md` for the template.
+- **Subagent isolation.** The dispatcher dispatches through the Go bridge (`evolve subagent run`). If the bridge has no driver for your CLI, you'll get exit 99 ("provider not supported"). The hybrid pattern used for Gemini is one viable workaround; see `reference/gemini-runtime.md` for the template. (The legacy bash CLI adapters under `adapters/*.sh` were removed in the script→Go migration; only the `*.capabilities.json` manifests remain.)
 
 - **PreToolUse kernel hooks.** `role-gate`, `ship-gate`, and `phase-gate-precondition` are configured in `.claude-plugin/plugin.json` and fire on Claude Code's PreToolUse mechanism. Other CLIs may have different hook surfaces or none. Without the hooks, the trust boundary is advisory rather than structural — a sufficiently confused or adversarial agent can edit source files directly, push without going through `ship.sh`, or skip phases. This is the substance of the forgery incident referenced from `docs/platform-compatibility.md`.
 
@@ -24,11 +24,11 @@ Treat evolve-loop as a documentation source. Read the phase docs, learn the arch
 
 ### Option 2 — Hybrid driver (recommended for any new CLI)
 
-Mirror what `legacy/scripts/cli_adapters/gemini.sh` does: implement a thin shim that probes for `claude` and delegates. Cost: ~50 lines of bash. Benefit: full trust-boundary preservation. Trade-off: requires the Claude binary at runtime.
+Mirror what the Go bridge's gemini driver does: a thin shim that probes for `claude` (via `capability.QualityTier`) and delegates to the claude driver. Adding it is a small driver entry plus an `adapters/<cli>.capabilities.json` manifest. Benefit: full trust-boundary preservation. Trade-off: requires the Claude binary at runtime.
 
 ### Option 3 — Native adapter
 
-Implement a real `legacy/scripts/cli_adapters/<cli>.sh` against your CLI's flag surface. Cost: 500–1000 lines (mirror `claude.sh`). Benefit: no Claude binary required. Trade-off: must verify your CLI supports profile-scoped permissions, non-interactive prompt mode, and either a budget cap flag or external cost tracking. Tier 1 designation requires passing the same regression suite Claude does (`legacy/scripts/utility/run-all-regression-tests.sh`).
+Implement a real Go bridge driver against your CLI's flag surface (plus an `adapters/<cli>.capabilities.json` manifest). Benefit: no Claude binary required. Trade-off: must verify your CLI supports profile-scoped permissions, non-interactive prompt mode, and either a budget cap flag or external cost tracking. Tier 1 designation requires passing the same Go regression suite Claude does.
 
 See [docs/platform-compatibility.md](../../../docs/platform-compatibility.md) "Adapter contract" section for the env-var interface every adapter must satisfy.
 

@@ -27,12 +27,15 @@ run-cycle.sh spawns the orchestrator subagent:
 
 subagent-run.sh reads .evolve/profiles/orchestrator.json
   → cli = "claude"
-  → dispatches to legacy/scripts/cli_adapters/claude.sh
+  → dispatches through the Go bridge (`evolve subagent run`)
 
   ↓
 
-claude.sh wraps `claude -p` in sandbox-exec (macOS) or bwrap (Linux),
-applies --allowedTools / --disallowedTools / --max-budget-usd / etc.
+The Go bridge's claude driver wraps `claude -p` in sandbox-exec (macOS) or
+bwrap (Linux) — see internal/bridge/sandbox_wrap.go (sandbox.ShouldWrap, gated
+by EVOLVE_SANDBOX) — and applies --allowedTools / --disallowedTools / etc.
+(The legacy bash CLI adapters under adapters/*.sh were removed in the
+script→Go migration; the bridge now dispatches natively.)
 
   ↓
 
@@ -79,7 +82,7 @@ The dispatcher is mandatory for `/evolve-loop` invocations. The only documented 
 | `1` | A `run-cycle.sh` invocation failed | Surface the cycle's stderr; do NOT retry inline |
 | `2` | A cycle bypassed Scout/Builder/Auditor (CRITICAL) | Quote ledger counts; recommend `git log` of `.evolve/runs/cycle-N/`; STOP |
 | `10` | Bad CLI arguments | Re-prompt with valid args |
-| `99` | Provider not supported (from a `cli_adapters/<cli>.sh` stub) | Switch the offending profile's `cli` field; do not "fix" the stub blindly |
+| `99` | Provider not supported (the Go bridge has no driver for the profile's `cli`) | Switch the offending profile's `cli` field to a supported driver |
 
 ## See also
 
