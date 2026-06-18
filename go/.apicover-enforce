@@ -238,3 +238,9 @@
 # CycleStateFile/PhaseSwarmPlan consts). This completes the tail: ALL internal
 # packages are now in the apicover hard-fail gate.
 ./internal/core
+
+# bash->Go migration Wave B0 (2026-06-18): tree-state SHA extracted from ship's
+# computeTreeStateSHA into a shared leaf so the commit-gate attestation reader and
+# the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by
+# treestate_test.go (table seam + real-git/shell parity).
+./internal/treestate

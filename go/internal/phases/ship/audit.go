@@ -12,12 +12,9 @@ package ship
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
 // auditEntry is the subset of LedgerEntry fields ship cares about.
@@ -340,19 +338,34 @@ func checkEGPSGate(path string, res *RunResult) error {
 // computeTreeStateSHA computes sha256(git diff HEAD) — the same
 // fingerprint the bash Auditor records. This is the audit-binding
 // model: tracked-file mutations after audit invalidate ship.
+//
+// The git-run + hashing live in the shared internal/treestate package so the
+// commit-gate attestation reader (verifyCommitGate) and the audit-binding
+// verifier hash byte-identically; this thin wrapper maps treestate's typed
+// failure onto ship's error vocabulary without changing behavior.
 func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
-	var buf strings.Builder
-	exitCode, err := opts.run(ctx, "git", []string{"diff", "HEAD"}, &buf, io.Discard)
+	sum, err := treestate.SHA(ctx, opts.runner(), opts.ProjectRoot, os.Environ())
 	if err != nil {
+		var re *treestate.RunError
+		if errors.As(err, &re) && re.Err == nil {
+			// Fatal git exit (>1) — rc=1 (differences) is handled inside SHA.
+			return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
+				fmt.Sprintf("ship: git diff HEAD exit %d", re.ExitCode), "git_rc", fmt.Sprintf("%d", re.ExitCode))
+		}
+		runnerErr := underlyingErr(err)
 		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
-			"ship: git diff HEAD: "+err.Error(), "git_err", err.Error())
+			"ship: git diff HEAD: "+runnerErr.Error(), "git_err", runnerErr.Error())
 	}
-	if exitCode > 1 {
-		// rc=1 from git diff is normal (differences). rc=128 is fatal.
-		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
-			fmt.Sprintf("ship: git diff HEAD exit %d", exitCode), "git_rc", fmt.Sprintf("%d", exitCode))
+	return sum, nil
+}
+
+// underlyingErr returns the runner error carried by a treestate.RunError, or the
+// error itself otherwise — so the "git_err" field stays the raw runner message
+// (boom), matching the pre-extraction behavior byte-for-byte.
+func underlyingErr(err error) error {
+	var re *treestate.RunError
+	if errors.As(err, &re) && re.Err != nil {
+		return re.Err
 	}
-	h := sha256.New()
-	_, _ = h.Write([]byte(buf.String()))
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return err
 }
