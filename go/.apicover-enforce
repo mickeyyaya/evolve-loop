@@ -244,3 +244,11 @@
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by
 # treestate_test.go (table seam + real-git/shell parity).
 ./internal/treestate
+
+# bash->Go migration Wave B1 (2026-06-18): commit-gate-runner.sh ported to a
+# native gate (lang-detect + reviewer precondition + lint lanes + tree-SHA-bound
+# attestation). Every export named: Exit* consts (exit-code contract), Options/
+# Result/Attestation/Runner via behavior+composite tests, Options.Run + Marshal
+# via behavior tests, plus a differential-parity test proving the Go writer emits
+# a byte-identical attestation to the bash runner before B2 deletes it.
+./internal/commitgate

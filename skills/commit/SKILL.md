@@ -21,10 +21,12 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
    | b | **one review**: the matching language reviewer (`go-reviewer` / `python-reviewer` / `typescript-reviewer` / `rust-reviewer`) **OR** the general `code-reviewer` / `/code-review` — pick **one** | correctness, security, semantics |
 
    Prefer the language reviewer when there's a clear primary language (richer); use the general `code-reviewer` for mixed/other languages. The combined `evolve-loop:code-review-simplify` skill satisfies **both a and b** in a single pass.
-4. **Run the gate**: `bash commit-gate/commit-gate-runner.sh --reviewers "<comma-list of what you ran>"`.
+4. **Run the gate**: `"$CLAUDE_PROJECT_DIR/go/bin/evolve" commit-gate run --reviewers "<comma-list of what you ran>"`.
+   - This is the native port of `commit-gate/commit-gate-runner.sh` (same lang-detect, same `--reviewers` precondition, same lint lanes, **byte-identical attestation** — proven by a differential-parity test). The bash runner still works as an `evolve`-independent fallback (`bash commit-gate/commit-gate-runner.sh --reviewers "…"`) until it is removed.
    - **exit 0** → attestation written; proceed immediately to step 5 (no edits in between).
-   - **exit 1** → reviewer-precondition or lint/test failure (read stderr). Fix, re-stage, return to step 3 for the affected files.
-   - **exit 3** → a required tool could not be auto-installed; surface the printed manual install command to the user and stop.
+   - **exit 1** → reviewer-precondition or lint/test failure, or nothing staged (read stderr). Fix, re-stage, return to step 3 for the affected files.
+   - **exit 2** → git/SHA fatal (not a repo, `git diff HEAD` failed). Stop and report.
+   - **exit 3** → a required tool is missing/could not be installed; surface the printed manual install command to the user and stop.
 5. **Commit + push** via the sanctioned path (handles both, on the current branch):
    ```bash
    EVOLVE_SHIP_AUTO_CONFIRM=1 "$CLAUDE_PROJECT_DIR/go/bin/evolve" ship --class manual "<message>"

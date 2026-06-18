@@ -60,6 +60,7 @@ var commands = []subcommand{
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
+	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: runCommitGate},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 
 	// Phase 3a + 3b dispatch helpers (ported from bash).
