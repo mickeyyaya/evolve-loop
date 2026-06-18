@@ -3,6 +3,7 @@ package consensusdispatch
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,63 @@ func writeProfile(t *testing.T, path string, consensus map[string]any) {
 	}
 	b, _ := json.Marshal(doc)
 	writeFile(t, path, string(b))
+}
+
+// installFakeEvolve writes a fake `evolve` binary into dir/bin and points
+// EVOLVE_GO_BIN at it. Because Run resolves the native `evolve` for THREE
+// subcommands — `bridge launch` (the per-voter worker, post-bridge cutover),
+// `fanout-dispatch`, and `aggregator` — via the same resolveEvolveBin, one
+// shim must handle all three:
+//
+//   - bridge launch ... --artifact=PATH : writes artifactBody to PATH (the
+//     bridge's artifact-write contract). Empty artifactBody writes nothing
+//     (modeling a worker that produces no artifact). Exits launchExit.
+//   - fanout-dispatch <commandsTSV> <resultsTSV> : runs each TSV worker command
+//     (so the bridge-launch workers actually execute), recording ok/fail.
+//   - aggregator <mode> <output> <artifacts...> : concatenates the artifacts and
+//     appends a verdict; exits aggExit (non-zero to model consensus FAIL).
+//
+// Because it sets a process-global env var, callers must NOT t.Parallel().
+func installFakeEvolve(t *testing.T, dir, artifactBody string, launchExit, aggExit int) {
+	t.Helper()
+	bin := filepath.Join(dir, "bin", "evolve")
+	script := fmt.Sprintf(`#!/usr/bin/env bash
+sub="$1"; shift
+case "$sub" in
+  bridge)
+    # form: bridge launch --cli=... --artifact=PATH ...
+    art=""
+    for a in "$@"; do
+      case "$a" in --artifact=*) art="${a#--artifact=}" ;; esac
+    done
+    body=%q
+    if [ -n "$art" ] && [ -n "$body" ]; then
+      mkdir -p "$(dirname "$art")"
+      printf '%%s' "$body" > "$art"
+    fi
+    exit %d
+    ;;
+  fanout-dispatch)
+    commands="$1"; results="$2"
+    while IFS=$'\t' read -r name cmd; do
+      bash -c "$cmd" >/dev/null 2>&1 && printf '%%s\tok\n' "$name" >> "$results" || printf '%%s\tfail\n' "$name" >> "$results"
+    done < "$commands"
+    exit 0
+    ;;
+  aggregator)
+    mode="$1"; output="$2"; shift 2
+    printf '# Cross-CLI Consensus (%%s)\n' "$mode" > "$output"
+    for a in "$@"; do printf '## %%s\n' "$a" >> "$output"; cat "$a" >> "$output"; done
+    printf '## Verdict: PASS\n' >> "$output"
+    exit %d
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`, artifactBody, launchExit, aggExit)
+	writeExec(t, bin, script)
+	t.Setenv("EVOLVE_GO_BIN", bin)
 }
 
 func TestParseProfile(t *testing.T) {
@@ -122,30 +180,42 @@ func TestFilterEligibleAgainstTiers(t *testing.T) {
 func TestBuildCommandsTSV(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	adapters := filepath.Join(dir, "adapters")
-	for _, cli := range []string{"claude", "gemini"} {
-		writeExec(t, filepath.Join(adapters, cli+".sh"), "#!/usr/bin/env bash\necho ok\n")
-	}
-	// non-executable adapter — should be skipped
-	writeFile(t, filepath.Join(adapters, "codex.sh"), "#!/usr/bin/env bash\necho ok\n")
-
 	workers := filepath.Join(dir, "workers")
 	if err := os.MkdirAll(workers, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	tsv, count, err := BuildCommandsTSV([]string{"claude", "gemini", "codex"},
-		"/tmp/profile.json", "/tmp/prompt.md", "42", workers, adapters, "sonnet")
+	// Post-bridge cutover: a worker is included when its resolved CLI projects
+	// onto a REGISTERED bridge driver (bridge.DriverFor + LookupDriver), not when
+	// a <cli>.sh exists. Bare "claude"/"gemini" map to claude-tmux; "codex" is
+	// itself a registered driver so it passes through unchanged (DriverFor keeps
+	// already-registered names). "no-such-cli" has no driver → skipped.
+	tsv, count, err := BuildCommandsTSV([]string{"claude", "gemini", "codex", "no-such-cli"},
+		"/tmp/profile.json", "/tmp/prompt.md", "42", workers, "/usr/local/bin/evolve", "sonnet")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if count != 2 {
-		t.Errorf("want 2 executable workers, got %d", count)
+	if count != 3 {
+		t.Errorf("want 3 driver-backed workers, got %d", count)
 	}
-	if !strings.Contains(tsv, "claude\t") || !strings.Contains(tsv, "gemini\t") {
-		t.Errorf("missing voter lines:\n%s", tsv)
+	for _, cli := range []string{"claude", "gemini", "codex"} {
+		if !strings.Contains(tsv, cli+"\t") {
+			t.Errorf("missing voter line for %s:\n%s", cli, tsv)
+		}
 	}
-	if strings.Contains(tsv, "codex\t") {
-		t.Errorf("non-exec codex should be skipped")
+	if strings.Contains(tsv, "no-such-cli\t") {
+		t.Errorf("driverless no-such-cli should be skipped:\n%s", tsv)
+	}
+	// command routes through the bridge, not bash <cli>.sh, and projects bare
+	// names onto registered drivers (claude → claude-tmux).
+	if !strings.Contains(tsv, "/usr/local/bin/evolve bridge launch --cli='claude-tmux'") {
+		t.Errorf("claude voter not routed through bridge launch with driver name:\n%s", tsv)
+	}
+	// codex is already a registered driver → passes through as codex.
+	if !strings.Contains(tsv, "--cli='codex'") {
+		t.Errorf("codex voter not dispatched via its registered driver:\n%s", tsv)
+	}
+	if strings.Contains(tsv, "bash '") {
+		t.Errorf("worker command must not shell bash <cli>.sh anymore:\n%s", tsv)
 	}
 	// deterministic ordering
 	if strings.Index(tsv, "claude\t") > strings.Index(tsv, "gemini\t") {
@@ -254,9 +324,12 @@ func TestRun_InsufficientVoters(t *testing.T) {
 	}
 }
 
-// TestRun_E2E_WithFakeBash drives Run() through a full pipeline using stub
-// bash scripts. Verifies orchestration, voter filtering, TSV writing,
-// shell-out and aggregator exit-code passthrough.
+// TestRun_E2E_WithFakeBash drives Run() through a full pipeline. Post-bridge
+// cutover the per-voter worker command is `evolve bridge launch ...`, and the
+// fanout/aggregator steps already resolve the native `evolve` binary, so the
+// test installs ONE fake `evolve` shim (via EVOLVE_GO_BIN) that handles all
+// three subcommands — proving the bridge-launch command is well-formed,
+// executes through fanout, and produces both worker artifacts + the aggregate.
 func TestRun_E2E_WithFakeBash(t *testing.T) {
 	if _, err := os.Stat("/bin/bash"); err != nil {
 		t.Skip("/bin/bash not present")
@@ -266,7 +339,6 @@ func TestRun_E2E_WithFakeBash(t *testing.T) {
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}
-
 	adapters := filepath.Join(dir, "adapters")
 	dispatch := filepath.Join(dir, "dispatch")
 	if err := os.MkdirAll(adapters, 0o755); err != nil {
@@ -276,40 +348,9 @@ func TestRun_E2E_WithFakeBash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// two fake CLI adapters that write the audit artifact directly
-	for _, cli := range []string{"claude", "gemini"} {
-		writeExec(t, filepath.Join(adapters, cli+".sh"),
-			`#!/usr/bin/env bash
-mkdir -p "$(dirname "$ARTIFACT_PATH")"
-echo "## Verdict: PASS from $0" > "$ARTIFACT_PATH"
-`)
-	}
-
-	// fake fanout-dispatch.sh: read commands TSV, run each command, write results TSV
-	writeExec(t, filepath.Join(dispatch, "fanout-dispatch.sh"),
-		`#!/usr/bin/env bash
-commands="$1"
-results="$2"
-while IFS=$'\t' read -r name cmd; do
-    bash -c "$cmd" >/dev/null 2>&1 && echo -e "$name\tok" >> "$results" || echo -e "$name\tfail" >> "$results"
-done < "$commands"
-exit 0
-`)
-
-	// fake aggregator.sh: write a fixed audit report; exit 0 (PASS)
-	writeExec(t, filepath.Join(dispatch, "aggregator.sh"),
-		`#!/usr/bin/env bash
-mode="$1"
-output="$2"
-shift 2
-echo "# Cross-CLI Consensus ($mode)" > "$output"
-for a in "$@"; do
-    echo "## $a" >> "$output"
-    cat "$a" >> "$output"
-done
-echo "## Verdict: PASS" >> "$output"
-exit 0
-`)
+	// One fake `evolve` shim covers bridge launch (writes the artifact), plus
+	// fanout-dispatch + aggregator (both resolve the native evolve binary).
+	installFakeEvolve(t, dir, "## Verdict: PASS from bridge\n", 0, 0)
 
 	prof := filepath.Join(dir, "auditor.json")
 	prompt := filepath.Join(dir, "prompt.md")
@@ -368,20 +409,9 @@ func TestRun_AggregatorFailPropagates(t *testing.T) {
 	if err := os.MkdirAll(dispatch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, cli := range []string{"claude", "gemini"} {
-		writeExec(t, filepath.Join(adapters, cli+".sh"),
-			"#!/usr/bin/env bash\nmkdir -p $(dirname \"$ARTIFACT_PATH\") && echo PASS > \"$ARTIFACT_PATH\"\n")
-	}
-	writeExec(t, filepath.Join(dispatch, "fanout-dispatch.sh"),
-		`#!/usr/bin/env bash
-while IFS=$'\t' read -r name cmd; do bash -c "$cmd"; done < "$1"
-exit 0
-`)
-	writeExec(t, filepath.Join(dispatch, "aggregator.sh"),
-		`#!/usr/bin/env bash
-echo FAIL > "$2"
-exit 1
-`)
+	// One fake `evolve` shim: bridge launch writes a PASS artifact; aggregator
+	// exits 1 to model consensus FAIL (the non-zero must propagate as the run rc).
+	installFakeEvolve(t, dir, "PASS\n", 0, 1)
 	prof := filepath.Join(dir, "p.json")
 	prompt := filepath.Join(dir, "pr.md")
 	writeProfile(t, prof, map[string]any{
@@ -420,17 +450,10 @@ func TestRun_NoArtifactsProducedFails(t *testing.T) {
 	if err := os.MkdirAll(dispatch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, cli := range []string{"claude", "gemini"} {
-		// adapter that does NOT write artifact
-		writeExec(t, filepath.Join(adapters, cli+".sh"), "#!/usr/bin/env bash\nexit 0\n")
-	}
-	writeExec(t, filepath.Join(dispatch, "fanout-dispatch.sh"),
-		`#!/usr/bin/env bash
-while IFS=$'\t' read -r name cmd; do bash -c "$cmd"; done < "$1"
-exit 0
-`)
-	// aggregator never runs in this path
-	writeExec(t, filepath.Join(dispatch, "aggregator.sh"), "#!/usr/bin/env bash\nexit 0\n")
+	// fake `evolve bridge launch` exits 0 but writes NO artifact (empty
+	// artifactBody → shim skips the write), so the "no worker artifacts" branch
+	// fires; the aggregator step is never reached.
+	installFakeEvolve(t, dir, "", 0, 0)
 	prof := filepath.Join(dir, "p.json")
 	prompt := filepath.Join(dir, "pr.md")
 	writeProfile(t, prof, map[string]any{

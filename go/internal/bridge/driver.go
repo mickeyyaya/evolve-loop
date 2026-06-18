@@ -91,6 +91,49 @@ func LookupDriver(cli string) (Driver, bool) {
 	return d, ok
 }
 
+// bareDriverMap is the single source of truth for the BARE CLI name →
+// registered driver projection. The dispatch path (subagent.Run /
+// ValidateProfile, consensusdispatch) historically shelled `bash <cli>.sh`
+// for both bare names ("claude") and driver names ("claude-tmux"). Routing
+// through the bridge instead means a bare name must first be projected onto
+// a registered driver, because LookupDriver keys on the exact driver name.
+//
+// Resolved CLI names (claude-tmux/codex-tmux/agy-tmux) are already driver
+// names and pass through DriverFor unchanged. The bare names:
+//   - claude → claude-tmux  (production subscription path; CLAUDE.md)
+//   - gemini → claude-tmux  (gemini.sh's HYBRID mode delegated to claude.sh;
+//     mapping to claude-tmux preserves that delegation)
+//   - codex → codex-tmux, agy → agy-tmux are listed for completeness, but they
+//     are DORMANT: "codex" and "agy" are themselves registered (headless)
+//     drivers, so DriverFor's already-a-driver pass-through wins and the map
+//     entry is never consulted. They fire only if those drivers were ever
+//     unregistered, keeping the projection total.
+//
+// "antigravity" is normalized to "agy" upstream (run.go / validateprofile.go),
+// so it never reaches here as a bare name.
+var bareDriverMap = map[string]string{
+	"claude": "claude-tmux",
+	"gemini": "claude-tmux",
+	"codex":  "codex-tmux",
+	"agy":    "agy-tmux",
+}
+
+// DriverFor projects a resolved-or-bare CLI name onto a registered driver
+// name. A name that is already a registered driver passes through unchanged;
+// a known bare name maps via bareDriverMap; anything else is returned as-is
+// so the caller's LookupDriver miss surfaces the original (unknown) name in
+// its diagnostic. This is the single source for the bare→driver projection
+// shared by every dispatch site (subagent + consensusdispatch).
+func DriverFor(cli string) string {
+	if _, ok := LookupDriver(cli); ok {
+		return cli
+	}
+	if mapped, ok := bareDriverMap[cli]; ok {
+		return mapped
+	}
+	return cli
+}
+
 // DriverNames returns a sorted snapshot of registered --cli values.
 // Used by probe, usage output, and the docs-contract test.
 func DriverNames() []string {

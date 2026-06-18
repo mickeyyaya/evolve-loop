@@ -36,19 +36,20 @@ func TestRun_WorkspaceMkdirFails(t *testing.T) {
 	}
 }
 
-// TestRun_QuorumReducedThenNoAdapters covers the quorum-reduction WARN block
+// TestRun_QuorumReducedThenNoDrivers covers the quorum-reduction WARN block
 // (eligible < declared quorum) followed by the post-build "workers ready < 2"
-// branch: require_min_tier=none admits all voters regardless of tier (the empty
-// adapters dir yields "unknown" tiers, which "none" still includes), quorum=5
-// forces the reduction, then the empty adapters dir yields zero ready workers.
-func TestRun_QuorumReducedThenNoAdapters(t *testing.T) {
+// branch. Post-bridge cutover a worker is ready only if its CLI projects onto a
+// REGISTERED bridge driver, so this uses two driverless voter names:
+// require_min_tier=none admits both regardless of tier, quorum=5 forces the
+// reduction WARN, then BuildCommandsTSV skips both (no driver) → zero ready workers.
+func TestRun_QuorumReducedThenNoDrivers(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	prof := filepath.Join(dir, "prof.json")
 	prompt := filepath.Join(dir, "prompt.md")
 	writeProfile(t, prof, map[string]any{
 		"enabled":          true,
-		"cli_voters":       []string{"claude", "gemini"},
+		"cli_voters":       []string{"no-driver-a", "no-driver-b"},
 		"quorum":           5, // > eligible(2) → reduction WARN
 		"require_min_tier": "none",
 	})
@@ -56,7 +57,7 @@ func TestRun_QuorumReducedThenNoAdapters(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := Run(Inputs{
 		Cycle: "1", WorkspacePath: dir, ProfilePath: prof, PromptFile: prompt,
-		AdaptersDir: filepath.Join(dir, "empty-adapters"), // no capability-check, no adapters
+		AdaptersDir: filepath.Join(dir, "empty-adapters"), // no capability manifests → unknown tier
 		DispatchDir: filepath.Join(dir, "fake-dispatch"),
 	}, &stdout, &stderr)
 	if rc != ExitRuntimeErr {

@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
@@ -157,8 +158,12 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 	}
 	commandsTSV := filepath.Join(workersDir, ".commands.tsv")
 	resultsTSV := filepath.Join(workersDir, ".results.tsv")
+	evolveBin := resolveEvolveBin(in.DispatchDir)
+	if evolveBin == "" {
+		evolveBin = "evolve" // PATH fallback; the worker shell resolves it
+	}
 	tsv, workerCount, terr := BuildCommandsTSV(eligible, in.ProfilePath, in.PromptFile,
-		in.Cycle, workersDir, in.AdaptersDir, prof.ModelTierDefault)
+		in.Cycle, workersDir, evolveBin, prof.ModelTierDefault)
 	if terr != nil {
 		logf("FAIL: %v", terr)
 		return ExitRuntimeErr
@@ -313,8 +318,17 @@ func filterEligible(voters []string, requireMinTier string, tierFor func(string)
 }
 
 // BuildCommandsTSV constructs the worker dispatch TSV. Each line is
-// <cli>\t<command-string>. Workers without an executable adapter are skipped.
-func BuildCommandsTSV(eligible []string, profilePath, promptFile, cycle, workersDir, adaptersDir, model string) (string, int, error) {
+// <cli>\t<command-string>. The command routes each worker through the Go
+// bridge (`evolve bridge launch`) rather than shelling `bash <cli>.sh` — the
+// bridge owns the dispatch contract (materialize prompt → drive CLI → write
+// artifact). Workers whose resolved CLI has no registered bridge driver are
+// skipped (the bridge would have no driver to dispatch).
+//
+// evolveBin is the resolved `evolve` binary (or "evolve" for a PATH lookup by
+// the worker shell). model maps to RESOLVED_MODEL; the per-voter CLI is
+// projected onto a registered driver via bridge.DriverFor so a bare voter
+// name ("claude") dispatches through claude-tmux.
+func BuildCommandsTSV(eligible []string, profilePath, promptFile, cycle, workersDir, evolveBin, model string) (string, int, error) {
 	var sb strings.Builder
 	count := 0
 	// deterministic order
@@ -322,17 +336,20 @@ func BuildCommandsTSV(eligible []string, profilePath, promptFile, cycle, workers
 	copy(sorted, eligible)
 	sort.Strings(sorted)
 	for _, cli := range sorted {
-		adapter := filepath.Join(adaptersDir, cli+".sh")
-		info, err := os.Stat(adapter)
-		if err != nil || info.Mode()&0o111 == 0 {
+		driver := bridge.DriverFor(cli)
+		if _, ok := bridge.LookupDriver(driver); !ok {
 			continue
 		}
 		artifact := filepath.Join(workersDir, cli+"-audit.md")
 		stdout := filepath.Join(workersDir, cli+"-stdout.log")
 		stderr := filepath.Join(workersDir, cli+"-stderr.log")
+		// `evolve bridge launch` reads its config from these flags (the bridge
+		// LaunchArgs flag surface). --allow-bypass mirrors the in-process
+		// runner's trusted-path posture so tmux drivers don't block on the
+		// safety gate. The model flows as --model (RESOLVED_MODEL equivalent).
 		cmd := fmt.Sprintf(
-			"PROFILE_PATH='%s' RESOLVED_MODEL='%s' PROMPT_FILE='%s' CYCLE='%s' WORKSPACE_PATH='%s' STDOUT_LOG='%s' STDERR_LOG='%s' ARTIFACT_PATH='%s' bash '%s'",
-			profilePath, model, promptFile, cycle, workersDir, stdout, stderr, artifact, adapter,
+			"%s bridge launch --cli='%s' --profile='%s' --model='%s' --prompt-file='%s' --cycle='%s' --workspace='%s' --stdout-log='%s' --stderr-log='%s' --artifact='%s' --allow-bypass",
+			evolveBin, driver, profilePath, model, promptFile, cycle, workersDir, stdout, stderr, artifact,
 		)
 		fmt.Fprintf(&sb, "%s\t%s\n", cli, cmd)
 		count++

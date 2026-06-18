@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
@@ -296,35 +298,82 @@ func defaultResolveLLM(agent string) (resolvellm.Result, error) {
 	return resolvellm.Resolve(agent, resolvellm.Options{})
 }
 
-// defaultAdapterExists checks the executable bit. Mirrors bash `[ -x ]`.
+// defaultAdapterExists reports whether the resolved CLI has a registered
+// bridge driver. The dispatch path no longer shells `bash <cli>.sh`, so the
+// pre-flight "is this dispatchable?" check is now driver presence, not the
+// adapter script's executable bit. path is the legacy adapter path
+// (<dir>/<cli>.sh); we recover <cli> from its base name, project it onto a
+// driver via bridge.DriverFor, and confirm the driver is registered. Kept
+// injectable (the ExecAdapter/AdapterExists seam is unchanged) so tests can
+// still stub it.
 func defaultAdapterExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	if info.IsDir() {
-		return false
-	}
-	return info.Mode()&0o111 != 0
+	cli := strings.TrimSuffix(filepath.Base(path), ".sh")
+	_, ok := gobridge.LookupDriver(gobridge.DriverFor(cli))
+	return ok
 }
 
-// defaultExecAdapter shells out to bash <adapter> with the given env.
-// Inherits stdout/stderr so the operator sees the adapter's VALIDATE-ONLY
-// chatter. Mirrors `bash "$adapter"` at subagent-run.sh:590.
-func defaultExecAdapter(ctx context.Context, adapterPath string, env map[string]string) (int, error) {
-	cmd := exec.CommandContext(ctx, "bash", adapterPath)
-	cmd.Env = os.Environ()
-	for k, v := range env {
-		cmd.Env = append(cmd.Env, k+"="+v)
-	}
-	cmd.Stdout = os.Stderr // bash adapter writes its log lines to stderr; mirror.
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			return ee.ExitCode(), nil
+// defaultExecAdapter dispatches the subagent through the in-process Go bridge
+// instead of shelling `bash <cli>.sh`. The bridge owns the same contract the
+// bash adapter had: it materializes the prompt, dispatches the driver, and
+// writes the artifact at ArtifactPath. A VALIDATE_ONLY=1 entry in env is
+// honored by the bridge's launch path (it prints the resolved config and
+// returns ExitOK without invoking an LLM), so ValidateProfile's dry-validate
+// keeps working (same ExitOK contract; no LLM invoked).
+//
+// adapterPath is retained for the injectable ExecAdapter seam (tests stub the
+// whole function), but the default no longer reads the .sh file — it reads
+// RESOLVED_CLI from env and projects it onto a registered driver via
+// bridge.DriverFor.
+func defaultExecAdapter(ctx context.Context, _ string, env map[string]string) (int, error) {
+	cli := gobridge.DriverFor(env["RESOLVED_CLI"])
+	prompt := ""
+	if pf := env["PROMPT_FILE"]; pf != "" {
+		b, err := os.ReadFile(pf)
+		if err != nil {
+			return -1, fmt.Errorf("subagent: read prompt file %q: %w", pf, err)
 		}
+		prompt = string(b)
+	}
+	// Contract bridge: the bash adapter accepted an empty prompt under
+	// VALIDATE_ONLY=1 (ValidateProfile sets PROMPT_FILE=""), but the bridge's
+	// launch guard fails fast on an empty prompt (an empty prompt would hang a
+	// real launch at the artifact timeout). Validate-only never reads the prompt
+	// — it prints the resolved config and returns ExitOK — so a placeholder
+	// satisfies the guard without changing behavior. A real run (VALIDATE_ONLY=0)
+	// always carries a non-empty PROMPT_FILE, so this never masks a missing prompt.
+	if prompt == "" {
+		prompt = "(validate-only: no prompt)"
+	}
+	eng := gobridge.NewEngine(gobridge.Deps{Env: env})
+	resp, err := eng.Launch(ctx, core.BridgeRequest{
+		CLI:          cli,
+		Profile:      env["PROFILE_PATH"],
+		Model:        env["RESOLVED_MODEL"],
+		Prompt:       prompt,
+		Workspace:    env["WORKSPACE_PATH"],
+		Worktree:     env["WORKTREE_PATH"],
+		ArtifactPath: env["ARTIFACT_PATH"],
+		StdoutLog:    env["STDOUT_LOG"],
+		StderrLog:    env["STDERR_LOG"],
+		Cycle:        atoiOrZero(env["CYCLE"]),
+		Env:          env,
+	})
+	if err != nil {
+		// Infra error from the bridge itself (guard failure, prompt write, …):
+		// resp is the zero value (ExitCode 0), and "exit 0 + error" misleads
+		// VerifyArtifact. Mirror the old bash defaultExecAdapter: -1 on error.
 		return -1, err
 	}
-	return 0, nil
+	return resp.ExitCode, nil
+}
+
+// atoiOrZero parses a base-10 integer, returning 0 on any error or for
+// negative values (the bridge treats Cycle<=0 as "no cycle", matching the
+// bash adapter's unset-CYCLE path).
+func atoiOrZero(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }

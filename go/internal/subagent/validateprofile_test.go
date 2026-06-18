@@ -490,67 +490,110 @@ func TestCapBoolEnv(t *testing.T) {
 	}
 }
 
-func TestDefaultAdapterExists_RealFilesystem(t *testing.T) {
+// TestDefaultAdapterExists_DriverPresence pins the post-bridge-cutover meaning
+// of the existence pre-flight: it is now "does the resolved CLI map onto a
+// REGISTERED bridge driver?" (bridge.DriverFor + LookupDriver), not "is the
+// <cli>.sh file executable?". The path's base name carries the cli; a bare
+// name ("claude") projects onto its tmux driver, a driver name passes through,
+// and an unknown name has no driver.
+func TestDefaultAdapterExists_DriverPresence(t *testing.T) {
 	tmp := t.TempDir()
-	missing := filepath.Join(tmp, "nope.sh")
-	if defaultAdapterExists(missing) {
-		t.Errorf("expected false for missing")
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{filepath.Join(tmp, "claude.sh"), true},      // bare → claude-tmux (registered)
+		{filepath.Join(tmp, "gemini.sh"), true},      // bare → claude-tmux (registered)
+		{filepath.Join(tmp, "claude-tmux.sh"), true}, // already a driver
+		{filepath.Join(tmp, "codex.sh"), true},       // registered driver
+		{filepath.Join(tmp, "agy.sh"), true},         // bare → agy-tmux (registered)
+		{filepath.Join(tmp, "nope.sh"), false},       // no driver
 	}
-	notExec := filepath.Join(tmp, "not-exec.sh")
-	if err := os.WriteFile(notExec, []byte("#!/bin/sh\n"), 0o644); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	if defaultAdapterExists(notExec) {
-		t.Errorf("expected false for non-executable")
-	}
-	exec := filepath.Join(tmp, "exec.sh")
-	if err := os.WriteFile(exec, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	if !defaultAdapterExists(exec) {
-		t.Errorf("expected true for executable")
-	}
-	if defaultAdapterExists(tmp) {
-		t.Errorf("expected false for directory")
+	for _, tc := range cases {
+		if got := defaultAdapterExists(tc.path); got != tc.want {
+			t.Errorf("defaultAdapterExists(%q)=%v, want %v", tc.path, got, tc.want)
+		}
 	}
 }
 
-func TestDefaultExecAdapter_RealBash(t *testing.T) {
-	tmp := t.TempDir()
-	script := filepath.Join(tmp, "ok.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("seed: %v", err)
+// TestDefaultExecAdapter_DispatchesViaBridge proves the DEFAULT exec path no
+// longer shells `bash <cli>.sh` but instead dispatches through the in-process
+// Go bridge, and that the bare→driver mapping is applied. It drives the
+// VALIDATE_ONLY=1 path (the bridge prints its resolved config and returns
+// ExitOK without invoking any LLM) so the test is hermetic. The env carries a
+// BARE cli ("claude"); a non-zero exit would mean the bridge either rejected
+// the request or never reached its validate-only short-circuit.
+func TestDefaultExecAdapter_DispatchesViaBridge(t *testing.T) {
+	dir := t.TempDir()
+	prof := filepath.Join(dir, "auditor.json")
+	if err := os.WriteFile(prof, []byte(`{"name":"auditor","permission_mode":"bypassPermissions"}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	rc, err := defaultExecAdapter(context.Background(), script, map[string]string{"K": "V"})
+	ws := filepath.Join(dir, "ws")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		"RESOLVED_CLI":   "claude", // BARE — must project onto claude-tmux
+		"PROFILE_PATH":   prof,
+		"RESOLVED_MODEL": "sonnet",
+		"PROMPT_FILE":    "", // validate path: empty prompt (placeholder is injected)
+		"WORKSPACE_PATH": ws,
+		"ARTIFACT_PATH":  filepath.Join(dir, "art.md"),
+		"STDOUT_LOG":     "/dev/null",
+		"STDERR_LOG":     "/dev/null",
+		"CYCLE":          "0",
+		"VALIDATE_ONLY":  "1",
+	}
+	rc, err := defaultExecAdapter(context.Background(), "/ignored/claude.sh", env)
 	if err != nil {
-		t.Fatalf("unexpected: %v", err)
+		t.Fatalf("bridge validate-only dispatch errored: %v", err)
 	}
 	if rc != 0 {
-		t.Errorf("rc=%d", rc)
-	}
-
-	failScript := filepath.Join(tmp, "fail.sh")
-	if err := os.WriteFile(failScript, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	rc, err = defaultExecAdapter(context.Background(), failScript, nil)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if rc != 3 {
-		t.Errorf("rc=%d, want 3", rc)
+		t.Errorf("rc=%d, want 0 (bridge validate-only ExitOK)", rc)
 	}
 }
 
-func TestDefaultExecAdapter_MissingBinaryReturnsError(t *testing.T) {
-	// Force a non-exit error by pointing at a non-existent shell.
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // pre-cancel — exec.CommandContext will see context.Canceled
-	rc, err := defaultExecAdapter(ctx, "/non/existent/script.sh", nil)
-	if err == nil {
-		t.Fatalf("expected error")
+// TestDefaultExecAdapter_UnknownCLIFails proves an unresolvable CLI (no bridge
+// driver) surfaces a non-zero exit + error from the bridge rather than silently
+// succeeding — the dispatch path fails loudly when no driver can serve the cli.
+func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
+	dir := t.TempDir()
+	prof := filepath.Join(dir, "auditor.json")
+	if err := os.WriteFile(prof, []byte(`{"name":"auditor","permission_mode":"bypassPermissions"}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if rc != -1 {
-		t.Errorf("rc=%d, want -1", rc)
+	ws := filepath.Join(dir, "ws")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		"RESOLVED_CLI":   "no-such-cli", // no registered driver
+		"PROFILE_PATH":   prof,
+		"RESOLVED_MODEL": "sonnet",
+		"PROMPT_FILE":    "",
+		"WORKSPACE_PATH": ws,
+		"ARTIFACT_PATH":  filepath.Join(dir, "art.md"),
+		"STDOUT_LOG":     "/dev/null",
+		"STDERR_LOG":     "/dev/null",
+		"CYCLE":          "0",
+		"VALIDATE_ONLY":  "0", // real-launch path so the no-driver miss surfaces
+	}
+	rc, err := defaultExecAdapter(context.Background(), "/ignored/no-such-cli.sh", env)
+	if err == nil {
+		t.Fatalf("expected error for unknown cli, got nil (rc=%d)", rc)
+	}
+	if rc == 0 {
+		t.Errorf("rc=%d, want non-zero for unknown cli", rc)
+	}
+}
+
+// TestAtoiOrZero pins the permissive cycle parser used to map CYCLE → Cycle.
+func TestAtoiOrZero(t *testing.T) {
+	cases := map[string]int{"": 0, "0": 0, "42": 42, "007": 7, "x": 0, "1.5": 0, "-3": 0}
+	for in, want := range cases {
+		if got := atoiOrZero(in); got != want {
+			t.Errorf("atoiOrZero(%q)=%d, want %d", in, got, want)
+		}
 	}
 }
