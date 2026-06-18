@@ -6,7 +6,7 @@ import "testing"
 // campaign. Every cycle that removes flags must lower this constant in the
 // same diff — the test below fails if a net addition pushes count above the
 // current ceiling.
-const FlagCeiling = 158
+const FlagCeiling = 155
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

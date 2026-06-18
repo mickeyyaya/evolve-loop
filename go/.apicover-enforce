@@ -269,3 +269,7 @@
 # cycle-12 ACS predicate package (2026-06-19): consolidate-bridge-cluster.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle12
+
+# cycle-13 ACS predicate package (2026-06-19): consolidate-checkpoint-cluster.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle13
