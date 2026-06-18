@@ -243,11 +243,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_AUTO_RESUME_MAX_ATTEMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BACKFILL_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BOOT_TIMEOUT_S` | active | int | 60 | Platform / CLI Hybrid | Boot-wait deadline in seconds for the tmux REPL driver (CI boot-budget override; default tmuxREPLBootTimeoutS=60). Readers: go/internal/bridge/driver_tmux_repl.go, recipe_adapter.go |
-| `EVOLVE_BRIDGE_CATALOG_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BRIDGE_GO` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BRIDGE_MANIFEST_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BRIDGE_PIDFILE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BRIDGE_RECIPE_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_REVIEW_SKILLS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_REVIEW_THRESHOLD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_SELF_REVIEW` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

@@ -265,3 +265,7 @@
 # cycle-11 ACS predicate package (2026-06-19): consolidate-observer-inactivity-cluster.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle11
+
+# cycle-12 ACS predicate package (2026-06-19): consolidate-bridge-cluster.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle12

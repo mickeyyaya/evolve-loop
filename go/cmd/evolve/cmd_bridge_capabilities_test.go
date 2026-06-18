@@ -49,9 +49,8 @@ func TestCapabilitiesCLI_Errors(t *testing.T) {
 	}
 }
 
-// writeOverrideCatalog points EVOLVE_BRIDGE_CATALOG_DIR at a temp dir holding a
-// tiny deterministic catalog, so drift tests don't depend on the full embedded
-// command list.
+// writeOverrideCatalog configures a policy-backed temp directory holding a tiny
+// deterministic catalog, so drift tests don't depend on the embedded list.
 func writeOverrideCatalog(t *testing.T, cmds string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -59,7 +58,7 @@ func writeOverrideCatalog(t *testing.T, cmds string) {
 	if err := os.WriteFile(filepath.Join(dir, "claude-tmux.json"), []byte(cat), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_BRIDGE_CATALOG_DIR", dir)
+	writeBridgePolicy(t, map[string]string{"catalog_dir": dir})
 }
 
 func TestIntrospectCLI_OfflineClean(t *testing.T) {

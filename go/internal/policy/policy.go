@@ -71,6 +71,9 @@ type Policy struct {
 	// Observer configures phase liveness observation and watchdog behavior.
 	// Absent ⇒ built-in defaults apply.
 	Observer *ObserverPolicy `json:"observer,omitempty"`
+	// Bridge configures operator-writable bridge override directories.
+	// Absent ⇒ each bridge subsystem uses its built-in .evolve directory.
+	Bridge *BridgePolicy `json:"bridge,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -369,4 +372,22 @@ func (p Policy) ObserverConfig() ObserverPolicy {
 	}
 	out.WatchdogDisabled = o.WatchdogDisabled
 	return out
+}
+
+// BridgePolicy configures operator-writable bridge override directories.
+// Empty fields preserve each subsystem's built-in .evolve directory.
+type BridgePolicy struct {
+	ManifestDir string `json:"manifest_dir,omitempty"`
+	CatalogDir  string `json:"catalog_dir,omitempty"`
+	RecipeDir   string `json:"recipe_dir,omitempty"`
+}
+
+// BridgeConfig returns the configured bridge directories. The zero value is
+// intentional: bridge subsystems resolve empty fields against the canonical
+// project root so relative-path behavior remains centralized.
+func (p Policy) BridgeConfig() BridgePolicy {
+	if p.Bridge == nil {
+		return BridgePolicy{}
+	}
+	return *p.Bridge
 }

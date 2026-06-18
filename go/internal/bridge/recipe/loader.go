@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // recipes/*.json are the embedded recipe definitions, making the engine
@@ -29,13 +32,21 @@ type recipeSource interface {
 
 var recipeFS recipeSource = embeddedRecipes
 
-// recipeDir is the writable override directory consulted before the embedded
-// set: EVOLVE_BRIDGE_RECIPE_DIR, else .evolve/bridge-recipes.
-func recipeDir() string {
-	if d := os.Getenv("EVOLVE_BRIDGE_RECIPE_DIR"); d != "" {
-		return d
+var recipeDirFn = func() string {
+	layout := paths.ResolveFromEnv()
+	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
+	if err == nil {
+		if dir := pol.BridgeConfig().RecipeDir; dir != "" {
+			return dir
+		}
 	}
-	return filepath.Join(".evolve", "bridge-recipes")
+	return filepath.Join(layout.EvolveDir, "bridge-recipes")
+}
+
+// recipeDir is the writable override directory consulted before the embedded
+// set.
+func recipeDir() string {
+	return recipeDirFn()
 }
 
 // LoadRecipe reads, parses, and validates the recipe named name (no .json

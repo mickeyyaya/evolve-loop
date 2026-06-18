@@ -69,7 +69,9 @@ func TestLoadRecipe_OverrideDirWins(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "plugin-install.json"), []byte(override), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_BRIDGE_RECIPE_DIR", dir)
+	orig := recipeDirFn
+	recipeDirFn = func() string { return dir }
+	t.Cleanup(func() { recipeDirFn = orig })
 	r, err := LoadRecipe("plugin-install")
 	if err != nil {
 		t.Fatalf("LoadRecipe: %v", err)
