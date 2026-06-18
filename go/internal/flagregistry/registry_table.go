@@ -157,6 +157,7 @@ var All = []Flag{
 	{Name: "EVOLVE_INTENT_PERMISSION_MODE", Status: StatusTestSeam, Doc: "Read only by _test.go files."},
 	{Name: "EVOLVE_INTERACTIVE_POLICY", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_KB_SEARCH_PATHS", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
+	{Name: "EVOLVE_LANE", Status: StatusActive, Cluster: "Concurrency / Fleet (ADR-0049)", Doc: "Operator-pinned human-readable lane name for a worktree (e.g. EVOLVE_LANE=campaign), overriding the hash-of-root default (runscope.EnvLane). Readability only — correctness never depends on the override; the hash default is collision-safe across distinct roots. Introduced in concurrency-arch-slices Slice 1."},
 	{Name: "EVOLVE_LEDGER_OVERRIDE", Status: StatusActive, Cluster: "Override / Test Seams", Doc: "Override ledger.jsonl path"},
 	{Name: "EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", Status: StatusActive, Kind: "int", Default: "1", Cluster: "Workflow Defaults", Doc: "Consecutive verdict-FAIL cycles a batch absorbs before stopping (default 1 = stop on first FAIL). A PASS/SHIPPED resets the streak; the cap still halts a broken run. rc=3 when any FAIL was absorbed."},
 	{Name: "EVOLVE_MANDATORY_PHASES", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN"},
