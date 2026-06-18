@@ -5,7 +5,8 @@
 // subprocess — so a PreToolUse hook can't observe it. This is the single
 // enforcement point for the review attestation: the manual class verifies it
 // HERE, at the real chokepoint, reusing the exact sha256(git diff HEAD) that
-// the standalone bash runner (commit-gate/commit-gate-runner.sh) wrote.
+// the commit-gate writer (go/internal/commitgate, via `evolve commit-gate run`)
+// stamped into the attestation.
 //
 // Class scope: ONLY --class manual. --class cycle keeps audit-binding
 // (autonomous cycles are exempt by construction); --class release/trivial are

@@ -22,8 +22,9 @@ node_modules/
 .antigravitycli/
 
 # Commit-gate review attestation (per-project runtime state). Written by the
-# /commit skill's runner (commit-gate/commit-gate-runner.sh) and verified by the
-# commit-gate PreToolUse hook. Never committed — it binds to the local tree SHA.
+# /commit skill's gate (`evolve commit-gate run`, go/internal/commitgate/) and
+# verified at the commit chokepoint (`evolve ship --class manual`). Never
+# committed — it binds to the local tree SHA.
 .commit-gate/
 
 # Evolve Loop runtime state (generated per-project, not part of the plugin)

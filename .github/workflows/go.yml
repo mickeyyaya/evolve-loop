@@ -5,16 +5,12 @@ on:
     branches: [main, go-rewrite-phase-1]
     paths:
       - 'go/**'
-      - 'commit-gate/**'
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
-      - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
   pull_request:
     paths:
       - 'go/**'
-      - 'commit-gate/**'
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
-      - 'go/test/commitgate/commit-gate-test.sh'
       - '.github/workflows/go.yml'
 
 permissions:
@@ -68,12 +64,6 @@ jobs:
           go tool cover -func=coverage.txt
       - name: e2e tier (no race; live sub-tier self-skips without EVOLVE_E2E_LIVE)
         run: go test -count=1 -tags e2e ./cmd/... ./test/e2e/...
-      - name: commit-gate gate tests (bash)
-        # Runs here (not ci.yml) because the harness fixtures use `go 1.23`,
-        # which needs the toolchain set up above. golangci-lint is optional in
-        # the runner, so its absence in CI is fine.
-        working-directory: ${{ github.workspace }}
-        run: bash go/test/commitgate/commit-gate-test.sh
       - name: coverage gate (>=85% per internal/* package)
         run: |
           fail=0

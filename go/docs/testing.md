@@ -58,7 +58,7 @@ Two tiers stand outside the axes:
 | Tier | Location | Scope | How to run |
 |---|---|---|---|
 | **Trust-kernel** | `go/test/trustkernel/` | Black-box pinning of safety invariants (ship gate, audit-binding, routing floor, transition legality, profile validity). | `go test ./test/trustkernel/` |
-| **Commit-gate** | `go/test/commitgate/` | `commit-gate-test.sh` over ephemeral repos (bash). | `bash go/test/commitgate/commit-gate-test.sh` |
+| **Commit-gate** | `go/internal/commitgate/` | Unit lanes + a Go-only golden (`parity_test.go`) pinning the attestation byte layout + tree-SHA binding over a real git repo. | `go test ./internal/commitgate/...` |
 
 ## The `go/test/fixtures` harness — single source of truth
 
@@ -278,5 +278,5 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
   — fast + integration tiers + trustkernel, race detector on, coverage captured.
 - `go test -count=1 -tags e2e ./cmd/... ./test/e2e/...` — e2e tier, no race
   (subprocess-heavy); live sub-tier self-skips without `EVOLVE_E2E_LIVE`.
-- `bash go/test/commitgate/commit-gate-test.sh` — commit-gate runner tier.
+- `go test ./internal/commitgate/...` — commit-gate tier (Go; unit + golden).
 - Per-package `internal/*` coverage gate at ≥85% (computed on the integration run).

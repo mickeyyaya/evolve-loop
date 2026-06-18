@@ -88,5 +88,6 @@ triage table maps each back to the failure it prevents.
   `TestCommitGate_ManualValidAttestation_Ships`.
 - `go/internal/phases/ship/*_test.go` — the `TestVerifyAuditBinding_*` family (the
   audit-binding refusals for the `--class cycle` path).
-- `go/test/commitgate/commit-gate-test.sh` — the portable commit-gate runner over
-  ephemeral repos.
+- `go/internal/commitgate/*_test.go` — the commit-gate runner tier (Go): unit
+  lanes plus a Go-only golden pinning the attestation byte layout + tree-SHA
+  binding over a real git repo.

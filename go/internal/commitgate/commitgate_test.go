@@ -196,6 +196,71 @@ func TestRun_GoLanePass_WritesAttestation(t *testing.T) {
 	}
 }
 
+// TestRun_GeneralReviewerAlone_ExitPass is the full-pipeline successor to bash
+// commit-gate-test.sh T4: the general `code-reviewer` (no language reviewer)
+// satisfies the "one review" precondition end-to-end, so a clean Go change runs
+// to ExitPass. TestReviewersSatisfied covers the precondition decision in
+// isolation; this proves it through the whole Run.
+func TestRun_GeneralReviewerAlone_ExitPass(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
+	mustWrite(t, filepath.Join(root, "x.go"), "package x\n")
+	o := baseOpts(root, "shasum", "go")
+	o.Reviewers = "code-simplifier,code-reviewer" // general reviewer, no go-reviewer
+	o.Env = os.Environ()
+	sr := &scriptRunner{rules: []scriptRule{
+		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
+		{matchPrefix: "git diff HEAD", stdout: "diff\n", exit: 1},
+		{matchPrefix: "gofmt -s -l", stdout: ""},
+		{matchPrefix: "go vet", exit: 0},
+		{matchPrefix: "go test", exit: 0},
+	}}
+	o.Runner = sr.run()
+	res := o.Run(context.Background())
+	if res.ExitCode != ExitPass {
+		t.Fatalf("ExitCode = %d, want %d (%v)", res.ExitCode, ExitPass, res.Logs)
+	}
+	// Prove the Go lane actually RAN — a regression that bypassed it would still
+	// satisfy the precondition and leave ExitPass, so assert the recorded checks.
+	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
+		t.Fatalf("ChecksPassed = %v, want [go:gofmt go:vet go:test]", res.ChecksPassed)
+	}
+}
+
+// TestRun_EccPrefixedReviewer_ExitPass is the full-pipeline successor to bash
+// commit-gate-test.sh T5: ECC namespace prefixes are stripped for the precondition
+// (ecc:go-reviewer counts as go-reviewer), so a clean Go change runs to ExitPass —
+// while reviewers_run records the RAW ecc:-prefixed spelling.
+func TestRun_EccPrefixedReviewer_ExitPass(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
+	mustWrite(t, filepath.Join(root, "x.go"), "package x\n")
+	o := baseOpts(root, "shasum", "go")
+	o.Reviewers = "ecc:code-simplifier,ecc:go-reviewer"
+	o.Env = os.Environ()
+	sr := &scriptRunner{rules: []scriptRule{
+		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
+		{matchPrefix: "git diff HEAD", stdout: "diff\n", exit: 1},
+		{matchPrefix: "gofmt -s -l", stdout: ""},
+		{matchPrefix: "go vet", exit: 0},
+		{matchPrefix: "go test", exit: 0},
+	}}
+	o.Runner = sr.run()
+	res := o.Run(context.Background())
+	if res.ExitCode != ExitPass {
+		t.Fatalf("ExitCode = %d, want %d (%v)", res.ExitCode, ExitPass, res.Logs)
+	}
+	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
+		t.Fatalf("ChecksPassed = %v, want [go:gofmt go:vet go:test]", res.ChecksPassed)
+	}
+	// Precondition strips ecc: prefixes, but reviewers_run keeps the raw spelling.
+	if !reflect.DeepEqual(res.Attestation.ReviewersRun, []string{"ecc:code-simplifier", "ecc:go-reviewer"}) {
+		t.Fatalf("ReviewersRun = %v, want raw ecc:-prefixed", res.Attestation.ReviewersRun)
+	}
+}
+
 func TestRun_GofmtUnformatted_ExitFail(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
