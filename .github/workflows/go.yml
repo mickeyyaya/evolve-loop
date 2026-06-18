@@ -62,7 +62,7 @@ jobs:
           # in the separate step below. See go/docs/testing.md (cost × granularity).
           go test -race -count=1 -tags integration -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
           go tool cover -func=coverage.txt
-      - name: e2e tier (no race; live sub-tier self-skips without EVOLVE_E2E_LIVE)
+      - name: e2e tier (no race; live sub-tier self-skips without live flag)
         run: go test -count=1 -tags e2e ./cmd/... ./test/e2e/...
       - name: coverage gate (>=85% per internal/* package)
         run: |

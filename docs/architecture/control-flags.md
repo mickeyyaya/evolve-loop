@@ -232,51 +232,29 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_ACS_PREDICATE_TIMEOUT_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ADAPTERS_DIR_OVERRIDE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ADVISOR_DEPTH` | active | int | — | Advisor Maximization (ADR-0052) | Recursion-depth stamp for the PhaseAdvisor (advisor-maximization WS1-S2), DEFENSE-IN-DEPTH only: when ≥1 the advisor refuses to dispatch and the cycle degrades to the static path, so a brain can never nest another brain. The PRIMARY recursion guard is the mint denylist (mintConfigsFrom drops any minted phase named router/advisor); this env stamp catches the otherwise-unreachable case where such a phase were dispatched anyway. Unset/0/non-numeric = no guard (byte-identical normal path). |
-| `EVOLVE_AGY_REQUIRE_FULL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_ALLOW_DEEP_RESEARCH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ALLOW_DOC_DELETE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ANTHROPIC_BASE_URL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ARTIFACT_MAX_EXTENDS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ARTIFACT_TIMEOUT_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_AUDITOR_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_AUDITOR_INTERACTIVE_POLICY` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_AUDITOR_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_AUDITOR_TIER_OVERRIDE` | active | — | — | Workflow Defaults | Override auditor model tier |
-| `EVOLVE_AUDIT_INTERACTIVE_POLICY` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_AUDIT_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_AUDIT_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_AUTO_PRUNE` | active | — | — | Workflow Defaults | Enable auto-prune of expired state entries |
 | `EVOLVE_AUTO_RESUME_MAX_ATTEMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BACKFILL_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BASH_PARITY` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BOOT_TIMEOUT_S` | active | int | 60 | Platform / CLI Hybrid | Boot-wait deadline in seconds for the tmux REPL driver (CI boot-budget override; default tmuxREPLBootTimeoutS=60). Readers: go/internal/bridge/driver_tmux_repl.go, recipe_adapter.go |
 | `EVOLVE_BRIDGE_CATALOG_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_GO` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BRIDGE_INTEGRATION_LIVE` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BRIDGE_LIVE_CLI` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BRIDGE_LIVE_CLI_INTERACTIVE` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BRIDGE_MANIFEST_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_PIDFILE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BRIDGE_RECIPE_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BUILD` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILDER_INTERACTIVE_POLICY` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILDER_ISOLATION_STRICT` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILDER_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILDER_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BUILDER_REVIEW_SKILLS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_REVIEW_THRESHOLD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_SELF_REVIEW` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILDER_WORKTREE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BUILD_CLI` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILD_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BUILD_PERMISSION_MODE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BUILD_PLANNER` | active | — | — | Budget Cluster | Opt C build-planner phase. `1` = advisory (default; build-plan.md produced, Builder reads it as a sanity check); `0` = opt-out. Enforce mode in cycle-105 (Builder Step 3 removed). 3-cycle rollout: shadow→advisory→enforce. Revert: `EVOLVE_BUILD_PLANNER=0`. See ADR-0019. |
 | `EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BUILD_PLANNER_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILD_PLAN_INPUT` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILD_PLAN_OUTPUT` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_BUILD_SYSTEM_PROMPT` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_BYPASS_COMMIT_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: skip the `--class manual` commit-gate review attestation (`.commit-gate/attestation.json`). Routine use is a CLAUDE.md violation. `--dry-run` is exempt by construction. Reader: `go/internal/phases/ship/commitgate.go` |
 | `EVOLVE_BYPASS_PHASE_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass phase-gate-precondition |
 | `EVOLVE_BYPASS_POSTEDIT_VALIDATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass postedit validation |
@@ -287,7 +265,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CHECKPOINT_DISABLE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CHECKPOINT_REASON` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CHECKPOINT_REQUEST` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_CHECKPOINT_TRIGGERED` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
 | `EVOLVE_CODEX_CONFIG_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -298,7 +275,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_COMPOSE_PHASES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CONDITIONAL_MANDATORY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | `phase:expr` conditional-mandatory predicate; op ∈ `!= == >= <= > <` |
 | `EVOLVE_CONSENSUS_AUDIT` | active | — | — | Workflow Defaults | Enable consensus-dispatch for auditor |
-| `EVOLVE_CONTEXT_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_CONTRACT_CORRECTION_RETRIES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CONTRACT_GATE` | active | enum | enforce | Gates | Deliverable-contract gate (ADR-0034): off\|shadow\|enforce, circuit breaker demotes after 3 consecutive blocks. |
 | `EVOLVE_DIFF_COMPLEXITY_DISABLE` | active | — | — | Workflow Defaults | Disable diff-complexity check in auditor |
@@ -308,24 +284,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_DISPATCH_PLAN_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_DISPATCH_POLICY` | active | — | — | Workflow Defaults | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
 | `EVOLVE_DISPATCH_REPEAT_THRESHOLD` | active | — | — | Workflow Defaults | Threshold for repeat-cycle detection |
-| `EVOLVE_DOCS_CONTRACT_STRICT` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_DYNAMIC_ROUTING` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
-| `EVOLVE_E2E_ADVISOR_MODEL_CLAUDE` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_ADVISOR_MODEL_OLLAMA` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_ADVISOR` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_BUDGET_USD` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_LLM` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_MATRIX` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_MODEL_OLLAMA` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_RETRIES` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_SMOKE` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_SMOKE_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_SOAK` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_LIVE_TMUX_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_TMUX_LIVE_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_E2E_TMUX_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_EVAL_GATE` | active | enum | enforce | Gates | Structural eval gates (internal/evalgate): off\|shadow\|enforce. Gate A scout eval materialization, Gate B tdd predicate quality, Gate C floor binding (R9.3). |
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
 | `EVOLVE_FLEET_SCOPE` | active | string | — | Fleet Cluster (Track C concurrency) | Comma-joined todo IDs assigned to this fleet cycle (ADR-0049 E); the launched cycle's triage selects only its disjoint subset. Empty/unset ⇒ the cycle works the whole backlog. Reader: go/internal/core/cyclerun.go (set by the `evolve fleet` supervisor, fleet/fleet.go) |
@@ -341,8 +300,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_INACTIVITY_THRESHOLD_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INACTIVITY_WARN_PCT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INTENT_DELTA` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_INTENT_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_INTENT_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_KB_SEARCH_PATHS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_LEDGER_OVERRIDE` | active | — | — | Override / Test Seams | Override ledger.jsonl path |
@@ -353,9 +310,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_MODELCATALOG_AUTOREFRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_MODELCATALOG_CLASSIFIER_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_MODEL_CATALOG_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_NAMELESS` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_NATIVE_SHIP` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_NO_EQUALS` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_OBSERVER_AUTOSPAWN` | active | bool | 1 | Observer | Auto-spawn the per-phase observer goroutine (ADR-0030); 0 opts out. |
 | `EVOLVE_OBSERVER_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_OBSERVER_ENFORCE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -364,7 +318,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_OBSERVER_NUDGE_S` | active | int | 300 | Observer | Soft-stall nudge threshold (seconds); default 300 (opt-out via =0). When >0 and idle reaches this before STALL_S, appends ONE nudge envelope to the agent inbox before hard SIGTERM. |
 | `EVOLVE_OBSERVER_POLL_S` | active | int | 5 | Observer | Stat-poll interval (seconds) for the auto-spawned observer's stdout-log growth check (ADR-0030). |
 | `EVOLVE_OBSERVER_STALL_S` | active | int | 600 | Observer | Primary stall threshold (seconds) for phase-observer (manual subcommand and auto-spawned adapter per ADR-0030). Bridges from EVOLVE_INACTIVITY_THRESHOLD_S (DEPRECATED). |
-| `EVOLVE_OBSERVER_TEST_KEY` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_OLLAMA_BASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PASS_CONFIDENCE_THRESHOLD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PERSONA_OVERRIDE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -375,10 +328,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PHASE_MAX_ATTEMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PHASE_RECOVERY` | active | — | — | Phase Recovery (ADR-0044, Go-native — one dial for the whole program) | The one dial for BOTH the ADR-0044 phase-recovery program (terminal-state recovery) AND the ADR-0045 corrective-interaction program (repair a live/just-completed phase through bounded interaction). ADR-0044: fatal-pane fast-fail at the stop-review checkpoint, the observer's chain-backed StallPolicy (subprocess injects it ONLY at explicit `enforce`), and the orchestrator's escalate→advise→promote hook (`config.RolloutStages.PhaseRecovery` view). ADR-0045 corrective ACTIONS ride the SAME stage: the graduated correction ladder (salvage→live-fix→re-dispatch), the pre-85 AskBroker rung, promoted-rule enforcement, and the live bidirectional channel (ADR-0037, folded in at I6 — `enforce` implies the channel). **Telemetry is EXEMPT**: ADR-0045 I1 interaction telemetry (`<phase>-interactions.ndjson` + `interaction-summary.json`) records at EVERY stage including `off` — only ACTIONS gate. Stages: `off` (detectors not consulted, no corrective actions; byte-identical legacy — telemetry still records) / `shadow` (DEFAULT — detect + log the would-act for every rung, legacy behavior decides; byte-identical) / `enforce` (fatal-pane preempt with `stop`; salvage relocates a misplaced deliverable; the kernel answers a blocking question pre-85; promoted enforce-stage rules fire; exit 81 hands the phase to the runner's CLI fallback chain). Unknown value → `off` (a typo never enables a kill-path). A Busy pane is never preempted/interrupted regardless of stage |
 | `EVOLVE_PHASE_ROOTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_PHASE_SCOUT_BIN` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_PLAN_REVIEW` | active | — | — | Workflow Defaults | Enable Sprint 2 plan-review phase (opt-in) |
-| `EVOLVE_PLAN_REVIEWER_INTERACTIVE_POLICY` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_PLAN_REVIEWER_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_PLAN_WORKSPACE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PLATFORM` | active | — | — | Platform / CLI Hybrid | Override platform detection |
 | `EVOLVE_PLUGIN_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Read-only plugin install location |
@@ -398,14 +348,12 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_REQUIRE_INTENT` | active | — | — | Workflow Defaults | Force intent phase on every cycle |
 | `EVOLVE_REQUIRE_TEAM_CONTEXT` | active | — | — | Workflow Defaults | Require team context before builder |
 | `EVOLVE_RESEARCH_CACHE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_RESEARCH_HOOK_DISABLED` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_RESET` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RESUME` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RESUME_ALLOW_HEAD_MOVED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RESUME_COMPLETED_PHASES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RESUME_MODE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RESUME_PHASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_RETROSPECTIVE_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_RETRO_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RETRY_BACKOFF_BASE_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REVIEW_GATE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -421,11 +369,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_RUN_TIMEOUT` | active | — | — | Observability / Prompt Tuning | Per-subagent run timeout |
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | active | — | — | Sandbox Cluster | EPERM fallback for nested-Claude (Darwin 25.4+) |
-| `EVOLVE_SCOUT_CLI` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_SCOUT_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_SCOUT_LATENCY_CEILING_S` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_SCOUT_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_SCOUT_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_SCROLLBACK_LINES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | active | — | — | Workflow Defaults | CI mode: skip interactive y/N in ship.sh |
 | `EVOLVE_SHIP_RELEASE_NOTES` | active | — | — | Workflow Defaults | Create GitHub release on ship |
@@ -447,27 +391,18 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TDD_ENGINEER_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TDD_ENGINEER_PERMISSION_MODE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TDD_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_TDD_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_TDD_PHASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TDD_PHASE_N` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_TDD_PLAN_INPUT` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |
-| `EVOLVE_TEST_COST_GUARD_STRICT` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_TEST_COST_THRESHOLD` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_TEST_PHASE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TRACKER_TTL_DAYS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL` | active | — | — | Triage Cluster (cycle 7 trim) | Opt A: auto-skip Triage when 3 conditions hold (≤1 scout task AND empty carryoverTodos AND predicate-dependency-check.sh exit 0). Default on (=1); opt-out with =0. Writes a stub `triage-decision.{md,json}` with `auto_skip: true` so downstream phases see consistent inputs. |
 | `EVOLVE_TRIAGE_CAP_GATE` | active | enum | enforce | Gates | R9.2 triage capacity clamp: off\|shadow\|enforce. Committed coverage floors above ceil(1.25·K observed throughput) reject triage into the correction ladder. |
 | `EVOLVE_TRIAGE_DISABLE` | active | — | — | Triage Cluster (cycle 7 trim) | Opt-out of triage default-on (v8.59+) |
-| `EVOLVE_TRIAGE_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
-| `EVOLVE_TRIAGE_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_TRIAGE_TOP_N` | active | — | — | Triage Cluster (cycle 7 trim) | Override triage top_n selection count |
 | `EVOLVE_USE_LEGACY_BASH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 | `EVOLVE_WORKTREE_BASE` | active | — | — | Worktree / Workspace | Per-cycle worktree base path |
 | `EVOLVE_WORKTREE_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_WORKTREE_ROOT` | active | — | — | Worktree / Workspace | SOURCE root for generated-doc predicates (dual-root pattern); ACS suite exports the cycle's worktree so `flags check`/`skills check` validate the worktree artifact (cycle-355). |
-| `EVOLVE_X` | test-seam | — | — | — | Read only by _test.go files. |
 
 <!-- GENERATED:flag-index END -->
