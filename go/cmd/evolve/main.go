@@ -19,6 +19,10 @@ Commands:
   version    Print build version and exit
   doctor     Probe environment ( doctor probe <tool> [--json] [--quiet] )
   setup      Onboarding ( setup detect [--json] | setup complete )
+  install    Manual install of evolve-loop agents + the loop skill into
+              ~/.claude ( install [--ci] ); --ci validates structure only
+  uninstall  Remove the manually-installed agents + loop skill from
+              ~/.claude ( uninstall [--ci] ); --ci is a dry-run
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )

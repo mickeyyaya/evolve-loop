@@ -21,7 +21,7 @@ All wrappers are read-only. None mutate state, commit, or push. They are safe to
 
 ## What's NOT here
 
-- `install.sh` / `uninstall.sh` — top-level by convention; referenced from CI.
+- `evolve install` / `evolve uninstall` — manual install/uninstall of the agents + loop skill into `~/.claude` (native subcommands; ported from the former top-level `install.sh`/`uninstall.sh` in Wave D). `evolve install --ci` validates plugin structure.
 - `scripts/release-pipeline.sh` — operator-runnable but heavyweight; kept distinct.
 - `scripts/utility/probe-tool.sh`, `scripts/utility/calibrate.sh`, etc. — ad-hoc helpers, not part of the curated operator surface.
 

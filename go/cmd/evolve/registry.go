@@ -47,6 +47,8 @@ var commands = []subcommand{
 	// Phase 1 + Phase 2 core surface.
 	{Name: "doctor", Summary: "Probe environment", Run: runDoctor},
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
+	{Name: "install", Summary: "Manual install of agents + loop skill into ~/.claude (install [--ci])", Run: runInstall},
+	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: runGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},

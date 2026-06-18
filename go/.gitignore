@@ -10,3 +10,4 @@ apicover-report.txt
 
 # Local dev
 .envrc.local
+/secure-orchestrator

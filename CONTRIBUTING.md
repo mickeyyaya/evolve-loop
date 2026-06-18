@@ -7,7 +7,7 @@ Thanks for your interest in contributing! This guide covers how to add agents, m
 ```bash
 git clone https://github.com/mickeyyaya/evolve-loop.git
 cd evolve-loop
-./install.sh
+evolve install
 ```
 
 ## Contribution Types
@@ -61,7 +61,7 @@ Cross-references count even if the doc isn't loaded into every cycle's context â
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/my-contribution`
 3. Make your changes
-4. Test by running `./install.sh` and executing `/evolve-loop 1` on a test project
+4. Test by running `evolve install` and executing `/evolve-loop 1` on a test project
 5. Submit a PR with summary, phase impact, and test results
 
 ## Code of Conduct

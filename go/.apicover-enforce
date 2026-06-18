@@ -252,3 +252,4 @@
 # via behavior tests, plus a differential-parity test proving the Go writer emits
 # a byte-identical attestation to the bash runner before B2 deletes it.
 ./internal/commitgate
+./internal/installer

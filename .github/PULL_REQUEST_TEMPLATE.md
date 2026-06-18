@@ -19,7 +19,7 @@
 
 ## Test Plan
 
-- [ ] Ran `./install.sh` successfully
+- [ ] Ran `evolve install` successfully
 - [ ] Ran `/evolve-loop 1` on a test project
 - [ ] Verified affected workspace files are generated correctly
 - [ ] Verified ledger entries have correct format

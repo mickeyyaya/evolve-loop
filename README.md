@@ -445,7 +445,7 @@ Set `EVOLVE_GO_BIN=$(pwd)/go/bin/evolve` (or drop the binary on `PATH`). The Go 
 ```bash
 git clone https://github.com/mickeyyaya/evolve-loop.git
 cd evolve-loop
-./install.sh
+evolve install
 ```
 
 ### First-time setup (`/setup`)
