@@ -253,3 +253,8 @@
 # a byte-identical attestation to the bash runner before B2 deletes it.
 ./internal/commitgate
 ./internal/installer
+
+# ADR-0054 campaign planner: deterministic plan verification/rendering and the
+# dependency-level engine are both public internal APIs consumed by cmd/evolve.
+./internal/campaign
+./internal/dag
