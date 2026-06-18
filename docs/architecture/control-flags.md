@@ -35,11 +35,8 @@
 |------|--------|---------|
 | `EVOLVE_SANDBOX` | ACTIVE | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | ACTIVE | EPERM fallback for nested-Claude (Darwin 25.4+) |
-| `EVOLVE_INNER_SANDBOX` | ACTIVE | Tri-state inner sandbox: `1`=force-enable, `0`=force-disable, unset=auto from environment.json |
-| `EVOLVE_FORCE_INNER_SANDBOX` | DEPRECATED | Bridged to `EVOLVE_INNER_SANDBOX=1` (v8.60+); emits stderr WARN; removal target v8.61+ |
 
-> **Cycle 8 delivered**: `EVOLVE_FORCE_INNER_SANDBOX` is now deprecated with a bridge in `claude.sh`.
-> Use `EVOLVE_INNER_SANDBOX=1` for force-enable, `EVOLVE_INNER_SANDBOX=0` for force-disable.
+> **Cycle 7 retirement**: The two inner-sandbox flags were removed (no Go reader; the Go bridge controls inner-sandbox via `sandbox.ShouldWrap`). Use `EVOLVE_SANDBOX=on/off`.
 
 ## Budget Cluster
 
@@ -138,7 +135,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_WORKTREE_BASE` | ACTIVE | Per-cycle worktree base path |
 | `EVOLVE_SKIP_WORKTREE` | ACTIVE | Emergency hatch: skip per-cycle worktree isolation |
 | `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD | Dry-run worktree provisioning [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD | Mark profile as worktree-aware [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Readiness Gate (pre-batch)
 
@@ -206,7 +202,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | ACTIVE | Max instinct summaries in state.json |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | ACTIVE | Carryover todos threshold |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | ACTIVE | Force release preflight gate |
-| `EVOLVE_REINVOKE_CMD` | ACTIVE | Stored reinvoke command for rate-limit recovery |
 | `EVOLVE_MARKETPLACE_DIR` | ACTIVE | Override marketplace dir (test/release seam) |
 
 ## Override / Test Seams
@@ -247,7 +242,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Cycle | Cluster | Action |
 |-------|---------|--------|
 | 7 (done) | State-file | Deprecated `EVOLVE_STATE_OVERRIDE` → `EVOLVE_STATE_FILE_OVERRIDE` |
-| 8 (done) | Sandbox | Deprecated `EVOLVE_FORCE_INNER_SANDBOX` → `EVOLVE_INNER_SANDBOX=1` bridge (v8.60) |
+| 8 (done) | Sandbox | Deprecated inner-sandbox flags via bridge (v8.60); retired in cycle-7 |
 | 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
 | 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` → `EVOLVE_DISPATCH_POLICY={off\|verify\|stop}` (v8.60) |
 | 11 | Require Phases | Investigate `EVOLVE_REQUIRE_INTENT` + `EVOLVE_REQUIRE_TEAM_CONTEXT` → unified `EVOLVE_REQUIRED_PHASES` list flag |
@@ -379,7 +374,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
 | `EVOLVE_FLEET_SCOPE` | active | string | — | Fleet Cluster (Track C concurrency) | Comma-joined todo IDs assigned to this fleet cycle (ADR-0049 E); the launched cycle's triage selects only its disjoint subset. Empty/unset ⇒ the cycle works the whole backlog. Reader: go/internal/core/cyclerun.go (set by the `evolve fleet` supervisor, fleet/fleet.go) |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FORCE_INNER_SANDBOX` | deprecated | — | — | Sandbox Cluster | Deprecation bridge: `EVOLVE_FORCE_INNER_SANDBOX=1` → `EVOLVE_INNER_SANDBOX=1` → `EVOLVE_SANDBOX`. Former reader adapters/claude.sh:323 removed in the script→Go migration; no Go reader — superseded. Replaced by `EVOLVE_INNER_SANDBOX`. |
 | `EVOLVE_GC` | active | enum | off | GC / Retention | GC shadow stage (L3.4). off=disabled (default); shadow=discover+plan+log manifest to workspace without mutations; enforce=shadow+apply (opt-in; honors quarantine/ledger/live hard rules). |
 | `EVOLVE_GO_BIN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_GO_BIN_TEST` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -390,7 +384,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_INACTIVITY_POLL_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INACTIVITY_THRESHOLD_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INACTIVITY_WARN_PCT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_INNER_SANDBOX` | deprecated | enum | — | Sandbox Cluster | Tri-state inner sandbox: `1`=force-enable, `0`=force-disable, unset=auto. Former reader adapters/claude.sh:342 removed in the script→Go migration; the Go bridge controls inner-sandbox via EVOLVE_SANDBOX → sandbox.ShouldWrap (internal/bridge/sandbox_wrap.go); no Go reader — superseded. Replaced by `EVOLVE_SANDBOX`. |
 | `EVOLVE_INTENT_DELTA` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INTENT_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_INTENT_PERMISSION_MODE` | test-seam | — | — | — | Read only by _test.go files. |
@@ -436,7 +429,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_POLICY_BYPASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROFILES_DIR_OVERRIDE` | active | — | — | Override / Test Seams | Override profiles dir path |
 | `EVOLVE_PROFILE_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_PROFILE_WORKTREE_AWARE` | deprecated | bool | 0 | Worktree / Workspace | Mark profile as worktree-aware (v8.23.3 BUG-009). Former reader adapters/claude.sh:278 removed in the script→Go migration; the Go bridge handles worktree-aware dispatch via BridgeRequest.Worktree directly; no Go reader — superseded. |
 | `EVOLVE_PROJECT_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Writable project directory (dual-root pattern) |
 | `EVOLVE_PROMPTS_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROMPT_MAX_TOKENS` | active | — | — | Observability / Prompt Tuning | Soft prompt token cap for role-context-builder |
@@ -445,7 +437,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_QUOTA_RESET_AT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_QUOTA_RESET_HOURS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_REINVOKE_CMD` | deprecated | string | — | Observability / Prompt Tuning | Reinvoke command surfaced in the rate-limit-recovery hint. Former reader adapters/claude.sh:624 removed in the script→Go migration; the Go bridge handles rate-limit recovery via manifest interactive_prompts; no Go reader — superseded. |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REQUIRE_INTENT` | active | — | — | Workflow Defaults | Force intent phase on every cycle |
