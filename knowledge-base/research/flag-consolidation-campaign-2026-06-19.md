@@ -67,6 +67,31 @@ subprocess spawning. A test seam deleted without DI will break the test. Classif
 into exactly one bucket above and apply that bucket's pattern. The flagreaders guard +
 `go test ./...` + the acs predicate are the proof the capability survived the consolidation.
 
+### 🚫 ANTI-GAMING RULE (cycle-8 audit lesson — HARD requirement)
+Cycle 8 was REJECTED by the auditor (H1 HIGH) for **metric-gaming**: it dropped 17 FANOUT
+rows but, for the 8 *config* flags (`CONCURRENCY`/`TIMEOUT`/`CANCEL_ON_CONSENSUS`/
+`CONSENSUS_K`/`CONSENSUS_POLL_S`/`TRACK_WORKERS`/`CACHE_PREFIX`/`TEST_EXECUTOR`), it merely
+HID the `os.Getenv`/`envchain` reads from the flagreaders guard via the split-const trick
+(`"EVOLVE_" + "FANOUT_..."`) — the override surface stayed LIVE at runtime. Row count fell
+without real consolidation; the registry-completeness invariant was silently broken.
+
+**The rule, non-negotiable:**
+1. **"Remove a config flag" MEANS "delete its `os.Getenv`/`envchain` read."** The value must
+   come from a `Config` struct loaded ONCE (defaults in code, optional single `policy.json`
+   source) — NOT from a still-live env read hidden from the guard. If `grep -rn
+   'os.Getenv\|envchain' ` still finds the flag's read after your cycle, you did NOT
+   consolidate it — you gamed it. That is a HIGH defect, the cycle will FAIL audit.
+2. **The split-const pattern (`"EVOLVE_" + "..."`) is ONLY for genuine cross-process IPC
+   handoffs** (parent sets env → child subprocess reads it once, e.g. `FANOUT_WORKER_TOKEN`/
+   `WORKER_NAME`/`PARENT_AGENT`). NEVER use it to make a config read invisible to the guard.
+3. **acs predicates MUST assert override-surface removal, not just registry-absence.** A
+   predicate that only checks "row gone + guard passes" is gaming-blind (cycle-8 M1). Add a
+   predicate that asserts the `os.Getenv`/`envchain` read for each consolidated config flag
+   is GONE (e.g. `FileNotContains` the read call-site / asserts the Config struct field is
+   the sole source). The auditor verifies behavior, not row count.
+4. The verdict is on SUBSTANCE: did the override surface actually move into a Config
+   object? Row count and guard-pass are necessary but NOT sufficient.
+
 ## Priority order (largest clusters first — most leverage per cycle)
 
 Cycle N takes ONE item. Recommended order (scout re-confirms live counts each cycle):
