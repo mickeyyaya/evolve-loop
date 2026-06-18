@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 type failingProvisioner struct {
@@ -183,7 +185,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := filepath.Join(root, ".evolve", "worktrees", "cycle-282-wbase")
+		want := filepath.Join(root, ".evolve", "worktrees", "cycle-"+gitexec.WorktreeToken(root)+"-282-wbase")
 		if wt != want {
 			t.Fatalf("CreateWorker default base = %q, want %q", wt, want)
 		}
@@ -203,7 +205,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 		root := gitInit(t)
 		base := filepath.Join(root, ".evolve", "worktrees")
 		t.Setenv("EVOLVE_WORKTREE_BASE", base)
-		stale := filepath.Join(base, "cycle-282-integration")
+		stale := filepath.Join(base, "cycle-"+gitexec.WorktreeToken(root)+"-282-integration")
 		if err := os.MkdirAll(stale, 0o755); err != nil {
 			t.Fatal(err)
 		}

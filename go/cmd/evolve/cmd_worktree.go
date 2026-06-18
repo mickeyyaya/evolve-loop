@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
@@ -71,7 +72,10 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve worktree create: mkdir: %v\n", err)
 		return 1
 	}
-	wt := filepath.Join(base, fmt.Sprintf("cycle-%d", cycle))
+	// Token-namespaced path so this CLI provisions/locates the SAME directory the
+	// in-process core.gitWorktree provisioner uses (gitexec.WorktreeToken), and so
+	// concurrent worktrees under a shared base never collide.
+	wt := filepath.Join(base, fmt.Sprintf("cycle-%s-%d", gitexec.WorktreeToken(projectRoot), cycle))
 	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", "--detach", wt, "HEAD")
 	var ebuf bytes.Buffer
 	cmd.Stderr = &ebuf
@@ -121,7 +125,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
 	}
 	if cycle > 0 {
-		wt := filepath.Join(base, fmt.Sprintf("cycle-%d", cycle))
+		wt := filepath.Join(base, fmt.Sprintf("cycle-%s-%d", gitexec.WorktreeToken(projectRoot), cycle))
 		cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt)
 		var ebuf bytes.Buffer
 		cmd.Stderr = &ebuf

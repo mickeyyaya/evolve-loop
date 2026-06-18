@@ -47,7 +47,8 @@ func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if want := filepath.Join(base, "cycle-5-integration"); wt != want {
+	integBranch := "cycle-" + gitexec.WorktreeToken("/repo") + "-5-integration"
+	if want := filepath.Join(base, integBranch); wt != want {
 		t.Errorf("wt = %q, want %q", wt, want)
 	}
 	// Fresh add: the worktree dir does not exist, so no reuse rev-parse probe —
@@ -55,7 +56,7 @@ func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	if keys := fake.CallKeys(); !reflect.DeepEqual(keys, []string{"git worktree"}) {
 		t.Fatalf("calls = %v, want [git worktree]", keys)
 	}
-	wantArgs := []string{"worktree", "add", "-B", "cycle-5-integration", wt, "HEAD"}
+	wantArgs := []string{"worktree", "add", "-B", integBranch, wt, "HEAD"}
 	if got := fake.Calls[0].Args; !reflect.DeepEqual(got, wantArgs) {
 		t.Errorf("args = %v, want %v", got, wantArgs)
 	}
