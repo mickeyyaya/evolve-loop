@@ -5,11 +5,19 @@
 //
 // Two surfaces, matching the bash exactly:
 //
-//   - Validate (CI mode): asserts the plugin manifest, the four core evolve-*
-//     agents, and the five loop skill files exist, that each agent file opens
-//     with a `---` YAML frontmatter fence, and that the manifest is valid JSON.
-//     The JSON check folds the legacy `python3 -c "json.load(...)"` snippet into
-//     encoding/json — no python dependency. CI mode copies nothing.
+//   - Validate (CI mode): the single replacement for the whole legacy CI
+//     workflow (Wave E). It folds every check the six ci.yml validation steps
+//     ran — the install.sh structure check, the two python3 plugin/marketplace
+//     JSON validators, and the three inline-bash file-existence loops (agent
+//     frontmatter, loop skill files, reference docs) — into one pass with no
+//     python or bash dependency. It asserts:
+//     plugin.json exists, is valid JSON, and carries every required field
+//     (name/version/description/agents/skills) with agents+skills as JSON
+//     arrays; marketplace.json exists, is valid JSON, and has a non-empty
+//     plugins array; every agents/evolve-*.md (EXCEPT *-reference.md) opens
+//     with a `---` fence and a frontmatter name: + description:; the required
+//     loop skill files exist; and the reference docs exist. Any hard failure
+//     increments Errors so the command exits 1. CI mode copies nothing.
 //   - Install / Uninstall: copies evolve-*.md agents and skills/loop/*.md into
 //     $HOME/.claude (install) or removes them (uninstall). Reproduces the bash
 //     "Overwriting:" vs "Installing:" / "Removing:" log lines and the
@@ -31,9 +39,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
-// coreAgents are the four agent files the CI validator requires by exact name
-// (install.sh lines 41-53). The install/uninstall copy/remove steps instead
-// glob agents/evolve-*.md, which is a superset of these.
+// coreAgents are the four canonical evolve agents. The CI validator now globs
+// every agents/evolve-*.md for frontmatter (so it no longer pins these by exact
+// name), and install/uninstall glob the same set; coreAgents remains the
+// minimal fixture set the tests build a fake layout from.
 var coreAgents = []string{
 	"evolve-scout",
 	"evolve-builder",
@@ -41,14 +50,30 @@ var coreAgents = []string{
 	"evolve-operator",
 }
 
-// loopSkillFiles are the five skill files the CI validator requires under
-// skills/loop/ (install.sh lines 56-63).
+// loopSkillFiles are the skill files the CI validator requires under
+// skills/loop/. install.sh and ci.yml step 5 require the first four; the
+// installer additionally requires online-researcher.md (a strict superset of
+// ci.yml step 5, so it subsumes it).
 var loopSkillFiles = []string{
 	"SKILL.md",
 	"phases.md",
 	"memory-protocol.md",
 	"eval-runner.md",
 	"online-researcher.md",
+}
+
+// pluginRequiredFields are the top-level keys ci.yml step 2 (the python3
+// plugin.json validator) required to be present. agents and skills must
+// additionally be JSON arrays (checked in validateManifestFields).
+var pluginRequiredFields = []string{"name", "version", "description", "agents", "skills"}
+
+// referenceDocs are the docs/reference/*.md files ci.yml step 6 required to
+// exist (paths post the v8.48.0 docs/ reorg; island-model.md was removed in the
+// skill-publishing cleanup, so it is not required).
+var referenceDocs = []string{
+	"docs/reference/genes.md",
+	"docs/reference/instincts.md",
+	"docs/reference/configuration.md",
 }
 
 // Version is the human-facing release line the manual installer prints. It
@@ -76,11 +101,13 @@ type ValidateResult struct {
 
 // Validate runs CI mode: it inspects the plugin layout rooted at srcDir,
 // writing OK/FAIL/WARN lines to out, and returns the summary. It mutates
-// nothing on disk. This is the Go form of `install.sh --ci`.
+// nothing on disk. This single pass is the Go replacement for all six legacy
+// ci.yml validation steps (Wave E of the bash→Go migration).
 func Validate(srcDir string, out io.Writer) ValidateResult {
 	res := ValidateResult{}
 
-	// Plugin manifest: existence + valid JSON (the python3 json.load fold).
+	// Plugin manifest: existence, valid JSON, and required fields/array types.
+	// (ci.yml step 1 existence + step 2's python3 plugin.json validator.)
 	manifest := filepath.Join(srcDir, ".claude-plugin", "plugin.json")
 	if !fileExists(manifest) {
 		fmt.Fprintln(out, "FAIL: .claude-plugin/plugin.json not found")
@@ -92,25 +119,19 @@ func Validate(srcDir string, out io.Writer) ValidateResult {
 		} else {
 			fmt.Fprintln(out, "WARN: could not validate JSON")
 		}
+		validateManifestFields(manifest, &res, out)
 	}
 
-	// Core agents: existence + YAML frontmatter fence.
-	for _, agent := range coreAgents {
-		path := filepath.Join(srcDir, "agents", agent+".md")
-		if !fileExists(path) {
-			fmt.Fprintf(out, "FAIL: agents/%s.md not found\n", agent)
-			res.Errors++
-			continue
-		}
-		if !hasFrontmatter(path) {
-			fmt.Fprintf(out, "FAIL: agents/%s.md missing YAML frontmatter\n", agent)
-			res.Errors++
-			continue
-		}
-		fmt.Fprintf(out, "OK: agents/%s.md\n", agent)
-	}
+	// Marketplace manifest: existence, valid JSON, non-empty plugins array.
+	// (ci.yml step 3's python3 marketplace.json validator.)
+	validateMarketplace(filepath.Join(srcDir, ".claude-plugin", "marketplace.json"), &res, out)
 
-	// Loop skill files: existence only.
+	// Agent frontmatter: EVERY agents/evolve-*.md (except *-reference.md) must
+	// open with a `---` fence AND carry name: + description: in the frontmatter.
+	// (ci.yml step 4 — the bash loop over agents/evolve-*.md.)
+	validateAgentFrontmatter(srcDir, &res, out)
+
+	// Loop skill files: existence only. (ci.yml step 5.)
 	for _, skill := range loopSkillFiles {
 		path := filepath.Join(srcDir, "skills", "loop", skill)
 		if !fileExists(path) {
@@ -121,6 +142,16 @@ func Validate(srcDir string, out io.Writer) ValidateResult {
 		fmt.Fprintf(out, "OK: skills/loop/%s\n", skill)
 	}
 
+	// Reference docs: existence only. (ci.yml step 6.)
+	for _, doc := range referenceDocs {
+		if !fileExists(filepath.Join(srcDir, doc)) {
+			fmt.Fprintf(out, "FAIL: %s not found\n", doc)
+			res.Errors++
+			continue
+		}
+		fmt.Fprintf(out, "OK: %s\n", doc)
+	}
+
 	res.Agents = len(globAgentsIn(filepath.Join(srcDir, "agents")))
 	res.Skills = len(globSkills(srcDir))
 
@@ -129,6 +160,97 @@ func Validate(srcDir string, out io.Writer) ValidateResult {
 	fmt.Fprintf(out, "EVOLVE_LOOP_SKILLS=%d\n", res.Skills)
 	fmt.Fprintf(out, "EVOLVE_LOOP_ERRORS=%d\n", res.Errors)
 	return res
+}
+
+// validateManifestFields asserts plugin.json carries every required top-level
+// field and that agents+skills are JSON arrays — the Go fold of ci.yml step 2's
+// python3 validator. A missing field or wrong-typed agents/skills is a hard
+// failure (res.Errors++). A manifest that does not parse is left to the
+// ValidateJSONFile WARN above (this returns early without piling on).
+func validateManifestFields(manifest string, res *ValidateResult, out io.Writer) {
+	raw, err := os.ReadFile(manifest)
+	if err != nil {
+		return
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return // already reported as a JSON WARN.
+	}
+	errs := 0
+	for _, field := range pluginRequiredFields {
+		if _, ok := m[field]; !ok {
+			fmt.Fprintf(out, "FAIL: plugin.json missing field: %s\n", field)
+			res.Errors++
+			errs++
+		}
+	}
+	for _, field := range []string{"agents", "skills"} {
+		if rawField, ok := m[field]; ok && !isJSONArray(rawField) {
+			fmt.Fprintf(out, "FAIL: plugin.json field %q must be an array\n", field)
+			res.Errors++
+			errs++
+		}
+	}
+	if errs == 0 {
+		fmt.Fprintln(out, "OK: plugin.json has all required fields")
+	}
+}
+
+// validateMarketplace asserts marketplace.json exists, parses, and has a
+// non-empty plugins array — the Go fold of ci.yml step 3's python3 validator.
+func validateMarketplace(path string, res *ValidateResult, out io.Writer) {
+	if !fileExists(path) {
+		fmt.Fprintln(out, "FAIL: .claude-plugin/marketplace.json not found")
+		res.Errors++
+		return
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(out, "FAIL: marketplace.json unreadable: %v\n", err)
+		res.Errors++
+		return
+	}
+	var m struct {
+		Plugins []json.RawMessage `json:"plugins"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		fmt.Fprintf(out, "FAIL: marketplace.json invalid JSON: %v\n", err)
+		res.Errors++
+		return
+	}
+	if len(m.Plugins) == 0 {
+		fmt.Fprintln(out, "FAIL: marketplace.json has no plugins")
+		res.Errors++
+		return
+	}
+	fmt.Fprintf(out, "OK: marketplace.json has %d plugin(s)\n", len(m.Plugins))
+}
+
+// validateAgentFrontmatter checks EVERY agents/evolve-*.md (excluding the
+// *-reference.md Layer-3 docs, which intentionally have no frontmatter) for a
+// `---` fence and name: + description: keys — the Go fold of ci.yml step 4's
+// bash loop. Each offending file is a hard failure.
+func validateAgentFrontmatter(srcDir string, res *ValidateResult, out io.Writer) {
+	for _, path := range globAgentsIn(filepath.Join(srcDir, "agents")) {
+		if strings.HasSuffix(path, "-reference.md") {
+			continue
+		}
+		rel := filepath.Join("agents", filepath.Base(path))
+		if !hasFrontmatter(path) {
+			fmt.Fprintf(out, "FAIL: %s missing YAML frontmatter\n", rel)
+			res.Errors++
+			continue
+		}
+		missing := frontmatterMissingKeys(path, "name", "description")
+		if len(missing) > 0 {
+			for _, key := range missing {
+				fmt.Fprintf(out, "FAIL: %s frontmatter missing %q field\n", rel, key)
+				res.Errors++
+			}
+			continue
+		}
+		fmt.Fprintf(out, "OK: %s\n", rel)
+	}
 }
 
 // ValidateJSONFile reports whether path holds syntactically valid JSON. It is
@@ -342,4 +464,47 @@ func hasFrontmatter(path string) bool {
 		first = first[:i]
 	}
 	return strings.TrimRight(first, "\r") == "---"
+}
+
+// isJSONArray reports whether raw is a JSON array value. It is the Go form of
+// the python `isinstance(p['agents'], list)` checks in ci.yml step 2.
+func isJSONArray(raw json.RawMessage) bool {
+	var arr []json.RawMessage
+	return json.Unmarshal(raw, &arr) == nil
+}
+
+// frontmatterMissingKeys returns which of wantKeys are NOT present as `key:`
+// lines inside the file's leading `---`…`---` YAML frontmatter block. It mirrors
+// the bash `sed -n '2,/^---$/p' | grep -q "^name:"` checks in ci.yml step 4:
+// a key matches a line whose first non-blank token is "<key>:". The opening
+// fence is assumed (callers gate on hasFrontmatter first); scanning stops at the
+// closing fence so body text can never satisfy a key.
+func frontmatterMissingKeys(path string, wantKeys ...string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return append([]string(nil), wantKeys...)
+	}
+	found := make(map[string]bool, len(wantKeys))
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimRight(line, "\r")
+		if i > 0 && trimmed == "---" {
+			break // closing fence — stop before the body.
+		}
+		if i == 0 {
+			continue // opening fence.
+		}
+		for _, key := range wantKeys {
+			if strings.HasPrefix(trimmed, key+":") {
+				found[key] = true
+			}
+		}
+	}
+	var missing []string
+	for _, key := range wantKeys {
+		if !found[key] {
+			missing = append(missing, key)
+		}
+	}
+	return missing
 }

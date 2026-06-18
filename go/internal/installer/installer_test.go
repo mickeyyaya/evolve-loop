@@ -21,19 +21,28 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// fakePluginLayout builds a minimal but valid evolve-loop source tree under a
-// fresh temp dir: a valid plugin.json, the four core agents (with frontmatter),
-// the five required loop skill files, plus one extra agent/skill so the glob
-// counts exceed the core minimums.
+// fakePluginLayout builds a minimal but fully-valid evolve-loop source tree
+// under a fresh temp dir, satisfying every CI-mode Validate check: a plugin.json
+// with all required fields (agents+skills as arrays), a marketplace.json with a
+// non-empty plugins array, the core agents (with name: + description:
+// frontmatter), a *-reference.md agent that is correctly skipped, the loop skill
+// files, and the reference docs. Extra agent/skill so the glob counts exceed the
+// core minimums.
 func fakePluginLayout(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, ".claude-plugin/plugin.json", `{"name":"evolve-loop","version":"6.0.0"}`)
+	writeFile(t, root, ".claude-plugin/plugin.json",
+		`{"name":"evolve-loop","version":"6.0.0","description":"d","agents":[],"skills":[]}`)
+	writeFile(t, root, ".claude-plugin/marketplace.json",
+		`{"plugins":[{"name":"evolve-loop"}]}`)
 	for _, a := range coreAgents {
-		writeFile(t, root, "agents/"+a+".md", "---\nname: "+a+"\n---\nbody\n")
+		writeFile(t, root, "agents/"+a+".md", "---\nname: "+a+"\ndescription: d\n---\nbody\n")
 	}
-	// An extra evolve-* agent so the glob count is core+1.
-	writeFile(t, root, "agents/evolve-retrospective.md", "---\nname: evolve-retrospective\n---\n")
+	// An extra evolve-* agent so the glob count is core+2 (with the reference).
+	writeFile(t, root, "agents/evolve-retrospective.md", "---\nname: evolve-retrospective\ndescription: d\n---\n")
+	// A *-reference.md agent: intentionally has NO frontmatter and must be
+	// SKIPPED by the frontmatter check (but still counts in the glob).
+	writeFile(t, root, "agents/evolve-scout-reference.md", "# Scout Reference\nno frontmatter\n")
 	// A non-evolve agent that must NOT be globbed.
 	writeFile(t, root, "agents/other-agent.md", "---\nname: other\n---\n")
 	for _, s := range loopSkillFiles {
@@ -41,8 +50,16 @@ func fakePluginLayout(t *testing.T) string {
 	}
 	// An extra skill file so the skill glob is len(loopSkillFiles)+1.
 	writeFile(t, root, "skills/loop/extra.md", "# extra\n")
+	for _, d := range referenceDocs {
+		writeFile(t, root, d, "# ref\n")
+	}
 	return root
 }
+
+// fakeAgentGlobCount is how many agents/evolve-*.md fakePluginLayout writes:
+// the core agents, plus evolve-retrospective.md, plus evolve-scout-reference.md
+// (other-agent.md is not evolve-* so it is excluded from the glob).
+var fakeAgentGlobCount = len(coreAgents) + 2
 
 func TestValidate_AcceptsWellFormedLayout(t *testing.T) {
 	root := fakePluginLayout(t)
@@ -52,8 +69,8 @@ func TestValidate_AcceptsWellFormedLayout(t *testing.T) {
 	if res.Errors != 0 {
 		t.Fatalf("Errors = %d, want 0; output:\n%s", res.Errors, out.String())
 	}
-	if res.Agents != len(coreAgents)+1 {
-		t.Errorf("Agents = %d, want %d", res.Agents, len(coreAgents)+1)
+	if res.Agents != fakeAgentGlobCount {
+		t.Errorf("Agents = %d, want %d", res.Agents, fakeAgentGlobCount)
 	}
 	if res.Skills != len(loopSkillFiles)+1 {
 		t.Errorf("Skills = %d, want %d", res.Skills, len(loopSkillFiles)+1)
@@ -62,14 +79,21 @@ func TestValidate_AcceptsWellFormedLayout(t *testing.T) {
 	for _, want := range []string{
 		"OK: plugin.json exists",
 		"OK: plugin.json is valid JSON",
+		"OK: plugin.json has all required fields",
+		"OK: marketplace.json has 1 plugin(s)",
 		"OK: agents/evolve-scout.md",
 		"OK: skills/loop/SKILL.md",
+		"OK: docs/reference/genes.md",
 		"EVOLVE_LOOP_VALIDATED=true",
 		"EVOLVE_LOOP_ERRORS=0",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("validate output missing %q\n%s", want, s)
 		}
+	}
+	// The *-reference.md agent must be SKIPPED, not failed.
+	if strings.Contains(s, "evolve-scout-reference.md missing") {
+		t.Errorf("*-reference.md agent should be skipped, not flagged:\n%s", s)
 	}
 }
 
@@ -78,16 +102,24 @@ func TestValidate_FlagsMissingManifestAndAgents(t *testing.T) {
 	var out bytes.Buffer
 	res := Validate(root, &out)
 
-	// 1 manifest + 4 core agents + 5 skills = 10 hard failures.
-	if res.Errors != 1+len(coreAgents)+len(loopSkillFiles) {
-		t.Fatalf("Errors = %d, want %d", res.Errors, 1+len(coreAgents)+len(loopSkillFiles))
+	// Missing-manifest short-circuits the field check, and an empty agents/ dir
+	// globs to zero agents (so no per-agent failure). Hard failures:
+	//   1 plugin.json + 1 marketplace.json + len(loopSkillFiles) skills +
+	//   len(referenceDocs) reference docs.
+	wantErrors := 1 + 1 + len(loopSkillFiles) + len(referenceDocs)
+	if res.Errors != wantErrors {
+		t.Fatalf("Errors = %d, want %d; output:\n%s", res.Errors, wantErrors, out.String())
 	}
 	s := out.String()
-	if !strings.Contains(s, "FAIL: .claude-plugin/plugin.json not found") {
-		t.Errorf("expected manifest FAIL, got:\n%s", s)
-	}
-	if !strings.Contains(s, "FAIL: agents/evolve-builder.md not found") {
-		t.Errorf("expected agent FAIL, got:\n%s", s)
+	for _, want := range []string{
+		"FAIL: .claude-plugin/plugin.json not found",
+		"FAIL: .claude-plugin/marketplace.json not found",
+		"FAIL: skills/loop/SKILL.md not found",
+		"FAIL: docs/reference/genes.md not found",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("expected %q, got:\n%s", want, s)
+		}
 	}
 }
 
@@ -103,6 +135,101 @@ func TestValidate_FlagsAgentMissingFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "FAIL: agents/evolve-auditor.md missing YAML frontmatter") {
 		t.Errorf("expected frontmatter FAIL, got:\n%s", out.String())
+	}
+}
+
+func TestValidate_FlagsAgentMissingDescriptionField(t *testing.T) {
+	root := fakePluginLayout(t)
+	// A fenced agent whose frontmatter has name: but not description:.
+	writeFile(t, root, "agents/evolve-scout.md", "---\nname: evolve-scout\n---\nbody\n")
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1; output:\n%s", res.Errors, out.String())
+	}
+	if !strings.Contains(out.String(), `FAIL: agents/evolve-scout.md frontmatter missing "description" field`) {
+		t.Errorf("expected description-field FAIL, got:\n%s", out.String())
+	}
+}
+
+func TestValidate_FlagsMissingPluginField(t *testing.T) {
+	root := fakePluginLayout(t)
+	// Drop the description field from an otherwise-valid manifest.
+	writeFile(t, root, ".claude-plugin/plugin.json",
+		`{"name":"evolve-loop","version":"6.0.0","agents":[],"skills":[]}`)
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1; output:\n%s", res.Errors, out.String())
+	}
+	if !strings.Contains(out.String(), "FAIL: plugin.json missing field: description") {
+		t.Errorf("expected missing-field FAIL, got:\n%s", out.String())
+	}
+}
+
+func TestValidate_FlagsNonArrayAgentsAndSkills(t *testing.T) {
+	root := fakePluginLayout(t)
+	// agents and skills present but the wrong JSON type (objects, not arrays).
+	writeFile(t, root, ".claude-plugin/plugin.json",
+		`{"name":"n","version":"v","description":"d","agents":{},"skills":"x"}`)
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 2 {
+		t.Fatalf("Errors = %d, want 2; output:\n%s", res.Errors, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, `FAIL: plugin.json field "agents" must be an array`) ||
+		!strings.Contains(s, `FAIL: plugin.json field "skills" must be an array`) {
+		t.Errorf("expected non-array FAILs, got:\n%s", s)
+	}
+}
+
+func TestValidate_FlagsMissingMarketplace(t *testing.T) {
+	root := fakePluginLayout(t)
+	if err := os.Remove(filepath.Join(root, ".claude-plugin", "marketplace.json")); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1; output:\n%s", res.Errors, out.String())
+	}
+	if !strings.Contains(out.String(), "FAIL: .claude-plugin/marketplace.json not found") {
+		t.Errorf("expected marketplace FAIL, got:\n%s", out.String())
+	}
+}
+
+func TestValidate_FlagsEmptyMarketplacePlugins(t *testing.T) {
+	root := fakePluginLayout(t)
+	writeFile(t, root, ".claude-plugin/marketplace.json", `{"plugins":[]}`)
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1; output:\n%s", res.Errors, out.String())
+	}
+	if !strings.Contains(out.String(), "FAIL: marketplace.json has no plugins") {
+		t.Errorf("expected empty-plugins FAIL, got:\n%s", out.String())
+	}
+}
+
+func TestValidate_FlagsMissingReferenceDoc(t *testing.T) {
+	root := fakePluginLayout(t)
+	if err := os.Remove(filepath.Join(root, "docs", "reference", "instincts.md")); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	res := Validate(root, &out)
+
+	if res.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1; output:\n%s", res.Errors, out.String())
+	}
+	if !strings.Contains(out.String(), "FAIL: docs/reference/instincts.md not found") {
+		t.Errorf("expected reference-doc FAIL, got:\n%s", out.String())
 	}
 }
 
@@ -157,8 +284,8 @@ func TestInstall_CopiesAgentsAndSkills(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Install: %v", err)
 	}
-	if res.Agents != len(coreAgents)+1 {
-		t.Errorf("copied Agents = %d, want %d", res.Agents, len(coreAgents)+1)
+	if res.Agents != fakeAgentGlobCount {
+		t.Errorf("copied Agents = %d, want %d", res.Agents, fakeAgentGlobCount)
 	}
 	if res.Skills != len(loopSkillFiles)+1 {
 		t.Errorf("copied Skills = %d, want %d", res.Skills, len(loopSkillFiles)+1)
@@ -219,8 +346,8 @@ func TestUninstall_RemovesAgentsAndSkillDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
-	if res.AgentsRemoved != len(coreAgents)+1 {
-		t.Errorf("AgentsRemoved = %d, want %d", res.AgentsRemoved, len(coreAgents)+1)
+	if res.AgentsRemoved != fakeAgentGlobCount {
+		t.Errorf("AgentsRemoved = %d, want %d", res.AgentsRemoved, fakeAgentGlobCount)
 	}
 	if !res.SkillDirExisted {
 		t.Error("SkillDirExisted = false, want true")
@@ -264,8 +391,8 @@ func TestUninstallDryRun_ListsButDeletesNothing(t *testing.T) {
 
 	var out bytes.Buffer
 	res := UninstallDryRun(home, &out)
-	if res.AgentsRemoved != len(coreAgents)+1 {
-		t.Errorf("would-remove count = %d, want %d", res.AgentsRemoved, len(coreAgents)+1)
+	if res.AgentsRemoved != fakeAgentGlobCount {
+		t.Errorf("would-remove count = %d, want %d", res.AgentsRemoved, fakeAgentGlobCount)
 	}
 	if !res.SkillDirExisted {
 		t.Error("SkillDirExisted = false, want true")

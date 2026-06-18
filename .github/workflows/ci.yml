@@ -6,100 +6,32 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Wave E of the bash→Go migration: the entire plugin-structure validation
+      # — formerly six steps (install.sh + two python3 JSON validators + three
+      # inline-bash file-existence loops) — now lives in installer.Validate and
+      # runs as one script-free `evolve install --ci`. See go/internal/installer.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+
+      - name: Build evolve
+        run: cd go && go build -o bin/evolve ./cmd/evolve
+
       - name: Validate plugin structure
-        run: CI=true ./install.sh
+        run: go/bin/evolve install --ci
 
-      - name: Verify plugin manifest
-        run: |
-          python3 -c "
-          import json, sys
-          with open('.claude-plugin/plugin.json') as f:
-              p = json.load(f)
-          required = ['name', 'version', 'description', 'agents', 'skills']
-          missing = [k for k in required if k not in p]
-          if missing:
-              print(f'FAIL: plugin.json missing fields: {missing}')
-              sys.exit(1)
-          if not isinstance(p['agents'], list):
-              print('FAIL: agents must be an array')
-              sys.exit(1)
-          if not isinstance(p['skills'], list):
-              print('FAIL: skills must be an array')
-              sys.exit(1)
-          print(f'OK: plugin.json has {len(p[\"agents\"])} agents, {len(p[\"skills\"])} skill paths')
-          "
-
-      - name: Verify marketplace manifest
-        run: |
-          python3 -c "
-          import json, sys
-          with open('.claude-plugin/marketplace.json') as f:
-              m = json.load(f)
-          if 'plugins' not in m or len(m['plugins']) == 0:
-              print('FAIL: marketplace.json has no plugins')
-              sys.exit(1)
-          print(f'OK: marketplace.json has {len(m[\"plugins\"])} plugin(s)')
-          "
-
-      - name: Verify agent frontmatter has required fields
-        run: |
-          for agent in agents/evolve-*.md; do
-            # *-reference.md are Layer-3 on-demand reference docs loaded BY an
-            # agent, not dispatchable agents — they intentionally have no
-            # frontmatter, so skip them in this agent-frontmatter check.
-            case "$agent" in *-reference.md) continue ;; esac
-            if ! head -1 "$agent" | grep -q "^---$"; then
-              echo "FAIL: $agent missing YAML frontmatter"
-              exit 1
-            fi
-            # Check for name and description in frontmatter
-            frontmatter=$(sed -n '2,/^---$/p' "$agent" | head -n -1)
-            if ! echo "$frontmatter" | grep -q "^name:"; then
-              echo "FAIL: $agent frontmatter missing 'name' field"
-              exit 1
-            fi
-            if ! echo "$frontmatter" | grep -q "^description:"; then
-              echo "FAIL: $agent frontmatter missing 'description' field"
-              exit 1
-            fi
-            echo "OK: $agent"
-          done
-
-      - name: Verify required skill files exist
-        run: |
-          ERRORS=0
-          for skill in skills/loop/SKILL.md skills/loop/phases.md skills/loop/memory-protocol.md skills/loop/eval-runner.md; do
-            if [ ! -f "$skill" ]; then
-              echo "FAIL: $skill not found"
-              ERRORS=$((ERRORS + 1))
-            else
-              echo "OK: $skill"
-            fi
-          done
-          if [ "$ERRORS" -gt 0 ]; then
-            exit 1
-          fi
-
-      - name: Verify reference docs exist
-        run: |
-          # Paths updated for the v8.48.0 docs/ reorg (moved to docs/reference/);
-          # island-model.md was intentionally removed in the skill-publishing
-          # cleanup (49884d2), so it is no longer required.
-          ERRORS=0
-          for doc in docs/reference/genes.md docs/reference/instincts.md docs/reference/configuration.md; do
-            if [ ! -f "$doc" ]; then
-              echo "FAIL: $doc not found"
-              ERRORS=$((ERRORS + 1))
-            else
-              echo "OK: $doc"
-            fi
-          done
-          if [ "$ERRORS" -gt 0 ]; then
-            exit 1
-          fi
+      # No-orphan invariant: the bash→Go migration removed every .sh/.py; this
+      # fails the build if any reappears. Also enforced per-cycle by the EGPS
+      # acs gate (go/acs/regression/noorphan) — this runs it on every push/PR.
+      - name: No orphaned scripts (zero .sh/.py)
+        run: cd go && go test -tags acs ./acs/regression/noorphan/...
