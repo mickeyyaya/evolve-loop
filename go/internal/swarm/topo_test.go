@@ -43,12 +43,12 @@ func TestTopoOrder(t *testing.T) {
 		{
 			name:    "self-dependency is rejected",
 			workers: []WorkerSpec{w("w0", "w0")},
-			wantErr: "depends_on itself",
+			wantErr: "depends on itself",
 		},
 		{
 			name:    "dangling dependency is rejected",
 			workers: []WorkerSpec{w("w0", "ghost")},
-			wantErr: "unknown worker",
+			wantErr: "unknown node",
 		},
 	}
 	for _, tc := range tests {

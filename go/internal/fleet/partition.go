@@ -31,11 +31,23 @@ func PlanCycles(todos []Todo, count int) (specs []CycleSpec, deferred []Todo) {
 }
 
 // Todo is one unit of backlog work plus the repo files it would touch. The
-// advisor supplies the file scope (from the task's plan / changed-file estimate).
-// JSON tags match the `evolve fleet --plan` backlog file: [{"id","files"}].
+// advisor (or the preliminary-study phase) supplies the file scope. JSON tags
+// match the `evolve fleet --plan` backlog and the richer campaign-plan.json.
 type Todo struct {
 	ID    string   `json:"id"`
 	Files []string `json:"files"`
+	// DependsOn lists todo IDs that must complete before this todo's cycle runs —
+	// the cross-cycle DAG that orders the campaign into waves. Empty = no prereqs.
+	DependsOn []string `json:"depends_on,omitempty"`
+	// Priority orders todos when scheduling is budget-limited (higher runs first);
+	// advisory — it never affects dependency correctness.
+	Priority int `json:"priority,omitempty"`
+	// OutputContract is the one-line done-definition the launched cycle must
+	// satisfy — the explicit per-cycle objective that prevents duplicated/missed
+	// work (2026 multi-agent lesson). Carried through to the cycle.
+	OutputContract string `json:"output_contract,omitempty"`
+	// ToolScope optionally constrains the tools the launched cycle may use.
+	ToolScope []string `json:"tool_scope,omitempty"`
 }
 
 // Partition assigns todos to n concurrent cycle buckets such that every repo
