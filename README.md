@@ -175,7 +175,7 @@ Capability detection (the Go preflight in `go/internal/preflight`, surfaced by `
 
 | Default | Catches |
 |---|---|
-| Intent capture (`EVOLVE_INTENT_ENABLED=1`) | Vague goals → 8-field structured intent |
+| Intent capture (`EVOLVE_REQUIRE_INTENT=1`) | Vague goals → 8-field structured intent |
 | Fan-out for read-only roles | Same-model judge sycophancy in Scout/Auditor/Retrospective |
 | Mutation testing on evals | Tautological predicates (AC-by-grep, echo-PASS) |
 | Adversarial Auditor mode | Same-family judge bias (Builder=Sonnet → Auditor=Opus by default) |

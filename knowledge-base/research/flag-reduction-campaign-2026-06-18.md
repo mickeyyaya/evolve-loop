@@ -33,11 +33,15 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
    removal (PR #96): `EVOLVE_BATCH_BUDGET_*`, `EVOLVE_BUDGET_*`, `EVOLVE_CHECKPOINT_*_PCT`,
    `EVOLVE_MAX_BUDGET_USD`, `EVOLVE_PHASE_COST_CEILING`, `EVOLVE_BUILDER_COST_*`,
    `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD`. "Accepted but ignored" → safe to delete entirely.
-   - **MANDATORY per-flag verification before removal:** the "no reader" claim is from a
-     2026-06-11 inventory and may be stale or Go-only. Grep ALL surfaces
-     (`go/`, `scripts/`, `skills/`, `*.sh`, `.evolve/`, configs) for each name. Note:
-     bash sourcing-guards like `EVOLVE_RESOLVE_ROOTS_LOADED` / `EVOLVE_FAILURE_CLASSIFICATIONS_LOADED`
-     are SET+READ at runtime if their script still exists — do NOT remove blind.
+   - **MANDATORY per-flag verification before removal (now MECHANICALLY ENFORCED):** the
+     "no reader" claim is a 2026-06-11 hint, NOT proof. Grep every surface — `go/`,
+     `.github/`, `skills/`, `agents/`, any `*.sh` — and paste the literal command + its
+     output as removal evidence. The Go-only scan that classified cycle-360's
+     `EVOLVE_INNER_SANDBOX` "dead" (while it had a live `adapters/claude.sh` reader) is the
+     canonical false-dead FAIL. The `flagreaders` ACS guard
+     (`go/acs/regression/flagreaders/`) now scans ALL these surfaces, so removing a row that
+     any surface still references FAILs at the gate — but verify first; do not lean on the
+     gate to catch your own removal.
 2. **Deprecated-bridge retirement.** The 5 `StatusDeprecated` flags + their WARN-bridge
    readers, where `RemoveIn` has passed. Remove the bridge code AND the flag together.
 3. **`internal` classification.** For each of the 111: grep readers across all surfaces.
@@ -55,8 +59,11 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
 
 - **No behavior change for `active` flags.** Removals target dead/no-op/test-only only.
   Every removal gets a regression guard (assert flag absent; assert behavior unchanged).
-- **Verify readers across ALL surfaces before removing** — Go, bash, skills, configs.
-  The 2026-06-11 inventory is a hint, not proof (root-cause/verify rule).
+- **Verify readers across ALL surfaces before removing** — `go/`, `.github/`, `skills/`,
+  `agents/`, `*.sh`. The 2026-06-11 inventory is a hint, not proof (root-cause/verify rule).
+  Now enforced by the broadened `flagreaders` guard (cycle-360 lesson: a Go-only "dead"
+  verdict for a flag with a non-Go reader is a false-dead). Two-part-removal applies to ANY
+  surface: if a non-Go reference remains, delete the reference first, then the registry row.
 - **Single-source-with-projection** (no_feature_flag_sprawl): consolidate via design
   patterns, never add a parallel flag. `control-flags.md` regenerates from the registry
   (now dual-root-correct after ADR-0053).
@@ -69,12 +76,13 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
 
 > Reduce the evolve-loop flag surface and improve its maintainability. The flag registry
 > (`go/internal/flagregistry/registry_table.go`, projected to
-> `docs/architecture/control-flags.md`) has 300 flags but only 80 are active production;
-> 111 are unclassified `internal`, 65 are test-only `test-seam`, ~38 are `dead`, 5 are
-> overdue `deprecated`. Each cycle, pick ONE highest-value, lowest-risk reduction:
-> (a) remove confirmed-dead flags (verify ZERO readers across go/, scripts/, skills/,
-> *.sh, configs — the "no reader (2026-06-11 inventory)" note is a hint, re-verify) plus
-> any vestigial reader and the doc index; (b) retire a past-due deprecated WARN-bridge
+> `docs/architecture/control-flags.md`) has 282 flags but only 82 are active production;
+> 111 are unclassified `internal`, 65 are test-only `test-seam`, 18 are `dead`, 6 are
+> `deprecated` (2 past-due). Each cycle, pick ONE highest-value, lowest-risk reduction:
+> (a) remove confirmed-dead flags (verify ZERO readers across ALL surfaces — go/, .github/,
+> skills/, agents/, *.sh — and paste the grep as evidence; the "no reader (2026-06-11
+> inventory)" note is a hint, re-verify) plus any vestigial reader and the doc index;
+> (b) retire a past-due deprecated WARN-bridge
 > with its reader; (c) classify `internal` flags (dead→remove, real→promote+document);
 > (d) consolidate a cluster of single-decision flags into a config-object/Strategy per
 > the no-flag-sprawl rule. NEVER change behavior of active flags or weaken an integrity
@@ -87,5 +95,14 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
 - Prereq landed: **ADR-0053** dual-root fix (`4ad4c7c3`) — `flags`/`skills check` now
   validate the worktree, so a flag-reduction cycle that regenerates `control-flags.md`
   no longer hits the cycle-355 trap.
-- Next: launch `evolve loop` with the goal-text above for 4 consecutive cycles; monitor
-  each; ultrathink-fix any failure class before continuing.
+- Cycles 356–359 SHIPPED (300→280); cycle-360 FAILED audit (false-dead: removed
+  `EVOLVE_INNER_SANDBOX`/`EVOLVE_FORCE_INNER_SANDBOX` that still had live `adapters/claude.sh`
+  readers). Damage remediated (flags → `StatusDeprecated`; the script→Go migration then
+  deleted all `.sh`). Registry now at **282** (82 active / 111 internal / 65 test-seam /
+  18 dead / 6 deprecated).
+- **Blocker root-caused + fixed (Phase 0):** the false-dead class was SYSTEMIC (2nd after
+  cycle-352) because the `flagreaders` guard + Scout grep scanned Go ONLY. The guard now
+  scans `.github/`, `skills/`, `agents/`, `*.sh` too (`go/acs/regression/flagreaders/`,
+  reproduction test `TestScanTextTree_DetectsNonGoOnlyReference`). 0 orphans on main.
+- Next: resume `evolve loop` at cycle 361 with the goal-text above, self-paced via `/loop`
+  with parallel worktree-agent fan-out; ultrathink-fix any failure class before continuing.

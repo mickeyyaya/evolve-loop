@@ -249,7 +249,7 @@ Phase 1: RESEARCH ── proactive research loop          → online-researcher.
 Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
 Phase 2b: TRIAGE ─── [Triage] top_n scope decision    → agents/evolve-triage.md
-                     (v8.56.0+ Layer C, opt-in via EVOLVE_TRIAGE_ENABLED=1)
+                     (v8.56.0+ Layer C, default-on v8.59+; opt-out via EVOLVE_TRIAGE_DISABLE=1)
 Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
 Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
 Phase 5:   SHIP ────── publish via `evolve release` (or `evolve ship` for non-release commits) → phase5-ship.md
