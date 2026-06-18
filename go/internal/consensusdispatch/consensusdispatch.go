@@ -16,10 +16,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
 // Exit code contract (matches consensus-dispatch.sh):
@@ -44,6 +45,12 @@ type Inputs struct {
 	AdaptersDir     string // optional — defaults to <scripts>/cli_adapters/
 	DispatchDir     string // optional — defaults to <scripts>/dispatch/
 	ConsensusEnvOff bool   // EVOLVE_CONSENSUS_AUDIT=0 → refuse
+
+	// TierFor resolves a voter CLI's quality tier (full|hybrid|degraded|none|
+	// unknown). Optional — defaults to capability.QualityTier over
+	// AdaptersDir/<cli>.capabilities.json with the host probe. Injected by tests
+	// to avoid touching the real PATH.
+	TierFor func(cli string) (string, error)
 }
 
 // Profile mirrors the consensus block from a profile JSON.
@@ -119,7 +126,13 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 
 	// ── voter eligibility filtering ──
 	logf("validating voter capabilities (require_min_tier=%s)...", prof.RequireMinTier)
-	eligible, declared := filterEligible(prof.CLIVoters, prof.RequireMinTier, in.AdaptersDir, stderr)
+	tierFor := in.TierFor
+	if tierFor == nil {
+		tierFor = func(cli string) (string, error) {
+			return capability.QualityTier(in.AdaptersDir, cli, nil)
+		}
+	}
+	eligible, declared := filterEligible(prof.CLIVoters, prof.RequireMinTier, tierFor, stderr)
 	logf("voters: %d declared, %d eligible (after tier filter)", declared, len(eligible))
 	logf("eligible: %s", strings.Join(eligible, " "))
 
@@ -262,56 +275,41 @@ func FilterEligibleAgainstTiers(voters []string, tiers map[string]string, requir
 	return out
 }
 
-// filterEligible runs the bash _capability-check.sh probe for each voter
-// and filters by tier. Logs exclusions to stderr.
-func filterEligible(voters []string, requireMinTier, adaptersDir string, stderr io.Writer) (eligible []string, declaredCount int) {
-	capCheck := filepath.Join(adaptersDir, "_capability-check.sh")
-	if _, err := os.Stat(capCheck); err != nil {
-		// no capability check available — include all, mirror bash WARN behavior
-		fmt.Fprintf(stderr, "[consensus-dispatch] WARN: capability-check missing; cannot validate voters — including all\n")
-		out := make([]string, len(voters))
-		copy(out, voters)
-		return out, len(voters)
-	}
+// filterEligible resolves each voter's quality tier via tierFor (Go-native
+// capability.QualityTier in production) and filters by requireMinTier. A
+// resolution error or empty tier becomes "unknown" — excluded by any
+// require_min_tier of hybrid or above, matching the bash caller's per-voter
+// treatment of a failed _capability-check.sh probe. Logs exclusions to stderr.
+//
+// The old shell-out path also had a GLOBAL bail-out: if _capability-check.sh
+// itself was absent from AdaptersDir, every voter was included with a WARN.
+// That guarded a missing *script*, which never happened in production (the
+// script shipped in adapters/) and is now structurally impossible — the checker
+// is compiled in. So only the per-voter behavior survives: a voter with no
+// <cli>.capabilities.json resolves to "unknown" and is excluded under
+// require≥hybrid (pinned by TestFilterEligible_MissingManifestExcludedUnderHybrid).
+func filterEligible(voters []string, requireMinTier string, tierFor func(string) (string, error), stderr io.Writer) (eligible []string, declaredCount int) {
 	tiers := make(map[string]string, len(voters))
 	for _, cli := range voters {
 		declaredCount++
-		tier := probeQualityTier(capCheck, cli)
+		tier, err := tierFor(cli)
+		if err != nil || tier == "" {
+			tier = "unknown"
+		}
 		tiers[cli] = tier
 	}
 	elig := FilterEligibleAgainstTiers(voters, tiers, requireMinTier)
 	// log exclusions
+	eligSet := make(map[string]bool, len(elig))
+	for _, e := range elig {
+		eligSet[e] = true
+	}
 	for _, cli := range voters {
-		excluded := true
-		for _, e := range elig {
-			if e == cli {
-				excluded = false
-				break
-			}
-		}
-		if excluded {
+		if !eligSet[cli] {
 			fmt.Fprintf(stderr, "[consensus-dispatch]   excluded %s (tier=%s, require>=%s)\n", cli, tiers[cli], requireMinTier)
 		}
 	}
 	return elig, declaredCount
-}
-
-func probeQualityTier(capCheck, cli string) string {
-	cmd := exec.Command("bash", capCheck, cli)
-	out, err := cmd.Output()
-	if err != nil {
-		return "unknown"
-	}
-	var doc struct {
-		QualityTier string `json:"quality_tier"`
-	}
-	if jerr := json.Unmarshal(out, &doc); jerr != nil {
-		return "unknown"
-	}
-	if doc.QualityTier == "" {
-		return "unknown"
-	}
-	return doc.QualityTier
 }
 
 // BuildCommandsTSV constructs the worker dispatch TSV. Each line is

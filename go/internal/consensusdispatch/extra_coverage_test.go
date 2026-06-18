@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
 // TestRun_WorkspaceMkdirFails covers Run's workspace-create error branch: the
@@ -36,8 +38,9 @@ func TestRun_WorkspaceMkdirFails(t *testing.T) {
 
 // TestRun_QuorumReducedThenNoAdapters covers the quorum-reduction WARN block
 // (eligible < declared quorum) followed by the post-build "workers ready < 2"
-// branch: with no capability-check all voters are eligible, quorum=5 forces the
-// reduction, then the empty adapters dir yields zero ready workers.
+// branch: require_min_tier=none admits all voters regardless of tier (the empty
+// adapters dir yields "unknown" tiers, which "none" still includes), quorum=5
+// forces the reduction, then the empty adapters dir yields zero ready workers.
 func TestRun_QuorumReducedThenNoAdapters(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -64,6 +67,31 @@ func TestRun_QuorumReducedThenNoAdapters(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "workers ready") {
 		t.Errorf("missing post-build workers-ready FAIL: %s", stderr.String())
+	}
+}
+
+// TestFilterEligible_MissingManifestExcludedUnderHybrid pins the deliberate
+// post-migration behavior (see filterEligible doc): a voter whose
+// <cli>.capabilities.json is absent resolves to "unknown" via the default
+// tierFor (capability.QualityTier) and is EXCLUDED when require_min_tier is
+// hybrid or above. The old shell path's "checker script absent → include all"
+// global bail-out is intentionally gone (the checker is compiled in now).
+func TestFilterEligible_MissingManifestExcludedUnderHybrid(t *testing.T) {
+	t.Parallel()
+	emptyAdapters := t.TempDir() // no *.capabilities.json manifests
+	tierFor := func(cli string) (string, error) {
+		return capability.QualityTier(emptyAdapters, cli, nil)
+	}
+	var stderr bytes.Buffer
+	elig, declared := filterEligible([]string{"claude", "gemini"}, "hybrid", tierFor, &stderr)
+	if declared != 2 {
+		t.Errorf("declared=%d, want 2", declared)
+	}
+	if len(elig) != 0 {
+		t.Errorf("eligible=%v, want none (missing manifests → unknown → excluded under hybrid)", elig)
+	}
+	if !strings.Contains(stderr.String(), "tier=unknown, require>=hybrid") {
+		t.Errorf("missing exclusion log line: %s", stderr.String())
 	}
 }
 
@@ -141,34 +169,6 @@ func TestResolveBashOrNative_BashFallback(t *testing.T) {
 	}
 	if cmd.Args[1] != filepath.Join(dir, "aggregator.sh") {
 		t.Errorf("script path = %q", cmd.Args[1])
-	}
-}
-
-// TestProbeQualityTier covers all four return paths via fake capability-check
-// shims: success, non-zero exit, bad JSON, and empty tier field.
-func TestProbeQualityTier(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	cases := []struct {
-		name string
-		body string
-		want string
-	}{
-		{"success", "#!/bin/sh\necho '{\"quality_tier\":\"full\"}'\n", "full"},
-		{"exit-error", "#!/bin/sh\nexit 3\n", "unknown"},
-		{"bad-json", "#!/bin/sh\necho 'not json'\n", "unknown"},
-		{"empty-tier", "#!/bin/sh\necho '{\"quality_tier\":\"\"}'\n", "unknown"},
-	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			cap := filepath.Join(dir, tc.name+".sh")
-			writeExec(t, cap, tc.body)
-			if got := probeQualityTier(cap, "claude"); got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-		})
 	}
 }
 

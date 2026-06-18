@@ -276,12 +276,6 @@ func TestRun_E2E_WithFakeBash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fake _capability-check.sh — always reports quality_tier=full
-	writeExec(t, filepath.Join(adapters, "_capability-check.sh"),
-		`#!/usr/bin/env bash
-echo '{"quality_tier":"full"}'
-`)
-
 	// two fake CLI adapters that write the audit artifact directly
 	for _, cli := range []string{"claude", "gemini"} {
 		writeExec(t, filepath.Join(adapters, cli+".sh"),
@@ -331,6 +325,7 @@ exit 0
 	rc := Run(Inputs{
 		Cycle: "42", WorkspacePath: workspace, ProfilePath: prof, PromptFile: prompt,
 		AdaptersDir: adapters, DispatchDir: dispatch,
+		TierFor: func(string) (string, error) { return "full", nil },
 	}, &stdout, &stderr)
 
 	if rc != ExitOK {
@@ -373,9 +368,6 @@ func TestRun_AggregatorFailPropagates(t *testing.T) {
 	if err := os.MkdirAll(dispatch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeExec(t, filepath.Join(adapters, "_capability-check.sh"), `#!/usr/bin/env bash
-echo '{"quality_tier":"full"}'
-`)
 	for _, cli := range []string{"claude", "gemini"} {
 		writeExec(t, filepath.Join(adapters, cli+".sh"),
 			"#!/usr/bin/env bash\nmkdir -p $(dirname \"$ARTIFACT_PATH\") && echo PASS > \"$ARTIFACT_PATH\"\n")
@@ -402,6 +394,7 @@ exit 1
 	rc := Run(Inputs{
 		Cycle: "1", WorkspacePath: workspace, ProfilePath: prof, PromptFile: prompt,
 		AdaptersDir: adapters, DispatchDir: dispatch,
+		TierFor: func(string) (string, error) { return "full", nil },
 	}, &stdout, &stderr)
 	if rc != ExitConsensusFAIL {
 		t.Errorf("expected aggregator-fail rc=1, got %d", rc)
@@ -427,9 +420,6 @@ func TestRun_NoArtifactsProducedFails(t *testing.T) {
 	if err := os.MkdirAll(dispatch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeExec(t, filepath.Join(adapters, "_capability-check.sh"), `#!/usr/bin/env bash
-echo '{"quality_tier":"full"}'
-`)
 	for _, cli := range []string{"claude", "gemini"} {
 		// adapter that does NOT write artifact
 		writeExec(t, filepath.Join(adapters, cli+".sh"), "#!/usr/bin/env bash\nexit 0\n")
@@ -453,6 +443,7 @@ exit 0
 	rc := Run(Inputs{
 		Cycle: "1", WorkspacePath: workspace, ProfilePath: prof, PromptFile: prompt,
 		AdaptersDir: adapters, DispatchDir: dispatch,
+		TierFor: func(string) (string, error) { return "full", nil },
 	}, &stdout, &stderr)
 	if rc != ExitRuntimeErr {
 		t.Errorf("expected runtime-fail rc=2 when no artifacts, got %d", rc)
