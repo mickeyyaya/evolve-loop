@@ -161,18 +161,19 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	evolveDir = absOrWarn("--evolve-dir", evolveDir)
 
 	return loopConfig{
-		ProjectRoot:    projectRoot,
-		EvolveDir:      evolveDir,
-		GoalHash:       resolvedGoalHash,
-		GoalText:       resolvedGoalText,
-		Strategy:       resolvedStrategy,
-		MaxCycles:      resolvedCycles,
-		Resume:         resume,
-		Reset:          reset,
-		ConsensusAudit: consensusAudit,
-		DryRun:         dryRun,
-		PerAgentCLI:    perAgentCLI,
-		PerAgentModel:  perAgentModel,
+		ProjectRoot:       projectRoot,
+		EvolveDir:         evolveDir,
+		GoalHash:          resolvedGoalHash,
+		GoalText:          resolvedGoalText,
+		Strategy:          resolvedStrategy,
+		MaxCycles:         resolvedCycles,
+		MaxCyclesExplicit: cyclesFlag > 0 || maxCyclesFlag > 0 || posCycles > 0,
+		Resume:            resume,
+		Reset:             reset,
+		ConsensusAudit:    consensusAudit,
+		DryRun:            dryRun,
+		PerAgentCLI:       perAgentCLI,
+		PerAgentModel:     perAgentModel,
 	}, 0
 }
 

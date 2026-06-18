@@ -18,9 +18,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
@@ -55,16 +57,21 @@ var validStrategies = map[string]struct{}{
 // `buf, _ := json.MarshalIndent(lr, "", "  "); fmt.Fprintln(...)`
 // pattern that obscured the loop body.
 type loopConfig struct {
-	ProjectRoot    string `json:"project_root"`
-	EvolveDir      string `json:"evolve_dir"`
-	GoalHash       string `json:"goal_hash"`
-	GoalText       string `json:"goal_text,omitempty"`
-	Strategy       string `json:"strategy"`
-	MaxCycles      int    `json:"max_cycles"`
-	Resume         bool   `json:"resume,omitempty"`
-	Reset          bool   `json:"reset,omitempty"`
-	ConsensusAudit bool   `json:"consensus_audit,omitempty"`
-	DryRun         bool   `json:"dry_run,omitempty"`
+	ProjectRoot string `json:"project_root"`
+	EvolveDir   string `json:"evolve_dir"`
+	GoalHash    string `json:"goal_hash"`
+	GoalText    string `json:"goal_text,omitempty"`
+	Strategy    string `json:"strategy"`
+	MaxCycles   int    `json:"max_cycles"`
+	// MaxCyclesExplicit records whether the operator set --max-cycles/--cycles
+	// (or a positional count). When false and EVOLVE_CYCLE_BUDGET=enforce, the
+	// loop defaults its ceiling to the safety cap and lets completion drive the
+	// stop, instead of the legacy default of 1.
+	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
+	Resume            bool `json:"resume,omitempty"`
+	Reset             bool `json:"reset,omitempty"`
+	ConsensusAudit    bool `json:"consensus_audit,omitempty"`
+	DryRun            bool `json:"dry_run,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -253,7 +260,19 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	maxConsecutiveFails := resolveMaxConsecutiveFails()
 	consecutiveFails := 0
 
-	for i := 0; i < cfg.MaxCycles; i++ {
+	// Advisor-decided cycle budget (EVOLVE_CYCLE_BUDGET). Off ⇒ the operator's
+	// --max-cycles governs (byte-identical to today). Enforce with no explicit
+	// --max-cycles ⇒ the ceiling becomes the safety cap and per-cycle completion
+	// (backlog drained) drives the early stop; advisory computes + logs the
+	// would-stop without changing behavior.
+	budgetStage := cyclebudget.ParseStage(os.Getenv("EVOLVE_CYCLE_BUDGET"))
+	effectiveMax := cfg.MaxCycles
+	if budgetStage == cyclebudget.Enforce && !cfg.MaxCyclesExplicit {
+		effectiveMax = resolveMaxCyclesCap()
+		fmt.Fprintf(stderr, "[loop] cycle-budget=enforce: completion-driven, safety cap=%d (no explicit --max-cycles)\n", effectiveMax)
+	}
+
+	for i := 0; i < effectiveMax; i++ {
 		// CLI-health canary (the per-cycle health seam): one cheap live probe
 		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
 		// ones re-bench with a doubled cooldown, instead of a full phase
@@ -484,6 +503,25 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
 		}
+
+		// Cycle-budget completion: on a non-FAIL cycle, if the backlog the
+		// planning phases produced is drained (or the advisor judged the goal
+		// done), stop instead of burning cycles to the cap. A FAIL cycle is left
+		// to the consecutive-fail breaker; an unreadable state.json skips the
+		// check (never falsely "complete").
+		if budgetStage != cyclebudget.Off && result.FinalVerdict != core.VerdictFAIL {
+			if backlog, ok := readCarryoverCount(filepath.Join(cfg.EvolveDir, "state.json")); ok {
+				d := cyclebudget.Next(budgetStage, i+1, effectiveMax, backlog, false)
+				if d.Advisory {
+					fmt.Fprintf(stderr, "[loop] cycle-budget ADVISORY: would stop (%s) after cycle %d (backlog=%d)\n", d.Reason, ranCycle, backlog)
+				}
+				if d.Stop {
+					fmt.Fprintf(stderr, "[loop] cycle-budget: stopping (%s) after cycle %d (backlog=%d)\n", d.Reason, ranCycle, backlog)
+					lr.StopReason = d.Reason
+					break
+				}
+			}
+		}
 	}
 
 	if lr.StopReason == "error" || lr.StopReason == "fail" {
@@ -500,6 +538,36 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 3
 	}
 	return 0
+}
+
+// resolveMaxCyclesCap returns the safety ceiling for advisor-budgeted runs:
+// EVOLVE_MAX_CYCLES_CAP if set to a positive int, else 25. It bounds runaway
+// when completion never triggers (an open-ended goal whose backlog never drains).
+func resolveMaxCyclesCap() int {
+	if v := os.Getenv("EVOLVE_MAX_CYCLES_CAP"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 25
+}
+
+// readCarryoverCount returns the number of carryoverTodos in state.json — the
+// goal's remaining backlog the planning phases produced. ok is false when the
+// file is absent/unreadable/malformed, so the caller skips the completion check
+// rather than ever treating an unreadable state as "goal complete".
+func readCarryoverCount(statePath string) (count int, ok bool) {
+	b, err := os.ReadFile(statePath)
+	if err != nil {
+		return 0, false
+	}
+	var s struct {
+		CarryoverTodos []json.RawMessage `json:"carryoverTodos"`
+	}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return 0, false
+	}
+	return len(s.CarryoverTodos), true
 }
 
 // wireOrchestratorDepsFn is the test seam for runLoop. Tests

@@ -339,6 +339,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CONTEXT_MODE` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_CONTRACT_CORRECTION_RETRIES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CONTRACT_GATE` | active | enum | enforce | Gates | Deliverable-contract gate (ADR-0034): off\|shadow\|enforce, circuit breaker demotes after 3 consecutive blocks. |
+| `EVOLVE_CYCLE_BUDGET` | active | enum | off | Workflow Defaults | Advisor-decided cycle-budget rollout dial (internal/cyclebudget): `off`/`0` (operator --max-cycles governs — DEFAULT, byte-identical to legacy) / `advisory` (completion/cap computed + logged, --max-cycles still governs) / `enforce` (the loop runs until the goal's backlog is drained, bounded by EVOLVE_MAX_CYCLES_CAP; an explicit --max-cycles becomes the ceiling). Unknown → off. |
 | `EVOLVE_CYCLE_STATE_FILE` | dead | — | — | Core Infrastructure (never consolidate) | Override cycle-state.json path (test seam) [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_DIFF_COMPLEXITY_DISABLE` | active | — | — | Workflow Defaults | Disable diff-complexity check in auditor |
 | `EVOLVE_DIR` | dead | — | — | Override / Test Seams | Derived `.evolve/` path in phase-gate.sh (internal) [no reader on any surface as of 2026-06-11 inventory] |
@@ -393,7 +394,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
 | `EVOLVE_FLEET_SCOPE` | active | string | — | Fleet Cluster (Track C concurrency) | Comma-joined todo IDs assigned to this fleet cycle (ADR-0049 E); the launched cycle's triage selects only its disjoint subset. Empty/unset ⇒ the cycle works the whole backlog. Reader: go/internal/core/cyclerun.go (set by the `evolve fleet` supervisor, fleet/fleet.go) |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FORCE_INNER_SANDBOX` | deprecated | — | — | Sandbox Cluster | Deprecation bridge: `EVOLVE_FORCE_INNER_SANDBOX=1` → `EVOLVE_INNER_SANDBOX=1` with stderr WARN. Live reader: adapters/claude.sh:323 (cycle-360: NOT dead — mis-inventoried). Replaced by `EVOLVE_INNER_SANDBOX`. |
+| `EVOLVE_FORCE_INNER_SANDBOX` | deprecated | — | — | Sandbox Cluster | Deprecation bridge: `EVOLVE_FORCE_INNER_SANDBOX=1` → `EVOLVE_INNER_SANDBOX=1` → `EVOLVE_SANDBOX`. Former reader adapters/claude.sh:323 removed in the script→Go migration; no Go reader — superseded. Replaced by `EVOLVE_INNER_SANDBOX`. |
 | `EVOLVE_GC` | active | enum | off | GC / Retention | GC shadow stage (L3.4). off=disabled (default); shadow=discover+plan+log manifest to workspace without mutations; enforce=shadow+apply (opt-in; honors quarantine/ledger/live hard rules). |
 | `EVOLVE_GO_BIN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_GO_BIN_TEST` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -404,7 +405,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_INACTIVITY_POLL_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INACTIVITY_THRESHOLD_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INACTIVITY_WARN_PCT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_INNER_SANDBOX` | active | enum | — | Sandbox Cluster | Tri-state inner sandbox: `1`=force-enable, `0`=force-disable, unset=auto. Drives SANDBOX_USE → the macOS sandbox-exec wrapper. Reader: adapters/claude.sh:342 (cycle-360: live, NOT dead — mis-inventoried) |
+| `EVOLVE_INNER_SANDBOX` | deprecated | enum | — | Sandbox Cluster | Tri-state inner sandbox: `1`=force-enable, `0`=force-disable, unset=auto. Former reader adapters/claude.sh:342 removed in the script→Go migration; the Go bridge controls inner-sandbox via EVOLVE_SANDBOX → sandbox.ShouldWrap (internal/bridge/sandbox_wrap.go); no Go reader — superseded. Replaced by `EVOLVE_SANDBOX`. |
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | dead | — | — | Observability / Prompt Tuning | Max instinct summaries in state.json [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_INTENT_DELTA` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INTENT_MODEL` | test-seam | — | — | — | Read only by _test.go files. |
@@ -415,6 +416,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS` | active | int | 1 | Workflow Defaults | Consecutive verdict-FAIL cycles a batch absorbs before stopping (default 1 = stop on first FAIL). A PASS/SHIPPED resets the streak; the cap still halts a broken run. rc=3 when any FAIL was absorbed. |
 | `EVOLVE_MANDATORY_PHASES` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | CSV ordered mandatory spine. Omitting `audit` or `ship` emits a `weak-spine` WARN |
 | `EVOLVE_MARKETPLACE_DIR` | active | — | — | Observability / Prompt Tuning | Override marketplace dir (test/release seam) |
+| `EVOLVE_MAX_CYCLES_CAP` | active | int | 25 | Workflow Defaults | Safety ceiling for advisor-budgeted runs (EVOLVE_CYCLE_BUDGET=enforce with no explicit --max-cycles): the loop stops after this many cycles if completion never triggers (open-ended goal whose backlog never drains). Positive int; non-positive/unparseable → 25. |
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Cap on optional phases the router may insert |
 | `EVOLVE_MODELCATALOG_AUTOREFRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_MODELCATALOG_CLASSIFIER_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -452,7 +454,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PROFILES_DIR_OVERRIDE` | active | — | — | Override / Test Seams | Override profiles dir path |
 | `EVOLVE_PROFILE_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROFILE_OVERRIDE` | dead | — | — | Override / Test Seams | Override pre-built profile path [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_PROFILE_WORKTREE_AWARE` | active | bool | 0 | Worktree / Workspace | Mark profile as worktree-aware (subagent-run exports =1; v8.23.3 BUG-009). Reader: adapters/claude.sh:278 (cycle-360: live, NOT dead — mis-inventoried) |
+| `EVOLVE_PROFILE_WORKTREE_AWARE` | deprecated | bool | 0 | Worktree / Workspace | Mark profile as worktree-aware (v8.23.3 BUG-009). Former reader adapters/claude.sh:278 removed in the script→Go migration; the Go bridge handles worktree-aware dispatch via BridgeRequest.Worktree directly; no Go reader — superseded. |
 | `EVOLVE_PROJECT_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Writable project directory (dual-root pattern) |
 | `EVOLVE_PROMPTS_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROMPT_BUDGET_ENFORCE` | dead | — | — | Observability / Prompt Tuning | Make prompt-over-cap a hard error [no reader on any surface as of 2026-06-11 inventory] |
@@ -462,7 +464,7 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_QUOTA_RESET_AT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_QUOTA_RESET_HOURS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_REINVOKE_CMD` | active | string | — | Observability / Prompt Tuning | Reinvoke command surfaced in the rate-limit-recovery hint (exported by the dispatch layer). Reader: adapters/claude.sh:624 (cycle-360: live, NOT dead — mis-inventoried) |
+| `EVOLVE_REINVOKE_CMD` | deprecated | string | — | Observability / Prompt Tuning | Reinvoke command surfaced in the rate-limit-recovery hint. Former reader adapters/claude.sh:624 removed in the script→Go migration; the Go bridge handles rate-limit recovery via manifest interactive_prompts; no Go reader — superseded. |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REQUIRE_INTENT` | active | — | — | Workflow Defaults | Force intent phase on every cycle |
