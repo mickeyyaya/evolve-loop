@@ -1,22 +1,16 @@
 package main
 
-import "testing"
-
-// observerEnvConfig reads the EVOLVE_OBSERVER_* knobs through envchain. The
-// most important pin is NudgeS's default of 300 (a flip to 0 silently disables
-// the pre-SIGTERM nudge) and that StallS keeps its two-key fallback
-// (EVOLVE_OBSERVER_STALL_S else EVOLVE_INACTIVITY_THRESHOLD_S).
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestObserverEnvConfig_Defaults(t *testing.T) {
-	for _, k := range []string{
-		"EVOLVE_OBSERVER_POLL_S", "EVOLVE_OBSERVER_STALL_S", "EVOLVE_INACTIVITY_THRESHOLD_S",
-		"EVOLVE_OBSERVER_NUDGE_S", "EVOLVE_OBSERVER_NUDGE_BODY", "EVOLVE_OBSERVER_EOF_GRACE_S",
-	} {
-		t.Setenv(k, "")
-	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	c := observerEnvConfig()
-	if c.PollS != 0 || c.StallS != 0 || c.EOFGraceS != 0 {
-		t.Errorf("PollS/StallS/EOFGraceS = %d/%d/%d, want 0/0/0", c.PollS, c.StallS, c.EOFGraceS)
+	if c.PollS != 5 || c.StallS != 600 || c.EOFGraceS != 0 {
+		t.Errorf("PollS/StallS/EOFGraceS = %d/%d/%d, want 5/600/0", c.PollS, c.StallS, c.EOFGraceS)
 	}
 	if c.NudgeS != 300 {
 		t.Errorf("NudgeS default = %d, want 300 (a flip to 0 disables the nudge)", c.NudgeS)
@@ -27,26 +21,23 @@ func TestObserverEnvConfig_Defaults(t *testing.T) {
 }
 
 func TestObserverEnvConfig_Parsing(t *testing.T) {
-	t.Setenv("EVOLVE_OBSERVER_POLL_S", "5")
-	t.Setenv("EVOLVE_OBSERVER_NUDGE_S", "120")
-	t.Setenv("EVOLVE_OBSERVER_NUDGE_BODY", "wake up")
-	t.Setenv("EVOLVE_OBSERVER_EOF_GRACE_S", "3")
+	root := writeObserverPolicy(t, `{"observer":{"poll_s":7,"stall_s":20,"nudge_s":0,"nudge_body":"wake up","eof_grace_s":3}}`)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	c := observerEnvConfig()
-	if c.PollS != 5 || c.NudgeS != 120 || c.EOFGraceS != 3 || c.NudgeBody != "wake up" {
-		t.Errorf("got PollS=%d NudgeS=%d EOFGraceS=%d NudgeBody=%q", c.PollS, c.NudgeS, c.EOFGraceS, c.NudgeBody)
+	if c.PollS != 7 || c.StallS != 20 || c.NudgeS != 0 || c.EOFGraceS != 3 || c.NudgeBody != "wake up" {
+		t.Errorf("got PollS=%d StallS=%d NudgeS=%d EOFGraceS=%d NudgeBody=%q", c.PollS, c.StallS, c.NudgeS, c.EOFGraceS, c.NudgeBody)
 	}
 }
 
-func TestObserverEnvConfig_StallSTwoKeyFallback(t *testing.T) {
-	// Primary wins when set.
-	t.Setenv("EVOLVE_OBSERVER_STALL_S", "10")
-	t.Setenv("EVOLVE_INACTIVITY_THRESHOLD_S", "20")
-	if c := observerEnvConfig(); c.StallS != 10 {
-		t.Errorf("StallS(primary=10,fallback=20) = %d, want 10", c.StallS)
+func writeObserverPolicy(t *testing.T, body string) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	// Falls back to the legacy key when primary is unset.
-	t.Setenv("EVOLVE_OBSERVER_STALL_S", "")
-	if c := observerEnvConfig(); c.StallS != 20 {
-		t.Errorf("StallS(primary unset, fallback=20) = %d, want 20", c.StallS)
+	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
+	return root
 }

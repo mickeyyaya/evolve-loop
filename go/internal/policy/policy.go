@@ -68,6 +68,9 @@ type Policy struct {
 	// Fanout configures the fan-out dispatch subsystem. Absent ⇒ built-in
 	// defaults apply (concurrency=2, track_workers=true, cache_prefix=true).
 	Fanout *FanoutPolicy `json:"fanout,omitempty"`
+	// Observer configures phase liveness observation and watchdog behavior.
+	// Absent ⇒ built-in defaults apply.
+	Observer *ObserverPolicy `json:"observer,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -304,5 +307,66 @@ func (p Policy) FanoutConfig() FanoutPolicy {
 		out.CachePrefixEnabled = f.CachePrefixEnabled
 	}
 	out.TestExecutor = f.TestExecutor
+	return out
+}
+
+// ObserverPolicy configures phase observation and inactivity watchdogs.
+// Pointer fields preserve the distinction between an omitted value and an
+// explicit zero/false override (for example nudge_s=0 disables nudging).
+type ObserverPolicy struct {
+	Autospawn        *bool  `json:"autospawn,omitempty"`
+	PollS            *int   `json:"poll_s,omitempty"`
+	StallS           *int   `json:"stall_s,omitempty"`
+	NudgeS           *int   `json:"nudge_s,omitempty"`
+	NudgeBody        string `json:"nudge_body,omitempty"`
+	EOFGraceS        int    `json:"eof_grace_s,omitempty"`
+	WatchdogPollS    *int   `json:"watchdog_poll_s,omitempty"`
+	WatchdogWarnPct  *int   `json:"watchdog_warn_pct,omitempty"`
+	WatchdogGraceS   *int   `json:"watchdog_grace_s,omitempty"`
+	WatchdogDisabled bool   `json:"watchdog_disabled,omitempty"`
+}
+
+// ObserverConfig returns an ObserverPolicy with all defaults resolved.
+// Returned pointer fields are always non-nil.
+func (p Policy) ObserverConfig() ObserverPolicy {
+	autospawn, pollS, stallS, nudgeS := true, 5, 600, 300
+	watchdogPollS, watchdogWarnPct, watchdogGraceS := 15, 75, 10
+	out := ObserverPolicy{
+		Autospawn:       &autospawn,
+		PollS:           &pollS,
+		StallS:          &stallS,
+		NudgeS:          &nudgeS,
+		WatchdogPollS:   &watchdogPollS,
+		WatchdogWarnPct: &watchdogWarnPct,
+		WatchdogGraceS:  &watchdogGraceS,
+	}
+	if p.Observer == nil {
+		return out
+	}
+	o := p.Observer
+	if o.Autospawn != nil {
+		out.Autospawn = o.Autospawn
+	}
+	if o.PollS != nil {
+		out.PollS = o.PollS
+	}
+	if o.StallS != nil {
+		out.StallS = o.StallS
+	}
+	if o.NudgeS != nil {
+		out.NudgeS = o.NudgeS
+	}
+	out.NudgeBody = o.NudgeBody
+	out.EOFGraceS = o.EOFGraceS
+	if o.WatchdogPollS != nil {
+		out.WatchdogPollS = o.WatchdogPollS
+	}
+	if o.WatchdogWarnPct != nil {
+		out.WatchdogWarnPct = o.WatchdogWarnPct
+	}
+	if o.WatchdogGraceS != nil {
+		out.WatchdogGraceS = o.WatchdogGraceS
+	}
+	out.WatchdogDisabled = o.WatchdogDisabled
 	return out
 }

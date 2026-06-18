@@ -2,45 +2,29 @@ package main
 
 import "testing"
 
-// watchdogEnvConfig reads the EVOLVE_INACTIVITY_* knobs through envchain.
-
 func TestWatchdogEnvConfig_Defaults(t *testing.T) {
-	for _, k := range []string{
-		"EVOLVE_PROJECT_ROOT", "EVOLVE_INACTIVITY_THRESHOLD_S", "EVOLVE_INACTIVITY_POLL_S",
-		"EVOLVE_INACTIVITY_WARN_PCT", "EVOLVE_INACTIVITY_GRACE_S", "EVOLVE_INACTIVITY_DISABLE",
-	} {
-		t.Setenv(k, "")
-	}
+	root := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	c := watchdogEnvConfig()
-	if c.ThresholdS != 0 || c.PollS != 0 || c.WarnPct != 0 || c.GraceS != 0 {
-		t.Errorf("ints = %d/%d/%d/%d, want all 0", c.ThresholdS, c.PollS, c.WarnPct, c.GraceS)
+	if c.ThresholdS != 600 || c.PollS != 15 || c.WarnPct != 75 || c.GraceS != 10 {
+		t.Errorf("ints = %d/%d/%d/%d, want 600/15/75/10", c.ThresholdS, c.PollS, c.WarnPct, c.GraceS)
 	}
 	if c.Disabled {
 		t.Errorf("Disabled default = true, want false (default-off `== \"1\"` flag)")
 	}
-	if c.ProjectRoot != "" {
-		t.Errorf("ProjectRoot default = %q, want empty", c.ProjectRoot)
+	if c.ProjectRoot != root {
+		t.Errorf("ProjectRoot = %q, want %q", c.ProjectRoot, root)
 	}
 }
 
 func TestWatchdogEnvConfig_Parsing(t *testing.T) {
-	t.Setenv("EVOLVE_INACTIVITY_THRESHOLD_S", "600")
-	t.Setenv("EVOLVE_INACTIVITY_POLL_S", "10")
-	t.Setenv("EVOLVE_INACTIVITY_WARN_PCT", "80")
-	t.Setenv("EVOLVE_INACTIVITY_GRACE_S", "30")
-	t.Setenv("EVOLVE_INACTIVITY_DISABLE", "1")
+	root := writeObserverPolicy(t, `{"observer":{"stall_s":900,"watchdog_poll_s":10,"watchdog_warn_pct":80,"watchdog_grace_s":30,"watchdog_disabled":true}}`)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	c := watchdogEnvConfig()
-	if c.ThresholdS != 600 || c.PollS != 10 || c.WarnPct != 80 || c.GraceS != 30 {
-		t.Errorf("ints = %d/%d/%d/%d, want 600/10/80/30", c.ThresholdS, c.PollS, c.WarnPct, c.GraceS)
+	if c.ThresholdS != 900 || c.PollS != 10 || c.WarnPct != 80 || c.GraceS != 30 {
+		t.Errorf("ints = %d/%d/%d/%d, want 900/10/80/30", c.ThresholdS, c.PollS, c.WarnPct, c.GraceS)
 	}
 	if !c.Disabled {
 		t.Errorf("Disabled(\"1\") = false, want true")
-	}
-}
-
-func TestWatchdogEnvConfig_InvalidIntFallsBack(t *testing.T) {
-	t.Setenv("EVOLVE_INACTIVITY_THRESHOLD_S", "not-a-number")
-	if c := watchdogEnvConfig(); c.ThresholdS != 0 {
-		t.Errorf("ThresholdS(garbage) = %d, want 0 (fallback)", c.ThresholdS)
 	}
 }

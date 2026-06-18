@@ -71,7 +71,7 @@ When you advance to the build phase, just call `cycle-state.sh advance build bui
 
 ## Phase Observer Reports
 
-When `EVOLVE_OBSERVER_ENABLED=1` (default OFF), each subagent spawns a phase-observer sibling that writes `{agent}-observer-events.ndjson` + `{agent}-observer-report.json` with verdict ∈ `{NORMAL, DEGRADED, INCIDENT}`. Read the report before `{agent}-report.md` and treat `INCIDENT` as a decision input. Full protocol: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `phase-observer`.
+When phase-observer reporting is enabled by policy, each subagent spawns a phase-observer sibling that writes `{agent}-observer-events.ndjson` + `{agent}-observer-report.json` with verdict ∈ `{NORMAL, DEGRADED, INCIDENT}`. Read the report before `{agent}-report.md` and treat `INCIDENT` as a decision input. Full protocol: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `phase-observer`.
 
 ## EGPS Tester Phase (default-on as of cycle-86)
 

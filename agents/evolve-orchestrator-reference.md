@@ -169,7 +169,7 @@ Loaded for the Failure Adaptation Kernel (v8.22.0+).
 
 ## Section: phase-observer
 
-Loaded only when `EVOLVE_OBSERVER_ENABLED=1`.
+Loaded when phase-observer reporting is enabled by the orchestrator policy.
 
 The observer is a sibling subagent that watches the active phase agent's stream-json output and writes two artifacts to the workspace before exiting:
 

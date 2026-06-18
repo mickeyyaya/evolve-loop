@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // syncSink is a goroutine-safe wrapper around bytes.Buffer for tests.
@@ -57,10 +58,7 @@ func TestCoreAdapter_Start_ReturnsNoopCancelOnEmptyWorkspace(t *testing.T) {
 // downstream tooling can read live events.
 func TestCoreAdapter_Start_CreatesEventsFile(t *testing.T) {
 	ws := t.TempDir()
-	a := NewCoreAdapter()
-	// Run very tight thresholds so the test doesn't wait 600s.
-	t.Setenv("EVOLVE_OBSERVER_STALL_S", "1")
-	t.Setenv("EVOLVE_OBSERVER_POLL_S", "1")
+	a := NewCoreAdapter(fastObserverPolicy())
 	cancel := a.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: ws, Cycle: 123})
 	defer cancel()
 
@@ -85,16 +83,8 @@ func TestCoreAdapter_Start_EmitsStallEventWhenFileNeverGrows(t *testing.T) {
 	ws := t.TempDir()
 	sink := &syncSink{}
 	a := &CoreAdapter{
-		Sink: sink,
-		EnvLookup: func(k string) string {
-			switch k {
-			case "EVOLVE_OBSERVER_STALL_S":
-				return "1"
-			case "EVOLVE_OBSERVER_POLL_S":
-				return "1"
-			}
-			return ""
-		},
+		Sink:   sink,
+		Config: fastObserverPolicy(),
 	}
 	cancel := a.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: ws, Cycle: 123})
 
@@ -126,8 +116,7 @@ func TestCoreAdapter_Start_EmitsStallEventWhenFileNeverGrows(t *testing.T) {
 // "stopped" entry.
 func TestCoreAdapter_Start_StopsCleanlyOnCancel(t *testing.T) {
 	sink := &syncSink{}
-	a := &CoreAdapter{Sink: sink}
-	t.Setenv("EVOLVE_OBSERVER_POLL_S", "1")
+	a := &CoreAdapter{Sink: sink, Config: fastObserverPolicy()}
 
 	cancel := a.Start(context.Background(), "scout", core.PhaseRequest{
 		Workspace: t.TempDir(), Cycle: 7,
@@ -174,7 +163,7 @@ func TestCoreAdapter_Start_ResolveDurationFallsBackOnBadEnv(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveDuration("EVOLVE_OBSERVER_STALL_S", DefaultStallS)
+			got := a.resolveDuration("TEST_DURATION_S", DefaultStallS)
 			if got != tc.want {
 				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
 			}
@@ -206,7 +195,7 @@ func TestCoreAdapter_ResolveNudgeS_ZeroMeansDisable(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveNudgeS(DefaultNudgeS)
+			got := a.resolveNudgeS("TEST_NUDGE_S", DefaultNudgeS)
 			if got != tc.want {
 				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
 			}
@@ -230,7 +219,7 @@ func TestCoreAdapter_ResolveString_FallsBackOnEmpty(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in+"|"+tc.def, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveString("EVOLVE_OBSERVER_NUDGE_BODY", tc.def)
+			got := a.resolveString("TEST_NUDGE_BODY", tc.def)
 			if got != tc.want {
 				t.Errorf("in=%q def=%q got=%q want=%q", tc.in, tc.def, got, tc.want)
 			}
@@ -278,7 +267,7 @@ func TestCoreAdapter_ResolveNudgeS_Bounds(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveNudgeS(DefaultNudgeS)
+			got := a.resolveNudgeS("TEST_NUDGE_S", DefaultNudgeS)
 			if got != tc.want {
 				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
 			}
@@ -305,7 +294,7 @@ func TestCoreAdapter_ResolveString_UnicodeAndSpecial(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveString("EVOLVE_OBSERVER_NUDGE_BODY", tc.def)
+			got := a.resolveString("TEST_NUDGE_BODY", tc.def)
 			if got != tc.want {
 				t.Errorf("in=%q got=%q want=%q", tc.in, got, tc.want)
 			}
@@ -335,7 +324,7 @@ func TestCoreAdapter_ResolveDuration_NovelBounds(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			a := &CoreAdapter{EnvLookup: func(_ string) string { return tc.in }}
-			got := a.resolveDuration("EVOLVE_OBSERVER_STALL_S", DefaultStallS)
+			got := a.resolveDuration("TEST_DURATION_S", DefaultStallS)
 			if got != tc.want {
 				t.Errorf("in=%q got=%v want=%v", tc.in, got, tc.want)
 			}
@@ -360,9 +349,9 @@ func TestCoreAdapter_ResolveString_EnvLookupNilFallsBackToOSGetenv(t *testing.T)
 // TestCoreAdapter_ResolveNudgeS_EnvLookupNilFallsBackToOSGetenv mirrors
 // the above for the nudge resolver.
 func TestCoreAdapter_ResolveNudgeS_EnvLookupNilFallsBackToOSGetenv(t *testing.T) {
-	t.Setenv("EVOLVE_OBSERVER_NUDGE_S", "120")
+	t.Setenv("TEST_NUDGE_S", "120")
 	a := &CoreAdapter{} // EnvLookup nil
-	got := a.resolveNudgeS(DefaultNudgeS)
+	got := a.resolveNudgeS("TEST_NUDGE_S", DefaultNudgeS)
 	if got != 120*time.Second {
 		t.Fatalf("nil EnvLookup must defer to os.Getenv; got %v want 120s", got)
 	}
@@ -372,8 +361,7 @@ func TestCoreAdapter_ResolveNudgeS_EnvLookupNilFallsBackToOSGetenv(t *testing.T)
 // thread-safety: two phases starting in parallel (unusual but possible
 // under multi-execute) get isolated sinks + cancels.
 func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
-	a := NewCoreAdapter()
-	t.Setenv("EVOLVE_OBSERVER_POLL_S", "1")
+	a := NewCoreAdapter(fastObserverPolicy())
 	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
@@ -388,6 +376,11 @@ func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
 	}
 	wg.Wait()
 	// Test passes if no race detected by -race + no panic.
+}
+
+func fastObserverPolicy() policy.ObserverPolicy {
+	stallS, pollS := 1, 1
+	return policy.ObserverPolicy{StallS: &stallS, PollS: &pollS}
 }
 
 // TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable covers the

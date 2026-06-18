@@ -261,3 +261,7 @@
 # cycle-10 ACS predicate package (2026-06-19): test-seam-registry-sweep.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle10
+
+# cycle-11 ACS predicate package (2026-06-19): consolidate-observer-inactivity-cluster.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle11
