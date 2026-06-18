@@ -231,5 +231,4 @@ The linter always exits 0 (WARN-only). No gate integration this cycle.
 
 - `legacy/scripts/utility/lint-markdown-structure.sh` — WARN-only linter
 - `legacy/scripts/utility/extract-tldr.sh` — TLDR extractor
-- `tests/markdown-structure-test.sh` — unit test suite
 - [[feedback_skill_file_structure]] — operator memory entry that motivated this convention
