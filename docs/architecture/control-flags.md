@@ -59,7 +59,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_BUILDER_COST_GUARD_STRICT` | DEPRECATED (no-op) | Former builder cost-overrun hard-fail switch |
 | `EVOLVE_CHECKPOINT_WARN_AT_PCT` / `EVOLVE_CHECKPOINT_AT_PCT` | DEPRECATED (no-op) | Former cost-percentage checkpoint thresholds |
 | `EVOLVE_PHASE_COST_CEILING` | DEPRECATED (no-op) | Former cyclehealth per-phase cost-ceiling anomaly |
-| `EVOLVE_FANOUT_PER_WORKER_BUDGET_USD` | DEPRECATED (no-op) | Former per-worker cost cap; fanout no longer reads or injects it |
 | `EVOLVE_BUILD_PLANNER` | ACTIVE (advisory; default on) | Opt C build-planner phase (NOT a cost flag). `1` = advisory (build-plan.md produced); `0` = opt-out. See ADR-0019. |
 
 > **Token-budget cost gates removed**: the dollar-cost calculation and every gate
@@ -100,26 +99,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL` | ACTIVE (v10.19) | Opt A: auto-skip Triage when 3 conditions hold (≤1 scout task AND empty carryoverTodos AND predicate-dependency-check.sh exit 0). Default on (=1); opt-out with =0. Writes a stub `triage-decision.{md,json}` with `auto_skip: true` so downstream phases see consistent inputs. |
 | `EVOLVE_TRIAGE_ENABLED` | DEAD | v8.56–v8.58 opt-in; replaced by `EVOLVE_TRIAGE_DISABLE`; removed from docs |
 
-## Fan-out Cluster (intentionally separate — do not consolidate per-phase flags)
-
-| Flag | Status | Purpose |
-|------|--------|---------|
-| `EVOLVE_FANOUT_ENABLED` | ACTIVE | Master switch for fan-out |
-| `EVOLVE_FANOUT_SCOUT` | DEAD | Enable fan-out for scout phase — no reader on any surface (2026-06-11 inventory) |
-| `EVOLVE_FANOUT_AUDITOR` | ACTIVE (wired v10.19) | Enable fan-out for auditor phase (orchestrator picks `dispatch-parallel auditor`; reads `auditor.json:parallel_subtasks[]`) |
-| `EVOLVE_FANOUT_RETROSPECTIVE` | DEAD | Enable fan-out for retrospective phase — no reader on any surface (2026-06-11 inventory) |
-| `EVOLVE_FANOUT_CONCURRENCY` | ACTIVE | Max parallel workers in flight (default 2) |
-| `EVOLVE_FANOUT_TIMEOUT` | ACTIVE | Per-worker timeout in fanout |
-| `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | ACTIVE | Cancel remaining workers on K-agreement |
-| `EVOLVE_FANOUT_CACHE_PREFIX` | ACTIVE | Write shared cache-prefix.md for siblings |
-| `EVOLVE_FANOUT_CACHE_PREFIX_FILE` | ACTIVE | Path for cache-prefix.md |
-| `EVOLVE_FANOUT_TRACK_WORKERS` | ACTIVE | Track active fanout worker PIDs |
-| `EVOLVE_FANOUT_TEST_EXECUTOR` | ACTIVE | Test seam: override fanout worker command |
-| `EVOLVE_FANOUT_CONSENSUS_K` | ACTIVE | Consensus threshold K |
-| `EVOLVE_FANOUT_CONSENSUS_POLL_S` | ACTIVE | Consensus poll interval |
-
-> Per-phase flags (`_SCOUT`/`_AUDITOR`/`_RETROSPECTIVE`) are intentionally separate to allow
-> gradual role-by-role rollout. Do not consolidate into a string-list flag.
 
 ## Platform / CLI Hybrid
 
@@ -226,12 +205,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 
 | Flag | Purpose |
 |------|---------|
-| `EVOLVE_FANOUT_CYCLE` | Internal env passed to fanout worker subprocess |
-| `EVOLVE_FANOUT_PARENT_AGENT` | Internal env passed to fanout worker subprocess |
-| `EVOLVE_FANOUT_WORKER_NAME` | Internal env passed to fanout worker subprocess |
-| `EVOLVE_FANOUT_WORKER_ARTIFACT` | Internal env passed to fanout worker subprocess |
-| `EVOLVE_FANOUT_WORKER_TOKEN` | Internal env passed to fanout worker subprocess |
-| `EVOLVE_FANOUT_WORKSPACE` | Internal env passed to fanout worker subprocess |
 | `EVOLVE_DISPATCH_DEPTH` | Bridge-recursion depth; set on each fan-out worker command (parent+1), read at the `subagent run` / `dispatch-parallel` chokepoint to enforce the recursion cap (max 3). Absent ⇒ depth 0 (top-level). |
 | `EVOLVE_PROJECT_WRITABLE` | Set by resolve-roots.sh after verification |
 
@@ -354,23 +327,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_E2E_TMUX_LIVE_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_E2E_TMUX_TIMEOUT_S` | test-seam | — | — | — | Read only by _test.go files. |
 | `EVOLVE_EVAL_GATE` | active | enum | enforce | Gates | Structural eval gates (internal/evalgate): off\|shadow\|enforce. Gate A scout eval materialization, Gate B tdd predicate quality, Gate C floor binding (R9.3). |
-| `EVOLVE_FANOUT_AUDITOR` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Enable fan-out for auditor phase (orchestrator picks `dispatch-parallel auditor`; reads `auditor.json:parallel_subtasks[]`) |
-| `EVOLVE_FANOUT_CACHE_PREFIX` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Write shared cache-prefix.md for siblings |
-| `EVOLVE_FANOUT_CACHE_PREFIX_FILE` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Path for cache-prefix.md |
-| `EVOLVE_FANOUT_CANCEL_ON_CONSENSUS` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Cancel remaining workers on K-agreement |
-| `EVOLVE_FANOUT_CONCURRENCY` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Max parallel workers in flight (default 2) |
-| `EVOLVE_FANOUT_CONSENSUS_K` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Consensus threshold K |
-| `EVOLVE_FANOUT_CONSENSUS_POLL_S` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Consensus poll interval |
-| `EVOLVE_FANOUT_CYCLE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_ENABLED` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Master switch for fan-out |
-| `EVOLVE_FANOUT_PARENT_AGENT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_TEST_EXECUTOR` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Escape hatch: override the fanout worker command to bypass the LLM in test harnesses (read in production code, not test-only) |
-| `EVOLVE_FANOUT_TIMEOUT` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Per-worker timeout in fanout |
-| `EVOLVE_FANOUT_TRACK_WORKERS` | active | — | — | Fan-out Cluster (intentionally separate — do not consolidate per-phase flags) | Track active fanout worker PIDs |
-| `EVOLVE_FANOUT_WORKER_ARTIFACT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_WORKER_NAME` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_WORKER_TOKEN` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_FANOUT_WORKSPACE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
 | `EVOLVE_FLEET_SCOPE` | active | string | — | Fleet Cluster (Track C concurrency) | Comma-joined todo IDs assigned to this fleet cycle (ADR-0049 E); the launched cycle's triage selects only its disjoint subset. Empty/unset ⇒ the cycle works the whole backlog. Reader: go/internal/core/cyclerun.go (set by the `evolve fleet` supervisor, fleet/fleet.go) |
 | `EVOLVE_FORCE_FRESH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

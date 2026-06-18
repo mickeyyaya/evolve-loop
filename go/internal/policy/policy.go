@@ -65,6 +65,9 @@ type Policy struct {
 	// rules — quarantine manual-only, ledger never touched, live runs never
 	// touched — are NOT configurable here, by design.
 	GC *gc.Policy `json:"gc,omitempty"`
+	// Fanout configures the fan-out dispatch subsystem. Absent ⇒ built-in
+	// defaults apply (concurrency=2, track_workers=true, cache_prefix=true).
+	Fanout *FanoutPolicy `json:"fanout,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -248,4 +251,58 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// FanoutPolicy configures the fan-out dispatch subsystem. Loaded from
+// .evolve/policy.json "fanout" block; absent block ⇒ built-in defaults apply.
+// Prefer Policy.FanoutConfig() for default-resolved access.
+type FanoutPolicy struct {
+	// Concurrency is the max parallel workers in flight. 0/absent ⇒ 2.
+	Concurrency int `json:"concurrency,omitempty"`
+	// TimeoutSecs is the per-worker timeout. 0/absent ⇒ fanoutdispatch built-in.
+	TimeoutSecs int `json:"timeout_secs,omitempty"`
+	// CancelOnConsensus cancels remaining workers when ConsensusK voters agree.
+	CancelOnConsensus bool `json:"cancel_on_consensus,omitempty"`
+	// ConsensusK is the consensus threshold. 0/absent ⇒ fanoutdispatch built-in.
+	ConsensusK int `json:"consensus_k,omitempty"`
+	// ConsensusPollSecs is the poll interval. 0/absent ⇒ fanoutdispatch built-in.
+	ConsensusPollSecs int `json:"consensus_poll_secs,omitempty"`
+	// TrackWorkers tracks active fanout worker PIDs. Nil/absent ⇒ true.
+	TrackWorkers *bool `json:"track_workers,omitempty"`
+	// CachePrefixEnabled writes shared cache-prefix.md for siblings. Nil/absent ⇒ true.
+	CachePrefixEnabled *bool `json:"cache_prefix_enabled,omitempty"`
+	// TestExecutor overrides the fanout worker command for test harnesses.
+	TestExecutor string `json:"test_executor,omitempty"`
+}
+
+// FanoutConfig returns a FanoutPolicy with all defaults resolved. Concurrency
+// defaults to 2 (min 1); TrackWorkers and CachePrefixEnabled default to true
+// (returned pointers are never nil). Int fields use 0 as the fanoutdispatch
+// built-in-default sentinel.
+func (p Policy) FanoutConfig() FanoutPolicy {
+	tw, cp := true, true
+	out := FanoutPolicy{
+		Concurrency:        2,
+		TrackWorkers:       &tw,
+		CachePrefixEnabled: &cp,
+	}
+	f := p.Fanout
+	if f == nil {
+		return out
+	}
+	if f.Concurrency >= 1 {
+		out.Concurrency = f.Concurrency
+	}
+	out.TimeoutSecs = f.TimeoutSecs
+	out.CancelOnConsensus = f.CancelOnConsensus
+	out.ConsensusK = f.ConsensusK
+	out.ConsensusPollSecs = f.ConsensusPollSecs
+	if f.TrackWorkers != nil {
+		out.TrackWorkers = f.TrackWorkers
+	}
+	if f.CachePrefixEnabled != nil {
+		out.CachePrefixEnabled = f.CachePrefixEnabled
+	}
+	out.TestExecutor = f.TestExecutor
+	return out
 }

@@ -253,3 +253,7 @@
 # a byte-identical attestation to the bash runner before B2 deletes it.
 ./internal/commitgate
 ./internal/installer
+
+# cycle-9 ACS predicate package (2026-06-19): consolidate-fanout-cluster.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle9

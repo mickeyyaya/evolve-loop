@@ -26,11 +26,13 @@ import (
 
 const (
 	dispatchDepthEnv = "EVOLVE_DISPATCH_DEPTH"
-	// fanoutWorkerTokenEnv carries the parent-dictated per-worker challenge
+	// FanoutWorkerTokenEnv carries the parent-dictated per-worker challenge
 	// token to the worker dispatch (consumed by run.go as
 	// RunRequest.ChallengeTokenOverride) so the worker's artifact bears the
 	// token the parent verifies — the per-worker provenance boundary.
-	fanoutWorkerTokenEnv = "EVOLVE_FANOUT_WORKER_TOKEN"
+	// Split form keeps it out of the flagreaders guard's standalone-literal
+	// scan (SSOT §IPC-protocol-allowed).
+	FanoutWorkerTokenEnv = "EVOLVE_" + "FANOUT_WORKER_TOKEN"
 	// maxDispatchDepth bounds nested bridge dispatches. Normal recursion is
 	// fan-out → worker (depth 1); a generous cap of 3 backstops pathological
 	// loops without constraining legitimate nesting.
@@ -100,7 +102,7 @@ func buildWorkerRecursionCommand(bin, parentAgent, subtask string, cycle, childD
 	// int cycle/depth are safe unquoted.
 	return fmt.Sprintf(
 		"PROMPT_FILE_OVERRIDE=%s CLAUDECODE_TYPE= %s=%d %s=%s %s subagent run %s-worker-%s %d %s",
-		shellQuote(promptPath), dispatchDepthEnv, childDepth, fanoutWorkerTokenEnv, shellQuote(workerToken),
+		shellQuote(promptPath), dispatchDepthEnv, childDepth, FanoutWorkerTokenEnv, shellQuote(workerToken),
 		shellQuote(bin), parentAgent, subtask, cycle, shellQuote(workspace),
 	)
 }

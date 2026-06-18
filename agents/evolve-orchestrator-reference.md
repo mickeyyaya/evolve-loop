@@ -268,14 +268,9 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
    (if size == trivial: skip Audit → jump to ship)
-4. Audit                →  if [ "${EVOLVE_FANOUT_AUDITOR:-0}" = "1" ]; then
-                              subagent-run.sh dispatch-parallel auditor $CYCLE $WORKSPACE
-                          else
-                              subagent-run.sh auditor $CYCLE $WORKSPACE
-                          fi
-   (Fan-out splits audit into 4 parallel sub-auditors per auditor.json:parallel_subtasks[].
-    Verdict aggregation is unchanged: aggregator.sh enforces ANY-FAIL → aggregate FAIL.
-    Defaults off; flip on with EVOLVE_FANOUT_AUDITOR=1 once you have soak miles on the path.)
+4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
+   (Fan-out: use `evolve subagent dispatch-parallel auditor $CYCLE $WORKSPACE` explicitly
+    when profile.parallel_eligible=true. Configure via .evolve/policy.json "fanout" block.)
    ↓ verdict-driven branch:
 5a. PASS         →  advance ship orchestrator
                     if [ "$size" = "trivial" ]; then
