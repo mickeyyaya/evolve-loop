@@ -253,3 +253,4 @@
 # a byte-identical attestation to the bash runner before B2 deletes it.
 ./internal/commitgate
 ./internal/installer
+./internal/dossier

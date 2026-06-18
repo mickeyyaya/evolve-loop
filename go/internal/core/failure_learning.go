@@ -453,6 +453,24 @@ func failureLearningSummary(cycle int, failed Phase, err error) string {
 	return fmt.Sprintf("cycle %d failed during %s: %s", cycle, failed, msg)
 }
 
+// ApplyDefectsAsCarryoverTodos promotes each entry in record.Defects into its
+// own CarryoverTodo in state. The D2 contract requires individual defects to be
+// individually addressable — one generic todo per cycle is insufficient.
+func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
+	for i, defect := range record.Defects {
+		id := fmt.Sprintf("cycle-%d-defect-%d", record.Cycle, i)
+		if !carryoverTodoExists(state.CarryoverTodos, id) {
+			state.CarryoverTodos = append(state.CarryoverTodos, CarryoverTodo{
+				ID:             id,
+				Action:         "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + defect,
+				Priority:       "P0",
+				FirstSeenCycle: record.Cycle,
+				CyclesUnpicked: 0,
+			})
+		}
+	}
+}
+
 // fleetMode reports whether this cycle runs under the `evolve fleet` supervisor
 // (EVOLVE_FLEET=1). In fleet mode the whole-cycle global project lock is not
 // taken (ADR-0049 S6 / root-cause R1) so concurrent fleet cycles don't refuse

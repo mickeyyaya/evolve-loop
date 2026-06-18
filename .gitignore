@@ -75,6 +75,10 @@ node_modules/
 # Operator-extensible but ships with sensible defaults; must be tracked so the
 # scripts/guards/commit-prefix-gate.sh hook applies consistently across clones.
 !.evolve/commit-prefix-scope.json
+# ... and except the operator policy file (ADR-0055 D3). Defines floor gates
+# (e.g. dossier-closeout) that must pass before a cycle can ship. Operator-
+# extensible; must be tracked so the gate applies consistently across clones.
+!.evolve/policy.json
 # ... and except user-defined phase specs. Operators drop a phase.json under
 # .evolve/phases/<name>/phase.json to extend the pipeline declaratively.
 # Analogous to .evolve/profiles/ — must be tracked so new phases ship with the

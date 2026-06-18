@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cycle-dossier",
+  "title": "CycleDossier",
+  "description": "The aggregated, committed record of one evolve-loop cycle (ADR-0055). Written to knowledge-base/cycles/cycle-N.json by dossier.Write at closeout; validated by evolve dossier verify.",
+  "type": "object",
+  "required": ["cycle", "goal", "final_verdict", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Cycle number (1-based)."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "CA.2 run ULID — unique per run, threads every ledger entry."
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The cycle goal text."
+    },
+    "final_verdict": {
+      "type": "string",
+      "enum": ["PASS", "WARN", "FAIL"],
+      "description": "Aggregated cycle outcome."
+    },
+    "commit_sha": {
+      "type": "string",
+      "description": "Git commit SHA shipped this cycle (empty when cycle did not ship)."
+    },
+    "tree_sha": {
+      "type": "string",
+      "description": "Git tree SHA of the shipped commit."
+    },
+    "started_at": {
+      "type": "string",
+      "description": "RFC3339 timestamp when the cycle started."
+    },
+    "ended_at": {
+      "type": "string",
+      "description": "RFC3339 timestamp when the cycle ended."
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered phase records (one per executed phase).",
+      "items": {
+        "$ref": "#/definitions/PhaseRecord"
+      }
+    },
+    "defects": {
+      "type": "array",
+      "description": "Structured defects (required when final_verdict=FAIL).",
+      "items": {
+        "$ref": "#/definitions/Defect"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Key decisions made during this cycle.",
+      "items": {"type": "string"}
+    },
+    "lessons": {
+      "type": "array",
+      "description": "Narrative learnings from the retrospective.",
+      "items": {
+        "$ref": "#/definitions/Lesson"
+      }
+    },
+    "carryover": {
+      "type": "array",
+      "description": "Work items for the next cycle (required when final_verdict=FAIL).",
+      "items": {
+        "$ref": "#/definitions/Carryover"
+      }
+    }
+  },
+  "definitions": {
+    "PhaseRecord": {
+      "type": "object",
+      "required": ["name", "verdict"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "verdict": {"type": "string", "enum": ["PASS", "WARN", "FAIL"]},
+        "key_findings": {"type": "string"},
+        "artifact_sha": {"type": "string"},
+        "signals": {"type": "object"}
+      }
+    },
+    "Defect": {
+      "type": "object",
+      "required": ["id", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "severity": {"type": "string"},
+        "summary": {"type": "string", "minLength": 1},
+        "fix": {"type": "string"}
+      }
+    },
+    "Lesson": {
+      "type": "object",
+      "required": ["id", "pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "pattern": {"type": "string", "minLength": 1},
+        "preventive_action": {"type": "string"}
+      }
+    },
+    "Carryover": {
+      "type": "object",
+      "required": ["id", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "action": {"type": "string", "minLength": 1},
+        "priority": {"type": "string"}
+      }
+    }
+  }
+}

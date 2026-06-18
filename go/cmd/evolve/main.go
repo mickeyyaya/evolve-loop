@@ -26,6 +26,8 @@ Commands:
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
+  dossier    Read and verify cycle dossiers
+              ( dossier verify [--project-root P] )
   acs        Run ACS predicates    ( acs run --cycle N <pkg> | acs suite --cycle N )
   phase        Run a single phase in-process; PhaseRequest on stdin,
                 PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
