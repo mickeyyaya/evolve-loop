@@ -243,8 +243,7 @@ type RoutingConfig struct {
 	// AuditFailRoutesTo is the failure-floor policy route for the audit-FAIL
 	// edge ("retrospective" | "memo"), merged from .evolve/policy.json:
 	// failure_floor at the composition root — the ONE user surface for this
-	// decision. Empty ⇒ the deprecated enable-chain behavior
-	// (EVOLVE_DISABLE_AUTO_RETROSPECTIVE) stands for one more release.
+	// decision. Empty ⇒ retro is enabled via PhaseEnable defaults.
 	AuditFailRoutesTo string
 	// GoalRecipes is the ADR-0052 WS5 recipe SSOT (config.goal_recipes in the
 	// registry): goal type → ordered, verbatim recipe-token list. It is the
@@ -321,10 +320,6 @@ var legacyFlags = map[string]legacyFlag{
 	// the single interpreter, so it binds the flag the phase actually honors.
 	"EVOLVE_TEST_PHASE_ENABLED": {phase: "tdd", whenOne: EnableOn, whenZero: EnableOff},
 	"EVOLVE_BUILD_PLANNER":      {phase: "build-planner", whenOne: EnableOn, whenZero: EnableOff},
-	"EVOLVE_DISABLE_AUTO_RETROSPECTIVE": {
-		phase: "retrospective", whenOne: EnableOff, whenZero: EnableContent,
-		deprecated: "use .evolve/policy.json failure_floor (always_learn / audit_fail_routes_to) — the ONE failure-learning surface; failure_floor wins when both are set",
-	},
 	// Swarm planner (ADR-0032) — opt-in like build-planner. EVOLVE_SWARM_STAGE
 	// (shadow|advisory|enforce) is the rollout dial; any non-empty value other
 	// than off/shadow enables the planner phase. config.Load maps the legacy =1

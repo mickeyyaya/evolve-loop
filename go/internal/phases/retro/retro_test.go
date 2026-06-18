@@ -214,18 +214,27 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestRun_DisabledByEnv_SKIPPED(t *testing.T) {
-	fb := &fakeBridge{}
+func TestRun_RetiredDisableEnvIgnored(t *testing.T) {
+	fb := &fakeBridge{
+		writeArtifact: "# Retrospective\n## Root Cause\nx\n## Lessons\ny\n",
+		writeLesson:   "id: retired-env-ignored\nlesson: retro still runs\n",
+	}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
 		Env: map[string]string{
 			"EVOLVE_DISABLE_AUTO_RETROSPECTIVE": "1",
 		},
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
-	if resp.Verdict != core.VerdictSKIPPED {
-		t.Errorf("Verdict=%q, want SKIPPED (auto-retro disabled)", resp.Verdict)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS (retired env ignored)", resp.Verdict)
+	}
+	if fb.gotReq.Cycle != 1 {
+		t.Error("bridge.Launch was not called for FAIL verdict with retired env set")
 	}
 }
 

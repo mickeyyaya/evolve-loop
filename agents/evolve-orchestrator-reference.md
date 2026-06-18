@@ -87,8 +87,8 @@ healthy phase loop.
    build-report + scout-report + failure context, produces a structured
    lesson YAML at `.evolve/instincts/lessons/<id>.yaml`, then
    `merge-lesson-into-state.sh` updates `state.json:instinctSummary[]`
-   so the next cycle benefits. Operator opt-out:
-   `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only.
+   so the next cycle benefits. Failure-learning routing is configured only
+   through `.evolve/policy.json:failure_floor`.
    Cost: ~$0.30-0.50 per FAIL/WARN cycle (retrospective uses Sonnet by
    default — see `.evolve/profiles/retrospective.json`).
 4. **Write the report once.** orchestrator-report.md is single-write. If
