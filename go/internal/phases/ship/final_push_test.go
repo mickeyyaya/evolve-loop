@@ -89,10 +89,10 @@ func TestRun_NilRunner_DefaultsToExecRunner(t *testing.T) {
 	}
 }
 
-// TestRun_BypassShipVerify_NilEnvMap_InitialisedInBypass: when
-// EVOLVE_BYPASS_SHIP_VERIFY=1 fires and opts.Env is nil, the bridge must
-// initialise opts.Env before writing EVOLVE_SHIP_AUTO_CONFIRM (line 182).
-func TestRun_BypassShipVerify_NilEnvMap_InitialisedInBypass(t *testing.T) {
+// TestRun_BypassShipVerify_NilEnvMap_FlagIgnored: EVOLVE_BYPASS_SHIP_VERIFY
+// with a nil opts.Env must not panic. The bridge is removed, so the flag is
+// silently ignored and ClassCycle proceeds as ClassCycle.
+func TestRun_BypassShipVerify_NilEnvMap_FlagIgnored(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "bypass2.txt"), "change\n")
@@ -102,7 +102,7 @@ func TestRun_BypassShipVerify_NilEnvMap_InitialisedInBypass(t *testing.T) {
 	t.Setenv("EVOLVE_BYPASS_SHIP_GATE", "1")
 	t.Setenv("EVOLVE_BYPASS_PREFIX_GATE", "1")
 
-	// Opts.Env is nil — the bypass bridge must allocate it.
+	// opts.Env is nil — no longer an issue (bridge removed).
 	ctx := context.Background()
 	opts := Options{
 		Class:          ClassCycle,
@@ -114,17 +114,17 @@ func TestRun_BypassShipVerify_NilEnvMap_InitialisedInBypass(t *testing.T) {
 		Stdin:          strings.NewReader(""),
 		Stdout:         io.Discard,
 		Stderr:         io.Discard,
-		Env:            nil, // must be initialised by bypass bridge
+		Env:            nil,
 	}
-	res, err := Run(ctx, opts)
-	if err != nil {
-		t.Fatalf("bypass nil-env ship errored: %v", err)
+	// err may be non-nil: ClassCycle without an audit fails at audit check.
+	// That's the expected ClassCycle behavior — the point is no bridge occurs.
+	res, _ := Run(ctx, opts)
+	// ClassCycle proceeds as ClassCycle (flag silently ignored, no bridge).
+	if res.ClassUsed == ClassManual {
+		t.Errorf("ClassUsed=%q, flag must not bridge to ClassManual anymore", res.ClassUsed)
 	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	if !containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
-		t.Errorf("missing deprecation log")
+	if containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
+		t.Errorf("deprecation log must not be emitted: %v", res.Logs)
 	}
 }
 

@@ -9,15 +9,10 @@ import (
 // os.Getenv that change ship's control flow. TestMain neutralizes them before
 // the suite runs so the audit-binding matrix stays hermetic.
 //
-// Without this, an operator who exports EVOLVE_BYPASS_SHIP_VERIFY=1 (a common
-// dev/CI posture) silently converts every ClassCycle ship to
-// ClassManual+auto-confirm BEFORE audit verification (native.go:174), making
-// the entire audit-binding matrix vacuously pass — the same "Local Hero" smell
-// the guards package TestMain fixes. Tests that exercise a specific var set it
-// explicitly via Options.Env (highest precedence) or t.Setenv (which restores
-// to the neutralized state on cleanup), so this composes cleanly with them.
+// Tests that exercise a specific var set it explicitly via Options.Env
+// (highest precedence) or t.Setenv (which restores to the neutralized state
+// on cleanup), so this composes cleanly with them.
 var shipControlFlowEnvVars = []string{
-	"EVOLVE_BYPASS_SHIP_VERIFY",
 	"EVOLVE_SHIP_AUTO_CONFIRM",
 	"EVOLVE_STRICT_AUDIT",
 	"EVOLVE_SHIP_RELEASE_NOTES",

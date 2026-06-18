@@ -63,7 +63,6 @@ var All = []Flag{
 	{Name: "EVOLVE_BYPASS_PREFIX_GATE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_BYPASS_ROLE_GATE", Status: StatusActive, Cluster: "Bypass / Emergency Hatches", Doc: "Emergency hatch: bypass role-gate"},
 	{Name: "EVOLVE_BYPASS_SHIP_GATE", Status: StatusActive, Cluster: "Bypass / Emergency Hatches", Doc: "Emergency hatch: bypass ship-gate"},
-	{Name: "EVOLVE_BYPASS_SHIP_VERIFY", Status: StatusDeprecated, Cluster: "Bypass / Emergency Hatches", Doc: "Emits deprecation WARN.", ReplacedBy: "evolve ship --class manual"},
 	{Name: "EVOLVE_CACHE_PREFIX_V2", Status: StatusActive, Cluster: "Observability / Prompt Tuning", Doc: "v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering."},
 	{Name: "EVOLVE_CHECKPOINT_DISABLE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_CHECKPOINT_REASON", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
