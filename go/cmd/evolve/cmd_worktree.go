@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // absWorktreeRoot absolutizes a worktree subcommand's --project-root (default
@@ -52,10 +53,12 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		cycle       int
 		projectRoot string
 		base        string
+		lane        string
 	)
 	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
+	fs.StringVar(&lane, "lane", "", "lane override for the worktree name (default: hash of project root, or EVOLVE_LANE)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -71,7 +74,10 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve worktree create: mkdir: %v\n", err)
 		return 1
 	}
-	wt := filepath.Join(base, fmt.Sprintf("cycle-%d", cycle))
+	// runscope is the single source for the lane-namespaced worktree dir so this
+	// CLI provisions (and `cleanup` later locates) the SAME path the in-process
+	// core.gitWorktree provisioner uses, and concurrent worktrees never collide.
+	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
 	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", "--detach", wt, "HEAD")
 	var ebuf bytes.Buffer
 	cmd.Stderr = &ebuf
@@ -109,10 +115,12 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 		projectRoot string
 		base        string
 		cycle       int
+		lane        string
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
 	fs.IntVar(&cycle, "cycle", 0, "cycle number to remove (0 = prune all stale)")
+	fs.StringVar(&lane, "lane", "", "lane override; must match the lane used at create (default: hash of project root, or EVOLVE_LANE)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -121,7 +129,8 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
 	}
 	if cycle > 0 {
-		wt := filepath.Join(base, fmt.Sprintf("cycle-%d", cycle))
+		// Same runscope projection as create, so cleanup targets the exact dir.
+		wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
 		cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt)
 		var ebuf bytes.Buffer
 		cmd.Stderr = &ebuf

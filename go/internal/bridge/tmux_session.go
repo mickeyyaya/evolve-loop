@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // resolveSession returns the tmux session name and whether it is a stable
@@ -23,12 +23,10 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 	agent := orDefault(cfg.Agent, "probe")
 	// CB.5: a run-scoped token right after the driver prefix namespaces the
 	// session to its run — observers/watchers assert it (CB.6) and `tmux ls`
-	// under an M-run fleet reads unambiguously. RunID="" (single-driver
-	// legacy, degraded paths) keeps the pre-CB.5 name byte-identical.
-	runTok := ""
-	if cfg.RunID != "" {
-		runTok = sessionrecord.RunScopeToken(cfg.RunID) + "-"
-	}
+	// under an M-run fleet reads unambiguously. runscope.SessionPrefix returns ""
+	// for an empty RunID (single-driver legacy, degraded paths), keeping the
+	// pre-CB.5 name byte-identical; it delegates to sessionrecord.RunScopeToken.
+	runTok := runscope.New("", cfg.RunID, cfg.Cycle).SessionPrefix()
 	// ADR-0049 N15: a per-process monotonic nonce GUARANTEES uniqueness even
 	// when two ephemeral sessions are minted in the same wall-clock second
 	// (concurrent fleet cycles, or a same-phase retry within a cycle). The

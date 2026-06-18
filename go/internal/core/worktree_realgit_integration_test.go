@@ -8,12 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // TestGitWorktree_CreateUsesNamedBranch validates the production provisioner
-// against real git: the worktree must be on a NAMED branch (cycle-<N>), not a
-// detached HEAD — worktree-aware ship resolves the branch via symbolic-ref and
-// ff-merges it, so a detached worktree would break every cycle's ship.
+// against real git: the worktree must be on a NAMED branch (cycle-<lane>-<N>),
+// not a detached HEAD — worktree-aware ship resolves the branch via symbolic-ref
+// and ff-merges it, so a detached worktree would break every cycle's ship. The
+// branch embeds the runscope lane so concurrent sibling worktrees don't collide.
 func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -47,8 +50,9 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("worktree is detached (symbolic-ref failed): %v — ship would break", err)
 	}
-	if got := strings.TrimSpace(string(out)); got != "cycle-77" {
-		t.Fatalf("worktree branch = %q, want cycle-77", got)
+	wantBranch := runscope.New(runscope.LaneFromRoot(root), "", 77).CycleBranch()
+	if got := strings.TrimSpace(string(out)); got != wantBranch {
+		t.Fatalf("worktree branch = %q, want %q", got, wantBranch)
 	}
 
 	// linkGuardDeps must expose the dispatcher binary at the gitignored hook

@@ -253,3 +253,10 @@
 # a byte-identical attestation to the bash runner before B2 deletes it.
 ./internal/commitgate
 ./internal/installer
+
+# Concurrent evolve-loop Layer-1 (2026-06-18): runscope is the single-source
+# Value Object for all run/cycle/lane-scoped names (worktree branches+dirs, tmux
+# session prefixes). Composes the projecthash lane + sessionrecord run-token
+# leaves; retires the duplicated minting sites. Every export named/exercised by
+# runscope_test.go (table-driven projections + back-compat token pin).
+./internal/runscope
