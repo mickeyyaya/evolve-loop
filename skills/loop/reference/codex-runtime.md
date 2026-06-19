@@ -41,7 +41,7 @@ The Go bridge's codex driver (HYBRID + DEGRADED, v8.51.0+):
   3. If missing (DEGRADED): same-session execution, pipeline still runs
                             → calling LLM (Codex) writes artifacts directly
                             → kernel hooks + forgery defenses still apply
-  4. Opt-in hard-fail: --require-full or EVOLVE_CODEX_REQUIRE_FULL=1
+  4. Opt-in hard-fail: --require-full
                        → exit 99 if claude is missing
 ```
 
@@ -56,7 +56,7 @@ Codex's driver declares modes per dimension via `adapters/codex.capabilities.jso
 | Capability | Hybrid (claude on PATH) | Degraded (no claude) | Quality impact when degraded |
 |---|---|---|---|
 | `subprocess_isolation` | inherited from the claude driver | same-session execution | Builder + Auditor share session memory |
-| `budget_cap` | inherited (`--max-budget-usd`) | none | Runaway cycles uncapped; mitigation: `EVOLVE_RUN_TIMEOUT` |
+| `budget_cap` | inherited (`--max-budget-usd`) | none | Runaway cycles uncapped |
 | `sandbox` | inherited (sandbox-exec / bwrap) | none | OS-level isolation absent; pipeline gates still fire |
 | `profile_permissions` | inherited (`--allowedTools`) | none | Subagents have whatever tools the calling Codex session allows |
 | `challenge_token` | embedded in profile prompt | post-hoc artifact verification | Forgery slightly harder to detect early |
@@ -81,7 +81,7 @@ Pre-v8.51, missing `claude` → the codex driver exited 99 → pipeline blocked.
 
 DEGRADED mode runs the cycle in the same session (Codex itself produces artifacts via its file-write tools rather than spawning a Claude subprocess). The pipeline-level kernel hooks still gate every git/gh operation, the ledger SHA chain still enforces tamper-evident provenance, and the v7.9.0+ forgery defenses still validate artifact content. So even without subprocess isolation, the cycle cannot silently fabricate state.
 
-Operators who NEED full hybrid (production with budget caps, subprocess isolation) opt back into hard-fail with `--require-full` or `EVOLVE_CODEX_REQUIRE_FULL=1`. Default is graceful degradation.
+Operators who NEED full hybrid (production with budget caps, subprocess isolation) opt back into hard-fail with `--require-full`. Default is graceful degradation.
 
 ## Required environment
 

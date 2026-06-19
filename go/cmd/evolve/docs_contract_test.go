@@ -83,7 +83,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override
 	"EVOLVE_PROJECT_ROOT":              true, // dispatcher root resolve
 	"EVOLVE_PROMPTS_DIR":               true, // prompts.NewForProject dev override (used)
-	"EVOLVE_QUOTA_DANGER_PCT":          true, // quotareset
 	"EVOLVE_QUOTA_RESET_AT":            true, // quotareset
 	"EVOLVE_QUOTA_RESET_HOURS":         true, // quotareset
 	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true, // releasepipeline flag

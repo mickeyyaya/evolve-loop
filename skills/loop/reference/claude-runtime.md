@@ -56,8 +56,6 @@ Optional but recommended:
 | Variable | Purpose |
 |---|---|
 | `EVOLVE_SANDBOX=1` | Enable kernel-level sandbox-exec / bwrap wrapping (default in profiles with `sandbox.enabled: true`) |
-| `EVOLVE_TASK_MODE=research` (or `deep`) | Select a budget tier from the profile's `budget_tiers` map |
-
 ## Trust boundary
 
 Three PreToolUse kernel hooks fire on Claude Code:

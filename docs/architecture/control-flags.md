@@ -71,8 +71,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 > `EVOLVE_STRICT_FAILURES` bridged to `EVOLVE_STRICT_AUDIT` (canonical). `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` bridged to `EVOLVE_DISPATCH_POLICY={off|verify|stop}` (canonical).
 > Note: cycle-9 callout misstated the counts as "3 STRICT + 2 DISPATCH" — actual was 2 STRICT + 3 DISPATCH (REPEAT_THRESHOLD is a numeric threshold, not a policy switch).
 >
-> **Cycle 11 target**: `EVOLVE_REQUIRE_*` family audit — `EVOLVE_REQUIRE_INTENT` and `EVOLVE_REQUIRE_TEAM_CONTEXT` share "force phase on every cycle" semantics; investigate unified `EVOLVE_REQUIRED_PHASES` list flag. Lower priority (rarely set by operators); treat as `investigate` not `commit`.
-
 ## State File Cluster (cycle 7 consolidation)
 
 | Flag | Status | Purpose |
@@ -103,7 +101,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_PLATFORM` | ACTIVE | Override platform detection |
-| `EVOLVE_CODEX_REQUIRE_FULL` | ACTIVE | Require Codex full-mode |
 
 ## Worktree / Workspace
 
@@ -129,9 +126,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 |------|--------|---------|
 | `EVOLVE_STRICT_AUDIT` | ACTIVE (canonical) | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
 | `EVOLVE_STRICT_FAILURES` | DEAD | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_TASK_MODE` | ACTIVE | Profile tier selector (default/research/deep) |
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
-| `EVOLVE_REQUIRE_TEAM_CONTEXT` | ACTIVE | Require team context before builder |
 | `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
 | `EVOLVE_DISPATCH_POLICY` | ACTIVE (canonical) | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
 | `EVOLVE_DISPATCH_STOP_ON_FAIL` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
@@ -175,7 +170,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_CACHE_PREFIX_V2` | ACTIVE (default `1`) | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering. |
 | `EVOLVE_CONTEXT_DIGEST` | ACTIVE (default `1`) | v8.62.0 Campaign B (Tier 2 — digest layer). When `1`, role-context-builder.sh: (B1) lazy-builds `cycle-digest.json` via `build-cycle-digest.sh`; (B2) replaces full intent.md cat with a compact `## Intent (compact)` block (intent_anchor + acceptance_criteria from digest) for scout/triage/plan-review/tdd/builder phases — auditor + retrospective still get the full file. Real-world reduction: scout 84%, triage 40%, builder 43%. Promoted to default=1 in cycle 24 (v9.4.0). Set `EVOLVE_CONTEXT_DIGEST=0` to revert to legacy full-file mode. |
 | `EVOLVE_ANCHOR_EXTRACT` | ACTIVE (default `1`) | v8.63.0 Campaign C (Tier 3 — anchored artifacts). When `1`, role-context-builder.sh extracts only named `<!-- ANCHOR:<name> -->` regions from prior phase artifacts instead of `cat`-ing whole files. Persona templates (scout/builder/auditor/retrospective) emit anchor markers around output sections. Backwards-compat: pre-v8.63 artifacts without anchors fall back to full-file emission once per file (no duplication regression). Auditor reads `diff_summary`+`test_results` from build-report and `proposed_tasks`+`acceptance_criteria` from scout-report; triage reads `proposed_tasks` only. Promoted to default=1 in cycle 24 (v9.4.0). Set `EVOLVE_ANCHOR_EXTRACT=0` to revert to legacy full-file mode. |
-| `EVOLVE_RUN_TIMEOUT` | ACTIVE | Per-subagent run timeout |
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | ACTIVE | Max instinct summaries in state.json |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | ACTIVE | Carryover todos threshold |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | ACTIVE | Force release preflight gate |
@@ -216,8 +210,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | 8 (done) | Sandbox | Deprecated inner-sandbox flags via bridge (v8.60); retired in cycle-7 |
 | 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
 | 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` → `EVOLVE_DISPATCH_POLICY={off\|verify\|stop}` (v8.60) |
-| 11 | Require Phases | Investigate `EVOLVE_REQUIRE_INTENT` + `EVOLVE_REQUIRE_TEAM_CONTEXT` → unified `EVOLVE_REQUIRED_PHASES` list flag |
-
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 
 ## Generated Flag Index
@@ -254,7 +246,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
 | `EVOLVE_CLI_MAX_CONCURRENT_CODEX` | active | — | — | Concurrency / Sibling-Worktree (ADR-0054) | Per-CLI cross-process admission cap for the sibling-worktree concurrent-loop model (ADR-0054 Slice 4). Pattern: EVOLVE_CLI_MAX_CONCURRENT_<UPPERCASE_CLI_NAME> (e.g. EVOLVE_CLI_MAX_CONCURRENT_CODEX=2, EVOLVE_CLI_MAX_CONCURRENT_CLAUDE=3, EVOLVE_CLI_MAX_CONCURRENT_AGY=1). Default 0 = unbounded (byte-identical to pre-concurrency behavior — safe default, no behavior change). A failed acquire degrades to uncapped + WARN; admission control never blocks a phase outright. Read by internal/bridge/driver_tmux_repl.go via internal/cliadmit.Acquire. Holder-set JSON under $XDG_RUNTIME_DIR/evolve/cli-<name>.slots; stale holders auto-pruned by TTL (lease-as-liveness). See ADR-0054. |
 | `EVOLVE_CODEX_CONFIG_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_CODEX_REQUIRE_FULL` | active | — | — | Platform / CLI Hybrid | Require Codex full-mode |
 | `EVOLVE_CODEX_VERSION_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_COMMIT_EVIDENCE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_COMPACT_PROMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -314,7 +305,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PROMPTS_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROMPT_MAX_TOKENS` | active | — | — | Observability / Prompt Tuning | Soft prompt token cap for role-context-builder |
 | `EVOLVE_PSMAS_SKIP` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_QUOTA_DANGER_PCT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_QUOTA_RESET_AT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_QUOTA_RESET_HOURS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REAP_ORPHANS` | active | bool | 1 | Concurrency / Sibling-Worktree (ADR-0054) | Operator opt-out for the Tier-3 liveness orphan session reaper (ADR-0054 Slice 3). Default 1 = active (sessionreaper.ReapOrphans runs unconditionally in looppreflight). Set 0 to disable reaping for a run (e.g. for debugging leaked sessions). IMPORTANT: this flag is documentation/opt-out only — it does NOT gate sessionreaper's core logic in production; the reaper is wired unconditionally in looppreflight. Safety invariant: a run whose .lease is Fresh is NEVER reaped regardless of this dial. See internal/sessionreaper and evolve swarm reap-orphans [--dry-run]. |
@@ -322,7 +312,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_REQUIRE_INTENT` | active | — | — | Workflow Defaults | Force intent phase on every cycle |
-| `EVOLVE_REQUIRE_TEAM_CONTEXT` | active | — | — | Workflow Defaults | Require team context before builder |
 | `EVOLVE_RESET` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RETRO_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RETRY_BACKOFF_BASE_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -336,7 +325,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_ROUTER_REPLAN_DEPTH` | active | int | 1 | Advisor Maximization (ADR-0052) | Post-scout re-plan depth cap (advisor-maximization WS2-S5; research P4 — cap depth, escalate not loop). A positive int (DEFAULT 1): at most this many measured re-plans per cycle, then the cycle records a debugger-escalation marker instead of re-planning again, so a persistent mismatch surfaces rather than thrashing. The LIVE depth is the cycle-scoped counter cr.replanDepth (not env — env can reset across subprocesses); this flag only sets the cap. Non-positive/unparseable → 1 (fail-safe; never an unbounded or zero cap). |
 | `EVOLVE_ROUTING_JUDGE` | active | bool | 0 | Advisor Maximization (ADR-0052) | Opt-in LLM-as-judge route-quality scoring (advisor-maximization WS4), strictly off the build/critical path: `off` (DEFAULT — no judge call, byte-identical) / `on` (the fast-tier judge scores the emitted route + records the score for forensics; never gates ship, never alters the plan). A plain bool, not a stage — the judge cannot move behavior, so off/shadow/advisory would be indistinguishable. Composition-root view (RoutingConfig.RoutingJudge) set by applyEnv; the scoring call site reads it (behavior wires in WS4-S3). Unknown → off + WARN (a typo never silently enables the judge). |
 | `EVOLVE_ROUTING_MODE` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
-| `EVOLVE_RUN_TIMEOUT` | active | — | — | Observability / Prompt Tuning | Per-subagent run timeout |
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | active | — | — | Sandbox Cluster | EPERM fallback for nested-Claude (Darwin 25.4+) |
 | `EVOLVE_SCOUT_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -356,7 +344,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_SWARM_PORT_BASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SWARM_STAGE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TASK_MODE` | active | — | — | Workflow Defaults | Profile tier selector (default/research/deep) |
 | `EVOLVE_TDD_ENGINEER_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TDD_ENGINEER_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
