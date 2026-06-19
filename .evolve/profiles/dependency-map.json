@@ -1,11 +1,11 @@
 {
   "name": "dependency-map",
   "role": "dependency-map",
-  "cli": "codex-tmux",
+  "cli": "agy-tmux",
   "cli_fallback": [
     "claude-tmux"
   ],
-  "model_tier_default": "balanced",
+  "model_tier_default": "fast",
   "allowed_tools": [
     "Read",
     "Grep",

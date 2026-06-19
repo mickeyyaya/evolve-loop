@@ -1,10 +1,8 @@
 {
   "name": "license-provenance-audit",
   "role": "license-provenance-audit",
-  "cli": "codex-tmux",
-  "cli_fallback": [
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
+  "cli_fallback": [],
   "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",

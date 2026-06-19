@@ -1,8 +1,8 @@
 {
   "name": "doc-sync",
   "role": "doc-sync",
-  "cli": "claude-tmux",
-  "model_tier_default": "balanced",
+  "cli": "agy-tmux",
+  "model_tier_default": "fast",
   "max_turns": 10,
   "output_artifact": ".evolve/runs/cycle-{cycle}/doc-sync-report.md",
   "challenge_token_required": true,
@@ -27,5 +27,8 @@
     ],
     "read_only_repo": false
   },
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "cli_fallback": [
+    "claude-tmux"
+  ]
 }
