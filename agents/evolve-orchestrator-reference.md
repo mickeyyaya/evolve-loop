@@ -87,8 +87,8 @@ healthy phase loop.
    build-report + scout-report + failure context, produces a structured
    lesson YAML at `.evolve/instincts/lessons/<id>.yaml`, then
    `merge-lesson-into-state.sh` updates `state.json:instinctSummary[]`
-   so the next cycle benefits. Operator opt-out:
-   `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to pre-v8.45 record-only.
+   so the next cycle benefits. Failure-learning routing is configured only
+   through `.evolve/policy.json:failure_floor`.
    Cost: ~$0.30-0.50 per FAIL/WARN cycle (retrospective uses Sonnet by
    default — see `.evolve/profiles/retrospective.json`).
 4. **Write the report once.** orchestrator-report.md is single-write. If
@@ -152,7 +152,7 @@ Three pause causes: `quota-likely`, `batch-cap-near`, `operator-requested` — t
 2. **Skip completed**: For each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, trust existing artifacts. Do not re-run completed phases — re-running burns tokens and may stomp valid output.
 3. **Clear checkpoint**: `cycle-state.sh clear-checkpoint` once you resume forward progress.
 4. **Pick up**: Invoke `EVOLVE_RESUME_PHASE` subagent normally.
-5. **Re-pause**: If `quota-likely` or `batch-cap-near` or if `EVOLVE_CHECKPOINT_REQUEST=1` is set (intentional operator pause), write new checkpoint and emit `CHECKPOINT-PAUSED`.
+5. **Re-pause**: If `quota-likely` or `batch-cap-near`, write new checkpoint and emit `CHECKPOINT-PAUSED`.
 
 ---
 
@@ -169,7 +169,7 @@ Loaded for the Failure Adaptation Kernel (v8.22.0+).
 
 ## Section: phase-observer
 
-Loaded only when `EVOLVE_OBSERVER_ENABLED=1`.
+Loaded when phase-observer reporting is enabled by the orchestrator policy.
 
 The observer is a sibling subagent that watches the active phase agent's stream-json output and writes two artifacts to the workspace before exiting:
 
@@ -268,14 +268,9 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
    (if size == trivial: skip Audit → jump to ship)
-4. Audit                →  if [ "${EVOLVE_FANOUT_AUDITOR:-0}" = "1" ]; then
-                              subagent-run.sh dispatch-parallel auditor $CYCLE $WORKSPACE
-                          else
-                              subagent-run.sh auditor $CYCLE $WORKSPACE
-                          fi
-   (Fan-out splits audit into 4 parallel sub-auditors per auditor.json:parallel_subtasks[].
-    Verdict aggregation is unchanged: aggregator.sh enforces ANY-FAIL → aggregate FAIL.
-    Defaults off; flip on with EVOLVE_FANOUT_AUDITOR=1 once you have soak miles on the path.)
+4. Audit                →  subagent-run.sh auditor $CYCLE $WORKSPACE
+   (Fan-out: use `evolve subagent dispatch-parallel auditor $CYCLE $WORKSPACE` explicitly
+    when profile.parallel_eligible=true. Configure via .evolve/policy.json "fanout" block.)
    ↓ verdict-driven branch:
 5a. PASS         →  advance ship orchestrator
                     if [ "$size" = "trivial" ]; then

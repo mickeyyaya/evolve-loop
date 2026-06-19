@@ -25,6 +25,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 //go:embed catalogs/*.json
@@ -38,13 +41,21 @@ type catalogSource interface {
 
 var catalogFS catalogSource = embeddedCatalogs
 
-// catalogDir is the writable override directory consulted before the embedded
-// set: EVOLVE_BRIDGE_CATALOG_DIR, else .evolve/bridge-catalogs.
-func catalogDir() string {
-	if d := os.Getenv("EVOLVE_BRIDGE_CATALOG_DIR"); d != "" {
-		return d
+var catalogDirFn = func() string {
+	layout := paths.ResolveFromEnv()
+	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
+	if err == nil {
+		if dir := pol.BridgeConfig().CatalogDir; dir != "" {
+			return dir
+		}
 	}
-	return filepath.Join(".evolve", "bridge-catalogs")
+	return filepath.Join(layout.EvolveDir, "bridge-catalogs")
+}
+
+// catalogDir is the writable override directory consulted before the embedded
+// set.
+func catalogDir() string {
+	return catalogDirFn()
 }
 
 // SlashCommand is one interactive `/command`.

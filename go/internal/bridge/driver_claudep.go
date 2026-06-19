@@ -78,7 +78,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// (<ws>/<phase>.bridge-pid); a mismatch degrades to no probe (best-effort).
 	env := driverEnv(deps)
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
-		env = append(env, "EVOLVE_BRIDGE_PIDFILE="+pidFile)
+		env = append(env, bridgePidfileEnv+"="+pidFile)
 	}
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
 	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, env, nil, stdoutF, stderrF)

@@ -47,7 +47,7 @@ func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	integBranch := "cycle-" + gitexec.WorktreeToken("/repo") + "-5-integration"
+	integBranch := integBranchFor("/repo", 5)
 	if want := filepath.Join(base, integBranch); wt != want {
 		t.Errorf("wt = %q, want %q", wt, want)
 	}

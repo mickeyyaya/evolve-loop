@@ -1,247 +1,286 @@
 //go:build acs
 
-// Package cycle2 holds the cycle-2 ACS predicates for the Cycle Dossier feature
-// (ADR-0055 slices D2–D4). Authored by TDD Engineer as the RED gate; Builder
-// makes them GREEN by implementing dossier.Build/Render/Write, the failure-learning
-// defects propagation, the evolve dossier CLI, and the docs patches.
+// Package cycle2 materializes the cycle-2 acceptance criteria for:
+//
+//   - sessionreaper-orphan-reap: Tier-3 liveness orphan reaper (Slice 3,
+//     concurrency-arch-slices campaign). New leaf pkg internal/sessionreaper
+//     with ReapOrphans function, replacement of the looppreflight glob-WARN,
+//     and `evolve swarm reap-orphans` CLI operator backstop.
 package cycle2
 
 import (
-	"encoding/json"
-	"os"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ── D2: dossier-recorder-d2 ────────────────────────────────────────────────
+// --- Task: sessionreaper-orphan-reap ---
 
-// TestC2_001_DossierBuildReturnsPopulatedDossier verifies dossier.Build
-// returns a non-nil Dossier with Cycle+Goal set from BuildOpts (D2-AC1).
-func TestC2_001_DossierBuildReturnsPopulatedDossier(t *testing.T) {
-	d, err := dossier.Build(1, dossier.BuildOpts{Goal: "reduce flags"})
-	if err != nil {
-		t.Fatalf("Build: %v", err)
+// TestC2_001_SessionreaperPackageExistsAndTracked asserts that
+// go/internal/sessionreaper/sessionreaper.go was created in the worktree
+// and is git-tracked. A gitignored file is silently dropped at ship
+// (cycle-93 lesson).
+func TestC2_001_SessionreaperPackageExistsAndTracked(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	rel := filepath.Join("go", "internal", "sessionreaper", "sessionreaper.go")
+	path := filepath.Join(root, rel)
+	if !acsassert.FileExists(t, path) {
+		t.Fatalf("RED: %s missing on disk", rel)
 	}
-	if d.Cycle != 1 {
-		t.Errorf("Cycle: got %d, want 1", d.Cycle)
-	}
-	if d.Goal != "reduce flags" {
-		t.Errorf("Goal: got %q, want %q", d.Goal, "reduce flags")
-	}
-	if len(d.Phases) == 0 {
-		t.Error("Build: expected >=1 PhaseRecord")
-	}
-	if d.FinalVerdict == "" {
-		t.Error("Build: FinalVerdict must not be empty")
+	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel); code != 0 {
+		t.Errorf("RED: %s not git-tracked — may be gitignored and dropped at ship", rel)
 	}
 }
 
-// TestC2_002_DossierBuildErrorOnBadCycle verifies Build returns an error for
-// cycle <= 0 (D2-AC2, negative test).
-func TestC2_002_DossierBuildErrorOnBadCycle(t *testing.T) {
-	cases := []struct{ cycle int }{{0}, {-1}}
-	for _, tc := range cases {
-		_, err := dossier.Build(tc.cycle, dossier.BuildOpts{Goal: "x"})
-		if err == nil {
-			t.Errorf("Build(%d, ...): want error for invalid cycle, got nil", tc.cycle)
-		}
+// TestC2_002_SessionreaperExportsCompile asserts that all four exports named in
+// AC1 (ReapOrphans, Options, Report, OrphanReap) are present by running go build.
+// A missing export is a compile error — behavioral proof the API contract holds.
+func TestC2_002_SessionreaperExportsCompile(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "build",
+		"-C", goDir,
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: sessionreaper package does not compile (exports may be missing):\n%s", combined)
 	}
 }
 
-// TestC2_003_DossierRenderJSONRoundTrip verifies RenderJSON produces valid
-// JSON that round-trips back to the original Cycle+Goal (D2-AC3).
-func TestC2_003_DossierRenderJSONRoundTrip(t *testing.T) {
-	d := &dossier.Dossier{
-		Cycle:        3,
-		Goal:         "render test",
-		FinalVerdict: dossier.VerdictPass,
-		Phases:       []dossier.PhaseRecord{{Name: "build", Verdict: dossier.VerdictPass}},
+// TestC2_003_FreshLeaseSkippedTestPasses runs TestReapOrphans_FreshLeaseSkipped
+// under -race and asserts: (a) the test executed (anti-no-op guard: `go test -run`
+// on a missing test exits 0 silently), (b) exit 0, (c) no DATA RACE.
+// This is the safety-invariant predicate: a live peer's sessions must NEVER be
+// killed — fake TmuxKiller must record zero calls for the fresh-lease run.
+func TestC2_003_FreshLeaseSkippedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_FreshLeaseSkipped",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_FreshLeaseSkipped") {
+		t.Fatalf("RED: TestReapOrphans_FreshLeaseSkipped did not execute — function missing or name mismatch:\n%s", combined)
 	}
-	raw, err := dossier.RenderJSON(d)
-	if err != nil {
-		t.Fatalf("RenderJSON: %v", err)
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE detected in FreshLeaseSkipped test:\n%s", combined)
 	}
-	var round dossier.Dossier
-	if err := json.Unmarshal(raw, &round); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if round.Cycle != d.Cycle {
-		t.Errorf("JSON round-trip Cycle: got %d, want %d", round.Cycle, d.Cycle)
-	}
-	if round.Goal != d.Goal {
-		t.Errorf("JSON round-trip Goal: got %q, want %q", round.Goal, d.Goal)
-	}
-	md, err := dossier.RenderMarkdown(d)
-	if err != nil {
-		t.Fatalf("RenderMarkdown: %v", err)
-	}
-	if len(md) == 0 {
-		t.Error("RenderMarkdown: empty output — must produce non-empty markdown")
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_FreshLeaseSkipped failed (exit %d):\n%s", code, combined)
 	}
 }
 
-// TestC2_004_DossierWriteCreatesTwoFiles verifies Write creates cycle-N.json
-// and cycle-N.md in the target directory (D2-AC4).
-func TestC2_004_DossierWriteCreatesTwoFiles(t *testing.T) {
-	d := &dossier.Dossier{
-		Cycle:        42,
-		Goal:         "write test",
-		FinalVerdict: dossier.VerdictPass,
-		Phases:       []dossier.PhaseRecord{{Name: "build", Verdict: dossier.VerdictPass}},
+// TestC2_004_StaleLeaseReapedTestPasses runs TestReapOrphans_StaleLeaseReaped
+// under -race and asserts it passes. The positive behavioral test: a stale-lease
+// run's sessions MUST be passed to the killer (non-zero kill count).
+func TestC2_004_StaleLeaseReapedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_StaleLeaseReaped",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_StaleLeaseReaped") {
+		t.Fatalf("RED: TestReapOrphans_StaleLeaseReaped did not execute — function missing or name mismatch:\n%s", combined)
 	}
-	dir := t.TempDir()
-	if err := dossier.Write(d, dir, false); err != nil {
-		t.Fatalf("Write: %v", err)
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in StaleLeaseReaped test:\n%s", combined)
 	}
-	for _, name := range []string{"cycle-42.json", "cycle-42.md"} {
-		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
-			t.Errorf("Write: expected %s to exist: %v", name, err)
-		}
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_StaleLeaseReaped failed (exit %d):\n%s", code, combined)
 	}
 }
 
-// TestC2_005_DefectsProducedAsCarryoverTodos verifies that each entry in
-// FailedRecord.Defects becomes its own CarryoverTodo entry in State (D2-AC5).
-// Negative test: one generic todo is NOT sufficient — each defect must be
-// individually represented.
-func TestC2_005_DefectsProducedAsCarryoverTodos(t *testing.T) {
-	defects := []string{
-		"unbounded fan-out in auditor verify path",
-		"nil pointer in router when signals absent",
+// TestC2_005_MissingRegistryIsZeroActivityTestPasses runs
+// TestReapOrphans_MissingRegistryIsZeroActivity: absent tmux-sessions.jsonl must
+// be a zero-activity success (no error, no crash). Mirrors swarm.ReapRunSessions'
+// MissingRegistry contract.
+func TestC2_005_MissingRegistryIsZeroActivityTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_MissingRegistryIsZeroActivity",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_MissingRegistryIsZeroActivity") {
+		t.Fatalf("RED: TestReapOrphans_MissingRegistryIsZeroActivity did not execute:\n%s", combined)
 	}
-	state := &core.State{}
-	record := core.FailedRecord{
-		Cycle:          1,
-		Verdict:        "FAIL",
-		Classification: "test-defects",
-		Defects:        defects,
-		Summary:        "two distinct defects",
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_MissingRegistryIsZeroActivity failed (exit %d):\n%s", code, combined)
 	}
-	core.ApplyDefectsAsCarryoverTodos(state, record)
-	if len(state.CarryoverTodos) < len(defects) {
-		t.Errorf("want >= %d CarryoverTodos (one per defect), got %d; a single generic todo is insufficient",
-			len(defects), len(state.CarryoverTodos))
+}
+
+// TestC2_006_AbsentLeaseIsStaleTestPasses runs TestReapOrphans_AbsentLeaseIsStale:
+// a missing .lease file must be treated as stale (fail-closed; reap proceeds)
+// rather than live (fail-open; reap skipped). Unknown = reapable.
+func TestC2_006_AbsentLeaseIsStaleTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_AbsentLeaseIsStale",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_AbsentLeaseIsStale") {
+		t.Fatalf("RED: TestReapOrphans_AbsentLeaseIsStale did not execute:\n%s", combined)
 	}
-	for i, defect := range defects {
-		found := false
-		for _, todo := range state.CarryoverTodos {
-			if strings.Contains(todo.Action, defect) {
-				found = true
-				break
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_AbsentLeaseIsStale failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired asserts two things:
+// (1) the old server-wide glob-WARN for stale sessions is removed — it's a
+// latent footgun (could enumerate live peers' sessions) and incapable of safe
+// reaping; (2) ReapOrphans is called in checks.go instead.
+//
+// Mixed: FileNotContains removes the footgun assertion; FileMatchesRegex
+// confirms wiring. The behavioral side is covered by TestC2_008.
+// acs-predicate: config-check — source-wiring assertion is inherently a
+// file-presence check.
+func TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	checksPath := filepath.Join(root, "go", "internal", "looppreflight", "checks.go")
+	// Negative axis: the old glob-WARN string must be absent.
+	acsassert.FileNotContains(t, checksPath, "stale bridge tmux session(s)")
+	// Positive axis: ReapOrphans call must be present.
+	acsassert.FileMatchesRegex(t, checksPath, `ReapOrphans`)
+}
+
+// TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring runs the looppreflight
+// integration test suite to confirm the ReapOrphans wiring is correct and no
+// regressions were introduced. Behavioral: exercises the actual checks.go code.
+func TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-count=1", "-tags", "integration",
+		"./internal/looppreflight/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: looppreflight integration tests failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_009_SwarmReapOrphansDryRunSucceeds builds the evolve binary and runs
+// `evolve swarm reap-orphans --dry-run`. Exit 0 proves the subcommand is
+// registered and functional. --dry-run injects a no-op killer so no real sessions
+// are touched.
+func TestC2_009_SwarmReapOrphansDryRunSucceeds(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "run",
+		"-C", goDir,
+		"./cmd/evolve/...",
+		"swarm", "reap-orphans", "--dry-run",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: `evolve swarm reap-orphans --dry-run` failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_010_ApiCoverEnforceContainsSessionreaper asserts ./internal/sessionreaper
+// is enrolled in go/.apicover-enforce. Enrollment is mandatory for every new
+// internal package (TestApicoverEnforce_CoversEveryInternalPackage gate, cycle-131
+// lesson: a new pkg not enrolled fails the completeness invariant at ship).
+//
+// acs-predicate: config-check — enrollment verification is inherently a
+// file-presence check; the behavioral gate is TestC2_011.
+func TestC2_010_ApiCoverEnforceContainsSessionreaper(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	enforcePath := filepath.Join(root, "go", ".apicover-enforce")
+	// acs-predicate: config-check
+	acsassert.FileContains(t, enforcePath, "./internal/sessionreaper")
+}
+
+// TestC2_011_ApiCoverEnforceTestPasses runs TestApicoverEnforce_CoversEveryInternalPackage
+// which is the completeness gate: every internal pkg enrolled in .apicover-enforce
+// must have named coverage tests in the same package. This fails until
+// sessionreaper's apicover_named_test.go names every export.
+func TestC2_011_ApiCoverEnforceTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1", "-tags", "acs",
+		"-run", "TestApicoverEnforce_CoversEveryInternalPackage",
+		"./acs/regression/apicover/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestApicoverEnforce_CoversEveryInternalPackage") {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_012_SessionreaperCoverageAtLeast85Pct runs the integration test suite
+// with -coverprofile and asserts coverage >= 85% for the sessionreaper package.
+// A package below the threshold cannot ship per the AC10 gate (apicover-enforce
+// checks coverage profiles).
+func TestC2_012_SessionreaperCoverageAtLeast85Pct(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	coverFile := filepath.Join(t.TempDir(), "sessionreaper.cover.out")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-count=1", "-tags", "integration",
+		"-coverprofile", coverFile,
+		"-coverpkg", "./internal/sessionreaper/...",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: sessionreaper integration tests failed (exit %d):\n%s", code, combined)
+	}
+	for _, line := range strings.Split(combined, "\n") {
+		if strings.Contains(line, "coverage:") && strings.Contains(line, "%") {
+			fields := strings.Fields(line)
+			for i, f := range fields {
+				if f == "coverage:" && i+1 < len(fields) {
+					pctStr := strings.TrimSuffix(fields[i+1], "%")
+					var pct float64
+					if _, scanErr := fmt.Sscanf(pctStr, "%f", &pct); scanErr == nil {
+						if pct < 85.0 {
+							t.Errorf("RED: sessionreaper coverage %.1f%% < 85%% threshold", pct)
+						}
+						return
+					}
+				}
 			}
 		}
-		if !found {
-			t.Errorf("defect[%d] %q has no corresponding CarryoverTodo", i, defect)
-		}
 	}
-}
-
-// ── D3: dossier-acs-d3 ────────────────────────────────────────────────────
-
-// TestC2_006_PolicyHasDossierCloseout verifies .evolve/policy.json contains
-// the "dossier-closeout" gate entry required by D3 (D3-AC5).
-// acs-predicate: config-check — inherently a policy-file presence assertion.
-func TestC2_006_PolicyHasDossierCloseout(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	policyPath := filepath.Join(root, ".evolve", "policy.json")
-	if !acsassert.FileExists(t, policyPath) {
-		t.Fatalf("RED: .evolve/policy.json missing")
-	}
-	if !acsassert.FileContains(t, policyPath, "dossier") {
-		t.Errorf("RED: .evolve/policy.json has no 'dossier' entry — gate not enrolled")
-	}
-}
-
-// TestC2_007_DossierCLISubcommandRegistered verifies the evolve binary
-// exposes a "dossier" subcommand (D3-AC4 behavioral check — invokes the
-// real binary and asserts on its help output).
-func TestC2_007_DossierCLISubcommandRegistered(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	bin := filepath.Join(root, "go", "bin", "evolve")
-	if _, err := os.Stat(bin); err != nil {
-		t.Skipf("evolve binary not found at %s — rebuild with 'cd go && make build': %v", bin, err)
-	}
-	out, _, _, _ := acsassert.SubprocessOutput(bin, "help")
-	if !strings.Contains(out, "dossier") {
-		t.Errorf("evolve help output does not mention 'dossier' — cmd_dossier.go not registered or binary stale; rebuild and retry")
-	}
-}
-
-// ── D4: dossier-docs-d4 ──────────────────────────────────────────────────
-
-// TestC2_008_ADRDossierFileExistsAndHasSections verifies the ADR file exists,
-// is > 1000 bytes, and contains all four required ADR sections (D4-AC1).
-// acs-predicate: config-check — inherently a documentation presence assertion.
-func TestC2_008_ADRDossierFileExistsAndHasSections(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0055-cycle-dossier.md")
-	if !acsassert.FileExists(t, adrPath) {
-		t.Fatalf("RED: %s missing — ADR not written", adrPath)
-	}
-	info, err := os.Stat(adrPath)
-	if err != nil {
-		t.Fatalf("stat ADR: %v", err)
-	}
-	if info.Size() < 1000 {
-		t.Errorf("ADR file is %d bytes, want >= 1000", info.Size())
-	}
-	for _, section := range []string{"## Status", "## Context", "## Decision", "## Consequences"} {
-		if !acsassert.FileContains(t, adrPath, section) {
-			t.Errorf("ADR missing required section %q", section)
-		}
-	}
-}
-
-// TestC2_009_ScoutMdHasKBRecallStep verifies agents/evolve-scout.md contains
-// a knowledge-base/cycles recall step (D4-AC2).
-// acs-predicate: config-check — doc-content presence assertion.
-func TestC2_009_ScoutMdHasKBRecallStep(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	scoutPath := filepath.Join(root, "agents", "evolve-scout.md")
-	if !acsassert.FileExists(t, scoutPath) {
-		t.Fatalf("agents/evolve-scout.md missing")
-	}
-	if !acsassert.FileContains(t, scoutPath, "knowledge-base/cycles") {
-		t.Errorf("RED: agents/evolve-scout.md has no 'knowledge-base/cycles' recall step — D4 patch not applied")
-	}
-}
-
-// TestC2_010_RuntimeReferenceHasDossierVerify verifies runtime-reference.md
-// documents the evolve dossier verify command (D4-AC3).
-// acs-predicate: config-check — doc-content presence assertion.
-func TestC2_010_RuntimeReferenceHasDossierVerify(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	rtPath := filepath.Join(root, "docs", "operations", "runtime-reference.md")
-	if !acsassert.FileExists(t, rtPath) {
-		t.Fatalf("docs/operations/runtime-reference.md missing")
-	}
-	if !acsassert.FileContains(t, rtPath, "dossier verify") {
-		t.Errorf("RED: runtime-reference.md has no 'dossier verify' entry — D4 doc patch not applied")
-	}
-}
-
-// TestC2_011_ScoutMdRetainsFiveSectionHeaders verifies agents/evolve-scout.md
-// retains >= 5 '## ' section headers after the D4 patch (regression guard,
-// D4-AC4 negative test — a destructive patch that removes headers fails here).
-func TestC2_011_ScoutMdRetainsFiveSectionHeaders(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	scoutPath := filepath.Join(root, "agents", "evolve-scout.md")
-	raw, err := os.ReadFile(scoutPath)
-	if err != nil {
-		t.Fatalf("read agents/evolve-scout.md: %v", err)
-	}
-	count := 0
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, "## ") {
-			count++
-		}
-	}
-	if count < 5 {
-		t.Errorf("agents/evolve-scout.md has %d '## ' section headers, want >= 5 — D4 patch must preserve file structure", count)
-	}
+	t.Errorf("RED: could not parse coverage percentage from output:\n%s", combined)
 }

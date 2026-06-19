@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // worktree.go — per-cycle git worktree provisioning for the Go orchestrator.
@@ -51,16 +51,14 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
 	}
-	// The cycle worktree's directory AND branch both embed WorktreeToken(projectRoot)
-	// (NOT a bare "cycle-<N>"). Both a git branch name and a shared
-	// EVOLVE_WORKTREE_BASE directory are GLOBAL across one object store, so two
-	// concurrent `evolve loop` runs in sibling worktrees of the same repo would
-	// otherwise collide on the "cycle-<N>" branch (and, under a shared base, the
-	// "cycle-<N>" path) — every run but the first failing to provision and silently
-	// falling back to the main tree. The token is a stable function of the root, so
-	// a resumed cycle reuses the same directory + branch. Matches swarm's provisioner.
-	name := "cycle-" + gitexec.WorktreeToken(projectRoot) + "-" + strconv.Itoa(cycle)
-	wt := filepath.Join(base, name)
+	// runscope is the single source for the cycle worktree's branch + directory
+	// name. The lane (a stable per-root token) namespaces both so concurrent
+	// sibling worktrees of one repo never collide on the global "cycle-<N>"
+	// branch — the multi-stream failure this closes. RunID is unset here: the
+	// worktree NAME is keyed on the stable lane (survives resume), not the
+	// per-invocation ULID.
+	rs := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle)
+	wt := rs.WorktreeDir(base)
 	// Idempotent reuse across resume/retry — but only if it is still a VALID
 	// git worktree. A pruned ref can leave a stale directory os.Stat sees but
 	// git rejects; reusing it would make every commit inside fail. Verify, and
@@ -78,8 +76,8 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// via `git symbolic-ref --short HEAD` and ff-merges it to main — a detached
 	// HEAD yields an empty branch and ship fails. -B creates or resets the branch
 	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle. The
-	// branch equals the token-namespaced directory name computed above.
-	branch := name
+	// name equals the lane-namespaced directory leaf (runscope).
+	branch := rs.CycleBranch()
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, "HEAD")
 	if err != nil || code != 0 {
 		return "", fmt.Errorf("git worktree add -B %s %s: rc=%d err=%v: %s", branch, wt, code, err, stderr)

@@ -8,8 +8,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
+
+// integBranchFor / workerBranchFor / cycleBranchFor are the runscope-derived
+// expected names a test asserts against — the single source the production
+// provisioner now mints, so the tests cannot drift from the impl.
+func integBranchFor(root string, cycle int) string {
+	return runscope.New(runscope.LaneFromRoot(root), "", cycle).IntegrationBranch()
+}
+func workerBranchFor(root string, cycle int, workerID string) string {
+	return runscope.New(runscope.LaneFromRoot(root), "", cycle).WorkerBranch(workerID)
+}
 
 // gitInit makes a throwaway repo with one commit so `git worktree add` works.
 func gitInit(t *testing.T) string {
@@ -52,8 +62,7 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 	var linked []string
 	p := NewGitWorkerProvisioner(func(wt, _ string) { linked = append(linked, wt) })
 
-	tok := gitexec.WorktreeToken(root)
-	integBranch := "cycle-" + tok + "-5-integration"
+	integBranch := integBranchFor(root, 5)
 	integ, err := p.CreateIntegration(ctx, root, 5)
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +77,7 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "cycle-" + tok + "-5-w0"; branchOf(t, w0) != want {
+	if want := workerBranchFor(root, 5, "w0"); branchOf(t, w0) != want {
 		t.Errorf("worker branch = %q, want %q", branchOf(t, w0), want)
 	}
 	w1, err := p.CreateWorker(ctx, root, 5, "w1", integBranch)
@@ -89,7 +98,7 @@ func TestGitWorkerProvisioner_CreateWorkerIdempotent(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
 	p := NewGitWorkerProvisioner(nil)
-	integBranch := "cycle-" + gitexec.WorktreeToken(root) + "-1-integration"
+	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
 	a, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
 	if err != nil {
@@ -109,7 +118,7 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
 	p := NewGitWorkerProvisioner(nil)
-	integBranch := "cycle-" + gitexec.WorktreeToken(root) + "-1-integration"
+	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
 	w0, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
 	if err != nil {
@@ -228,7 +237,7 @@ func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateWorker with empty integrationBranch: %v", err)
 	}
-	if want := "cycle-" + gitexec.WorktreeToken(root) + "-9-w0"; branchOf(t, wt) != want {
+	if want := workerBranchFor(root, 9, "w0"); branchOf(t, wt) != want {
 		t.Errorf("branch = %q, want %q", branchOf(t, wt), want)
 	}
 }
@@ -242,9 +251,9 @@ func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", base)
 	ctx := context.Background()
 
-	// Pre-create a stale stub directory (just a plain dir, no .git) at the EXACT
-	// path CreateWorker will target, so the teardown path is actually exercised.
-	stub := filepath.Join(base, "cycle-"+gitexec.WorktreeToken(root)+"-7-w0")
+	// Pre-create a stale stub at the EXACT path CreateWorker will target, so the
+	// teardown path is actually exercised.
+	stub := filepath.Join(base, workerBranchFor(root, 7, "w0"))
 	if err := os.MkdirAll(stub, 0o755); err != nil {
 		t.Fatal(err)
 	}

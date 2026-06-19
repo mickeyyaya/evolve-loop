@@ -2,11 +2,31 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 // cmd_bridge_test.go — tests the `evolve bridge` CLI shim dispatch.
+
+func writeBridgePolicy(t *testing.T, bridge map[string]string) {
+	t.Helper()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{"bridge": bridge})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+}
 
 func TestRunBridge_Help(t *testing.T) {
 	var out, errb bytes.Buffer
@@ -65,7 +85,7 @@ func TestRunBridge_LaunchMissingRequiredFlags(t *testing.T) {
 }
 
 func TestRunBridge_AddRule(t *testing.T) {
-	t.Setenv("EVOLVE_BRIDGE_MANIFEST_DIR", t.TempDir())
+	writeBridgePolicy(t, map[string]string{"manifest_dir": t.TempDir()})
 	var out, errb bytes.Buffer
 	if code := runBridge([]string{"add-rule", "--cli=claude-p", "--regex=FOO", "--response=y,Enter"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("add-rule exit = %d, want 0; stderr=%q", code, errb.String())

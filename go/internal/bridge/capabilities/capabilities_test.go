@@ -74,7 +74,9 @@ func TestLoadCatalog_OverrideDirWins(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "claude-tmux.json"), []byte(override), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_BRIDGE_CATALOG_DIR", dir)
+	orig := catalogDirFn
+	catalogDirFn = func() string { return dir }
+	t.Cleanup(func() { catalogDirFn = orig })
 	c, err := LoadCatalog("claude-tmux")
 	if err != nil {
 		t.Fatal(err)

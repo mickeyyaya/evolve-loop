@@ -136,22 +136,20 @@ func TestPostShip_ClassCycle_AdvancesAndLogs(t *testing.T) {
 	}
 }
 
-// --- Run: BYPASS_SHIP_VERIFY bridge ----------------------------------------
+// --- Run: BYPASS_SHIP_VERIFY bridge removed --------------------------------
 
-// TestRun_BypassShipVerify_TranslatesToManualAutoConfirm: when
-// EVOLVE_BYPASS_SHIP_VERIFY=1 is set with ClassCycle, the bridge must:
-//  1. log the deprecation warning
-//  2. re-classify as ClassManual + EVOLVE_SHIP_AUTO_CONFIRM=1
-//  3. ship successfully (using a real repo with staged changes)
-func TestRun_BypassShipVerify_TranslatesToManualAutoConfirm(t *testing.T) {
+// TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge: EVOLVE_BYPASS_SHIP_VERIFY
+// is silently ignored — the retired bridge no longer re-classifies ClassCycle
+// to ClassManual. ClassCycle proceeds as ClassCycle.
+func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "bypass.txt"), "bypass test\n")
-	// No seedAudit — bypass skips audit entirely.
+	// No seedAudit — ClassCycle will fail at audit check (not at a bridge).
 
-	res, err := runShip(t, repo, Options{
+	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
-		CommitMessage: "bypass: deprecation bridge",
+		CommitMessage: "bypass: flag silently ignored",
 		Env: map[string]string{
 			"EVOLVE_BYPASS_SHIP_VERIFY": "1",
 			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
@@ -160,17 +158,12 @@ func TestRun_BypassShipVerify_TranslatesToManualAutoConfirm(t *testing.T) {
 			"EVOLVE_BYPASS_PREFIX_GATE": "1",
 		},
 	})
-	if err != nil {
-		t.Fatalf("bypass ship errored: %v (logs=%v)", err, res.Logs)
+	// Flag is silently ignored: ClassCycle stays ClassCycle (no bridge conversion).
+	if res.ClassUsed == ClassManual {
+		t.Errorf("ClassUsed=%q, flag must not bridge to ClassManual anymore", res.ClassUsed)
 	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("bypass ship want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	if !containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
-		t.Errorf("missing deprecation log; got %v", res.Logs)
-	}
-	if res.ClassUsed != ClassManual {
-		t.Errorf("ClassUsed=%q, want ClassManual after bypass translate", res.ClassUsed)
+	if containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
+		t.Errorf("deprecation log emitted — bridge should be removed: %v", res.Logs)
 	}
 }
 

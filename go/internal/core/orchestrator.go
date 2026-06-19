@@ -193,7 +193,7 @@ type Orchestrator struct {
 	// Start is called once before each runner.Run; the returned cancel runs
 	// once after. Nil ⇒ noopObserver default ⇒ byte-identical to the pre-
 	// ADR-0030 cycle. Set via WithObserver; cmd_cycle.go wires the real
-	// implementation when EVOLVE_OBSERVER_AUTOSPAWN != "0" (default 1).
+	// implementation when ObserverPolicy.Autospawn is enabled.
 	observer Observer
 
 	// failureAdviser is the ADR-0044 C3 LLM escalation tail consulted by
@@ -308,7 +308,7 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 // which is byte-identical to the pre-ADR-0030 cycle.
 //
 // cmd_cycle.go wires the real implementation via
-// observer.NewCoreAdapter when EVOLVE_OBSERVER_AUTOSPAWN != "0" (default 1).
+// observer.NewCoreAdapter when ObserverPolicy.Autospawn is enabled.
 func WithObserver(o Observer) Option {
 	return func(orch *Orchestrator) {
 		if o != nil {

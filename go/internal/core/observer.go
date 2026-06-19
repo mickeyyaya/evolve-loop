@@ -15,7 +15,7 @@ package core
 //
 // The interface here is intentionally tiny: presence is the contract,
 // not shape. The noopObserver default is byte-identical to the pre-fix
-// orchestrator behavior, so EVOLVE_OBSERVER_AUTOSPAWN=0 + an absent
+// orchestrator behavior, so ObserverPolicy.Autospawn=false + an absent
 // WithObserver option together reproduce the pre-ADR-0030 cycle exactly.
 
 import "context"

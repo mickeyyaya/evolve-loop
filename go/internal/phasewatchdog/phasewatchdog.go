@@ -32,7 +32,7 @@ type Config struct {
 	PollS          int    // default 15
 	WarnPct        int    // default 75
 	GraceS         int    // default 10
-	Disabled       bool   // EVOLVE_INACTIVITY_DISABLE=1
+	Disabled       bool   // ObserverPolicy.WatchdogDisabled
 	Now            func() time.Time
 	Sleep          func(d time.Duration)
 	KillPgrp       func(pgid int, sig syscall.Signal) error
@@ -97,7 +97,7 @@ func Run(cfg Config, stderr io.Writer) int {
 	}
 
 	if cfg.Disabled {
-		logf("EVOLVE_INACTIVITY_DISABLE=1 — watchdog disabled, exiting.")
+		logf("observer policy disables watchdog; exiting.")
 		return ExitOK
 	}
 
@@ -292,7 +292,7 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 		"source_phase":     "phase-watchdog",
 		"severity":         "HIGH",
 		"details":          details,
-		"remediation_hint": "Check agent turn count; reduce scope or increase EVOLVE_INACTIVITY_THRESHOLD_S",
+		"remediation_hint": "Check agent turn count; reduce scope or increase observer.stall_s in policy.json",
 	}
 	b, err := json.Marshal(entry)
 	if err != nil {

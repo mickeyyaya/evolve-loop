@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
@@ -46,9 +48,8 @@ Subcommands:
                      run via fanoutdispatch + aggregator merge.
                      ( dispatch-parallel <agent> <cycle> <workspace_path> )
                      Refuses if profile.parallel_eligible != true.
-                     Honors EVOLVE_FANOUT_CONCURRENCY,
-                     EVOLVE_FANOUT_CACHE_PREFIX,
-                     EVOLVE_FANOUT_TEST_EXECUTOR.
+                     Config via .evolve/policy.json fanout.{concurrency,
+                     cache_prefix_enabled,track_workers,test_executor}.
 `
 
 // runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
@@ -348,7 +349,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		AdversarialAudit:       flags.adversarialAudit,
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
-		ChallengeTokenOverride: os.Getenv("EVOLVE_FANOUT_WORKER_TOKEN"),
+		ChallengeTokenOverride: os.Getenv(subagent.FanoutWorkerTokenEnv),
 	}, subagent.RunOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
@@ -372,9 +373,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent dispatch-parallel <agent> <cycle> <workspace_path>")
-		fmt.Fprintln(stdout, "Env: EVOLVE_FANOUT_CONCURRENCY, EVOLVE_FANOUT_CACHE_PREFIX,")
-		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TRACK_WORKERS,")
-		fmt.Fprintln(stdout, "     EVOLVE_FANOUT_TEST_EXECUTOR, WORKTREE_PATH")
+		fmt.Fprintln(stdout, "Config: .evolve/policy.json fanout.{concurrency,cache_prefix_enabled,track_workers,test_executor},")
+		fmt.Fprintln(stdout, "     WORKTREE_PATH")
 		return 0
 	}
 	if len(args) != 3 {
@@ -391,7 +391,12 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 
 	layout := paths.ResolveFromEnv()
 
-	flags := readDispatchParallelFlags()
+	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "[dispatch-parallel] WARN: policy load: %v; using defaults\n", err)
+		pol = policy.Policy{}
+	}
+	fc := pol.FanoutConfig()
 
 	res, err := subagent.DispatchParallel(context.Background(), subagent.DispatchParallelRequest{
 		Agent:              agent,
@@ -404,10 +409,10 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 		PluginRoot:         layout.PluginRoot,
 		LedgerPath:         layout.LedgerFile,
 		WorktreePath:       os.Getenv("WORKTREE_PATH"),
-		Concurrency:        flags.concurrency,
-		CachePrefixEnabled: flags.cachePrefixEnabled,
-		TrackWorkers:       flags.trackWorkers,
-		TestExecutor:       os.Getenv("EVOLVE_FANOUT_TEST_EXECUTOR"),
+		Concurrency:        fc.Concurrency,
+		CachePrefixEnabled: *fc.CachePrefixEnabled,
+		TrackWorkers:       *fc.TrackWorkers,
+		TestExecutor:       fc.TestExecutor,
 		DispatchDepth:      subagent.ReadDispatchDepth(os.Getenv),
 	}, subagent.DispatchParallelOptions{})
 	if err != nil {
@@ -487,22 +492,5 @@ func readSubagentRunFlags() subagentRunFlags {
 		cachePrefixV2:       envchain.Bool("EVOLVE_CACHE_PREFIX_V2", nil, true),
 		adversarialAudit:    envchain.Bool("ADVERSARIAL_AUDIT", nil, true),
 		legacyAgentDispatch: envchain.Bool("LEGACY_AGENT_DISPATCH", nil, false),
-	}
-}
-
-// dispatchParallelFlags holds the env-derived knobs for `subagent
-// dispatch-parallel`. concurrency defaults to 2 and ignores values < 1 (the
-// legacy `n > 0` guard), expressed via envchain.IntMin.
-type dispatchParallelFlags struct {
-	concurrency        int
-	cachePrefixEnabled bool
-	trackWorkers       bool
-}
-
-func readDispatchParallelFlags() dispatchParallelFlags {
-	return dispatchParallelFlags{
-		concurrency:        envchain.IntMin("EVOLVE_FANOUT_CONCURRENCY", nil, 2, 1),
-		cachePrefixEnabled: envchain.Bool("EVOLVE_FANOUT_CACHE_PREFIX", nil, true),
-		trackWorkers:       envchain.Bool("EVOLVE_FANOUT_TRACK_WORKERS", nil, true),
 	}
 }

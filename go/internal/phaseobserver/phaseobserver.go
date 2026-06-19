@@ -5,8 +5,7 @@
 // + NDJSON event tracking + report writing on shutdown. The 4 secondary
 // detection rules (infinite_loop, error_spike, cost_anomaly, rate_limit) emit
 // best-effort events but do not yet fire as INCIDENT severity. Operators
-// requiring the full rule set should fall back to the bash original via
-// EVOLVE_OBSERVER_ENFORCE=0 until the rule-engine port lands in a later cycle.
+// The full rule set remains deferred until the rule-engine port lands.
 //
 // Tails the subagent's stream-json stdout.log, maintains in-memory state,
 // runs deterministic detection rules periodically, and emits observations to:

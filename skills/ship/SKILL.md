@@ -16,7 +16,7 @@ description: Use after audit returns Verdict PASS. Atomic git commit + tag + led
 
 - Audit verdict is FAIL or ABORT
 - The current tree-state SHA differs from what the auditor saw (cycle-binding violation)
-- `EVOLVE_BYPASS_SHIP_VERIFY` is requested but not justified
+- Ship class is unclear (use `--class cycle`, `--class manual`, or `--class release` explicitly)
 
 ## Workflow
 

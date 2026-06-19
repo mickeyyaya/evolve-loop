@@ -167,27 +167,6 @@ func TestRun_HostCapabilities_NoSandboxProfiles_Passes(t *testing.T) {
 	}
 }
 
-func TestRun_HostCapabilities_StaleBridgeSessions_Warns(t *testing.T) {
-	opts := goodPipelineOptions(t)
-	opts.TmuxSessions = func() ([]string, error) {
-		return []string{"evolve-bridge-build-42", "some-unrelated-session"}, nil
-	}
-	r, err := Run(opts)
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if r.Halted() {
-		t.Fatalf("stale sessions must not halt; got %s", r.OverallLevel)
-	}
-	c := findCheck(t, r, "host-capabilities")
-	if c.Level != LevelWarn {
-		t.Fatalf("want LevelWarn, got %s", c.Level)
-	}
-	if !strings.Contains(c.Detail, "evolve-bridge-build-42") {
-		t.Fatalf("detail should name the stale session; got %q", c.Detail)
-	}
-}
-
 func TestRun_HostCapabilities_LowDisk_Warns(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.DiskFreeBytes = func(string) (uint64, error) { return 100 << 20, nil } // 100 MiB
