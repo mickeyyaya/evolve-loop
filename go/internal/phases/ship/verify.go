@@ -200,7 +200,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		}
 		// Hard gate: interactive commits must carry a fresh commit-gate review
 		// attestation. Runs after verifyManualConfirm's `git add -A` so the SHA
-		// reflects the staged tree. Bypassed by EVOLVE_BYPASS_COMMIT_GATE=1.
+		// reflects the staged tree. Bypassed by Options.BypassCommitGate.
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
 		}

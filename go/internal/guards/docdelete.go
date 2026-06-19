@@ -23,7 +23,7 @@ var (
 )
 
 func (d *DocDelete) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_ALLOW_DOC_DELETE") {
+	if envEnabled("EVOLVE_ALLOW_DOC_DELETE") {
 		return core.GuardDecision{Allow: true}
 	}
 	if in.ToolName != "Bash" {

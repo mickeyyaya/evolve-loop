@@ -128,3 +128,16 @@ func TestRunGuard_EmitsAuditLine(t *testing.T) {
 		t.Errorf("audit line missing tag: %q", got)
 	}
 }
+
+func TestRunGuard_BypassFlagAfterName(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	input := `{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`
+	rc := runGuard([]string{"ship", "--evolve-dir", dir, "--bypass"}, strings.NewReader(input), &stdout, &stderr)
+	if rc != 0 {
+		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"allow":true`) {
+		t.Fatalf("bypass result missing allow=true: %q", stdout.String())
+	}
+}

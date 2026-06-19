@@ -246,7 +246,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	// is silently skipped to match bash behavior (`if [ -x ... ]`).
 	if err := runCommitPrefixGate(ctx, opts, msg, opts.ProjectRoot); err != nil {
 		return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
-			"ship: commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: "+err.Error(),
+			"ship: commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: --bypass-prefix-gate: "+err.Error(),
 			"gate_err", err.Error())
 	}
 
@@ -378,7 +378,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 		if err := runCommitPrefixGate(ctx, opts, msg, worktree); err != nil {
 			return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
-				"ship: commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual: "+err.Error(),
+				"ship: commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: --bypass-prefix-gate: "+err.Error(),
 				"gate_err", err.Error(), "worktree", worktree)
 		}
 
@@ -611,7 +611,7 @@ func runCommitPrefixGate(ctx context.Context, opts *Options, msg, repoDir string
 		RepoDir:   repoDir,
 		Mode:      commitprefixgate.ModeStaged,
 		Stderr:    opts.Stderr,
-		BypassEnv: os.Getenv("EVOLVE_BYPASS_PREFIX_GATE"),
+		Bypass:    opts.BypassPrefixGate,
 		ShipClass: string(opts.Class),
 	})
 	return err

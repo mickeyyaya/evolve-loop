@@ -73,7 +73,9 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string
+	var bypass bool
 	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.BoolVar(&bypass, "bypass", false, "emergency: bypass this guard")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -94,12 +96,23 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if name == "triage-floors" {
 		return runGuardTriageFloors(fs.Args()[1:], stdout, stderr)
 	}
+	guardFS := flag.NewFlagSet("evolve guard "+name, flag.ContinueOnError)
+	guardFS.SetOutput(stderr)
+	guardFS.StringVar(&evolveDir, "evolve-dir", evolveDir, "path to .evolve/ state directory")
+	guardFS.BoolVar(&bypass, "bypass", bypass, "emergency: bypass this guard")
+	if err := guardFS.Parse(fs.Args()[1:]); err != nil {
+		return 10
+	}
+	if guardFS.NArg() != 0 {
+		fmt.Fprintf(stderr, "evolve guard %s: unexpected arguments: %v\n", name, guardFS.Args())
+		return 10
+	}
 	in, err := readGuardInput(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard %s: stdin parse: %v\n", name, err)
 		return 10
 	}
-	g, err := buildGuard(name, evolveDir)
+	g, err := buildGuard(name, evolveDir, bypass)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard: %v\n", err)
 		return 10
@@ -234,14 +247,14 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 	return 0
 }
 
-func buildGuard(name, evolveDir string) (core.Guard, error) {
+func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 	switch name {
 	case "ship":
-		return guards.NewShip(), nil
+		return guards.NewShip(bypass), nil
 	case "phase":
-		return guards.NewPhase(storage.New(evolveDir)), nil
+		return guards.NewPhase(storage.New(evolveDir), bypass), nil
 	case "role":
-		return guards.NewRole(storage.New(evolveDir)), nil
+		return guards.NewRole(storage.New(evolveDir), bypass), nil
 	case "docdelete":
 		return guards.NewDocDelete(nil), nil
 	case "quota":

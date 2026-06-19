@@ -53,7 +53,7 @@ Namespace prefixes are stripped, so `ecc:go-reviewer` counts as `go-reviewer`. P
 
 ## Emergency bypass
 
-`EVOLVE_BYPASS_COMMIT_GATE=1` skips the attestation check on the `evolve ship --class manual` path. Routine bypassing is a CLAUDE.md violation; use only when the gate itself is broken.
+`evolve ship --class manual --bypass-commit-gate` skips the attestation check. Routine bypassing is a CLAUDE.md violation; use only when the gate itself is broken.
 
 ## Portability note
 

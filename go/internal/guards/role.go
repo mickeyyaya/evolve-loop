@@ -18,14 +18,15 @@ import (
 //   - Always-safe:  /tmp/**, $HOME/.claude/**
 type Role struct {
 	storage core.Storage
+	bypass  bool
 }
 
-func NewRole(s core.Storage) *Role { return &Role{storage: s} }
+func NewRole(s core.Storage, bypass bool) *Role { return &Role{storage: s, bypass: bypass} }
 
 func (r *Role) Name() string { return "role" }
 
 func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_BYPASS_ROLE_GATE") {
+	if r.bypass {
 		return core.GuardDecision{Allow: true}
 	}
 	if in.ToolName != "Edit" && in.ToolName != "Write" {
@@ -61,7 +62,7 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	return core.GuardDecision{
 		Allow: false,
 		Reason: "role guard: phase=" + cs.Phase + " may not write outside workspace " +
-			cs.WorkspacePath + " (path=" + path + "); EVOLVE_BYPASS_ROLE_GATE=1 to override",
+			cs.WorkspacePath + " (path=" + path + "); pass --bypass to override in an emergency",
 	}
 }
 

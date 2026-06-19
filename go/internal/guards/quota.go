@@ -42,7 +42,7 @@ func NewQuota(cfg QuotaConfig) *Quota {
 func (q *Quota) Name() string { return "quota" }
 
 func (q *Quota) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_ALLOW_DEEP_RESEARCH") {
+	if envEnabled("EVOLVE_ALLOW_DEEP_RESEARCH") {
 		return core.GuardDecision{Allow: true}
 	}
 	bucket, cap := q.bucketFor(in)

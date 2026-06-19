@@ -109,7 +109,7 @@ git commit body line 2`,
 
 // === The full ship-gate now lets verbs-in-heredoc-body pass ================
 func TestShip_Decide_VerbInHeredocBody(t *testing.T) {
-	s := NewShip()
+	s := NewShip(false)
 	// Native evolve ship invocation with commit message body that
 	// legitimately mentions `git push` and `git commit` (the v11.7.5
 	// failure mode that triggered this fix).
@@ -132,7 +132,7 @@ EOF
 
 // === A bare `git push` outside any heredoc still triggers DENY =============
 func TestShip_Decide_BareGitPush_Denied(t *testing.T) {
-	s := NewShip()
+	s := NewShip(false)
 	in := core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "git push origin main"},
@@ -145,7 +145,7 @@ func TestShip_Decide_BareGitPush_Denied(t *testing.T) {
 
 // === `evolve ship` invocation is allowed ====================================
 func TestShip_Decide_NativeEvolveShip_Allowed(t *testing.T) {
-	s := NewShip()
+	s := NewShip(false)
 	cases := []string{
 		`evolve ship --class manual "msg"`,
 		`go/bin/evolve ship --class manual "msg"`,
@@ -166,7 +166,7 @@ func TestShip_Decide_NativeEvolveShip_Allowed(t *testing.T) {
 
 // === Word-boundary safety: "devolve ship" must NOT match nativeShipRe ======
 func TestShip_Decide_WordBoundary_Devolve(t *testing.T) {
-	s := NewShip()
+	s := NewShip(false)
 	in := core.GuardInput{
 		ToolName: "Bash",
 		ToolInput: map[string]any{
@@ -181,7 +181,7 @@ func TestShip_Decide_WordBoundary_Devolve(t *testing.T) {
 
 // === Canonical bash ship.sh path still allowed (no regression) ============
 func TestShip_Decide_BashShipSh_Allowed(t *testing.T) {
-	s := NewShip()
+	s := NewShip(false)
 	in := core.GuardInput{
 		ToolName: "Bash",
 		ToolInput: map[string]any{

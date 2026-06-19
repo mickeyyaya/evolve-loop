@@ -12,7 +12,7 @@
 // (autonomous cycles are exempt by construction); --class release/trivial are
 // driven by their own pipelines and are not interactive commits.
 //
-// Bypass: EVOLVE_BYPASS_COMMIT_GATE=1 (routine use is a CLAUDE.md violation).
+// Bypass: Options.BypassCommitGate (routine use is a policy violation).
 package ship
 
 import (
@@ -42,13 +42,13 @@ type commitGateAttestation struct {
 //
 // Returns "" (no trailer == not reviewed) unless ALL hold: class is manual (the
 // only class that carries + verifies a review attestation), the commit gate was
-// NOT bypassed (EVOLVE_BYPASS_COMMIT_GATE — a bypass means review was skipped, so
+// NOT bypassed (a bypass means review was skipped, so
 // a stale on-disk attestation must NOT falsely assert review), and the
 // attestation parses with ≥1 valid reviewer. Best-effort: a read/parse error
 // omits the trailer. Reviewers with embedded newlines are dropped so a corrupt
 // attestation can't inject spurious lines into the trailer block.
 func reviewedByTrailer(opts *Options) string {
-	if opts.Class != ClassManual || opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
+	if opts.Class != ClassManual || opts.BypassCommitGate {
 		return ""
 	}
 	raw, err := os.ReadFile(filepath.Join(opts.ProjectRoot, ".commit-gate", "attestation.json"))
@@ -83,8 +83,8 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 		res.Logs = append(res.Logs, "[ship] commit-gate: dry-run — review attestation not required (no commit)")
 		return nil
 	}
-	if opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
-		res.Logs = append(res.Logs, "[ship] commit-gate: EVOLVE_BYPASS_COMMIT_GATE=1 — review attestation skipped")
+	if opts.BypassCommitGate {
+		res.Logs = append(res.Logs, "[ship] commit-gate: --bypass-commit-gate — review attestation skipped")
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 			return shipErr(core.CodeCommitGateMissing, core.ShipClassConfig, core.StageVerifyClass,
 				"--class manual requires a commit-gate review attestation, but .commit-gate/attestation.json is missing. "+
 					"Run /commit (code-simplifier + code-reviewer + language reviewer + lint + targeted tests) to produce one, "+
-					"or set EVOLVE_BYPASS_COMMIT_GATE=1 to bypass.",
+					"or pass --bypass-commit-gate to bypass.",
 				"attestation_path", attPath)
 		}
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
@@ -135,8 +135,8 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 }
 
 func runPersonaLint(ctx context.Context, opts *Options, res *RunResult) error {
-	if opts.envBool("EVOLVE_BYPASS_COMMIT_GATE") {
-		res.Logs = append(res.Logs, "[ship] persona-lint: EVOLVE_BYPASS_COMMIT_GATE=1 — persona lint skipped")
+	if opts.BypassCommitGate {
+		res.Logs = append(res.Logs, "[ship] persona-lint: --bypass-commit-gate — persona lint skipped")
 		return nil
 	}
 

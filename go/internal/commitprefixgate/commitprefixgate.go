@@ -55,8 +55,8 @@ type Options struct {
 	GuardsLog    string // defaulted to <RepoDir>/.evolve/guards.log
 	Stderr       io.Writer
 
-	// Env-equivalent toggles (cmd layer wires these from env).
-	BypassEnv string // EVOLVE_BYPASS_PREFIX_GATE
+	// Explicit command inputs.
+	Bypass    bool
 	ShipClass string // SHIP_CLASS
 
 	// Seams for testing.
@@ -126,13 +126,13 @@ func Run(opts Options) (Result, error) {
 	}
 
 	// Bypass check.
-	if opts.BypassEnv == "1" {
+	if opts.Bypass {
 		shipClass := opts.ShipClass
 		if shipClass == "" {
 			shipClass = "cycle"
 		}
 		if shipClass == "manual" {
-			logf("WARN: EVOLVE_BYPASS_PREFIX_GATE=1 + SHIP_CLASS=manual — bypass allowed")
+			logf("WARN: --bypass + SHIP_CLASS=manual — bypass allowed")
 			stderrf("WARN: bypass active (manual class); gate not enforcing")
 			res.Allowed = true
 			res.Reason = "bypass-manual"
@@ -230,7 +230,7 @@ func Run(opts Options) (Result, error) {
 		if !matched {
 			stderrf("DENY: prefix '%s' requires at least one diff path under %v, but diff contains only: %v",
 				prefix, rule.RequiredPaths, diffPaths)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: required_paths failed")
 			return res, fmt.Errorf("%w: required_paths", ErrScopeViolation)
 		}
@@ -256,7 +256,7 @@ func Run(opts Options) (Result, error) {
 		if allForbidden {
 			stderrf("DENY: prefix '%s' diff is entirely under forbidden_only_paths %v. This commit looks like docs/lessons/test work mislabeled as a feature. Use a different prefix (docs:, chore:, test:).",
 				prefix, rule.ForbiddenOnlyPaths)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: forbidden_only_paths")
 			return res, fmt.Errorf("%w: forbidden_only_paths", ErrScopeViolation)
 		}
@@ -281,7 +281,7 @@ func Run(opts Options) (Result, error) {
 		if len(violators) > 0 {
 			stderrf("DENY: prefix '%s' requires diff to be a subset of %v, but these paths violate: %v",
 				prefix, rule.RequiredPaths, violators)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: diff_must_be_subset")
 			return res, fmt.Errorf("%w: diff_must_be_subset", ErrScopeViolation)
 		}

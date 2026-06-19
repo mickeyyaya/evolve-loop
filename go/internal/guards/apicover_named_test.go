@@ -72,7 +72,7 @@ func TestQuotaType_SatisfiesGuardAndEnforcesCap(t *testing.T) {
 // TestShipType_SatisfiesGuardAndDenies names the *Ship type and asserts it
 // denies a bare `git commit` (the un-sanctioned ship path it gates).
 func TestShipType_SatisfiesGuardAndDenies(t *testing.T) {
-	var g *Ship = NewShip()
+	var g *Ship = NewShip(false)
 	var _ core.Guard = g
 	if g.Name() != "ship" {
 		t.Fatalf("Ship.Name() = %q, want ship", g.Name())

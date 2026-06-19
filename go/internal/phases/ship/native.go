@@ -73,6 +73,11 @@ type Options struct {
 	// DryRun skips all mutations but runs every read-only check.
 	DryRun bool
 
+	// Explicit emergency bypasses. The CLI exposes these as flags; environment
+	// variables are intentionally not consulted.
+	BypassCommitGate bool
+	BypassPrefixGate bool
+
 	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
 
@@ -103,7 +108,7 @@ type Options struct {
 
 	// Env overrides for the operator-facing env vars. Empty values fall
 	// through to os.Getenv. Keys: EVOLVE_SHIP_AUTO_CONFIRM,
-	// EVOLVE_STRICT_AUDIT, EVOLVE_SHIP_RELEASE_NOTES, EVOLVE_BYPASS_PREFIX_GATE.
+	// EVOLVE_STRICT_AUDIT, EVOLVE_SHIP_RELEASE_NOTES.
 	Env map[string]string
 
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict

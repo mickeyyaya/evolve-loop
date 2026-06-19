@@ -122,7 +122,7 @@ func TestRun_InvalidJSON(t *testing.T) {
 	if !strings.Contains(buf.String(), "does NOT parse as valid JSON") {
 		t.Errorf("LLM stderr missing JSON warn: %q", buf.String())
 	}
-	if !strings.Contains(buf.String(), "Bypass: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1") {
+	if !strings.Contains(buf.String(), "Emergency bypass: --bypass") {
 		t.Errorf("LLM stderr missing bypass hint")
 	}
 }

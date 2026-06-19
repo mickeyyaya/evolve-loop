@@ -12,14 +12,15 @@ import (
 // the rest land in Phase 2).
 type Phase struct {
 	storage core.Storage
+	bypass  bool
 }
 
-func NewPhase(s core.Storage) *Phase { return &Phase{storage: s} }
+func NewPhase(s core.Storage, bypass bool) *Phase { return &Phase{storage: s, bypass: bypass} }
 
 func (p *Phase) Name() string { return "phase" }
 
 func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_BYPASS_PHASE_GATE") {
+	if p.bypass {
 		return core.GuardDecision{Allow: true}
 	}
 	if in.ToolName != "Agent" {
@@ -42,7 +43,7 @@ func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisi
 		return core.GuardDecision{
 			Allow: false,
 			Reason: "Agent tool denied during cycle " +
-				cs.Phase + " (use scripts/dispatch/subagent-run.sh); EVOLVE_BYPASS_PHASE_GATE=1 to override",
+				cs.Phase + " (use the native subagent bridge); pass --bypass to override in an emergency",
 		}
 	}
 	return core.GuardDecision{Allow: true}

@@ -230,7 +230,7 @@ func Probe(opts Options) Profile {
 		}
 	} else {
 		autoReasoning = fmt.Sprintf(
-			"ERROR: no writable worktree base. Tried in-project (%v), TMPDIR (%v), cache dir (%v). OPERATOR ACTION: set EVOLVE_WORKTREE_BASE to a writable directory, or run from a different shell with broader permissions. Last-resort: EVOLVE_SKIP_WORKTREE=1 (loses per-cycle isolation, NOT recommended).",
+			"ERROR: no writable worktree base. Tried in-project (%v), TMPDIR (%v), cache dir (%v). OPERATOR ACTION: set EVOLVE_WORKTREE_BASE to a writable directory, or run from a different shell with broader permissions. Last-resort: use the explicit no-worktree operator mode (loses per-cycle isolation, NOT recommended).",
 			fs.InProjectWorktreesWritable, fs.TmpdirWritable, fs.CacheDirWritable)
 	}
 

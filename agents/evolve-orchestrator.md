@@ -145,7 +145,7 @@ If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files mod
 
 *Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*. For complete legacy phase sequence, see [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
 
-**phase-gate-precondition.sh enforces this sequence at the kernel layer.** If you try to invoke `subagent-run.sh builder` while phase=calibrate, the hook denies the call. There is no way around it short of `EVOLVE_BYPASS_PHASE_GATE=1` — and bypassing is a CRITICAL violation per CLAUDE.md.
+**The phase guard enforces this sequence at the kernel layer.** If you try to invoke Builder while phase=calibrate, the hook denies the call. The explicit `evolve guard phase --bypass` emergency path is a CRITICAL violation per CLAUDE.md.
 
 ### Per-phase prompt context (Layer B)
 

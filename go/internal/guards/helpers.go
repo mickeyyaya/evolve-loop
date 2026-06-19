@@ -25,7 +25,7 @@ func strField(in core_GuardInput, key string) string {
 	return s
 }
 
-// envBypass returns true if the given env var is set to "1".
-func envBypass(name string) bool {
+// envEnabled returns true if the given env var is set to "1".
+func envEnabled(name string) bool {
 	return os.Getenv(name) == "1"
 }

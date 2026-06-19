@@ -67,7 +67,7 @@ Invoked by:
 Cannot be:
 - Invoked by another persona (Anti-pattern B per `docs/architecture/tri-layer.md`)
 - Fanned out (single perspective; no `parallel_subtasks` in profile for v0.1)
-- Substituted via `EVOLVE_BYPASS_PHASE_GATE=1` (CRITICAL violation per CLAUDE.md)
+- Substituted via `evolve guard phase --bypass` (CRITICAL violation per CLAUDE.md)
 
 ## Reference
 

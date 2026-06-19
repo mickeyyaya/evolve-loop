@@ -2,7 +2,7 @@
 
 > **93+ distinct flags** as of 2026-05-27 (count approximate). See cluster annotations for consolidation targets in cycles 8–10.
 > Canonical source — bash surface: `grep -rohE 'EVOLVE_[A-Z_]+' legacy/scripts/ agents/ skills/ | sort -u`.
-> Go-native surface (NOT captured by the bash grep — e.g. the dynamic-routing family and `EVOLVE_BYPASS_COMMIT_GATE` live in `go/internal/`): `grep -rohE 'EVOLVE_[A-Z_]+' go/ | sort -u`.
+> Go-native surface (NOT captured by the bash grep — e.g. the dynamic-routing family lives in `go/internal/`): `grep -rohE 'EVOLVE_[A-Z_]+' go/ | sort -u`.
 
 ## Status Key
 
@@ -80,13 +80,10 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 
 ## Bypass / Emergency Hatches
 
-| Flag | Status | Purpose |
-|------|--------|---------|
-| `EVOLVE_BYPASS_SHIP_GATE` | ACTIVE | Emergency hatch: bypass ship-gate |
-| `EVOLVE_BYPASS_PHASE_GATE` | ACTIVE | Emergency hatch: bypass phase-gate-precondition |
-| `EVOLVE_BYPASS_ROLE_GATE` | ACTIVE | Emergency hatch: bypass role-gate |
-| `EVOLVE_BYPASS_POSTEDIT_VALIDATE` | ACTIVE | Emergency hatch: bypass postedit validation |
-| `EVOLVE_BYPASS_COMMIT_GATE` | ACTIVE (Go-native, v13.0.0+) | Emergency hatch: skip the `--class manual` commit-gate review attestation (`.commit-gate/attestation.json`). Routine use is a CLAUDE.md violation. `--dry-run` is exempt by construction. Reader: `go/internal/phases/ship/commitgate.go` |
+Emergency bypasses are explicit CLI flags rather than environment variables:
+`evolve guard <phase|role|ship> --bypass`, `evolve postedit-validate --bypass`,
+`evolve commit-prefix-gate --bypass`, and `evolve ship --bypass-commit-gate`
+or `--bypass-prefix-gate`.
 
 ## Triage Cluster (cycle 7 trim)
 
@@ -107,7 +104,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_WORKTREE_BASE` | ACTIVE | Per-cycle worktree base path |
-| `EVOLVE_SKIP_WORKTREE` | ACTIVE | Emergency hatch: skip per-cycle worktree isolation |
 | `EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD | Dry-run worktree provisioning [no reader on any surface as of 2026-06-11 inventory] |
 
 ## Readiness Gate (pre-batch)
@@ -227,12 +223,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_BOOT_TIMEOUT_S` | active | int | 60 | Platform / CLI Hybrid | Boot-wait deadline in seconds for the tmux REPL driver (CI boot-budget override; default tmuxREPLBootTimeoutS=60). Readers: go/internal/bridge/driver_tmux_repl.go, recipe_adapter.go |
 | `EVOLVE_BUILD_PLANNER` | active | — | — | Budget Cluster | Opt C build-planner phase. `1` = advisory (default; build-plan.md produced, Builder reads it as a sanity check); `0` = opt-out. Enforce mode in cycle-105 (Builder Step 3 removed). 3-cycle rollout: shadow→advisory→enforce. Revert: `EVOLVE_BUILD_PLANNER=0`. See ADR-0019. |
 | `EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BYPASS_COMMIT_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: skip the `--class manual` commit-gate review attestation (`.commit-gate/attestation.json`). Routine use is a CLAUDE.md violation. `--dry-run` is exempt by construction. Reader: `go/internal/phases/ship/commitgate.go` |
-| `EVOLVE_BYPASS_PHASE_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass phase-gate-precondition |
-| `EVOLVE_BYPASS_POSTEDIT_VALIDATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass postedit validation |
-| `EVOLVE_BYPASS_PREFIX_GATE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_BYPASS_ROLE_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass role-gate |
-| `EVOLVE_BYPASS_SHIP_GATE` | active | — | — | Bypass / Emergency Hatches | Emergency hatch: bypass ship-gate |
 | `EVOLVE_CACHE_PREFIX_V2` | active | — | — | Observability / Prompt Tuning | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering. |
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
@@ -308,7 +298,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_SHIP_SCRIPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SKIP_PREFLIGHT` | active | — | — | Readiness Gate (pre-batch) | Emergency hatch: skip the whole readiness gate (no checks, no boot) |
 | `EVOLVE_SKIP_PREFLIGHT_BOOT` | active | — | — | Readiness Gate (pre-batch) | Run the cheap checks (structure/CLI/host) but skip the real bridge-boot probe — CI/offline (bridge-boot downgrades Halt→Warn) |
-| `EVOLVE_SKIP_WORKTREE` | active | — | — | Worktree / Workspace | Emergency hatch: skip per-cycle worktree isolation |
 | `EVOLVE_STDOUT_FILTER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_STRATEGY` | active | — | — | Workflow Defaults | Cycle strategy override |
 | `EVOLVE_STRICT_AUDIT` | active | — | — | Workflow Defaults | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
