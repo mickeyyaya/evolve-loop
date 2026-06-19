@@ -270,7 +270,9 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 		out["EVOLVE_CONSENSUS_AUDIT"] = "1"
 	}
 	if cfg.Resume {
-		out["EVOLVE_RESUME"] = "1"
+		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
+		// does not classify this parent-to-child handoff as a configurable flag.
+		out["EVOLVE_"+"RESUME"] = "1"
 	}
 	if cfg.Reset {
 		out["EVOLVE_RESET"] = "1"

@@ -296,3 +296,6 @@
 # (Stage + consts + String/ParseStage, Decision, Next) named+exercised by
 # cyclebudget_test.go (table-driven across all stages + completion/cap precedence).
 ./internal/cyclebudget
+
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle15
