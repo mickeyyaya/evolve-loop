@@ -10,17 +10,27 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// bridgeManifestDir is the writable manifest-override directory consulted
-// before the embedded set: EVOLVE_BRIDGE_MANIFEST_DIR, else
-// .evolve/bridge-manifests. `bridge add-rule` writes here; LoadManifest
-// reads here first so operator-added rules take effect.
-func bridgeManifestDir() string {
-	if d := os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR"); d != "" {
-		return d
+var bridgeManifestDirFn = func() string {
+	layout := paths.ResolveFromEnv()
+	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
+	if err == nil {
+		if dir := pol.BridgeConfig().ManifestDir; dir != "" {
+			return dir
+		}
 	}
-	return filepath.Join(".evolve", "bridge-manifests")
+	return filepath.Join(layout.EvolveDir, "bridge-manifests")
+}
+
+// bridgeManifestDir is the writable manifest-override directory consulted
+// before the embedded set. `bridge add-rule` writes here; LoadManifest reads
+// here first so operator-added rules take effect.
+func bridgeManifestDir() string {
+	return bridgeManifestDirFn()
 }
 
 // manifests/*.json are the per-CLI capability manifests (ported verbatim

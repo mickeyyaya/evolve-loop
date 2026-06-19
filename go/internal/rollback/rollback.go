@@ -4,9 +4,7 @@
 //
 //  1. Delete the GitHub Release (gh release delete vX.Y.Z)
 //  2. Delete the remote tag (git push origin :refs/tags/vX.Y.Z)
-//  3. Create a revert commit and push it via ship.sh (with
-//     EVOLVE_BYPASS_SHIP_VERIFY=1, since the original audit was bound to
-//     the now-reverted tree)
+//  3. Create a revert commit and push it via evolve ship --class manual
 //
 // Each step's status is appended as one NDJSON line to
 // .evolve/release-rollbacks.jsonl for audit trail.
@@ -74,7 +72,7 @@ type Steps struct {
 	DeleteRemoteTag func(repoRoot, tag string) string
 
 	// RevertAndShip creates the revert commit (git revert --no-edit) and
-	// pushes via ship.sh with EVOLVE_BYPASS_SHIP_VERIFY=1. Returns:
+	// pushes via evolve ship --class manual. Returns:
 	//   "reverted" — revert + push both succeeded
 	//   "local-only" — revert succeeded; ship.sh push failed
 	//   "failed" — git revert failed (no commit made)
@@ -171,7 +169,7 @@ func dryRunSteps(logf func(string, ...any)) Steps {
 		},
 		RevertAndShip: func(_, sha, reason, version string) string {
 			logf("DRY-RUN: would git revert --no-edit %s", sha)
-			logf("DRY-RUN: would EVOLVE_BYPASS_SHIP_VERIFY=1 bash ship.sh \"revert: %s [rollback of v%s]\"",
+			logf("DRY-RUN: would evolve ship --class manual \"revert: %s [rollback of v%s]\"",
 				reason, version)
 			return "dry-run-ok"
 		},
@@ -371,7 +369,6 @@ func revertAndShipWith(g gitexec.Git, repoRoot, commitSHA, reason, version strin
 	}
 	cmd := exec.Command(binPath, "ship", "--class", "manual", msg)
 	cmd.Env = append(os.Environ(),
-		"EVOLVE_BYPASS_SHIP_VERIFY=1",
 		"EVOLVE_SHIP_AUTO_CONFIRM=1",
 	)
 	if err := cmd.Run(); err != nil {

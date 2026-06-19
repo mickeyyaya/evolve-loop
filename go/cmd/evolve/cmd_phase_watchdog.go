@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasewatchdog"
 )
 
@@ -18,8 +17,7 @@ func runPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		switch a {
 		case "--help", "-h":
 			fmt.Fprintln(stdout, "Usage: evolve phase-watchdog <workspace> <target_pgid> <cycle> <cycle_state_path>")
-			fmt.Fprintln(stdout, "Env: EVOLVE_INACTIVITY_THRESHOLD_S (default 600), POLL_S (15),")
-			fmt.Fprintln(stdout, "     WARN_PCT (75), GRACE_S (10), DISABLE (0), EVOLVE_PROJECT_ROOT")
+			fmt.Fprintln(stdout, "Config: .evolve/policy.json observer.{stall_s,watchdog_poll_s,watchdog_warn_pct,watchdog_grace_s,watchdog_disabled}")
 			return 0
 		default:
 			pos = append(pos, a)
@@ -47,27 +45,16 @@ func runPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	return phasewatchdog.Run(cfg, stderr)
 }
 
-// watchdogEnvConfig reads the EVOLVE_INACTIVITY_* / EVOLVE_PROJECT_ROOT knobs
-// through envchain. The ints default to 0 (phasewatchdog's "use built-in
-// default" sentinel); Disabled is a default-off `== "1"` flag.
+// watchdogEnvConfig resolves watchdog settings from .evolve/policy.json.
+// EVOLVE_PROJECT_ROOT remains the bootstrap path to that file.
 func watchdogEnvConfig() phasewatchdog.Config {
+	cfg := loadObserverPolicy()
 	return phasewatchdog.Config{
 		ProjectRoot: os.Getenv("EVOLVE_PROJECT_ROOT"),
-		ThresholdS:  envchain.Int("EVOLVE_INACTIVITY_THRESHOLD_S", nil, 0),
-		PollS:       envchain.Int("EVOLVE_INACTIVITY_POLL_S", nil, 0),
-		WarnPct:     envchain.Int("EVOLVE_INACTIVITY_WARN_PCT", nil, 0),
-		GraceS:      envchain.Int("EVOLVE_INACTIVITY_GRACE_S", nil, 0),
-		Disabled:    envchain.Bool("EVOLVE_INACTIVITY_DISABLE", nil, false),
+		ThresholdS:  *cfg.StallS,
+		PollS:       *cfg.WatchdogPollS,
+		WarnPct:     *cfg.WatchdogWarnPct,
+		GraceS:      *cfg.WatchdogGraceS,
+		Disabled:    cfg.WatchdogDisabled,
 	}
-}
-
-func atoiOr(s string, fallback int) int {
-	if s == "" {
-		return fallback
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return fallback
-	}
-	return v
 }

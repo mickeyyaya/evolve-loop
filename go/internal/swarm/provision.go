@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // WorkerProvisioner creates and removes the per-worker git worktrees + the
@@ -91,7 +92,9 @@ func worktreeBase(projectRoot string) (string, error) {
 }
 
 func (g gitWorkerProvisioner) CreateIntegration(ctx context.Context, projectRoot string, cycle int) (string, error) {
-	branch := fmt.Sprintf("cycle-%d-integration", cycle)
+	// runscope lane-namespaces the integration branch+dir so concurrent sibling
+	// worktrees of one repo never collide on a global "cycle-<N>-integration".
+	branch := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle).IntegrationBranch()
 	return g.addWorktree(ctx, projectRoot, branch, "HEAD")
 }
 
@@ -100,7 +103,7 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 	if base == "" {
 		base = "HEAD"
 	}
-	branch := fmt.Sprintf("cycle-%d-%s", cycle, workerID)
+	branch := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle).WorkerBranch(workerID)
 	return g.addWorktree(ctx, projectRoot, branch, base)
 }
 

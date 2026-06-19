@@ -54,7 +54,7 @@ func TestRun_DisabledShortCircuits(t *testing.T) {
 	if rc != ExitOK {
 		t.Errorf("disabled should exit 0, got %d", rc)
 	}
-	if !strings.Contains(b.String(), "DISABLE=1") {
+	if !strings.Contains(b.String(), "policy disables watchdog") {
 		t.Errorf("missing disable log: %s", b.String())
 	}
 }

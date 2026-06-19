@@ -309,8 +309,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// where the runner re-loads it for pins. Per-phase CLI/model pins are
 	// consulted at dispatch by the runner.
 	var shipFloor []string // WS4: nil ⇒ orchestrator uses router.DefaultShipFloor
-	if pol, perr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); perr != nil {
-		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", perr)
+	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if policyErr != nil {
+		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", policyErr)
+		pol = policy.Policy{}
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
 		// WS4: a user-configured ship_floor (e.g. ["audit"] for audit-only) drives
@@ -431,13 +433,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		}}),
 	}
 	// Cycle-122 Fix 3 / ADR-0030: auto-spawn the per-phase observer
-	// goroutine unless explicitly opted out via EVOLVE_OBSERVER_AUTOSPAWN=0.
+	// goroutine unless explicitly disabled in policy.json.
 	// Restores the pre-v12 bash-dispatcher behavior the Go port silently
 	// dropped. The default StallS=600s matches the bridge's coarse
-	// artifact-timeout; an operator who wants faster detection can set
-	// EVOLVE_OBSERVER_STALL_S=90 (or similar).
-	if os.Getenv("EVOLVE_OBSERVER_AUTOSPAWN") != "0" {
-		opts = append(opts, core.WithObserver(observer.NewCoreAdapter()))
+	// artifact-timeout.
+	observerCfg := pol.ObserverConfig()
+	if *observerCfg.Autospawn {
+		opts = append(opts, core.WithObserver(observer.NewCoreAdapter(observerCfg)))
 	}
 	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
 	// materialization) + Gate B (tdd predicate-quality), mounted at the

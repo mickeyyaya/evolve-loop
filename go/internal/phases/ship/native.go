@@ -4,7 +4,7 @@
 // legacy/scripts/lifecycle/ship.sh shell-out.
 //
 // The native Run() reproduces the full ship.sh state machine:
-//  1. arg parse (--class, --dry-run, commit message) + EVOLVE_BYPASS_SHIP_VERIFY bridge
+//  1. arg parse (--class, --dry-run, commit message)
 //  2. self-SHA TOFU (verify.go)
 //  3. class-aware verification (audit.go for cycle, prompt for manual, skip for release/trivial)
 //  4. atomic ship: stage + commit + ff-merge (if worktree) + push + optional gh release (gitops.go)
@@ -102,9 +102,8 @@ type Options struct {
 	ShipBinaryPath string
 
 	// Env overrides for the operator-facing env vars. Empty values fall
-	// through to os.Getenv. Keys: EVOLVE_BYPASS_SHIP_VERIFY,
-	// EVOLVE_SHIP_AUTO_CONFIRM, EVOLVE_STRICT_AUDIT, EVOLVE_SHIP_RELEASE_NOTES,
-	// EVOLVE_BYPASS_PREFIX_GATE.
+	// through to os.Getenv. Keys: EVOLVE_SHIP_AUTO_CONFIRM,
+	// EVOLVE_STRICT_AUDIT, EVOLVE_SHIP_RELEASE_NOTES, EVOLVE_BYPASS_PREFIX_GATE.
 	Env map[string]string
 
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
@@ -217,29 +216,6 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 	}
 	if opts.NowFn == nil {
 		opts.NowFn = defaultNow
-	}
-
-	// Handle the EVOLVE_BYPASS_SHIP_VERIFY=1 legacy bridge: translates to
-	// --class manual + auto-confirm with a deprecation log. ship.sh does
-	// this in section 1; replicating here preserves the audit trail and
-	// the "Test K" deprecation-warning behavior.
-	if opts.envBool("EVOLVE_BYPASS_SHIP_VERIFY") && opts.Class == ClassCycle {
-		res.Logs = append(res.Logs,
-			"DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1 is deprecated in v8.25.0+",
-			"  → Migrate to: evolve ship --class manual \"<msg>\"",
-			"  → Or for CI:  EVOLVE_SHIP_AUTO_CONFIRM=1 evolve ship --class manual \"<msg>\"",
-			"  → Treating this invocation as: --class manual + EVOLVE_SHIP_AUTO_CONFIRM=1",
-		)
-		opts.Class = ClassManual
-		if opts.Env == nil {
-			opts.Env = map[string]string{}
-		}
-		opts.Env["EVOLVE_SHIP_AUTO_CONFIRM"] = "1"
-		// The legacy bypass is a declared emergency total-bypass, so it also
-		// waives the commit-gate review attestation (the manual class would
-		// otherwise require one).
-		opts.Env["EVOLVE_BYPASS_COMMIT_GATE"] = "1"
-		res.ClassUsed = ClassManual
 	}
 
 	// 1. Self-SHA TOFU verification. Writes state.json on first-run /

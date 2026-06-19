@@ -289,7 +289,6 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
-	t.Setenv("EVOLVE_CHECKPOINT_DISABLE", "1")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

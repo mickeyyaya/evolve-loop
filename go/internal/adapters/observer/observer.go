@@ -28,7 +28,7 @@ const (
 	DefaultPollS = 5 * time.Second
 	// DefaultStallS is the hard-kill threshold — after this many seconds of
 	// no stdout-log output the observer signals the runner to SIGTERM the
-	// subagent. ADR-0030 + EVOLVE_OBSERVER_STALL_S.
+	// subagent. ADR-0030; configured by ObserverPolicy.StallS.
 	DefaultStallS = 600 * time.Second
 	// DefaultNudgeS is the soft-stall nudge threshold (cycle-124 Task 6 /
 	// operator redirect): when an agent emits no fresh output for this many
@@ -36,7 +36,7 @@ const (
 	// asking it to summarize state + continue OR finalize, BEFORE the hard
 	// SIGTERM at DefaultStallS. Default is half of DefaultStallS so the
 	// agent gets a clear "still alive?" prompt with enough time to recover.
-	// Opt-out: set EVOLVE_OBSERVER_NUDGE_S=0. See ADR-0023 facet A.
+	// Opt-out: set ObserverPolicy.NudgeS=0. See ADR-0023 facet A.
 	DefaultNudgeS = 300 * time.Second
 
 	// observerEventsSuffix names the observer's own NDJSON sink file (the
@@ -67,8 +67,8 @@ type Event struct {
 
 // Config pins the observer's runtime parameters.
 type Config struct {
-	StallS    time.Duration // EVOLVE_OBSERVER_STALL_S
-	PollS     time.Duration // EVOLVE_OBSERVER_POLL_S
+	StallS    time.Duration // ObserverPolicy.StallS
+	PollS     time.Duration // ObserverPolicy.PollS
 	Cycle     int
 	Phase     string
 	Agent     string

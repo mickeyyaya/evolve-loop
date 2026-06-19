@@ -1,55 +1,63 @@
 package main
 
-import "testing"
+import (
+	"testing"
 
-// fanoutEnvConfig reads the EVOLVE_FANOUT_* knobs through envchain. These tests
-// pin the truthy/falsy/default parsing of each migrated key — the guard against
-// a default-flip (e.g. a default-on `!= "0"` flag becoming default-off) during
-// the os.Getenv -> envchain migration.
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+)
 
-func TestFanoutEnvConfig_Defaults(t *testing.T) {
-	// All knobs unset -> documented defaults.
-	for _, k := range []string{
-		"EVOLVE_FANOUT_CONCURRENCY", "EVOLVE_FANOUT_TIMEOUT",
-		"EVOLVE_FANOUT_CANCEL_ON_CONSENSUS", "EVOLVE_FANOUT_CONSENSUS_K",
-		"EVOLVE_FANOUT_CONSENSUS_POLL_S", "EVOLVE_FANOUT_TRACK_WORKERS",
-	} {
-		t.Setenv(k, "")
+// FanoutConfig replaces fanoutEnvConfig. These tests pin the built-in defaults
+// and override behavior of policy.Policy.FanoutConfig().
+
+func TestFanoutPolicyConfig_Defaults(t *testing.T) {
+	pol := policy.Policy{}
+	fc := pol.FanoutConfig()
+	if fc.Concurrency != 2 {
+		t.Errorf("Concurrency default = %d, want 2", fc.Concurrency)
 	}
-	c := fanoutEnvConfig()
-	if c.Concurrency != 0 || c.TimeoutSecs != 0 || c.ConsensusK != 0 || c.ConsensusPollSecs != 0 {
-		t.Errorf("int defaults = {%d,%d,%d,%d}, want all 0", c.Concurrency, c.TimeoutSecs, c.ConsensusK, c.ConsensusPollSecs)
+	if fc.TimeoutSecs != 0 {
+		t.Errorf("TimeoutSecs default = %d, want 0 (package sentinel)", fc.TimeoutSecs)
 	}
-	if c.CancelOnConsensus {
-		t.Errorf("CancelOnConsensus default = true, want false (default-off `== \"1\"` flag)")
+	if fc.CancelOnConsensus {
+		t.Errorf("CancelOnConsensus default = true, want false")
 	}
-	if !c.TrackWorkers {
-		t.Errorf("TrackWorkers default = false, want true (default-on flag)")
+	if fc.TrackWorkers == nil || !*fc.TrackWorkers {
+		t.Errorf("TrackWorkers default = nil or false, want true")
+	}
+	if fc.CachePrefixEnabled == nil || !*fc.CachePrefixEnabled {
+		t.Errorf("CachePrefixEnabled default = nil or false, want true")
 	}
 }
 
-func TestFanoutEnvConfig_Parsing(t *testing.T) {
-	t.Setenv("EVOLVE_FANOUT_CONCURRENCY", "4")
-	t.Setenv("EVOLVE_FANOUT_TIMEOUT", "600")
-	t.Setenv("EVOLVE_FANOUT_CONSENSUS_K", "2")
-	t.Setenv("EVOLVE_FANOUT_CONSENSUS_POLL_S", "5")
-	t.Setenv("EVOLVE_FANOUT_CANCEL_ON_CONSENSUS", "1") // truthy
-	t.Setenv("EVOLVE_FANOUT_TRACK_WORKERS", "0")       // falsy -> disables a default-on flag
-	c := fanoutEnvConfig()
-	if c.Concurrency != 4 || c.TimeoutSecs != 600 || c.ConsensusK != 2 || c.ConsensusPollSecs != 5 {
-		t.Errorf("ints = {%d,%d,%d,%d}, want {4,600,2,5}", c.Concurrency, c.TimeoutSecs, c.ConsensusK, c.ConsensusPollSecs)
+func TestFanoutPolicyConfig_Override(t *testing.T) {
+	tw := false
+	pol := policy.Policy{
+		Fanout: &policy.FanoutPolicy{
+			Concurrency:  4,
+			TimeoutSecs:  600,
+			ConsensusK:   2,
+			TrackWorkers: &tw,
+		},
 	}
-	if !c.CancelOnConsensus {
-		t.Errorf("CancelOnConsensus(\"1\") = false, want true")
+	fc := pol.FanoutConfig()
+	if fc.Concurrency != 4 {
+		t.Errorf("Concurrency = %d, want 4", fc.Concurrency)
 	}
-	if c.TrackWorkers {
-		t.Errorf("TrackWorkers(\"0\") = true, want false")
+	if fc.TimeoutSecs != 600 {
+		t.Errorf("TimeoutSecs = %d, want 600", fc.TimeoutSecs)
+	}
+	if fc.ConsensusK != 2 {
+		t.Errorf("ConsensusK = %d, want 2", fc.ConsensusK)
+	}
+	if fc.TrackWorkers == nil || *fc.TrackWorkers {
+		t.Errorf("TrackWorkers = nil or true, want &false")
 	}
 }
 
-func TestFanoutEnvConfig_InvalidIntFallsBack(t *testing.T) {
-	t.Setenv("EVOLVE_FANOUT_CONCURRENCY", "not-a-number")
-	if c := fanoutEnvConfig(); c.Concurrency != 0 {
-		t.Errorf("Concurrency(garbage) = %d, want 0 (fallback)", c.Concurrency)
+func TestFanoutPolicyConfig_ConcurrencyFloor(t *testing.T) {
+	// Concurrency < 1 falls back to the default 2.
+	pol := policy.Policy{Fanout: &policy.FanoutPolicy{Concurrency: 0}}
+	if fc := pol.FanoutConfig(); fc.Concurrency != 2 {
+		t.Errorf("Concurrency(0) = %d, want 2 (floor)", fc.Concurrency)
 	}
 }

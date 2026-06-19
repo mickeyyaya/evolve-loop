@@ -6,10 +6,6 @@
 // Verdict mapping:
 //
 //   - previous verdict != FAIL/WARN → SKIPPED, no bridge call
-//   - EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1 → SKIPPED, no bridge call
-//     (DEPRECATED, honored one more release — policy.json failure_floor is
-//     the one surface and routes AHEAD of this check; the deterministic
-//     floor still records the failure either way)
 //   - retrospective.md non-empty AND at least one failure-lesson*.yaml
 //     present in workspace → PASS
 //   - otherwise → FAIL
@@ -56,18 +52,6 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 
 	prev := req.Context["previous_verdict"]
 	if prev != core.VerdictFAIL && prev != core.VerdictWARN {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictSKIPPED,
-			NextPhase:    string(core.PhaseEnd),
-			ArtifactsDir: req.Workspace,
-			DurationMS:   p.nowFn().Sub(start).Milliseconds(),
-		}, nil
-	}
-	// DEPRECATED escape hatch (one more release): policy.json failure_floor
-	// supersedes this flag and is consulted by the router BEFORE this phase
-	// dispatches; this in-phase check only remains for direct invocations.
-	if req.Env["EVOLVE_DISABLE_AUTO_RETROSPECTIVE"] == "1" {
 		return core.PhaseResponse{
 			Phase:        phaseName,
 			Verdict:      core.VerdictSKIPPED,

@@ -65,6 +65,15 @@ type Policy struct {
 	// rules — quarantine manual-only, ledger never touched, live runs never
 	// touched — are NOT configurable here, by design.
 	GC *gc.Policy `json:"gc,omitempty"`
+	// Fanout configures the fan-out dispatch subsystem. Absent ⇒ built-in
+	// defaults apply (concurrency=2, track_workers=true, cache_prefix=true).
+	Fanout *FanoutPolicy `json:"fanout,omitempty"`
+	// Observer configures phase liveness observation and watchdog behavior.
+	// Absent ⇒ built-in defaults apply.
+	Observer *ObserverPolicy `json:"observer,omitempty"`
+	// Bridge configures operator-writable bridge override directories.
+	// Absent ⇒ each bridge subsystem uses its built-in .evolve directory.
+	Bridge *BridgePolicy `json:"bridge,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -248,4 +257,137 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// FanoutPolicy configures the fan-out dispatch subsystem. Loaded from
+// .evolve/policy.json "fanout" block; absent block ⇒ built-in defaults apply.
+// Prefer Policy.FanoutConfig() for default-resolved access.
+type FanoutPolicy struct {
+	// Concurrency is the max parallel workers in flight. 0/absent ⇒ 2.
+	Concurrency int `json:"concurrency,omitempty"`
+	// TimeoutSecs is the per-worker timeout. 0/absent ⇒ fanoutdispatch built-in.
+	TimeoutSecs int `json:"timeout_secs,omitempty"`
+	// CancelOnConsensus cancels remaining workers when ConsensusK voters agree.
+	CancelOnConsensus bool `json:"cancel_on_consensus,omitempty"`
+	// ConsensusK is the consensus threshold. 0/absent ⇒ fanoutdispatch built-in.
+	ConsensusK int `json:"consensus_k,omitempty"`
+	// ConsensusPollSecs is the poll interval. 0/absent ⇒ fanoutdispatch built-in.
+	ConsensusPollSecs int `json:"consensus_poll_secs,omitempty"`
+	// TrackWorkers tracks active fanout worker PIDs. Nil/absent ⇒ true.
+	TrackWorkers *bool `json:"track_workers,omitempty"`
+	// CachePrefixEnabled writes shared cache-prefix.md for siblings. Nil/absent ⇒ true.
+	CachePrefixEnabled *bool `json:"cache_prefix_enabled,omitempty"`
+	// TestExecutor overrides the fanout worker command for test harnesses.
+	TestExecutor string `json:"test_executor,omitempty"`
+}
+
+// FanoutConfig returns a FanoutPolicy with all defaults resolved. Concurrency
+// defaults to 2 (min 1); TrackWorkers and CachePrefixEnabled default to true
+// (returned pointers are never nil). Int fields use 0 as the fanoutdispatch
+// built-in-default sentinel.
+func (p Policy) FanoutConfig() FanoutPolicy {
+	tw, cp := true, true
+	out := FanoutPolicy{
+		Concurrency:        2,
+		TrackWorkers:       &tw,
+		CachePrefixEnabled: &cp,
+	}
+	f := p.Fanout
+	if f == nil {
+		return out
+	}
+	if f.Concurrency >= 1 {
+		out.Concurrency = f.Concurrency
+	}
+	out.TimeoutSecs = f.TimeoutSecs
+	out.CancelOnConsensus = f.CancelOnConsensus
+	out.ConsensusK = f.ConsensusK
+	out.ConsensusPollSecs = f.ConsensusPollSecs
+	if f.TrackWorkers != nil {
+		out.TrackWorkers = f.TrackWorkers
+	}
+	if f.CachePrefixEnabled != nil {
+		out.CachePrefixEnabled = f.CachePrefixEnabled
+	}
+	out.TestExecutor = f.TestExecutor
+	return out
+}
+
+// ObserverPolicy configures phase observation and inactivity watchdogs.
+// Pointer fields preserve the distinction between an omitted value and an
+// explicit zero/false override (for example nudge_s=0 disables nudging).
+type ObserverPolicy struct {
+	Autospawn        *bool  `json:"autospawn,omitempty"`
+	PollS            *int   `json:"poll_s,omitempty"`
+	StallS           *int   `json:"stall_s,omitempty"`
+	NudgeS           *int   `json:"nudge_s,omitempty"`
+	NudgeBody        string `json:"nudge_body,omitempty"`
+	EOFGraceS        int    `json:"eof_grace_s,omitempty"`
+	WatchdogPollS    *int   `json:"watchdog_poll_s,omitempty"`
+	WatchdogWarnPct  *int   `json:"watchdog_warn_pct,omitempty"`
+	WatchdogGraceS   *int   `json:"watchdog_grace_s,omitempty"`
+	WatchdogDisabled bool   `json:"watchdog_disabled,omitempty"`
+}
+
+// ObserverConfig returns an ObserverPolicy with all defaults resolved.
+// Returned pointer fields are always non-nil.
+func (p Policy) ObserverConfig() ObserverPolicy {
+	autospawn, pollS, stallS, nudgeS := true, 5, 600, 300
+	watchdogPollS, watchdogWarnPct, watchdogGraceS := 15, 75, 10
+	out := ObserverPolicy{
+		Autospawn:       &autospawn,
+		PollS:           &pollS,
+		StallS:          &stallS,
+		NudgeS:          &nudgeS,
+		WatchdogPollS:   &watchdogPollS,
+		WatchdogWarnPct: &watchdogWarnPct,
+		WatchdogGraceS:  &watchdogGraceS,
+	}
+	if p.Observer == nil {
+		return out
+	}
+	o := p.Observer
+	if o.Autospawn != nil {
+		out.Autospawn = o.Autospawn
+	}
+	if o.PollS != nil {
+		out.PollS = o.PollS
+	}
+	if o.StallS != nil {
+		out.StallS = o.StallS
+	}
+	if o.NudgeS != nil {
+		out.NudgeS = o.NudgeS
+	}
+	out.NudgeBody = o.NudgeBody
+	out.EOFGraceS = o.EOFGraceS
+	if o.WatchdogPollS != nil {
+		out.WatchdogPollS = o.WatchdogPollS
+	}
+	if o.WatchdogWarnPct != nil {
+		out.WatchdogWarnPct = o.WatchdogWarnPct
+	}
+	if o.WatchdogGraceS != nil {
+		out.WatchdogGraceS = o.WatchdogGraceS
+	}
+	out.WatchdogDisabled = o.WatchdogDisabled
+	return out
+}
+
+// BridgePolicy configures operator-writable bridge override directories.
+// Empty fields preserve each subsystem's built-in .evolve directory.
+type BridgePolicy struct {
+	ManifestDir string `json:"manifest_dir,omitempty"`
+	CatalogDir  string `json:"catalog_dir,omitempty"`
+	RecipeDir   string `json:"recipe_dir,omitempty"`
+}
+
+// BridgeConfig returns the configured bridge directories. The zero value is
+// intentional: bridge subsystems resolve empty fields against the canonical
+// project root so relative-path behavior remains centralized.
+func (p Policy) BridgeConfig() BridgePolicy {
+	if p.Bridge == nil {
+		return BridgePolicy{}
+	}
+	return *p.Bridge
 }

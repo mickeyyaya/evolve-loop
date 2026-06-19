@@ -28,13 +28,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // CoreAdapter satisfies the core.Observer interface by spawning one
-// Observer.Watch goroutine per Start call. Defaults come from the
-// EVOLVE_OBSERVER_* env vars (StallS, PollS) resolved at Start time so
-// per-cycle env overrides apply. Zero value is a usable adapter with
-// production defaults (StallS=600s, PollS=5s).
+// Observer.Watch goroutine per Start call. Zero value is a usable adapter
+// with production defaults (StallS=600s, PollS=5s).
 type CoreAdapter struct {
 	// Sink, when non-nil, replaces the default <workspace>/<phase>-
 	// observer-events.ndjson file sink. Used by tests + future
@@ -43,13 +42,18 @@ type CoreAdapter struct {
 
 	// EnvLookup overrides os.Getenv for tests. Nil → os.Getenv.
 	EnvLookup func(key string) string
+
+	// Config carries policy.json observer settings.
+	Config policy.ObserverPolicy
 }
 
 // NewCoreAdapter returns a CoreAdapter wired with production defaults.
-// Operators usually call this from cmd_cycle.go's wireOrchestratorDeps
-// when EVOLVE_OBSERVER_AUTOSPAWN != "0".
-func NewCoreAdapter() *CoreAdapter {
-	return &CoreAdapter{}
+func NewCoreAdapter(config ...policy.ObserverPolicy) *CoreAdapter {
+	a := &CoreAdapter{}
+	if len(config) > 0 {
+		a.Config = config[0]
+	}
+	return a
 }
 
 // Start implements core.Observer. Returns a cancel function the
@@ -82,9 +86,10 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		sinkCloser = f
 	}
 
+	resolved := policy.Policy{Observer: &a.Config}.ObserverConfig()
 	cfg := Config{
-		StallS:    a.resolveDuration("EVOLVE_OBSERVER_STALL_S", DefaultStallS),
-		PollS:     a.resolveDuration("EVOLVE_OBSERVER_POLL_S", DefaultPollS),
+		StallS:    time.Duration(*resolved.StallS) * time.Second,
+		PollS:     time.Duration(*resolved.PollS) * time.Second,
 		Cycle:     req.Cycle,
 		Phase:     phase,
 		Agent:     phase, // runner-side: agent name == phase name post-prefix-strip
@@ -226,8 +231,8 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 	return "claude-tmux"
 }
 
-// resolveDuration reads an EVOLVE_OBSERVER_* env var as seconds; falls
-// back to def on empty/invalid OR on a non-positive value. Used for
+// resolveDuration reads an injected value as seconds and falls back to def
+// on empty/invalid OR on a non-positive value. Used for
 // PollS/StallS where 0 is meaningless (no polling / no stall threshold)
 // and indistinguishable from "the operator forgot to set it". Per-adapter
 // EnvLookup is honored. For NudgeS the 0-means-disable semantics differ —
@@ -248,11 +253,7 @@ func (a *CoreAdapter) resolveDuration(key string, def time.Duration) time.Durati
 	return time.Duration(n) * time.Second
 }
 
-// resolveString reads an EVOLVE_OBSERVER_* env var as a string; falls back
-// to def on empty. Cycle-124 Task 6: used to thread EVOLVE_OBSERVER_NUDGE_BODY
-// into the auto-spawn adapter so an operator can override the built-in
-// nudge text without recompiling. An empty default tells phaseobserver.Run
-// to fall back to its own built-in body (phaseobserver.go:148).
+// resolveString reads an injected string setting and falls back on empty.
 func (a *CoreAdapter) resolveString(key, def string) string {
 	get := os.Getenv
 	if a.EnvLookup != nil {
@@ -264,19 +265,14 @@ func (a *CoreAdapter) resolveString(key, def string) string {
 	return def
 }
 
-// resolveNudgeS reads EVOLVE_OBSERVER_NUDGE_S with cycle-124 Task 6
-// semantics — DIFFERENT from resolveDuration. A "0" value is the
-// documented opt-OUT (disable nudging entirely), an UNSET var falls back
-// to def (DefaultNudgeS=300s, the new default-on behavior). A negative or
-// non-integer value also falls back to def so a typo doesn't accidentally
-// disable nudging. This semantic split matches the phaseobserver internal
-// sentinel `cfg.NudgeS == 0 → nudging disabled` (phaseobserver.go:148).
-func (a *CoreAdapter) resolveNudgeS(def time.Duration) time.Duration {
+// resolveNudgeS resolves an injected seconds setting where zero explicitly
+// disables nudging and invalid/negative values fall back to the default.
+func (a *CoreAdapter) resolveNudgeS(key string, def time.Duration) time.Duration {
 	get := os.Getenv
 	if a.EnvLookup != nil {
 		get = a.EnvLookup
 	}
-	raw := get("EVOLVE_OBSERVER_NUDGE_S")
+	raw := get(key)
 	if raw == "" {
 		return def
 	}
@@ -284,6 +280,5 @@ func (a *CoreAdapter) resolveNudgeS(def time.Duration) time.Duration {
 	if err != nil || n < 0 {
 		return def
 	}
-	// n == 0 → explicit opt-out (returns 0 = disable).
 	return time.Duration(n) * time.Second
 }

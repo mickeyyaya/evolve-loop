@@ -7,7 +7,7 @@ package observer
 // false-stall shape as cycle-190, one layer over. This probe reads the agent
 // process's accumulated CPU time: a computing agent (even silently thinking)
 // accrues CPU; a deadlocked one does not. The bridge writes the agent PID to a
-// per-phase file at launch (engine.go execRunner, gated by EVOLVE_BRIDGE_PIDFILE);
+// per-phase file at launch (engine.go execRunner, gated by bridgePidfileEnv);
 // this probe reads it.
 //
 // NOT absolute ground truth — it is a better PROXY than stdout-flatness, with

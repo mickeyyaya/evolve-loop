@@ -43,7 +43,7 @@ description: Use after ship completes. Three sub-reflectors (instinct, gene, fai
 
 | Fact | Value |
 |---|---|
-| Phase | `retrospective` (control archetype, optional, gated by `EVOLVE_DISABLE_AUTO_RETROSPECTIVE`) |
+| Phase | `retrospective` (control archetype, optional) |
 | Persona | `agents/evolve-retrospective.md` |
 | Profile | `.evolve/profiles/retrospective.json` — CLI `claude-tmux`, tier `deep`, fan-out ×3 |
 | Inputs | `audit-report.md` · `build-report.md` |

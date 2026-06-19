@@ -36,7 +36,11 @@ func loadPlanSpecs(planJSON []byte, goalHash string, count int) ([]fleet.CycleSp
 	return specs, deferred, nil
 }
 
-func runFleet(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	// Sub-command: evolve fleet soak
+	if len(args) > 0 && args[0] == "soak" {
+		return runFleetSoak(args[1:], stdin, stdout, stderr)
+	}
 	fs := flag.NewFlagSet("evolve fleet", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var (

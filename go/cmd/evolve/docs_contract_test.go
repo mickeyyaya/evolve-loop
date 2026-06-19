@@ -74,13 +74,8 @@ var allowedUndocumented = map[string]bool{
 	// NEW additions.
 	"EVOLVE_GUARDS_LOG":                true, // observability shunt
 	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
-	"EVOLVE_INACTIVITY_DISABLE":        true, // phase-watchdog opt-out
-	"EVOLVE_INACTIVITY_GRACE_S":        true, // phase-watchdog
-	"EVOLVE_INACTIVITY_POLL_S":         true, // phase-watchdog
-	"EVOLVE_INACTIVITY_WARN_PCT":       true, // phase-watchdog
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
 	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
-	"EVOLVE_OBSERVER_EOF_GRACE_S":      true, // phase-observer
 	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
 	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
 	"EVOLVE_PLATFORM":                  true, // platform-detect override

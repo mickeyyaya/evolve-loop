@@ -32,17 +32,6 @@ func TestDefaultDirWritable(t *testing.T) {
 	})
 }
 
-func TestDefaultTmuxSessions(t *testing.T) {
-	sessions, err := defaultTmuxSessions()
-	if err != nil {
-		if sessions != nil {
-			t.Fatalf("on error, sessions must be nil; got %v", sessions)
-		}
-		return
-	}
-	_ = sessions // success path: sessions may be nil or non-nil
-}
-
 func TestDefaultDiskFreeBytes(t *testing.T) {
 	free, err := defaultDiskFreeBytes(t.TempDir())
 	if err != nil {

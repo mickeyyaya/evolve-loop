@@ -74,7 +74,7 @@ test-component: ## Component tier: several internal packages wired against temp 
 test-integration: ## Integration tier: real FS/git/tmux subprocess tests (//go:build integration)
 	$(GO) test -race -count=1 -tags integration ./internal/... ./cmd/... ./test/integration/...
 
-test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e); live sub-tier self-skips without EVOLVE_E2E_LIVE
+test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e); live sub-tier self-skips without its opt-in
 	$(GO) test -count=1 -tags e2e ./cmd/... ./test/e2e/...
 
 test-all: ## All tiers in one race run (local superset of CI; CI runs e2e WITHOUT -race in a separate step)

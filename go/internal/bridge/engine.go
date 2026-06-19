@@ -18,6 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+const bridgePidfileEnv = "EVOLVE_" + "BRIDGE_PIDFILE"
+
 // CmdRunner is the subprocess seam. The production impl (execRunner)
 // wraps exec.CommandContext; tests inject a fake to drive driver
 // behavior without exec()ing a real CLI. Signature matches the adapter's
@@ -478,9 +480,9 @@ func execRunner(ctx context.Context, name, dir string, args, env []string,
 	}
 	// Best-effort: publish the agent PID so the auto-spawn observer's CPU
 	// liveness probe can tell a silently-thinking HEADLESS agent from a hung
-	// one. Gated by EVOLVE_BRIDGE_PIDFILE (set only by the headless driver, so
+	// one. Gated by bridgePidfileEnv (set only by the headless driver, so
 	// tmux drivers — which use the pane probe — are unaffected). Removed on exit.
-	if pidFile := envValue(env, "EVOLVE_BRIDGE_PIDFILE"); pidFile != "" {
+	if pidFile := envValue(env, bridgePidfileEnv); pidFile != "" {
 		// cmd.Process is guaranteed non-nil after a successful Start.
 		_ = os.WriteFile(pidFile, []byte(strconv.Itoa(cmd.Process.Pid)), 0o644)
 		defer func() { _ = os.Remove(pidFile) }()

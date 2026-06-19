@@ -155,19 +155,29 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 	}
 }
 
-// --- Test G: EVOLVE_BYPASS_SHIP_VERIFY=1 → ships ---------------------
+// --- Test G: EVOLVE_BYPASS_SHIP_VERIFY=1 is silently ignored ---------
 
-func TestNative_G_BypassEnv_AllowsShip(t *testing.T) {
+func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "emergency.txt"), "emergency change\n")
 	addRemote(t, repo)
+	// EVOLVE_BYPASS_SHIP_VERIFY is silently ignored; ClassManual+AUTO_CONFIRM
+	// ships normally because of the explicit class, not the retired flag.
 	res, _ := runShip(t, repo, Options{
-		Class:         ClassCycle,
+		Class:         ClassManual,
 		CommitMessage: "emergency",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_SHIP_VERIFY": "1"},
+		Env: map[string]string{
+			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
+			"EVOLVE_BYPASS_SHIP_VERIFY": "1", // silently ignored
+			"EVOLVE_BYPASS_COMMIT_GATE": "1",
+		},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	// ClassUsed reflects the explicit class (ClassManual), not a bridge conversion.
+	if res.ClassUsed != ClassManual {
+		t.Errorf("ClassUsed=%q, want ClassManual (set explicitly, not via bridge)", res.ClassUsed)
 	}
 }
 
@@ -226,12 +236,14 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 	}
 }
 
-// --- Test K: legacy EVOLVE_BYPASS_SHIP_VERIFY → deprecation log ------
+// --- Test K: EVOLVE_BYPASS_SHIP_VERIFY → no deprecation log ----------
 
-func TestNative_K_BypassEnvDeprecationLogged(t *testing.T) {
+func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "bridge.txt"), "bridge change\n")
+	seedAudit(t, repo, "PASS")
 	addRemote(t, repo)
+	// Flag is silently ignored — no deprecation log, ClassUsed stays ClassCycle.
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
 		CommitMessage: "legacy bypass",
@@ -240,8 +252,11 @@ func TestNative_K_BypassEnvDeprecationLogged(t *testing.T) {
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	if !containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
-		t.Errorf("missing deprecation log in: %v", res.Logs)
+	if containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
+		t.Errorf("deprecation log must not be emitted after bridge removal: %v", res.Logs)
+	}
+	if res.ClassUsed != ClassCycle {
+		t.Errorf("ClassUsed=%q, want ClassCycle (flag no longer bridges to ClassManual)", res.ClassUsed)
 	}
 }
 

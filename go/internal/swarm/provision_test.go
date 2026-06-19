@@ -7,7 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
+
+// integBranchFor / workerBranchFor / cycleBranchFor are the runscope-derived
+// expected names a test asserts against — the single source the production
+// provisioner now mints, so the tests cannot drift from the impl.
+func integBranchFor(root string, cycle int) string {
+	return runscope.New(runscope.LaneFromRoot(root), "", cycle).IntegrationBranch()
+}
+func workerBranchFor(root string, cycle int, workerID string) string {
+	return runscope.New(runscope.LaneFromRoot(root), "", cycle).WorkerBranch(workerID)
+}
 
 // gitInit makes a throwaway repo with one commit so `git worktree add` works.
 func gitInit(t *testing.T) string {
@@ -50,24 +62,25 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 	var linked []string
 	p := NewGitWorkerProvisioner(func(wt, _ string) { linked = append(linked, wt) })
 
+	integBranch := integBranchFor(root, 5)
 	integ, err := p.CreateIntegration(ctx, root, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if branchOf(t, integ) != "cycle-5-integration" {
-		t.Errorf("integration branch = %q", branchOf(t, integ))
+	if branchOf(t, integ) != integBranch {
+		t.Errorf("integration branch = %q, want %q", branchOf(t, integ), integBranch)
 	}
 
 	// Workers branch off the integration branch with a NAMED branch (symbolic-ref
 	// resolvable, required by merge-train/ship).
-	w0, err := p.CreateWorker(ctx, root, 5, "w0", "cycle-5-integration")
+	w0, err := p.CreateWorker(ctx, root, 5, "w0", integBranch)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if branchOf(t, w0) != "cycle-5-w0" {
-		t.Errorf("worker branch = %q", branchOf(t, w0))
+	if want := workerBranchFor(root, 5, "w0"); branchOf(t, w0) != want {
+		t.Errorf("worker branch = %q, want %q", branchOf(t, w0), want)
 	}
-	w1, err := p.CreateWorker(ctx, root, 5, "w1", "cycle-5-integration")
+	w1, err := p.CreateWorker(ctx, root, 5, "w1", integBranch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,12 +98,13 @@ func TestGitWorkerProvisioner_CreateWorkerIdempotent(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
 	p := NewGitWorkerProvisioner(nil)
+	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
-	a, err := p.CreateWorker(ctx, root, 1, "w0", "cycle-1-integration")
+	a, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := p.CreateWorker(ctx, root, 1, "w0", "cycle-1-integration") // reuse
+	b, err := p.CreateWorker(ctx, root, 1, "w0", integBranch) // reuse
 	if err != nil {
 		t.Fatalf("idempotent re-create failed: %v", err)
 	}
@@ -104,8 +118,9 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
 	p := NewGitWorkerProvisioner(nil)
+	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
-	w0, err := p.CreateWorker(ctx, root, 1, "w0", "cycle-1-integration")
+	w0, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,8 +237,8 @@ func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateWorker with empty integrationBranch: %v", err)
 	}
-	if branchOf(t, wt) != "cycle-9-w0" {
-		t.Errorf("branch = %q, want cycle-9-w0", branchOf(t, wt))
+	if want := workerBranchFor(root, 9, "w0"); branchOf(t, wt) != want {
+		t.Errorf("branch = %q, want %q", branchOf(t, wt), want)
 	}
 }
 
@@ -236,8 +251,9 @@ func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	t.Setenv("EVOLVE_WORKTREE_BASE", base)
 	ctx := context.Background()
 
-	// Pre-create a stale stub directory (just a plain dir, no .git).
-	stub := filepath.Join(base, "cycle-7-w0")
+	// Pre-create a stale stub at the EXACT path CreateWorker will target, so the
+	// teardown path is actually exercised.
+	stub := filepath.Join(base, workerBranchFor(root, 7, "w0"))
 	if err := os.MkdirAll(stub, 0o755); err != nil {
 		t.Fatal(err)
 	}

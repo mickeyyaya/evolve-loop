@@ -84,7 +84,7 @@ specific Read and Bash deny patterns:
 
 **Applies regardless of OS sandbox.** Works in both `sandbox-exec` (macOS),
 `bwrap` (Linux), AND in nested-Claude environments where the OS sandbox
-is disabled (`EVOLVE_INNER_SANDBOX=0`). This is the load-bearing layer.
+is disabled (`EVOLVE_SANDBOX=off`). This is the load-bearing layer.
 
 ### Layer 2: OS sandbox (`sandbox.deny_subpaths`)
 

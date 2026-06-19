@@ -113,3 +113,8 @@ func PorcelainOldPath(line string) string {
 	}
 	return strings.Trim(p[:i], "\"")
 }
+
+// WorktreeToken was the cycle-360 hotfix for per-root branch namespacing; it is
+// superseded by runscope.LaneFromRoot (the single-source naming Value Object,
+// byte-identical token via projecthash) and removed in the v20 integration to
+// honor single-source — see ADR-0054 and internal/runscope.

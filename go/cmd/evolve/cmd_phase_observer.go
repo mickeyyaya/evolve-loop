@@ -5,12 +5,14 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -88,20 +90,25 @@ func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	return phaseobserver.Run(cfg, "", stderr)
 }
 
-// observerEnvConfig reads the EVOLVE_OBSERVER_* knobs through envchain. StallS
-// keeps its two-key fallback (EVOLVE_OBSERVER_STALL_S else the legacy
-// EVOLVE_INACTIVITY_THRESHOLD_S) via envOr+atoiOr — a precedence envchain.Int
-// cannot express without diverging on an explicit "0"/invalid primary. NudgeS
-// defaults to 300 (the pre-SIGTERM nudge, promoted from opt-in; 0 disables it,
-// body overridable via EVOLVE_OBSERVER_NUDGE_BODY — see ADR-0023 facet A).
+// observerEnvConfig resolves observer settings from .evolve/policy.json.
+// The name is retained to avoid widening this mechanical configuration change.
 func observerEnvConfig() phaseobserver.Config {
+	cfg := loadObserverPolicy()
 	return phaseobserver.Config{
-		PollS:     envchain.Int("EVOLVE_OBSERVER_POLL_S", nil, 0),
-		StallS:    atoiOr(envOr("EVOLVE_OBSERVER_STALL_S", os.Getenv("EVOLVE_INACTIVITY_THRESHOLD_S")), 0),
-		NudgeS:    envchain.Int("EVOLVE_OBSERVER_NUDGE_S", nil, 300),
-		NudgeBody: os.Getenv("EVOLVE_OBSERVER_NUDGE_BODY"),
-		EOFGraceS: envchain.Int("EVOLVE_OBSERVER_EOF_GRACE_S", nil, 0),
+		PollS:     *cfg.PollS,
+		StallS:    *cfg.StallS,
+		NudgeS:    *cfg.NudgeS,
+		NudgeBody: cfg.NudgeBody,
+		EOFGraceS: cfg.EOFGraceS,
 	}
+}
+
+func loadObserverPolicy() policy.ObserverPolicy {
+	pol, err := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))
+	if err != nil {
+		pol = policy.Policy{}
+	}
+	return pol.ObserverConfig()
 }
 
 // stallPolicyFromEnv resolves the ADR-0044 stage for the observer
@@ -113,11 +120,4 @@ func stallPolicyFromEnv() recovery.StallPolicy {
 		return nil
 	}
 	return recovery.NewChainStallPolicy(envchain.Int("EVOLVE_ARTIFACT_MAX_EXTENDS", nil, 0))
-}
-
-func envOr(primary, fallback string) string {
-	if v := os.Getenv(primary); v != "" {
-		return v
-	}
-	return fallback
 }
