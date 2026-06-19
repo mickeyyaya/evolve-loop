@@ -6,10 +6,7 @@ package gitexec
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -117,27 +114,7 @@ func PorcelainOldPath(line string) string {
 	return strings.Trim(p[:i], "\"")
 }
 
-// WorktreeToken returns a short, stable, git-ref-safe discriminator derived from
-// the absolute project root. Cycle worktree BRANCH names must embed it because
-// git worktree branch names are GLOBAL to one object store: sibling worktrees of
-// the same repo (e.g. several concurrent `evolve loop` runs, each on its own
-// branch) share a single branch namespace, so a plain `cycle-<N>` branch created
-// by the first run makes every other run's `git worktree add -B cycle-<N>` fail
-// with "already used by worktree", silently degrading them into the main tree.
-// The token is a pure function of the root: distinct roots yield distinct tokens
-// (concurrent runs never clash) while one root is stable across resume/retry
-// (the same cycle reuses its branch). Path variants of one dir (trailing slash,
-// relative form) normalize to the same token.
-//
-// The root is absolutized via filepath.Abs; that can fail only when os.Getwd
-// fails (effectively never in a live process), in which case the token falls
-// back to the cleaned input verbatim — so callers MUST pass an absolute root for
-// a stable token (the orchestrator already does).
-func WorktreeToken(projectRoot string) string {
-	root := filepath.Clean(projectRoot)
-	if abs, err := filepath.Abs(root); err == nil {
-		root = abs
-	}
-	sum := sha256.Sum256([]byte(root))
-	return hex.EncodeToString(sum[:4]) // 8 hex chars: collision-safe per repo set
-}
+// WorktreeToken was the cycle-360 hotfix for per-root branch namespacing; it is
+// superseded by runscope.LaneFromRoot (the single-source naming Value Object,
+// byte-identical token via projecthash) and removed in the v20 integration to
+// honor single-source — see ADR-0054 and internal/runscope.
