@@ -273,3 +273,19 @@
 # cycle-13 ACS predicate package (2026-06-19): consolidate-checkpoint-cluster.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle13
+
+# Concurrent evolve-loop Layer-1 (2026-06-18): runscope is the single-source
+# Value Object for all run/cycle/lane-scoped names (worktree branches+dirs, tmux
+# session prefixes). Composes the projecthash lane + sessionrecord run-token
+# leaves; retires the duplicated minting sites. Every export named/exercised by
+# runscope_test.go (table-driven projections + back-compat token pin).
+./internal/runscope
+
+# Concurrent evolve-loop Layer-2 Slice 3 (2026-06-18): registry-scoped orphan
+# reaping is gated by fresh per-run leases so a dead run cannot reap live peers.
+./internal/sessionreaper
+
+# Concurrent evolve-loop Layer-2 Slice 4 (2026-06-18): cross-process LLM-CLI
+# admission control via flock'd holder-set JSON. Acquire/DefaultTTL named by
+# apicover_named_test.go; max<=0 unbounded path is byte-identical to today.
+./internal/cliadmit

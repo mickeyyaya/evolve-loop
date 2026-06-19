@@ -1,182 +1,275 @@
 //go:build acs
 
-// Package cycle3 materializes the cycle-3 acceptance criteria for the
-// committed top_n task:
+// Package cycle3 materializes the cycle-3 acceptance criteria for:
 //
-//   - retire-bypass-ship-verify — remove EVOLVE_BYPASS_SHIP_VERIFY from the
-//     flag registry, delete the WARN-bridge block in ship/native.go, strip the
-//     vestigial env-var from rollback.go, and regenerate control-flags.md.
-//
-// AC map (1:1 with triage top_n, scout-report.md ACs):
-//
-//	retire-bypass-ship-verify:
-//	  AC1   EVOLVE_BYPASS_SHIP_VERIFY absent from flagregistry.Lookup     → C3_001 (behavioral)
-//	  AC2   registry row count == 263 (264 - 1)                           → C3_002 (behavioral, count assertion)
-//	  NEG1  bridge block removed from ship/native.go                      → C3_003 (absence check, waiver)
-//	  NEG2  vestigial env-var removed from rollback.go                    → C3_004 (absence check, waiver)
-//	  AC6   EVOLVE_BYPASS_SHIP_VERIFY absent from control-flags.md        → C3_005 (absence check, waiver)
-//	  AC3   ship test suite still green after bridge removal + test update → C3_006 (subprocess, pre-existing GREEN)
-//	  AC4   rollback test suite still green                                → C3_007 (subprocess, pre-existing GREEN)
-//
-// Floor binding (R9.3): predicates only for committed top_n task
-// (retire-bypass-ship-verify). Deferred tasks (EVOLVE_DISABLE_AUTO_RETROSPECTIVE,
-// internal classification) get zero predicates.
+//   - cliadmit-cross-process-admission: Slice 4 of the concurrency-arch-slices
+//     campaign. New leaf pkg internal/cliadmit — cross-process LLM-CLI admission
+//     control via flock'd holder-set JSON, TTL pruning, and Acquire/release hook
+//     in internal/bridge/driver_tmux_repl.go.
 package cycle3
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-const targetFlag = "EVOLVE_BYPASS_SHIP_VERIFY"
+// --- Task: cliadmit-cross-process-admission ---
 
-func goDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(acsassert.RepoRoot(t), "go")
-}
-
-// TestC3_001_BypassShipVerifyAbsentFromRegistry verifies that the
-// EVOLVE_BYPASS_SHIP_VERIFY flag is no longer registered after Builder
-// removes its row from registry_table.go.
-//
-// BEHAVIORAL: calls flagregistry.Lookup() directly — the production SSOT
-// function. A source edit alone cannot satisfy this; the row must be
-// physically absent for Lookup to return ok=false.
-//
-// RED: flagregistry.Lookup currently returns (flag, true) because the row
-// exists at registry_table.go:66.
-func TestC3_001_BypassShipVerifyAbsentFromRegistry(t *testing.T) {
-	if f, ok := flagregistry.Lookup(targetFlag); ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — deprecated flag still registered.\n"+
-			"Builder must remove this row from go/internal/flagregistry/registry_table.go.\n"+
-			"Current entry: Status=%q Cluster=%q ReplacedBy=%q",
-			targetFlag, f.Status, f.Cluster, f.ReplacedBy)
-	}
-}
-
-// TestC3_002_RegistryRowCountIs263 verifies that after removing the
-// EVOLVE_BYPASS_SHIP_VERIFY row, the total registry count drops from 264 to 263.
-//
-// BEHAVIORAL: asserts len(flagregistry.All) == 263. Over-removal or
-// under-removal both fail this predicate.
-//
-// RED: len(flagregistry.All) is currently 264.
-func TestC3_002_RegistryRowCountIs263(t *testing.T) {
-	const want = 263
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove exactly 1 row (264 → 263). "+
-			"Over-removal (< 263) or under-removal (> 263) both fail.",
-			got, want)
-	}
-}
-
-// TestC3_003_BridgeBlockRemovedFromNativeGo verifies that the WARN-bridge
-// block in ship/native.go — the only live production reader of the flag —
-// has been deleted.
-//
-// // acs-predicate: config-check — this is a code-deletion task; the
-// behavioral criterion IS the absence of the if-block. FileNotContains is the
-// correct primitive (absence checks are not susceptible to magic-string gaming
-// because adding text makes the string present and fails the check).
-//
-// RED: native.go currently contains `envBool("EVOLVE_BYPASS_SHIP_VERIFY")` at
-// line 226 (the bridge entry point).
-func TestC3_003_BridgeBlockRemovedFromNativeGo(t *testing.T) {
+// TestC3_001_CliadmitPackageExistsAndTracked asserts that
+// go/internal/cliadmit/cliadmit.go was created in the worktree and is
+// git-tracked. A gitignored file is silently dropped at ship (cycle-93 lesson).
+func TestC3_001_CliadmitPackageExistsAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	nativePath := filepath.Join(root, "go", "internal", "phases", "ship", "native.go")
-	// Assert the bridge entry-point call is gone.
-	if !acsassert.FileNotContains(t, nativePath, `envBool("EVOLVE_BYPASS_SHIP_VERIFY")`) {
-		t.Errorf("RED: ship/native.go still contains the WARN-bridge block.\n"+
-			"Builder must delete the if-block at native.go:222-243.\n"+
-			"Affected file: %s", nativePath)
+	rel := filepath.Join("go", "internal", "cliadmit", "cliadmit.go")
+	path := filepath.Join(root, rel)
+	if !acsassert.FileExists(t, path) {
+		t.Fatalf("RED: %s missing on disk", rel)
+	}
+	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel); code != 0 {
+		t.Errorf("RED: %s not git-tracked — may be gitignored and dropped at ship", rel)
 	}
 }
 
-// TestC3_004_RollbackVestigialEnvVarRemoved verifies that the vestigial
-// EVOLVE_BYPASS_SHIP_VERIFY=1 env-var in rollback.go has been stripped.
-//
-// // acs-predicate: config-check — code-deletion task; the criterion is the
-// absence of the env-var append. rollback.go already uses `--class manual`
-// (line 365) so the env-var is a no-op today; removing it is cleanup only.
-//
-// RED: rollback.go currently appends "EVOLVE_BYPASS_SHIP_VERIFY=1" to
-// cmd.Env at line 374.
-func TestC3_004_RollbackVestigialEnvVarRemoved(t *testing.T) {
+// TestC3_002_CliadmitPackageCompiles asserts that all exports named in the
+// cliadmit API contract are present by running go build. A missing export is
+// a compile error — behavioral proof the API contract holds.
+func TestC3_002_CliadmitPackageCompiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	rollbackPath := filepath.Join(root, "go", "internal", "rollback", "rollback.go")
-	if !acsassert.FileNotContains(t, rollbackPath, targetFlag) {
-		t.Errorf("RED: rollback.go still references EVOLVE_BYPASS_SHIP_VERIFY.\n"+
-			"Builder must remove the env-var from cmd.Env at rollback.go:374 and\n"+
-			"update the comments on lines 8 and 77.\n"+
-			"Affected file: %s", rollbackPath)
-	}
-}
-
-// TestC3_005_ControlFlagsDocEntryAbsent verifies that the generated
-// docs/architecture/control-flags.md no longer lists EVOLVE_BYPASS_SHIP_VERIFY.
-//
-// // acs-predicate: config-check — the doc entry is generated from the
-// registry; its absence follows from AC1 (row removed). This predicate ensures
-// the regeneration step also ran.
-//
-// RED: control-flags.md currently has 2 occurrences (lines 91 and 320).
-func TestC3_005_ControlFlagsDocEntryAbsent(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	docPath := filepath.Join(root, "docs", "architecture", "control-flags.md")
-	if !acsassert.FileNotContains(t, docPath, targetFlag) {
-		t.Errorf("RED: control-flags.md still lists EVOLVE_BYPASS_SHIP_VERIFY.\n"+
-			"Builder must regenerate the doc after removing the registry row\n"+
-			"(e.g. `evolve flags generate` or manual deletion of the two occurrences).\n"+
-			"Affected file: %s", docPath)
-	}
-}
-
-// TestC3_006_ShipTestSuiteGreenAfterBridgeRemoval verifies that the ship
-// package's unit tests pass AFTER Builder removes the bridge and updates
-// Test G + Test K to reflect the new behavior (flag silently ignored).
-//
-// PRE-EXISTING GREEN: this subprocess currently passes because the bridge
-// tests (Test G, Test K) exercise the present bridge code and it works.
-// It becomes a regression guard: if Builder removes the bridge but forgets
-// to update the tests, this predicate catches the gap.
-func TestC3_006_ShipTestSuiteGreenAfterBridgeRemoval(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
-		"go", "test",
-		"-C", goDir(t),
-		"-count=1",
-		"./internal/phases/ship/...",
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "build",
+		"-C", goDir,
+		"./internal/cliadmit/...",
 	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("ship test suite failed (exit=%d): %v\n"+
-			"Builder must update Test G and Test K in native_test.go (and related\n"+
-			"bridge tests in misc_gaps_test.go, final_push_test.go) to reflect that\n"+
-			"EVOLVE_BYPASS_SHIP_VERIFY is now silently ignored.\n"+
-			"Output:\n%s", code, err, combined)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: cliadmit package does not compile (Acquire/release exports may be missing):\n%s", combined)
 	}
 }
 
-// TestC3_007_RollbackTestSuiteGreen verifies that the rollback package's
-// unit tests pass after the vestigial env-var is removed.
-//
-// PRE-EXISTING GREEN: rollback tests currently pass. This is a regression guard
-// ensuring the rollback.go cleanup (env-var removal + comment updates) doesn't
-// break rollback behavior.
-func TestC3_007_RollbackTestSuiteGreen(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
+// TestC3_003_AcquireUnboundedTestPasses runs TestAcquire_Unbounded under -race
+// and asserts: (a) the test executed (anti-no-op guard), (b) exit 0, (c) no
+// DATA RACE. The safe-default invariant: max<=0 must return a no-op release
+// immediately without creating any slots file or acquiring any lock.
+func TestC3_003_AcquireUnboundedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
 		"go", "test",
-		"-C", goDir(t),
-		"-count=1",
-		"./internal/rollback/...",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_Unbounded",
+		"./internal/cliadmit/...",
 	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("rollback test suite failed (exit=%d): %v\n"+
-			"Builder must not break rollback behavior when removing the vestigial env-var.\n"+
-			"Output:\n%s", code, err, combined)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_Unbounded") {
+		t.Fatalf("RED: TestAcquire_Unbounded did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE detected in TestAcquire_Unbounded:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_Unbounded failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_004_AcquireMaxOneTestPasses runs TestAcquire_MaxOne under -race and
+// asserts it passes. Positive axis: a single caller must acquire the sole slot
+// for a max=1 cap and receive a working release function.
+func TestC3_004_AcquireMaxOneTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_MaxOne",
+		"./internal/cliadmit/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_MaxOne") {
+		t.Fatalf("RED: TestAcquire_MaxOne did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in TestAcquire_MaxOne:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_MaxOne failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_005_AcquireMutualExclusionTestPasses runs TestAcquire_MutualExclusion
+// under -race and asserts it passes. Negative/adversarial axis: two concurrent
+// goroutines must NOT both hold a max=1 slot simultaneously — the second caller
+// must block until the first releases. This is the strongest anti-no-op signal
+// for the admission-control invariant.
+func TestC3_005_AcquireMutualExclusionTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_MutualExclusion",
+		"./internal/cliadmit/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_MutualExclusion") {
+		t.Fatalf("RED: TestAcquire_MutualExclusion did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in TestAcquire_MutualExclusion:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_MutualExclusion failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_006_AcquireStaleHolderPrunedTestPasses runs TestAcquire_StaleHolderPruned
+// under -race and asserts it passes. TTL-pruning safety: a holder whose heartbeat
+// exceeds the TTL is removed from the slot-set so its slot becomes available again,
+// preventing a permanent deadlock after a crashed holder.
+func TestC3_006_AcquireStaleHolderPrunedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_StaleHolderPruned",
+		"./internal/cliadmit/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_StaleHolderPruned") {
+		t.Fatalf("RED: TestAcquire_StaleHolderPruned did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in TestAcquire_StaleHolderPruned:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_StaleHolderPruned failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_007_AcquireReleaseFreesSlotTestPasses runs TestAcquire_ReleaseFreesSlot
+// under -race and asserts it passes. Release correctness: calling the release
+// function returned by Acquire must remove the caller's holder from the slot-set,
+// allowing a subsequent caller to immediately acquire.
+func TestC3_007_AcquireReleaseFreesSlotTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_ReleaseFreesSlot",
+		"./internal/cliadmit/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_ReleaseFreesSlot") {
+		t.Fatalf("RED: TestAcquire_ReleaseFreesSlot did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in TestAcquire_ReleaseFreesSlot:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_ReleaseFreesSlot failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_008_AcquireContextCancelUnblocksTestPasses runs
+// TestAcquire_ContextCancelUnblocks under -race and asserts it passes.
+// Degradation invariant: admission control must NEVER block a phase outright —
+// context cancellation must unblock a waiting caller within one backoff tick.
+func TestC3_008_AcquireContextCancelUnblocksTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestAcquire_ContextCancelUnblocks",
+		"./internal/cliadmit/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestAcquire_ContextCancelUnblocks") {
+		t.Fatalf("RED: TestAcquire_ContextCancelUnblocks did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in TestAcquire_ContextCancelUnblocks:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestAcquire_ContextCancelUnblocks failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC3_009_CliadmitHookedInDriverTmuxRepl asserts that the Acquire call is
+// wired in go/internal/bridge/driver_tmux_repl.go before session creation. Two
+// checks: (1) the import of cliadmit is present, (2) Acquire is called in the
+// session-spawn block, (3) EVOLVE_CLI_MAX_CONCURRENT_ env dial is referenced.
+//
+// acs-predicate: config-check — source-wiring assertion is inherently a
+// file-presence check; the behavioral side is covered by TestC3_003-008.
+func TestC3_009_CliadmitHookedInDriverTmuxRepl(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	driverPath := filepath.Join(root, "go", "internal", "bridge", "driver_tmux_repl.go")
+	// cliadmit import must be present.
+	if !acsassert.FileContains(t, driverPath, "cliadmit") {
+		t.Errorf("RED: cliadmit not imported or referenced in driver_tmux_repl.go")
+	}
+	// The specific Acquire call must be present.
+	if !acsassert.FileContains(t, driverPath, "cliadmit.Acquire") {
+		t.Errorf("RED: cliadmit.Acquire not called in driver_tmux_repl.go")
+	}
+	// The env dial must be referenced (EVOLVE_CLI_MAX_CONCURRENT_).
+	if !acsassert.FileContains(t, driverPath, "EVOLVE_CLI_MAX_CONCURRENT_") {
+		t.Errorf("RED: EVOLVE_CLI_MAX_CONCURRENT_ dial not referenced in driver_tmux_repl.go")
+	}
+}
+
+// TestC3_010_ApiCoverEnforceContainsCliadmit asserts ./internal/cliadmit is
+// enrolled in go/.apicover-enforce. Enrollment is mandatory for every new
+// internal package (TestApicoverEnforce_CoversEveryInternalPackage gate,
+// cycle-131 lesson: a new pkg not enrolled fails the completeness invariant
+// at ship).
+//
+// acs-predicate: config-check — enrollment verification is inherently a
+// file-presence check; the behavioral gate is TestC3_011.
+func TestC3_010_ApiCoverEnforceContainsCliadmit(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	enforcePath := filepath.Join(root, "go", ".apicover-enforce")
+	// acs-predicate: config-check
+	acsassert.FileContains(t, enforcePath, "./internal/cliadmit")
+}
+
+// TestC3_011_ApiCoverEnforceTestPasses runs TestApicoverEnforce_CoversEveryInternalPackage
+// which is the completeness gate: every internal pkg enrolled in .apicover-enforce
+// must have named coverage tests in the same package. This fails until
+// cliadmit's apicover_named_test.go names every export.
+func TestC3_011_ApiCoverEnforceTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1", "-tags", "acs",
+		"-run", "TestApicoverEnforce_CoversEveryInternalPackage",
+		"./acs/regression/apicover/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestApicoverEnforce_CoversEveryInternalPackage") {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage failed (exit %d):\n%s", code, combined)
 	}
 }

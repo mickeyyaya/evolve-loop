@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliadmit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
@@ -184,6 +185,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// --- Spawn + cd + launch + wait for the REPL prompt marker.
 	if !namedExists {
+		// Slice-4: cross-process CLI admission control. max<=0 (the default) is
+		// unbounded — byte-identical to the pre-Slice-4 path. On error, degrade
+		// gracefully: proceed uncapped + WARN (admission control must never block
+		// a phase outright). EVOLVE_CLI_MAX_CONCURRENT_<CLI> opts in.
+		admitMax := envInt(deps, "EVOLVE_CLI_MAX_CONCURRENT_"+strings.ToUpper(lp.name), 0)
+		admitRelease, admitErr := cliadmit.Acquire(ctx, lp.name, admitMax, cliadmit.DefaultTTL)
+		if admitErr != nil {
+			fmt.Fprintf(deps.Stderr, "%s WARN cliadmit: %v (proceeding uncapped)\n", pfx, admitErr)
+		}
+		defer admitRelease()
+
 		// CB.2: bind the pane cwd at session birth when the controller can
 		// (`tmux new-session -c`); the cd keystroke below stays as the second
 		// layer for capability-less controllers. (A RESUMED named session gets

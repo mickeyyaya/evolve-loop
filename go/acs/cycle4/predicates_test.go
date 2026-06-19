@@ -1,189 +1,144 @@
 //go:build acs
 
-// Package cycle4 materializes the cycle-4 acceptance criteria for the
-// committed top_n task:
+// Package cycle4 materializes the cycle-4 acceptance criteria for:
 //
-//   - retire-disable-auto-retrospective — remove EVOLVE_DISABLE_AUTO_RETROSPECTIVE
-//     from the flag registry, the legacyFlags map in config.go, and the direct
-//     env-check in retro.go:70–77; update the two tests that tested the retired
-//     bridge behavior; regenerate control-flags.md.
-//
-// AC map (1:1 with triage top_n, scout-report.md ACs):
-//
-//	retire-disable-auto-retrospective:
-//	  AC1   EVOLVE_DISABLE_AUTO_RETROSPECTIVE absent from flagregistry.Lookup → C4_001 (behavioral)
-//	  EDGE1 registry row count == 262 (263 - 1)                               → C4_002 (behavioral, count assertion)
-//	  NEG1  flag string removed from config.go                                → C4_003 (absence check, waiver)
-//	  NEG2  flag string removed from retro.go                                 → C4_004 (absence check, waiver)
-//	  AC6   flag absent from control-flags.md                                 → C4_005 (absence check, waiver)
-//	  AC3   config test suite still green after legacyFlags entry removal     → C4_006 (subprocess, pre-existing GREEN)
-//	  AC4   retro test suite still green after bridge-block removal           → C4_007 (subprocess, pre-existing GREEN)
-//
-// Floor binding (R9.3): predicates only for committed top_n task
-// (retire-disable-auto-retrospective). Deferred tasks (pinned-deprecated-4-flags,
-// docs-sweep-bypass-ship-verify-l1) get zero predicates.
+//   - fleet-soak-invariants: Slice 5 of the concurrency-arch-slices campaign.
+//     cmd/evolve/cmd_fleet_soak.go implements `evolve fleet soak --count N`,
+//     an in-process soak harness (no LLM, no tmux) that proves the four
+//     concurrency invariants from the sibling-worktree architecture under -race.
 package cycle4
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-const targetFlag = "EVOLVE_DISABLE_AUTO_RETROSPECTIVE"
+// --- Task: fleet-soak-invariants ---
 
-func goDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(acsassert.RepoRoot(t), "go")
-}
-
-// TestC4_001_DisableAutoRetroAbsentFromRegistry verifies that the
-// EVOLVE_DISABLE_AUTO_RETROSPECTIVE flag is no longer registered after Builder
-// removes its row from registry_table.go.
-//
-// BEHAVIORAL: calls flagregistry.Lookup() directly — the production SSOT
-// function. A source edit alone cannot satisfy this; the row must be
-// physically absent for Lookup to return ok=false.
-//
-// RED: flagregistry.Lookup currently returns (flag, true) because the row
-// exists at registry_table.go:85.
-func TestC4_001_DisableAutoRetroAbsentFromRegistry(t *testing.T) {
-	if f, ok := flagregistry.Lookup(targetFlag); ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — deprecated flag still registered.\n"+
-			"Builder must remove this row from go/internal/flagregistry/registry_table.go.\n"+
-			"Current entry: Status=%q Cluster=%q ReplacedBy=%q",
-			targetFlag, f.Status, f.Cluster, f.ReplacedBy)
-	}
-}
-
-// TestC4_002_RegistryRowCountIs262 verifies that after removing the
-// EVOLVE_DISABLE_AUTO_RETROSPECTIVE row, the total registry count drops
-// from 263 to 262.
-//
-// BEHAVIORAL: asserts len(flagregistry.All) == 262. Over-removal or
-// under-removal both fail this predicate.
-//
-// RED: len(flagregistry.All) is currently 263.
-func TestC4_002_RegistryRowCountIs262(t *testing.T) {
-	const want = 262
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove exactly 1 row (263 → 262). "+
-			"Over-removal (< 262) or under-removal (> 262) both fail.",
-			got, want)
-	}
-}
-
-// TestC4_003_FlagRemovedFromConfigGo verifies that the EVOLVE_DISABLE_AUTO_RETROSPECTIVE
-// string has been fully removed from config.go — both the legacyFlags map entry
-// (config.go:324) and the AuditFailRoutesTo comment (config.go:247).
-//
-// // acs-predicate: config-check — this is a code-deletion task; the behavioral
-// criterion IS the absence of the flag string. FileNotContains is the correct
-// primitive: absence checks are not susceptible to magic-string gaming because
-// adding text makes the string present and fails the check.
-//
-// RED: config.go currently contains EVOLVE_DISABLE_AUTO_RETROSPECTIVE at lines
-// 247 and 324.
-func TestC4_003_FlagRemovedFromConfigGo(t *testing.T) {
+// TestC4_001_FleetSoakFileExistsAndTracked asserts that
+// go/cmd/evolve/cmd_fleet_soak.go was created in the worktree and is
+// git-tracked. A gitignored file is silently dropped at ship (cycle-93 lesson).
+func TestC4_001_FleetSoakFileExistsAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	configPath := filepath.Join(root, "go", "internal", "config", "config.go")
-	if !acsassert.FileNotContains(t, configPath, targetFlag) {
-		t.Errorf("RED: config.go still references %s.\n"+
-			"Builder must remove the legacyFlags map entry at config.go:324 and\n"+
-			"update the AuditFailRoutesTo comment at config.go:247.\n"+
-			"Affected file: %s", targetFlag, configPath)
+	rel := filepath.Join("go", "cmd", "evolve", "cmd_fleet_soak.go")
+	path := filepath.Join(root, rel)
+	if !acsassert.FileExists(t, path) {
+		t.Fatalf("RED: %s missing on disk — Builder must create cmd_fleet_soak.go", rel)
+	}
+	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel); code != 0 {
+		t.Errorf("RED: %s not git-tracked — may be gitignored and dropped at ship", rel)
 	}
 }
 
-// TestC4_004_FlagRemovedFromRetroGo verifies that the EVOLVE_DISABLE_AUTO_RETROSPECTIVE
-// string has been fully removed from retro.go — both the direct behavioral reader
-// (retro.go:70) and the package-doc comment reference (retro.go:9).
-//
-// // acs-predicate: config-check — code-deletion task; the criterion is the
-// absence of the flag string. The package-doc reference and the if-block both
-// carry the string, so a single FileNotContains covers both.
-//
-// RED: retro.go currently contains EVOLVE_DISABLE_AUTO_RETROSPECTIVE at lines
-// 9 (package comment) and 70 (if-block direct reader).
-func TestC4_004_FlagRemovedFromRetroGo(t *testing.T) {
+// TestC4_002_FleetSoakBuilds asserts that `go build ./cmd/evolve/` exits 0.
+// This confirms runFleetSoak is defined and the fleet soak dispatch is wired
+// (cmd_fleet.go must delegate 'soak' args to runFleetSoak).
+func TestC4_002_FleetSoakBuilds(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	retroPath := filepath.Join(root, "go", "internal", "phases", "retro", "retro.go")
-	if !acsassert.FileNotContains(t, retroPath, targetFlag) {
-		t.Errorf("RED: retro.go still references %s.\n"+
-			"Builder must remove the if-block at retro.go:70–77 and update the\n"+
-			"package-doc comment at retro.go:9.\n"+
-			"Affected file: %s", targetFlag, retroPath)
-	}
-}
-
-// TestC4_005_ControlFlagsDocEntryAbsent verifies that the generated
-// docs/architecture/control-flags.md no longer lists EVOLVE_DISABLE_AUTO_RETROSPECTIVE.
-//
-// // acs-predicate: config-check — the doc entry is generated from the
-// registry; its absence follows from AC1 (row removed). This predicate ensures
-// the regeneration step also ran.
-//
-// RED: control-flags.md currently has 2 occurrences of the flag (scout finding).
-func TestC4_005_ControlFlagsDocEntryAbsent(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	docPath := filepath.Join(root, "docs", "architecture", "control-flags.md")
-	if !acsassert.FileNotContains(t, docPath, targetFlag) {
-		t.Errorf("RED: control-flags.md still lists %s.\n"+
-			"Builder must regenerate or manually update the doc after removing\n"+
-			"the registry row (both entries at lines 163 and 338).\n"+
-			"Affected file: %s", targetFlag, docPath)
-	}
-}
-
-// TestC4_006_ConfigTestSuiteGreenAfterLegacyFlagsRemoval verifies that the
-// config package's unit tests pass AFTER Builder removes the legacyFlags entry
-// and converts TestDisableAutoRetro_DeprecatedButHonored to a negative assertion
-// (flag silently ignored — no PhaseEnable binding, no warn emitted).
-//
-// PRE-EXISTING GREEN: this subprocess currently passes because the bridge
-// tests exercise the present bridge code and it works. It becomes a regression
-// guard: if Builder removes the legacyFlags entry but forgets to update the
-// tests, this predicate catches the gap.
-func TestC4_006_ConfigTestSuiteGreenAfterLegacyFlagsRemoval(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
-		"go", "test",
-		"-C", goDir(t),
-		"-count=1",
-		"./internal/config/...",
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "build",
+		"-C", goDir,
+		"./cmd/evolve/...",
 	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("config test suite failed (exit=%d): %v\n"+
-			"Builder must update TestDisableAutoRetro_DeprecatedButHonored in\n"+
-			"config_legacyflags_test.go: convert to a negative assertion that the\n"+
-			"flag is now silently ignored (no PhaseEnable binding, no warn emitted).\n"+
-			"Output:\n%s", code, err, combined)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: go build ./cmd/evolve/ failed:\n%s", combined)
 	}
 }
 
-// TestC4_007_RetroTestSuiteGreenAfterBridgeRemoval verifies that the retro
-// package's unit tests pass AFTER Builder removes the if-block at retro.go:70–77
-// and updates retro_test.go:223 to assert retro runs normally (no bridge skip)
-// when the deprecated flag is set.
+// TestC4_003_AllFourInvariantsTestPasses runs TestFleetSoak_AllFourInvariants
+// under -race -tags integration and asserts: (a) the test executed (anti-no-op
+// guard), (b) exit 0, (c) no DATA RACE.
 //
-// PRE-EXISTING GREEN: retro tests currently pass. This is a regression guard
-// ensuring the bridge removal doesn't break retro behavior and that the test
-// at line 223 is updated to reflect the new behavior.
-func TestC4_007_RetroTestSuiteGreenAfterBridgeRemoval(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
+// This single predicate covers AC2 (test exists and passes), AC3 (distinct
+// branches), AC4 (reaped sessions), AC5 (no cross-run reap), and AC6 (no torn
+// config) — all four invariants are verified within that one test.
+func TestC4_003_AllFourInvariantsTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
 		"go", "test",
-		"-C", goDir(t),
-		"-count=1",
-		"./internal/phases/retro/...",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestFleetSoak_AllFourInvariants",
+		"./cmd/evolve/...",
 	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("retro test suite failed (exit=%d): %v\n"+
-			"Builder must update retro_test.go:223: set EVOLVE_DISABLE_AUTO_RETROSPECTIVE\n"+
-			"in the env map but assert retro still runs (the bridge skip is removed).\n"+
-			"Output:\n%s", code, err, combined)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestFleetSoak_AllFourInvariants") {
+		t.Fatalf("RED: TestFleetSoak_AllFourInvariants did not execute — function missing or build failed:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE detected in TestFleetSoak_AllFourInvariants:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestFleetSoak_AllFourInvariants failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC4_004_RejectsZeroCountTestPasses runs TestFleetSoakArgs_RejectsZeroCount
+// under -race -tags integration and asserts it passes. This is the AC7
+// predicate: --count 0 must be rejected with exit 1.
+func TestC4_004_RejectsZeroCountTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestFleetSoakArgs_RejectsZeroCount",
+		"./cmd/evolve/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestFleetSoakArgs_RejectsZeroCount") {
+		t.Fatalf("RED: TestFleetSoakArgs_RejectsZeroCount did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestFleetSoakArgs_RejectsZeroCount failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC4_005_SoakReportUsedInCmdFleetSoak verifies that cmd_fleet_soak.go
+// imports or references the soakreport package (AC8: the verdict table must
+// be rendered via soakreport.RenderTable to stdout).
+//
+// acs-predicate: config-check — source-wiring assertion is inherently a
+// file-presence check; the behavioral side is covered by TestC4_003 (the
+// integration test asserts stdout contains 4 PASS rows).
+func TestC4_005_SoakReportUsedInCmdFleetSoak(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	soakPath := filepath.Join(root, "go", "cmd", "evolve", "cmd_fleet_soak.go")
+	// acs-predicate: config-check
+	if !acsassert.FileContains(t, soakPath, "soakreport") {
+		t.Errorf("RED: cmd_fleet_soak.go does not reference soakreport — verdict table must use soakreport")
+	}
+}
+
+// TestC4_006_ExistingRegressionTestsPass runs the three existing tests that AC9
+// requires be unbroken: TestSimulatePhases_CoversCanonicalOrder (fleet simulate
+// harness), TestCycleRunArgs_Simulate (fleet arg threading), and TestRunFleet_*
+// (fleet flag validation). Runs without -tags integration to exclude the new
+// soak test file, matching the pre-Slice-5 test surface.
+func TestC4_006_ExistingRegressionTestsPass(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-run", "TestSimulatePhases_CoversCanonicalOrder|TestCycleRunArgs_Simulate|TestRunFleet_",
+		"./cmd/evolve/...",
+	)
+	combined := stdout + "\n" + stderr
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in regression tests:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: regression tests failed (exit %d):\n%s", code, combined)
 	}
 }

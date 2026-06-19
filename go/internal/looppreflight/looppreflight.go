@@ -120,7 +120,6 @@ type Options struct {
 	HostProbe     func() preflight.Profile                // default preflight.Probe(ProjectRoot)
 	DirWritable   func(dir string) bool                   // default real touch-probe
 	DiskFreeBytes func(path string) (uint64, error)       // default statfs; error → disk check skipped
-	TmuxSessions  func() ([]string, error)                // default `tmux ls`; error → no stale sessions
 
 	// BootTester really boots one *-tmux driver's REPL (boot-only, no prompt)
 	// under the supplied context and returns its bridge exit code + scrollback.
@@ -170,7 +169,6 @@ type resolved struct {
 	hostProbe     func() preflight.Profile
 	dirWritable   func(string) bool
 	diskFreeBytes func(string) (uint64, error)
-	tmuxSessions  func() ([]string, error)
 	bootTester    func(context.Context, string, bool) (int, string)
 
 	selfUpdateEvidence func(string) (bool, string, error)
@@ -206,7 +204,6 @@ func resolve(opts Options) (resolved, error) {
 		hostProbe:     opts.HostProbe,
 		dirWritable:   opts.DirWritable,
 		diskFreeBytes: opts.DiskFreeBytes,
-		tmuxSessions:  opts.TmuxSessions,
 		bootTester:    opts.BootTester,
 
 		selfUpdateEvidence: opts.SelfUpdateEvidence,
@@ -259,9 +256,6 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.diskFreeBytes == nil {
 		o.diskFreeBytes = defaultDiskFreeBytes
-	}
-	if o.tmuxSessions == nil {
-		o.tmuxSessions = defaultTmuxSessions
 	}
 	if o.bootTester == nil {
 		o.bootTester = newDefaultBootTester(o.projectRoot, o.stderr)

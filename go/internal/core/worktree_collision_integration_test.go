@@ -9,18 +9,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // TestGitWorktree_ConcurrentSiblingsNoBranchCollision reproduces the multi-stream
 // failure: several `evolve loop` runs, each in its OWN worktree of the SAME repo,
-// every one provisioning cycle 1. git worktree branch names are GLOBAL to one
-// object store, so a plain `cycle-1` branch from the first run made the second
-// run's `git worktree add -B cycle-1` fail ("'cycle-1' is already used by
-// worktree ..."); that run then fell back to the main tree and the cycle FAILED
-// on the tree-diff guard. After the fix each cycle branch embeds
-// gitexec.WorktreeToken(root), so sibling roots get distinct branches and both
-// provision cleanly — the precondition for concurrent work streams.
+// every one provisioning cycle 1. git worktree branch names — and, under a shared
+// EVOLVE_WORKTREE_BASE, the directory path — are GLOBAL to one object store, so a
+// bare `cycle-1` branch/dir from the first run made the second run's
+// `git worktree add -B cycle-1` fail ("'cycle-1' is already used by worktree …");
+// that run then fell back to the main tree and FAILED on the tree-diff guard.
+// After the runscope fix each cycle name embeds the per-root lane, so sibling
+// roots get distinct branches AND distinct dirs and both provision cleanly.
 func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -48,10 +48,9 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	sibling := filepath.Join(t.TempDir(), "sibling")
 	git(mainRoot, "worktree", "add", "-q", "-b", "stream-sibling", sibling, "HEAD")
 
-	// Force a SHARED worktree base for BOTH roots. This is the strongest form of
-	// the bug: without the token, both runs would target the same directory path
-	// (<shared>/cycle-1) AND the same global branch (cycle-1) — exercising both
-	// the directory-collision and the branch-collision axes at once.
+	// Force a SHARED worktree base for BOTH roots — the strongest form of the bug:
+	// without the lane, both runs target the same dir (<shared>/cycle-1) AND the
+	// same global branch (cycle-1), exercising both collision axes at once.
 	sharedBase := t.TempDir()
 	t.Setenv("EVOLVE_WORKTREE_BASE", sharedBase)
 
@@ -62,8 +61,6 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	}
 	defer func() { _ = g.Cleanup(mainRoot, wtMain) }()
 
-	// Pre-fix this FAILED with "'cycle-1' is already used by worktree" (or a path
-	// collision under the shared base).
 	wtSibling, err := g.Create(sibling, 1)
 	if err != nil {
 		t.Fatalf("Create(sibling, 1) collided (the multi-stream bug): %v", err)
@@ -78,7 +75,7 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	branchOf := func(wt string) string {
 		out, err := exec.Command("git", "-C", wt, "symbolic-ref", "--short", "HEAD").Output()
 		if err != nil {
-			t.Fatalf("symbolic-ref in %s (worktree detached?): %v", wt, err)
+			t.Fatalf("symbolic-ref in %s (detached?): %v", wt, err)
 		}
 		return strings.TrimSpace(string(out))
 	}
@@ -86,10 +83,10 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	if bMain == bSib {
 		t.Fatalf("sibling cycle branches collide: both %q", bMain)
 	}
-	if want := "cycle-" + gitexec.WorktreeToken(mainRoot) + "-1"; bMain != want {
+	if want := runscope.New(runscope.LaneFromRoot(mainRoot), "", 1).CycleBranch(); bMain != want {
 		t.Errorf("main branch = %q, want %q", bMain, want)
 	}
-	if want := "cycle-" + gitexec.WorktreeToken(sibling) + "-1"; bSib != want {
+	if want := runscope.New(runscope.LaneFromRoot(sibling), "", 1).CycleBranch(); bSib != want {
 		t.Errorf("sibling branch = %q, want %q", bSib, want)
 	}
 }

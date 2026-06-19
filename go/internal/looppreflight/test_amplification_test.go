@@ -17,7 +17,6 @@ func TestAmplifyRun_HostCapabilitiesMultipleWarningsStayNonHalting(t *testing.T)
 		return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: false, Reason: "sandbox unavailable"}}
 	}
 	opts.DiskFreeBytes = func(string) (uint64, error) { return 100 << 20, nil }
-	opts.TmuxSessions = func() ([]string, error) { return []string{"evolve-bridge-audit-300"}, nil }
 
 	r, err := Run(opts)
 	if err != nil {
@@ -31,7 +30,7 @@ func TestAmplifyRun_HostCapabilitiesMultipleWarningsStayNonHalting(t *testing.T)
 		t.Fatalf("combined host degradations should warn, got %s (%q)", c.Level, c.Detail)
 	}
 	detail := strings.ToLower(c.Detail)
-	for _, want := range []string{"sandbox", "disk", "evolve-bridge-audit-300"} {
+	for _, want := range []string{"sandbox", "disk"} {
 		if !strings.Contains(detail, strings.ToLower(want)) {
 			t.Fatalf("combined warning detail should include %q, got %q", want, c.Detail)
 		}

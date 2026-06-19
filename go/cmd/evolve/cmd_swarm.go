@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
@@ -31,10 +32,40 @@ func runSwarm(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runSwarmStatus(args, stdout, stderr)
 	case "reap":
 		return runSwarmReap(args, stdout, stderr)
+	case "reap-orphans":
+		return runSwarmReapOrphans(args, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "usage: evolve swarm <status|reap> [--evolve-dir DIR] --cycle N\n")
+		fmt.Fprintf(stderr, "usage: evolve swarm <status|reap|reap-orphans> [options]\n")
 		return 2
 	}
+}
+
+func runSwarmReapOrphans(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("swarm reap-orphans", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	evolveDir := fs.String("evolve-dir", ".evolve", "path to the .evolve directory")
+	dryRun := fs.Bool("dry-run", false, "report orphaned sessions without killing them")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	kill := swarm.ExecTmuxKill
+	if *dryRun {
+		kill = func(context.Context, string) error { return nil }
+	}
+	rep, err := sessionreaper.ReapOrphans(context.Background(), *evolveDir, sessionreaper.Options{Kill: kill})
+	if err != nil {
+		fmt.Fprintf(stderr, "swarm reap-orphans: %v\n", err)
+		return 1
+	}
+	killed, skipped, failures := 0, 0, 0
+	for _, orphan := range rep.Orphaned {
+		killed += orphan.Report.Killed
+		skipped += orphan.Report.Skipped
+		failures += orphan.Report.Errors
+	}
+	fmt.Fprintf(stdout, "orphan runs=%d live-skipped=%d sessions=%d unsafe-skipped=%d errors=%d dry-run=%t\n",
+		len(rep.Orphaned), rep.LiveRunsSkipped, killed, skipped, failures, *dryRun)
+	return 0
 }
 
 // manifestPath resolves the per-cycle swarm manifest the registry writes:

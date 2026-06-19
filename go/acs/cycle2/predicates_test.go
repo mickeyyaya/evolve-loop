@@ -1,174 +1,286 @@
 //go:build acs
 
-// Package cycle2 materializes the cycle-2 acceptance criteria for the
-// committed top_n task:
+// Package cycle2 materializes the cycle-2 acceptance criteria for:
 //
-//   - dead-flag-sweep — remove 18 StatusDead flags from flagregistry
-//     (registry_table.go), add regression test TestDeadFlagsSweep_Gone in
-//     go/internal/flagregistry/registry_deadflags_test.go, and regenerate
-//     docs/architecture/control-flags.md (282 → 264 flags).
-//
-// AC map (1:1 with triage top_n, scout-report.md ACs):
-//
-//	dead-flag-sweep:
-//	  AC1  18 dead flags absent from flagregistry.Lookup            → C2_001 (behavioral)
-//	  AC2  0 StatusDead rows remain in registry                     → C2_002 (behavioral, adversarial-negative)
-//	  AC3  registry row count == 264                                → C2_003 (behavioral, count assertion)
-//	  AC4  TestDeadFlagsSweep_Gone passes in flagregistry package   → C2_004 (behavioral, subprocess)
-//	  AC5  flagreaders ACS guard exits 0                            → C2_005 (behavioral, subprocess)
-//
-// Floor binding (R9.3): predicates only for committed top_n task (dead-flag-sweep).
-// Deferred tasks (deprecated-no-reader retirement, internal classification) get zero predicates.
+//   - sessionreaper-orphan-reap: Tier-3 liveness orphan reaper (Slice 3,
+//     concurrency-arch-slices campaign). New leaf pkg internal/sessionreaper
+//     with ReapOrphans function, replacement of the looppreflight glob-WARN,
+//     and `evolve swarm reap-orphans` CLI operator backstop.
 package cycle2
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// deadFlags is the full list of 18 StatusDead flags targeted by the sweep.
-// Each was verified zero-reader on all surfaces (go/ *.go, .github/, skills/,
-// agents/, *.sh) in the cycle-1 and cycle-2 scout cross-surface grep.
-var deadFlags = []string{
-	"EVOLVE_ANCHOR_EXTRACT",
-	"EVOLVE_CARRYOVER_TODO_MAX_UNPICKED",
-	"EVOLVE_CONTEXT_DIGEST",
-	"EVOLVE_CYCLE_STATE_FILE",
-	"EVOLVE_DIR",
-	"EVOLVE_DIR_OVERRIDE",
-	"EVOLVE_DRY_RUN_PROVISION_WORKTREE",
-	"EVOLVE_FAILURE_CLASSIFICATIONS_LOADED",
-	"EVOLVE_FANOUT_RETROSPECTIVE",
-	"EVOLVE_FANOUT_SCOUT",
-	"EVOLVE_INSTINCT_SUMMARY_CAP",
-	"EVOLVE_PROFILE_OVERRIDE",
-	"EVOLVE_PROMPT_BUDGET_ENFORCE",
-	"EVOLVE_RESOLVE_ROOTS_LOADED",
-	"EVOLVE_STATE_FILE_OVERRIDE",
-	"EVOLVE_STATE_OVERRIDE",
-	"EVOLVE_STRICT_FAILURES",
-	"EVOLVE_TRIAGE_ENABLED",
+// --- Task: sessionreaper-orphan-reap ---
+
+// TestC2_001_SessionreaperPackageExistsAndTracked asserts that
+// go/internal/sessionreaper/sessionreaper.go was created in the worktree
+// and is git-tracked. A gitignored file is silently dropped at ship
+// (cycle-93 lesson).
+func TestC2_001_SessionreaperPackageExistsAndTracked(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	rel := filepath.Join("go", "internal", "sessionreaper", "sessionreaper.go")
+	path := filepath.Join(root, rel)
+	if !acsassert.FileExists(t, path) {
+		t.Fatalf("RED: %s missing on disk", rel)
+	}
+	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel); code != 0 {
+		t.Errorf("RED: %s not git-tracked — may be gitignored and dropped at ship", rel)
+	}
 }
 
-// goDir returns the go module directory for subprocess calls.
-func goDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(acsassert.RepoRoot(t), "go")
+// TestC2_002_SessionreaperExportsCompile asserts that all four exports named in
+// AC1 (ReapOrphans, Options, Report, OrphanReap) are present by running go build.
+// A missing export is a compile error — behavioral proof the API contract holds.
+func TestC2_002_SessionreaperExportsCompile(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "build",
+		"-C", goDir,
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: sessionreaper package does not compile (exports may be missing):\n%s", combined)
+	}
 }
 
-// TestC2_001_DeadFlagsAbsentFromRegistry verifies that all 18 StatusDead flags
-// are no longer registered after Builder removes their rows from registry_table.go.
+// TestC2_003_FreshLeaseSkippedTestPasses runs TestReapOrphans_FreshLeaseSkipped
+// under -race and asserts: (a) the test executed (anti-no-op guard: `go test -run`
+// on a missing test exits 0 silently), (b) exit 0, (c) no DATA RACE.
+// This is the safety-invariant predicate: a live peer's sessions must NEVER be
+// killed — fake TmuxKiller must record zero calls for the fresh-lease run.
+func TestC2_003_FreshLeaseSkippedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_FreshLeaseSkipped",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_FreshLeaseSkipped") {
+		t.Fatalf("RED: TestReapOrphans_FreshLeaseSkipped did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE detected in FreshLeaseSkipped test:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_FreshLeaseSkipped failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_004_StaleLeaseReapedTestPasses runs TestReapOrphans_StaleLeaseReaped
+// under -race and asserts it passes. The positive behavioral test: a stale-lease
+// run's sessions MUST be passed to the killer (non-zero kill count).
+func TestC2_004_StaleLeaseReapedTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_StaleLeaseReaped",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_StaleLeaseReaped") {
+		t.Fatalf("RED: TestReapOrphans_StaleLeaseReaped did not execute — function missing or name mismatch:\n%s", combined)
+	}
+	if strings.Contains(combined, "DATA RACE") {
+		t.Errorf("RED: DATA RACE in StaleLeaseReaped test:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_StaleLeaseReaped failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_005_MissingRegistryIsZeroActivityTestPasses runs
+// TestReapOrphans_MissingRegistryIsZeroActivity: absent tmux-sessions.jsonl must
+// be a zero-activity success (no error, no crash). Mirrors swarm.ReapRunSessions'
+// MissingRegistry contract.
+func TestC2_005_MissingRegistryIsZeroActivityTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_MissingRegistryIsZeroActivity",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_MissingRegistryIsZeroActivity") {
+		t.Fatalf("RED: TestReapOrphans_MissingRegistryIsZeroActivity did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_MissingRegistryIsZeroActivity failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_006_AbsentLeaseIsStaleTestPasses runs TestReapOrphans_AbsentLeaseIsStale:
+// a missing .lease file must be treated as stale (fail-closed; reap proceeds)
+// rather than live (fail-open; reap skipped). Unknown = reapable.
+func TestC2_006_AbsentLeaseIsStaleTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1",
+		"-tags", "integration",
+		"-run", "TestReapOrphans_AbsentLeaseIsStale",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestReapOrphans_AbsentLeaseIsStale") {
+		t.Fatalf("RED: TestReapOrphans_AbsentLeaseIsStale did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestReapOrphans_AbsentLeaseIsStale failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired asserts two things:
+// (1) the old server-wide glob-WARN for stale sessions is removed — it's a
+// latent footgun (could enumerate live peers' sessions) and incapable of safe
+// reaping; (2) ReapOrphans is called in checks.go instead.
 //
-// BEHAVIORAL: calls flagregistry.Lookup() directly — the production SSOT
-// binary-search function. A source edit alone cannot satisfy this; the flag rows
-// must be physically absent for Lookup to return ok=false.
+// Mixed: FileNotContains removes the footgun assertion; FileMatchesRegex
+// confirms wiring. The behavioral side is covered by TestC2_008.
+// acs-predicate: config-check — source-wiring assertion is inherently a
+// file-presence check.
+func TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	checksPath := filepath.Join(root, "go", "internal", "looppreflight", "checks.go")
+	// Negative axis: the old glob-WARN string must be absent.
+	acsassert.FileNotContains(t, checksPath, "stale bridge tmux session(s)")
+	// Positive axis: ReapOrphans call must be present.
+	acsassert.FileMatchesRegex(t, checksPath, `ReapOrphans`)
+}
+
+// TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring runs the looppreflight
+// integration test suite to confirm the ReapOrphans wiring is correct and no
+// regressions were introduced. Behavioral: exercises the actual checks.go code.
+func TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-count=1", "-tags", "integration",
+		"./internal/looppreflight/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: looppreflight integration tests failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_009_SwarmReapOrphansDryRunSucceeds builds the evolve binary and runs
+// `evolve swarm reap-orphans --dry-run`. Exit 0 proves the subcommand is
+// registered and functional. --dry-run injects a no-op killer so no real sessions
+// are touched.
+func TestC2_009_SwarmReapOrphansDryRunSucceeds(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "run",
+		"-C", goDir,
+		"./cmd/evolve/...",
+		"swarm", "reap-orphans", "--dry-run",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: `evolve swarm reap-orphans --dry-run` failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_010_ApiCoverEnforceContainsSessionreaper asserts ./internal/sessionreaper
+// is enrolled in go/.apicover-enforce. Enrollment is mandatory for every new
+// internal package (TestApicoverEnforce_CoversEveryInternalPackage gate, cycle-131
+// lesson: a new pkg not enrolled fails the completeness invariant at ship).
 //
-// NEGATIVE (AC1): each flag currently has StatusDead and Lookup returns ok=true,
-// so the assert-!ok fails.
-//
-// RED: flagregistry.Lookup returns (flag, true) for all 18 flags — dead rows are
-// still registered in registry_table.go.
-func TestC2_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
-	for _, name := range deadFlags {
-		if f, ok := flagregistry.Lookup(name); ok {
-			t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — dead flag still registered.\n"+
-				"Builder must remove this row from go/internal/flagregistry/registry_table.go.\n"+
-				"Current entry: Status=%q Cluster=%q",
-				name, f.Status, f.Cluster)
+// acs-predicate: config-check — enrollment verification is inherently a
+// file-presence check; the behavioral gate is TestC2_011.
+func TestC2_010_ApiCoverEnforceContainsSessionreaper(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	enforcePath := filepath.Join(root, "go", ".apicover-enforce")
+	// acs-predicate: config-check
+	acsassert.FileContains(t, enforcePath, "./internal/sessionreaper")
+}
+
+// TestC2_011_ApiCoverEnforceTestPasses runs TestApicoverEnforce_CoversEveryInternalPackage
+// which is the completeness gate: every internal pkg enrolled in .apicover-enforce
+// must have named coverage tests in the same package. This fails until
+// sessionreaper's apicover_named_test.go names every export.
+func TestC2_011_ApiCoverEnforceTestPasses(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-v", "-count=1", "-tags", "acs",
+		"-run", "TestApicoverEnforce_CoversEveryInternalPackage",
+		"./acs/regression/apicover/...",
+	)
+	combined := stdout + "\n" + stderr
+	if !strings.Contains(combined, "TestApicoverEnforce_CoversEveryInternalPackage") {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage did not execute:\n%s", combined)
+	}
+	if code != 0 {
+		t.Fatalf("RED: TestApicoverEnforce_CoversEveryInternalPackage failed (exit %d):\n%s", code, combined)
+	}
+}
+
+// TestC2_012_SessionreaperCoverageAtLeast85Pct runs the integration test suite
+// with -coverprofile and asserts coverage >= 85% for the sessionreaper package.
+// A package below the threshold cannot ship per the AC10 gate (apicover-enforce
+// checks coverage profiles).
+func TestC2_012_SessionreaperCoverageAtLeast85Pct(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	coverFile := filepath.Join(t.TempDir(), "sessionreaper.cover.out")
+	stdout, stderr, code, _ := acsassert.SubprocessOutput(
+		"go", "test",
+		"-C", goDir,
+		"-race", "-count=1", "-tags", "integration",
+		"-coverprofile", coverFile,
+		"-coverpkg", "./internal/sessionreaper/...",
+		"./internal/sessionreaper/...",
+	)
+	combined := stdout + "\n" + stderr
+	if code != 0 {
+		t.Fatalf("RED: sessionreaper integration tests failed (exit %d):\n%s", code, combined)
+	}
+	for _, line := range strings.Split(combined, "\n") {
+		if strings.Contains(line, "coverage:") && strings.Contains(line, "%") {
+			fields := strings.Fields(line)
+			for i, f := range fields {
+				if f == "coverage:" && i+1 < len(fields) {
+					pctStr := strings.TrimSuffix(fields[i+1], "%")
+					var pct float64
+					if _, scanErr := fmt.Sscanf(pctStr, "%f", &pct); scanErr == nil {
+						if pct < 85.0 {
+							t.Errorf("RED: sessionreaper coverage %.1f%% < 85%% threshold", pct)
+						}
+						return
+					}
+				}
+			}
 		}
 	}
-}
-
-// TestC2_002_NoStatusDeadRowsRemain verifies that flagregistry.All contains
-// zero entries with Status == StatusDead after the sweep.
-//
-// BEHAVIORAL: iterates flagregistry.All (the production slice, populated by
-// registry_table.go). A no-op implementation cannot satisfy this — the rows must
-// be deleted.
-//
-// ADVERSARIAL-NEGATIVE: this is the strongest anti-no-op signal: even if only
-// some dead flags are removed, any remaining StatusDead entry fails the test.
-//
-// RED: flagregistry.All currently has 18 StatusDead entries.
-func TestC2_002_NoStatusDeadRowsRemain(t *testing.T) {
-	var deadRemaining []string
-	for _, f := range flagregistry.All {
-		if f.Status == flagregistry.StatusDead {
-			deadRemaining = append(deadRemaining, f.Name)
-		}
-	}
-	if len(deadRemaining) != 0 {
-		t.Errorf("RED: %d StatusDead rows remain in flagregistry.All — Builder must remove all dead rows.\n"+
-			"Remaining: %v", len(deadRemaining), deadRemaining)
-	}
-}
-
-// TestC2_003_RegistryRowCountIs264 verifies that after removing 18 dead flags
-// from the 282-row registry, the row count is exactly 264.
-//
-// BEHAVIORAL: asserts len(flagregistry.All) == 264. The value 264 = 282 - 18
-// (cross-verified by the cycle-1 and cycle-2 scouts). Over-removal fails this test.
-//
-// RED: len(flagregistry.All) is currently 282.
-func TestC2_003_RegistryRowCountIs264(t *testing.T) {
-	const want = 264
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove exactly 18 StatusDead rows (282 → 264). "+
-			"Over-removal or under-removal both fail this predicate.", got, want)
-	}
-}
-
-// TestC2_004_DeadFlagsSweepGoneUnitTestPasses verifies that the regression test
-// TestDeadFlagsSweep_Gone in go/internal/flagregistry/registry_deadflags_test.go
-// (authored by TDD-engineer for Builder to make GREEN) passes after the sweep.
-//
-// BEHAVIORAL: runs `go test -run TestDeadFlagsSweep_Gone ./internal/flagregistry/`
-// via SubprocessOutput — exercises the actual registry binary, not just source text.
-//
-// RED: TestDeadFlagsSweep_Gone currently fails because all 18 dead flags are still
-// registered (Lookup returns ok=true for each, and the test asserts ok=false).
-func TestC2_004_DeadFlagsSweepGoneUnitTestPasses(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
-		"go", "test",
-		"-C", goDir(t),
-		"-count=1",
-		"-run", "TestDeadFlagsSweep_Gone",
-		"./internal/flagregistry/",
-	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("RED: go test -run TestDeadFlagsSweep_Gone ./internal/flagregistry/ failed (exit=%d): %v\n"+
-			"Builder must delete all 18 StatusDead rows from registry_table.go to make this GREEN.\n"+
-			"Output:\n%s", code, err, combined)
-	}
-}
-
-// TestC2_005_FlagreadersACSGuardPasses verifies that the flagreaders regression
-// ACS guard exits 0 after the dead-flag sweep, confirming no live production
-// reader references any of the 18 removed flags.
-//
-// BEHAVIORAL: runs the real go test binary against the flagreaders ACS package.
-// Source edits alone cannot satisfy this — the guard scans the actual filesystem.
-//
-// RED: this test is expected pre-existing GREEN (the flagreaders guard passes
-// because all 18 flags have 0 readers already). Marked RED-candidate: if Builder
-// accidentally removes a flag that HAS a reader, this test will catch it.
-func TestC2_005_FlagreadersACSGuardPasses(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
-		"go", "test",
-		"-C", goDir(t),
-		"-tags", "acs",
-		"-count=1",
-		"./acs/regression/flagreaders/...",
-	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("flagreaders ACS guard failed (exit=%d): %v\n"+
-			"This means a removed flag still has a production reader.\n"+
-			"Output:\n%s", code, err, combined)
-	}
+	t.Errorf("RED: could not parse coverage percentage from output:\n%s", combined)
 }
