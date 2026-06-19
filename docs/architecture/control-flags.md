@@ -301,7 +301,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PROMPTS_DIR` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PROMPT_MAX_TOKENS` | active | — | — | Observability / Prompt Tuning | Soft prompt token cap for role-context-builder |
 | `EVOLVE_PSMAS_SKIP` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_REAP_ORPHANS` | active | bool | 1 | Concurrency / Sibling-Worktree (ADR-0054) | Operator opt-out for the Tier-3 liveness orphan session reaper (ADR-0054 Slice 3). Default 1 = active (sessionreaper.ReapOrphans runs unconditionally in looppreflight). Set 0 to disable reaping for a run (e.g. for debugging leaked sessions). IMPORTANT: this flag is documentation/opt-out only — it does NOT gate sessionreaper's core logic in production; the reaper is wired unconditionally in looppreflight. Safety invariant: a run whose .lease is Fresh is NEVER reaped regardless of this dial. See internal/sessionreaper and evolve swarm reap-orphans [--dry-run]. |
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
@@ -332,12 +331,10 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_STDOUT_FILTER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_STRATEGY` | active | — | — | Workflow Defaults | Cycle strategy override |
 | `EVOLVE_STRICT_AUDIT` | active | — | — | Workflow Defaults | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
-| `EVOLVE_SWARM_CONCURRENCY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SWARM_PLANNER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SWARM_PORT_BASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SWARM_STAGE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TDD_PHASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |
 | `EVOLVE_TEST_PHASE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TRACKER_TTL_DAYS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
