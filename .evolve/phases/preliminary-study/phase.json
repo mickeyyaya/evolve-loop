@@ -1,0 +1,47 @@
+{
+  "name": "preliminary-study",
+  "archetype": "plan",
+  "agent": "evolve-preliminary-study",
+  "when_to_use": "Use before a multi-cycle campaign when the goal needs research-backed decomposition into dependency-ordered cycle tasks.",
+  "description": "Researches a campaign goal and produces a verified, dependency-aware campaign plan for operator review.",
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/intent.md"
+    ],
+    "signals": [
+      "intent.risk_level"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/campaign-plan.json",
+      ".evolve/runs/cycle-{cycle}/preliminary-study.md"
+    ],
+    "signals": [
+      "study.cycle_count",
+      "study.wave_count"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Research Scope",
+      "Knowledge Capsules",
+      "Decomposition Plan",
+      "Dependency and Concurrency Rationale",
+      "Anti-Over-Decomposition Justification",
+      "Critical Unknowns",
+      "Verdict"
+    ]
+  },
+  "routing": {
+    "insert_when": [
+      {
+        "field": "campaign.mode",
+        "op": "==",
+        "value": "study"
+      }
+    ]
+  },
+  "after": "intent",
+  "optional": true
+}

@@ -68,7 +68,7 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if goalHash == "" {
 			goalHash = "soak-noop"
 		}
-		launchFn = execCycleLaunch(binPath, true, stdout, stderr)
+		launchFn = execCycleLaunch(binPath, true, "", stdout, stderr)
 	}
 
 	// Invariant 1: N distinct CycleBranch values from N distinct RunScopes.

@@ -35,6 +35,8 @@ Commands:
                 end of phaseproto.SubprocessRunner ( serve-phase <name> )
   cycle      Run one full cycle, or seal an unfinished one
               ( cycle run --goal-hash X | cycle reset [--dry-run] [--force] )
+  campaign   Plan and execute dependency-ordered multi-cycle campaigns
+              ( campaign study|replan|run )
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N --budget-usd X )
   ship       Atomic commit + push (native; v11.3.0)

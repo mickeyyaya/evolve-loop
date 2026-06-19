@@ -302,3 +302,17 @@
 
 # Cycle Dossier ACS gate (ADR-0055 D3); rehomed from cycle2 (v20 collision).
 ./acs/cycle6
+# ADR-0054 campaign planner: deterministic plan verification/rendering and the
+# dependency-level engine are both public internal APIs consumed by cmd/evolve.
+./internal/campaign
+./internal/dag
+
+# Cycle-6 merge rehomes the branch's original cycle1/cycle3 acceptance suites
+# so main's v20 suites retain their canonical cycle numbers.
+./acs/cycle8
+./acs/cycle14
+
+# cycle-17 ACS predicate package (2026-06-19): campaign-verify-comma-rejection,
+# fix-preliminary-study-metadata, cmd-campaign-dispatch-coverage.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle17
