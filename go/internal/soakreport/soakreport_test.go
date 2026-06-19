@@ -92,8 +92,8 @@ func TestCollect_AggregatesAllComponentEvidence(t *testing.T) {
 func TestCollect_EmptyWorkspacesDegradeToNotes(t *testing.T) {
 	t.Parallel()
 	r := Collect(t.TempDir(), []int{7})
-	if len(r.Cycles) != 1 || r.Cycles[0].Outcome != "FAILED_UNEXPLAINED" {
-		t.Fatalf("missing workspace must still classify (unexplained): %+v", r.Cycles)
+	if len(r.Cycles) != 1 || r.Cycles[0].Outcome != "FAILED_EXPLAINED" {
+		t.Fatalf("missing workspace must classify as initialization failure: %+v", r.Cycles)
 	}
 	// Every component still appears (with zero counts) — the report's shape
 	// is stable so soak comparisons never diff against absent sections.

@@ -8,7 +8,7 @@ import "testing"
 // current ceiling.
 //
 // Cycle 34 migrates four gate flags to policy.GatesPolicy.
-const FlagCeiling = 89
+const FlagCeiling = 83
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

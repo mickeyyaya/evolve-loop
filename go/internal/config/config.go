@@ -214,9 +214,8 @@ type RolloutStages struct {
 	//   StageAdvisory — the re-plan replaces the clamped plan after the floor
 	//                   re-clamps it (opt-in, post-soak).
 	// PRECEDENCE NOTE: like the other rollout dials this is the composition-root
-	// view, set from EVOLVE_ROUTER_REPLAN by applyEnv; the re-plan call site
-	// (WS2-S3) reads it. Default StageShadow (set in defaults()); a typo falls
-	// back to off via parseStage (fail-safe — never silently enables the re-plan).
+	// view, loaded from policy; the re-plan call site (WS2-S3) reads it.
+	// Default StageShadow (set in defaults()).
 	RouterReplan Stage
 }
 
@@ -252,30 +251,28 @@ type RoutingConfig struct {
 	// Registry-sourced only; nil when no registry supplies it (projection renders empty).
 	GoalRecipes map[string][]string
 	// RoutingJudge is the ADR-0052 advisor-maximization WS4 route-quality judge
-	// toggle (EVOLVE_ROUTING_JUDGE). false (DEFAULT) — no judge call,
+	// toggle. false (DEFAULT) — no judge call,
 	// byte-identical. true — the fast-tier LLM-as-judge scores the emitted route
 	// for forensics, strictly off the build path (never gates ship, never alters
 	// the plan). It is a plain bool, NOT a Stage: the judge cannot move behavior,
 	// so the off→shadow→advisory ladder would be meaningless (shadow≡advisory≡on).
-	// Composition-root view set by applyEnv; the scoring call site reads it. A
-	// typo/unknown value falls back to false (fail-safe — never silently enables).
+	// Composition-root view loaded from policy; the scoring call site reads it.
 	RoutingJudge bool
 	// ReconDigest is the ADR-0052 advisor-maximization WS2-S0b toggle for the
-	// deterministic pre-plan recon digest (EVOLVE_ROUTER_RECON_DIGEST). false
+	// deterministic pre-plan recon digest. false
 	// (DEFAULT) — the initial Plan prompt is byte-identical to pre-slice. true —
 	// the advisor renders measured repo facts (langs/tests/hotspots, goal-keyword
 	// hits, backlog/carryover) under "## Pre-plan recon (deterministic)" so
 	// upfront selection is grounded in evidence, not goal-text inference alone.
 	// A plain bool (not a Stage): it injects deterministic facts the floor still
 	// clamps, so there is no shadow/advisory distinction. Composition-root view
-	// set by applyEnv; composePlanPrompt reads it. Typo/unknown → false (fail-safe).
+	// loaded from policy; composePlanPrompt reads it.
 	ReconDigest bool
 	// RePlanMaxDepth caps how many post-scout re-plans a single cycle may run
 	// (ADR-0052 WS2-S5; research P4 — cap depth, escalate not loop). Default 1
 	// (set in defaults()): one measured re-plan per cycle, then escalate to the
-	// debugger rather than thrash. Set via EVOLVE_ROUTER_REPLAN_DEPTH (a
-	// cycle-scoped counter cr.replanDepth, NOT env, tracks the live depth — env
-	// can reset across subprocesses). A non-positive/typo value falls back to 1.
+	// debugger rather than thrash. A cycle-scoped counter cr.replanDepth tracks
+	// the live depth. A non-positive policy value falls back to 1.
 	RePlanMaxDepth int
 }
 
@@ -527,59 +524,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// defaults(); set EVOLVE_PHASE_IO=off to roll back.
 		cfg.PhaseIO = parseStage(v, "EVOLVE_PHASE_IO", ws)
 	}
-	if v := env["EVOLVE_ROUTER_REPLAN"]; v != "" {
-		// ADR-0052 advisor-maximization — the post-scout re-plan rollout dial
-		// (WS2). Reuses parseStage (off→shadow→advisory→enforce); the dial only
-		// documents off/shadow/advisory but enforce parses harmlessly. A typo
-		// falls back to off (fail-safe). Default (no env) is shadow, set in
-		// defaults(). Behavior wires in WS2-S3; this reserves the parse + view.
-		cfg.RouterReplan = parseStage(v, "EVOLVE_ROUTER_REPLAN", ws)
-	}
-	if v := env["EVOLVE_ROUTING_JUDGE"]; v != "" {
-		// ADR-0052 advisor-maximization WS4 — the route-quality judge toggle.
-		// Simple off/on bool (NOT a Stage: the judge is off the build path and
-		// cannot move behavior, so the shadow/advisory ladder is meaningless —
-		// hence no parseStage). A typo falls back to off (fail-safe). Default
-		// (no env) is the false zero value. Behavior wires at the scoring call
-		// site (WS4-S3 GradePlan); this reserves the parse + view.
-		switch strings.TrimSpace(v) {
-		case "1", "on":
-			cfg.RoutingJudge = true
-		case "0", "off":
-			cfg.RoutingJudge = false
-		default:
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTING_JUDGE=%q unknown (want on|off), defaulting to off", v)})
-		}
-	}
-	if v := env["EVOLVE_ROUTER_RECON_DIGEST"]; v != "" {
-		// ADR-0052 advisor-maximization WS2-S0b — the deterministic pre-plan recon
-		// toggle. Simple off/on bool (NOT a Stage: it injects deterministic facts
-		// the floor still clamps, so off/shadow/advisory are indistinguishable). A
-		// typo falls back to off (fail-safe — byte-identical default). Read by
-		// composePlanPrompt to gate rendering the recon section.
-		switch strings.TrimSpace(v) {
-		case "1", "on":
-			cfg.ReconDigest = true
-		case "0", "off":
-			cfg.ReconDigest = false
-		default:
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTER_RECON_DIGEST=%q unknown (want on|off), defaulting to off", v)})
-		}
-	}
-	if v := env["EVOLVE_ROUTER_REPLAN_DEPTH"]; v != "" {
-		// ADR-0052 advisor-maximization WS2-S5 — the post-scout re-plan depth cap.
-		// A positive int; a non-positive/unparseable value falls back to the
-		// default 1 (fail-safe — never an unbounded or zero cap). The live depth is
-		// the cycle-scoped cr.replanDepth, not env (env can reset across subprocs).
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
-			cfg.RePlanMaxDepth = n
-		} else {
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTER_REPLAN_DEPTH=%q invalid (want a positive int), defaulting to 1", v)})
-		}
-	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
 		case SandboxModeAuto, SandboxModeOn, SandboxModeOff:
@@ -656,8 +600,7 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 // ladder, unlike parseEvidenceStage's off/shadow/enforce trichotomy). varName
 // names the offending key in the unknown-value warning; an unknown value
 // defaults to off (a typo must never silently enable a kill-path or a staged
-// rollout). Shared by EVOLVE_DYNAMIC_ROUTING, EVOLVE_PHASE_IO (ADR-0050), and
-// EVOLVE_ROUTER_REPLAN (ADR-0052).
+// rollout). Shared by dynamic routing and unified phase I/O.
 func parseStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":

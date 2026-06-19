@@ -306,10 +306,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase}
 	gatesCfg := pol.GatesConfig()
+	routerCfg := pol.RouterConfig()
 	cfg.ContractGate = parseGateStage(gatesCfg.ContractGate)
 	cfg.EvalGate = parseGateStage(gatesCfg.EvalGate)
 	cfg.TriageCapGate = parseGateStage(gatesCfg.TriageCapGate)
 	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
+	cfg.RouterReplan = parseRouterStage(routerCfg.RouterReplan)
+	cfg.RoutingJudge = routerCfg.RoutingJudge
+	cfg.ReconDigest = routerCfg.ReconDigest
+	cfg.RePlanMaxDepth = routerCfg.ReplanDepth
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
@@ -385,12 +390,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Select consults it only at routing_mode=llm; the kernel clamp is the floor.
 	// The advisor's PRIMARY model is the plan/re-plan (deep) dispatch — the
 	// confidence-critical decision. WS6-S1: routed through the per-decision-type
-	// resolver so EVOLVE_ROUTER_PLAN_MODEL can override it; no-op vs the prior
-	// resolveRouterDispatch when unset. WS6-S2: if the resolved family is benched
+	// resolver so policy can override it; no-op vs the prior resolveRouterDispatch
+	// when unset. WS6-S2: if the resolved family is benched
 	// (the cli-health circuit breaker), fall back to the healthy claude family;
 	// when even that is benched the advisor keeps the benched dispatch and degrades
 	// to the static spine via its existing fail-safe (clihealth IS the breaker).
-	advCLI, advModel, advHealthy := resolveRouterDispatchHealthy(evolveDir, decisionPlan, benchedFamilies(projectRoot))
+	advCLI, advModel, advHealthy := resolveRouterDispatchHealthy(evolveDir, decisionPlan, benchedFamilies(projectRoot), routerCfg)
 	if !advHealthy {
 		// advCLI/advModel are the base (benched) dispatch — usable; the advisor's
 		// dispatch will fail on the benched family and degrade to the static spine.
@@ -561,22 +566,18 @@ const (
 // resolveRouterDispatchFor resolves the (cli, model) for a SPECIFIC advisor
 // decision type (ADR-0052 WS6-S1, optional multi-model). It starts from the
 // single base dispatch (resolveRouterDispatch) and applies a per-type model
-// override: plan/replan honor EVOLVE_ROUTER_PLAN_MODEL, propose/judge honor
-// EVOLVE_ROUTER_PROPOSE_MODEL. With no override set it returns the base value for
-// EVERY type — strictly no-op, single-model — until an operator opts into
-// per-decision models (the D2 recommendation: deep for plan/replan, fast for
-// propose/judge). The CLI is unchanged across types (cross-family floor and
-// health are per-call concerns, WS6-S2); only the model tier differentiates.
-func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType) (cli, model string) {
+// override from RouterPolicy. With no override set it returns the base value for
+// every type. The CLI is unchanged across types; only the model tier differs.
+func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType, rc policy.RouterPolicy) (cli, model string) {
 	cli, model = resolveRouterDispatch(evolveDir)
 	switch dt {
 	case decisionPlan, decisionRePlan:
-		if v := os.Getenv("EVOLVE_ROUTER_PLAN_MODEL"); v != "" {
-			model = v
+		if rc.PlanModel != "" {
+			model = rc.PlanModel
 		}
 	case decisionPropose, decisionJudge:
-		if v := os.Getenv("EVOLVE_ROUTER_PROPOSE_MODEL"); v != "" {
-			model = v
+		if rc.ProposeModel != "" {
+			model = rc.ProposeModel
 		}
 	}
 	return cli, model
@@ -590,8 +591,8 @@ func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType) (cli, mod
 // static spine — the advisor's existing fail-safe, so no separate breaker is
 // minted (clihealth IS the breaker; ADR-0052 WS6-S2). benched is the set of
 // benched family names (clihealth.Store.Active values' Family).
-func resolveRouterDispatchHealthy(evolveDir string, dt routerDecisionType, benched map[string]bool) (cli, model string, ok bool) {
-	cli, model = resolveRouterDispatchFor(evolveDir, dt)
+func resolveRouterDispatchHealthy(evolveDir string, dt routerDecisionType, benched map[string]bool, rc policy.RouterPolicy) (cli, model string, ok bool) {
+	cli, model = resolveRouterDispatchFor(evolveDir, dt, rc)
 	if !benched[llmroute.Family(cli)] {
 		return cli, model, true // primary family healthy
 	}
@@ -648,6 +649,19 @@ func parseGateStage(stage string) config.Stage {
 	switch strings.TrimSpace(stage) {
 	case "shadow":
 		return config.StageShadow
+	case "enforce":
+		return config.StageEnforce
+	default:
+		return config.StageOff
+	}
+}
+
+func parseRouterStage(stage string) config.Stage {
+	switch strings.TrimSpace(stage) {
+	case "shadow":
+		return config.StageShadow
+	case "advisory":
+		return config.StageAdvisory
 	case "enforce":
 		return config.StageEnforce
 	default:

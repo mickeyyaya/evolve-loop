@@ -92,6 +92,9 @@ type Policy struct {
 	// Gates configures persistent rollout stages for the contract, eval,
 	// triage-cap, and review gates. Absent ⇒ built-in defaults apply.
 	Gates *GatesPolicy `json:"gates,omitempty"`
+	// Router configures advisor routing behavior and per-decision model
+	// overrides. Absent ⇒ built-in defaults apply.
+	Router *RouterPolicy `json:"router,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -589,6 +592,35 @@ func (p Policy) SwarmConfig() SwarmConfig {
 		c.Stage = p.Swarm.Stage
 	}
 	c.PortBase = p.Swarm.PortBase
+	return c
+}
+
+// RouterPolicy is the .evolve/policy.json "router" block.
+type RouterPolicy struct {
+	RouterReplan string `json:"router_replan,omitempty"`
+	RoutingJudge bool   `json:"routing_judge,omitempty"`
+	ReconDigest  bool   `json:"recon_digest,omitempty"`
+	ReplanDepth  int    `json:"replan_depth,omitempty"`
+	PlanModel    string `json:"plan_model,omitempty"`
+	ProposeModel string `json:"propose_model,omitempty"`
+}
+
+// RouterConfig returns router configuration with built-in defaults resolved.
+func (p Policy) RouterConfig() RouterPolicy {
+	c := RouterPolicy{RouterReplan: "shadow", ReplanDepth: 1}
+	if p.Router == nil {
+		return c
+	}
+	if p.Router.RouterReplan != "" {
+		c.RouterReplan = p.Router.RouterReplan
+	}
+	c.RoutingJudge = p.Router.RoutingJudge
+	c.ReconDigest = p.Router.ReconDigest
+	if p.Router.ReplanDepth > 0 {
+		c.ReplanDepth = p.Router.ReplanDepth
+	}
+	c.PlanModel = p.Router.PlanModel
+	c.ProposeModel = p.Router.ProposeModel
 	return c
 }
 
