@@ -71,8 +71,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 > `EVOLVE_STRICT_FAILURES` bridged to `EVOLVE_STRICT_AUDIT` (canonical). `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` bridged to `EVOLVE_DISPATCH_POLICY={off|verify|stop}` (canonical).
 > Note: cycle-9 callout misstated the counts as "3 STRICT + 2 DISPATCH" — actual was 2 STRICT + 3 DISPATCH (REPEAT_THRESHOLD is a numeric threshold, not a policy switch).
 >
-> **Cycle 11 target**: `EVOLVE_REQUIRE_*` family audit — `EVOLVE_REQUIRE_INTENT` and `EVOLVE_REQUIRE_TEAM_CONTEXT` share "force phase on every cycle" semantics; investigate unified `EVOLVE_REQUIRED_PHASES` list flag. Lower priority (rarely set by operators); treat as `investigate` not `commit`.
-
 ## State File Cluster (cycle 7 consolidation)
 
 | Flag | Status | Purpose |
@@ -95,8 +93,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_TRIAGE_DISABLE` | ACTIVE | Opt-out of triage default-on (v8.59+) |
-| `EVOLVE_TRIAGE_TOP_N` | ACTIVE | Override triage top_n selection count |
-| `EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL` | ACTIVE (v10.19) | Opt A: auto-skip Triage when 3 conditions hold (≤1 scout task AND empty carryoverTodos AND predicate-dependency-check.sh exit 0). Default on (=1); opt-out with =0. Writes a stub `triage-decision.{md,json}` with `auto_skip: true` so downstream phases see consistent inputs. |
 | `EVOLVE_TRIAGE_ENABLED` | DEAD | v8.56–v8.58 opt-in; replaced by `EVOLVE_TRIAGE_DISABLE`; removed from docs |
 
 
@@ -105,7 +101,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | Flag | Status | Purpose |
 |------|--------|---------|
 | `EVOLVE_PLATFORM` | ACTIVE | Override platform detection |
-| `EVOLVE_CODEX_REQUIRE_FULL` | ACTIVE | Require Codex full-mode |
 
 ## Worktree / Workspace
 
@@ -131,9 +126,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 |------|--------|---------|
 | `EVOLVE_STRICT_AUDIT` | ACTIVE (canonical) | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
 | `EVOLVE_STRICT_FAILURES` | DEAD | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_TASK_MODE` | ACTIVE | Profile tier selector (default/research/deep) |
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
-| `EVOLVE_REQUIRE_TEAM_CONTEXT` | ACTIVE | Require team context before builder |
 | `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
 | `EVOLVE_DISPATCH_POLICY` | ACTIVE (canonical) | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
 | `EVOLVE_DISPATCH_STOP_ON_FAIL` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
@@ -177,7 +170,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_CACHE_PREFIX_V2` | ACTIVE (default `1`) | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering. |
 | `EVOLVE_CONTEXT_DIGEST` | ACTIVE (default `1`) | v8.62.0 Campaign B (Tier 2 — digest layer). When `1`, role-context-builder.sh: (B1) lazy-builds `cycle-digest.json` via `build-cycle-digest.sh`; (B2) replaces full intent.md cat with a compact `## Intent (compact)` block (intent_anchor + acceptance_criteria from digest) for scout/triage/plan-review/tdd/builder phases — auditor + retrospective still get the full file. Real-world reduction: scout 84%, triage 40%, builder 43%. Promoted to default=1 in cycle 24 (v9.4.0). Set `EVOLVE_CONTEXT_DIGEST=0` to revert to legacy full-file mode. |
 | `EVOLVE_ANCHOR_EXTRACT` | ACTIVE (default `1`) | v8.63.0 Campaign C (Tier 3 — anchored artifacts). When `1`, role-context-builder.sh extracts only named `<!-- ANCHOR:<name> -->` regions from prior phase artifacts instead of `cat`-ing whole files. Persona templates (scout/builder/auditor/retrospective) emit anchor markers around output sections. Backwards-compat: pre-v8.63 artifacts without anchors fall back to full-file emission once per file (no duplication regression). Auditor reads `diff_summary`+`test_results` from build-report and `proposed_tasks`+`acceptance_criteria` from scout-report; triage reads `proposed_tasks` only. Promoted to default=1 in cycle 24 (v9.4.0). Set `EVOLVE_ANCHOR_EXTRACT=0` to revert to legacy full-file mode. |
-| `EVOLVE_RUN_TIMEOUT` | ACTIVE | Per-subagent run timeout |
 | `EVOLVE_INSTINCT_SUMMARY_CAP` | ACTIVE | Max instinct summaries in state.json |
 | `EVOLVE_CARRYOVER_TODO_MAX_UNPICKED` | ACTIVE | Carryover todos threshold |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | ACTIVE | Force release preflight gate |
@@ -218,8 +210,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | 8 (done) | Sandbox | Deprecated inner-sandbox flags via bridge (v8.60); retired in cycle-7 |
 | 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
 | 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` → `EVOLVE_DISPATCH_POLICY={off\|verify\|stop}` (v8.60) |
-| 11 | Require Phases | Investigate `EVOLVE_REQUIRE_INTENT` + `EVOLVE_REQUIRE_TEAM_CONTEXT` → unified `EVOLVE_REQUIRED_PHASES` list flag |
-
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 
 ## Generated Flag Index
