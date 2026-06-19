@@ -7,9 +7,9 @@ import "testing"
 // same diff — the test below fails if a net addition pushes count above the
 // current ceiling.
 //
-// Cycle 31 removes six environment-backed bypass flags in favor of explicit CLI
-// inputs and dead-sweeps the obsolete worktree skip flag.
-const FlagCeiling = 102
+// Cycle 32 migrates four workflow controls to policy.json and removes one
+// docs-only flag.
+const FlagCeiling = 97
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

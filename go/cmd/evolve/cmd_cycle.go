@@ -493,6 +493,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
+	opts = append(opts, core.WithWorkflowConfig(pol.WorkflowConfig()))
 
 	return orchDeps{
 		Storage:      st,

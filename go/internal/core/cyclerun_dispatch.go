@@ -8,7 +8,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
 
@@ -172,11 +171,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.
-				// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in the
-				// per-cycle env SNAPSHOT (ADR-0049 N9: read the snapshot, not live
-				// os.Getenv, so a concurrent fleet cycle's env can't flip this cycle's
-				// backfill. The snapshot already carries the operator's shell value).
-				backfillEnabled := envchain.BoolValue(cr.envSnap["EVOLVE_BACKFILL_ENABLED"], true)
+				// Default-on; policy.json can disable artifact backfill for the cycle.
+				backfillEnabled := cr.workflowConfig.BackfillEnabled
 				if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
 					artifactPath := backfillArtifactPath(cr.cs.WorkspacePath, string(next))
 					if ok, berr := backfill.TryExtract(cr.cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {

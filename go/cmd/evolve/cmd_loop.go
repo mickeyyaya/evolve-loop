@@ -63,7 +63,7 @@ type loopConfig struct {
 	Strategy    string `json:"strategy"`
 	MaxCycles   int    `json:"max_cycles"`
 	// MaxCyclesExplicit records whether the operator set --max-cycles/--cycles
-	// (or a positional count). When false and EVOLVE_CYCLE_BUDGET=enforce, the
+	// (or a positional count). When false and cycle-budget policy is enforce, the
 	// loop defaults its ceiling to the safety cap and lets completion drive the
 	// stop, instead of the legacy default of 1.
 	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
@@ -261,12 +261,12 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	maxConsecutiveFails := wc.MaxConsecutiveFails
 	consecutiveFails := 0
 
-	// Advisor-decided cycle budget (EVOLVE_CYCLE_BUDGET). Off ⇒ the operator's
+	// Advisor-decided cycle budget. Off ⇒ the operator's
 	// --max-cycles governs (byte-identical to today). Enforce with no explicit
 	// --max-cycles ⇒ the ceiling becomes the safety cap and per-cycle completion
 	// (backlog drained) drives the early stop; advisory computes + logs the
 	// would-stop without changing behavior.
-	budgetStage := cyclebudget.ParseStage(os.Getenv("EVOLVE_CYCLE_BUDGET"))
+	budgetStage := cyclebudget.ParseStage(wc.CycleBudget)
 	effectiveMax := cfg.MaxCycles
 	if budgetStage == cyclebudget.Enforce && !cfg.MaxCyclesExplicit {
 		effectiveMax = wc.MaxCyclesCap

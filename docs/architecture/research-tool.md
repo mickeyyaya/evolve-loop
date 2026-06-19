@@ -106,7 +106,7 @@ Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` a
 
 | Subsystem | Env var | Default | Effect |
 |-----------|---------|---------|--------|
-| Research tool | `EVOLVE_ALLOW_DEEP_RESEARCH` | `0` | When `1`, lifts per-agent quota cap; records `deep_overrides` counter. Does not disable hook telemetry. |
+| Research tool | `workflow.allow_deep_research` | `false` | When `true`, lifts the per-agent quota cap. Does not disable hook telemetry. |
 | Research tool | `EVOLVE_RESEARCH_QUOTA_SOFT` | *(planned)* | Soft quota: allows over-quota calls but emits WARN in guards.log. Not yet implemented in `research-quota-gate.sh` as of cycle-89. |
 | Research tool | `EVOLVE_RESEARCH_HOOK_DISABLED` | `0` | When `1`, hook is a no-op but counters still increment (telemetry-only mode). |
 | Research tool | `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `kb-search.sh`. |

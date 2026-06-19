@@ -12,17 +12,17 @@ import (
 //   - rm command targeting docs/** or knowledge-base/** → DENY
 //   - mv from docs/** or knowledge-base/** → DENY unless dest is
 //     knowledge-base/research/archived-YYYY-MM-DD/
-//   - EVOLVE_ALLOW_DOC_DELETE=1 bypasses
+//   - constructor policy can bypass
 //   - Edit / Write tools pass through (cannot delete files in place)
 func TestDocDelete_Name(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	if g.Name() != "docdelete" {
 		t.Errorf("name=%q", g.Name())
 	}
 }
 
 func TestDocDelete_AllowsNonRm(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	cases := []string{
 		"ls docs/",
 		"cat docs/README.md",
@@ -40,7 +40,7 @@ func TestDocDelete_AllowsNonRm(t *testing.T) {
 }
 
 func TestDocDelete_DeniesRmDocs(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	cases := []string{
 		"rm docs/foo.md",
 		"rm -rf docs/architecture",
@@ -58,20 +58,19 @@ func TestDocDelete_DeniesRmDocs(t *testing.T) {
 	}
 }
 
-func TestDocDelete_BypassEnvAllows(t *testing.T) {
-	t.Setenv("EVOLVE_ALLOW_DOC_DELETE", "1")
-	g := NewDocDelete(nil)
+func TestDocDelete_BypassPolicyAllows(t *testing.T) {
+	g := NewDocDelete(true)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "rm -rf docs/old"},
 	})
 	if !dec.Allow {
-		t.Errorf("EVOLVE_ALLOW_DOC_DELETE=1 must allow, got: %s", dec.Reason)
+		t.Errorf("allow policy must permit deletion, got: %s", dec.Reason)
 	}
 }
 
 func TestDocDelete_DeniesMvOutOfDocs(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "mv docs/old.md /tmp/"},
@@ -82,7 +81,7 @@ func TestDocDelete_DeniesMvOutOfDocs(t *testing.T) {
 }
 
 func TestDocDelete_AllowsMvToArchive(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "mv docs/old.md knowledge-base/research/archived-2026-05-22/old.md"},
@@ -93,7 +92,7 @@ func TestDocDelete_AllowsMvToArchive(t *testing.T) {
 }
 
 func TestDocDelete_PassThroughForEditWrite(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	for _, tool := range []string{"Edit", "Write", "Read"} {
 		dec := g.Decide(context.Background(), core.GuardInput{ToolName: tool})
 		if !dec.Allow {
@@ -103,7 +102,7 @@ func TestDocDelete_PassThroughForEditWrite(t *testing.T) {
 }
 
 func TestDocDelete_MissingCommandIsAllow(t *testing.T) {
-	g := NewDocDelete(nil)
+	g := NewDocDelete(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{}, // no command field

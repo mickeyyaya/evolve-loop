@@ -455,6 +455,10 @@ type WorkflowPolicy struct {
 	MaxConsecutiveFails   int    `json:"max_consecutive_fails,omitempty"`
 	MaxCyclesCap          int    `json:"max_cycles_cap,omitempty"`
 	AutoPrune             *bool  `json:"auto_prune,omitempty"`
+	BackfillEnabled       *bool  `json:"backfill_enabled,omitempty"`
+	CycleBudget           string `json:"cycle_budget,omitempty"`
+	AllowDeepResearch     bool   `json:"allow_deep_research,omitempty"`
+	AllowDocDelete        bool   `json:"allow_doc_delete,omitempty"`
 	DiffComplexityDisable bool   `json:"diff_complexity_disable,omitempty"`
 	AuditorTierOverride   string `json:"auditor_tier_override,omitempty"`
 }
@@ -464,6 +468,10 @@ type WorkflowConfig struct {
 	MaxConsecutiveFails   int
 	MaxCyclesCap          int
 	AutoPrune             bool
+	BackfillEnabled       bool
+	CycleBudget           string
+	AllowDeepResearch     bool
+	AllowDocDelete        bool
 	DiffComplexityDisable bool
 	AuditorTierOverride   string
 }
@@ -474,6 +482,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		MaxConsecutiveFails: 1,
 		MaxCyclesCap:        25,
 		AutoPrune:           true,
+		BackfillEnabled:     true,
 	}
 	if p.Workflow == nil {
 		return c
@@ -487,6 +496,12 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	if p.Workflow.AutoPrune != nil {
 		c.AutoPrune = *p.Workflow.AutoPrune
 	}
+	if p.Workflow.BackfillEnabled != nil {
+		c.BackfillEnabled = *p.Workflow.BackfillEnabled
+	}
+	c.CycleBudget = p.Workflow.CycleBudget
+	c.AllowDeepResearch = p.Workflow.AllowDeepResearch
+	c.AllowDocDelete = p.Workflow.AllowDocDelete
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
 	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
 	return c

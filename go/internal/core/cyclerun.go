@@ -42,12 +42,13 @@ type cycleRun struct {
 	req               CycleRequest
 	cycle             int
 	mainDirtyBaseline map[string]bool
-	envSnap           map[string]string   // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
-	ctxSnap           map[string]string   // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
-	preCycleHEAD      string              // read post-loop by finalizeCycle
-	benchedCLIs       []router.BenchedCLI // CLI-health snapshot; read in selectNext Decide
-	clampedPlan       *router.PhasePlan   // clamped whole-cycle plan; nil ⇒ static spine
-	retryConfig       policy.RetryConfig  // resolved once at orchestrator construction
+	envSnap           map[string]string     // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
+	ctxSnap           map[string]string     // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
+	preCycleHEAD      string                // read post-loop by finalizeCycle
+	benchedCLIs       []router.BenchedCLI   // CLI-health snapshot; read in selectNext Decide
+	clampedPlan       *router.PhasePlan     // clamped whole-cycle plan; nil ⇒ static spine
+	retryConfig       policy.RetryConfig    // resolved once at orchestrator construction
+	workflowConfig    policy.WorkflowConfig // resolved once at orchestrator construction
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
 	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle

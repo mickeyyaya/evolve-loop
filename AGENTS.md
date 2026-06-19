@@ -42,7 +42,7 @@ The auditor profile defaults to Opus, but the native diff-complexity check (`go/
 
 > **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. Place runtime references in `docs/research/`, archival dossiers in `knowledge-base/research/`. **Never delete; always archive.** When superseding a doc, MOVE it to `knowledge-base/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
 
-Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: `EVOLVE_ALLOW_DOC_DELETE=1` (logged; emergency only).
+Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
 
 ## 12 Core agent rules
 

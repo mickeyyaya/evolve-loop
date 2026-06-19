@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -248,6 +249,14 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 }
 
 func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
+	var workflow policy.WorkflowConfig
+	if name == "docdelete" || name == "quota" {
+		pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+		if err != nil {
+			return nil, err
+		}
+		workflow = pol.WorkflowConfig()
+	}
 	switch name {
 	case "ship":
 		return guards.NewShip(bypass), nil
@@ -256,9 +265,9 @@ func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 	case "role":
 		return guards.NewRole(storage.New(evolveDir), bypass), nil
 	case "docdelete":
-		return guards.NewDocDelete(nil), nil
+		return guards.NewDocDelete(workflow.AllowDocDelete), nil
 	case "quota":
-		return guards.NewQuota(guards.QuotaConfig{}), nil
+		return guards.NewQuota(guards.QuotaConfig{AllowDeepResearch: workflow.AllowDeepResearch}), nil
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:

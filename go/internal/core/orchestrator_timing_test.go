@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // cycleWorkspaceDir mirrors RunCycle's WorkspacePath formula
@@ -203,7 +205,7 @@ func TestOrchestrator_Backfill_LedgerEntry(t *testing.T) {
 
 	req := CycleRequest{
 		ProjectRoot: root,
-		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+		Env:         map[string]string{},
 	}
 	_, err := o.RunCycle(context.Background(), req)
 	if err != nil {
@@ -231,11 +233,11 @@ func TestOrchestrator_Backfill_LedgerRole(t *testing.T) {
 	runners[PhaseScout] = &backfillRunner{
 		content: "# Scout Report\n" + strings.Repeat("a", 250),
 	}
-	o := NewOrchestrator(st, led, runners)
+	o := NewOrchestrator(st, led, runners, WithWorkflowConfig(policy.WorkflowConfig{BackfillEnabled: true}))
 
 	req := CycleRequest{
 		ProjectRoot: root,
-		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+		Env:         map[string]string{},
 	}
 	_, err := o.RunCycle(context.Background(), req)
 	if err != nil {
@@ -266,11 +268,11 @@ func TestOrchestrator_Backfill_NoLedgerEntryWhenDisabled(t *testing.T) {
 	runners[PhaseScout] = &backfillRunner{
 		content: "# Scout Report\n" + strings.Repeat("a", 250),
 	}
-	o := NewOrchestrator(st, led, runners)
+	o := NewOrchestrator(st, led, runners, WithWorkflowConfig(policy.WorkflowConfig{BackfillEnabled: false}))
 
 	req := CycleRequest{
 		ProjectRoot: root,
-		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "0"},
+		Env:         map[string]string{},
 	}
 	_, err := o.RunCycle(context.Background(), req)
 	if err == nil {
@@ -307,11 +309,11 @@ func TestOrchestrator_Backfill_TDDArtifactPath(t *testing.T) {
 		phase:   "tdd",
 		content: "# TDD\n" + strings.Repeat("a", 250),
 	}
-	o := NewOrchestrator(st, led, runners)
+	o := NewOrchestrator(st, led, runners, WithWorkflowConfig(policy.WorkflowConfig{BackfillEnabled: true}))
 
 	req := CycleRequest{
 		ProjectRoot: root,
-		Env:         map[string]string{"EVOLVE_BACKFILL_ENABLED": "1"},
+		Env:         map[string]string{},
 	}
 	res, err := o.RunCycle(context.Background(), req)
 	if err != nil {

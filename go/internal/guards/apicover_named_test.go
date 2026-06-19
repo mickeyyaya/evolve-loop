@@ -38,7 +38,7 @@ func TestChainType_SatisfiesGuardAndDenies(t *testing.T) {
 // TestDocDeleteType_SatisfiesGuardAndDenies names the *DocDelete type and
 // asserts it denies an `rm docs/` command (its documented contract).
 func TestDocDeleteType_SatisfiesGuardAndDenies(t *testing.T) {
-	var g *DocDelete = NewDocDelete(nil)
+	var g *DocDelete = NewDocDelete(false)
 	var _ core.Guard = g
 	if g.Name() != "docdelete" {
 		t.Fatalf("DocDelete.Name() = %q, want docdelete", g.Name())
