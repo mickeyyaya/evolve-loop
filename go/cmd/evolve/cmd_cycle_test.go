@@ -11,11 +11,26 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // cmd_cycle_test.go — `evolve cycle reset` seals an unfinished cycle
 // (history preserved) and advances the cycle number. Mirrors the
 // flag-parsing + temp-dir conventions of the other cmd_*_test.go files.
+
+func TestParseGateStage(t *testing.T) {
+	for input, want := range map[string]config.Stage{
+		"off":     config.StageOff,
+		"0":       config.StageOff,
+		"shadow":  config.StageShadow,
+		"enforce": config.StageEnforce,
+		"unknown": config.StageOff,
+	} {
+		if got := parseGateStage(input); got != want {
+			t.Errorf("parseGateStage(%q) = %v, want %v", input, got, want)
+		}
+	}
+}
 
 func seedResetDir(t *testing.T, cycleID, lastCycle int) (projectRoot, evolveDir string) {
 	t.Helper()

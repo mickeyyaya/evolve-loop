@@ -305,6 +305,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase}
+	gatesCfg := pol.GatesConfig()
+	cfg.ContractGate = parseGateStage(gatesCfg.ContractGate)
+	cfg.EvalGate = parseGateStage(gatesCfg.EvalGate)
+	cfg.TriageCapGate = parseGateStage(gatesCfg.TriageCapGate)
+	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
@@ -446,7 +451,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
 	// materialization) + Gate B (tdd predicate-quality), mounted at the
 	// per-phase DeliverableReviewer seam. Default enforce (config.defaults);
-	// EVOLVE_EVAL_GATE=off keeps the noopReviewer default (byte-identical).
+	// policy.gates.eval_gate=off keeps the noopReviewer default.
 	// The gates fail open on any ambiguity, so enforce never false-blocks.
 	// Compose the structural eval gates with the deliverable-contract gate
 	// (internal/deliverable, ADR-0034) behind ONE reviewer via ChainReviewers —
@@ -637,6 +642,17 @@ func resolveRouterDispatch(evolveDir string) (cli, model string) {
 		model = v
 	}
 	return cli, model
+}
+
+func parseGateStage(stage string) config.Stage {
+	switch strings.TrimSpace(stage) {
+	case "shadow":
+		return config.StageShadow
+	case "enforce":
+		return config.StageEnforce
+	default:
+		return config.StageOff
+	}
 }
 
 // registerBuiltinSpecRunners wires a spec-driven runner for every builtin

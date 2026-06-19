@@ -225,6 +225,18 @@ func TestWorkflowConfig(t *testing.T) {
 	}
 }
 
+func TestGatesConfig(t *testing.T) {
+	got := (Policy{Gates: &GatesPolicy{
+		ContractGate: "shadow",
+		ReviewGate:   "enforce",
+	}}).GatesConfig()
+
+	if got.ContractGate != "shadow" || got.EvalGate != "enforce" ||
+		got.TriageCapGate != "enforce" || got.ReviewGate != "enforce" {
+		t.Fatalf("GatesConfig() = %+v, want partial overrides with defaults retained", got)
+	}
+}
+
 func TestRetryConfig(t *testing.T) {
 	defaults := (Policy{}).RetryConfig()
 	if defaults.PhaseMaxAttempts != 2 || defaults.RetryBackoffBaseS != 5 ||

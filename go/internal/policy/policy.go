@@ -89,6 +89,9 @@ type Policy struct {
 	// Swarm configures swarm dispatch stage and port allocation. Absent ⇒
 	// built-in defaults apply (Stage="shadow", PortBase=0).
 	Swarm *SwarmPolicy `json:"swarm,omitempty"`
+	// Gates configures persistent rollout stages for the contract, eval,
+	// triage-cap, and review gates. Absent ⇒ built-in defaults apply.
+	Gates *GatesPolicy `json:"gates,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -586,6 +589,48 @@ func (p Policy) SwarmConfig() SwarmConfig {
 		c.Stage = p.Swarm.Stage
 	}
 	c.PortBase = p.Swarm.PortBase
+	return c
+}
+
+// GatesPolicy is the .evolve/policy.json "gates" block.
+type GatesPolicy struct {
+	ContractGate  string `json:"contract_gate,omitempty"`
+	EvalGate      string `json:"eval_gate,omitempty"`
+	TriageCapGate string `json:"triage_cap_gate,omitempty"`
+	ReviewGate    string `json:"review_gate,omitempty"`
+}
+
+// GatesConfig is the resolved gate configuration with defaults applied.
+type GatesConfig struct {
+	ContractGate  string
+	EvalGate      string
+	TriageCapGate string
+	ReviewGate    string
+}
+
+// GatesConfig returns persistent gate stages with built-in defaults resolved.
+func (p Policy) GatesConfig() GatesConfig {
+	c := GatesConfig{
+		ContractGate:  "enforce",
+		EvalGate:      "enforce",
+		TriageCapGate: "enforce",
+		ReviewGate:    "off",
+	}
+	if p.Gates == nil {
+		return c
+	}
+	if p.Gates.ContractGate != "" {
+		c.ContractGate = p.Gates.ContractGate
+	}
+	if p.Gates.EvalGate != "" {
+		c.EvalGate = p.Gates.EvalGate
+	}
+	if p.Gates.TriageCapGate != "" {
+		c.TriageCapGate = p.Gates.TriageCapGate
+	}
+	if p.Gates.ReviewGate != "" {
+		c.ReviewGate = p.Gates.ReviewGate
+	}
 	return c
 }
 

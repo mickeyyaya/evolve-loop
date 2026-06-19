@@ -2,9 +2,8 @@ package config
 
 import "testing"
 
-// Workstream E2 config parsing. ReviewGate accepts the same off/shadow/enforce
-// trichotomy as CommitEvidence; unknown values fall back to off with a
-// warning (typo must never silently enable a kill path).
+// Workstream E2 defaults. Runtime overrides are applied from policy.GatesConfig
+// at the composition root rather than by config.Load.
 
 func TestLoad_ReviewGate_DefaultsOff(t *testing.T) {
 	cfg, _ := Load("", map[string]string{})
@@ -13,43 +12,14 @@ func TestLoad_ReviewGate_DefaultsOff(t *testing.T) {
 	}
 }
 
-func TestLoad_ReviewGate_EnvOverride(t *testing.T) {
-	cases := []struct {
-		val  string
-		want Stage
-	}{
-		{"off", StageOff},
-		{"0", StageOff},
-		{"shadow", StageShadow},
-		{"enforce", StageEnforce},
-	}
-	for _, c := range cases {
-		t.Run(c.val, func(t *testing.T) {
-			cfg, ws := Load("", map[string]string{"EVOLVE_REVIEW_GATE": c.val})
-			if cfg.ReviewGate != c.want {
-				t.Errorf("ReviewGate=%v, want %v", cfg.ReviewGate, c.want)
-			}
-			for _, w := range ws {
-				if w.Code == "unknown-value" {
-					t.Errorf("unexpected unknown-value warning on %q: %+v", c.val, w)
-				}
-			}
-		})
-	}
-}
-
-func TestLoad_ReviewGate_UnknownValueFallsBackToOff(t *testing.T) {
+func TestLoad_ReviewGate_IgnoresRemovedEnvOverride(t *testing.T) {
 	cfg, ws := Load("", map[string]string{"EVOLVE_REVIEW_GATE": "advisory"})
 	if cfg.ReviewGate != StageOff {
-		t.Errorf("unknown value did NOT fall back to off; got %v", cfg.ReviewGate)
+		t.Errorf("removed env override changed ReviewGate; got %v", cfg.ReviewGate)
 	}
-	var sawWarn bool
 	for _, w := range ws {
 		if w.Code == "unknown-value" {
-			sawWarn = true
+			t.Errorf("removed env override should be ignored without warning: %+v", ws)
 		}
-	}
-	if !sawWarn {
-		t.Errorf("expected unknown-value warning; got %+v", ws)
 	}
 }

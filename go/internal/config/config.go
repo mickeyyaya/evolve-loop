@@ -134,8 +134,8 @@ type RolloutStages struct {
 	// materialization) + Gate B (tdd predicate-quality) run + log but always
 	// approve; StageEnforce — a CERTAIN violation (a stat'd-missing eval file
 	// or a definite tautology) aborts the cycle. The gates fail OPEN on any
-	// ambiguity, so enforce-default never false-blocks a healthy cycle. Set
-	// from EVOLVE_EVAL_GATE via applyEnv; default StageEnforce.
+	// ambiguity, so enforce-default never false-blocks a healthy cycle.
+	// Configured through policy.GatesConfig; default StageEnforce.
 	EvalGate Stage
 	// ContractGate is the deliverable-contract gate rollout stage
 	// (internal/deliverable, ADR-0034): StageOff — no contract gate
@@ -144,8 +144,8 @@ type RolloutStages struct {
 	// confirmed well-formedness violation (missing/misplaced/malformed
 	// deliverable) rejects the phase. The gate fails OPEN on ambiguity, and a
 	// runtime circuit breaker demotes enforce→advisory after N consecutive
-	// blocks so a miscalibrated gate cannot brick the loop. Set from
-	// EVOLVE_CONTRACT_GATE via applyEnv; default StageEnforce.
+	// blocks so a miscalibrated gate cannot brick the loop. Configured through
+	// policy.GatesConfig; default StageEnforce.
 	ContractGate Stage
 	// TriageCapGate is the R9.2 triage capacity clamp rollout stage
 	// (internal/triagecap): StageOff — no clamp; StageShadow — overpacked
@@ -154,8 +154,7 @@ type RolloutStages struct {
 	// reject the triage deliverable through the correction ladder with a
 	// cap directive (inbox coverage-floor-overpacking: three consecutive
 	// coverage cycles burned on the same overpacked shape). Fails OPEN on
-	// any ambiguity. Set from EVOLVE_TRIAGE_CAP_GATE via applyEnv; default
-	// StageEnforce.
+	// any ambiguity. Configured through policy.GatesConfig; default StageEnforce.
 	TriageCapGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
@@ -514,33 +513,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
-	if v := env["EVOLVE_REVIEW_GATE"]; v != "" {
-		// Same off/shadow/enforce trichotomy as CommitEvidence — no advisory
-		// intermediate. Reuses parseEvidenceStage to share the warning text +
-		// fallback (typo defaults to off, never silently enables a kill-path).
-		cfg.ReviewGate = parseEvidenceStage(v, "EVOLVE_REVIEW_GATE", ws)
-	}
-	if v := env["EVOLVE_EVAL_GATE"]; v != "" {
-		// Structural eval gates (internal/evalgate). Same off/shadow/enforce
-		// trichotomy; reuses parseEvidenceStage so a typo defaults to off
-		// rather than silently enabling a kill-path. Default (no env) is
-		// enforce, set in defaults().
-		cfg.EvalGate = parseEvidenceStage(v, "EVOLVE_EVAL_GATE", ws)
-	}
-	if v := env["EVOLVE_CONTRACT_GATE"]; v != "" {
-		// Deliverable-contract gate (internal/deliverable, ADR-0034). Same
-		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
-		// defaults to off rather than silently enabling the kill-path. Default
-		// (no env) is enforce, set in defaults().
-		cfg.ContractGate = parseEvidenceStage(v, "EVOLVE_CONTRACT_GATE", ws)
-	}
-	if v := env["EVOLVE_TRIAGE_CAP_GATE"]; v != "" {
-		// Triage capacity clamp (internal/triagecap, R9.2). Same
-		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
-		// defaults to off rather than silently enabling the kill-path.
-		// Default (no env) is enforce, set in defaults().
-		cfg.TriageCapGate = parseEvidenceStage(v, "EVOLVE_TRIAGE_CAP_GATE", ws)
-	}
 	if v := env["EVOLVE_PHASE_RECOVERY"]; v != "" {
 		// ADR-0044 Unified Phase Recovery — the one dial for the whole
 		// program. Same trichotomy; a typo defaults to off, never silently
@@ -705,8 +677,8 @@ func parseStage(v, varName string, ws *[]Warning) Stage {
 // parseEvidenceStage parses an off/shadow/enforce dial. Unlike parseStage it has
 // no "advisory" middle state — these axes are compute-and-log (shadow) vs act
 // (enforce). Any unknown value defaults to off with a warning (a typo must never
-// silently enable a kill-path). Shared by EVOLVE_COMMIT_EVIDENCE / _REVIEW_GATE /
-// _EVAL_GATE; varName names the offending env var in the warning.
+// silently enable a kill-path). Used by the remaining environment-backed
+// rollout stages; varName names the offending env var in the warning.
 func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
