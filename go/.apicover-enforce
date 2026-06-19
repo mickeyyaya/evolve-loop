@@ -289,3 +289,10 @@
 # admission control via flock'd holder-set JSON. Acquire/DefaultTTL named by
 # apicover_named_test.go; max<=0 unbounded path is byte-identical to today.
 ./internal/cliadmit
+
+# Advisor-decided cycle budget (2026-06-18): cyclebudget is the pure decision core
+# for completion-driven loop termination (advisor/backlog decides when to stop, cap
+# bounds runaway) — the EVOLVE_CYCLE_BUDGET off/advisory/enforce dial. Every export
+# (Stage + consts + String/ParseStage, Decision, Next) named+exercised by
+# cyclebudget_test.go (table-driven across all stages + completion/cap precedence).
+./internal/cyclebudget
