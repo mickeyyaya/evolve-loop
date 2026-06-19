@@ -341,6 +341,10 @@ type BridgeRequest struct {
 	// passed as typed config, NOT a raw flag, so it never leaks into a
 	// non-claude launch command. Empty = profile/realizer default (bypass).
 	PermissionMode string `json:"permission_mode,omitempty"`
+	// InteractivePolicy is the resolved per-phase prompt interaction policy.
+	// The runner resolves explicit per-agent request env, then profile config,
+	// and passes the result as typed config. Empty = adapter default.
+	InteractivePolicy string `json:"interactive_policy,omitempty"`
 	// SystemPrompt is the per-agent launch-time rules block prepended to the
 	// prompt body (facet B). Resolved by the runner via systemprompt.Resolve.
 	SystemPrompt string `json:"system_prompt,omitempty"`

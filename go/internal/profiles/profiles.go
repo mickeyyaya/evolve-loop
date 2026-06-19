@@ -63,6 +63,7 @@ type Profile struct {
 	EffortLevel        string             `json:"effort_level,omitempty"`
 	AddDir             []string           `json:"add_dir,omitempty"`
 	PermissionMode     string             `json:"permission_mode,omitempty"`
+	InteractivePolicy  string             `json:"interactive_policy,omitempty"`
 	StreamOutput       bool               `json:"stream_output,omitempty"`
 	StopCriterion      string             `json:"stop_criterion,omitempty"`
 	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`

@@ -271,7 +271,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_GUARDS_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_HANG_CLASSIFIER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_INTENT_DELTA` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_KB_SEARCH_PATHS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_LANE` | active | — | — | Concurrency / Fleet (ADR-0049) | Operator-pinned human-readable lane name for a worktree (e.g. EVOLVE_LANE=campaign), overriding the hash-of-root default (runscope.EnvLane). Readability only — correctness never depends on the override; the hash default is collision-safe across distinct roots. Introduced in concurrency-arch-slices Slice 1. |
 | `EVOLVE_LEDGER_OVERRIDE` | active | — | — | Override / Test Seams | Override ledger.jsonl path |
@@ -325,7 +324,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_ROUTING_MODE` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | active | — | — | Sandbox Cluster | EPERM fallback for nested-Claude (Darwin 25.4+) |
-| `EVOLVE_SCOUT_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SCROLLBACK_LINES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | active | — | — | Workflow Defaults | CI mode: skip interactive y/N in ship.sh |
 | `EVOLVE_SHIP_RELEASE_NOTES` | active | — | — | Workflow Defaults | Create GitHub release on ship |
@@ -342,7 +340,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_SWARM_PORT_BASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SWARM_STAGE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TDD_PHASE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |
 | `EVOLVE_TEST_PHASE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

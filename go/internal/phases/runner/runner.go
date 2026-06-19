@@ -445,6 +445,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if permissionMode == "" && prof != nil {
 		permissionMode = prof.PermissionMode
 	}
+	// Interactive policy follows the same profile-SSOT model: explicit
+	// per-phase request env, then typed profile. Process env and the retired
+	// global flag are intentionally excluded.
+	interactivePolicy := req.Env[envchain.PhaseEnvKey(profileName, "INTERACTIVE_POLICY")]
+	if interactivePolicy == "" && prof != nil {
+		interactivePolicy = prof.InteractivePolicy
+	}
 	// Facet B: resolve the per-agent launch-time system prompt / rules
 	// (profileName keys both the profile lookup and the EVOLVE_<AGENT>_* env).
 	sysPrompt := systemprompt.Resolve(profileName, profileDir, req.Env)
@@ -482,6 +489,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			Cycle:               req.Cycle,
 			Env:                 req.Env,
 			PermissionMode:      permissionMode,
+			InteractivePolicy:   interactivePolicy,
 			SystemPrompt:        sysPrompt,
 			CorrectionDirective: req.CorrectionDirective,
 		})
