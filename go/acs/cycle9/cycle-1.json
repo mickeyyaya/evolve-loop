@@ -1,0 +1,11 @@
+{
+  "cycle": 1,
+  "goal": "write-blank-dir-check",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS"
+    }
+  ]
+}

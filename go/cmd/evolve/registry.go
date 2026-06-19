@@ -51,6 +51,7 @@ var commands = []subcommand{
 	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: runGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
+	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},

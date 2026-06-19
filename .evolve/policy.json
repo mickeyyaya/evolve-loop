@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "Evolve loop policy pins (ADR-0055 D3). Each entry names a gate that must pass before a cycle can ship.",
+  "floor": [
+    {
+      "id": "dossier-closeout",
+      "description": "Every completed cycle must write a dossier to knowledge-base/cycles/cycle-N.json. Enforced by evolve dossier verify.",
+      "enforced_since_cycle": 2
+    }
+  ]
+}

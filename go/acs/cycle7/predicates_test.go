@@ -58,20 +58,19 @@ func TestC7_001_FlagCeilingRatchetEnforced(t *testing.T) {
 	}
 }
 
-// TestC7_002_RegistryRowCountIs258 verifies that after removing the 4 deprecated
-// rows the total count is exactly 258 (not merely ≤ 258). Over-removal
-// (< 258) or under-removal (> 258) both fail.
+// TestC7_002_RegistryRowCountIs258 verifies the registry stays at or below the
+// cycle-7 ceiling of 258. Originally an exact "== 258" snapshot, relaxed to a
+// monotonic ratchet (<= 258) so it survives later flag-reduction cycles: an
+// exact-count regression predicate is self-invalidating the moment the same
+// campaign reduces the count further (it went 258 -> 160), which is why it was
+// red under -tags acs on every branch that merged v20 main. The ratchet matches
+// C7_001's intent and the campaign's monotonic-reduction invariant.
 //
-// BEHAVIORAL: asserts len(flagregistry.All) == 258.
-//
-// RED: len(flagregistry.All) is currently 262.
+// BEHAVIORAL: asserts len(flagregistry.All) <= 258.
 func TestC7_002_RegistryRowCountIs258(t *testing.T) {
-	const want = 258
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove exactly 4 rows (262 → 258).\n"+
-			"Over-removal (< 258) or under-removal (> 258) both fail.",
-			got, want)
+	const ceiling = 258
+	if got := len(flagregistry.All); got > ceiling {
+		t.Errorf("RED: len(flagregistry.All) = %d exceeds the cycle-7 ceiling of %d.", got, ceiling)
 	}
 }
 

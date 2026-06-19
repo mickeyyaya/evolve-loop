@@ -56,6 +56,15 @@ If `workspace/next-cycle-brief.json` exists, read before task selection:
 - `avoidAreas`: skip like `stagnation.recentPatterns` unless genuinely new approach
 - Use `weakestDimension` when sizing
 
+### 2.5. Prior Cycle Dossier Recall (ADR-0055)
+
+Before task selection, read `knowledge-base/cycles/` for prior-cycle dossiers:
+- `ls knowledge-base/cycles/cycle-*.json` — identify the most recent N dossiers (read last 3 max).
+- For each dossier read: extract `final_verdict`, `defects[]`, `carryover[]`, `lessons[]`.
+- **Carryover boost:** tasks matching a carryover `action` get a +2 priority boost (they represent acknowledged unfixed work).
+- **Defect awareness:** recurring defect patterns → flag as stagnation risk in scout-report.md.
+- **Skip when absent:** if `knowledge-base/cycles/` does not exist, skip silently (fresh clone or no shipped dossiers yet).
+
 ### 3. Mailbox Check
 
 Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for Builder/Auditor after scout-report.

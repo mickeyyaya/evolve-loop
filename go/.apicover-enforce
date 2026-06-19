@@ -296,3 +296,9 @@
 # (Stage + consts + String/ParseStage, Decision, Next) named+exercised by
 # cyclebudget_test.go (table-driven across all stages + completion/cap precedence).
 ./internal/cyclebudget
+
+# Cycle Dossier (ADR-0055): durable per-cycle history record.
+./internal/dossier
+
+# Cycle Dossier ACS gate (ADR-0055 D3); rehomed from cycle2 (v20 collision).
+./acs/cycle6
