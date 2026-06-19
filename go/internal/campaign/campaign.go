@@ -96,6 +96,9 @@ func (p *Plan) Verify() error {
 		if seen[c.ID] {
 			return fmt.Errorf("campaign: duplicate cycle id %q", c.ID)
 		}
+		if strings.ContainsAny(c.ID, ",") {
+			return fmt.Errorf("campaign: cycle id %q contains invalid char", c.ID)
+		}
 		seen[c.ID] = true
 	}
 	// DAG validity (acyclic + every depends_on resolvable) — reuse the wave planner.

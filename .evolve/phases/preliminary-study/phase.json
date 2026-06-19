@@ -2,6 +2,8 @@
   "name": "preliminary-study",
   "archetype": "plan",
   "agent": "evolve-preliminary-study",
+  "when_to_use": "Use before a multi-cycle campaign when the goal needs research-backed decomposition into dependency-ordered cycle tasks.",
+  "description": "Researches a campaign goal and produces a verified, dependency-aware campaign plan for operator review.",
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/intent.md"

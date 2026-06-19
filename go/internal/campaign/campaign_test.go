@@ -56,6 +56,7 @@ func TestVerify_Errors(t *testing.T) {
 		{"no cycles", func(p *Plan) { p.Cycles = nil }, "no cycles"},
 		{"empty id", func(p *Plan) { p.Cycles[1].ID = "" }, "empty id"},
 		{"duplicate id", func(p *Plan) { p.Cycles[1].ID = "a" }, "duplicate cycle id"},
+		{"comma in id", func(p *Plan) { p.Cycles[1].ID = "b,c" }, "invalid char"},
 		{"dangling dep", func(p *Plan) { p.Cycles[1].DependsOn = []string{"ghost"} }, "invalid cycle DAG"},
 		{"cyclic dep", func(p *Plan) { p.Cycles[0].DependsOn = []string{"b"} }, "invalid cycle DAG"},
 	}

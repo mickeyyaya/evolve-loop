@@ -44,6 +44,37 @@ func TestCampaignRenderMissingPlan(t *testing.T) {
 	}
 }
 
+func TestRunCampaign_NoArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := runCampaign([]string{}, nil, &stdout, &stderr); code != 2 {
+		t.Fatalf("runCampaign code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "study") {
+		t.Fatalf("stderr = %q, want campaign usage", stderr.String())
+	}
+}
+
+func TestRunCampaign_UnknownSub(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := runCampaign([]string{"unknown"}, nil, &stdout, &stderr); code != 2 {
+		t.Fatalf("runCampaign code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "unknown subcommand") {
+		t.Fatalf("stderr = %q, want unknown-subcommand error", stderr.String())
+	}
+}
+
+func TestRenderCampaignPlan_Valid(t *testing.T) {
+	path := writeCampaignTestPlan(t)
+	var stdout, stderr bytes.Buffer
+	if code := renderCampaignPlan(path, &stdout, &stderr); code != 0 {
+		t.Fatalf("renderCampaignPlan code = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("renderCampaignPlan produced empty stdout on valid plan")
+	}
+}
+
 func TestCampaignLoadVerifiedPlanPropagatesVerifyError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "campaign-plan.json")
 	if err := os.WriteFile(path, []byte(`{"version":0,"goal":"test","cycles":[{"id":"c1"}]}`), 0o600); err != nil {
