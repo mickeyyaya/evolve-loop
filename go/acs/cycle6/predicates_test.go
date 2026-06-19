@@ -23,7 +23,7 @@ import (
 // TestC6_001_DossierBuildReturnsPopulatedDossier verifies dossier.Build
 // returns a non-nil Dossier with Cycle+Goal set from BuildOpts (D2-AC1).
 func TestC6_001_DossierBuildReturnsPopulatedDossier(t *testing.T) {
-	d, err := dossier.Build(1, dossier.BuildOpts{Goal: "reduce flags"})
+	d, err := dossier.Build(1, dossier.BuildOpts{WorkspacePath: t.TempDir(), Goal: "reduce flags"})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
