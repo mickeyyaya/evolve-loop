@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -46,6 +47,7 @@ type cycleRun struct {
 	preCycleHEAD      string              // read post-loop by finalizeCycle
 	benchedCLIs       []router.BenchedCLI // CLI-health snapshot; read in selectNext Decide
 	clampedPlan       *router.PhasePlan   // clamped whole-cycle plan; nil ⇒ static spine
+	retryConfig       policy.RetryConfig  // resolved once at orchestrator construction
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
 	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle

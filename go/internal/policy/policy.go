@@ -83,6 +83,9 @@ type Policy struct {
 	// Workflow configures loop and subagent workflow defaults. Absent ⇒
 	// built-in defaults apply.
 	Workflow *WorkflowPolicy `json:"workflow,omitempty"`
+	// Retry configures phase retry, backoff, correction, and latency defaults.
+	// Absent ⇒ built-in defaults apply.
+	Retry *RetryPolicy `json:"retry,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -486,5 +489,81 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	}
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
 	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
+	return c
+}
+
+// RetryPolicy is the .evolve/policy.json "retry" block.
+type RetryPolicy struct {
+	PhaseMaxAttempts          int `json:"phase_max_attempts,omitempty"`
+	RetryBackoffBaseS         int `json:"retry_backoff_base_s,omitempty"`
+	PhaseLatencyCeilingS      int `json:"phase_latency_ceiling_s,omitempty"`
+	ContractCorrectionRetries int `json:"contract_correction_retries,omitempty"`
+
+	retryBackoffBaseSSet         bool
+	contractCorrectionRetriesSet bool
+}
+
+// UnmarshalJSON records explicit zero values for the two settings where zero
+// disables behavior. Plain struct zero values still mean "use defaults".
+func (r *RetryPolicy) UnmarshalJSON(data []byte) error {
+	type retryPolicy RetryPolicy
+	var decoded retryPolicy
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = RetryPolicy(decoded)
+	_, r.retryBackoffBaseSSet = fields["retry_backoff_base_s"]
+	_, r.contractCorrectionRetriesSet = fields["contract_correction_retries"]
+	return nil
+}
+
+// RetryConfig is the resolved retry configuration with defaults applied.
+type RetryConfig struct {
+	PhaseMaxAttempts          int
+	RetryBackoffBaseS         int
+	PhaseLatencyCeilingS      int
+	ContractCorrectionRetries int
+}
+
+const (
+	defaultPhaseMaxAttempts          = 2
+	maxPhaseMaxAttempts              = 5
+	defaultRetryBackoffBaseS         = 5
+	defaultPhaseLatencyCeilingS      = 900
+	defaultContractCorrectionRetries = 2
+	maxContractCorrectionRetries     = 5
+)
+
+// RetryConfig returns retry configuration with defaults and safety bounds.
+func (p Policy) RetryConfig() RetryConfig {
+	c := RetryConfig{
+		PhaseMaxAttempts:          defaultPhaseMaxAttempts,
+		RetryBackoffBaseS:         defaultRetryBackoffBaseS,
+		PhaseLatencyCeilingS:      defaultPhaseLatencyCeilingS,
+		ContractCorrectionRetries: defaultContractCorrectionRetries,
+	}
+	if p.Retry == nil {
+		return c
+	}
+	if p.Retry.PhaseMaxAttempts > 0 {
+		c.PhaseMaxAttempts = min(p.Retry.PhaseMaxAttempts, maxPhaseMaxAttempts)
+	}
+	if p.Retry.retryBackoffBaseSSet {
+		c.RetryBackoffBaseS = max(p.Retry.RetryBackoffBaseS, 0)
+	} else if p.Retry.RetryBackoffBaseS > 0 {
+		c.RetryBackoffBaseS = p.Retry.RetryBackoffBaseS
+	}
+	if p.Retry.PhaseLatencyCeilingS > 0 {
+		c.PhaseLatencyCeilingS = p.Retry.PhaseLatencyCeilingS
+	}
+	if p.Retry.contractCorrectionRetriesSet && p.Retry.ContractCorrectionRetries >= 0 {
+		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
+	} else if p.Retry.ContractCorrectionRetries > 0 {
+		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
+	}
 	return c
 }

@@ -718,7 +718,7 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	}
 }
 
-// A phase that times out on every attempt must abort after phaseMaxAttempts —
+// A phase that times out on every attempt must abort after the configured cap —
 // not retry forever — and the error must still wrap ErrArtifactTimeout.
 func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -734,8 +734,8 @@ func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 	if !errors.Is(err, ErrArtifactTimeout) {
 		t.Errorf("err=%v, want wrapped ErrArtifactTimeout", err)
 	}
-	if got := runners[PhaseScout].(*fakeRunner).calls; got != phaseMaxAttempts {
-		t.Errorf("scout calls=%d, want %d (capped)", got, phaseMaxAttempts)
+	if got := runners[PhaseScout].(*fakeRunner).calls; got != o.retryConfig.PhaseMaxAttempts {
+		t.Errorf("scout calls=%d, want %d (capped)", got, o.retryConfig.PhaseMaxAttempts)
 	}
 }
 

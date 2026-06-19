@@ -9,7 +9,7 @@ import "testing"
 //
 // Cycle 29 removes five workflow-default flags by moving their values into the
 // typed policy configuration object, lowering the post-integration floor to 115.
-const FlagCeiling = 115
+const FlagCeiling = 109
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

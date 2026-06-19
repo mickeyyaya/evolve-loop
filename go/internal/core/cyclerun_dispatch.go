@@ -140,7 +140,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// recovery phase instead of aborting; the caller continues the outer loop
 	// (skipping verdict/ledger handling for the failed ship).
 	shipRecovered := false
-	maxAttempts := resolvePhaseMaxAttempts(phaseReq.Env)
+	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	var attemptCount int
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
@@ -272,7 +272,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}); lerr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
-			executeRetryBackoff(attempt, phaseReq.Env)
+			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue
 		}
 		if err == nil && !IsVerdict(resp.Verdict) {
@@ -296,7 +296,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}); lerr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
-			executeRetryBackoff(attempt, phaseReq.Env)
+			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue
 		}
 	}

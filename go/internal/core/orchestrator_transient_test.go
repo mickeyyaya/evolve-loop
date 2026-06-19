@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func wrapTransient(code int) error {
@@ -219,18 +221,20 @@ func TestPhaseMaxAttempts_Default(t *testing.T) {
 	}
 }
 
-func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
+func TestPhaseMaxAttempts_PolicyOverride(t *testing.T) {
 	t.Parallel()
 	{
 		st := &fakeStorage{state: State{LastCycleNumber: 0}}
 		led := &fakeLedger{}
 		runners := buildRunners(nil)
 		runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
-		o := NewOrchestrator(st, led, runners)
+		cfg := policy.Policy{}.RetryConfig()
+		cfg.PhaseMaxAttempts = 3
+		o := NewOrchestrator(st, led, runners, WithRetryConfig(cfg))
 
 		_, err := o.RunCycle(context.Background(), CycleRequest{
 			ProjectRoot: t.TempDir(),
-			Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "3"},
+			Env:         map[string]string{},
 		})
 		if err == nil {
 			t.Fatal("expected failure")
@@ -244,11 +248,13 @@ func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
 		led := &fakeLedger{}
 		runners := buildRunners(nil)
 		runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
-		o := NewOrchestrator(st, led, runners)
+		cfg := policy.Policy{}.RetryConfig()
+		cfg.PhaseMaxAttempts = 5
+		o := NewOrchestrator(st, led, runners, WithRetryConfig(cfg))
 
 		_, err := o.RunCycle(context.Background(), CycleRequest{
 			ProjectRoot: t.TempDir(),
-			Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "5"},
+			Env:         map[string]string{},
 		})
 		if err == nil {
 			t.Fatal("expected failure")
@@ -259,34 +265,33 @@ func TestPhaseMaxAttempts_EnvOverride(t *testing.T) {
 	}
 }
 
-func TestPhaseMaxAttempts_OutOfRange(t *testing.T) {
+func TestPhaseMaxAttempts_PolicyResolverBounds(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		val  string
+		val  int
 		want int
 	}{
-		{"0", 2},
-		{"6", 5},
-		{"", 2},
-		{"abc", 2},
+		{0, 2},
+		{6, 5},
 	}
 	for _, tc := range cases {
-		t.Run("val-"+tc.val, func(t *testing.T) {
+		t.Run("val-"+strconv.Itoa(tc.val), func(t *testing.T) {
 			st := &fakeStorage{state: State{LastCycleNumber: 0}}
 			led := &fakeLedger{}
 			runners := buildRunners(nil)
 			runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(80), failUntil: 99}
-			o := NewOrchestrator(st, led, runners)
+			cfg := (policy.Policy{Retry: &policy.RetryPolicy{PhaseMaxAttempts: tc.val}}).RetryConfig()
+			o := NewOrchestrator(st, led, runners, WithRetryConfig(cfg))
 
 			_, err := o.RunCycle(context.Background(), CycleRequest{
 				ProjectRoot: t.TempDir(),
-				Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": tc.val},
+				Env:         map[string]string{},
 			})
 			if err == nil {
 				t.Fatal("expected failure")
 			}
 			if got := runners[PhaseScout].(*fakeRunner).calls; got != tc.want {
-				t.Errorf("val=%s: calls=%d, want %d", tc.val, got, tc.want)
+				t.Errorf("val=%d: calls=%d, want %d", tc.val, got, tc.want)
 			}
 		})
 	}
@@ -302,7 +307,7 @@ func TestPhaseMaxAttempts_NonTransient_NoExtraAttempt(t *testing.T) {
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
-		Env:         map[string]string{"EVOLVE_PHASE_MAX_ATTEMPTS": "5"},
+		Env:         map[string]string{},
 	})
 	if err == nil {
 		t.Fatal("expected failure")

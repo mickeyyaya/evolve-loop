@@ -18,23 +18,3 @@ func TestComposeCorrection(t *testing.T) {
 		t.Errorf("must instruct writing at the contracted path: %q", got)
 	}
 }
-
-func TestResolveContractCorrectionRetries(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		in   map[string]string
-		want int
-	}{
-		{nil, 2}, // default
-		{map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "0"}, 0}, // disable allowed
-		{map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "3"}, 3},
-		{map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "99"}, 5}, // clamp to max
-		{map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "-1"}, 2}, // invalid → default
-		{map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "x"}, 2},  // unparseable → default
-	}
-	for _, c := range cases {
-		if got := resolveContractCorrectionRetries(c.in); got != c.want {
-			t.Errorf("env=%v → %d, want %d", c.in, got, c.want)
-		}
-	}
-}

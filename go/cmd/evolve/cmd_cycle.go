@@ -492,6 +492,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// WS4 configurable integrity floor: pass the user-resolved ship_floor (nil ⇒
 	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
 	opts = append(opts, core.WithShipFloor(shipFloor))
+	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 
 	return orchDeps{
 		Storage:      st,

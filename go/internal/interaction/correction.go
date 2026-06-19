@@ -36,8 +36,8 @@ type CorrectionInput struct {
 	// the I1 ledger (so a salvage outcome links to the re-dispatch it averted).
 	DecisionID string
 	// RungBudget is the remaining budget per rung (salvage:1, live_fix:1,
-	// redispatch:EVOLVE_CONTRACT_CORRECTION_RETRIES). The caller decrements
-	// on execution; NextCorrection never mutates it (pure).
+	// redispatch:configured correction limit). The caller decrements on
+	// execution; NextCorrection never mutates it (pure).
 	RungBudget map[string]int
 }
 

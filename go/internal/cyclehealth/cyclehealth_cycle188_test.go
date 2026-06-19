@@ -17,9 +17,8 @@ import (
 // the reviewer paused for investigation), while action=extend is healthy and
 // emits nothing.
 //
-// Task 2 (per-phase-latency-ceiling): checkPhaseLatency must honour a per-phase
-// ceiling override EVOLVE_<PHASE_UPPER>_LATENCY_CEILING_S (phase normalized via
-// ToUpper + "-"→"_"), falling back to the global ceiling when unset/invalid.
+// Task 2 (per-phase-latency-ceiling) was superseded by the policy-backed global
+// ceiling. These tests now pin the explicit Options input and default fallback.
 
 // --- Task 1 helpers ---------------------------------------------------------
 
@@ -110,20 +109,16 @@ func phaseLatencyAnomalies(r Report) []Anomaly {
 	return out
 }
 
-// TestCheck_PhaseLatency_PerPhaseOverride_Warn — AC1 + AC3: a scout that took
-// 200s is UNDER the 900s global default (no WARN), but a per-phase override of
-// 120s makes it slow → WARN naming scout.
-func TestCheck_PhaseLatency_PerPhaseOverride_Warn(t *testing.T) {
+func TestCheck_PhaseLatency_ConfiguredCeiling_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writePhaseTiming(t, ws, []phaseTimingEntry{{Phase: "scout", DurationMS: 200000, Verdict: "PASS"}})
-	t.Setenv("EVOLVE_SCOUT_LATENCY_CEILING_S", "120")
-	r, err := Check(Options{Cycle: 1, Workspace: ws})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, PhaseLatencyCeilingS: 120})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := phaseLatencyAnomalies(r)
 	if len(got) != 1 {
-		t.Fatalf("phase_latency count=%d, want 1 (scout over per-phase ceiling); anomalies=%+v", len(got), r.Anomalies)
+		t.Fatalf("phase_latency count=%d, want 1 (scout over configured ceiling); anomalies=%+v", len(got), r.Anomalies)
 	}
 	if got[0].Severity != SeverityWarn {
 		t.Errorf("severity=%s, want warn", got[0].Severity)
@@ -133,14 +128,9 @@ func TestCheck_PhaseLatency_PerPhaseOverride_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_PhaseLatency_NoOverride_UsesGlobal_NoWarn — AC1 fallback + AC3
-// anti-no-op: the SAME 200s scout, with NO per-phase override, stays under the
-// 900s global default → no WARN. An implementation that always warned, or that
-// dropped the global fallback, fails this.
-func TestCheck_PhaseLatency_NoOverride_UsesGlobal_NoWarn(t *testing.T) {
+func TestCheck_PhaseLatency_DefaultCeiling_NoWarn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writePhaseTiming(t, ws, []phaseTimingEntry{{Phase: "scout", DurationMS: 200000, Verdict: "PASS"}})
-	// No EVOLVE_SCOUT_LATENCY_CEILING_S set; global default 900s applies.
 	r, err := Check(Options{Cycle: 1, Workspace: ws})
 	if err != nil {
 		t.Fatal(err)
@@ -150,40 +140,30 @@ func TestCheck_PhaseLatency_NoOverride_UsesGlobal_NoWarn(t *testing.T) {
 	}
 }
 
-// TestCheck_PhaseLatency_BuildPlannerNormalization_Warn — AC2 + AC4: a hyphenated
-// phase name "build-planner" must normalize to EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S
-// (ToUpper + "-"→"_"). An implementation that forgets the "-"→"_" replacement
-// would look up the invalid env name EVOLVE_BUILD-PLANNER_..., miss the override,
-// fall back to 900s, and NOT warn — failing this test.
-func TestCheck_PhaseLatency_BuildPlannerNormalization_Warn(t *testing.T) {
+func TestCheck_PhaseLatency_ConfiguredCeilingNamesPhase(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writePhaseTiming(t, ws, []phaseTimingEntry{{Phase: "build-planner", DurationMS: 200000, Verdict: "PASS"}})
-	t.Setenv("EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S", "100")
-	r, err := Check(Options{Cycle: 1, Workspace: ws})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, PhaseLatencyCeilingS: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := phaseLatencyAnomalies(r)
 	if len(got) != 1 {
-		t.Fatalf("phase_latency count=%d, want 1 (build-planner over normalized ceiling); anomalies=%+v", len(got), r.Anomalies)
+		t.Fatalf("phase_latency count=%d, want 1 (build-planner over configured ceiling); anomalies=%+v", len(got), r.Anomalies)
 	}
 	if !strings.Contains(got[0].Message, "build-planner") {
 		t.Errorf("expected 'build-planner' in message; got %q", got[0].Message)
 	}
 }
 
-// TestCheck_PhaseLatency_InvalidOverride_FallsBackToGlobal — AC1: a malformed
-// per-phase override ("abc") is ignored and the global ceiling applies, so a
-// 200s scout under 900s global does NOT warn.
-func TestCheck_PhaseLatency_InvalidOverride_FallsBackToGlobal(t *testing.T) {
+func TestCheck_PhaseLatency_NonPositiveCeilingFallsBackToDefault(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writePhaseTiming(t, ws, []phaseTimingEntry{{Phase: "scout", DurationMS: 200000, Verdict: "PASS"}})
-	t.Setenv("EVOLVE_SCOUT_LATENCY_CEILING_S", "abc") // invalid → ignored
-	r, err := Check(Options{Cycle: 1, Workspace: ws})
+	r, err := Check(Options{Cycle: 1, Workspace: ws, PhaseLatencyCeilingS: -1})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := phaseLatencyAnomalies(r); len(got) != 0 {
-		t.Errorf("invalid override must fall back to 900s global (no warn for 200s), got %d; %+v", len(got), got)
+		t.Errorf("non-positive ceiling must fall back to 900s default (no warn for 200s), got %d; %+v", len(got), got)
 	}
 }
