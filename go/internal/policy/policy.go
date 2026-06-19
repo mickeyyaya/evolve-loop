@@ -603,6 +603,8 @@ type RouterPolicy struct {
 	ReplanDepth  int    `json:"replan_depth,omitempty"`
 	PlanModel    string `json:"plan_model,omitempty"`
 	ProposeModel string `json:"propose_model,omitempty"`
+	CLI          string `json:"cli,omitempty"`
+	Model        string `json:"model,omitempty"`
 }
 
 // RouterConfig returns router configuration with built-in defaults resolved.
@@ -621,6 +623,8 @@ func (p Policy) RouterConfig() RouterPolicy {
 	}
 	c.PlanModel = p.Router.PlanModel
 	c.ProposeModel = p.Router.ProposeModel
+	c.CLI = p.Router.CLI
+	c.Model = p.Router.Model
 	return c
 }
 

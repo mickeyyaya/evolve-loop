@@ -569,7 +569,7 @@ const (
 // override from RouterPolicy. With no override set it returns the base value for
 // every type. The CLI is unchanged across types; only the model tier differs.
 func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType, rc policy.RouterPolicy) (cli, model string) {
-	cli, model = resolveRouterDispatch(evolveDir)
+	cli, model = resolveRouterDispatch(evolveDir, rc)
 	switch dt {
 	case decisionPlan, decisionRePlan:
 		if rc.PlanModel != "" {
@@ -620,7 +620,7 @@ func benchedFamilies(projectRoot string) map[string]bool {
 	return out
 }
 
-func resolveRouterDispatch(evolveDir string) (cli, model string) {
+func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model string) {
 	cli, model = "claude-tmux", "opus"
 	if raw, err := os.ReadFile(filepath.Join(evolveDir, "profiles", "router.json")); err == nil {
 		var pj struct {
@@ -636,11 +636,11 @@ func resolveRouterDispatch(evolveDir string) (cli, model string) {
 			}
 		}
 	}
-	if v := os.Getenv("EVOLVE_ROUTER_CLI"); v != "" {
-		cli = v
+	if rc.CLI != "" {
+		cli = rc.CLI
 	}
-	if v := os.Getenv("EVOLVE_ROUTER_MODEL"); v != "" {
-		model = v
+	if rc.Model != "" {
+		model = rc.Model
 	}
 	return cli, model
 }

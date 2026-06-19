@@ -12,9 +12,8 @@ import (
 // dispatch falls back to the universal claude family — keeping the advisor alive
 // on a healthy footing rather than failing outright.
 func TestAdvisorDispatch_FallsBackWhenFamilyBenched(t *testing.T) {
-	t.Setenv("EVOLVE_ROUTER_CLI", "codex-tmux") // primary family = codex
 	benched := map[string]bool{llmroute.Family("codex-tmux"): true}
-	cli, _, ok := resolveRouterDispatchHealthy(t.TempDir(), decisionPlan, benched, policy.RouterPolicy{})
+	cli, _, ok := resolveRouterDispatchHealthy(t.TempDir(), decisionPlan, benched, policy.RouterPolicy{CLI: "codex-tmux"})
 	if !ok || cli != "claude-tmux" {
 		t.Errorf("benched primary family must fall back to claude-tmux (ok); got cli=%q ok=%v", cli, ok)
 	}
@@ -24,9 +23,8 @@ func TestAdvisorDispatch_FallsBackWhenFamilyBenched(t *testing.T) {
 // when the primary family AND the claude fallback are both benched (every family
 // down), the resolver signals !ok and the caller degrades to the static spine.
 func TestAdvisorDispatch_CircuitBreakerAfterRepeatedFailure(t *testing.T) {
-	t.Setenv("EVOLVE_ROUTER_CLI", "codex-tmux")
 	benched := map[string]bool{llmroute.Family("codex-tmux"): true, "claude": true}
-	if _, _, ok := resolveRouterDispatchHealthy(t.TempDir(), decisionPlan, benched, policy.RouterPolicy{}); ok {
+	if _, _, ok := resolveRouterDispatchHealthy(t.TempDir(), decisionPlan, benched, policy.RouterPolicy{CLI: "codex-tmux"}); ok {
 		t.Error("primary + claude fallback both benched must signal !ok (degrade to static)")
 	}
 }

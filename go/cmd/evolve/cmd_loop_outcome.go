@@ -83,7 +83,15 @@ func (lr *loopResult) emit(w io.Writer) {
 }
 
 func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
-	mode := os.Getenv("EVOLVE_GC")
+	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: policy load failed: %v; using zero-value gc policy\n", err)
+	}
+	gcPol := gc.Policy{}
+	if pol.GC != nil {
+		gcPol = *pol.GC
+	}
+	mode := gcPol.Mode
 	if mode == "" {
 		mode = "off"
 	}
@@ -92,17 +100,8 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 		return
 	case "shadow", "enforce":
 	default:
-		fmt.Fprintf(stderr, "[gc] WARN: invalid EVOLVE_GC=%q (want off|shadow|enforce); skipping\n", mode)
+		fmt.Fprintf(stderr, "[gc] WARN: invalid gc.mode=%q (want off|shadow|enforce); skipping\n", mode)
 		return
-	}
-
-	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
-	if err != nil {
-		fmt.Fprintf(stderr, "[gc] WARN: policy load failed: %v; using zero-value gc policy\n", err)
-	}
-	gcPol := gc.Policy{}
-	if pol.GC != nil {
-		gcPol = *pol.GC
 	}
 
 	runs, err := gc.Discover(cfg.EvolveDir, gc.DiscoverOptions{})
