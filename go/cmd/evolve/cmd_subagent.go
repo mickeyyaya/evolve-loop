@@ -151,7 +151,7 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 		switch a {
 		case "--help", "-h":
 			fmt.Fprintln(stdout, "Usage: evolve subagent resolve-tier --profile PATH --cycle N [--project-root PATH] [--worktree PATH]")
-			fmt.Fprintln(stdout, "Honors MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, EVOLVE_DIFF_COMPLEXITY_DISABLE.")
+			fmt.Fprintln(stdout, "Honors MODEL_TIER_HINT and .evolve/policy.json workflow settings.")
 			return 0
 		case "--profile":
 			i++
@@ -182,6 +182,7 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		projectRoot = envOrCwd("EVOLVE_PROJECT_ROOT")
 	}
+	wc := loadWorkflowConfig(filepath.Join(projectRoot, ".evolve"))
 	tier, err := subagent.ResolveModelTier(
 		subagent.ResolveModelTierRequest{
 			ProfilePath:            profile,
@@ -189,8 +190,8 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 			ProjectRoot:            projectRoot,
 			WorktreePath:           worktree,
 			ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
-			AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-			DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
+			AuditorTierOverride:    wc.AuditorTierOverride,
+			DiffComplexityDisabled: wc.DiffComplexityDisable,
 		},
 		subagent.ResolveModelTierOptions{},
 	)
@@ -307,9 +308,9 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
 		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
-		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
-		fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
+		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT, EVOLVE_CACHE_PREFIX_V2,")
 		fmt.Fprintln(stdout, "     WORKTREE_PATH")
+		fmt.Fprintln(stdout, "Config: .evolve/policy.json workflow settings")
 		fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
 		return 0
 	}
@@ -342,6 +343,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	flags := readSubagentRunFlags()
+	wc := loadWorkflowConfig(layout.EvolveDir)
 
 	res, err := subagent.Run(context.Background(), subagent.RunRequest{
 		Agent:                  agent,
@@ -356,8 +358,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		LedgerPath:             layout.LedgerFile,
 		PromptReader:           promptReader,
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
-		AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-		DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
+		AuditorTierOverride:    wc.AuditorTierOverride,
+		DiffComplexityDisabled: wc.DiffComplexityDisable,
 		CachePrefixV2:          flags.cachePrefixV2,
 		AdversarialAudit:       flags.adversarialAudit,
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,

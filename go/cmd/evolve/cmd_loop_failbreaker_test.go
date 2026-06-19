@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -61,23 +64,19 @@ func TestConsecutiveFailBreaker(t *testing.T) {
 
 func TestResolveMaxConsecutiveFails(t *testing.T) {
 	tests := []struct {
-		name string
-		env  string
-		want int
+		name     string
+		workflow *policy.WorkflowPolicy
+		want     int
 	}{
-		{"unset defaults to 1", "", 1},
-		{"valid value", "3", 3},
-		{"zero clamps to default", "0", 1},
-		{"negative clamps to default", "-2", 1},
-		{"garbage clamps to default", "lots", 1},
+		{"absent defaults to 1", nil, 1},
+		{"valid value", &policy.WorkflowPolicy{MaxConsecutiveFails: 3}, 3},
+		{"zero clamps to default", &policy.WorkflowPolicy{}, 1},
+		{"negative clamps to default", &policy.WorkflowPolicy{MaxConsecutiveFails: -2}, 1},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// An empty value and an unset var are the same path for the
-			// resolver (both yield the default), so "" exercises both.
-			t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", tc.env)
-			if got := resolveMaxConsecutiveFails(); got != tc.want {
-				t.Errorf("resolveMaxConsecutiveFails() with env %q = %d, want %d", tc.env, got, tc.want)
+			if got := (policy.Policy{Workflow: tc.workflow}).WorkflowConfig().MaxConsecutiveFails; got != tc.want {
+				t.Errorf("WorkflowConfig().MaxConsecutiveFails = %d, want %d", got, tc.want)
 			}
 		})
 	}
@@ -158,14 +157,20 @@ func (f *failingOrch) RunCycleFromPhase(ctx context.Context, req core.CycleReque
 func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
 	t.Helper()
 	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "1")
-	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", maxConsecutive)
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeDispatchPolicy(t, evolveDir, "off")
+	maxFails, err := strconv.Atoi(maxConsecutive)
+	if err != nil {
+		t.Fatalf("parse max consecutive fails: %v", err)
+	}
+	policyJSON := fmt.Sprintf(`{"dispatch":{"policy":"off"},"workflow":{"max_consecutive_fails":%d}}`, maxFails)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(policyJSON), 0o644); err != nil {
+		t.Fatalf("write policy.json: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(evolveDir, "state.json"), []byte(`{"failedApproaches":[],"lastCycleNumber":0}`), 0o644); err != nil {
 		t.Fatal(err)
 	}

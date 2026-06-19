@@ -203,3 +203,23 @@ func TestValidatePin_UnclassifiableModelSkipsEnvelope(t *testing.T) {
 		t.Errorf("unclassifiable model must skip envelope check, got %v", err)
 	}
 }
+
+func TestWorkflowConfig(t *testing.T) {
+	disabled := false
+	got := (Policy{Workflow: &WorkflowPolicy{
+		MaxConsecutiveFails:   3,
+		MaxCyclesCap:          8,
+		AutoPrune:             &disabled,
+		DiffComplexityDisable: true,
+		AuditorTierOverride:   "deep",
+	}}).WorkflowConfig()
+	if got.MaxConsecutiveFails != 3 || got.MaxCyclesCap != 8 || got.AutoPrune ||
+		!got.DiffComplexityDisable || got.AuditorTierOverride != "deep" {
+		t.Fatalf("WorkflowConfig() = %+v, want configured values", got)
+	}
+
+	defaults := (Policy{Workflow: &WorkflowPolicy{}}).WorkflowConfig()
+	if defaults.MaxConsecutiveFails != 1 || defaults.MaxCyclesCap != 25 || !defaults.AutoPrune {
+		t.Fatalf("WorkflowConfig() defaults = %+v, want max fails=1 max cycles=25 auto prune=true", defaults)
+	}
+}

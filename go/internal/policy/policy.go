@@ -80,6 +80,9 @@ type Policy struct {
 	// Dispatch configures the loop dispatch verification policy. Absent ⇒
 	// built-in defaults apply (Policy="verify", RepeatThreshold=5).
 	Dispatch *DispatchConfig `json:"dispatch,omitempty"`
+	// Workflow configures loop and subagent workflow defaults. Absent ⇒
+	// built-in defaults apply.
+	Workflow *WorkflowPolicy `json:"workflow,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -441,5 +444,47 @@ func (p Policy) DispatchConfig() DispatchConfig {
 	if p.Dispatch.RepeatThreshold > 0 {
 		c.RepeatThreshold = p.Dispatch.RepeatThreshold
 	}
+	return c
+}
+
+// WorkflowPolicy is the .evolve/policy.json "workflow" block.
+type WorkflowPolicy struct {
+	MaxConsecutiveFails   int    `json:"max_consecutive_fails,omitempty"`
+	MaxCyclesCap          int    `json:"max_cycles_cap,omitempty"`
+	AutoPrune             *bool  `json:"auto_prune,omitempty"`
+	DiffComplexityDisable bool   `json:"diff_complexity_disable,omitempty"`
+	AuditorTierOverride   string `json:"auditor_tier_override,omitempty"`
+}
+
+// WorkflowConfig is the resolved workflow configuration with defaults applied.
+type WorkflowConfig struct {
+	MaxConsecutiveFails   int
+	MaxCyclesCap          int
+	AutoPrune             bool
+	DiffComplexityDisable bool
+	AuditorTierOverride   string
+}
+
+// WorkflowConfig returns workflow configuration with built-in defaults resolved.
+func (p Policy) WorkflowConfig() WorkflowConfig {
+	c := WorkflowConfig{
+		MaxConsecutiveFails: 1,
+		MaxCyclesCap:        25,
+		AutoPrune:           true,
+	}
+	if p.Workflow == nil {
+		return c
+	}
+	if p.Workflow.MaxConsecutiveFails > 0 {
+		c.MaxConsecutiveFails = p.Workflow.MaxConsecutiveFails
+	}
+	if p.Workflow.MaxCyclesCap > 0 {
+		c.MaxCyclesCap = p.Workflow.MaxCyclesCap
+	}
+	if p.Workflow.AutoPrune != nil {
+		c.AutoPrune = *p.Workflow.AutoPrune
+	}
+	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
+	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
 	return c
 }

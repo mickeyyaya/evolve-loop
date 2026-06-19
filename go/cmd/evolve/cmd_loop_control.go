@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -72,6 +71,16 @@ func loadDispatchConfig(evolveDir string) policy.DispatchConfig {
 	return pol.DispatchConfig()
 }
 
+// loadWorkflowConfig loads .evolve/policy.json and returns workflow defaults.
+// Absent or malformed policy falls back to built-in defaults.
+func loadWorkflowConfig(evolveDir string) policy.WorkflowConfig {
+	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	if err != nil {
+		return policy.Policy{}.WorkflowConfig()
+	}
+	return pol.WorkflowConfig()
+}
+
 // recordAbsorbedFail persists a continue-on-fail-absorbed verdict-FAIL cycle
 // to state.json:failedApproaches. The clean-completion FAIL path (audit
 // FAIL → retro → end, err==nil) is NOT recorded by the orchestrator — only
@@ -111,31 +120,11 @@ type loopCycleRunner interface {
 // instead of the wired *core.Orchestrator. nil in production.
 var loopOrchOverride loopCycleRunner
 
-// defaultMaxConsecutiveFails reproduces the pre-flag contract: a single
-// verdict-FAIL stops the batch.
-const defaultMaxConsecutiveFails = 1
-
-// resolveMaxConsecutiveFails reads EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS — the
-// number of consecutive verdict-FAIL cycles the batch absorbs before
-// stopping. Unset / non-positive / garbage all clamp to the default of 1
-// (stop on first FAIL), so the flag is purely additive.
-func resolveMaxConsecutiveFails() int {
-	v := os.Getenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS")
-	if v == "" {
-		return defaultMaxConsecutiveFails
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
-		return defaultMaxConsecutiveFails
-	}
-	return n
-}
-
 // consecutiveFailBreaker advances the consecutive-verdict-FAIL streak and
 // reports whether the batch must stop. A non-FAIL cycle resets the streak to
 // zero (a PASS/SHIPPED breaks the run); a FAIL increments it and stops once
-// the streak reaches max. max is always ≥1 (resolveMaxConsecutiveFails
-// clamps), so max==1 stops on the first FAIL — byte-identical to the
+// the streak reaches max. WorkflowConfig guarantees max is always ≥1, so
+// max==1 stops on the first FAIL — byte-identical to the
 // pre-flag unconditional break. Pure for testability, mirroring
 // updateBreaker (the same-cycle dispatcher breaker).
 func consecutiveFailBreaker(failed bool, streak, max int) (newStreak int, stop bool) {

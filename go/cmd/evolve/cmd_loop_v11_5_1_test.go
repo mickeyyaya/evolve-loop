@@ -180,7 +180,6 @@ func TestDetectQuotaPause_FallbackFields(t *testing.T) {
 // TestRunLoop_QuotaPause_Rc5 drives runLoop end-to-end with a
 // cycle-state.json checkpoint that triggers quota-pause → rc=5.
 func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -230,7 +229,6 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 // ============================================================================
 
 func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -287,7 +285,6 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 // summarized as display-only telemetry, no BATCH-BUDGET output is ever emitted,
 // and the loop exits 0 regardless of cost.
 func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

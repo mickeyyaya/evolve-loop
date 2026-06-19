@@ -57,7 +57,6 @@ func readFailedApproaches(t *testing.T, statePath string) []map[string]any {
 // dispatcher-deadlock fatal (same harness as TestRunLoop_CircuitBreakerTrips)
 // and asserts the batch LEARNS from it.
 func TestLoopFatal_CircuitBreaker_AppendsBatchLevelFailedApproach(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -99,7 +98,6 @@ func TestLoopFatal_CircuitBreaker_AppendsBatchLevelFailedApproach(t *testing.T) 
 // TestLoopMaxCycles_NoFalseFailureLearning: clean exits (max_cycles) must
 // NOT write failure learning — the floor fires only on abnormal exits.
 func TestLoopMaxCycles_NoFalseFailureLearning(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -133,7 +131,6 @@ func TestLoopMaxCycles_NoFalseFailureLearning(t *testing.T) {
 // best-effort — recording into a missing state.json must not panic or
 // change the exit code (the WARN is the only trace).
 func TestLoopFatal_MissingStateJSON_DoesNotBlockExit(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

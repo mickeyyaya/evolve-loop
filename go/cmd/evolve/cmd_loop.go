@@ -18,7 +18,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -113,13 +112,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if loopOrchOverride != nil {
 		orch = loopOrchOverride
 	}
+	wc := loadWorkflowConfig(cfg.EvolveDir)
 
 	// E2: auto-prune expired failedApproaches at dispatcher start.
-	// Opt-out via EVOLVE_AUTO_PRUNE=0. Non-fatal on error — pruning
+	// Non-fatal on error — pruning
 	// is cosmetic (the failure-adapter already filters expired entries
 	// at read time). Pruning AFTER LoadResumeState so a stale resume
 	// pointer doesn't get culled mid-resume.
-	if os.Getenv("EVOLVE_AUTO_PRUNE") != "0" {
+	if wc.AutoPrune {
 		statePath := filepath.Join(cfg.EvolveDir, "state.json")
 		if pr, err := failurelog.PruneExpired(statePath, time.Now().UTC()); err != nil {
 			fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", err)
@@ -254,11 +254,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	prevRanCycle := -1
 	sameCycleStreak := 0
 
-	// Consecutive-verdict-FAIL breaker (EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS).
+	// Consecutive-verdict-FAIL breaker.
 	// Default 1 ⇒ stop on the first FAIL (pre-flag contract); >1 lets the
 	// batch absorb isolated work-quality misses so a 3-PASS streak can form,
 	// while the streak cap still halts a genuinely broken run.
-	maxConsecutiveFails := resolveMaxConsecutiveFails()
+	maxConsecutiveFails := wc.MaxConsecutiveFails
 	consecutiveFails := 0
 
 	// Advisor-decided cycle budget (EVOLVE_CYCLE_BUDGET). Off ⇒ the operator's
@@ -269,7 +269,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	budgetStage := cyclebudget.ParseStage(os.Getenv("EVOLVE_CYCLE_BUDGET"))
 	effectiveMax := cfg.MaxCycles
 	if budgetStage == cyclebudget.Enforce && !cfg.MaxCyclesExplicit {
-		effectiveMax = resolveMaxCyclesCap()
+		effectiveMax = wc.MaxCyclesCap
 		fmt.Fprintf(stderr, "[loop] cycle-budget=enforce: completion-driven, safety cap=%d (no explicit --max-cycles)\n", effectiveMax)
 	}
 
@@ -501,7 +501,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if result.FinalVerdict == core.VerdictFAIL {
 			recordAbsorbedFail(cfg, ranCycle, stderr)
 			lr.ContinuedFailures++
-			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS)\n",
+			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
 		}
 
@@ -539,18 +539,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 3
 	}
 	return 0
-}
-
-// resolveMaxCyclesCap returns the safety ceiling for advisor-budgeted runs:
-// EVOLVE_MAX_CYCLES_CAP if set to a positive int, else 25. It bounds runaway
-// when completion never triggers (an open-ended goal whose backlog never drains).
-func resolveMaxCyclesCap() int {
-	if v := os.Getenv("EVOLVE_MAX_CYCLES_CAP"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return n
-		}
-	}
-	return 25
 }
 
 // readCarryoverCount returns the number of carryoverTodos in state.json — the

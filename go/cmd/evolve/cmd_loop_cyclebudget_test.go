@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func TestReadCarryoverCount(t *testing.T) {
@@ -42,20 +44,23 @@ func TestReadCarryoverCount(t *testing.T) {
 	}
 }
 
-func TestResolveMaxCyclesCap(t *testing.T) {
-	t.Setenv("EVOLVE_MAX_CYCLES_CAP", "")
-	if got := resolveMaxCyclesCap(); got != 25 {
-		t.Errorf("unset cap = %d, want default 25", got)
+func TestWorkflowMaxCyclesCap(t *testing.T) {
+	tests := []struct {
+		name     string
+		workflow *policy.WorkflowPolicy
+		want     int
+	}{
+		{"absent defaults to 25", nil, 25},
+		{"configured value", &policy.WorkflowPolicy{MaxCyclesCap: 8}, 8},
+		{"zero defaults to 25", &policy.WorkflowPolicy{}, 25},
+		{"negative defaults to 25", &policy.WorkflowPolicy{MaxCyclesCap: -3}, 25},
 	}
-	t.Setenv("EVOLVE_MAX_CYCLES_CAP", "8")
-	if got := resolveMaxCyclesCap(); got != 8 {
-		t.Errorf("cap = %d, want 8", got)
-	}
-	for _, bad := range []string{"0", "-3", "abc"} {
-		t.Setenv("EVOLVE_MAX_CYCLES_CAP", bad)
-		if got := resolveMaxCyclesCap(); got != 25 {
-			t.Errorf("cap %q = %d, want default 25", bad, got)
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := (policy.Policy{Workflow: tc.workflow}).WorkflowConfig().MaxCyclesCap; got != tc.want {
+				t.Errorf("WorkflowConfig().MaxCyclesCap = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 

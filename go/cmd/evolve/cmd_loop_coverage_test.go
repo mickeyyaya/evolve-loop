@@ -23,7 +23,7 @@ func writeDispatchPolicy(t *testing.T, evolveDir, policyVal string) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("writeDispatchPolicy: mkdir: %v", err)
 	}
-	content := fmt.Sprintf(`{"dispatch":{"policy":%q}}`, policyVal)
+	content := fmt.Sprintf(`{"dispatch":{"policy":%q},"workflow":{"auto_prune":false}}`, policyVal)
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(content), 0o644); err != nil {
 		t.Fatalf("writeDispatchPolicy: write: %v", err)
 	}
@@ -35,7 +35,7 @@ func writeDispatchPolicyFull(t *testing.T, evolveDir, policyVal string, repeatTh
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("writeDispatchPolicyFull: mkdir: %v", err)
 	}
-	content := fmt.Sprintf(`{"dispatch":{"policy":%q,"repeat_threshold":%d}}`, policyVal, repeatThreshold)
+	content := fmt.Sprintf(`{"dispatch":{"policy":%q,"repeat_threshold":%d},"workflow":{"auto_prune":false}}`, policyVal, repeatThreshold)
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(content), 0o644); err != nil {
 		t.Fatalf("writeDispatchPolicyFull: write: %v", err)
 	}

@@ -15,7 +15,6 @@ import (
 // branch in the --reset wiring. Achieved by setting state.json to a
 // directory (so atomic write fails on the rename step).
 func TestRunLoop_ResetErrorLogged(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -68,7 +67,6 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 // --batch-cap-usd, the run completes its cycles normally (rc=0, no
 // BUDGET-EXHAUSTED / batch_cap), with cost reported as telemetry only.
 func TestRunLoop_BudgetFlagsDoNotStop(t *testing.T) {
-	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
