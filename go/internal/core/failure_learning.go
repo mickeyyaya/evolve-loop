@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
@@ -457,8 +458,13 @@ func failureLearningSummary(cycle int, failed Phase, err error) string {
 // own CarryoverTodo in state. The D2 contract requires individual defects to be
 // individually addressable — one generic todo per cycle is insufficient.
 func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
-	for i, defect := range record.Defects {
-		id := fmt.Sprintf("cycle-%d-defect-%d", record.Cycle, i)
+	n := 0
+	for _, defect := range record.Defects {
+		if strings.TrimSpace(defect) == "" {
+			continue
+		}
+		id := fmt.Sprintf("cycle-%d-defect-%d", record.Cycle, n)
+		n++
 		if !carryoverTodoExists(state.CarryoverTodos, id) {
 			state.CarryoverTodos = append(state.CarryoverTodos, CarryoverTodo{
 				ID:             id,

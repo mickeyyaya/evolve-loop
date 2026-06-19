@@ -11,6 +11,9 @@ import (
 // temp+rename via atomicwrite.Bytes. The commit parameter is reserved for a
 // future slice that will git-commit the two files; pass false for now.
 func Write(d *Dossier, dir string, commit bool) error {
+	if dir == "" {
+		return fmt.Errorf("dossier: Write: dir must not be blank")
+	}
 	base := fmt.Sprintf("cycle-%d", d.Cycle)
 
 	jsonBytes, err := RenderJSON(d)

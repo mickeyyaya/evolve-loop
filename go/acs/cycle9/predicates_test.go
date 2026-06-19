@@ -1,86 +1,77 @@
 //go:build acs
 
-// Package cycle9 materializes the cycle-9 acceptance criteria for the
-// committed top_n task:
+// Package cycle9 materializes the cycle-9 acceptance criteria for two committed
+// top_n tasks (current session: dossier ADR-0055 contracts) plus the prior-session
+// fanout-consolidation predicates that have been corrected to match current state.
 //
-//	consolidate-fanout-cluster — consolidate all 17 EVOLVE_FANOUT_* env flags
-//	into policy.json-backed FanoutPolicy struct + CLI flags for subprocess config;
-//	registry count 258 → 241.
+// AC map for current top_n tasks (fix-dossier-render-contracts,
+// fix-core-apply-defects-blank-filter):
 //
-// AC map (1:1 with triage top_n, scout-report.md ACs):
+//	fix-dossier-render-contracts:
+//	  AC-D1  RenderJSON(nil) returns error                     → C9_012 (behavioral)
+//	  AC-D2  RenderJSON(invalid) calls Validate, returns error → C9_013 (behavioral)
+//	  AC-D3  RenderJSON output ends with '\n'                  → C9_014 (behavioral)
+//	  AC-D4  RenderMarkdown(invalid) returns error             → C9_015 (behavioral)
+//	  AC-D5  Write(d,"",false) returns error                   → C9_016 (behavioral)
+//	  AC-D6  Build({WorkspacePath:""}) returns error           → C9_017 (behavioral)
+//	  AC-D7  Build({Goal:""}) returns error                    → C9_018 (behavioral)
+//	  AC-D8  All 7 dossier gap tests PASS                      → manual+checklist (CI)
 //
-//	consolidate-fanout-cluster:
-//	  AC1      Registry row count == 241                              → C9_001 (behavioral, exact count)
-//	  AC2+NEG1 FlagCeiling const == 241                              → C9_002 (config-check, waiver)
-//	  AC3+NEG2 All 17 FANOUT flags absent from Lookup                → C9_003 (behavioral, absence)
-//	  AC4(a)   fanoutEnvConfig envchain reads gone from dispatch cmd  → C9_004 (config-check, waiver)
-//	  AC4(b)   envchain FANOUT reads gone from subagent cmd           → C9_005 (config-check, waiver)
-//	  AC4(c)   os.Getenv FANOUT_TEST_EXECUTOR gone from subagent cmd  → C9_006 (config-check, waiver)
-//	  NEG3     WORKER_TOKEN const changed to split form (no literal)  → C9_007 (config-check, waiver)
-//	  AC9(a)   EVOLVE_FANOUT_AUDITOR absent from orchestrator ref doc → C9_008 (config-check, waiver)
-//	  AC9(b)   EVOLVE_FANOUT_ENABLED absent from scout ref doc        → C9_009 (config-check, waiver)
-//	  EDGE1    control-flags.md has no EVOLVE_FANOUT_* rows           → C9_010 (config-check, waiver)
-//	  EDGE3    FanoutPolicy struct present in internal/policy/policy.go → C9_011 (config-check, waiver)
+//	fix-core-apply-defects-blank-filter:
+//	  AC-C1  All-blank defects → 0 todos                       → C9_019 (behavioral)
+//	  AC-C2  Mixed blank+real → exactly 2 todos                → C9_020 (behavioral)
+//	  AC-C3  Idempotency/deterministic-ID tests still pass     → manual+checklist (CI)
+//	  AC-C4  go test ./internal/core/... → PASS               → manual+checklist (CI)
 //
-// ACs with manual+checklist disposition (enforced by CI, no cycle predicate needed):
+//	Removed ACs:
+//	  Full suite 0 FAIL: CI pipeline (manual+checklist)
+//	  ACS gate PASS: self-referential (unverifiable-remove)
 //
-//	AC5  (flagregistry tests pass): TestAll_SortedByName + TestRegistry_FlagCeiling in CI
-//	AC6  (full suite 0 FAIL): CI pipeline
-//	AC8  (flagreaders guard passes): CI acs lane — go test -tags acs ./acs/regression/flagreaders/...
-//	AC10 (registry sorted): TestAll_SortedByName in normal CI run
-//
-// Removed ACs:
-//
-//	AC7 (ACS cycle9 predicates pass): self-referential — unverifiable-remove
-//	EDGE2 (.apicover-enforce has cycle9): pre-existing GREEN (TDD adds ./acs/cycle9/ during RED phase)
-//
-// Floor binding (R9.3): predicates authored only for the committed top_n task
-// (consolidate-fanout-cluster). Deferred tasks (per-phase agent config cluster,
-// BRIDGE/OBSERVER/etc.) get zero predicates this cycle.
+// Prior-session fanout predicates (C9_001–C9_011): corrected for current state.
+// C9_001 corrected from exact-241 to ratchet ≤160 (further reductions landed post
+// the original session). C9_002 corrected from 241→160 (current FlagCeiling).
+// C9_003–C9_011 unchanged (all GREEN, fanout consolidation complete).
 package cycle9
 
 import (
 	"path/filepath"
 	"testing"
 
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC9_001_RegistryRowCountIs241 verifies that after removing all 17
-// EVOLVE_FANOUT_* rows the total registry count is exactly 241.
+// TestC9_001_RegistryRowCountRatchet verifies the flag registry does not exceed
+// the post-fanout-consolidation ratchet ceiling (≤ 160).
 //
 // BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 258, which is 17 rows above 241.
-func TestC9_001_RegistryRowCountIs241(t *testing.T) {
-	const want = 241
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 17 EVOLVE_FANOUT_* rows from registry_table.go.\n"+
-			"Both over-removal (< 241) and under-removal (> 241) fail.\n"+
-			"Expected: 258 − 17 = 241.",
-			got, want)
+// Corrected from original exact-count 241: subsequent consolidation cycles
+// lowered the registry further to 160; the ratchet enforces ≤160, not ==241.
+// Pre-existing GREEN after correction.
+func TestC9_001_RegistryRowCountRatchet(t *testing.T) {
+	const ceiling = 160
+	if got := len(flagregistry.All); got > ceiling {
+		t.Errorf("registry row count %d exceeds ratchet ceiling %d.\n"+
+			"Net flag additions are blocked; remove flags to lower the count.",
+			got, ceiling)
 	}
 }
 
-// TestC9_002_FlagCeilingConstIs241 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 258 to 241
-// in the same diff as the row removal.
+// TestC9_002_FlagCeilingConstIs160 verifies that the FlagCeiling ratchet
+// constant in registry_ceiling_test.go reflects the post-consolidation value 160.
 //
-// // acs-predicate: config-check — the constant value is the canonical config
-// item; its absence (still 258) directly breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 258.
-func TestC9_002_FlagCeilingConstIs241(t *testing.T) {
+// // acs-predicate: config-check — corrected from original 241 to 160 (the
+// current ratchet after further flag-reduction cycles). Pre-existing GREEN.
+func TestC9_002_FlagCeilingConstIs160(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
 	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 241") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 241'.\n"+
-			"Builder must lower the FlagCeiling constant from 258 to 241 in the same diff\n"+
-			"as removing the 17 EVOLVE_FANOUT_* rows (258 − 17 = 241).\n"+
+	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 160") {
+		t.Errorf("registry_ceiling_test.go does not contain 'FlagCeiling = 160'.\n"+
 			"File: %s", ceilingFile)
 	}
 }
@@ -302,5 +293,200 @@ func TestC9_011_FanoutPolicyStructAddedToPolicy(t *testing.T) {
 			"  }\n"+
 			"and a Fanout *FanoutPolicy field to the Policy struct.\n"+
 			"File: %s", policyFile)
+	}
+}
+
+// ── fix-dossier-render-contracts predicates (C9_012–C9_018) ──────────────────
+// All 7 are behavioral: they call the actual dossier functions and assert on
+// return values. No source-grepping. RED until Builder adds the nil guard,
+// Validate calls, trailing-\n append, and blank-dir/blank-goal checks.
+
+// TestC9_012_RenderJSON_NilReturnsError verifies that RenderJSON(nil) returns
+// a non-nil error rather than marshaling nil to "null".
+//
+// BEHAVIORAL: directly calls dossier.RenderJSON with a nil pointer.
+// RED: current impl calls json.MarshalIndent(nil) → ("null", nil).
+func TestC9_012_RenderJSON_NilReturnsError(t *testing.T) {
+	_, err := dossier.RenderJSON(nil)
+	if err == nil {
+		t.Errorf("RED: dossier.RenderJSON(nil) must return error.\n" +
+			"Builder must add nil guard before json.MarshalIndent in render.go.")
+	}
+}
+
+// TestC9_013_RenderJSON_InvalidDossierReturnsError verifies that RenderJSON
+// calls Validate before marshaling and returns an error on invalid input.
+//
+// BEHAVIORAL: constructs a dossier with cycle=0 (Validate returns error for
+// cycle <= 0), calls RenderJSON, asserts error.
+// RED: current impl does not call Validate.
+func TestC9_013_RenderJSON_InvalidDossierReturnsError(t *testing.T) {
+	bad := &dossier.Dossier{
+		Cycle:        0,
+		Goal:         "bad-cycle",
+		FinalVerdict: dossier.VerdictPass,
+		Phases:       []dossier.PhaseRecord{{Name: "p", Verdict: dossier.VerdictPass}},
+	}
+	_, err := dossier.RenderJSON(bad)
+	if err == nil {
+		t.Errorf("RED: dossier.RenderJSON(invalid dossier) must call Validate and return error.\n" +
+			"Builder must call d.Validate() at the top of RenderJSON in render.go.")
+	}
+}
+
+// TestC9_014_RenderJSON_TrailingNewline verifies that RenderJSON output ends
+// with a trailing '\n' (contract: "Returns UTF-8 JSON with a trailing newline").
+//
+// BEHAVIORAL: calls RenderJSON on a valid dossier and inspects the last byte.
+// RED: json.MarshalIndent does not append '\n'; last byte is '}' (0x7d).
+func TestC9_014_RenderJSON_TrailingNewline(t *testing.T) {
+	d := &dossier.Dossier{
+		Cycle:        1,
+		Goal:         "trailing-newline-check",
+		FinalVerdict: dossier.VerdictPass,
+		Phases:       []dossier.PhaseRecord{{Name: "scout", Verdict: dossier.VerdictPass}},
+	}
+	out, err := dossier.RenderJSON(d)
+	if err != nil {
+		t.Fatalf("RenderJSON failed on valid dossier: %v", err)
+	}
+	if len(out) == 0 || out[len(out)-1] != '\n' {
+		last := byte(0)
+		if len(out) > 0 {
+			last = out[len(out)-1]
+		}
+		t.Errorf("RED: RenderJSON output must end with '\\n'; got last byte 0x%02x.\n"+
+			"Builder must append '\\n' after json.MarshalIndent in render.go.", last)
+	}
+}
+
+// TestC9_015_RenderMarkdown_InvalidReturnsError verifies that RenderMarkdown
+// calls Validate before executing the template and returns error on invalid input.
+//
+// BEHAVIORAL: constructs a dossier with cycle=0, calls RenderMarkdown, asserts err.
+// RED: current impl calls template.Execute without Validate.
+func TestC9_015_RenderMarkdown_InvalidReturnsError(t *testing.T) {
+	bad := &dossier.Dossier{
+		Cycle:        0,
+		Goal:         "bad-markdown",
+		FinalVerdict: dossier.VerdictPass,
+		Phases:       []dossier.PhaseRecord{{Name: "p", Verdict: dossier.VerdictPass}},
+	}
+	_, err := dossier.RenderMarkdown(bad)
+	if err == nil {
+		t.Errorf("RED: dossier.RenderMarkdown(invalid dossier) must call Validate and return error.\n" +
+			"Builder must call d.Validate() at the top of RenderMarkdown in render.go.")
+	}
+}
+
+// TestC9_016_Write_BlankDirReturnsError verifies that Write(d, "", false) returns
+// an error rather than silently writing to the current working directory.
+//
+// BEHAVIORAL: calls dossier.Write with a blank dir, asserts error.
+// RED: current impl calls filepath.Join("", "cycle-N.json") which resolves to
+// the cwd; no precondition check exists.
+func TestC9_016_Write_BlankDirReturnsError(t *testing.T) {
+	d := &dossier.Dossier{
+		Cycle:        1,
+		Goal:         "write-blank-dir-check",
+		FinalVerdict: dossier.VerdictPass,
+		Phases:       []dossier.PhaseRecord{{Name: "scout", Verdict: dossier.VerdictPass}},
+	}
+	err := dossier.Write(d, "", false)
+	if err == nil {
+		t.Errorf("RED: dossier.Write(d, \"\", false) must return error.\n" +
+			"Builder must check dir == \"\" at top of Write in write.go.")
+	}
+}
+
+// TestC9_017_Build_BlankWorkspacePathReturnsError verifies that Build returns
+// an error when BuildOpts.WorkspacePath is empty.
+//
+// BEHAVIORAL: calls dossier.Build(1, {WorkspacePath:""}) and asserts error.
+// RED: current impl skips the WorkspacePath precondition check.
+func TestC9_017_Build_BlankWorkspacePathReturnsError(t *testing.T) {
+	_, err := dossier.Build(1, dossier.BuildOpts{WorkspacePath: "", Goal: "g"})
+	if err == nil {
+		t.Errorf("RED: dossier.Build with blank WorkspacePath must return error.\n" +
+			"Builder must add WorkspacePath precondition check in build.go.")
+	}
+}
+
+// TestC9_018_Build_BlankGoalReturnsError verifies that Build returns an error
+// when BuildOpts.Goal is empty or whitespace-only.
+//
+// BEHAVIORAL: calls dossier.Build twice (empty and whitespace-only Goal), asserts error.
+// RED: current impl sets d.Goal = opts.Goal without validation.
+func TestC9_018_Build_BlankGoalReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := dossier.Build(1, dossier.BuildOpts{WorkspacePath: dir, Goal: ""})
+	if err == nil {
+		t.Errorf("RED: dossier.Build with empty Goal must return error.\n" +
+			"Builder must add Goal precondition check in build.go.")
+	}
+	_, err = dossier.Build(1, dossier.BuildOpts{WorkspacePath: dir, Goal: "   "})
+	if err == nil {
+		t.Errorf("RED: dossier.Build with whitespace-only Goal must return error.\n" +
+			"Builder must use strings.TrimSpace in the Goal precondition check in build.go.")
+	}
+}
+
+// ── fix-core-apply-defects-blank-filter predicates (C9_019–C9_020) ───────────
+// Both are behavioral: they call ApplyDefectsAsCarryoverTodos and assert on
+// the resulting CarryoverTodos slice. RED until Builder adds TrimSpace guard.
+
+// TestC9_019_ApplyDefects_BlankOnlyProducesZeroTodos verifies that a defect
+// list containing only blank/whitespace strings produces zero carryover todos.
+//
+// BEHAVIORAL: constructs a FailedRecord with all-blank Defects, calls
+// ApplyDefectsAsCarryoverTodos, asserts len(state.CarryoverTodos) == 0.
+// RED: current impl iterates without TrimSpace check; blanks produce todos.
+func TestC9_019_ApplyDefects_BlankOnlyProducesZeroTodos(t *testing.T) {
+	state := &core.State{}
+	record := core.FailedRecord{
+		Cycle:   3,
+		Verdict: "FAIL",
+		Defects: []string{"", "   ", "\t"},
+	}
+	core.ApplyDefectsAsCarryoverTodos(state, record)
+	if len(state.CarryoverTodos) != 0 {
+		t.Errorf("RED: blank/whitespace defects must produce 0 todos; got %d.\n"+
+			"Builder must add strings.TrimSpace guard in ApplyDefectsAsCarryoverTodos\n"+
+			"(failure_learning.go) to skip blank entries.",
+			len(state.CarryoverTodos))
+	}
+}
+
+// TestC9_020_ApplyDefects_MixedSkipsBlanksProducesTwoTodos verifies that a
+// mixed list ["", "real A", "   ", "real B"] produces exactly 2 todos.
+//
+// BEHAVIORAL: constructs a FailedRecord with 2 real + 2 blank Defects, calls
+// ApplyDefectsAsCarryoverTodos, asserts exactly 2 todos with real text.
+// RED: current impl produces 4 todos (includes the 2 blank entries).
+func TestC9_020_ApplyDefects_MixedSkipsBlanksProducesTwoTodos(t *testing.T) {
+	state := &core.State{}
+	record := core.FailedRecord{
+		Cycle:   4,
+		Verdict: "FAIL",
+		Defects: []string{"", "real defect A", "   ", "real defect B"},
+	}
+	core.ApplyDefectsAsCarryoverTodos(state, record)
+	if got := len(state.CarryoverTodos); got != 2 {
+		t.Errorf("RED: mixed blank+real defects must produce exactly 2 todos; got %d.\n"+
+			"Builder must skip blank entries in ApplyDefectsAsCarryoverTodos.",
+			got)
+	}
+	// Verify real defects appear in the todos (behavioral: checks content, not just count).
+	for _, want := range []string{"real defect A", "real defect B"} {
+		found := false
+		for _, todo := range state.CarryoverTodos {
+			if strings.Contains(todo.Action, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("no todo found for real defect %q", want)
+		}
 	}
 }

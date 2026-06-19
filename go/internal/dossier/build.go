@@ -1,6 +1,9 @@
 package dossier
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // BuildOpts configures a Build call.
 type BuildOpts struct {
@@ -22,6 +25,12 @@ type BuildOpts struct {
 func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	if cycle <= 0 {
 		return nil, fmt.Errorf("dossier: Build: cycle must be >= 1, got %d", cycle)
+	}
+	if strings.TrimSpace(opts.WorkspacePath) == "" {
+		return nil, fmt.Errorf("dossier: Build: WorkspacePath must not be blank")
+	}
+	if strings.TrimSpace(opts.Goal) == "" {
+		return nil, fmt.Errorf("dossier: Build: Goal must not be blank")
 	}
 	d := &Dossier{
 		Cycle:        cycle,

@@ -3,9 +3,9 @@ package dossier
 import "testing"
 
 // TestBuild verifies Build returns a populated Dossier with Cycle+Goal from
-// BuildOpts and at least one phase. RED: Build/BuildOpts don't exist yet.
+// BuildOpts and at least one phase.
 func TestBuild(t *testing.T) {
-	d, err := Build(1, BuildOpts{Goal: "reduce flags"})
+	d, err := Build(1, BuildOpts{WorkspacePath: t.TempDir(), Goal: "reduce flags"})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}

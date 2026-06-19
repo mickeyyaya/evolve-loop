@@ -7,13 +7,19 @@ import (
 	"text/template"
 )
 
-// RenderJSON serialises d to indented JSON bytes.
+// RenderJSON serialises d to indented JSON bytes with a trailing newline.
 func RenderJSON(d *Dossier) ([]byte, error) {
+	if d == nil {
+		return nil, fmt.Errorf("dossier: RenderJSON: nil dossier")
+	}
+	if err := d.Validate(); err != nil {
+		return nil, fmt.Errorf("dossier: RenderJSON: %w", err)
+	}
 	raw, err := json.MarshalIndent(d, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("dossier: RenderJSON: %w", err)
 	}
-	return raw, nil
+	return append(raw, '\n'), nil
 }
 
 // ParseJSON deserialises raw JSON bytes into a Dossier.
@@ -71,6 +77,12 @@ var markdownTmpl = template.Must(template.New("dossier-md").Parse(`# Cycle {{.Cy
 
 // RenderMarkdown renders d as a human-readable markdown document.
 func RenderMarkdown(d *Dossier) ([]byte, error) {
+	if d == nil {
+		return nil, fmt.Errorf("dossier: RenderMarkdown: nil dossier")
+	}
+	if err := d.Validate(); err != nil {
+		return nil, fmt.Errorf("dossier: RenderMarkdown: %w", err)
+	}
 	var buf bytes.Buffer
 	if err := markdownTmpl.Execute(&buf, d); err != nil {
 		return nil, fmt.Errorf("dossier: RenderMarkdown: %w", err)
