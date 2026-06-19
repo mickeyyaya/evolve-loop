@@ -74,6 +74,9 @@ type Policy struct {
 	// Bridge configures operator-writable bridge override directories.
 	// Absent ⇒ each bridge subsystem uses its built-in .evolve directory.
 	Bridge *BridgePolicy `json:"bridge,omitempty"`
+	// QuotaReset configures the quota-reset wake-time estimator. Absent ⇒
+	// built-in defaults apply (DefaultHours=5.4167, no ResetAt override).
+	QuotaReset *QuotaResetConfig `json:"quota_reset,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -390,4 +393,23 @@ func (p Policy) BridgeConfig() BridgePolicy {
 		return BridgePolicy{}
 	}
 	return *p.Bridge
+}
+
+// QuotaResetConfig configures the quota-reset wake-time estimator (quotareset package).
+// Replaces the EVOLVE_QUOTA_RESET_AT and EVOLVE_QUOTA_RESET_HOURS env reads.
+type QuotaResetConfig struct {
+	// ResetAt is an operator-supplied ISO 8601 wake-time override. Empty = no override.
+	ResetAt string `json:"reset_at,omitempty"`
+	// DefaultHours is the fallback wake duration when no override or hint file
+	// is present. Zero = use built-in default (5.4167 ≈ 5h25min).
+	DefaultHours float64 `json:"default_hours,omitempty"`
+}
+
+// QuotaResetConfig returns a QuotaResetConfig with defaults resolved.
+// When absent from policy.json the zero value means "use quotareset built-in defaults".
+func (p Policy) QuotaResetConfig() QuotaResetConfig {
+	if p.QuotaReset == nil {
+		return QuotaResetConfig{}
+	}
+	return *p.QuotaReset
 }

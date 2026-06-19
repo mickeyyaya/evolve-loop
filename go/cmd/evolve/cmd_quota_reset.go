@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
@@ -23,7 +26,12 @@ func runQuotaReset(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			}
 		}
 	}
-	r, err := quotareset.Compute(workspace, quotareset.Options{})
+	pol, _ := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))
+	qr := pol.QuotaResetConfig()
+	r, err := quotareset.Compute(workspace, quotareset.Options{
+		ResetAt:      qr.ResetAt,
+		DefaultHours: qr.DefaultHours,
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "[estimate-quota-reset] FATAL: %v\n", err)
 		return 1

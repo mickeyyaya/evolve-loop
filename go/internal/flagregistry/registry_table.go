@@ -9,7 +9,6 @@ package flagregistry
 // sorted (TestAll_SortedByName enforces this).
 var All = []Flag{
 	{Name: "EVOLVE_ACS_GO_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
-	{Name: "EVOLVE_ACS_PREDICATE_TIMEOUT_S", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ADAPTERS_DIR_OVERRIDE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_ADVISOR_DEPTH", Status: StatusActive, Kind: "int", Cluster: "Advisor Maximization (ADR-0052)", Doc: "Recursion-depth stamp for the PhaseAdvisor (advisor-maximization WS1-S2), DEFENSE-IN-DEPTH only: when ≥1 the advisor refuses to dispatch and the cycle degrades to the static path, so a brain can never nest another brain. The PRIMARY recursion guard is the mint denylist (mintConfigsFrom drops any minted phase named router/advisor); this env stamp catches the otherwise-unreachable case where such a phase were dispatched anyway. Unset/0/non-numeric = no guard (byte-identical normal path)."},
 	{Name: "EVOLVE_ALLOW_DEEP_RESEARCH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
@@ -92,8 +91,6 @@ var All = []Flag{
 	{Name: "EVOLVE_PROMPTS_DIR", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_PROMPT_MAX_TOKENS", Status: StatusActive, Cluster: "Observability / Prompt Tuning", Doc: "Soft prompt token cap for role-context-builder"},
 	{Name: "EVOLVE_PSMAS_SKIP", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
-	{Name: "EVOLVE_QUOTA_RESET_AT", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
-	{Name: "EVOLVE_QUOTA_RESET_HOURS", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_REAP_ORPHANS", Status: StatusActive, Kind: "bool", Default: "1", Cluster: "Concurrency / Sibling-Worktree (ADR-0054)", Doc: "Operator opt-out for the Tier-3 liveness orphan session reaper (ADR-0054 Slice 3). Default 1 = active (sessionreaper.ReapOrphans runs unconditionally in looppreflight). Set 0 to disable reaping for a run (e.g. for debugging leaked sessions). IMPORTANT: this flag is documentation/opt-out only — it does NOT gate sessionreaper's core logic in production; the reaper is wired unconditionally in looppreflight. Safety invariant: a run whose .lease is Fresh is NEVER reaped regardless of this dial. See internal/sessionreaper and evolve swarm reap-orphans [--dry-run]."},
 	{Name: "EVOLVE_REFLECTION_JOURNAL", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_RELEASE_REQUIRE_PREFLIGHT", Status: StatusActive, Cluster: "Observability / Prompt Tuning", Doc: "Force release preflight gate"},
