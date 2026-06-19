@@ -233,12 +233,12 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ unless EVOLVE_TRIAGE_DISABLE=1: advance triage triage
 2b. Triage (default-on; opt-out via EVOLVE_TRIAGE_DISABLE=1)
        Before invoking the Triage subagent, check the 3 auto-skip conditions
-       (Opt A, v10.19.0; default-on, opt-out via EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL=0):
+       (Opt A, v10.19.0; removed in flag-reduction campaign — auto-skip was the default):
          (i)   scout-report.md task count ≤ 1
          (ii)  state.json:carryoverTodos | length == 0
          (iii) predicate-dependency-check.sh returns exit 0 (no cross-cycle
                predicate-graph reachability via cycle-91 lesson)
-       If ALL three hold AND EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL != 0, write a
+       If ALL three hold, write a
        deterministic stub triage-report.md to $WORKSPACE with:
          - challenge_token (generate via openssl rand or `date +%s` fallback)
          - `cycle_size_estimate: trivial`

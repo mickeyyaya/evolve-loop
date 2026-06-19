@@ -300,7 +300,7 @@ For each `carryoverTodos[]` entry with a non-empty `action`, check whether Scout
 # Compute fingerprint
 fp=$(bash legacy/scripts/utility/task-fingerprint.sh --action "$action" \
        [--criteria "$criteria"] [--files "$files_hint"])
-# Check cache (exit 50 = DISABLED when EVOLVE_RESEARCH_CACHE_ENABLED unset)
+# Check cache (disabled — research cache feature removed)
 bash legacy/scripts/utility/research-cache.sh check "$task_id"
 ```
 

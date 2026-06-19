@@ -152,7 +152,7 @@ bash legacy/scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
 
 Loaded for Step 2.5.
 
-**Per-task cache check (Phase B; `EVOLVE_RESEARCH_CACHE_ENABLED=1`):** If `task.research_pointer` is non-empty, read from that path instead of doing KB scan or web search.
+**Per-task cache check (Phase B):** If `task.research_pointer` is non-empty, read from that path instead of doing KB scan or web search.
 - `Research Source: per-task-cache` — log in `## Research Sources` of build-report.md; skip remaining sub-steps.
 
 **Fallback (research_pointer absent or feature disabled):**
@@ -175,7 +175,7 @@ Convergence loop (pseudocode):
 ```
 for iter in 1..MAX_ITERS:
     all_clean = true
-    for skill in split(EVOLVE_BUILDER_REVIEW_SKILLS, ','):
+    for skill in split(reviewSkills, ','):
         invoke Skill tool with `skill` (the skill reads `git diff HEAD` itself)
         parse: composite_score (0.0-1.0), severity_counts (HIGH/CRITICAL)
         if composite_score >= THRESHOLD and HIGH+CRITICAL == 0:
@@ -187,7 +187,7 @@ for iter in 1..MAX_ITERS:
 record final state: converged | iter-cap-hit | error
 ```
 
-Skill contract: read diff; emit composite score 0.0-1.0 + severity (HIGH/CRITICAL); parseable output. Default: `code-review-simplify`; extend via `EVOLVE_BUILDER_REVIEW_SKILLS=code-review-simplify,refactor`.
+Skill contract: read diff; emit composite score 0.0-1.0 + severity (HIGH/CRITICAL); parseable output. Default: `code-review-simplify`; extend via the `reviewSkills` config.
 
 ---
 

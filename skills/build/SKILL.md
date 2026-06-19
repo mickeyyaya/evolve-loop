@@ -28,7 +28,7 @@ description: Use after tdd has written RED tests and the contract is in team-con
 
 ## Single-writer invariant
 
-Builder runs in a worktree with `EVOLVE_BUILDER_WORKTREE` set. Concurrent builders are STRUCTURALLY blocked because:
+Builder runs in a dedicated worktree. Concurrent builders are STRUCTURALLY blocked because:
 - The trust kernel binds the cycle via SHA256 of `git diff HEAD`
 - Two concurrent writers would invalidate each other's tree-state SHA
 - `phase-gate-precondition.sh` allows only one `active_agent` per cycle

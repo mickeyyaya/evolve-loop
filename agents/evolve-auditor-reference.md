@@ -181,7 +181,7 @@ HIGH	<issue>	<file>	<line>
 
 `legacy/scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
 
-`EVOLVE_PASS_CONFIDENCE_THRESHOLD=0.85` (default). **Why (P6):** "I think it works but I'm not sure" must NOT ship. Layer 5 makes confidence honesty load-bearing.
+Confidence threshold default 0.85. **Why (P6):** "I think it works but I'm not sure" must NOT ship. Layer 5 makes confidence honesty load-bearing.
 
 **Integration**: ship.sh post-audit chain (cycle-78+) invokes verdict-elevation.sh and updates `acs-verdict.json:verdict` if elevation fires.
 

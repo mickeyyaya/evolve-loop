@@ -283,7 +283,7 @@ Each audit criterion in `audit-report.md` MUST cite at least one of 8 principles
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `hypothesis-falsification-example` for schema, P4 requirement, and `unfalsifiable-claim` defect format.
 
 ## WARN-elevation hardening
-Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `warn-elevation` for confidence threshold, `EVOLVE_PASS_CONFIDENCE_THRESHOLD`, and `verdict-elevation.sh` integration.
+Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `warn-elevation` for confidence threshold and `verdict-elevation.sh` integration.
 
 ## Reflection Authoring (v10.20.0+)
 Execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md`'s `## Reflection` section and `audit-reflection.yaml` sidecar. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.

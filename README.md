@@ -2,7 +2,7 @@
 
 **Current (v20.0)** · A self-evolving development pipeline that improves your codebase while you sleep — with structural anti-gaming so you can trust the result.
 
-> **Breaking change (Go-only consolidation):** The bash trees (`scripts/` and `legacy/scripts/`) and the `EVOLVE_USE_LEGACY_BASH` rollback hatch have been removed — there is no bash fallback. The `evolve` Go binary (`go/bin/evolve`) is the sole runtime entrypoint; every operation is a native `evolve <subcommand>`. Operator integrations that hardcode `scripts/...` or `legacy/scripts/...` paths must move to the equivalent `evolve` subcommand. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the bash→Go port history.
+> **Breaking change (Go-only consolidation):** The bash trees (`scripts/` and `legacy/scripts/`) have been removed — there is no bash fallback. The `evolve` Go binary (`go/bin/evolve`) is the sole runtime entrypoint; every operation is a native `evolve <subcommand>`. Operator integrations that hardcode `scripts/...` or `legacy/scripts/...` paths must move to the equivalent `evolve` subcommand. See [docs/migration-from-bash.md](docs/migration-from-bash.md) for the bash→Go port history.
 
 Evolve Loop is an open-source plugin for AI coding assistants (Claude Code, Gemini CLI, Codex CLI) that runs autonomous improvement cycles on your codebase. Each cycle finds work, implements it, adversarially audits its own output, ships only what passes deterministic predicate checks, and extracts durable lessons from failures so the next cycle is smarter.
 
@@ -625,7 +625,7 @@ Two-surface model:
 
 Everything learned, applied, or verified across cycles MUST land in one of those two surfaces. Memory entries (`~/.claude/projects/.../memory/`) are operator-scoped — mirror to `docs/` when team-shareable.
 
-Research persistence rule: when a cycle's research is non-trivial (web searches, library evaluations, paper reviews), Scout records sources in `scout-report.md` AND the operator (or Scout itself if `EVOLVE_RESEARCH_CACHE_ENABLED=1` v9.X+) promotes the substance to `knowledge-base/research/<topic>.md`. The next cycle doesn't re-research.
+Research persistence rule: when a cycle's research is non-trivial (web searches, library evaluations, paper reviews), Scout records sources in `scout-report.md` AND the operator (or Scout itself) promotes the substance to `knowledge-base/research/<topic>.md`. The next cycle doesn't re-research.
 
 See [docs/architecture/private-context-policy.md](docs/architecture/private-context-policy.md) for the full policy.
 
