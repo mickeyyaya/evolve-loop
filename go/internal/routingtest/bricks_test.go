@@ -127,7 +127,10 @@ func TestBrick_EnableEnvAndTriggerBricks(t *testing.T) {
 	if s.Enable["triage"] != config.EnableOff || s.Enable["memo"] != config.EnableOn {
 		t.Fatalf("enable map = %+v", s.Enable)
 	}
-	if s.Env["EVOLVE_REQUIRE_INTENT"] != "1" || s.Env["EVOLVE_STRICT_AUDIT"] != "1" {
+	if s.Enable["intent"] != config.EnableOn {
+		t.Fatalf("IntentRequired() must set Enable[intent]=on; got enable=%+v", s.Enable)
+	}
+	if s.Env["EVOLVE_STRICT_AUDIT"] != "1" {
 		t.Fatalf("env map = %+v", s.Env)
 	}
 	trigger := s.Triggers["tester"]

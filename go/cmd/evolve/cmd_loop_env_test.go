@@ -65,13 +65,15 @@ func TestBuildCycleEnv_CLIOverridesEnv(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_DispatcherFlagsPropagate covers the 3 explicitly-set
-// dispatcher flags (ConsensusAudit, Resume, Reset) — present iff bool set.
+// TestBuildCycleEnv_DispatcherFlagsPropagate covers the explicitly-set
+// dispatcher flags (Resume, Reset) — present iff bool set.
+// ConsensusAudit is no longer written to the cycle env; it is configured
+// via policy.json workflow.consensus_audit_enabled instead.
 func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 	t.Run("all set", func(t *testing.T) {
-		cfg := loopConfig{Strategy: "balanced", ConsensusAudit: true, Resume: true, Reset: true}
+		cfg := loopConfig{Strategy: "balanced", Resume: true, Reset: true}
 		got := buildCycleEnv(cfg, nil)
-		for _, k := range []string{"EVOLVE_CONSENSUS_AUDIT", "EVOLVE_RESUME", "EVOLVE_RESET"} {
+		for _, k := range []string{"EVOLVE_RESUME", "EVOLVE_RESET"} {
 			if got[k] != "1" {
 				t.Errorf("%s not set; got=%v", k, got)
 			}
@@ -80,7 +82,7 @@ func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 	t.Run("none set", func(t *testing.T) {
 		cfg := loopConfig{Strategy: "balanced"}
 		got := buildCycleEnv(cfg, nil)
-		for _, k := range []string{"EVOLVE_CONSENSUS_AUDIT", "EVOLVE_RESUME", "EVOLVE_RESET"} {
+		for _, k := range []string{"EVOLVE_RESUME", "EVOLVE_RESET"} {
 			if _, present := got[k]; present {
 				t.Errorf("%s must not be set when flag false; got=%q", k, got[k])
 			}

@@ -181,19 +181,6 @@ func TestLoad_PerPhaseEnabledAndTriggers(t *testing.T) {
 	}
 }
 
-func TestLoad_LegacyFlagAbsorption(t *testing.T) {
-	cfg, _ := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
-		"EVOLVE_TRIAGE_DISABLE": "1",
-		"EVOLVE_REQUIRE_INTENT": "1",
-	})
-	if cfg.PhaseEnable["triage"] != EnableOff {
-		t.Errorf("triage enable = %v, want EnableOff (EVOLVE_TRIAGE_DISABLE=1)", cfg.PhaseEnable["triage"])
-	}
-	if cfg.PhaseEnable["intent"] != EnableOn {
-		t.Errorf("intent enable = %v, want EnableOn (EVOLVE_REQUIRE_INTENT=1)", cfg.PhaseEnable["intent"])
-	}
-}
-
 func TestParseCondRule(t *testing.T) {
 	cases := []struct {
 		in              string

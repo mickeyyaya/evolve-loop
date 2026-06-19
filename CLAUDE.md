@@ -40,7 +40,7 @@ bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date
 
 ## Critical runtime facts (full table → runtime-reference.md)
 
-- Gates default-ON: `.evolve/policy.json` `gates.eval_gate=enforce` and `gates.contract_gate=enforce`; EGPS `red_count==0` to ship, `EVOLVE_TEST_PHASE_ENABLED=1`.
+- Gates default-ON: `.evolve/policy.json` `gates.eval_gate=enforce` and `gates.contract_gate=enforce`; EGPS `red_count==0` to ship, tdd phase enabled via `workflow.phase_enables.tdd=on`.
 - Default execution = tmux-LLM drivers (`claude-tmux` etc.); headless `claude -p` is opt-in only. Claude OAuth detected from macOS Keychain.
 - Commits: bare `git commit` / `git push origin main` are ship-gate-denied. Interactive commits: `/commit` → attestation → `evolve ship --class manual` (`--bypass-commit-gate` routine use is a violation). Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z` — "publish" ≠ "push".
 - Unfinished cycle → `evolve loop --resume` or `evolve cycle reset`; never routine `EVOLVE_FORCE_FRESH=1`.

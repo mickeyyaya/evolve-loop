@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -140,6 +141,20 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	opts := []core.Option{core.WithRouting(cfg, strat)}
 	if agent != nil && s.Agent.hasPlan() {
 		opts = append(opts, core.WithPlanner(agent))
+	}
+	// Mirror s.Enable into WorkflowConfig.PhaseEnables so orchestrator-level
+	// intent-gate logic (cyclerun.go) sees the same enables as the router.
+	if len(s.Enable) > 0 {
+		phaseEnables := make(map[string]string, len(s.Enable))
+		for phase, e := range s.Enable {
+			switch e {
+			case config.EnableOn:
+				phaseEnables[phase] = "on"
+			case config.EnableOff:
+				phaseEnables[phase] = "off"
+			}
+		}
+		opts = append(opts, core.WithWorkflowConfig(policy.WorkflowConfig{PhaseEnables: phaseEnables}))
 	}
 
 	projectRoot := t.TempDir()

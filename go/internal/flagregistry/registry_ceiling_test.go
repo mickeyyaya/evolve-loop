@@ -7,8 +7,9 @@ import "testing"
 // same diff — the test below fails if a net addition pushes count above the
 // current ceiling.
 //
-// Cycle 38 migrates ROUTER_CLI, ROUTER_MODEL, and GC flags to policy structs.
-const FlagCeiling = 80
+// Cycle 39 migrates 6 legacyFlags (REQUIRE_INTENT, TRIAGE_DISABLE, PLAN_REVIEW,
+// TEST_PHASE_ENABLED, BUILD_PLANNER, SWARM_PLANNER) and CONSENSUS_AUDIT to policy structs.
+const FlagCeiling = 73
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

@@ -103,26 +103,6 @@ Add rate limiter to /login
 	}
 }
 
-func TestRun_DisabledByEnv_SKIPPED(t *testing.T) {
-	// EVOLVE_TEST_PHASE_ENABLED=0 short-circuits TDD (fallback to
-	// Builder writing own predicates per CLAUDE.md env table).
-	fb := &fakeBridge{}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_TEST_PHASE_ENABLED": "0"},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if resp.Verdict != core.VerdictSKIPPED {
-		t.Errorf("Verdict=%q, want SKIPPED", resp.Verdict)
-	}
-	if resp.NextPhase != "build" {
-		t.Errorf("NextPhase=%q, want build", resp.NextPhase)
-	}
-}
-
 func TestRun_NoAcceptance_FAIL(t *testing.T) {
 	body := "# Team Context\n\n## Goal\nx\n\n## RED Tests\n- a_test.go\n"
 	// Missing "## Acceptance" → contract incomplete → FAIL.

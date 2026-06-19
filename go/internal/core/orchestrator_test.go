@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // Orchestrator phase-1 test surface — uses fake adapters to verify the
@@ -497,18 +499,20 @@ func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
 	}
 }
 
-// EVOLVE_REQUIRE_INTENT=1 in CycleRequest.Env triggers the intent phase
+// PhaseEnables["intent"]="on" in WorkflowConfig triggers the intent phase
 // before Scout. CycleState.IntentRequired is persisted so resume +
 // downstream consumers can read it.
-func TestOrchestrator_IntentGate_EnvVarRunsIntentFirst(t *testing.T) {
+func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	o := NewOrchestrator(st, led, runners)
+	o := NewOrchestrator(st, led, runners, WithWorkflowConfig(policy.WorkflowConfig{
+		PhaseEnables: map[string]string{"intent": "on"},
+	}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: "/tmp/p",
-		Env:         map[string]string{"EVOLVE_REQUIRE_INTENT": "1"},
+		Env:         map[string]string{},
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)

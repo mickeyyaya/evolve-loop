@@ -75,20 +75,20 @@ When phase-observer reporting is enabled by policy, each subagent spawns a phase
 
 ## EGPS Tester Phase (default-on as of cycle-86)
 
-`EVOLVE_TEST_PHASE_ENABLED` defaults to `1` as of cycle-86 (predicate-quality Layer 4). The phase flow **always includes TDD between Triage and Build**:
+The `tdd` phase is default-on (enabled via `workflow.phase_enables.tdd=on` in policy.json) as of cycle-86 (predicate-quality Layer 4). The phase flow **always includes TDD between Triage and Build**:
 
 ```
 Scout → Triage → TDD-Engineer → Builder → Auditor → Ship
 ```
 
-When `EVOLVE_TEST_PHASE_ENABLED=1` (default):
+When tdd phase enabled (default):
 1. After Triage: `cycle-state.sh advance test tdd-engineer`
 2. Run: `subagent-run.sh tdd-engineer $CYCLE $WORKSPACE`
 3. TDD-Engineer writes `acs/cycle-N/*.sh` behavioral predicates BEFORE Builder runs.
 4. Builder implements to make those predicates pass.
 5. After Builder: Tester validates Builder's predicates with lint + mutation checks.
 
-When `EVOLVE_TEST_PHASE_ENABLED=0` (opt-out): Builder writes its own predicates (v10.1 fallback). This degrades predicate quality — avoid unless debugging.
+When tdd phase opted out (`workflow.phase_enables.tdd=off`): Builder writes its own predicates (v10.1 fallback). This degrades predicate quality — avoid unless debugging.
 
 Full protocol + gate rationale: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `egps-tester-phase`.
 

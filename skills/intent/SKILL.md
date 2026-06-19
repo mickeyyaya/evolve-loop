@@ -1,15 +1,15 @@
 ---
 name: intent
-description: Pre-Scout intent capture phase. Structures vague user goals into intent.md before any subagent budget is spent. Opt-in via EVOLVE_REQUIRE_INTENT=1.
+description: Pre-Scout intent capture phase. Structures vague user goals into intent.md before any subagent budget is spent. Opt-in via policy.json workflow.phase_enables.intent=on.
 ---
 
 # intent
 
-> Sprint 4 composable skill (v8.19.0+). Wraps the new Intent phase that runs between Calibrate and Research when `EVOLVE_REQUIRE_INTENT=1`. Single-persona, autonomy-preserving — no human checkpoint mid-cycle.
+> Sprint 4 composable skill (v8.19.0+). Wraps the new Intent phase that runs between Calibrate and Research when `workflow.phase_enables.intent=1`. Single-persona, autonomy-preserving — no human checkpoint mid-cycle.
 
 ## When to invoke
 
-- **Autonomous**: orchestrator advances to phase=intent when `cycle-state.intent_required==true` (set at cycle init from `EVOLVE_REQUIRE_INTENT=1`)
+- **Autonomous**: orchestrator advances to phase=intent when `cycle-state.intent_required==true` (set at cycle init from `workflow.phase_enables.intent=1`)
 - **User-driven**: `/evolve-loop:intent`, before `/evolve-loop:loop`, to lock in structured intent
 - **Re-run**: re-invoke to replace prior intent.md within the same cycle (kernel accepts latest ledger entry)
 
@@ -17,7 +17,7 @@ description: Pre-Scout intent capture phase. Structures vague user goals into in
 
 - After Scout has already run for this cycle (intent must precede research)
 - For pure-execution cycles where the goal is fully specified (e.g., "fix typo at file.md:42") — but in practice, even those benefit from the explicit `non_goals` and `acceptance_checks`
-- When `EVOLVE_REQUIRE_INTENT` is unset and the user has not explicitly invoked `/evolve-loop:intent` — default flow skips this phase
+- When `workflow.phase_enables.intent` is unset and the user has not explicitly invoked `/evolve-loop:intent` — default flow skips this phase
 
 ## Workflow
 
@@ -44,7 +44,7 @@ Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, gi
 
 | Fact | Value |
 |---|---|
-| Phase | `intent` (plan archetype, optional, gated by `EVOLVE_REQUIRE_INTENT`) |
+| Phase | `intent` (plan archetype, optional, gated by `workflow.phase_enables.intent=on`) |
 | Persona | `agents/evolve-intent.md` |
 | Profile | `.evolve/profiles/intent.json` — CLI `claude-tmux`, tier `deep`, single-writer |
 | Artifact | `intent.md` (cycle workspace) |

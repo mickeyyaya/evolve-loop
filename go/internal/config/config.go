@@ -290,39 +290,6 @@ type Warning struct {
 	Message string
 }
 
-// legacyEnableFlags maps a legacy per-phase env flag to (phase, valueWhenSet).
-// Absorbing them here keeps the flags out of the phase code (no os.Getenv in
-// triage/buildplanner/scout/audit/retro after the PhasePolicy refactor).
-type legacyFlag struct {
-	phase    string
-	whenOne  Enable // value when env == "1"
-	whenZero Enable // value when env == "0"
-	// deprecated, when non-empty, is the migration guidance WARNed (code
-	// "deprecated-flag") whenever the operator sets the flag — the binding
-	// still applies for one more release.
-	deprecated string
-}
-
-var legacyFlags = map[string]legacyFlag{
-	"EVOLVE_REQUIRE_INTENT": {phase: "intent", whenOne: EnableOn, whenZero: EnableContent},
-	// EVOLVE_TRIAGE_DISABLE: =1 disables triage; =0 explicitly enables it
-	// (legacy default is on, so =0 must map to On, NOT Content — Content with
-	// no trigger would wrongly skip).
-	"EVOLVE_TRIAGE_DISABLE": {phase: "triage", whenOne: EnableOff, whenZero: EnableOn},
-	"EVOLVE_PLAN_REVIEW":    {phase: "plan-review", whenOne: EnableOn, whenZero: EnableOff},
-	// EVOLVE_TEST_PHASE_ENABLED is the real runtime flag the tdd phase reads
-	// (=1 on, =0 off); the registry's enable_var metadata historically said
-	// EVOLVE_TDD_PHASE, which never matched the phase code. config.Load is now
-	// the single interpreter, so it binds the flag the phase actually honors.
-	"EVOLVE_TEST_PHASE_ENABLED": {phase: "tdd", whenOne: EnableOn, whenZero: EnableOff},
-	"EVOLVE_BUILD_PLANNER":      {phase: "build-planner", whenOne: EnableOn, whenZero: EnableOff},
-	// Swarm planner (ADR-0032) — opt-in like build-planner. EVOLVE_SWARM_STAGE
-	// (shadow|advisory|enforce) is the rollout dial; any non-empty value other
-	// than off/shadow enables the planner phase. config.Load maps the legacy =1
-	// form here; the orchestrator reads the stage for dispatch behavior.
-	"EVOLVE_SWARM_PLANNER": {phase: "swarm-plan", whenOne: EnableOn, whenZero: EnableOff},
-}
-
 // registryDoc is the subset of phase-registry.json this loader reads.
 type registryDoc struct {
 	Config struct {
@@ -383,10 +350,10 @@ var staticSpinePhases = map[string]struct{}{
 
 // validateInertEnables warns when PhaseEnable[p]=EnableOn but p is neither
 // mandatory, in the static spine, nor reachable via the router (Stage<Advisory).
-// The classic trigger is EVOLVE_PLAN_REVIEW=1 with default routing: plan-review
-// only runs at Stage>=Advisory, so the enable is silently inert at Stage=Off
-// AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but the
-// STATIC state machine still drives execution — so non-spine phases remain
+// The classic trigger is plan-review enabled via policy.json with default routing:
+// plan-review only runs at Stage>=Advisory, so the enable is silently inert at
+// Stage=Off AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but
+// the STATIC state machine still drives execution — so non-spine phases remain
 // unreachable). Surfacing this prevents the operator-confusion failure mode
 // from cycle 120.
 func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
@@ -551,21 +518,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 			cfg.MaxInsertions = n
 		} else {
 			*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("EVOLVE_MAX_OPTIONAL_INSERTIONS=%q not an int", v)})
-		}
-	}
-	// Legacy per-phase enable flags absorbed here (kept out of phase code).
-	for flag, lf := range legacyFlags {
-		v := env[flag]
-		if v != "1" && v != "0" {
-			continue
-		}
-		if lf.deprecated != "" {
-			*ws = append(*ws, Warning{"deprecated-flag", fmt.Sprintf("%s is deprecated — %s", flag, lf.deprecated)})
-		}
-		if v == "1" {
-			cfg.PhaseEnable[lf.phase] = lf.whenOne
-		} else {
-			cfg.PhaseEnable[lf.phase] = lf.whenZero
 		}
 	}
 }

@@ -102,8 +102,8 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 - External invocation ~2-5K tokens; `/code-review-simplify` pipeline ~5K. Skip if guidance in applied instinct.
 
 Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
-### Step 2.8: Advisory Build-Plan Read (if EVOLVE_BUILD_PLANNER=1)
-If `workspace/build-plan.md` exists (produced by the build-planner phase when `EVOLVE_BUILD_PLANNER=1`):
+### Step 2.8: Advisory Build-Plan Read (if build-planner phase enabled)
+If `workspace/build-plan.md` exists (produced by the build-planner phase when `workflow.phase_enables.build-planner=on`):
 - Read `workspace/build-plan.md` before starting Step 3.
 - In `build-report.md`, cite at least one directive from build-plan.md:
   either as "adhered: <directive>" or "diverged: <directive> — reason: <why>".
@@ -264,7 +264,7 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
 ## EGPS Predicate Authoring
 
-**Builder MUST NOT write or modify ACS predicates** — neither the Go form (`go/acs/cycle*/**`, the current authoring target) nor the legacy bash form (`acs/cycle-*/*.sh`, `acs/regression-suite/**`). Predicate authoring is the exclusive responsibility of the TDD-engineer phase (enabled via `EVOLVE_TEST_PHASE_ENABLED=1`). This separation prevents the test-author == code-author cooperative-bias failure mode (cycle-85 fake-predicate incident: 7/7 predicates degenerated into `grep -qF "magic_string" file.sh` checks).
+**Builder MUST NOT write or modify ACS predicates** — neither the Go form (`go/acs/cycle*/**`, the current authoring target) nor the legacy bash form (`acs/cycle-*/*.sh`, `acs/regression-suite/**`). Predicate authoring is the exclusive responsibility of the TDD-engineer phase (enabled via `workflow.phase_enables.tdd=on`). This separation prevents the test-author == code-author cooperative-bias failure mode (cycle-85 fake-predicate incident: 7/7 predicates degenerated into `grep -qF "magic_string" file.sh` checks).
 
 If you observe an existing predicate that appears wrong, do NOT edit it. Record an entry in `workspace/abnormal-events.jsonl` describing the issue; the next TDD-engineer cycle will adjudicate.
 

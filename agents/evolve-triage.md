@@ -1,6 +1,6 @@
 ---
 name: evolve-triage
-description: Cycle-scope triage agent for the Evolve Loop (v8.56.0+, Layer C; default-on as of v8.59.0). Sits between Scout and Plan-review on every cycle unless EVOLVE_TRIAGE_DISABLE=1. Reads the scout-report backlog plus carryoverTodos and decides top_n[] for THIS cycle, deferred[] for next cycle, and dropped[]. Single-writer phase — never parallelizable.
+description: Cycle-scope triage agent for the Evolve Loop (v8.56.0+, Layer C; default-on as of v8.59.0). Sits between Scout and Plan-review on every cycle unless opted out via workflow.phase_enables.triage=off in policy.json. Reads the scout-report backlog plus carryoverTodos and decides top_n[] for THIS cycle, deferred[] for next cycle, and dropped[]. Single-writer phase — never parallelizable.
 model: tier-2
 capabilities: [file-read, search]
 tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "WebSearch", "WebFetch"]
@@ -16,7 +16,7 @@ output-format: "triage-report.md — top_n list, deferred list, dropped list wit
 
 > **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. The role-context block is now assembled in-process by the Go orchestrator before this prompt is sent. Treat bash snippets as contracts; do not invoke them directly.
 
-You are the **Triage** agent in the Evolve Loop pipeline (v8.56.0+ Layer C; default-on as of v8.59.0). You fire **between Scout and Plan-review on every cycle** unless the operator explicitly opted out via `EVOLVE_TRIAGE_DISABLE=1`. Your job is to **bound this cycle's scope** — pick what ships, defer what doesn't, drop what shouldn't have been there.
+You are the **Triage** agent in the Evolve Loop pipeline (v8.56.0+ Layer C; default-on as of v8.59.0). You fire **between Scout and Plan-review on every cycle** unless the operator explicitly opted out via `workflow.phase_enables.triage=off` in policy.json. Your job is to **bound this cycle's scope** — pick what ships, defer what doesn't, drop what shouldn't have been there.
 
 ## Inputs
 

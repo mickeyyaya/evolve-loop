@@ -59,7 +59,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_BUILDER_COST_GUARD_STRICT` | DEPRECATED (no-op) | Former builder cost-overrun hard-fail switch |
 | `EVOLVE_CHECKPOINT_WARN_AT_PCT` / `EVOLVE_CHECKPOINT_AT_PCT` | DEPRECATED (no-op) | Former cost-percentage checkpoint thresholds |
 | `EVOLVE_PHASE_COST_CEILING` | DEPRECATED (no-op) | Former cyclehealth per-phase cost-ceiling anomaly |
-| `EVOLVE_BUILD_PLANNER` | ACTIVE (advisory; default on) | Opt C build-planner phase (NOT a cost flag). `1` = advisory (build-plan.md produced); `0` = opt-out. See ADR-0019. |
+| `workflow.phase_enables.build-planner` | MIGRATED (cycle-39) | Opt C build-planner phase. Set `on` in policy.json to enable (advisory mode). Replaces removed env flag. See ADR-0019. |
 
 > **Token-budget cost gates removed**: the dollar-cost calculation and every gate
 > that decided off it (loop stop, phase FAIL, checkpoint-by-cost, optional-phase
@@ -89,8 +89,8 @@ or `--bypass-prefix-gate`.
 
 | Flag | Status | Purpose |
 |------|--------|---------|
-| `EVOLVE_TRIAGE_DISABLE` | ACTIVE | Opt-out of triage default-on (v8.59+) |
-| `EVOLVE_TRIAGE_ENABLED` | DEAD | v8.56–v8.58 opt-in; replaced by `EVOLVE_TRIAGE_DISABLE`; removed from docs |
+| `workflow.phase_enables.triage` | MIGRATED (cycle-39) | Triage opt-out: set `=off` in policy.json. Default-on (v8.59+). Replaces removed env flag. |
+| `EVOLVE_TRIAGE_ENABLED` | DEAD | v8.56–v8.58 opt-in; replaced by env flag (now removed, cycle-39); use policy.json triage phase_enables. |
 
 
 ## Platform / CLI Hybrid
@@ -122,8 +122,8 @@ or `--bypass-prefix-gate`.
 |------|--------|---------|
 | `EVOLVE_STRICT_AUDIT` | ACTIVE (canonical) | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
 | `EVOLVE_STRICT_FAILURES` | DEAD | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
-| `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
-| `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
+| `workflow.phase_enables.intent` | MIGRATED (cycle-39) | Force intent phase on every cycle: set `=on` in policy.json. Replaces removed env flag. |
+| `workflow.phase_enables.plan-review` | MIGRATED (cycle-39) | Enable Sprint 2 plan-review phase (opt-in): set `=on` in policy.json. Replaces removed env flag. |
 | `EVOLVE_DISPATCH_STOP_ON_FAIL` | REMOVED (dispatch-cluster-28) | Former dispatch fail-fast switch; moved to `policy.json` `dispatch.policy` config |
 | `EVOLVE_DISPATCH_VERIFY` | REMOVED (dispatch-cluster-28) | Former dispatch verify toggle; moved to `policy.json` `dispatch.policy` config |
 | `EVOLVE_AUTO_PRUNE` | ACTIVE | Enable auto-prune of expired state entries |
@@ -182,7 +182,7 @@ or `--bypass-prefix-gate`.
 
 | Flag | Evidence | Action |
 |------|---------|--------|
-| `EVOLVE_TRIAGE_ENABLED` | Comment-only; production uses `EVOLVE_TRIAGE_DISABLE` | Removed from CLAUDE.md in cycle 7 |
+| `EVOLVE_TRIAGE_ENABLED` | Comment-only; production now uses `workflow.phase_enables.triage` (policy.json) | Removed from CLAUDE.md in cycle 7; env opt-out also removed in cycle-39 |
 | `EVOLVE_DIR_OVERRIDE` | Test-only conditional; no production reader | Leave in test; document as test-only |
 | `EVOLVE_PROJECT_ROOT_OVERRIDE` | 1 occurrence, no reader | Document as dead |
 | `EVOLVE_REPO_ROOT_OVERRIDE` | 1 occurrence, no reader | Document as dead |
@@ -218,7 +218,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_ARTIFACT_MAX_EXTENDS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ARTIFACT_TIMEOUT_S` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_BOOT_TIMEOUT_S` | active | int | 60 | Platform / CLI Hybrid | Boot-wait deadline in seconds for the tmux REPL driver (CI boot-budget override; default tmuxREPLBootTimeoutS=60). Readers: go/internal/bridge/driver_tmux_repl.go, recipe_adapter.go |
-| `EVOLVE_BUILD_PLANNER` | active | — | — | Budget Cluster | Opt C build-planner phase. `1` = advisory (default; build-plan.md produced, Builder reads it as a sanity check); `0` = opt-out. Enforce mode in cycle-105 (Builder Step 3 removed). 3-cycle rollout: shadow→advisory→enforce. Revert: `EVOLVE_BUILD_PLANNER=0`. See ADR-0019. |
 | `EVOLVE_CACHE_PREFIX_V2` | active | — | — | Observability / Prompt Tuning | v8.61.0 Campaign A — static-first / dynamic-last prompt layering. When `1`: (Cycle A1) subagent-run.sh emits a small INVOCATION CONTEXT user prompt; (Cycle A2) claude.sh attaches the role-specific bedrock from `build-invocation-context.sh` via `--append-system-prompt` AND adds `--exclude-dynamic-system-prompt-sections` so per-machine sections move out of the cached system layer. Promoted to default=1 in cycle 43 (v10.6+), overdue since v8.62 target. Set `EVOLVE_CACHE_PREFIX_V2=0` to revert to legacy v1 ordering. |
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CLI_HEALTH` | active | — | — | Readiness Gate (pre-batch) | The one dial for the CLI-health bench layer (cycle-283: a quota-walled codex re-burned its boot on every dispatch all night because nothing remembered the wall). `0` disables ALL of it: the runner's bench-writer (exit-85 + classified `rate_limit` escalation → bench the CLI FAMILY in `.evolve/cli-health.json`, `benched_until` from the wall's own reset hint else a strike-doubled cooldown), the dispatch-chain demotion (benched families start at their fallback; bench is advice — all-benched dispatches least-recently-benched with a loud WARN; policy pins bypass entirely), the loop's per-cycle canary (one `bridge.LiveSmokeTest` per EXPIRED bench: recovered → cleared, walled again → strikes+1), and the advisor's environmental "CLI health" prompt section. Preflight's `cli-health` check (WARN-only) and `evolve doctor live <driver>` (the probe that can SEE a quota wall — boot smoke cannot, walls appear only after work is submitted) remain readable surfaces. |
@@ -229,7 +228,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_COMPACT_PROMPTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_COMPOSE_PHASES` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_CONDITIONAL_MANDATORY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | `phase:expr` conditional-mandatory predicate; op ∈ `!= == >= <= > <` |
-| `EVOLVE_CONSENSUS_AUDIT` | active | — | — | Workflow Defaults | Enable consensus-dispatch for auditor |
 | `EVOLVE_DISABLE_WORKSPACE_GUARD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_DYNAMIC_ROUTING` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
@@ -254,7 +252,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_PHASE_IO` | active | — | — | Phase I/O (ADR-0050) | ADR-0050 Phase-3 unified-phase-I/O rollout dial. FULL off→shadow→advisory→enforce ladder (4-value, unlike the 3-value gate dials). off = dormant legacy dispatch, byte-identical (the rollback escape hatch); shadow = typed envelope assembled + compared against legacy disk reads (mismatch → ledger phaseio_shadow_mismatch); advisory = envelope populated + read alongside legacy (legacy still wins); enforce = the typed envelope is AUTHORITATIVE — phase readers consume it and the audit/ship verdict parse is sentinel-mandatory. DEFAULT enforce as of the 3.10 cutover (was off through 18.14.0); set EVOLVE_PHASE_IO=off to roll back. A typo falls back to off (fail-safe, never leaves the dial in an unintended state). |
 | `EVOLVE_PHASE_RECOVERY` | active | — | — | Phase Recovery (ADR-0044, Go-native — one dial for the whole program) | The one dial for BOTH the ADR-0044 phase-recovery program (terminal-state recovery) AND the ADR-0045 corrective-interaction program (repair a live/just-completed phase through bounded interaction). ADR-0044: fatal-pane fast-fail at the stop-review checkpoint, the observer's chain-backed StallPolicy (subprocess injects it ONLY at explicit `enforce`), and the orchestrator's escalate→advise→promote hook (`config.RolloutStages.PhaseRecovery` view). ADR-0045 corrective ACTIONS ride the SAME stage: the graduated correction ladder (salvage→live-fix→re-dispatch), the pre-85 AskBroker rung, promoted-rule enforcement, and the live bidirectional channel (ADR-0037, folded in at I6 — `enforce` implies the channel). **Telemetry is EXEMPT**: ADR-0045 I1 interaction telemetry (`<phase>-interactions.ndjson` + `interaction-summary.json`) records at EVERY stage including `off` — only ACTIONS gate. Stages: `off` (detectors not consulted, no corrective actions; byte-identical legacy — telemetry still records) / `shadow` (DEFAULT — detect + log the would-act for every rung, legacy behavior decides; byte-identical) / `enforce` (fatal-pane preempt with `stop`; salvage relocates a misplaced deliverable; the kernel answers a blocking question pre-85; promoted enforce-stage rules fire; exit 81 hands the phase to the runner's CLI fallback chain). Unknown value → `off` (a typo never enables a kill-path). A Busy pane is never preempted/interrupted regardless of stage |
 | `EVOLVE_PHASE_ROOTS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_PLAN_REVIEW` | active | — | — | Workflow Defaults | Enable Sprint 2 plan-review phase (opt-in) |
 | `EVOLVE_PLAN_WORKSPACE` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_PLATFORM` | active | — | — | Platform / CLI Hybrid | Override platform detection |
 | `EVOLVE_PLUGIN_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Read-only plugin install location |
@@ -268,7 +265,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_REQUIRE_INTENT` | active | — | — | Workflow Defaults | Force intent phase on every cycle |
 | `EVOLVE_RESET` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RETRO_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ROUTING_MODE` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
@@ -282,11 +278,8 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_STDOUT_FILTER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_STRATEGY` | active | — | — | Workflow Defaults | Cycle strategy override |
 | `EVOLVE_STRICT_AUDIT` | active | — | — | Workflow Defaults | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
-| `EVOLVE_SWARM_PLANNER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |
-| `EVOLVE_TEST_PHASE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TRIAGE_DISABLE` | active | — | — | Triage Cluster (cycle 7 trim) | Opt-out of triage default-on (v8.59+) |
 | `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 | `EVOLVE_WORKTREE_BASE` | active | — | — | Worktree / Workspace | Per-cycle worktree base path |
 | `EVOLVE_WORKTREE_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |

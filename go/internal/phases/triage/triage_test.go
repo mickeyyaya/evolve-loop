@@ -100,30 +100,6 @@ func TestRun_HappyPath_PASSWithTopN(t *testing.T) {
 	}
 }
 
-func TestRun_DisabledByEnv_SKIPPED(t *testing.T) {
-	// EVOLVE_TRIAGE_DISABLE=1 short-circuits without calling bridge.
-	fb := &fakeBridge{}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle:       1,
-		ProjectRoot: "/p",
-		Workspace:   t.TempDir(),
-		Env:         map[string]string{"EVOLVE_TRIAGE_DISABLE": "1"},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if resp.Verdict != core.VerdictSKIPPED {
-		t.Errorf("Verdict=%q, want SKIPPED", resp.Verdict)
-	}
-	if resp.NextPhase != "tdd" {
-		t.Errorf("NextPhase=%q, want tdd", resp.NextPhase)
-	}
-	if fb.gotReq.Cycle != 0 {
-		t.Errorf("bridge.Launch should not be called when triage disabled")
-	}
-}
-
 func TestRun_EmptyTopN_FAIL(t *testing.T) {
 	body := `# Triage Report
 

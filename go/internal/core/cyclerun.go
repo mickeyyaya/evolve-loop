@@ -234,10 +234,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	startedAt := o.now().UTC().Format(time.RFC3339)
 	// IntentRequired is the gate for the start→intent vs start→scout
 	// edge. Source priority: explicit Context["intent_required"]=="true"
-	// from the caller > env EVOLVE_REQUIRE_INTENT=="1" > false. This
-	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
+	// from the caller > policy WorkflowConfig.PhaseEnables["intent"]=="on" > false.
 	intentRequired := req.Context["intent_required"] == "true" ||
-		envchain.BoolValue(req.Env["EVOLVE_REQUIRE_INTENT"], false)
+		o.workflowConfig.PhaseEnables["intent"] == "on"
 	// CA.5: one ULID per run — persisted in the cycle state; the
 	// construction-time stampingLedger stamps it on every ledger entry for
 	// as long as it is the current id (cleared on every exit path).

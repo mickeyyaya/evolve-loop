@@ -266,9 +266,6 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 	}
 	// Dispatcher-derived overrides — CLI > env.
 	out["EVOLVE_STRATEGY"] = cfg.Strategy
-	if cfg.ConsensusAudit {
-		out["EVOLVE_CONSENSUS_AUDIT"] = "1"
-	}
 	if cfg.Resume {
 		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
 		// does not classify this parent-to-child handoff as a configurable flag.

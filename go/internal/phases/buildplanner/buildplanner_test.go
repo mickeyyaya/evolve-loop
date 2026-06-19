@@ -9,7 +9,7 @@ import (
 
 func TestShouldSkip_ShadowMode(t *testing.T) {
 	p := New(Config{})
-	req := core.PhaseRequest{} // Env nil → EVOLVE_BUILD_PLANNER unset
+	req := core.PhaseRequest{} // default: build-planner disabled (shadow mode)
 	skip, verdict, next, diags := p.ShouldSkip(req)
 	if !skip {
 		t.Error("want skip=true when EVOLVE_BUILD_PLANNER unset (shadow mode)")
@@ -19,26 +19,6 @@ func TestShouldSkip_ShadowMode(t *testing.T) {
 	}
 	if next != string(core.PhaseBuild) {
 		t.Errorf("next=%q, want build", next)
-	}
-	if len(diags) != 0 {
-		t.Errorf("diags=%v, want none", diags)
-	}
-}
-
-func TestShouldSkip_AdvisoryMode(t *testing.T) {
-	p := New(Config{})
-	req := core.PhaseRequest{
-		Env: map[string]string{"EVOLVE_BUILD_PLANNER": "1"},
-	}
-	skip, verdict, next, diags := p.ShouldSkip(req)
-	if skip {
-		t.Error("want skip=false when EVOLVE_BUILD_PLANNER=1 (advisory mode)")
-	}
-	if verdict != "" {
-		t.Errorf("verdict=%q, want empty on non-skip", verdict)
-	}
-	if next != "" {
-		t.Errorf("next=%q, want empty on non-skip", next)
 	}
 	if len(diags) != 0 {
 		t.Errorf("diags=%v, want none", diags)

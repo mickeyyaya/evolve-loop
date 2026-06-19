@@ -461,15 +461,17 @@ func (p Policy) DispatchConfig() DispatchConfig {
 
 // WorkflowPolicy is the .evolve/policy.json "workflow" block.
 type WorkflowPolicy struct {
-	MaxConsecutiveFails   int    `json:"max_consecutive_fails,omitempty"`
-	MaxCyclesCap          int    `json:"max_cycles_cap,omitempty"`
-	AutoPrune             *bool  `json:"auto_prune,omitempty"`
-	BackfillEnabled       *bool  `json:"backfill_enabled,omitempty"`
-	CycleBudget           string `json:"cycle_budget,omitempty"`
-	AllowDeepResearch     bool   `json:"allow_deep_research,omitempty"`
-	AllowDocDelete        bool   `json:"allow_doc_delete,omitempty"`
-	DiffComplexityDisable bool   `json:"diff_complexity_disable,omitempty"`
-	AuditorTierOverride   string `json:"auditor_tier_override,omitempty"`
+	MaxConsecutiveFails   int               `json:"max_consecutive_fails,omitempty"`
+	MaxCyclesCap          int               `json:"max_cycles_cap,omitempty"`
+	AutoPrune             *bool             `json:"auto_prune,omitempty"`
+	BackfillEnabled       *bool             `json:"backfill_enabled,omitempty"`
+	CycleBudget           string            `json:"cycle_budget,omitempty"`
+	AllowDeepResearch     bool              `json:"allow_deep_research,omitempty"`
+	AllowDocDelete        bool              `json:"allow_doc_delete,omitempty"`
+	DiffComplexityDisable bool              `json:"diff_complexity_disable,omitempty"`
+	AuditorTierOverride   string            `json:"auditor_tier_override,omitempty"`
+	PhaseEnables          map[string]string `json:"phase_enables,omitempty"`
+	ConsensusAuditEnabled *bool             `json:"consensus_audit_enabled,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -483,15 +485,18 @@ type WorkflowConfig struct {
 	AllowDocDelete        bool
 	DiffComplexityDisable bool
 	AuditorTierOverride   string
+	PhaseEnables          map[string]string
+	ConsensusAuditEnabled bool
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
 func (p Policy) WorkflowConfig() WorkflowConfig {
 	c := WorkflowConfig{
-		MaxConsecutiveFails: 1,
-		MaxCyclesCap:        25,
-		AutoPrune:           true,
-		BackfillEnabled:     true,
+		MaxConsecutiveFails:   1,
+		MaxCyclesCap:          25,
+		AutoPrune:             true,
+		BackfillEnabled:       true,
+		ConsensusAuditEnabled: true,
 	}
 	if p.Workflow == nil {
 		return c
@@ -513,6 +518,10 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	c.AllowDocDelete = p.Workflow.AllowDocDelete
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
 	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
+	c.PhaseEnables = p.Workflow.PhaseEnables
+	if p.Workflow.ConsensusAuditEnabled != nil {
+		c.ConsensusAuditEnabled = *p.Workflow.ConsensusAuditEnabled
+	}
 	return c
 }
 

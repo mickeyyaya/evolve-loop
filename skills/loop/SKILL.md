@@ -21,7 +21,7 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
 
 ```bash
-EVOLVE_REQUIRE_INTENT=1 EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 "${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
+EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 "${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
 ```
 
 The `find` expression locates the Go binary in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install. The whole `"${EVOLVE_GO_BIN:-$(find ...)}"` expression is **one** shell argument from bash's perspective.
@@ -55,7 +55,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 
 …and then read the binary's summary. Nothing else. The dispatcher loops one cycle per iteration and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
-**Why `EVOLVE_REQUIRE_INTENT=1`** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
+**Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable via `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
 
 **Why `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1`** (v8.20.1+): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. When the orchestrator subagent (already wrapped in sandbox) tries to spawn the builder subagent (which also wraps in sandbox), the inner `sandbox_apply()` returns `EPERM` because the outer sandbox forbids creating new sandbox profiles. This is a kernel-level macOS restriction, not a config bug. The flag tells the adapter: on EPERM, retry the inner subagent without sandbox-exec — preserving sandbox where the kernel allows it, degrading only where the kernel forces it. On Linux (`bwrap`) the flag is a no-op because nested namespaces work. Without this flag, every macOS `/evolve-loop` cycle that needs a builder fails at the orchestrator → builder hand-off with `rc=71 sandbox_apply: Operation not permitted`.
 
@@ -249,7 +249,7 @@ Phase 1: RESEARCH ── proactive research loop          → online-researcher.
 Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
 Phase 2b: TRIAGE ─── [Triage] top_n scope decision    → agents/evolve-triage.md
-                     (v8.56.0+ Layer C, default-on v8.59+; opt-out via EVOLVE_TRIAGE_DISABLE=1)
+                     (v8.56.0+ Layer C, default-on v8.59+; opt-out via workflow.phase_enables.triage=off)
 Phase 3:   BUILD ───── [Builder] implement (worktree)   → phase3-build.md
 Phase 4:   AUDIT ───── [Auditor] review + eval gate     → phases.md
 Phase 5:   SHIP ────── publish via `evolve release` (or `evolve ship` for non-release commits) → phase5-ship.md
