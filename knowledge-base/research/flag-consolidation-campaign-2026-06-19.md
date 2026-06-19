@@ -1,5 +1,35 @@
 # Flag-Consolidation Campaign — design-pattern-driven reduction to < 30 (2026-06-19)
 
+> ## 🎯 TARGET UPDATED 2026-06-19 (post v20.0.0): ZERO operator feature flags
+>
+> New HIGHEST standing rule from the user: **"any feature flags are not allowed — use design
+> patterns to solve cross-component functionality."** The target is no longer `<30` — it is the
+> operator flag registry driven to **0 rows**. Everything below about cluster-consolidation,
+> the ratchet, and anti-gaming still applies; the extensions for ZERO are:
+>
+> - **Persistent dials/gates/stages → config-as-code** (typed `.evolve/policy.json` structs +
+>   `FooConfig()` resolver; reuse `FanoutConfig()/ObserverConfig()` shape). The `os.Getenv`/
+>   `envchain` read is DELETED; value flows from `policy.json`.
+> - **Per-phase `*_CLI`/`*_MODEL`/`*_PERMISSION_MODE` → profiles SSOT + `policy.Agents map[string]Pin`.**
+> - **Test seams → Dependency Injection** (read moves into `_test.go`; reuse `sysexec.RunFunc`,
+>   `gitexec.Git`, `bridge.engineFactory`, `loopCycleRunner`).
+> - **Transient emergency (BYPASS_*, SKIP_*) → explicit CLI flags** (struct param, not env).
+> - **Subprocess IPC handoffs → documented protocol** via split-const `"EVOLVE_"+"..."` +
+>   `// SSOT IPC-protocol-allowed:` comment; removed from the registry (protocol, not a flag).
+> - **Bootstrap locators (PROJECT_ROOT/PLUGIN_ROOT/WORKTREE_ROOT) → CLI flags** + split-const
+>   env fallback; removed from the registry (documented bootstrap, not a feature flag).
+> - **Hybrid gates:** persistent → `policy.json`; transient → CLI flags (Fowler config-vs-ops split).
+>
+> **Load-bearing cycle:** invert `config.Load` from reading `EVOLVE_*` env to a stdlib-only
+> `RolloutInput` DTO built from `pol.RolloutConfig()` at `wireOrchestratorDeps` (keep `config`
+> a leaf; reuse `parseStage`; delete `applyEnv` env reads + `legacyFlags`); atomic diff + parity
+> contract test. **Sequence:** dead → per-agent → rollout-stages(+inversion) → phase-enable →
+> budget/gc/quota → swarm/dispatch → workflow-defaults → recovery/latency(+DI) → bypass→CLI →
+> IPC→split-const → bootstrap→CLI(last) → sweep to `FlagCeiling=0`.
+> **Anti-gaming for ZERO:** "removing a config flag" MEANS deleting its read into a Config
+> struct; split-const is ONLY for genuine IPC/bootstrap (with the justification comment).
+> Plan of record: `~/.claude/plans/deep-dive-on-design-dazzling-russell.md`.
+
 > **Campaign SSOT.** Supersedes the one-flag-at-a-time approach of
 > `flag-reduction-campaign-2026-06-18.md` (which stalled: cycles 5–6 shipped nothing
 > because the per-flag backlog was scraped dry). This campaign reduces by **cluster
