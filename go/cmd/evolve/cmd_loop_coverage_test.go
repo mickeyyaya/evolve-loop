@@ -16,6 +16,31 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
+// writeDispatchPolicy writes policy.json to evolveDir with dispatch.policy set.
+// Creates evolveDir if absent. Replaces t.Setenv("EVOLVE_DISPATCH_POLICY",...).
+func writeDispatchPolicy(t *testing.T, evolveDir, policyVal string) {
+	t.Helper()
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatalf("writeDispatchPolicy: mkdir: %v", err)
+	}
+	content := fmt.Sprintf(`{"dispatch":{"policy":%q}}`, policyVal)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writeDispatchPolicy: write: %v", err)
+	}
+}
+
+// writeDispatchPolicyFull writes policy.json with both policy and repeat_threshold.
+func writeDispatchPolicyFull(t *testing.T, evolveDir, policyVal string, repeatThreshold int) {
+	t.Helper()
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatalf("writeDispatchPolicyFull: mkdir: %v", err)
+	}
+	content := fmt.Sprintf(`{"dispatch":{"policy":%q,"repeat_threshold":%d}}`, policyVal, repeatThreshold)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writeDispatchPolicyFull: write: %v", err)
+	}
+}
+
 // TestRunLoop_DryRun verifies the --dry-run short-circuit prints the
 // resolved config and exits 0 without invoking the orchestrator.
 func TestRunLoop_DryRun(t *testing.T) {
@@ -76,13 +101,12 @@ func TestRunLoop_EnvFlagPropagation(t *testing.T) {
 // a real (stubbed) cycle. The DryRun-based test exercises parsing but
 // short-circuits before those lines.
 func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
@@ -152,9 +176,8 @@ func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 // in resolveDispatchPolicy (unknown value → verify with WARN). The
 // WARN line is what we need to see.
 func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "garbage")
 	var stderr bytes.Buffer
-	got := resolveDispatchPolicy(&stderr)
+	got := resolveDispatchPolicy("garbage", &stderr)
 	if got != dispatchPolicyVerify {
 		t.Fatalf("got %v want verify", got)
 	}
@@ -347,13 +370,12 @@ func (f fatalRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse
 // 174-177 (cycle error path). Replace the scout runner with fatalRunner
 // so the orchestrator returns a batch-fatal error on the very first phase.
 func TestRunLoop_OrchestratorError(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
@@ -399,13 +421,12 @@ func (l *erroringLedger) Iter(context.Context) (core.LedgerIterator, error) {
 // 227-229. VerifyCycle returns an error but the loop continues
 // (verify-error is non-fatal — bash treats it as "log and proceed").
 func TestRunLoop_VerifyIterError(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "verify")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "verify")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
@@ -463,7 +484,6 @@ func (failVerdictRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResp
 // branch (lines 260-262 + 268-269). Audit returns FAIL, the loop
 // breaks with stop_reason=fail, rc=2.
 func TestRunLoop_FailVerdictBreaks(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off") // skip verify so policy doesn't intercept
 	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", "1")
 
 	projectRoot := t.TempDir()
@@ -471,6 +491,7 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off") // skip verify so policy doesn't intercept
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {

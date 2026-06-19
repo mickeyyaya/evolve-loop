@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,62 +90,48 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) fun
 }
 
 func TestResolveDispatchPolicy(t *testing.T) {
-	// No t.Parallel: subtests mutate process env via t.Setenv.
+	t.Parallel()
 	tests := []struct {
-		name string
-		env  map[string]string
-		want dispatchPolicy
+		name  string
+		input string
+		want  dispatchPolicy
 	}{
-		{"default → verify", nil, dispatchPolicyVerify},
-		{"explicit verify", map[string]string{"EVOLVE_DISPATCH_POLICY": "verify"}, dispatchPolicyVerify},
-		{"explicit off", map[string]string{"EVOLVE_DISPATCH_POLICY": "off"}, dispatchPolicyOff},
-		{"explicit stop", map[string]string{"EVOLVE_DISPATCH_POLICY": "stop"}, dispatchPolicyStop},
-		{"unknown → verify (fallback)", map[string]string{"EVOLVE_DISPATCH_POLICY": "bogus"}, dispatchPolicyVerify},
+		{"default → verify", "", dispatchPolicyVerify},
+		{"explicit verify", "verify", dispatchPolicyVerify},
+		{"explicit off", "off", dispatchPolicyOff},
+		{"explicit stop", "stop", dispatchPolicyStop},
+		{"unknown → verify (fallback)", "bogus", dispatchPolicyVerify},
 	}
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			// Not t.Parallel — uses process env. Use t.Setenv for isolation.
-			for k := range envKeys {
-				t.Setenv(k, "")
-			}
-			for k, v := range tc.env {
-				t.Setenv(k, v)
-			}
+			t.Parallel()
 			var stderr bytes.Buffer
-			got := resolveDispatchPolicy(&stderr)
+			got := resolveDispatchPolicy(tc.input, &stderr)
 			if got != tc.want {
-				t.Fatalf("policy=%v want %v (stderr=%q)", got, tc.want, stderr.String())
+				t.Fatalf("policy(%q)=%v want %v (stderr=%q)", tc.input, got, tc.want, stderr.String())
 			}
 		})
 	}
 }
 
-// envKeys is the set t.Setenv-clears for policy tests. Centralized so
-// adding a new env var only requires one update.
-var envKeys = map[string]struct{}{
-	"EVOLVE_DISPATCH_POLICY": {},
-}
-
 func TestResolveCircuitBreakerThreshold(t *testing.T) {
-	// No t.Parallel: subtests mutate process env via t.Setenv.
+	t.Parallel()
 	tests := []struct {
-		val  string
-		want int
+		input int
+		want  int
 	}{
-		{"", defaultCircuitBreakerThreshold},
-		{"3", 3},
-		{"100", 100},
-		{"0", defaultCircuitBreakerThreshold},
-		{"-5", defaultCircuitBreakerThreshold},
-		{"abc", defaultCircuitBreakerThreshold},
+		{0, defaultCircuitBreakerThreshold},
+		{3, 3},
+		{100, 100},
+		{-5, defaultCircuitBreakerThreshold},
 	}
 	for _, tc := range tests {
 		tc := tc
-		t.Run(tc.val, func(t *testing.T) {
-			t.Setenv("EVOLVE_DISPATCH_REPEAT_THRESHOLD", tc.val)
-			if got := resolveCircuitBreakerThreshold(); got != tc.want {
-				t.Fatalf("threshold(%q)=%d want %d", tc.val, got, tc.want)
+		t.Run(fmt.Sprintf("%d", tc.input), func(t *testing.T) {
+			t.Parallel()
+			if got := resolveCircuitBreakerThreshold(tc.input); got != tc.want {
+				t.Fatalf("threshold(%d)=%d want %d", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -252,10 +239,9 @@ func runM4Loop(t *testing.T, projectRoot, evolveDir string, args []string,
 // (would normally trip "missing scout"), but policy=off skips the
 // check entirely, so the loop exits cleanly.
 func TestRunLoop_PolicyOff_SkipsVerify(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
+	writeDispatchPolicy(t, evolveDir, "off")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 
@@ -281,13 +267,12 @@ func TestRunLoop_PolicyOff_SkipsVerify(t *testing.T) {
 // entry. policy=verify must classify build-fail and continue the loop
 // for the next cycle (exit 0 because cycles=1 means batch ends).
 func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "verify")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "verify")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger() // empty → verify will fail with missing-all
 	args := []string{
@@ -321,13 +306,12 @@ func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 // NO orchestrator-report (classifier → integrity-breach) and an empty
 // ledger. policy=verify must STOP with rc=2.
 func TestRunLoop_PolicyVerify_IntegrityBreachStops(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "verify")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "verify")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 
@@ -356,13 +340,12 @@ func TestRunLoop_PolicyVerify_IntegrityBreachStops(t *testing.T) {
 // TestRunLoop_PolicyStop_AnyVerifyFailStops verifies that the legacy
 // fail-fast policy STOPs on any verify failure regardless of class.
 func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "stop")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "stop")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	args := []string{
@@ -387,14 +370,12 @@ func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
 // populated ledger means verify passes, no abnormal events get
 // emitted, rc=0.
 func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "verify")
-	t.Setenv("EVOLVE_DISPATCH_REPEAT_THRESHOLD", "")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "verify")
 	storage := &fixtures.FakeStorage{State: core.State{LastCycleNumber: 0}}
 	ledger := &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{Entries: []core.LedgerEntry{
 		{Cycle: 1, Role: "scout", Kind: "agent_subprocess", ExitCode: 0},
@@ -468,14 +449,12 @@ func (s *stuckStorage) WriteState(context.Context, core.State) error { return ni
 // keeps result.Cycle=1 forever, threshold=3, cycles=5 → breaker trips
 // on iteration 3, exits with rc=1 + stop_reason=circuit_breaker.
 func TestRunLoop_CircuitBreakerTrips(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off") // skip verify so only the breaker can fire
-	t.Setenv("EVOLVE_DISPATCH_REPEAT_THRESHOLD", "3")
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicyFull(t, evolveDir, "off", 3) // skip verify so only the breaker can fire
 	storage := &stuckStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()

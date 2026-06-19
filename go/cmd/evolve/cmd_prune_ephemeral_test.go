@@ -36,21 +36,19 @@ func TestCmd_PruneEphemeral_UnexpectedArg(t *testing.T) {
 	}
 }
 
-func TestCmd_PruneEphemeral_BadTTLEnv(t *testing.T) {
-	t.Setenv("EVOLVE_TRACKER_TTL_DAYS", "abc")
+func TestCmd_PruneEphemeral_BadTrackerTTLFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runPruneEphemeral([]string{}, nil, &stdout, &stderr)
+	rc := runPruneEphemeral([]string{"--tracker-ttl-days=abc"}, nil, &stdout, &stderr)
 	if rc != 10 {
-		t.Fatalf("rc = %d, want 10 (bad TTL env)", rc)
+		t.Fatalf("rc = %d, want 10 (bad --tracker-ttl-days flag)", rc)
 	}
 }
 
-func TestCmd_PruneEphemeral_BadLogTTLEnv(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_LOG_TTL_DAYS", "xyz")
+func TestCmd_PruneEphemeral_BadLogTTLFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runPruneEphemeral([]string{}, nil, &stdout, &stderr)
+	rc := runPruneEphemeral([]string{"--dispatch-log-ttl-days=xyz"}, nil, &stdout, &stderr)
 	if rc != 10 {
-		t.Fatalf("rc = %d, want 10 (bad log TTL env)", rc)
+		t.Fatalf("rc = %d, want 10 (bad --dispatch-log-ttl-days flag)", rc)
 	}
 }
 

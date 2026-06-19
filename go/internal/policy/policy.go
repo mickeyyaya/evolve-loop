@@ -77,6 +77,9 @@ type Policy struct {
 	// QuotaReset configures the quota-reset wake-time estimator. Absent ⇒
 	// built-in defaults apply (DefaultHours=5.4167, no ResetAt override).
 	QuotaReset *QuotaResetConfig `json:"quota_reset,omitempty"`
+	// Dispatch configures the loop dispatch verification policy. Absent ⇒
+	// built-in defaults apply (Policy="verify", RepeatThreshold=5).
+	Dispatch *DispatchConfig `json:"dispatch,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -412,4 +415,31 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 		return QuotaResetConfig{}
 	}
 	return *p.QuotaReset
+}
+
+// DispatchConfig configures the loop dispatch verification policy and circuit-breaker.
+// Replaces EVOLVE_DISPATCH_POLICY and EVOLVE_DISPATCH_REPEAT_THRESHOLD env reads.
+type DispatchConfig struct {
+	// Policy selects dispatch verification: "off" / "verify" (default) / "stop".
+	Policy string `json:"policy,omitempty"`
+	// RepeatThreshold is the same-cycle repeat count that trips the circuit-breaker.
+	// Zero / absent ⇒ built-in default (5).
+	RepeatThreshold int `json:"repeat_threshold,omitempty"`
+}
+
+const defaultDispatchRepeatThreshold = 5
+
+// DispatchConfig returns a DispatchConfig with defaults resolved.
+func (p Policy) DispatchConfig() DispatchConfig {
+	c := DispatchConfig{Policy: "verify", RepeatThreshold: defaultDispatchRepeatThreshold}
+	if p.Dispatch == nil {
+		return c
+	}
+	if p.Dispatch.Policy != "" {
+		c.Policy = p.Dispatch.Policy
+	}
+	if p.Dispatch.RepeatThreshold > 0 {
+		c.RepeatThreshold = p.Dispatch.RepeatThreshold
+	}
+	return c
 }

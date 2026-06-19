@@ -67,9 +67,9 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 > package, the gemini price table, and claude.sh budget-tier resolution are gone.
 > The flags above remain accepted-but-ignored for backward compatibility.
 >
-> **Cycle 10 CLOSED**: Workflow Defaults cluster — `EVOLVE_STRICT_*` (2 flags) and `EVOLVE_DISPATCH_*` (2 policy flags; REPEAT_THRESHOLD excluded as numeric threshold) consolidated.
-> `EVOLVE_STRICT_FAILURES` bridged to `EVOLVE_STRICT_AUDIT` (canonical). `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` bridged to `EVOLVE_DISPATCH_POLICY={off|verify|stop}` (canonical).
-> Note: cycle-9 callout misstated the counts as "3 STRICT + 2 DISPATCH" — actual was 2 STRICT + 3 DISPATCH (REPEAT_THRESHOLD is a numeric threshold, not a policy switch).
+> **Cycle 10 CLOSED**: Workflow Defaults cluster — `EVOLVE_STRICT_*` (2 flags) consolidated.
+> `EVOLVE_STRICT_FAILURES` bridged to `EVOLVE_STRICT_AUDIT` (canonical).
+> Dispatch policy flags (`EVOLVE_DISPATCH_VERIFY`, `EVOLVE_DISPATCH_STOP_ON_FAIL`) moved to config-as-code (dispatch-cluster-28).
 >
 ## State File Cluster (cycle 7 consolidation)
 
@@ -128,10 +128,8 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | `EVOLVE_STRICT_FAILURES` | DEAD | Bridged to `EVOLVE_STRICT_AUDIT`; emits stderr WARN; removal target v8.61+ [no reader on any surface as of 2026-06-11 inventory] |
 | `EVOLVE_REQUIRE_INTENT` | ACTIVE | Force intent phase on every cycle |
 | `EVOLVE_PLAN_REVIEW` | ACTIVE | Enable Sprint 2 plan-review phase (opt-in) |
-| `EVOLVE_DISPATCH_POLICY` | ACTIVE (canonical) | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
-| `EVOLVE_DISPATCH_STOP_ON_FAIL` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=stop`; emits stderr WARN; removal target v8.61+ |
-| `EVOLVE_DISPATCH_VERIFY` | DEPRECATED | Bridged to `EVOLVE_DISPATCH_POLICY=off` (when `=0`); emits stderr WARN; removal target v8.61+ |
-| `EVOLVE_DISPATCH_REPEAT_THRESHOLD` | ACTIVE | Threshold for repeat-cycle detection |
+| `EVOLVE_DISPATCH_STOP_ON_FAIL` | REMOVED (dispatch-cluster-28) | Former dispatch fail-fast switch; moved to `policy.json` `dispatch.policy` config |
+| `EVOLVE_DISPATCH_VERIFY` | REMOVED (dispatch-cluster-28) | Former dispatch verify toggle; moved to `policy.json` `dispatch.policy` config |
 | `EVOLVE_AUTO_PRUNE` | ACTIVE | Enable auto-prune of expired state entries |
 | `EVOLVE_STRATEGY` | ACTIVE | Cycle strategy override |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | ACTIVE | CI mode: skip interactive y/N in ship.sh |
@@ -197,7 +195,6 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 
 | Flag | Purpose |
 |------|---------|
-| `EVOLVE_DISPATCH_DEPTH` | Bridge-recursion depth; set on each fan-out worker command (parent+1), read at the `subagent run` / `dispatch-parallel` chokepoint to enforce the recursion cap (max 3). Absent ⇒ depth 0 (top-level). |
 | `EVOLVE_PROJECT_WRITABLE` | Set by resolve-roots.sh after verification |
 
 ---
@@ -209,7 +206,7 @@ in loop output, per-phase `cost_usd`). The flags below are accepted but ignored
 | 7 (done) | State-file | Deprecated `EVOLVE_STATE_OVERRIDE` → `EVOLVE_STATE_FILE_OVERRIDE` |
 | 8 (done) | Sandbox | Deprecated inner-sandbox flags via bridge (v8.60); retired in cycle-7 |
 | 9 (done) | Budget | Deprecated `EVOLVE_BUDGET_CAP` → `EVOLVE_MAX_BUDGET_USD` bridge (v8.60); added builder cost-overrun guard |
-| 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated `EVOLVE_DISPATCH_VERIFY` + `EVOLVE_DISPATCH_STOP_ON_FAIL` → `EVOLVE_DISPATCH_POLICY={off\|verify\|stop}` (v8.60) |
+| 10 (done) | Workflow Defaults | Deprecated `EVOLVE_STRICT_FAILURES` → `EVOLVE_STRICT_AUDIT`; deprecated dispatch policy flags, moved to `policy.json` dispatch config (dispatch-cluster-28) |
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 
 ## Generated Flag Index
@@ -254,11 +251,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_CYCLE_BUDGET` | active | enum | off | Workflow Defaults | Advisor-decided cycle-budget rollout dial (internal/cyclebudget): `off`/`0` (operator --max-cycles governs — DEFAULT, byte-identical to legacy) / `advisory` (completion/cap computed + logged, --max-cycles still governs) / `enforce` (the loop runs until the goal's backlog is drained, bounded by EVOLVE_MAX_CYCLES_CAP; an explicit --max-cycles becomes the ceiling). Unknown → off. |
 | `EVOLVE_DIFF_COMPLEXITY_DISABLE` | active | — | — | Workflow Defaults | Disable diff-complexity check in auditor |
 | `EVOLVE_DISABLE_WORKSPACE_GUARD` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_DISPATCH_DEPTH` | internal | — | — | — | Bridge-recursion depth (B2): set on each fan-out worker command (parent+1), read at the subagent run / dispatch-parallel chokepoint to enforce the recursion cap (max 3). Absent ⇒ 0 (top-level). |
-| `EVOLVE_DISPATCH_LOG_TTL_DAYS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_DISPATCH_PLAN_LOG` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_DISPATCH_POLICY` | active | — | — | Workflow Defaults | Dispatch verification policy: `off` (skip check) / `verify` (default) / `stop` (fail-fast) |
-| `EVOLVE_DISPATCH_REPEAT_THRESHOLD` | active | — | — | Workflow Defaults | Threshold for repeat-cycle detection |
 | `EVOLVE_DYNAMIC_ROUTING` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Rollout stage: `off`/`0` (static state machine drives — operator escape hatch) / `shadow` (router computes + logs, static drives) / `advisory` (router drives optional surface, spine static; DEFAULT) / `enforce` (router drives, kernel-clamped). Unknown value → `off` + WARN |
 | `EVOLVE_EVAL_GATE` | active | enum | enforce | Gates | Structural eval gates (internal/evalgate): off\|shadow\|enforce. Gate A scout eval materialization, Gate B tdd predicate quality, Gate C floor binding (R9.3). |
 | `EVOLVE_FLEET` | active | bool | 0 | Fleet Cluster (Track C concurrency) | Fleet mode (CB.2+): bridges refuse the process-cwd fallback when no worktree is designated (typed ExitBadFlags, never CLI-fallback). Set by the `evolve fleet` supervisor (CE.2); single-driver runs leave it unset and keep the loud-WARN fallback. |
@@ -337,7 +329,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |
 | `EVOLVE_TEST_PHASE_ENABLED` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_TRACKER_TTL_DAYS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TRIAGE_CAP_GATE` | active | enum | enforce | Gates | R9.2 triage capacity clamp: off\|shadow\|enforce. Committed coverage floors above ceil(1.25·K observed throughput) reject triage into the correction ladder. |
 | `EVOLVE_TRIAGE_DISABLE` | active | — | — | Triage Cluster (cycle 7 trim) | Opt-out of triage default-on (v8.59+) |
 | `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |

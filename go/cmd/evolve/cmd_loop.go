@@ -244,8 +244,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	lastBeforeGCHook, _ := readLastCycleNumber(context.Background(), deps.Storage)
 	runGCHook(cfg, cycleWorkspace(cfg.ProjectRoot, lastBeforeGCHook+1), stderr)
 
-	policy := resolveDispatchPolicy(stderr)
-	threshold := resolveCircuitBreakerThreshold()
+	dc := loadDispatchConfig(cfg.EvolveDir)
+	dispPolicy := resolveDispatchPolicy(dc.Policy, stderr)
+	threshold := resolveCircuitBreakerThreshold(dc.RepeatThreshold)
 
 	// Circuit-breaker state. PREV_RAN_CYCLE tracks the cycle number
 	// returned by the most-recent RunCycle; SAME_CYCLE_STREAK counts
@@ -397,7 +398,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// mode, classify + emit event + continue (recoverable classes)
 		// or break (integrity-breach). On `stop` mode, any verify-fail
 		// halts the batch.
-		if policy != dispatchPolicyOff {
+		if dispPolicy != dispatchPolicyOff {
 			vc := ledgerverify.LoadVerifyContext(workspace, cfg.EvolveDir)
 			vr, vErr := ledgerverify.VerifyCycle(context.Background(), deps.Ledger, ranCycle, ledgerverify.Options(vc))
 			if vErr != nil {
@@ -415,7 +416,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				}
 				fmt.Fprintf(stderr, "[loop] cycle %d incomplete: missing %v classification=%s\n", ranCycle, vr.Missing, class.Class)
 
-				if policy == dispatchPolicyStop {
+				if dispPolicy == dispatchPolicyStop {
 					lr.StopReason = "verify_failed_stop"
 					lr.emitFatal(stdout, stderr, cfg, ranCycle)
 					return 2

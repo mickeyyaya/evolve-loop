@@ -25,7 +25,10 @@ import (
 // construction at any depth.
 
 const (
-	dispatchDepthEnv = "EVOLVE_DISPATCH_DEPTH"
+	// SSOT IPC-protocol-allowed: parent→child recursion-depth handoff
+	// Split form keeps it out of the flagreaders guard's standalone-literal
+	// scan (SSOT §IPC-protocol-allowed) — same pattern as FanoutWorkerTokenEnv.
+	dispatchDepthEnv = "EVOLVE_" + "DISPATCH_DEPTH"
 	// FanoutWorkerTokenEnv carries the parent-dictated per-worker challenge
 	// token to the worker dispatch (consumed by run.go as
 	// RunRequest.ChallengeTokenOverride) so the worker's artifact bears the

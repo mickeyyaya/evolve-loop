@@ -61,12 +61,12 @@ func writeStdoutLog(t *testing.T, workspace, phase string, costUSD float64) {
 // failurelog.Record. policy=verify + build-fail report → record
 // appended + rc=3.
 func TestRunLoop_M5_RecordsRecoverable(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "verify")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0") // disable prune to isolate
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	seedStateJSON(t, evolveDir, `{"lastCycleNumber": 0}`)
+	writeDispatchPolicy(t, evolveDir, "verify")
 
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger() // empty → verify fails
@@ -118,14 +118,13 @@ func TestRunLoop_M5_RecordsRecoverable(t *testing.T) {
 // TestRunLoop_M5_AutoPruneAtStart verifies that the dispatcher prunes
 // expired failedApproaches at start when EVOLVE_AUTO_PRUNE!=0.
 func TestRunLoop_M5_AutoPruneAtStart(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off") // skip verify so we focus on prune
-
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	// Seed state.json with an expired + a fresh entry.
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off") // skip verify so we focus on prune
 	state := map[string]any{
 		"failedApproaches": []any{
 			map[string]any{"cycle": float64(1), "expiresAt": "2020-01-01T00:00:00Z"},
@@ -170,7 +169,6 @@ func TestRunLoop_M5_AutoPruneAtStart(t *testing.T) {
 // TestRunLoop_M5_CostAccumulationLogged verifies that cyclecost reads
 // per-cycle stdout-logs and the batch total accumulates across runs.
 func TestRunLoop_M5_CostAccumulationLogged(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
@@ -178,6 +176,7 @@ func TestRunLoop_M5_CostAccumulationLogged(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off")
 
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()

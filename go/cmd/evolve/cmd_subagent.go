@@ -33,10 +33,9 @@ Subcommands:
                      Always exits 0; advisory printed to stderr.
   validate-profile   Validate agent profile JSON + adapter capabilities +
                      dispatch plan log; runs adapter with VALIDATE_ONLY=1
-                     ( validate-profile <agent> )
+                     ( validate-profile [--dispatch-plan-log PATH] <agent> )
                      Honors EVOLVE_PROFILES_DIR_OVERRIDE,
-                     EVOLVE_ADAPTERS_DIR_OVERRIDE,
-                     EVOLVE_DISPATCH_PLAN_LOG.
+                     EVOLVE_ADAPTERS_DIR_OVERRIDE.
   run                Execute one phase agent end-to-end (v2 cache-prefix
                      prompt + adapter exec + verify + ledger).
                      ( run <agent> <cycle> <workspace_path> )
@@ -249,10 +248,24 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 
 func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
-		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
-		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
-		fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG")
+		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile [--dispatch-plan-log PATH] <agent>")
+		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE")
 		return 0
+	}
+	var dispatchPlanLog string
+	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		a := args[0]
+		switch {
+		case a == "--dispatch-plan-log" && len(args) > 1:
+			dispatchPlanLog = args[1]
+			args = args[2:]
+		case strings.HasPrefix(a, "--dispatch-plan-log="):
+			dispatchPlanLog = strings.TrimPrefix(a, "--dispatch-plan-log=")
+			args = args[1:]
+		default:
+			fmt.Fprintf(stderr, "evolve subagent validate-profile: unknown flag: %s\n", a)
+			return 2
+		}
 	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "evolve subagent validate-profile: expected <agent>")
@@ -270,7 +283,7 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 			CapabilityDir:   layout.CapabilityDir,
 			ProjectRoot:     layout.ProjectRoot,
 			WorktreePath:    os.Getenv("WORKTREE_PATH"),
-			DispatchPlanLog: os.Getenv("EVOLVE_DISPATCH_PLAN_LOG"),
+			DispatchPlanLog: dispatchPlanLog,
 		},
 		subagent.ValidateProfileOptions{},
 	)

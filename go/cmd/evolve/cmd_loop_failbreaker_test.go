@@ -157,7 +157,6 @@ func (f *failingOrch) RunCycleFromPhase(ctx context.Context, req core.CycleReque
 
 func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
 	t.Helper()
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "1")
 	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", maxConsecutive)
 
@@ -166,6 +165,7 @@ func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off")
 	if err := os.WriteFile(filepath.Join(evolveDir, "state.json"), []byte(`{"failedApproaches":[],"lastCycleNumber":0}`), 0o644); err != nil {
 		t.Fatal(err)
 	}

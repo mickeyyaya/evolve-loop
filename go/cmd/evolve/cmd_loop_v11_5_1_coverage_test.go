@@ -15,7 +15,6 @@ import (
 // branch in the --reset wiring. Achieved by setting state.json to a
 // directory (so atomic write fails on the rename step).
 func TestRunLoop_ResetErrorLogged(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
@@ -34,6 +33,7 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "state.json"), b, 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+	writeDispatchPolicy(t, evolveDir, "off")
 	// Make evolveDir read-only so the tmp+mv atomic write fails.
 	// We need state.json itself to be readable but the directory to
 	// reject new files — chmod 555 on the dir.
@@ -68,12 +68,12 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 // --batch-cap-usd, the run completes its cycles normally (rc=0, no
 // BUDGET-EXHAUSTED / batch_cap), with cost reported as telemetry only.
 func TestRunLoop_BudgetFlagsDoNotStop(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
 	t.Setenv("EVOLVE_AUTO_PRUNE", "0")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	_ = os.MkdirAll(evolveDir, 0o755)
+	writeDispatchPolicy(t, evolveDir, "off")
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
