@@ -103,11 +103,11 @@ func gitInitForTest(t *testing.T) string {
 func TestDecorator_ShadowDelegates(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &fakeBridge{}
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	// No EVOLVE_SWARM_STAGE → off → pure delegate, NO dispatch.
+	// Config{} (Stage="") → stageOff → pure delegate, NO dispatch.
 	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
@@ -126,11 +126,11 @@ func TestDecorator_ShadowDelegates(t *testing.T) {
 func TestDecorator_AdvisoryDispatchesButInnerAuthoritative(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &fakeBridge{}
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "advisory"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "advisory"}))
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,11 +151,11 @@ func TestDecorator_AdvisoryDispatchesButInnerAuthoritative(t *testing.T) {
 func TestDecorator_EnforceReaderDrivesResult(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &fakeBridge{}
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,11 +173,11 @@ func TestDecorator_EnforceReaderDrivesResult(t *testing.T) {
 func TestDecorator_EnforceReaderSynthesizesArtifact(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &artifactBridge{}
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,11 +252,11 @@ func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
 func TestDecorator_EnforceReaderMarksMissingArtifact(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &fakeBridge{} // succeeds but writes NO report file
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	if _, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"})); err != nil {
+	if _, err := d.Run(context.Background(), reqWith(ws, map[string]string{})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,27 +271,28 @@ func TestDecorator_EnforceReaderMarksMissingArtifact(t *testing.T) {
 	}
 }
 
-func TestPortBaseFromEnv(t *testing.T) {
+func TestConfigPortBase_FlowsThroughToDispatchDeps(t *testing.T) {
 	cases := []struct {
-		name string
-		env  map[string]string
-		want int
+		name     string
+		portBase int
+		want     int
 	}{
-		{"unset → 0 (dispatcher applies default)", map[string]string{}, 0},
-		{"valid override", map[string]string{"EVOLVE_SWARM_PORT_BASE": "60000"}, 60000},
-		{"invalid → 0", map[string]string{"EVOLVE_SWARM_PORT_BASE": "not-a-port"}, 0},
+		{"zero (dispatcher applies default)", 0, 0},
+		{"valid override", 60000, 60000},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := portBaseFromEnv(tc.env); got != tc.want {
-				t.Errorf("portBaseFromEnv(%v) = %d, want %d", tc.env, got, tc.want)
+			d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{PortBase: tc.portBase})
+			deps := d.dispatchDeps(core.PhaseRequest{Cycle: 1, Workspace: t.TempDir(), Env: map[string]string{}})
+			if deps.PortBase != tc.want {
+				t.Errorf("Config{PortBase: %d} → deps.PortBase = %d, want %d", tc.portBase, deps.PortBase, tc.want)
 			}
 		})
 	}
 }
 
 func TestDecorator_Name(t *testing.T) {
-	if New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter).Name() != "build" {
+	if New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{}).Name() != "build" {
 		t.Error("Name must be transparent (inner phase name)")
 	}
 }
@@ -357,7 +358,7 @@ func TestBridgeLauncher_PropagatesLaunchError(t *testing.T) {
 
 // dispatchDeps: writer mode must inject a WorkerProvisioner; reader must not.
 func TestDecorator_DispatchDeps_WriterMode_SetsProvisioner(t *testing.T) {
-	d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+	d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{})
 	deps := d.dispatchDeps(reqWith(t.TempDir(), map[string]string{}))
 	if deps.Provisioner == nil {
 		t.Error("writer mode dispatchDeps must set a non-nil WorkerProvisioner")
@@ -365,7 +366,7 @@ func TestDecorator_DispatchDeps_WriterMode_SetsProvisioner(t *testing.T) {
 }
 
 func TestDecorator_DispatchDeps_ReaderMode_NoProvisioner(t *testing.T) {
-	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader)
+	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader, Config{})
 	deps := d.dispatchDeps(reqWith(t.TempDir(), map[string]string{}))
 	if deps.Provisioner != nil {
 		t.Error("reader mode dispatchDeps must NOT set a WorkerProvisioner")
@@ -374,11 +375,11 @@ func TestDecorator_DispatchDeps_ReaderMode_NoProvisioner(t *testing.T) {
 
 // enforce must return FAIL when all workers fail due to transport errors.
 func TestDecorator_EnforceReader_WorkerFailureReturnsFail(t *testing.T) {
-	d := New(&fakeInner{name: "scout"}, &errBridge{}, swarm.ModeReader)
+	d := New(&fakeInner{name: "scout"}, &errBridge{}, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err == nil {
 		t.Fatal("enforce with all-worker transport failure must return a non-nil error")
 	}
@@ -390,7 +391,7 @@ func TestDecorator_EnforceReader_WorkerFailureReturnsFail(t *testing.T) {
 // A non-partitionable plan must collapse to the inner runner even in enforce mode.
 func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
 	inner := &fakeInner{name: "build"}
-	d := New(inner, &fakeBridge{}, swarm.ModeWriter)
+	d := New(inner, &fakeBridge{}, swarm.ModeWriter, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	// Non-partitionable → Validate returns Collapse=true → inner must run.
 	plan := `{"swarm_plan":{"task_id":"t","mode":"writer","partitionable":false,` +
@@ -398,7 +399,7 @@ func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
 	_ = os.MkdirAll(ws, 0o755)
 	_ = os.WriteFile(filepath.Join(ws, "swarm-plan.json"), []byte(plan), 0o644)
 
-	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,18 +408,11 @@ func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
 	}
 }
 
-// swarmStage must map "shadow" (explicit) and any unknown value to off (not just the empty string).
-func TestSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
-	cases := map[string]string{
-		"shadow":        "off",
-		"SHADOW":        "off",
-		"":              "off",
-		"unknown_value": "off",
-	}
-	for input, want := range cases {
-		st := swarmStage(map[string]string{"EVOLVE_SWARM_STAGE": input})
-		if want == "off" && st != stageOff {
-			t.Errorf("swarmStage(%q) = %v, want stageOff", input, st)
+// parseSwarmStage must map "shadow" (explicit) and any unknown value to stageOff.
+func TestParseSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
+	for _, input := range []string{"shadow", "SHADOW", "", "unknown_value"} {
+		if st := parseSwarmStage(input); st != stageOff {
+			t.Errorf("parseSwarmStage(%q) = %v, want stageOff", input, st)
 		}
 	}
 }
@@ -428,10 +422,10 @@ func TestSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
 func TestDecorator_NoPlanFile_FallsBackToInner(t *testing.T) {
 	inner := &fakeInner{name: "build"}
 	bridge := &fakeBridge{}
-	d := New(inner, bridge, swarm.ModeWriter)
+	d := New(inner, bridge, swarm.ModeWriter, Config{Stage: "enforce"})
 	ws := t.TempDir() // no plan file written
 
-	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,24 +487,20 @@ func TestAnnotate_InitialisesNilSignals(t *testing.T) {
 	}
 }
 
-// portBaseFromEnv must handle the full range of parsing failures gracefully,
-// returning 0 (→ dispatcher uses DefaultPortBase) for any non-integer input.
-func TestPortBaseFromEnv_EdgeCases(t *testing.T) {
-	cases := []struct {
-		env  map[string]string
-		want int
-	}{
-		{map[string]string{}, 0},
-		{map[string]string{"EVOLVE_SWARM_PORT_BASE": ""}, 0},
-		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "abc"}, 0},
-		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "-1"}, -1}, // negative allowed by Atoi
-		{map[string]string{"EVOLVE_SWARM_PORT_BASE": "65535"}, 65535},
+// parseSwarmStage must correctly parse advisory and enforce, and default to stageOff
+// for any other input (fail-safe: a typo or env mismatch never silently enables swarm).
+func TestParseSwarmStage_AdvisoryAndEnforce(t *testing.T) {
+	if st := parseSwarmStage("advisory"); st != stageAdvisory {
+		t.Errorf("parseSwarmStage(\"advisory\") = %v, want stageAdvisory", st)
 	}
-	for _, tc := range cases {
-		got := portBaseFromEnv(tc.env)
-		if got != tc.want {
-			t.Errorf("portBaseFromEnv(%v) = %d, want %d", tc.env, got, tc.want)
-		}
+	if st := parseSwarmStage("ADVISORY"); st != stageAdvisory {
+		t.Errorf("parseSwarmStage(\"ADVISORY\") = %v, want stageAdvisory", st)
+	}
+	if st := parseSwarmStage("enforce"); st != stageEnforce {
+		t.Errorf("parseSwarmStage(\"enforce\") = %v, want stageEnforce", st)
+	}
+	if st := parseSwarmStage("ENFORCE"); st != stageEnforce {
+		t.Errorf("parseSwarmStage(\"ENFORCE\") = %v, want stageEnforce", st)
 	}
 }
 
@@ -519,11 +509,11 @@ func TestPortBaseFromEnv_EdgeCases(t *testing.T) {
 func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &artifactBridge{}
-	d := New(inner, bridge, swarm.ModeReader)
+	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"}))
+	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatalf("reader enforce with artifact bridge must not error: %v", err)
 	}
@@ -542,15 +532,13 @@ func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 // Enforce writer path: when all workers fail → FAIL verdict + non-nil error.
 func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
 	inner := &fakeInner{name: "build"}
-	d := New(inner, &errBridge{}, swarm.ModeWriter)
+	d := New(inner, &errBridge{}, swarm.ModeWriter, Config{Stage: "enforce"})
 	root := gitInitForTest(t)
 	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ws := t.TempDir()
 	writeWriterPlan(t, ws)
 
-	resp, err := d.Run(context.Background(), reqWithRoot(root, ws, map[string]string{
-		"EVOLVE_SWARM_STAGE": "enforce",
-	}))
+	resp, err := d.Run(context.Background(), reqWithRoot(root, ws, map[string]string{}))
 	if err == nil {
 		t.Fatal("enforce writer with transport failure must return error")
 	}
@@ -580,7 +568,7 @@ func TestBranchByID(t *testing.T) {
 
 // TestDecorator_Enforce_WorkerFail covers the !sr.AllOK() path in enforce.
 func TestDecorator_Enforce_WorkerFail(t *testing.T) {
-	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader)
+	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader, Config{})
 	plan := swarm.SwarmPlan{Mode: swarm.ModeReader, Workers: []swarm.WorkerSpec{{WorkerID: "w0"}}}
 	sr := swarm.SwarmResult{Workers: []swarm.WorkerResult{{WorkerID: "w0", ExitCode: 1}}}
 	resp, _ := d.enforce(context.Background(), core.PhaseRequest{}, plan, sr, nil)

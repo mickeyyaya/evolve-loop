@@ -86,6 +86,9 @@ type Policy struct {
 	// Retry configures phase retry, backoff, correction, and latency defaults.
 	// Absent ⇒ built-in defaults apply.
 	Retry *RetryPolicy `json:"retry,omitempty"`
+	// Swarm configures swarm dispatch stage and port allocation. Absent ⇒
+	// built-in defaults apply (Stage="shadow", PortBase=0).
+	Swarm *SwarmPolicy `json:"swarm,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -552,6 +555,39 @@ const (
 	defaultContractCorrectionRetries = 2
 	maxContractCorrectionRetries     = 5
 )
+
+// SwarmPolicy is the .evolve/policy.json "swarm" block.
+// Replaces the EVOLVE_SWARM_STAGE and EVOLVE_SWARM_PORT_BASE env reads.
+type SwarmPolicy struct {
+	// Stage selects the swarm dispatch stage: "off" / "shadow" / "advisory" / "enforce".
+	// Empty/absent ⇒ "shadow" (byte-identical delegate to inner runner).
+	Stage string `json:"stage,omitempty"`
+	// PortBase is the operator override for the writer dev-server port base.
+	// Zero/absent ⇒ swarm.DefaultPortBase.
+	PortBase int `json:"port_base,omitempty"`
+}
+
+// SwarmConfig is the resolved swarm configuration with defaults applied.
+type SwarmConfig struct {
+	Stage    string
+	PortBase int
+}
+
+// SwarmConfig returns swarm configuration with built-in defaults resolved.
+// Stage defaults to "shadow" — matching the previous swarmStage() default branch
+// (empty/unknown → stageOff, i.e. shadow/delegate behavior).
+// PortBase defaults to 0 — matching portBaseFromEnv's "unset/invalid → 0" behavior.
+func (p Policy) SwarmConfig() SwarmConfig {
+	c := SwarmConfig{Stage: "shadow"}
+	if p.Swarm == nil {
+		return c
+	}
+	if p.Swarm.Stage != "" {
+		c.Stage = p.Swarm.Stage
+	}
+	c.PortBase = p.Swarm.PortBase
+	return c
+}
 
 // RetryConfig returns retry configuration with defaults and safety bounds.
 func (p Policy) RetryConfig() RetryConfig {

@@ -89,10 +89,10 @@ func TestSwarmRunner_CoveragePlanLoadingAndDeps(t *testing.T) {
 	})
 
 	t.Run("writer deps include provisioner and port base", func(t *testing.T) {
-		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{PortBase: 62000})
 		deps := d.dispatchDeps(core.PhaseRequest{
 			Cycle: 282, Workspace: t.TempDir(),
-			Env: map[string]string{"EVOLVE_SWARM_PORT_BASE": "62000"},
+			Env: map[string]string{},
 		})
 		if deps.Provisioner == nil {
 			t.Fatal("writer dispatch deps must include a provisioner")
@@ -107,13 +107,13 @@ func TestSwarmRunner_CoveragePlanLoadingAndDeps(t *testing.T) {
 
 	t.Run("valid but non-partitionable plan falls back to inner", func(t *testing.T) {
 		inner := &fakeInner{name: "build"}
-		d := New(inner, &fakeBridge{}, swarm.ModeWriter)
+		d := New(inner, &fakeBridge{}, swarm.ModeWriter, Config{Stage: "enforce"})
 		ws := t.TempDir()
 		plan := `{"swarm_plan":{"task_id":"t","mode":"writer","partitionable":false,"workers":[{"worker_id":"w0"},{"worker_id":"w1"}]}}`
 		if err := os.WriteFile(filepath.Join(ws, "swarm-plan.json"), []byte(plan), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := d.Run(context.Background(), reqWith(ws, map[string]string{"EVOLVE_SWARM_STAGE": "enforce"})); err != nil {
+		if _, err := d.Run(context.Background(), reqWith(ws, map[string]string{})); err != nil {
 			t.Fatal(err)
 		}
 		if got := atomic.LoadInt32(&inner.ran); got != 1 {
@@ -124,7 +124,7 @@ func TestSwarmRunner_CoveragePlanLoadingAndDeps(t *testing.T) {
 
 func TestSwarmRunner_CoverageEnforceFailureBranches(t *testing.T) {
 	t.Run("dispatch error fails response", func(t *testing.T) {
-		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{})
 		resp, err := d.enforce(context.Background(), reqWith(t.TempDir(), nil),
 			swarm.SwarmPlan{Mode: swarm.ModeWriter},
 			swarm.SwarmResult{},
@@ -135,7 +135,7 @@ func TestSwarmRunner_CoverageEnforceFailureBranches(t *testing.T) {
 	})
 
 	t.Run("writer merge failure fails response and records merge signal", func(t *testing.T) {
-		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+		d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{})
 		resp, err := d.enforce(context.Background(), reqWith(t.TempDir(), nil),
 			swarm.SwarmPlan{
 				Mode:              swarm.ModeWriter,
@@ -158,7 +158,7 @@ func TestSwarmRunner_CoverageEnforceFailureBranches(t *testing.T) {
 	})
 
 	t.Run("reader synthesis write failure", func(t *testing.T) {
-		d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader)
+		d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader, Config{})
 		wsFile := filepath.Join(t.TempDir(), "not-a-dir")
 		if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
 			t.Fatal(err)

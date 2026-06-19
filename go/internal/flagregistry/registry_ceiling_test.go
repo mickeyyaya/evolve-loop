@@ -7,9 +7,9 @@ import "testing"
 // same diff — the test below fails if a net addition pushes count above the
 // current ceiling.
 //
-// Cycle 32 migrates four workflow controls to policy.json and removes one
-// docs-only flag.
-const FlagCeiling = 97
+// Cycle 33 migrates two swarm flags to policy.SwarmPolicy (Configuration Object)
+// and dead-sweeps two comment-only flags.
+const FlagCeiling = 93
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

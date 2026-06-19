@@ -278,28 +278,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
 	}
 
-	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
-		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
-		// Decorator so EVOLVE_SWARM_STAGE=advisory|enforce dispatches them across N
-		// parallel workers (reader fan-out / writer merge-train). Default (stage
-		// unset) = byte-identical delegate to the inner runner — zero behavior change.
-		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
-		// (the shipping default) keeps these byte-identical.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeReader),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}),
-		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
-		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeWriter),
-		core.PhaseAudit:        audit.NewDefaultWithStage(br, prm, cfg.PhaseIO),
-		core.PhaseShip:         ship.NewWithDefaultRunnerStage(cfg.PhaseIO),
-		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
-		// Ship-error recovery phase (Component #8): the advisor's recovery chain
-		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
-		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
-	}
-
 	// User policy (.evolve/policy.json): merge mandatory_phases into the routing
 	// spine so the advisor can never drop a user-declared mandatory phase. This
 	// is ADDITIVE — policy can only ADD mandatory phases; the non-configurable
@@ -307,7 +285,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// core spine regardless. A malformed policy is WARNed here (this construction
 	// path returns no error) and hard-fails loudly at the first phase dispatch,
 	// where the runner re-loads it for pins. Per-phase CLI/model pins are
-	// consulted at dispatch by the runner.
+	// consulted at dispatch by the runner. Loaded BEFORE the runners map so
+	// swarm config (policy.SwarmConfig) can be threaded into swarmrunner.New.
 	var shipFloor []string // WS4: nil ⇒ orchestrator uses router.DefaultShipFloor
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
@@ -324,6 +303,29 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// surface for the audit-FAIL learning route; shared fold with
 		// router.PolicyForProject so per-phase consumers see the same route.
 		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
+	}
+	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase}
+
+	runners := map[core.Phase]core.PhaseRunner{
+		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
+		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
+		// them across N parallel workers (reader fan-out / writer merge-train).
+		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
+		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
+		// (the shipping default) keeps these byte-identical.
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeReader, swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
+		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeWriter, swCfg),
+		core.PhaseAudit:        audit.NewDefaultWithStage(br, prm, cfg.PhaseIO),
+		core.PhaseShip:         ship.NewWithDefaultRunnerStage(cfg.PhaseIO),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
+		// Ship-error recovery phase (Component #8): the advisor's recovery chain
+		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
+		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
