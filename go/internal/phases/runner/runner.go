@@ -436,13 +436,15 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			phase, profileName, cli, plan.PrimarySource, profilePath)
 	}
 	model := plan.Model
-	// Per-phase permission-mode override: EVOLVE_<AGENT>_PERMISSION_MODE,
-	// resolved here with the AGENT name (profileName) so the env key matches
-	// CLAUDE.md's convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, not
-	// EVOLVE_TDD_*). Passed as typed config — the bridge realizes it per-CLI
-	// via the LaunchIntent (no raw --permission-mode leak into non-claude
-	// launch commands). Empty = profile/realizer default (bypass).
-	permissionMode := envchain.Resolve(envchain.PhaseEnvKey(profileName, "PERMISSION_MODE"), req.Env, "", "")
+	// Per-phase permission mode comes from the request snapshot first, then
+	// the typed agent profile. The process environment is intentionally not
+	// consulted: profiles are the persistent SSOT and req.Env is the explicit
+	// per-dispatch override surface. Passed as typed config — the bridge
+	// realizes it per-CLI via the LaunchIntent (no raw flag leak).
+	permissionMode := req.Env[envchain.PhaseEnvKey(profileName, "PERMISSION_MODE")]
+	if permissionMode == "" && prof != nil {
+		permissionMode = prof.PermissionMode
+	}
 	// Facet B: resolve the per-agent launch-time system prompt / rules
 	// (profileName keys both the profile lookup and the EVOLVE_<AGENT>_* env).
 	sysPrompt := systemprompt.Resolve(profileName, profileDir, req.Env)

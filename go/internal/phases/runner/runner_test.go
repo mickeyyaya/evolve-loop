@@ -531,7 +531,7 @@ func TestRun_PermissionModeOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "builder.json"),
-		[]byte(`{"name":"builder","cli":"claude-tmux"}`), 0o644); err != nil {
+		[]byte(`{"name":"builder","cli":"claude-tmux","permission_mode":"acceptEdits"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
@@ -549,6 +549,29 @@ func TestRun_PermissionModeOverride(t *testing.T) {
 	}
 	if len(fb.gotReq.ExtraFlags) != 0 {
 		t.Errorf("ExtraFlags should be empty (permission is typed config, not a raw flag); got %v", fb.gotReq.ExtraFlags)
+	}
+}
+
+func TestRun_PermissionModeFromProfile(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "builder.json"),
+		[]byte(`{"name":"builder","cli":"claude-tmux","permission_mode":"plan"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
+	fb := &fakeBridge{writeArtifact: "x"}
+	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x")})
+	if _, err := r.Run(context.Background(), core.PhaseRequest{
+		ProjectRoot: root, Workspace: t.TempDir(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if fb.gotReq.PermissionMode != "plan" {
+		t.Errorf("PermissionMode = %q, want \"plan\" from profile", fb.gotReq.PermissionMode)
 	}
 }
 

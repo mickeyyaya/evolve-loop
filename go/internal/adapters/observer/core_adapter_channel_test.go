@@ -88,21 +88,24 @@ func TestChannelSourcePaths_Headless(t *testing.T) {
 	}
 }
 
-// TestChannelSourcePaths_PerAgentKeyAndProcessEnv: the per-agent env key wins,
-// hyphens map to underscores (tdd-engineer → EVOLVE_TDD_ENGINEER_CLI), and a
-// value present only in the process env (EnvLookup) is honored.
-func TestChannelSourcePaths_PerAgentKeyAndProcessEnv(t *testing.T) {
+// TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv: request-scoped per-agent
+// keys remain supported, hyphens map to underscores, and the persistent process
+// environment is ignored because agent profiles are the routing SSOT.
+func TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	a := &CoreAdapter{EnvLookup: func(k string) string {
 		if k == "EVOLVE_TDD_ENGINEER_CLI" {
-			return "claude-p"
+			return "codex-tmux"
 		}
 		return ""
 	}}
-	req := core.PhaseRequest{Workspace: ws} // no req.Env → falls through to process env
+	req := core.PhaseRequest{
+		Workspace: ws,
+		Env:       map[string]string{"EVOLVE_TDD_ENGINEER_CLI": "claude-p"},
+	}
 	stdout, stderr := a.channelSourcePaths(req, "tdd-engineer")
 	if stdout != "" || stderr != "" {
-		t.Errorf("process-env claude-p must select headless legacy, got stdout=%q stderr=%q", stdout, stderr)
+		t.Errorf("request-scoped claude-p must select headless legacy, got stdout=%q stderr=%q", stdout, stderr)
 	}
 }

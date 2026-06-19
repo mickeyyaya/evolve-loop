@@ -139,14 +139,20 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 	}
 }
 
-// resolveModel runs the model precedence: EVOLVE_<AGENT>_MODEL > profile
+// resolveModel runs the model precedence: request override > profile
 // .model_tier_default > defaultModel, then expands "auto" via autoExpand.
 func resolveModel(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel) string {
 	profileModelTier := ""
 	if prof != nil {
 		profileModelTier = prof.ModelTierDefault
 	}
-	model := envchain.Resolve(envchain.PhaseEnvKey(agent, "MODEL"), env, profileModelTier, defaultModel)
+	model := env[envchain.PhaseEnvKey(agent, "MODEL")]
+	if model == "" {
+		model = profileModelTier
+	}
+	if model == "" {
+		model = defaultModel
+	}
 	if model == "auto" && autoExpand != nil {
 		if m, ok := autoExpand(phase); ok {
 			model = m
@@ -158,7 +164,7 @@ func resolveModel(agent, phase, defaultModel string, env map[string]string, prof
 // resolvePrimary returns the primary CLI and its provenance label.
 func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile) (cli, source string) {
 	perAgentKey := envchain.PhaseEnvKey(agent, "CLI")
-	if v := envchain.Resolve(perAgentKey, env, "", ""); v != "" {
+	if v := env[perAgentKey]; v != "" {
 		return v, "env(" + perAgentKey + ")"
 	}
 	if v := envchain.Resolve("EVOLVE_CLI", env, "", ""); v != "" {
