@@ -12,6 +12,8 @@ argument-hint: "<target-version> [--dry-run]"
 
 `evolve release-preflight` already gates: clean tree, attached branch, semver bump, recent audit PASS, gate-test suites. `evolve release-consistency` already verifies the 6 version markers (plugin.json, marketplace.json, README, CHANGELOG, SKILL headings). Neither checks whether **GitHub CI is actually green on the commit you're about to release from**, nor screens for accidental WIP commits. This skill closes exactly those gaps — nothing more.
 
+> Defense-in-depth: [`/publish`](../publish/SKILL.md) now performs the same pre-release CI-green check itself (so a direct `/publish` call is still gated) **and** adds a post-release watch of the released commit's `go`/`CI` workflows. Running `/release` first stays the recommended path; `evolve release` (the raw binary) is `gh`-free and only prints a "CI not verified" advisory.
+
 ## Procedure
 
 Run in order. Any **FAIL** → print the reason and stop (do not delegate to `/publish`).

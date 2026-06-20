@@ -366,6 +366,13 @@ func Run(opts Options) (Result, error) {
 	setJournalField(journal, journalPath, "completed_at", now().UTC().Format(time.RFC3339))
 	logf("DONE: v%s shipped, propagated, and verified", opts.Target)
 	logf("journal: %s", journalPath)
+	// GitHub CI is intentionally NOT checked here: this pipeline is self-contained
+	// and gh-free (headless/cron-safe). A green pipeline therefore does NOT imply a
+	// green `go`/`CI` workflow on the pushed commit (the v20.1.0 false-success: the
+	// release exited 0 while the released commit's apicover gate was red). Disclose
+	// the gap loudly; CI-gating lives in the /publish skill (pre-release CI-green
+	// check + post-release CI watch).
+	logf("NOTE: GitHub CI is NOT verified by this pipeline — confirm the `go` and `CI` workflows are green on the release commit (e.g. `gh run watch`), or publish via /publish (which watches CI).")
 	return res, nil
 }
 
