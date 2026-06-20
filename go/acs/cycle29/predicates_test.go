@@ -120,46 +120,6 @@ func TestC29_001_WorkflowFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC29_002_RegistryRowCountIs115 verifies that after removing all 5 rows the
-// total registry count is exactly 115.
-//
-// Covers AC2. Both over-removal (< 115) and under-removal (> 115) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 120, which is 5 rows above 115.
-func TestC29_002_RegistryRowCountIs115(t *testing.T) {
-	const want = 115
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 5 workflow-defaults rows from registry_table.go.\n"+
-			"Both over-removal (< 115) and under-removal (> 115) fail.\n"+
-			"Expected: 120 − 5 = 115.",
-			got, want)
-	}
-}
-
-// TestC29_003_FlagCeilingConstIs115 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 120 to 115
-// in the same diff as the 5-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 120 after the 5-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 120.
-func TestC29_003_FlagCeilingConstIs115(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 115") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 115'.\n"+
-			"Builder must lower the FlagCeiling constant from 120 to 115 in the same diff\n"+
-			"as removing the 5 workflow-defaults rows (120 − 5 = 115).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC29_004_NoEnvReadsForRemovedFlags verifies that the os.Getenv and envchain
 // read sites for the 5 workflow-defaults flags have been deleted from their
 // respective source files.

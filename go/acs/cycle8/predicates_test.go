@@ -6,7 +6,7 @@
 //     `evolve campaign` with three subcommands (study, replan, run) and wire
 //     it into registry.go.
 //
-//   - campaign-adr-and-citations — write ADR-0054 and the companion
+//   - campaign-adr-and-citations — write ADR-0056 and the companion
 //     docs/architecture/campaign-planning-citations.md.
 //
 // AC map (1:1 with triage top_n, scout-report.md ACs):
@@ -21,7 +21,7 @@
 //	  AC6  go build ./cmd/evolve/... and go vet pass                           → C1_006 (pre-existing GREEN)
 //
 //	campaign-adr-and-citations:
-//	  AC1  ADR-0054 file exists and is git-tracked                             → C2_001
+//	  AC1  ADR-0056 file exists and is git-tracked                             → C2_001
 //	  AC2  ADR has ## Status / ## Context / ## Decision / ## Consequences      → C2_002
 //	  AC3  ADR describes all four slices S1–S4                                 → C2_003
 //	  AC4  campaign-planning-citations.md exists, non-empty (≥5 lines)         → C2_004
@@ -265,7 +265,7 @@ func TestC1_006_BuildAndVetPass(t *testing.T) {
 
 // ── campaign-adr-and-citations ───────────────────────────────────────────────
 
-// TestC2_001_ADRFileExistsAndTracked verifies that the ADR-0054 file exists on
+// TestC2_001_ADRFileExistsAndTracked verifies that the ADR-0056 file exists on
 // disk AND is tracked by git (not gitignored or untracked).
 //
 // BEHAVIORAL: disk presence + git tracking check prevents a gitignored worktree
@@ -274,12 +274,12 @@ func TestC1_006_BuildAndVetPass(t *testing.T) {
 // RED: file does not exist yet.
 func TestC2_001_ADRFileExistsAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	rel := filepath.Join("docs", "architecture", "adr", "0054-advisor-driven-preliminary-study-cycle.md")
+	rel := filepath.Join("docs", "architecture", "adr", "0056-advisor-driven-preliminary-study-cycle.md")
 	abs := filepath.Join(root, rel)
 
 	if !acsassert.FileExists(t, abs) {
 		t.Fatalf("RED: %s missing on disk.\n"+
-			"Builder must create docs/architecture/adr/0054-advisor-driven-preliminary-study-cycle.md.", rel)
+			"Builder must create docs/architecture/adr/0056-advisor-driven-preliminary-study-cycle.md.", rel)
 	}
 	_, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel)
 	if code != 0 {
@@ -288,7 +288,7 @@ func TestC2_001_ADRFileExistsAndTracked(t *testing.T) {
 	}
 }
 
-// TestC2_002_ADRHasRequiredSections verifies that ADR-0054 contains the four
+// TestC2_002_ADRHasRequiredSections verifies that ADR-0056 contains the four
 // standard ADR section headers.
 //
 // // acs-predicate: config-check
@@ -300,16 +300,16 @@ func TestC2_001_ADRFileExistsAndTracked(t *testing.T) {
 func TestC2_002_ADRHasRequiredSections(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	// acs-predicate: config-check
-	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0054-advisor-driven-preliminary-study-cycle.md")
+	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0056-advisor-driven-preliminary-study-cycle.md")
 	for _, section := range []string{"## Status", "## Context", "## Decision", "## Consequences"} {
 		if !acsassert.FileContains(t, adrPath, section) {
-			t.Errorf("RED: ADR-0054 is missing required section %q.\n"+
+			t.Errorf("RED: ADR-0056 is missing required section %q.\n"+
 				"Builder must include all four standard ADR sections.\nFile: %s", section, adrPath)
 		}
 	}
 }
 
-// TestC2_003_ADRDescribesAllFourSlices verifies that ADR-0054 describes all four
+// TestC2_003_ADRDescribesAllFourSlices verifies that ADR-0056 describes all four
 // implementation slices: S1 (wave engine / dag.Levels), S2 (preliminary-study
 // phase), S3 (CLI driver / cmd_campaign), and S4 (documentation).
 //
@@ -321,7 +321,7 @@ func TestC2_002_ADRHasRequiredSections(t *testing.T) {
 func TestC2_003_ADRDescribesAllFourSlices(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	// acs-predicate: config-check
-	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0054-advisor-driven-preliminary-study-cycle.md")
+	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0056-advisor-driven-preliminary-study-cycle.md")
 	sliceMarkers := []struct {
 		slice   string
 		keyword string
@@ -333,7 +333,7 @@ func TestC2_003_ADRDescribesAllFourSlices(t *testing.T) {
 	}
 	for _, m := range sliceMarkers {
 		if !acsassert.FileContains(t, adrPath, m.keyword) {
-			t.Errorf("RED: ADR-0054 does not mention %q (required keyword for %s).\n"+
+			t.Errorf("RED: ADR-0056 does not mention %q (required keyword for %s).\n"+
 				"Builder must describe all four slices in the ADR.\nFile: %s",
 				m.keyword, m.slice, adrPath)
 		}
@@ -378,7 +378,7 @@ func TestC2_004_CitationsFileExistsAndNonEmpty(t *testing.T) {
 	}
 }
 
-// TestC2_005_NoPlaceholderURLsInADR verifies that ADR-0054 does not contain
+// TestC2_005_NoPlaceholderURLsInADR verifies that ADR-0056 does not contain
 // placeholder URLs: no "example.com" and no "TODO" in a URL context.
 //
 // // acs-predicate: config-check
@@ -388,13 +388,13 @@ func TestC2_004_CitationsFileExistsAndNonEmpty(t *testing.T) {
 func TestC2_005_NoPlaceholderURLsInADR(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	// acs-predicate: config-check
-	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0054-advisor-driven-preliminary-study-cycle.md")
+	adrPath := filepath.Join(root, "docs", "architecture", "adr", "0056-advisor-driven-preliminary-study-cycle.md")
 	if !acsassert.FileNotContains(t, adrPath, "example.com") {
-		t.Errorf("RED: ADR-0054 contains placeholder URL \"example.com\".\n"+
+		t.Errorf("RED: ADR-0056 contains placeholder URL \"example.com\".\n"+
 			"Builder must replace all placeholder URLs with verified-live citations.\nFile: %s", adrPath)
 	}
 	if !acsassert.FileNotContains(t, adrPath, "TODO") {
-		t.Errorf("RED: ADR-0054 contains \"TODO\" — unresolved placeholder.\n"+
+		t.Errorf("RED: ADR-0056 contains \"TODO\" — unresolved placeholder.\n"+
 			"Builder must replace all TODO-tagged content with verified information.\nFile: %s", adrPath)
 	}
 }

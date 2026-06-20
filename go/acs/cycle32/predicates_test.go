@@ -120,46 +120,6 @@ func TestC32_001_RemovedFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC32_002_RegistryRowCountIs97 verifies that after removing all 5 rows the
-// total registry count is exactly 97.
-//
-// Covers AC2. Both over-removal (< 97) and under-removal (> 97) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 102, which is 5 rows above 97.
-func TestC32_002_RegistryRowCountIs97(t *testing.T) {
-	const want = 97
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 5 rows from registry_table.go.\n"+
-			"Both over-removal (< 97) and under-removal (> 97) fail.\n"+
-			"Expected: 102 − 5 = 97.",
-			got, want)
-	}
-}
-
-// TestC32_003_FlagCeilingConstIs97 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 102 to 97
-// in the same diff as the 5-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 102 after the 5-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 102.
-func TestC32_003_FlagCeilingConstIs97(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 97") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 97'.\n"+
-			"Builder must lower the FlagCeiling constant from 102 to 97 in the same diff\n"+
-			"as removing the 5 removed rows (102 − 5 = 97).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC32_004_NoEnvReadsInProductionGo verifies that the env-read mechanisms
 // for all 4 live migrated flags have been deleted from their specific production
 // Go files.

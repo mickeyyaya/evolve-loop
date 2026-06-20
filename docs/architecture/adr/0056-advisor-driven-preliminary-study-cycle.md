@@ -1,4 +1,9 @@
-# ADR-0054: Advisor-driven preliminary study cycle
+# ADR-0056: Advisor-driven preliminary study cycle
+
+> Renumbered from ADR-0054 (2026-06-21): ADR-0054 collided with
+> `0054-concurrent-evolve-loop-sibling-worktrees.md` after both parallel
+> branches claimed the number; this preliminary-study ADR moved to 0056
+> (0055 = Cycle Dossier). Content unchanged.
 
 ## Status
 

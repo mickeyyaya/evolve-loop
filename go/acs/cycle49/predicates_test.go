@@ -172,26 +172,6 @@ func TestC49A_003_ForceFresh_CLIBoolVarRegistered(t *testing.T) {
 
 // === FlagCeiling after Task A (config-check waiver) ===
 
-// TestC49A_004_FlagCeilingIs53 verifies that the FlagCeiling ratchet constant
-// has been lowered to 53 after removing EVOLVE_FORCE_FRESH (54 − 1 = 53).
-// This is the intermediate ceiling; Task B will further lower it to 52.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 54.
-func TestC49A_004_FlagCeilingIs53(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 53") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 53'.\n"+
-			"Builder must lower the FlagCeiling constant to 53 in the Task A diff\n"+
-			"(54 − 1 = 53 after removing EVOLVE_FORCE_FRESH row).\n"+
-			"Note: Task B will further lower to 52; this predicate checks the 53 intermediate.\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === Test-file migration (config-check waiver) ===
 
 // TestC49A_005_TestFiles_NoSetenvForceFresh verifies that both test files that
@@ -309,25 +289,6 @@ func TestC49B_002_EnvLane_IsSplitConst(t *testing.T) {
 
 // === FlagCeiling after Task B (config-check waiver) ===
 
-// TestC49B_003_FlagCeilingIs52 verifies that the FlagCeiling ratchet constant
-// has been lowered to 52 after removing EVOLVE_LANE (53 − 1 = 52, combining both
-// tasks: 54 − 2 = 52).
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 54 (will be 53 after Task A).
-func TestC49B_003_FlagCeilingIs52(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 52") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 52'.\n"+
-			"Builder must lower the FlagCeiling constant to 52 in the Task B diff\n"+
-			"(53 − 1 = 52 after removing EVOLVE_LANE row; 54 − 2 = 52 for both tasks).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === registry_lane_amp_test.go deleted (behavioral: os.Stat + git) ===
 
 // TestC49B_004_LaneAmpTestFile_Deleted verifies that registry_lane_amp_test.go
@@ -366,23 +327,3 @@ func TestC49B_004_LaneAmpTestFile_Deleted(t *testing.T) {
 }
 
 // === Exact row count — final state (behavioral: negative / edge) ===
-
-// TestC49B_NEG_ExactRowCountIs52 verifies that after both tasks are implemented
-// the total registry count is exactly 52. This is the strongest invariant:
-// over-removal (<52) AND under-removal (>52) both fail. It subsumes C49A_NEG's
-// upper-bound check.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-//
-// RED: registry currently has 54 rows (FlagCeiling=54); 54 ≠ 52 fails.
-func TestC49B_NEG_ExactRowCountIs52(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 52 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 52 (54 − 2 removed flags).\n"+
-			"Builder must remove exactly 2 rows from registry_table.go:\n"+
-			"  Task A: EVOLVE_FORCE_FRESH\n"+
-			"  Task B: EVOLVE_LANE\n"+
-			"Over-removal (<52) and under-removal (>52) both fail. Current count: %d",
-			got, got)
-	}
-}

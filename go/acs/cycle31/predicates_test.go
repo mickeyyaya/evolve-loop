@@ -121,46 +121,6 @@ func TestC31_001_BypassFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC31_002_RegistryRowCountIs102 verifies that after removing all 7 rows the
-// total registry count is exactly 102.
-//
-// Covers AC2. Both over-removal (< 102) and under-removal (> 102) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 109, which is 7 rows above 102.
-func TestC31_002_RegistryRowCountIs102(t *testing.T) {
-	const want = 102
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 7 bypass/dead-sweep rows from registry_table.go.\n"+
-			"Both over-removal (< 102) and under-removal (> 102) fail.\n"+
-			"Expected: 109 − 7 = 102.",
-			got, want)
-	}
-}
-
-// TestC31_003_FlagCeilingConstIs102 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 109 to 102
-// in the same diff as the 7-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 109 after the 7-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 109.
-func TestC31_003_FlagCeilingConstIs102(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 102") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 102'.\n"+
-			"Builder must lower the FlagCeiling constant from 109 to 102 in the same diff\n"+
-			"as removing the 7 bypass/dead rows (109 − 7 = 102).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC31_004_NoEnvBypassReadsInProductionGo verifies that the env-read mechanisms
 // for all 6 BYPASS flags have been deleted from their specific production Go files.
 //

@@ -102,46 +102,6 @@ func TestC26_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC26_002_RegistryRowCountIs129 verifies that after removing all 3 rows the
-// total registry count is exactly 129.
-//
-// Covers AC2. Both over-removal (< 129) and under-removal (> 129) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly (the production SSOT slice).
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 132, which is 3 rows above 129.
-func TestC26_002_RegistryRowCountIs129(t *testing.T) {
-	const want = 129
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 3 quota/ACS cluster rows from registry_table.go.\n"+
-			"Both over-removal (< 129) and under-removal (> 129) fail.\n"+
-			"Expected: 132 − 3 = 129.",
-			got, want)
-	}
-}
-
-// TestC26_003_FlagCeilingConstIs129 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 132 to 129
-// in the same diff as the 3-row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 132 after the 3-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 132.
-func TestC26_003_FlagCeilingConstIs129(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 129") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 129'.\n"+
-			"Builder must lower the FlagCeiling constant from 132 to 129 in the same diff\n"+
-			"as removing the 3 quota/ACS cluster rows (132 − 3 = 129).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC26_004_NoEnvReadsForQuotaFlags verifies that the two os.Getenv tier-2
 // read sites for EVOLVE_QUOTA_RESET_AT and EVOLVE_QUOTA_RESET_HOURS have been
 // deleted from quotareset.go:

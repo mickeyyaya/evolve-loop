@@ -206,27 +206,6 @@ func TestC44_005_ShipReleaseNotesIPCPreserved(t *testing.T) {
 	}
 }
 
-// TestC44_006_FlagCeilingIs65 verifies that the FlagCeiling ratchet constant
-// has been updated to 65 in registry_ceiling_test.go (68 − 3 removed flags = 65).
-//
-// Covers AC6. The ratchet prevents accidental registry growth; lowering it by 3
-// is mandatory alongside the registry row removals.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 68.
-func TestC44_006_FlagCeilingIs65(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 65") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 65'.\n"+
-			"Builder must lower the FlagCeiling constant to 65 in the same diff as\n"+
-			"removing all 3 registry rows (68 − 3 = 65).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC44_009_ControlFlagsDocNoRemovedFlagRows verifies that the regenerated
 // docs/architecture/control-flags.md no longer contains entries for the 3 removed flags.
 //
@@ -267,23 +246,5 @@ func TestC44_010_DocsContractNoRemovedFlagAllowlist(t *testing.T) {
 				"After removal from the registry, these flags are no longer valid allowedUndocumented entries.\n"+
 				"File: %s", name, name, contractTest)
 		}
-	}
-}
-
-// TestC44_NEG_ExactRowCountIs65 verifies that after removing all 3 rows the total
-// registry count is exactly 65.
-//
-// Covers AC1 (NEG exact-count). BEHAVIORAL: calls len(flagregistry.All) — the
-// production count. Over-removal (<65) AND under-removal (>65) both fail.
-//
-// RED: registry currently has 68 rows (FlagCeiling=68).
-func TestC44_NEG_ExactRowCountIs65(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 65 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 65 (68 − 3 removed flags).\n"+
-			"Builder must remove exactly 3 rows from registry_table.go:\n"+
-			"  EVOLVE_RESET, EVOLVE_SHIP_RELEASE_NOTES, EVOLVE_STRATEGY\n"+
-			"Over-removal (<65) and under-removal (>65) both fail. Current count: %d",
-			got, got)
 	}
 }

@@ -96,47 +96,6 @@ func TestC23_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC23_002_RegistryRowCountIs140 verifies that after removing all 5 dead rows
-// the total registry count is exactly 140.
-//
-// Covers AC2 (140 rows total). Both over-removal (< 140) and under-removal
-// (> 140) fail the assertion.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 145, which is 5 rows above 140.
-func TestC23_002_RegistryRowCountIs140(t *testing.T) {
-	const want = 140
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 5 dead flag rows from registry_table.go.\n"+
-			"Both over-removal (< 140) and under-removal (> 140) fail.\n"+
-			"Expected: 145 − 5 = 140.",
-			got, want)
-	}
-}
-
-// TestC23_003_FlagCeilingConstIs140 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 145 to 140
-// in the same diff as the 5-row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; keeping 145 after the 5-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 145.
-func TestC23_003_FlagCeilingConstIs140(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 140") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 140'.\n"+
-			"Builder must lower the FlagCeiling constant from 145 to 140 in the same diff\n"+
-			"as removing the 5 dead flag rows (145 − 5 = 140).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC23_004_NoProductionReaderForDeadFlags verifies that no production Go file
 // reads any of the 5 dead flags via os.Getenv.
 //

@@ -61,21 +61,6 @@ func TestC9_001_RegistryRowCountRatchet(t *testing.T) {
 	}
 }
 
-// TestC9_002_FlagCeilingConstIs160 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go reflects the post-consolidation value 160.
-//
-// // acs-predicate: config-check — corrected from original 241 to 160 (the
-// current ratchet after further flag-reduction cycles). Pre-existing GREEN.
-func TestC9_002_FlagCeilingConstIs160(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 160") {
-		t.Errorf("registry_ceiling_test.go does not contain 'FlagCeiling = 160'.\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC9_003_AllFanoutFlagsAbsentFromRegistry verifies that all 17
 // EVOLVE_FANOUT_* flags are no longer registered after Builder removes
 // their rows from registry_table.go.

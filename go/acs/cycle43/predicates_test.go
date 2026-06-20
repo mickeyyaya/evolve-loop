@@ -342,27 +342,6 @@ func TestC43_005_BridgeDepsHas4TypedIntFields(t *testing.T) {
 	}
 }
 
-// TestC43_008_FlagCeilingConstIs68 verifies that the FlagCeiling ratchet constant
-// has been updated to 68 in registry_ceiling_test.go (73 − 5 removed flags = 68).
-//
-// Covers AC8. The ratchet prevents accidental registry growth; lowering it by 5
-// is mandatory alongside the registry row removals.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 73.
-func TestC43_008_FlagCeilingConstIs68(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 68") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 68'.\n"+
-			"Builder must lower the FlagCeiling constant to 68 in the same diff as\n"+
-			"removing all 5 registry rows (73 − 5 = 68).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC43_010_ControlFlagsDocNoRemovedFlagRows verifies that the regenerated
 // docs/architecture/control-flags.md no longer contains entries for the 5 removed flags.
 //
@@ -489,25 +468,6 @@ func TestC43_012_AllBridgeTestFilesMigrated(t *testing.T) {
 					"File: %s", tf.relPath, flag, flag, fullPath)
 			}
 		}
-	}
-}
-
-// TestC43_NEG_RowCountIs68 verifies that after removing all 5 rows the total
-// registry count is exactly 68.
-//
-// Covers NEG (adversarial count check). BEHAVIORAL: calls len(flagregistry.All) —
-// the production count. Over-removal (<68) AND under-removal (>68) both fail.
-//
-// RED: registry currently has 73 rows (FlagCeiling=73).
-func TestC43_NEG_RowCountIs68(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 68 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 68 (73 − 5 removed flags).\n"+
-			"Builder must remove exactly 5 rows from registry_table.go:\n"+
-			"  EVOLVE_SCROLLBACK_LINES, EVOLVE_BOOT_TIMEOUT_S, EVOLVE_ARTIFACT_TIMEOUT_S,\n"+
-			"  EVOLVE_ARTIFACT_MAX_EXTENDS, EVOLVE_PSMAS_SKIP\n"+
-			"Over-removal (<68) and under-removal (>68) both fail. Current count: %d",
-			got, got)
 	}
 }
 

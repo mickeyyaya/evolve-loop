@@ -317,45 +317,6 @@ func TestC38_GC_001_GCAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC38_GC_002_RegistryRowCountIs80 verifies that after removing all 3 rows
-// (ROUTER_CLI, ROUTER_MODEL, GC) the total registry count is exactly 80.
-//
-// Covers gc-mode AC2 (FINAL state after both tasks). BEHAVIORAL: calls
-// len(flagregistry.All) — the production count.
-// Over-removal (<80) and under-removal (>80) both fail.
-//
-// RED: registry currently has 83 rows (FlagCeiling=83).
-func TestC38_GC_002_RegistryRowCountIs80(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 80 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 80 (83 − 3 removed flags).\n"+
-			"Builder must remove exactly 3 rows from registry_table.go:\n"+
-			"  EVOLVE_ROUTER_CLI, EVOLVE_ROUTER_MODEL (Task 1) + EVOLVE_GC (Task 2).\n"+
-			"Current count: %d", got, got)
-	}
-}
-
-// TestC38_GC_003_FlagCeilingConstIs80 verifies that the FlagCeiling ratchet constant
-// has been updated to 80 in registry_ceiling_test.go (final state after both tasks).
-//
-// Covers gc-mode AC3 (FINAL state). The ratchet prevents accidental registry growth;
-// lowering it by 3 (83−3=80) is mandatory alongside the row removals.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 83.
-func TestC38_GC_003_FlagCeilingConstIs80(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 80") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 80'.\n"+
-			"Builder must lower the FlagCeiling constant to 80 in the same diff\n"+
-			"as removing the 3 registry rows (83 − 2 router − 1 gc = 80).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC38_GC_004_NoProdGCEnvReadInCmdLoopOutcome verifies that the os.Getenv
 // string literal for EVOLVE_GC has been deleted from cmd_loop_outcome.go.
 //

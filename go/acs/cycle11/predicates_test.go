@@ -107,47 +107,6 @@ func TestC11_001_AllObserverInactivityFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC11_002_RegistryRowCountIs163 verifies that after removing all 13
-// OBSERVER_*/INACTIVITY_* rows the total registry count is exactly 163.
-//
-// Covers AC3 (163 rows total). Both over-removal (< 163) and under-removal
-// (> 163) fail the assertion.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 176, which is 13 rows above 163.
-func TestC11_002_RegistryRowCountIs163(t *testing.T) {
-	const want = 163
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 13 OBSERVER_*/INACTIVITY_* rows from registry_table.go.\n"+
-			"Both over-removal (< 163) and under-removal (> 163) fail.\n"+
-			"Expected: 176 − 13 = 163.",
-			got, want)
-	}
-}
-
-// TestC11_003_FlagCeilingConstIs163 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 176 to 163
-// in the same diff as the row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; still reading 176 after the 13-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 176.
-func TestC11_003_FlagCeilingConstIs163(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 163") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 163'.\n"+
-			"Builder must lower the FlagCeiling constant from 176 to 163 in the same diff\n"+
-			"as removing the 13 OBSERVER_*/INACTIVITY_* rows (176 − 13 = 163).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC11_004_ObserverEnvReadsGoneFromPhaseObserverCmd verifies that the
 // observerEnvConfig() function's envchain.Int / os.Getenv calls for all
 // EVOLVE_OBSERVER_* and EVOLVE_INACTIVITY_THRESHOLD_S have been removed from

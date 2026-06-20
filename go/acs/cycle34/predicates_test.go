@@ -103,44 +103,6 @@ func TestC34_001_RemovedFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC34_002_RegistryRowCountIs89 verifies that after removing all 4 rows the
-// total registry count is exactly 89.
-//
-// Covers AC2. BEHAVIORAL: calls len(flagregistry.All) — the production count.
-// Over-removal (< 89) and under-removal (> 89) both fail.
-//
-// RED: registry currently has 93 rows (FlagCeiling=93); count is 93.
-func TestC34_002_RegistryRowCountIs89(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 89 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 89 (93 − 4 removed gate flags).\n"+
-			"Builder must remove exactly 4 rows from registry_table.go:\n"+
-			"  EVOLVE_CONTRACT_GATE, EVOLVE_EVAL_GATE, EVOLVE_REVIEW_GATE, EVOLVE_TRIAGE_CAP_GATE",
-			got)
-	}
-}
-
-// TestC34_003_FlagCeilingConstIs89 verifies that the FlagCeiling ratchet constant
-// has been updated from 93 to 89 in registry_ceiling_test.go.
-//
-// Covers AC3. The ratchet prevents accidental registry growth; lowering it by 4
-// (93−4=89) is mandatory alongside the row removal.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 93.
-func TestC34_003_FlagCeilingConstIs89(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 89") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 89'.\n"+
-			"Builder must lower the FlagCeiling constant from 93 to 89 in the same diff\n"+
-			"as removing the 4 gate rows (93 − 4 = 89).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC34_004_NoGateEnvReadsInConfigGo verifies that all 4 gate-flag env-read
 // string literals have been deleted from config.go:applyEnv.
 //

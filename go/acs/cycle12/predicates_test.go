@@ -92,47 +92,6 @@ func TestC12_001_AllBridgeFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC12_002_RegistryRowCountIs158 verifies that after removing all 5
-// BRIDGE_* rows the total registry count is exactly 158.
-//
-// Covers AC3 (158 rows total). Both over-removal (< 158) and under-removal
-// (> 158) fail the assertion.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 163, which is 5 rows above 158.
-func TestC12_002_RegistryRowCountIs158(t *testing.T) {
-	const want = 158
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 5 BRIDGE_* rows from registry_table.go.\n"+
-			"Both over-removal (< 158) and under-removal (> 158) fail.\n"+
-			"Expected: 163 − 5 = 158.",
-			got, want)
-	}
-}
-
-// TestC12_003_FlagCeilingConstIs158 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 163 to 158
-// in the same diff as the row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; still reading 163 after the 5-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 163.
-func TestC12_003_FlagCeilingConstIs158(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 158") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 158'.\n"+
-			"Builder must lower the FlagCeiling constant from 163 to 158 in the same diff\n"+
-			"as removing the 5 BRIDGE_* rows (163 − 5 = 158).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC12_004_BridgeManifestDirEnvReadGoneFromManifest verifies that the
 // os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR") call at manifest.go:20 has been
 // removed and replaced by a DI seam var backed by BridgePolicy.

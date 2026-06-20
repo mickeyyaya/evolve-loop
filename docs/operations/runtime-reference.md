@@ -129,7 +129,7 @@ Migration note: `EVOLVE_ALLOW_DEEP_RESEARCH` is retired; use
 > - `evolve campaign replan --workspace <dir> --feedback <text>` — re-run the study with operator feedback; loads and verifies the previous plan, generates a revised one, prints a diff (added/removed/modified cycle IDs), and renders the updated plan.
 > - `evolve campaign run --plan <campaign-plan.json> [--simulate]` — load, verify, and execute the campaign plan as dependency-ordered waves. Each wave's file-disjoint cycles run concurrently via `fleet.Supervisor`; a failed cycle receives one localized retry before the wave fails. `--simulate` exercises wave execution without LLM calls (deterministic plumbing test).
 >
-> The plan is **deterministically verified** (`campaign.Plan.Verify`: version≥1, non-empty goal, unique cycle IDs, acyclic depends_on DAG) before any render or execution. The LLM study output is advisory; all trust boundaries remain downstream (per-cycle build∧audit∧tdd gates). See `docs/architecture/adr/0054-advisor-driven-preliminary-study-cycle.md` and `docs/architecture/campaign-planning-citations.md`.
+> The plan is **deterministically verified** (`campaign.Plan.Verify`: version≥1, non-empty goal, unique cycle IDs, acyclic depends_on DAG) before any render or execution. The LLM study output is advisory; all trust boundaries remain downstream (per-cycle build∧audit∧tdd gates). See `docs/architecture/adr/0056-advisor-driven-preliminary-study-cycle.md` and `docs/architecture/campaign-planning-citations.md`.
 
 > **Operator commands (write a verdict file):**
 >

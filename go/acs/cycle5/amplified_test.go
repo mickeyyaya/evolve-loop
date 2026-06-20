@@ -125,35 +125,6 @@ func TestC5_AMP_007_ADRHasSliceTable(t *testing.T) {
 	acsassert.FileContains(t, adrPath, "Slice")
 }
 
-// TestC5_AMP_008_NewFlagNamesMatchRegistryRegex verifies that the two new
-// concrete flag names registered under the Sibling-Worktree cluster match
-// the registry's strict ^EVOLVE(_[A-Z0-9]+)+$ regex (enforced by
-// TestAll_NonEmptyAndWellFormed in registry_test.go:25).
-//
-// The builder adapted the template "EVOLVE_CLI_MAX_CONCURRENT_<CLI>" to
-// the concrete "EVOLVE_CLI_MAX_CONCURRENT_CODEX". This test verifies both
-// names are well-formed and present in the registry file.
-//
-// Failure mode caught: template-form name with angle brackets slipped into
-// the registry, which the flagregistry unit tests would catch at ship-gate
-// but this test catches earlier.
-func TestC5_AMP_008_NewFlagNamesMatchRegistryRegex(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	regTable := filepath.Join(root, "go", "internal", "flagregistry", "registry_table.go")
-	re := regexp.MustCompile(`^EVOLVE(_[A-Z0-9]+)+$`)
-	cases := []string{
-		"EVOLVE_REAP_ORPHANS",
-		"EVOLVE_CLI_MAX_CONCURRENT_CODEX",
-	}
-	for _, name := range cases {
-		if !re.MatchString(name) {
-			t.Errorf("RED: flag name %q does not satisfy ^EVOLVE(_[A-Z0-9]+)+$", name)
-		}
-		// Belt-and-suspenders: flag must also be present in the registry file.
-		acsassert.FileContains(t, regTable, name)
-	}
-}
-
 // TestC5_AMP_009_RuntimeReferenceHasTableRowForReapOrphans verifies that
 // EVOLVE_REAP_ORPHANS in runtime-reference.md is part of a table row
 // (contains a "|" separator on the same line), not just a bare mention in

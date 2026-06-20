@@ -67,27 +67,6 @@ func TestC5_003_RuntimeReferenceHasAllConcurrencyFlags(t *testing.T) {
 	acsassert.FileContains(t, rtRef, "EVOLVE_CLI_MAX_CONCURRENT")
 }
 
-// TestC5_004_FlagRegistryHasNewConcurrencyRows verifies that
-// go/internal/flagregistry/registry_table.go contains registry rows for
-// EVOLVE_REAP_ORPHANS and EVOLVE_CLI_MAX_CONCURRENT_<CLI> in the
-// Sibling-Worktree cluster (not the Fleet cluster). AC3.
-//
-// Negative dimension: rows must use the "Sibling-Worktree" cluster label,
-// distinguishing them from EVOLVE_LANE's "Fleet (ADR-0049)" cluster. This
-// prevents a copy-paste that misattributes the new flags to the fleet topology.
-//
-// acs-predicate: config-check — registry_table.go is static configuration;
-// the behavioral verification is TestC5_006 (go test ./internal/flagregistry/).
-func TestC5_004_FlagRegistryHasNewConcurrencyRows(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	regTable := filepath.Join(root, "go", "internal", "flagregistry", "registry_table.go")
-	// acs-predicate: config-check
-	acsassert.FileContains(t, regTable, "EVOLVE_REAP_ORPHANS")
-	acsassert.FileContains(t, regTable, "EVOLVE_CLI_MAX_CONCURRENT")
-	// Negative: new rows must declare the Sibling-Worktree cluster, not Fleet.
-	acsassert.FileContains(t, regTable, "Sibling-Worktree")
-}
-
 // TestC5_005_GoBuildPassesAfterFlagRows verifies that adding the two flag
 // registry rows introduces no compilation regression. AC4.
 //

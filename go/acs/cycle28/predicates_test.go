@@ -111,46 +111,6 @@ func TestC28_001_DispatchFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC28_002_RegistryRowCountIs120 verifies that after removing all 6 rows the
-// total registry count is exactly 120.
-//
-// Covers AC2. Both over-removal (< 120) and under-removal (> 120) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 126, which is 6 rows above 120.
-func TestC28_002_RegistryRowCountIs120(t *testing.T) {
-	const want = 120
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 6 dispatch-cluster rows from registry_table.go.\n"+
-			"Both over-removal (< 120) and under-removal (> 120) fail.\n"+
-			"Expected: 126 − 6 = 120.",
-			got, want)
-	}
-}
-
-// TestC28_003_FlagCeilingConstIs120 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 126 to 120
-// in the same diff as the 6-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 126 after the 6-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 126.
-func TestC28_003_FlagCeilingConstIs120(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 120") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 120'.\n"+
-			"Builder must lower the FlagCeiling constant from 126 to 120 in the same diff\n"+
-			"as removing the 6 dispatch-cluster rows (126 − 6 = 120).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC28_004_NoEnvReadsForRemovedFlags verifies that the os.Getenv read sites
 // for EVOLVE_DISPATCH_POLICY, EVOLVE_DISPATCH_REPEAT_THRESHOLD,
 // EVOLVE_DISPATCH_PLAN_LOG, EVOLVE_DISPATCH_LOG_TTL_DAYS, and

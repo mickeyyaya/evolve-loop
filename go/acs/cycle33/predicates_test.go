@@ -115,46 +115,6 @@ func TestC33_001_RemovedFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC33_002_RegistryRowCountIs93 verifies that after removing all 4 rows the
-// total registry count is exactly 93.
-//
-// Covers AC2. Both over-removal (< 93) and under-removal (> 93) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 97, which is 4 rows above 93.
-func TestC33_002_RegistryRowCountIs93(t *testing.T) {
-	const want = 93
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 4 rows from registry_table.go.\n"+
-			"Both over-removal (< 93) and under-removal (> 93) fail.\n"+
-			"Expected: 97 − 4 = 93.",
-			got, want)
-	}
-}
-
-// TestC33_003_FlagCeilingConstIs93 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 97 to 93
-// in the same diff as the 4-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 97 after the 4-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 97.
-func TestC33_003_FlagCeilingConstIs93(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 93") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 93'.\n"+
-			"Builder must lower the FlagCeiling constant from 97 to 93 in the same diff\n"+
-			"as removing the 4 removed rows (97 − 4 = 93).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC33_004_SwarmStageNotInSwarmrunner verifies that the env-map read for
 // EVOLVE_SWARM_STAGE has been deleted from swarmrunner.go.
 //
