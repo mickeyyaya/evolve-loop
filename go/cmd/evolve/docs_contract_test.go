@@ -55,7 +55,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_AUDIT_PERMISSION_MODE":         true,
 	"EVOLVE_BUILD_PLAN_INPUT":              true,
 	"EVOLVE_BUILD_PLAN_OUTPUT":             true,
-	"EVOLVE_PLAN_WORKSPACE":                true,
 	"EVOLVE_TDD_ENGINEER_MODEL":            true,
 	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":  true,
 	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE": true,

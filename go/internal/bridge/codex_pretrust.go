@@ -149,15 +149,20 @@ func codexConfigPath() (string, error) {
 	return filepath.Join(home, ".codex", "config.toml"), nil
 }
 
-func codexVersionPath() (string, error) {
-	if v := os.Getenv("EVOLVE_CODEX_VERSION_PATH"); v != "" {
-		return v, nil
-	}
+// codexVersionPathFn is the DI seam for resolving the codex version file path.
+// Tests replace this var (with t.Cleanup restore) to inject a temporary path.
+var codexVersionPathFn func() (string, error) = defaultCodexVersionPath
+
+func defaultCodexVersionPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(home, ".codex", "version.json"), nil
+}
+
+func codexVersionPath() (string, error) {
+	return codexVersionPathFn()
 }
 
 func dismissCodexUpdateNag() error {

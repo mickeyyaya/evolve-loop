@@ -13,7 +13,9 @@ import "testing"
 // ARTIFACT_TIMEOUT_S, ARTIFACT_MAX_EXTENDS, PSMAS_SKIP) to BridgePolicy/WorkflowPolicy.
 // Cycle 44 removes 3 flags: EVOLVE_STRATEGY + EVOLVE_RESET (dead env writes) and
 // EVOLVE_SHIP_RELEASE_NOTES (IPC split-const; exec.Command parent→child handoff).
-const FlagCeiling = 65
+// Cycle 45 removes 4 flags: EVOLVE_GO_BIN_TEST (DI var), EVOLVE_PLAN_WORKSPACE (CLI flag),
+// EVOLVE_CODEX_VERSION_PATH (DI pkg-var), EVOLVE_COMPACT_PROMPTS (Config Object).
+const FlagCeiling = 61
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

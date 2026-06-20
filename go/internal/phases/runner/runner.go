@@ -150,6 +150,11 @@ type Options struct {
 	// Options{} literal byte-identical — only build/scout/triage set it (the
 	// phases with a RequireFailureContextPhaseIO contract).
 	PhaseIO config.Stage
+	// CompactPrompts, when true, strips on-demand reference sections from
+	// disk-loaded agent docs before ComposePrompt. Replaces the former
+	// EVOLVE_COMPACT_PROMPTS env read. Inline bodies (minted/spec phases) are
+	// never stripped regardless of this setting (R7).
+	CompactPrompts bool
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
@@ -164,6 +169,7 @@ type BaseRunner struct {
 	eventsProducer func(workspace, phase, cli string, cycle int) error
 	optional       bool
 	verifyFn       func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	compactPrompts bool
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -216,6 +222,7 @@ func New(opts Options) *BaseRunner {
 		eventsProducer: eventsProducer,
 		optional:       opts.Optional,
 		verifyFn:       verifyFn,
+		compactPrompts: opts.CompactPrompts,
 	}
 }
 
@@ -274,7 +281,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
 		}
 		body = agent.Body
-		if envchain.Bool("EVOLVE_COMPACT_PROMPTS", req.Env, false) {
+		if b.compactPrompts {
 			body = prompts.StripOnDemandSections(body)
 		}
 	}

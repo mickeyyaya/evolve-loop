@@ -63,9 +63,9 @@ func TestDefaultGateTestRunner_Error(t *testing.T) {
 	}
 }
 
-// TestDefaultSimulationRunner covers both branches via the EVOLVE_GO_BIN_TEST
+// TestDefaultSimulationRunner covers both branches via the defaultGoBinFn
 // shim seam — a fake `go` that exits 0 (success) then 1 (failure), avoiding a
-// real nested test run. Not parallel: mutates process env via t.Setenv.
+// real nested test run. Not parallel: mutates package-level var defaultGoBinFn.
 func TestDefaultSimulationRunner(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real subprocess (go/gh/git) invocation under -short; full `go test` + CI still run it")
@@ -75,7 +75,9 @@ func TestDefaultSimulationRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	shim := filepath.Join(dir, "fake-go")
-	t.Setenv("EVOLVE_GO_BIN_TEST", shim)
+	old := defaultGoBinFn
+	t.Cleanup(func() { defaultGoBinFn = old })
+	defaultGoBinFn = func() string { return shim }
 
 	if err := os.WriteFile(shim, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -109,7 +111,9 @@ func TestRun_AdvisorySimulationDefaultRunner(t *testing.T) {
 	if err := os.WriteFile(shim, []byte("#!/bin/sh\necho boom; exit 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_GO_BIN_TEST", shim)
+	old := defaultGoBinFn
+	t.Cleanup(func() { defaultGoBinFn = old })
+	defaultGoBinFn = func() string { return shim }
 
 	opts := stubOpts(r, "1.0.1")
 	opts.SkipTests = false
@@ -124,16 +128,15 @@ func TestRun_AdvisorySimulationDefaultRunner(t *testing.T) {
 	}
 }
 
-// TestDefaultSimulationRunner_GoBinDefault covers the goBin=="" → "go" default
-// in defaultSimulationRunner: with EVOLVE_GO_BIN_TEST unset and a repo whose
-// go/ module dir is absent, the real `go test` fails fast (chdir error) before
-// any package compiles — exercising the default-binary path without a hermetic
-// nested test run. Skips if `go` is not on PATH.
+// TestDefaultSimulationRunner_GoBinDefault covers the defaultGoBinFn→"go" default
+// in defaultSimulationRunner: with a repo whose go/ module dir is absent, the
+// real `go test` fails fast (chdir error) before any package compiles —
+// exercising the default-binary path without a hermetic nested test run.
+// Skips if `go` is not on PATH.
 func TestDefaultSimulationRunner_GoBinDefault(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go not on PATH")
 	}
-	t.Setenv("EVOLVE_GO_BIN_TEST", "") // force the goBin=="go" default
 	// repoRoot/go does not exist → cmd.Dir chdir fails → error returned.
 	if err := defaultSimulationRunner(filepath.Join(t.TempDir(), "no-such-repo")); err == nil {
 		t.Error("expected error when the go module dir is absent")
