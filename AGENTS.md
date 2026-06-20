@@ -122,6 +122,9 @@ To prevent context saturation from accumulated tool results:
 - **No Pipeline Bypass**: Never attempt to skip a phase or ignore a kernel-gate failure.
 - **No Post-Report Turns**: Once the phase report (scout/build/audit/orchestrator) is written, STOP. Turn accumulation after report completion is a critical cost driver.
 
+### 3. Flag → Parameter Conversion Standard (flag-reduction campaign)
+When a cycle converts an `EVOLVE_*` env flag into a typed input parameter, the conversion is "done" ONLY when it meets the **[Flag → Parameter Conversion Standard](knowledge-base/research/flag-parameter-conversion-standard.md)**: (1) the resolution package is environment-agnostic (no `os.Getenv`/`LookupEnv`/`Environ` — enforced by `paramPackages` in `go/internal/policy/param_env_agnostic_test.go`, which the conversion MUST enroll the package in); (2) it ships an env-free, black-box, public-API test suite covering the full field × edge-case matrix; (3) every exported parameter API at 100% coverage with `apicover -enforce` exit 0. Tests drive behavior ONLY through input parameters — never `t.Setenv`. Reference template: `internal/quotareset` + `internal/policy` config accessors.
+
 ## Where to file issues
 
 - Security vulnerabilities: see [SECURITY.md](SECURITY.md)
