@@ -35,7 +35,12 @@ import "testing"
 //
 //	Task A: FlagCeiling = 51 after removing EVOLVE_CODEX_CONFIG_PATH (DI field on bridge.Config)
 //	Task B: FlagCeiling = 50 after removing EVOLVE_RELEASE_STRICT_PASS (CLI flag --strict-pass)
-const FlagCeiling = 50
+//
+// Cycle 52 removes 3 flags in two tasks:
+//
+//	Task A: FlagCeiling = 48 after removing EVOLVE_SKIP_PREFLIGHT + EVOLVE_SKIP_PREFLIGHT_BOOT (CLI flags --skip-preflight/--skip-preflight-boot)
+//	Task B: FlagCeiling = 47 after removing EVOLVE_SHIP_AUTO_CONFIRM (IPC split-const in verify.go)
+const FlagCeiling = 47
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

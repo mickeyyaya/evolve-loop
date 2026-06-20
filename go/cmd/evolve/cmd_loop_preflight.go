@@ -15,8 +15,8 @@ import (
 var runLoopPreflightFn = defaultLoopPreflight
 
 // defaultLoopPreflight runs the real deterministic readiness checks against the
-// resolved project/profile layout. EVOLVE_SKIP_PREFLIGHT_BOOT=1 keeps the cheap
-// checks but skips the (slow, tmux-touching) real REPL boot.
+// resolved project/profile layout. cfg.SkipPreflightBoot keeps the cheap
+// checks but skips the (slow, tmux-touching) real REPL boot (--skip-preflight-boot).
 func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result {
 	layout := paths.ResolveFromEnv()
 	res, err := looppreflight.Run(looppreflight.Options{
@@ -24,7 +24,7 @@ func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result
 		EvolveDir:   cfg.EvolveDir,
 		ProfileDir:  layout.ProfilesDir,
 		Stderr:      stderr,
-		SkipBoot:    os.Getenv("EVOLVE_SKIP_PREFLIGHT_BOOT") == "1",
+		SkipBoot:    cfg.SkipPreflightBoot,
 	})
 	if err != nil {
 		// A harness fault (e.g. an unresolved project root) must fail LOUD as a
@@ -43,12 +43,12 @@ func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result
 }
 
 // loopPreflightHalts runs the pre-batch readiness gate and reports whether the
-// batch must abort. EVOLVE_SKIP_PREFLIGHT=1 bypasses the gate entirely.
-// Otherwise the result is always persisted to .evolve/loop-preflight.json and
-// summarized to stderr.
+// batch must abort. cfg.SkipPreflight (--skip-preflight) bypasses the gate
+// entirely. Otherwise the result is always persisted to .evolve/loop-preflight.json
+// and summarized to stderr.
 func loopPreflightHalts(cfg loopConfig, stderr io.Writer) bool {
-	if os.Getenv("EVOLVE_SKIP_PREFLIGHT") == "1" {
-		fmt.Fprintln(stderr, "[loop] readiness gate skipped (EVOLVE_SKIP_PREFLIGHT=1)")
+	if cfg.SkipPreflight {
+		fmt.Fprintln(stderr, "[loop] readiness gate skipped (--skip-preflight)")
 		return false
 	}
 	res := runLoopPreflightFn(cfg, stderr)

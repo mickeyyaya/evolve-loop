@@ -31,7 +31,6 @@ func TestLoopPreflightHalts_SeamHalt_WritesFileAndHalts(t *testing.T) {
 	defer func() { runLoopPreflightFn = prev }()
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result { return forcedHalt() }
 
-	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "")
 	var stderr bytes.Buffer
 	if !loopPreflightHalts(loopConfig{ProjectRoot: dir, EvolveDir: evolveDir}, &stderr) {
 		t.Fatalf("expected the gate to halt")
@@ -53,13 +52,12 @@ func TestLoopPreflightHalts_SkipEnv_BypassesSeam(t *testing.T) {
 		return forcedHalt()
 	}
 
-	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "1")
 	var stderr bytes.Buffer
-	if loopPreflightHalts(loopConfig{ProjectRoot: t.TempDir()}, &stderr) {
-		t.Fatalf("EVOLVE_SKIP_PREFLIGHT=1 must bypass the gate (no halt)")
+	if loopPreflightHalts(loopConfig{ProjectRoot: t.TempDir(), SkipPreflight: true}, &stderr) {
+		t.Fatalf("--skip-preflight must bypass the gate (no halt)")
 	}
 	if called {
-		t.Fatalf("EVOLVE_SKIP_PREFLIGHT=1 must not invoke the preflight seam")
+		t.Fatalf("--skip-preflight must not invoke the preflight seam")
 	}
 }
 
@@ -80,8 +78,6 @@ func TestRunLoop_PreflightHalt_AbortsBeforeCycle(t *testing.T) {
 	prevPf := runLoopPreflightFn
 	defer func() { runLoopPreflightFn = prevPf }()
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result { return forcedHalt() }
-
-	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "")
 
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{

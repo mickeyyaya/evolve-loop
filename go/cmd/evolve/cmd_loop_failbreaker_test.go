@@ -156,7 +156,6 @@ func (f *failingOrch) RunCycleFromPhase(ctx context.Context, req core.CycleReque
 
 func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
 	t.Helper()
-	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "1")
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

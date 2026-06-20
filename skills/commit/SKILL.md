@@ -29,9 +29,10 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
    - **exit 3** → a required tool is missing/could not be installed; surface the printed manual install command to the user and stop.
 5. **Commit + push** via the sanctioned path (handles both, on the current branch):
    ```bash
-   EVOLVE_SHIP_AUTO_CONFIRM=1 "$CLAUDE_PROJECT_DIR/go/bin/evolve" ship --class manual "<message>"
+   "$CLAUDE_PROJECT_DIR/go/bin/evolve" ship --class manual "<message>"
    ```
-   - `--class manual` re-stages (`git add -A`, a no-op after step 1), **verifies the commit-gate attestation matches the staged tree** (the Go-side hard gate), commits to the current branch, and pushes `origin/<branch>`. `AUTO_CONFIRM=1` is required because the agent's stdin is not a TTY.
+   - `--class manual` re-stages (`git add -A`, a no-op after step 1), **verifies the commit-gate attestation matches the staged tree** (the Go-side hard gate), commits to the current branch, and pushes `origin/<branch>`.
+   - **Non-TTY agents** (LLM invocations): the command will fail with a non-TTY error that includes the exact IPC auto-confirm env var to set. Set it before re-running. The signal name comes from `envShipAutoConfirm` in `go/internal/phases/ship/verify.go`.
    - If it refuses with *"stale"* or *"missing … attestation"* → a file changed after step 4; return to step 3.
 6. **Watch CI** (skip with a clear note if `gh` is absent or the repo has no workflows):
    - `gh run watch "$(git rev-parse HEAD)"` (or `gh pr checks --watch`).

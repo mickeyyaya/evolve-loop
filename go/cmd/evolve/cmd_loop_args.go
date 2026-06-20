@@ -17,20 +17,22 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.SetOutput(stderr)
 
 	var (
-		projectRoot    string
-		evolveDir      string
-		goalHash       string
-		goalText       string
-		strategy       string
-		maxCyclesFlag  int
-		cyclesFlag     int
-		budgetUSD      float64
-		batchCapUSD    float64
-		resume         bool
-		dryRun         bool
-		reset          bool
-		consensusAudit bool
-		forceFresh     bool
+		projectRoot       string
+		evolveDir         string
+		goalHash          string
+		goalText          string
+		strategy          string
+		maxCyclesFlag     int
+		cyclesFlag        int
+		budgetUSD         float64
+		batchCapUSD       float64
+		resume            bool
+		dryRun            bool
+		reset             bool
+		consensusAudit    bool
+		forceFresh        bool
+		skipPreflight     bool
+		skipPreflightBoot bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
@@ -52,6 +54,8 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
 	fs.BoolVar(&consensusAudit, "consensus-audit", false, "opt-in cross-CLI auditor consensus mode")
 	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
+	fs.BoolVar(&skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
+	fs.BoolVar(&skipPreflightBoot, "skip-preflight-boot", false, "run cheap checks but skip the real bridge-boot probe (CI/offline)")
 
 	// WS-G2 repeatable per-agent overrides:
 	//   --cli  auditor=claude-tmux              (one --cli per agent)
@@ -175,6 +179,8 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		ConsensusAudit:    consensusAudit,
 		DryRun:            dryRun,
 		ForceFresh:        forceFresh,
+		SkipPreflight:     skipPreflight,
+		SkipPreflightBoot: skipPreflightBoot,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}, 0

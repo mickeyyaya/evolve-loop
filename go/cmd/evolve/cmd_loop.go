@@ -72,6 +72,8 @@ type loopConfig struct {
 	ConsensusAudit    bool `json:"consensus_audit,omitempty"`
 	DryRun            bool `json:"dry_run,omitempty"`
 	ForceFresh        bool `json:"force_fresh,omitempty"`
+	SkipPreflight     bool `json:"skip_preflight,omitempty"`
+	SkipPreflightBoot bool `json:"skip_preflight_boot,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -233,8 +235,8 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// pipeline can actually run — wiring, profiles, LLM CLIs, host capabilities,
 	// and a REAL bridge boot — before any cycle spends LLM budget, catching the
 	// cycle-258 ExitREPLBootTimeout at batch start instead of ~30 min in.
-	// EVOLVE_SKIP_PREFLIGHT=1 bypasses the whole gate; EVOLVE_SKIP_PREFLIGHT_BOOT=1
-	// runs the cheap checks but skips the boot test (CI/offline). No cycle exists
+	// --skip-preflight bypasses the whole gate; --skip-preflight-boot runs the cheap
+	// checks but skips the boot test (CI/offline). No cycle exists
 	// yet, so this uses plain emit (cycle=0), mirroring the unfinished-cycle guard.
 	if loopPreflightHalts(cfg, stderr) {
 		lr.StopReason = "preflight_failed"
