@@ -155,21 +155,26 @@ type Options struct {
 	// EVOLVE_COMPACT_PROMPTS env read. Inline bodies (minted/spec phases) are
 	// never stripped regardless of this setting (R7).
 	CompactPrompts bool
+	// DisableStdoutFilter, when true, skips the post-phase .clean.txt writer.
+	// Replaces the former EVOLVE_STDOUT_FILTER=off env check. Default false =
+	// filter enabled, matching the historical "on" default.
+	DisableStdoutFilter bool
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
 type BaseRunner struct {
-	hooks          Hooks
-	bridge         core.Bridge
-	prompts        *prompts.Loader
-	nowFn          func() time.Time
-	resolveLLM     func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
-	stdoutFilter   func(workspace, phase string) error
-	eventsProducer func(workspace, phase, cli string, cycle int) error
-	optional       bool
-	verifyFn       func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
-	compactPrompts bool
+	hooks               Hooks
+	bridge              core.Bridge
+	prompts             *prompts.Loader
+	nowFn               func() time.Time
+	resolveLLM          func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	stdoutFilter        func(workspace, phase string) error
+	eventsProducer      func(workspace, phase, cli string, cycle int) error
+	optional            bool
+	verifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	compactPrompts      bool
+	disableStdoutFilter bool
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -213,16 +218,17 @@ func New(opts Options) *BaseRunner {
 		}
 	}
 	return &BaseRunner{
-		hooks:          opts.Hooks,
-		bridge:         opts.Bridge,
-		prompts:        opts.Prompts,
-		nowFn:          nowFn,
-		resolveLLM:     resolveLLM,
-		stdoutFilter:   stdoutFilter,
-		eventsProducer: eventsProducer,
-		optional:       opts.Optional,
-		verifyFn:       verifyFn,
-		compactPrompts: opts.CompactPrompts,
+		hooks:               opts.Hooks,
+		bridge:              opts.Bridge,
+		prompts:             opts.Prompts,
+		nowFn:               nowFn,
+		resolveLLM:          resolveLLM,
+		stdoutFilter:        stdoutFilter,
+		eventsProducer:      eventsProducer,
+		optional:            opts.Optional,
+		verifyFn:            verifyFn,
+		compactPrompts:      opts.CompactPrompts,
+		disableStdoutFilter: opts.DisableStdoutFilter,
 	}
 }
 
@@ -627,11 +633,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	// Best-effort: write the <phase>-stdout.clean.txt companion next to
-	// the raw log. Default-on; set EVOLVE_STDOUT_FILTER=off to skip.
+	// the raw log. Default-on; set Options.DisableStdoutFilter=true to skip.
 	// Filter failures NEVER block the phase — they WARN and continue,
 	// because the raw log remains the forensic source of truth and
 	// cyclecost / phaseobserver still read it directly.
-	if envchain.Resolve("EVOLVE_STDOUT_FILTER", req.Env, "", "on") != "off" {
+	if !b.disableStdoutFilter {
 		if err := b.stdoutFilter(req.Workspace, phase); err != nil {
 			log.Diag().Warnf("[runner] WARN stdout filter phase=%s: %v\n", phase, err)
 		}

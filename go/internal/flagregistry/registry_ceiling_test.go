@@ -15,7 +15,8 @@ import "testing"
 // EVOLVE_SHIP_RELEASE_NOTES (IPC split-const; exec.Command parent→child handoff).
 // Cycle 45 removes 4 flags: EVOLVE_GO_BIN_TEST (DI var), EVOLVE_PLAN_WORKSPACE (CLI flag),
 // EVOLVE_CODEX_VERSION_PATH (DI pkg-var), EVOLVE_COMPACT_PROMPTS (Config Object).
-const FlagCeiling = 61
+// Cycle 46 removes 2 flags: EVOLVE_RETRO_MODEL (Config Object), EVOLVE_STDOUT_FILTER (DI field).
+const FlagCeiling = 59
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

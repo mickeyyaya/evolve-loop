@@ -242,8 +242,7 @@ func buildCycleContext(cfg loopConfig) map[string]string {
 //
 //  1. Copy every EVOLVE_* var from osEnv. This is how operator-set
 //     flags (REQUIRE_INTENT, SANDBOX_FALLBACK_ON_EPERM, TRIAGE_DISABLE,
-//     BUILD_PLANNER, STDOUT_FILTER, …) reach the orchestrator + every
-//     downstream subagent.
+//     BUILD_PLANNER, …) reach the orchestrator + every downstream subagent.
 //  2. Apply dispatcher-derived IPC overrides (Resume). Strategy flows
 //     via Context["strategy"] — not env. cfg.Reset is consumed at
 //     cmd_loop.go before buildCycleEnv is called — neither writes env.

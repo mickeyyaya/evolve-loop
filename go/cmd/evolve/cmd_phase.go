@@ -120,5 +120,6 @@ func newRetro(req core.PhaseRequest) core.PhaseRunner {
 	return retro.New(retro.Config{
 		Bridge:  bridge.NewDefault(req.ProjectRoot),
 		Prompts: newPromptsLoader(req.ProjectRoot),
+		Model:   "auto",
 	})
 }

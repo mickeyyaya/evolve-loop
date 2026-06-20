@@ -137,7 +137,7 @@ func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 
 // TestBuildCycleEnv_BroadDocumentedFlagsSurface spot-checks several
 // documented EVOLVE_* flags from CLAUDE.md (intent, sandbox, triage,
-// build-planner, stdout-filter) to lock in the propagation contract.
+// build-planner) to lock in the propagation contract.
 func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
@@ -145,7 +145,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1",
 		"EVOLVE_TRIAGE_DISABLE=1",
 		"EVOLVE_BUILD_PLANNER=1",
-		"EVOLVE_STDOUT_FILTER=off",
 		"EVOLVE_STRICT_AUDIT=1",
 	}
 	got := buildCycleEnv(cfg, osEnv)
@@ -154,7 +153,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1",
 		"EVOLVE_TRIAGE_DISABLE":            "1",
 		"EVOLVE_BUILD_PLANNER":             "1",
-		"EVOLVE_STDOUT_FILTER":             "off",
 		"EVOLVE_STRICT_AUDIT":              "1",
 	} {
 		if got[k] != want {

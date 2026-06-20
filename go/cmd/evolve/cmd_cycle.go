@@ -331,7 +331,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStage(br, prm, cfg.PhaseIO),
 		core.PhaseShip:         ship.NewWithDefaultRunnerStage(cfg.PhaseIO),
-		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm}),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto"}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
