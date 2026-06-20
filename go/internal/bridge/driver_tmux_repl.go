@@ -142,7 +142,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		}
 	}
 	scrollbackFile := filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
-	artifactScrollback := envInt(deps, "EVOLVE_SCROLLBACK_LINES", tmuxArtifactScrollback)
+	artifactScrollback := defaultIfZero(deps.ScrollbackLines, tmuxArtifactScrollback)
 	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", pfx, lp.session, cfg.Model, workingDir)
 	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named, artifactScrollback)
 
@@ -241,11 +241,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if interval <= 0 {
 			interval = 1
 		}
-		// Boot-wait deadline (seconds), overridable via EVOLVE_BOOT_TIMEOUT_S so a
-		// loaded CI runner can raise the fake-CLI/tmux handshake budget — the fixed
-		// 60s intermittently flaked the integration tier ("REPL prompt never
-		// appeared after 60s"). Mirrors EVOLVE_ARTIFACT_TIMEOUT_S below.
-		bootDeadlineS := envInt(deps, "EVOLVE_BOOT_TIMEOUT_S", tmuxREPLBootTimeoutS)
+		// Boot-wait deadline (seconds). Configurable via BridgePolicy.BootTimeoutS
+		// (policy.json bridge.boot_timeout_s) so a loaded CI runner can raise the
+		// fake-CLI/tmux handshake budget — the fixed 60s intermittently flaked the
+		// integration tier ("REPL prompt never appeared after 60s").
+		bootDeadlineS := defaultIfZero(deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 		// ADR-0043 A0: accumulate the cold-boot wait. Seeded with the two fixed
 		// deps.Sleep(time.Second) readiness waits above (post new-session, post
 		// cd); each poll iteration adds its interval. Derived from the Sleep-driven
@@ -396,17 +396,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// into extend (still working, wait another interval) or pause (stalled,
 	// surface for investigation, do not silently kill). See stopreview.go +
 	// ADR-0026. The interval defaults to tmuxArtifactTimeoutS,
-	// overridable per-launch (cfg.ArtifactTimeoutS) or via EVOLVE_ARTIFACT_TIMEOUT_S.
+	// overridable per-launch (cfg.ArtifactTimeoutS) or via Deps.ArtifactTimeoutS (BridgePolicy).
 	interval := cfg.ArtifactTimeoutS
 	if interval <= 0 {
-		interval = envInt(deps, "EVOLVE_ARTIFACT_TIMEOUT_S", tmuxArtifactTimeoutS)
+		interval = defaultIfZero(deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
 	}
 	// Defensive default: the Engine path sets deps.Reviewer via withDefaults,
 	// but direct runTmuxREPL callers (tests, future Stage-1 wiring) may not —
 	// avoid a nil-deref at the review checkpoint.
 	reviewer := deps.Reviewer
 	if reviewer == nil {
-		reviewer = newDeterministicReviewer(envInt(deps, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
+		reviewer = newDeterministicReviewer(defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends))
 	}
 	// ADR-0044 C2: the fatal-pane registry consulted before each review
 	// checkpoint (fatalpane.go). Stage off ⇒ fatalPaneVerdict short-circuits

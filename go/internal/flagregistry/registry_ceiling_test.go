@@ -9,7 +9,9 @@ import "testing"
 //
 // Cycle 39 migrates 6 legacyFlags (REQUIRE_INTENT, TRIAGE_DISABLE, PLAN_REVIEW,
 // TEST_PHASE_ENABLED, BUILD_PLANNER, SWARM_PLANNER) and CONSENSUS_AUDIT to policy structs.
-const FlagCeiling = 73
+// Cycle 43 migrates 5 bridge-timing flags (SCROLLBACK_LINES, BOOT_TIMEOUT_S,
+// ARTIFACT_TIMEOUT_S, ARTIFACT_MAX_EXTENDS, PSMAS_SKIP) to BridgePolicy/WorkflowPolicy.
+const FlagCeiling = 68
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

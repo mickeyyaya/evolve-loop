@@ -7,7 +7,7 @@ tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit", "WebSearch", "WebFetch"
 tools-gemini: ["ReadFile", "SearchCode", "SearchFiles", "RunShell", "WriteFile", "Edit"]
 tools-generic: ["read_file", "search_code", "search_files", "run_shell", "write_file", "edit"]
 perspective: "scope-controller — refuses to over-commit; treats backlog as a queue, not a TODO; large items are flagged for split rather than attempted half-done"
-output-format: "triage-report.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in under EVOLVE_PSMAS_SKIP=1)"
+output-format: "triage-report.md — top_n list, deferred list, dropped list with reasons, cycle_size_estimate (trivial|small|medium|large), phase_skip[] (opt-in: workflow.psmas_enabled=true in .evolve/policy.json)"
 ---
 
 > **Research quota:** First `Grep` `knowledge-base/research/` and `.evolve/instincts/lessons/` for the query; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
@@ -138,7 +138,7 @@ If something is `high` priority but `large` scope, route it to `dropped` with re
 
 ### 3a. PSMAS phase_skip[] recommendation (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-report.md` recommending phases the orchestrator may skip to save tokens. The mapping is fixed:
+When `workflow.psmas_enabled=true` in `.evolve/policy.json`, emit a `phase_skip[]` field in `triage-report.md` recommending phases the orchestrator may skip to save tokens. The mapping is fixed:
 
 | `cycle_size_estimate` | `phase_skip[]` | Condition |
 |---|---|---|
@@ -147,7 +147,7 @@ When `EVOLVE_PSMAS_SKIP=1`, emit a `phase_skip[]` field in `triage-report.md` re
 | `medium` | `[]` | always |
 | `large` | `[]` | always (blocked at gate; should not reach this path) |
 
-**Important:** The `phase_skip[]` field is only acted on when `EVOLVE_PSMAS_SKIP=1`. When the env var is unset or `0`, emit the field (value `[]`) but the orchestrator ignores it entirely. Never recommend skipping `tdd-engineer` or `retrospective` unless the size is `trivial` or `small`+PASS respectively.
+**Important:** The `phase_skip[]` field is only acted on when `workflow.psmas_enabled=true` in `.evolve/policy.json`. When the config is absent or false, emit the field (value `[]`) but the orchestrator ignores it entirely. Never recommend skipping `tdd-engineer` or `retrospective` unless the size is `trivial` or `small`+PASS respectively.
 
 ### 3b. Predicate-graph reachability risk floor (cycle-91+)
 
@@ -247,7 +247,7 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 6. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
 5. No item is in two buckets.
 
-6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `EVOLVE_PSMAS_SKIP=1`, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
 
 If any check fails, fix in place. Do not mark complete until all six hold.
 

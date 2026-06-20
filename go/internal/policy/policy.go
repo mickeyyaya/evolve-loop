@@ -395,17 +395,24 @@ func (p Policy) ObserverConfig() ObserverPolicy {
 	return out
 }
 
-// BridgePolicy configures operator-writable bridge override directories.
-// Empty fields preserve each subsystem's built-in .evolve directory.
+// BridgePolicy configures operator-writable bridge override directories and
+// timing overrides. Empty string fields preserve each subsystem's built-in
+// .evolve directory. Zero int fields mean "use the bridge package built-in
+// default" (the bridge's defaultIfZero helper handles the zero sentinel).
 type BridgePolicy struct {
 	ManifestDir string `json:"manifest_dir,omitempty"`
 	CatalogDir  string `json:"catalog_dir,omitempty"`
 	RecipeDir   string `json:"recipe_dir,omitempty"`
+	// Timing overrides (seconds). 0 = use bridge built-in default.
+	BootTimeoutS       int `json:"boot_timeout_s,omitempty"`
+	ArtifactTimeoutS   int `json:"artifact_timeout_s,omitempty"`
+	ArtifactMaxExtends int `json:"artifact_max_extends,omitempty"`
+	ScrollbackLines    int `json:"scrollback_lines,omitempty"`
 }
 
-// BridgeConfig returns the configured bridge directories. The zero value is
-// intentional: bridge subsystems resolve empty fields against the canonical
-// project root so relative-path behavior remains centralized.
+// BridgeConfig returns the configured bridge policy. Zero int fields mean
+// "use bridge built-in defaults"; the bridge package resolves them via
+// defaultIfZero.
 func (p Policy) BridgeConfig() BridgePolicy {
 	if p.Bridge == nil {
 		return BridgePolicy{}
@@ -472,6 +479,9 @@ type WorkflowPolicy struct {
 	AuditorTierOverride   string            `json:"auditor_tier_override,omitempty"`
 	PhaseEnables          map[string]string `json:"phase_enables,omitempty"`
 	ConsensusAuditEnabled *bool             `json:"consensus_audit_enabled,omitempty"`
+	// PSMASEnabled enables the Phase Scheduling and Management Advisor
+	// Subsystem. Absent/false = disabled (opt-in). Replaces EVOLVE_PSMAS_SKIP.
+	PSMASEnabled *bool `json:"psmas_enabled,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -487,6 +497,7 @@ type WorkflowConfig struct {
 	AuditorTierOverride   string
 	PhaseEnables          map[string]string
 	ConsensusAuditEnabled bool
+	PSMASEnabled          bool
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -521,6 +532,9 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	c.PhaseEnables = p.Workflow.PhaseEnables
 	if p.Workflow.ConsensusAuditEnabled != nil {
 		c.ConsensusAuditEnabled = *p.Workflow.ConsensusAuditEnabled
+	}
+	if p.Workflow.PSMASEnabled != nil {
+		c.PSMASEnabled = *p.Workflow.PSMASEnabled
 	}
 	return c
 }

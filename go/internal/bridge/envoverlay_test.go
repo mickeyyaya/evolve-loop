@@ -35,8 +35,8 @@ func TestLookupEnv_DepsEnvOverlay(t *testing.T) {
 
 // TestEnvInt_DepsEnvOverlay proves the int reader (which resolves the
 // artifact-wait deadline) honours Deps.Env. This is the unit-level proof that
-// an operator EVOLVE_ARTIFACT_TIMEOUT_S override carried on the launch reaches
-// the deadline — the knob-never-applies bug B3 fixes.
+// a per-launch env overlay carried on the launch reaches the deadline — the
+// knob-never-applies bug B3 fixes.
 func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 	if got := envInt(Deps{Env: map[string]string{"K": "600"}}, "K", 300); got != 600 {
 		t.Fatalf("envInt from Deps.Env = %d, want 600", got)
@@ -51,19 +51,19 @@ func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_TimeoutFromDepsEnv is the end-to-end proof: an
-// EVOLVE_ARTIFACT_TIMEOUT_S override placed in Deps.Env reaches the
-// artifact-wait interval, observable on the StopEvent the reviewer receives.
-// RED before the fix (Deps.Env ignored → IntervalS defaults to 300).
-func TestRunTmuxREPL_TimeoutFromDepsEnv(t *testing.T) {
+// TestRunTmuxREPL_TimeoutFromDeps is the end-to-end proof: the typed
+// Deps.ArtifactTimeoutS field reaches the artifact-wait interval, observable
+// on the StopEvent the reviewer receives.
+// RED before the fix (Deps field ignored → IntervalS defaults to 300).
+func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop now"}}}
 	eng := NewEngine(Deps{
-		Tmux:     tmux,
-		Sleep:    func(time.Duration) {},
-		Env:      map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "7"},
-		Reviewer: rev,
+		Tmux:             tmux,
+		Sleep:            func(time.Duration) {},
+		ArtifactTimeoutS: 7,
+		Reviewer:         rev,
 	})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
@@ -75,15 +75,15 @@ func TestRunTmuxREPL_TimeoutFromDepsEnv(t *testing.T) {
 		t.Fatalf("reviewer never consulted; stderr=%q", stderr.String())
 	}
 	if rev.events[0].IntervalS != 7 {
-		t.Fatalf("StopEvent.IntervalS = %d, want 7 (resolved from Deps.Env override)", rev.events[0].IntervalS)
+		t.Fatalf("StopEvent.IntervalS = %d, want 7 (resolved from Deps.ArtifactTimeoutS)", rev.events[0].IntervalS)
 	}
 }
 
-// TestRunTmuxREPL_CfgTimeoutWinsOverEnv locks the precedence the SSOT fix must
-// preserve: an explicit per-launch Config.ArtifactTimeoutS (set by livesmoke /
-// integration callers) beats the EVOLVE_ARTIFACT_TIMEOUT_S overlay, so a stray
-// global override cannot lengthen a deliberately-short wait.
-func TestRunTmuxREPL_CfgTimeoutWinsOverEnv(t *testing.T) {
+// TestRunTmuxREPL_CfgTimeoutWinsOverDeps locks the precedence: an explicit
+// per-launch Config.ArtifactTimeoutS (set by livesmoke / integration callers)
+// beats the Deps.ArtifactTimeoutS policy default, so a stray global override
+// cannot lengthen a deliberately-short wait.
+func TestRunTmuxREPL_CfgTimeoutWinsOverDeps(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
@@ -91,7 +91,7 @@ func TestRunTmuxREPL_CfgTimeoutWinsOverEnv(t *testing.T) {
 		ArtifactTimeoutS: 3}
 	deps := covDeps()
 	deps.Tmux = &fakeTmux{paneSeq: []string{"❯"}}
-	deps.Env = map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "600"}
+	deps.ArtifactTimeoutS = 600
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop"}}}
 	deps.Reviewer = rev
 	lp := tmuxLaunch{name: "claude", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
@@ -101,6 +101,6 @@ func TestRunTmuxREPL_CfgTimeoutWinsOverEnv(t *testing.T) {
 		t.Fatalf("want ExitArtifactTimeout, got %d", code)
 	}
 	if len(rev.events) == 0 || rev.events[0].IntervalS != 3 {
-		t.Fatalf("StopEvent.IntervalS = %v, want 3 (cfg wins over env=600)", rev.events)
+		t.Fatalf("StopEvent.IntervalS = %v, want 3 (cfg wins over deps.ArtifactTimeoutS=600)", rev.events)
 	}
 }

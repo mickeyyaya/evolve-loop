@@ -118,7 +118,7 @@ Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-refere
 
 ## PSMAS Phase-Skip (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-report.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
+When `workflow.psmas_enabled=true` in `.evolve/policy.json`, read `triage.phase_skip[]` from `triage-report.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
 
 1. Emits a `kind:phase_skipped` ledger entry for that phase before advancing past it:
    ```json
@@ -133,7 +133,7 @@ When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-report.md` i
 effective_skips = union(adapter.skip_phases[], triage.phase_skip[])
 ```
 
-Applied only when `EVOLVE_PSMAS_SKIP=1`. When the flag is unset/`0`, use only `adapter.skip_phases[]` (no change from pre-P3 behavior).
+Applied only when `workflow.psmas_enabled=true` in `.evolve/policy.json`. When the config is absent or false, use only `adapter.skip_phases[]` (no change from pre-P3 behavior).
 
 **Resume-safe:** A `kind:phase_skipped` ledger entry for phase X means `--resume` must treat X as already completed and must not re-execute it.
 

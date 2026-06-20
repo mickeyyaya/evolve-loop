@@ -90,7 +90,7 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, d.launchCmd, true)
 	fmt.Fprintf(d.deps.Stderr, "[recipe] launching: %s\n", d.launchCmd)
-	bootDeadlineS := envInt(d.deps, "EVOLVE_BOOT_TIMEOUT_S", tmuxREPLBootTimeoutS) // CI boot-budget override (same as primary driver)
+	bootDeadlineS := defaultIfZero(d.deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed++ {
 		d.deps.Sleep(time.Second)
 		if d.ar != nil {

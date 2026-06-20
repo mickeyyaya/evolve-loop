@@ -38,10 +38,10 @@ func (j *jiggleTmux) JiggleWindow(_ context.Context, _ string) error {
 func runTmuxWedge(t *testing.T, fx launchFixture, tmux TmuxController, spy func(phase, action, reason string)) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
-		Tmux:         tmux,
-		Sleep:        func(time.Duration) {},
-		LookupEnv:    mapLookup(map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "2"}),
-		OnStopReview: spy,
+		Tmux:             tmux,
+		Sleep:            func(time.Duration) {},
+		ArtifactTimeoutS: 2,
+		OnStopReview:     spy,
 	})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)

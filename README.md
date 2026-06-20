@@ -97,7 +97,7 @@ INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD
    └─ Structure the vague goal: 8 fields + Ask-when-Needed classifier + ≥1 challenged premise (v8.19.1+)
 ```
 
-**Opt-in shortcuts (default-off, v10.17+):** PSMAS phase-skip — when `EVOLVE_PSMAS_SKIP=1`, Triage may recommend skipping `tdd-engineer` (trivial cycles) or `retrospective` (small PASS cycles) to save tokens. The skip leaves a ledger entry so `--resume` and audit-binding both see it as deliberate. See [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md).
+**Opt-in shortcuts (default-off, v10.17+):** PSMAS phase-skip — when `workflow.psmas_enabled=true` in `.evolve/policy.json`, Triage may recommend skipping `tdd-engineer` (trivial cycles) or `retrospective` (small PASS cycles) to save tokens. The skip leaves a ledger entry so `--resume` and audit-binding both see it as deliberate. See [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md).
 
 ### Phase artifacts you'll see
 

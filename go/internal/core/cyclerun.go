@@ -381,7 +381,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
 		BenchedCLIs:    benchedCLIs,
 		IntentRequired: cs.IntentRequired,
-		PSMASEnabled:   envchain.BoolValue(env["EVOLVE_PSMAS_SKIP"], false),
+		PSMASEnabled:   o.workflowConfig.PSMASEnabled,
 	}
 }
 

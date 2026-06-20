@@ -19,7 +19,7 @@ func TestRunTmuxREPL_PauseWritesEscalationReport(t *testing.T) {
 		got = append(got, stopReviewRec{phase, action, reason})
 	}
 	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, spy,
-		map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "2"}, "--allow-bypass", "--agent=scout")
+		Deps{ArtifactTimeoutS: 2}, "--allow-bypass", "--agent=scout")
 
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout after pause); stderr=%q", code, ExitArtifactTimeout, stderr)
@@ -65,7 +65,7 @@ func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
 	rev := &writingReviewer{artifact: fx.artifact}
 
 	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, nil,
-		map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "2"}, "--allow-bypass", "--agent=scout")
+		Deps{ArtifactTimeoutS: 2}, "--allow-bypass", "--agent=scout")
 
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (success); stderr=%q", code, stderr)

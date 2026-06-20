@@ -47,12 +47,8 @@ jobs:
       - name: build
         run: make build
       - name: test (race + cover, incl. integration tier)
-        # Raise the REPL boot-wait budget (default 60s) for the integration
-        # tier: a loaded CI runner intermittently exceeds it on the fake-CLI/
-        # tmux handshake ("REPL prompt never appeared after 60s"), flaking
-        # internal/bridge. Reaches the tests via os.LookupEnv (Deps.withDefaults).
-        env:
-          EVOLVE_BOOT_TIMEOUT_S: "120"
+        # Boot timeout is configured via BridgePolicy.BootTimeoutS in
+        # .evolve/policy.json (bridge.boot_timeout_s) — no env override needed.
         run: |
           # Exclude acs/ — per-cycle ACS predicate evals that read runtime
           # artifacts (.evolve/runs/cycle-N/...) absent in CI; they run in the
