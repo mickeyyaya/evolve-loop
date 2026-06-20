@@ -66,7 +66,6 @@ var allowedUndocumented = map[string]bool{
 	// either (a) documented in runtime-reference.md OR (b) removed from
 	// code. Tracked as technical debt; the contract test still catches
 	// NEW additions.
-	"EVOLVE_GUARDS_LOG":              true, // observability shunt
 	"EVOLVE_HANG_CLASSIFIER":         true, // legacy dispatcher classifier override
 	"EVOLVE_LEDGER_OVERRIDE":         true, // ledger adapter test override
 	"EVOLVE_MARKETPLACE_DIR":         true, // marketplace-poll path override

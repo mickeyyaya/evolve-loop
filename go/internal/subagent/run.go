@@ -21,7 +21,7 @@ import (
 // RunRequest captures every input cmd_run reads from argv + environment.
 // Mirrors the bash signature subagent-run.sh <agent> <cycle> <workspace>
 // + env overrides (PROMPT_FILE_OVERRIDE, MODEL_TIER_HINT, WORKTREE_PATH,
-// ADVERSARIAL_AUDIT, EVOLVE_CACHE_PREFIX_V2, LEGACY_AGENT_DISPATCH).
+// ADVERSARIAL_AUDIT, LEGACY_AGENT_DISPATCH).
 type RunRequest struct {
 	Agent         string
 	Cycle         int
@@ -44,7 +44,6 @@ type RunRequest struct {
 	ModelTierHint          string // MODEL_TIER_HINT
 	AuditorTierOverride    string // EVOLVE_AUDITOR_TIER_OVERRIDE
 	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
-	CachePrefixV2          bool   // EVOLVE_CACHE_PREFIX_V2 (default true)
 	AdversarialAudit       bool   // ADVERSARIAL_AUDIT (default true)
 	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — retired; now a hard error (see ErrInProcessDispatchBanned)
 	DispatchDepth          int    // EVOLVE_DISPATCH_DEPTH — recursion depth; capped at maxDispatchDepth
@@ -145,7 +144,6 @@ var agentRolePattern = regexp.MustCompile(`^(` + strings.Join(agentRoles, "|") +
 //   - kind="agent_subprocess" ledger entry write
 //
 // Deferred to follow-on ships:
-//   - v1 legacy prompt path (EVOLVE_CACHE_PREFIX_V2=0) — fossil per v10.6
 //   - prompt-size guard (EVOLVE_PROMPT_MAX_TOKENS / autotrim)
 //   - fast-fail consecutive-failure counter (v9.1.0 cycle-94)
 //   - phase timing sidecar

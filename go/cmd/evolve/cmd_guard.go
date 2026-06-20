@@ -33,18 +33,13 @@ var guardLogTag = map[string]string{
 	"chain":     "chain",
 }
 
-// appendGuardsLog writes one line to .evolve/guards.log mirroring the
+// appendGuardsLog writes one line to the given logPath mirroring the
 // bash `echo "[ts] [<tag>] <line>" >> guards.log` pattern. Best-effort:
 // failures are silent so hook latency isn't impacted by audit-log I/O.
-func appendGuardsLog(evolveDir, guardName string, allow bool, reason string) {
+func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 	tag, ok := guardLogTag[guardName]
 	if !ok {
 		tag = guardName
-	}
-	// EVOLVE_GUARDS_LOG override mirrors the bash convention.
-	logPath := os.Getenv("EVOLVE_GUARDS_LOG")
-	if logPath == "" {
-		logPath = filepath.Join(evolveDir, "guards.log")
 	}
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return
@@ -119,7 +114,8 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 	dec := g.Decide(context.Background(), in)
-	appendGuardsLog(evolveDir, name, dec.Allow, dec.Reason)
+	logPath := filepath.Join(evolveDir, "guards.log")
+	appendGuardsLog(logPath, name, dec.Allow, dec.Reason)
 	payload := map[string]any{"guard": name, "allow": dec.Allow, "reason": dec.Reason}
 	if buf, mErr := json.Marshal(payload); mErr == nil {
 		fmt.Fprintf(stdout, "%s\n", buf)

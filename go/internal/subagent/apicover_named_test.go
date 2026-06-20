@@ -145,7 +145,6 @@ func TestRunResult_BoundFromProducer(t *testing.T) {
 		ProjectRoot:      tmp,
 		PluginRoot:       tmp,
 		PromptReader:     strings.NewReader("do it\n"),
-		CachePrefixV2:    true,
 		AdversarialAudit: true,
 	}, runHappyOpts(t))
 	if err != nil {

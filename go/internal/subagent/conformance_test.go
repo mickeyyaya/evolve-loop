@@ -93,7 +93,6 @@ func conformanceReq(t *testing.T, role string) RunRequest {
 		ProjectRoot:      root,
 		PluginRoot:       root,
 		PromptReader:     strings.NewReader("Do the thing.\n"),
-		CachePrefixV2:    true,
 		AdversarialAudit: true,
 	}
 }

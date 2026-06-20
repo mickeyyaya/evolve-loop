@@ -20,7 +20,12 @@ import "testing"
 //
 //	Task A: FlagCeiling = 57 after removing EVOLVE_RELEASE_REQUIRE_PREFLIGHT, EVOLVE_OLLAMA_BASE (env aliases)
 //	Task B: FlagCeiling = 56 after removing EVOLVE_MODELCATALOG_CLASSIFIER_CLI (env read → DI param)
-const FlagCeiling = 56
+//
+// Cycle 48 removes 2 flags in two tasks:
+//
+//	Task A: FlagCeiling = 55 after removing EVOLVE_CACHE_PREFIX_V2 (dead field in RunRequest)
+//	Task B: FlagCeiling = 54 after removing EVOLVE_GUARDS_LOG (env read → DI logPath param)
+const FlagCeiling = 54
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

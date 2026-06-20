@@ -40,8 +40,7 @@ Subcommands:
                      prompt + adapter exec + verify + ledger).
                      ( run <agent> <cycle> <workspace_path> )
                      Prompt read from stdin (or PROMPT_FILE_OVERRIDE).
-                     Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT,
-                     EVOLVE_CACHE_PREFIX_V2.
+                     Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT.
                      (LEGACY_AGENT_DISPATCH is retired — bridge is the only path.)
   dispatch-parallel  Fan-out N workers per profile.parallel_subtasks[],
                      run via fanoutdispatch + aggregator merge.
@@ -308,7 +307,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
 		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
-		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT, EVOLVE_CACHE_PREFIX_V2,")
+		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT,")
 		fmt.Fprintln(stdout, "     WORKTREE_PATH")
 		fmt.Fprintln(stdout, "Config: .evolve/policy.json workflow settings")
 		fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
@@ -360,7 +359,6 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
 		AuditorTierOverride:    wc.AuditorTierOverride,
 		DiffComplexityDisabled: wc.DiffComplexityDisable,
-		CachePrefixV2:          flags.cachePrefixV2,
 		AdversarialAudit:       flags.adversarialAudit,
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
@@ -493,18 +491,16 @@ func sourceRoot() string {
 
 // subagentRunFlags holds the run-specific env-derived boolean knobs for
 // `subagent run`, read through envchain so the truthy/falsy/default vocabulary
-// is uniform (P2). CachePrefixV2 / AdversarialAudit are default-on (`!= "0"`);
+// is uniform (P2). AdversarialAudit is default-on (`!= "0"`);
 // LegacyAgentDispatch is default-off (`== "1"`). DiffComplexityDisabled is read
 // inline (shared with the resolve-tier handler), not via this struct.
 type subagentRunFlags struct {
-	cachePrefixV2       bool
 	adversarialAudit    bool
 	legacyAgentDispatch bool
 }
 
 func readSubagentRunFlags() subagentRunFlags {
 	return subagentRunFlags{
-		cachePrefixV2:       envchain.Bool("EVOLVE_CACHE_PREFIX_V2", nil, true),
 		adversarialAudit:    envchain.Bool("ADVERSARIAL_AUDIT", nil, true),
 		legacyAgentDispatch: envchain.Bool("LEGACY_AGENT_DISPATCH", nil, false),
 	}
