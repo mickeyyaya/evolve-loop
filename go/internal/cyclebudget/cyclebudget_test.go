@@ -88,3 +88,13 @@ func TestParseStage(t *testing.T) {
 		t.Errorf("Stage.String() = %q, want enforce", cyclebudget.Enforce.String())
 	}
 }
+
+// TestDecision_ZeroValueIsNoStop names the cyclebudget.Decision type explicitly
+// (apicover requires the type identifier in a test, not just a `:=` binding) and
+// pins the Off-stage contract: Next returns the zero Decision — no stop, no
+// advisory, no reason.
+func TestDecision_ZeroValueIsNoStop(t *testing.T) {
+	if got := cyclebudget.Next(cyclebudget.Off, 5, 3, 0, true); got != (cyclebudget.Decision{}) {
+		t.Errorf("Off stage must return zero cyclebudget.Decision, got %+v", got)
+	}
+}

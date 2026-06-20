@@ -190,3 +190,14 @@ func TestValidateProfileResult_BoundFromProducer(t *testing.T) {
 		t.Errorf("ValidateProfileResult.AdapterExitCode=%d, want 0", r.AdapterExitCode)
 	}
 }
+
+// TestFanoutWorkerTokenEnv_NamesTheIPCContract names the FanoutWorkerTokenEnv
+// const and pins the split-const IPC key: the parent threads the per-worker
+// challenge token through this exact env var (assembled as "EVOLVE_"+"…" so the
+// flag-registry scanner does not classify it), so the resolved value must equal
+// the protocol name workers read in run.go.
+func TestFanoutWorkerTokenEnv_NamesTheIPCContract(t *testing.T) {
+	if FanoutWorkerTokenEnv != "EVOLVE_FANOUT_WORKER_TOKEN" {
+		t.Errorf("FanoutWorkerTokenEnv=%q, want EVOLVE_FANOUT_WORKER_TOKEN", FanoutWorkerTokenEnv)
+	}
+}

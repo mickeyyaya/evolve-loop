@@ -217,3 +217,33 @@ func TestPolicy_QuotaResetConfig(t *testing.T) {
 		t.Errorf("QuotaResetConfig() = %+v, want %+v", got, want)
 	}
 }
+
+// TestPolicy_ConfigAccessors pins the bridge/fanout/observer sub-config
+// accessors: absent ⇒ built-in defaults (the zero Policy is always safe to
+// read). Typed-var declarations name the *Policy return types so apicover
+// counts the type coverage, not just the method.
+func TestPolicy_ConfigAccessors(t *testing.T) {
+	// BridgeConfig: absent ⇒ zero value (each subsystem uses its .evolve dir).
+	var bridge BridgePolicy = (Policy{}).BridgeConfig()
+	if bridge != (BridgePolicy{}) {
+		t.Errorf("absent Bridge must yield zero BridgePolicy, got %+v", bridge)
+	}
+
+	// FanoutConfig: absent ⇒ built-in defaults (concurrency 2, tracking on).
+	var fanout FanoutPolicy = (Policy{}).FanoutConfig()
+	if fanout.Concurrency != 2 {
+		t.Errorf("default FanoutPolicy.Concurrency = %d, want 2", fanout.Concurrency)
+	}
+	if fanout.TrackWorkers == nil || !*fanout.TrackWorkers {
+		t.Error("default FanoutPolicy.TrackWorkers must be true")
+	}
+
+	// ObserverConfig: absent ⇒ built-in defaults (autospawn on, stall 600s).
+	var observer ObserverPolicy = (Policy{}).ObserverConfig()
+	if observer.Autospawn == nil || !*observer.Autospawn {
+		t.Error("default ObserverPolicy.Autospawn must be true")
+	}
+	if observer.StallS == nil || *observer.StallS != 600 {
+		t.Error("default ObserverPolicy.StallS must be 600")
+	}
+}
