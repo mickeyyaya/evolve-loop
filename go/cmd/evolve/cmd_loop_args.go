@@ -244,9 +244,9 @@ func buildCycleContext(cfg loopConfig) map[string]string {
 //     flags (REQUIRE_INTENT, SANDBOX_FALLBACK_ON_EPERM, TRIAGE_DISABLE,
 //     BUILD_PLANNER, STDOUT_FILTER, …) reach the orchestrator + every
 //     downstream subagent.
-//  2. Apply dispatcher-derived overrides (Strategy, ConsensusAudit,
-//     Resume, Reset). CLI-derived choices win over env so an operator
-//     passing `--strategy harden` overrides EVOLVE_STRATEGY=balanced.
+//  2. Apply dispatcher-derived IPC overrides (Resume). Strategy flows
+//     via Context["strategy"] — not env. cfg.Reset is consumed at
+//     cmd_loop.go before buildCycleEnv is called — neither writes env.
 //
 // Non-EVOLVE_* vars are intentionally skipped — only this prefix is
 // part of the documented operator surface. The orchestrator reads from
@@ -264,15 +264,11 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 		}
 		out[kv[:eq]] = kv[eq+1:]
 	}
-	// Dispatcher-derived overrides — CLI > env.
-	out["EVOLVE_STRATEGY"] = cfg.Strategy
+	// Dispatcher-derived IPC overrides.
 	if cfg.Resume {
 		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
 		// does not classify this parent-to-child handoff as a configurable flag.
 		out["EVOLVE_"+"RESUME"] = "1"
-	}
-	if cfg.Reset {
-		out["EVOLVE_RESET"] = "1"
 	}
 	// WS-G2: per-agent --cli / --model launch flags translate to
 	// EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL env keys (matching

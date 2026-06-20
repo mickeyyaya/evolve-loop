@@ -127,9 +127,7 @@ or `--bypass-prefix-gate`.
 | `EVOLVE_DISPATCH_STOP_ON_FAIL` | REMOVED (dispatch-cluster-28) | Former dispatch fail-fast switch; moved to `policy.json` `dispatch.policy` config |
 | `EVOLVE_DISPATCH_VERIFY` | REMOVED (dispatch-cluster-28) | Former dispatch verify toggle; moved to `policy.json` `dispatch.policy` config |
 | `EVOLVE_AUTO_PRUNE` | ACTIVE | Enable auto-prune of expired state entries |
-| `EVOLVE_STRATEGY` | ACTIVE | Cycle strategy override |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | ACTIVE | CI mode: skip interactive y/N in ship.sh |
-| `EVOLVE_SHIP_RELEASE_NOTES` | ACTIVE | Create GitHub release on ship |
 | `EVOLVE_DIFF_COMPLEXITY_DISABLE` | ACTIVE | Disable diff-complexity check in auditor |
 | `EVOLVE_CONSENSUS_AUDIT` | ACTIVE | Enable consensus-dispatch for auditor |
 | `EVOLVE_AUDITOR_TIER_OVERRIDE` | ACTIVE | Override auditor model tier |
@@ -261,17 +259,14 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RELEASE_REQUIRE_PREFLIGHT` | active | — | — | Observability / Prompt Tuning | Force release preflight gate |
 | `EVOLVE_RELEASE_STRICT_PASS` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_RESET` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_RETRO_MODEL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ROUTING_MODE` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | active | — | — | Sandbox Cluster | EPERM fallback for nested-Claude (Darwin 25.4+) |
 | `EVOLVE_SHIP_AUTO_CONFIRM` | active | — | — | Workflow Defaults | CI mode: skip interactive y/N in ship.sh |
-| `EVOLVE_SHIP_RELEASE_NOTES` | active | — | — | Workflow Defaults | Create GitHub release on ship |
 | `EVOLVE_SKIP_PREFLIGHT` | active | — | — | Readiness Gate (pre-batch) | Emergency hatch: skip the whole readiness gate (no checks, no boot) |
 | `EVOLVE_SKIP_PREFLIGHT_BOOT` | active | — | — | Readiness Gate (pre-batch) | Run the cheap checks (structure/CLI/host) but skip the real bridge-boot probe — CI/offline (bridge-boot downgrades Halt→Warn) |
 | `EVOLVE_STDOUT_FILTER` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_STRATEGY` | active | — | — | Workflow Defaults | Cycle strategy override |
 | `EVOLVE_STRICT_AUDIT` | active | — | — | Workflow Defaults | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
 | `EVOLVE_SYSTEM_PROMPT` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_TESTING` | active | — | — | Core Infrastructure (never consolidate) | Test harness mode — disables real CLI calls |

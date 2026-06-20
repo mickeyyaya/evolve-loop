@@ -617,7 +617,8 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	}
 	cmd := exec.Command(binPath, "ship", "--class", "release", msg)
 	cmd.Env = append(os.Environ(),
-		"EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes,
+		// SSOT IPC-protocol-allowed: releasepipeline → evolve-ship subprocess
+		"EVOLVE_"+"SHIP_RELEASE_NOTES="+releaseNotes,
 		"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {

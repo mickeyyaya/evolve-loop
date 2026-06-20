@@ -11,7 +11,9 @@ import "testing"
 // TEST_PHASE_ENABLED, BUILD_PLANNER, SWARM_PLANNER) and CONSENSUS_AUDIT to policy structs.
 // Cycle 43 migrates 5 bridge-timing flags (SCROLLBACK_LINES, BOOT_TIMEOUT_S,
 // ARTIFACT_TIMEOUT_S, ARTIFACT_MAX_EXTENDS, PSMAS_SKIP) to BridgePolicy/WorkflowPolicy.
-const FlagCeiling = 68
+// Cycle 44 removes 3 flags: EVOLVE_STRATEGY + EVOLVE_RESET (dead env writes) and
+// EVOLVE_SHIP_RELEASE_NOTES (IPC split-const; exec.Command parent→child handoff).
+const FlagCeiling = 65
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching
