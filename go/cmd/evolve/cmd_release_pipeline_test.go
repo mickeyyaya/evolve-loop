@@ -76,11 +76,10 @@ func TestCmd_ReleasePipeline_InvalidSemver(t *testing.T) {
 
 func TestCmd_ReleasePipeline_EnvRequirePreflight(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
-	t.Setenv("EVOLVE_RELEASE_REQUIRE_PREFLIGHT", "1")
 	var stdout, stderr bytes.Buffer
 	// Will fail at preflight or full-dry-run step (no real repo); we just
 	// verify it's > 0 (some pre-publish error) and doesn't hit exit 10.
-	rc := runReleasePipeline([]string{"99.99.99", "--dry-run"}, nil, &stdout, &stderr)
+	rc := runReleasePipeline([]string{"99.99.99", "--dry-run", "--require-preflight"}, nil, &stdout, &stderr)
 	if rc == 0 || rc == 10 {
 		t.Errorf("rc = %d, want pre-publish or post-publish error (1/2/3)", rc)
 	}

@@ -16,7 +16,11 @@ import "testing"
 // Cycle 45 removes 4 flags: EVOLVE_GO_BIN_TEST (DI var), EVOLVE_PLAN_WORKSPACE (CLI flag),
 // EVOLVE_CODEX_VERSION_PATH (DI pkg-var), EVOLVE_COMPACT_PROMPTS (Config Object).
 // Cycle 46 removes 2 flags: EVOLVE_RETRO_MODEL (Config Object), EVOLVE_STDOUT_FILTER (DI field).
-const FlagCeiling = 59
+// Cycle 47 removes 3 flags in two tasks:
+//
+//	Task A: FlagCeiling = 57 after removing EVOLVE_RELEASE_REQUIRE_PREFLIGHT, EVOLVE_OLLAMA_BASE (env aliases)
+//	Task B: FlagCeiling = 56 after removing EVOLVE_MODELCATALOG_CLASSIFIER_CLI (env read → DI param)
+const FlagCeiling = 56
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

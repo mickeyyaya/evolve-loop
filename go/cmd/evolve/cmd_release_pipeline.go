@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"time"
 
@@ -42,7 +41,6 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 			fmt.Fprintln(stdout, "  --require-preflight     run full-dry-run.sh harness before any step")
 			fmt.Fprintln(stdout, "  --max-poll-wait-s N     marketplace propagation deadline (default 300)")
 			fmt.Fprintln(stdout, "  --from-tag <tag>        changelog range start (default: previous tag)")
-			fmt.Fprintln(stdout, "Env: EVOLVE_RELEASE_REQUIRE_PREFLIGHT=1 same as --require-preflight.")
 			fmt.Fprintln(stdout, "     EVOLVE_RELEASE_STRICT_PASS=1 to reject WARN verdicts in preflight.")
 			return 0
 		case a == "--dry-run":
@@ -89,11 +87,6 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 	if target == "" {
 		fmt.Fprintln(stderr, "[release-pipeline] usage: release <target-version> [flags]")
 		return 10
-	}
-
-	// Honor env equivalents (consistent with bash version).
-	if !requirePreflight && os.Getenv("EVOLVE_RELEASE_REQUIRE_PREFLIGHT") == "1" {
-		requirePreflight = true
 	}
 
 	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")

@@ -39,7 +39,7 @@ The slash command translates to:
 "$CLAUDE_PROJECT_DIR/go/evolve" release <args>
 ```
 
-Optional hardening: `--require-preflight` (or `EVOLVE_RELEASE_REQUIRE_PREFLIGHT=1`) runs the full-dry-run harness before any step; `EVOLVE_RELEASE_STRICT_PASS=1` rejects WARN preflight verdicts.
+Optional hardening: `--require-preflight` runs the full-dry-run harness before any step; `EVOLVE_RELEASE_STRICT_PASS=1` rejects WARN preflight verdicts.
 
 ## When to use this skill
 

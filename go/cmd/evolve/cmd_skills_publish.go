@@ -158,9 +158,6 @@ func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 		fmt.Fprintln(stderr, "note: --check takes precedence over --dry-run (check never writes)")
 	}
 	if cfg.OllamaBase == "" {
-		cfg.OllamaBase = os.Getenv("EVOLVE_OLLAMA_BASE")
-	}
-	if cfg.OllamaBase == "" {
 		// Default mirrors driver_ollamatmux.go's model default; no ollama
 		// profile exists in .evolve/profiles/ to read it from (ADR-0041).
 		cfg.OllamaBase = "llama3.1:8b"

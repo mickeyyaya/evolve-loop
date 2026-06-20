@@ -108,7 +108,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, workspace string, 
 	}
 	// Non-empty by construction: pickClassifierCLI returns "" only for an empty
 	// ready set, already excluded above.
-	classifierCLI := pickClassifierCLI(readyCLIs)
+	classifierCLI := pickClassifierCLI(readyCLIs, "")
 
 	capturer := bridgeModelCapturer{workspace: workspace}
 	router := modelquery.Router{
@@ -126,17 +126,17 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, workspace string, 
 }
 
 // pickClassifierCLI chooses which ready CLI runs the tier-classification prompt.
-// EVOLVE_MODELCATALOG_CLASSIFIER_CLI overrides — but ONLY when it names a ready
-// CLI (a stale/misconfigured override must not silently classify against a
-// blocked CLI; mirrors the policy-pin validation discipline). Otherwise the
-// first ready CLI in preference order, else any ready CLI.
-func pickClassifierCLI(ready []string) string {
+// overrideCLI pins a specific CLI — but ONLY when it names a ready CLI (a
+// stale/misconfigured override must not silently classify against a blocked CLI;
+// mirrors the policy-pin validation discipline). Otherwise the first ready CLI
+// in preference order, else any ready CLI.
+func pickClassifierCLI(ready []string, overrideCLI string) string {
 	readySet := make(map[string]bool, len(ready))
 	for _, r := range ready {
 		readySet[r] = true
 	}
-	if env := os.Getenv("EVOLVE_MODELCATALOG_CLASSIFIER_CLI"); env != "" && readySet[env] {
-		return env
+	if overrideCLI != "" && readySet[overrideCLI] {
+		return overrideCLI
 	}
 	for _, pref := range classifierCLIPreference {
 		if readySet[pref] {

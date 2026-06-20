@@ -66,27 +66,26 @@ var allowedUndocumented = map[string]bool{
 	// either (a) documented in runtime-reference.md OR (b) removed from
 	// code. Tracked as technical debt; the contract test still catches
 	// NEW additions.
-	"EVOLVE_GUARDS_LOG":                true, // observability shunt
-	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
-	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
-	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
-	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
-	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
-	"EVOLVE_PLATFORM":                  true, // platform-detect override
-	"EVOLVE_PLUGIN_ROOT":               true, // dispatcher root resolve
-	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override
-	"EVOLVE_PROJECT_ROOT":              true, // dispatcher root resolve
-	"EVOLVE_PROMPTS_DIR":               true, // prompts.NewForProject dev override (used)
-	"EVOLVE_QUOTA_RESET_AT":            true, // quotareset
-	"EVOLVE_QUOTA_RESET_HOURS":         true, // quotareset
-	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true, // releasepipeline flag
-	"EVOLVE_RELEASE_STRICT_PASS":       true, // releasepreflight strict mode
-	"EVOLVE_RESUME":                    true, // cmd_loop resume signal
-	"EVOLVE_RESUME_ALLOW_HEAD_MOVED":   true, // checkpoint flag
-	"EVOLVE_RESUME_MODE":               true, // checkpoint flag
-	"EVOLVE_SHIP_SCRIPT":               true, // legacy ship.sh override
-	"EVOLVE_TRACKER_TTL_DAYS":          true, // tracker telemetry TTL
-	"EVOLVE_USE_PHASE_REGISTRY":        true, // v12.1 internal toggle
+	"EVOLVE_GUARDS_LOG":              true, // observability shunt
+	"EVOLVE_HANG_CLASSIFIER":         true, // legacy dispatcher classifier override
+	"EVOLVE_LEDGER_OVERRIDE":         true, // ledger adapter test override
+	"EVOLVE_MARKETPLACE_DIR":         true, // marketplace-poll path override
+	"EVOLVE_PHASE_":                  true, // regex anchor leak — not a real var
+	"EVOLVE_PHASE_BUILD_BIN":         true, // per-phase subprocess override pattern
+	"EVOLVE_PLATFORM":                true, // platform-detect override
+	"EVOLVE_PLUGIN_ROOT":             true, // dispatcher root resolve
+	"EVOLVE_PROFILES_DIR_OVERRIDE":   true, // profile loader override
+	"EVOLVE_PROJECT_ROOT":            true, // dispatcher root resolve
+	"EVOLVE_PROMPTS_DIR":             true, // prompts.NewForProject dev override (used)
+	"EVOLVE_QUOTA_RESET_AT":          true, // quotareset
+	"EVOLVE_QUOTA_RESET_HOURS":       true, // quotareset
+	"EVOLVE_RELEASE_STRICT_PASS":     true, // releasepreflight strict mode
+	"EVOLVE_RESUME":                  true, // cmd_loop resume signal
+	"EVOLVE_RESUME_ALLOW_HEAD_MOVED": true, // checkpoint flag
+	"EVOLVE_RESUME_MODE":             true, // checkpoint flag
+	"EVOLVE_SHIP_SCRIPT":             true, // legacy ship.sh override
+	"EVOLVE_TRACKER_TTL_DAYS":        true, // tracker telemetry TTL
+	"EVOLVE_USE_PHASE_REGISTRY":      true, // v12.1 internal toggle
 }
 
 // TestEnvVars_DocumentedInCLAUDEmd is the docs-contract enforcement.
