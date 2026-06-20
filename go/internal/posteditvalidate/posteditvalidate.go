@@ -12,7 +12,7 @@
 // detected issue, it emits a stderr WARN that Claude Code surfaces to the
 // LLM, prompting an immediate re-edit.
 //
-// Bypass: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1.
+// Bypass: Options.Bypass, wired from the command's --bypass flag.
 //
 // Always returns nil error — exit codes are non-blocking by design. The
 // cmd layer always exits 0.
@@ -27,6 +27,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/guardslog"
 )
 
 // Options drives a Run() invocation.
@@ -35,7 +37,7 @@ type Options struct {
 	ProjectRoot string    // for guards.log path; required
 	LLMStderr   io.Writer // visible to the LLM via Claude Code's reminder mechanism
 	GuardsLog   string    // optional override; defaults to <ProjectRoot>/.evolve/guards.log
-	Bypass      bool      // honors EVOLVE_BYPASS_POSTEDIT_VALIDATE=1
+	Bypass      bool      // explicit emergency bypass
 	Now         func() time.Time
 
 	// Validator seams: each takes the file path, returns (ok, errMsg).
@@ -87,7 +89,7 @@ func Run(opts Options) Result {
 	}
 
 	if opts.Bypass {
-		logf("WARN: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1; bypassing")
+		logf("WARN: --bypass active; bypassing")
 		res.Kind = "bypass"
 		return res
 	}
@@ -130,7 +132,7 @@ func Run(opts Options) Result {
 		} else {
 			logf("WARN: invalid JSON in %s: %s", filePath, errMsg)
 			warnLLM("WARN: just-edited file %s does NOT parse as valid JSON: %s", filePath, errMsg)
-			warnLLM("  Re-read and fix before continuing. Bypass: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1.")
+			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
 	case ".sh":
 		res.Kind = "sh"
@@ -142,7 +144,7 @@ func Run(opts Options) Result {
 			logf("WARN: bash syntax error in %s: %s", filePath, errMsg)
 			warnLLM("WARN: just-edited file %s has a bash syntax error: %s", filePath, errMsg)
 			warnLLM("  Common causes: bash 4+ features (declare -A, mapfile) on a 3.2 target; unbalanced quotes; missing fi/done.")
-			warnLLM("  Re-read and fix before continuing. Bypass: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1.")
+			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
 	case ".py":
 		res.Kind = "py"
@@ -155,7 +157,7 @@ func Run(opts Options) Result {
 		} else {
 			logf("WARN: python compile error in %s: %s", filePath, errMsg)
 			warnLLM("WARN: just-edited file %s has a Python compile error: %s", filePath, errMsg)
-			warnLLM("  Re-read and fix before continuing. Bypass: EVOLVE_BYPASS_POSTEDIT_VALIDATE=1.")
+			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
 	default:
 		res.Kind = "noop"
@@ -254,18 +256,11 @@ func cleanPyCache(filePath string) {
 
 // --- Guards-log append (best-effort) ---------------------------------------
 
+// appendGuardsLog is a best-effort NDJSON-ish append. The open/write/close is
+// centralized in guardslog.Append (which surfaces the close error so it is
+// testable); this guard is fire-and-forget by design — a read-only sandbox is
+// expected to fail here and must never surface — so the error is discarded
+// explicitly at this boundary.
 func appendGuardsLog(path string, ts time.Time, msg string) {
-	if path == "" {
-		return
-	}
-	// Best-effort: ensure parent dir, ignore failures (read-only sandboxes
-	// are expected to fail here; never surface to stderr).
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	_, _ = fmt.Fprintf(f, "[%s] [postedit-validate] %s\n",
-		ts.UTC().Format(time.RFC3339), msg)
+	_ = guardslog.Append(path, "postedit-validate", msg, ts)
 }

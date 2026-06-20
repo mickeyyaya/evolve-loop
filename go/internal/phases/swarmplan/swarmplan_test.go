@@ -39,14 +39,6 @@ func TestPhase_ShouldSkip_DefaultShadow(t *testing.T) {
 	}
 }
 
-func TestPhase_ShouldSkip_EnabledRuns(t *testing.T) {
-	p := New(Config{})
-	skip, _, _, _ := p.ShouldSkip(core.PhaseRequest{Env: map[string]string{"EVOLVE_SWARM_PLANNER": "1"}})
-	if skip {
-		t.Error("swarm-plan must run when EVOLVE_SWARM_PLANNER=1")
-	}
-}
-
 func TestPhase_Classify(t *testing.T) {
 	p := New(Config{})
 	if v, _, _ := p.Classify("", core.PhaseRequest{}, core.BridgeResponse{}); v != core.VerdictFAIL {

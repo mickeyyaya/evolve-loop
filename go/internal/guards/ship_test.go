@@ -10,16 +10,16 @@ import (
 // Ship is the port of scripts/guards/ship-gate.sh.
 // Rule: ship-class verbs (git commit, git push, gh release create, gh
 // release edit) are denied UNLESS the command's entry point is
-// scripts/lifecycle/ship.sh. EVOLVE_BYPASS_SHIP_GATE=1 bypasses (legacy).
+// scripts/lifecycle/ship.sh. Constructor-injected bypass=true bypasses.
 func TestShip_Name(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	if g.Name() != "ship" {
 		t.Errorf("name=%q", g.Name())
 	}
 }
 
 func TestShip_AllowsCanonicalShipScript(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	cases := []string{
 		"bash scripts/lifecycle/ship.sh 'msg'",
 		"scripts/lifecycle/ship.sh --class manual 'msg'",
@@ -37,7 +37,7 @@ func TestShip_AllowsCanonicalShipScript(t *testing.T) {
 }
 
 func TestShip_DeniesBareGitCommit(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	cases := []string{
 		"git commit -m 'msg'",
 		"git push origin main",
@@ -57,7 +57,7 @@ func TestShip_DeniesBareGitCommit(t *testing.T) {
 }
 
 func TestShip_DeniesPipedShipVerbs(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	// Common bypass attempts.
 	for _, cmd := range []string{
 		`echo y | git commit -m 'x'`,
@@ -73,9 +73,8 @@ func TestShip_DeniesPipedShipVerbs(t *testing.T) {
 	}
 }
 
-func TestShip_BypassEnvAllows(t *testing.T) {
-	t.Setenv("EVOLVE_BYPASS_SHIP_GATE", "1")
-	g := NewShip()
+func TestShip_BypassAllows(t *testing.T) {
+	g := NewShip(true)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "git commit -m 'x'"},
@@ -86,7 +85,7 @@ func TestShip_BypassEnvAllows(t *testing.T) {
 }
 
 func TestShip_AllowsNonShipBash(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	cases := []string{
 		"ls",
 		"git status",
@@ -107,7 +106,7 @@ func TestShip_AllowsNonShipBash(t *testing.T) {
 }
 
 func TestShip_MissingCommandAllows(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{},
@@ -118,7 +117,7 @@ func TestShip_MissingCommandAllows(t *testing.T) {
 }
 
 func TestShip_NonBashToolPassesThrough(t *testing.T) {
-	g := NewShip()
+	g := NewShip(false)
 	for _, tool := range []string{"Edit", "Write", "Read"} {
 		dec := g.Decide(context.Background(), core.GuardInput{ToolName: tool})
 		if !dec.Allow {

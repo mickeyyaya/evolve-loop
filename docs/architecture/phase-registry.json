@@ -44,7 +44,7 @@
       "name": "intent",
       "role": "intent",
       "optional": true,
-      "enable_var": "EVOLVE_REQUIRE_INTENT",
+      "enable_var": "workflow.phase_enables.intent=on",
       "inputs": {
         "files": [],
         "state_fields": ["lastCycleNumber"]
@@ -86,8 +86,7 @@
       "name": "triage",
       "role": "triage",
       "optional": true,
-      "enable_var": "EVOLVE_TRIAGE_DISABLE",
-      "enable_var_inverted": true,
+      "enable_var": "workflow.phase_enables.triage",
       "enabled": "on",
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
@@ -158,7 +157,7 @@
       "role": "plan-reviewer",
       "agent": "plan-reviewer",
       "optional": true,
-      "enable_var": "EVOLVE_PLAN_REVIEW",
+      "enable_var": "workflow.phase_enables.plan-review=on",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
@@ -184,9 +183,9 @@
       "name": "tdd",
       "role": "tdd-engineer",
       "optional": true,
-      "enable_var": "EVOLVE_TEST_PHASE_ENABLED",
+      "enable_var": "workflow.phase_enables.tdd=on",
       "enabled": "on",
-      "_v3_note": "enable_var corrected EVOLVE_TDD_PHASE -> EVOLVE_TEST_PHASE_ENABLED (the flag the tdd phase actually reads). tdd is conditional-mandatory (cycle_size!=trivial) in config.conditional_mandatory; enabled:on is the legacy floor honored in Stage:Off.",
+      "_v3_note": "enable_var migrated from EVOLVE_TEST_PHASE_ENABLED (cycle-39 flag-reduction). tdd is conditional-mandatory (cycle_size!=trivial) in config.conditional_mandatory; enabled:on is the legacy floor honored in Stage:Off.",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
@@ -206,7 +205,7 @@
       "name": "build-planner",
       "role": "build-planner",
       "optional": true,
-      "enable_var": "EVOLVE_BUILD_PLANNER",
+      "enable_var": "workflow.phase_enables.build-planner=on",
       "enabled": "off",
       "inputs": {
         "files": [

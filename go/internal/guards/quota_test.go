@@ -10,7 +10,7 @@ import (
 // Quota is the port of scripts/hooks/research-quota-gate.sh. Phase-1
 // surface: a simple in-memory counter keyed by (agent, bucket). Real
 // persistence into cycle-state.json:research_usage lands in Phase 2.
-// EVOLVE_ALLOW_DEEP_RESEARCH=1 lifts the cap.
+// Workflow policy can lift the cap through QuotaConfig.
 //
 // Buckets:
 //   - WebSearch  → "web_search"  (default cap 3 per agent)
@@ -44,8 +44,7 @@ func TestQuota_DefaultCapDeniesOverlimit(t *testing.T) {
 }
 
 func TestQuota_DeepResearchBypass(t *testing.T) {
-	t.Setenv("EVOLVE_ALLOW_DEEP_RESEARCH", "1")
-	g := NewQuota(QuotaConfig{})
+	g := NewQuota(QuotaConfig{AllowDeepResearch: true})
 	for i := 0; i < 10; i++ {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "WebSearch",

@@ -17,11 +17,8 @@
 //  9. hash_chain           — ledger prev_hash chain unbroken
 //
 // 10. duplicate_ledger     — no two ledger entries with same SHA
-// 11. phase_latency        — per-phase execution time ≤ EVOLVE_PHASE_LATENCY_CEILING
+// 11. phase_latency        — per-phase execution time stays within policy
 // 12. self_heal_events     — anomalous self-heal retries / backfills in cycle
-//
-// Per the skill docs: "Any ANOMALY = halt." Operators bypass via
-// EVOLVE_SKIP_CYCLE_HEALTH=1 (logged loudly).
 //
 // v12.1 Phase 2A port. CLI: `evolve cycle-health <cycle-N> <workspace>`.
 package cyclehealth
@@ -35,8 +32,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 // Severity classifies a single anomaly's blocking force.
@@ -67,9 +62,10 @@ type Report struct {
 
 // Options configures Check. Cycle and Workspace are required.
 type Options struct {
-	Cycle     int
-	Workspace string
-	NowFn     func() time.Time
+	Cycle                int
+	Workspace            string
+	NowFn                func() time.Time
+	PhaseLatencyCeilingS int
 }
 
 // Check runs the 13 signals and writes cycle-health.json. Returns the
@@ -462,12 +458,14 @@ func checkPhaseLatency(opts Options) []Anomaly {
 		}
 	}
 
-	globalCeilingSec := envchain.IntMin(envchain.KeyPhaseLatencyCeilingS, nil, envchain.DefPhaseLatencyCeilingS, 1)
+	globalCeilingSec := opts.PhaseLatencyCeilingS
+	if globalCeilingSec <= 0 {
+		globalCeilingSec = 900
+	}
 
 	var out []Anomaly
 	for _, entry := range entries {
-		ceil := perPhaseCeiling(entry.Phase, globalCeilingSec)
-		ceilingMS := int64(ceil) * 1000
+		ceilingMS := int64(globalCeilingSec) * 1000
 		if entry.DurationMS > ceilingMS {
 			out = append(out, Anomaly{
 				Signal: "phase_latency", Severity: SeverityWarn,
@@ -476,15 +474,6 @@ func checkPhaseLatency(opts Options) []Anomaly {
 		}
 	}
 	return out
-}
-
-// perPhaseCeiling returns the effective latency ceiling (in seconds) for the
-// given phase name. It reads EVOLVE_<UPPER_PHASE>_LATENCY_CEILING_S where
-// <UPPER_PHASE> is the phase name uppercased with "-" replaced by "_" (e.g.
-// "build-planner" → EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S). When the
-// per-phase override is absent or invalid, globalCeiling is returned.
-func perPhaseCeiling(phase string, globalCeiling int) int {
-	return envchain.IntMin(envchain.PhaseEnvKey(phase, "LATENCY_CEILING_S"), nil, globalCeiling, 1)
 }
 
 func checkSelfHealEvents(opts Options) []Anomaly {

@@ -20,7 +20,7 @@ func freshRepoNoGit(t *testing.T) string {
 // without one, the underlying library errors and the bridge surfaces it.
 func TestRunPreflightLib_NoGit_ReturnsError(t *testing.T) {
 	root := freshRepoNoGit(t)
-	err := runPreflightLib(root, "1.2.3", true, true)
+	err := runPreflightLib(root, "1.2.3", true, true, false)
 	if err == nil {
 		t.Error("runPreflightLib without git: want error")
 	}

@@ -5,48 +5,6 @@ import (
 	"time"
 )
 
-func TestResolveRetryBackoffBase(t *testing.T) {
-	tests := []struct {
-		name string
-		env  map[string]string
-		want int
-	}{
-		{
-			name: "empty env",
-			env:  nil,
-			want: 5,
-		},
-		{
-			name: "unset val",
-			env:  map[string]string{},
-			want: 5,
-		},
-		{
-			name: "valid val",
-			env:  map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "10"},
-			want: 10,
-		},
-		{
-			name: "invalid val",
-			env:  map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "abc"},
-			want: 5,
-		},
-		{
-			name: "negative val",
-			env:  map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "-3"},
-			want: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveRetryBackoffBase(tt.env); got != tt.want {
-				t.Errorf("resolveRetryBackoffBase() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
 // captureBackoff swaps in a recording sleep and returns pointers to the
 // captured duration and a called-flag, plus a restore func. Tests the COMPUTED
 // backoff duration directly via the seam — no wall-clock sleeping (instant) and
@@ -64,7 +22,7 @@ func captureBackoff() (*time.Duration, *bool, func()) {
 func TestExecuteRetryBackoff_ZeroBaseDisables(t *testing.T) {
 	_, called, restore := captureBackoff()
 	defer restore()
-	executeRetryBackoff(1, map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "0"})
+	executeRetryBackoff(1, 0)
 	if *called {
 		t.Error("zero base must not invoke the sleep")
 	}
@@ -73,16 +31,14 @@ func TestExecuteRetryBackoff_ZeroBaseDisables(t *testing.T) {
 func TestExecuteRetryBackoff_AppliedOnAttempt2(t *testing.T) {
 	slept, called, restore := captureBackoff()
 	defer restore()
-	env := map[string]string{"EVOLVE_RETRY_BACKOFF_BASE_S": "1"}
-
 	// nextAttempt = 1 (attempt = 0) -> below the >=2 threshold, no sleep.
-	executeRetryBackoff(0, env)
+	executeRetryBackoff(0, 1)
 	if *called {
 		t.Errorf("nextAttempt < 2 must not sleep; slept %v", *slept)
 	}
 
 	// nextAttempt = 2 (attempt = 1) -> base * 2^(2-2) = 1s exactly.
-	executeRetryBackoff(1, env)
+	executeRetryBackoff(1, 1)
 	if !*called || *slept != 1*time.Second {
 		t.Errorf("attempt 2: want exactly 1s sleep, got called=%v slept=%v", *called, *slept)
 	}

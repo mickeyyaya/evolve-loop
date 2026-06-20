@@ -77,6 +77,24 @@ type Policy struct {
 	// QuotaReset configures the quota-reset wake-time estimator. Absent ⇒
 	// built-in defaults apply (DefaultHours=5.4167, no ResetAt override).
 	QuotaReset *QuotaResetConfig `json:"quota_reset,omitempty"`
+	// Dispatch configures the loop dispatch verification policy. Absent ⇒
+	// built-in defaults apply (Policy="verify", RepeatThreshold=5).
+	Dispatch *DispatchConfig `json:"dispatch,omitempty"`
+	// Workflow configures loop and subagent workflow defaults. Absent ⇒
+	// built-in defaults apply.
+	Workflow *WorkflowPolicy `json:"workflow,omitempty"`
+	// Retry configures phase retry, backoff, correction, and latency defaults.
+	// Absent ⇒ built-in defaults apply.
+	Retry *RetryPolicy `json:"retry,omitempty"`
+	// Swarm configures swarm dispatch stage and port allocation. Absent ⇒
+	// built-in defaults apply (Stage="shadow", PortBase=0).
+	Swarm *SwarmPolicy `json:"swarm,omitempty"`
+	// Gates configures persistent rollout stages for the contract, eval,
+	// triage-cap, and review gates. Absent ⇒ built-in defaults apply.
+	Gates *GatesPolicy `json:"gates,omitempty"`
+	// Router configures advisor routing behavior and per-decision model
+	// overrides. Absent ⇒ built-in defaults apply.
+	Router *RouterPolicy `json:"router,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -377,17 +395,24 @@ func (p Policy) ObserverConfig() ObserverPolicy {
 	return out
 }
 
-// BridgePolicy configures operator-writable bridge override directories.
-// Empty fields preserve each subsystem's built-in .evolve directory.
+// BridgePolicy configures operator-writable bridge override directories and
+// timing overrides. Empty string fields preserve each subsystem's built-in
+// .evolve directory. Zero int fields mean "use the bridge package built-in
+// default" (the bridge's defaultIfZero helper handles the zero sentinel).
 type BridgePolicy struct {
 	ManifestDir string `json:"manifest_dir,omitempty"`
 	CatalogDir  string `json:"catalog_dir,omitempty"`
 	RecipeDir   string `json:"recipe_dir,omitempty"`
+	// Timing overrides (seconds). 0 = use bridge built-in default.
+	BootTimeoutS       int `json:"boot_timeout_s,omitempty"`
+	ArtifactTimeoutS   int `json:"artifact_timeout_s,omitempty"`
+	ArtifactMaxExtends int `json:"artifact_max_extends,omitempty"`
+	ScrollbackLines    int `json:"scrollback_lines,omitempty"`
 }
 
-// BridgeConfig returns the configured bridge directories. The zero value is
-// intentional: bridge subsystems resolve empty fields against the canonical
-// project root so relative-path behavior remains centralized.
+// BridgeConfig returns the configured bridge policy. Zero int fields mean
+// "use bridge built-in defaults"; the bridge package resolves them via
+// defaultIfZero.
 func (p Policy) BridgeConfig() BridgePolicy {
 	if p.Bridge == nil {
 		return BridgePolicy{}
@@ -412,4 +437,288 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 		return QuotaResetConfig{}
 	}
 	return *p.QuotaReset
+}
+
+// DispatchConfig configures the loop dispatch verification policy and circuit-breaker.
+// Replaces EVOLVE_DISPATCH_POLICY and EVOLVE_DISPATCH_REPEAT_THRESHOLD env reads.
+type DispatchConfig struct {
+	// Policy selects dispatch verification: "off" / "verify" (default) / "stop".
+	Policy string `json:"policy,omitempty"`
+	// RepeatThreshold is the same-cycle repeat count that trips the circuit-breaker.
+	// Zero / absent ⇒ built-in default (5).
+	RepeatThreshold int `json:"repeat_threshold,omitempty"`
+}
+
+const defaultDispatchRepeatThreshold = 5
+
+// DispatchConfig returns a DispatchConfig with defaults resolved.
+func (p Policy) DispatchConfig() DispatchConfig {
+	c := DispatchConfig{Policy: "verify", RepeatThreshold: defaultDispatchRepeatThreshold}
+	if p.Dispatch == nil {
+		return c
+	}
+	if p.Dispatch.Policy != "" {
+		c.Policy = p.Dispatch.Policy
+	}
+	if p.Dispatch.RepeatThreshold > 0 {
+		c.RepeatThreshold = p.Dispatch.RepeatThreshold
+	}
+	return c
+}
+
+// WorkflowPolicy is the .evolve/policy.json "workflow" block.
+type WorkflowPolicy struct {
+	MaxConsecutiveFails   int               `json:"max_consecutive_fails,omitempty"`
+	MaxCyclesCap          int               `json:"max_cycles_cap,omitempty"`
+	AutoPrune             *bool             `json:"auto_prune,omitempty"`
+	BackfillEnabled       *bool             `json:"backfill_enabled,omitempty"`
+	CycleBudget           string            `json:"cycle_budget,omitempty"`
+	AllowDeepResearch     bool              `json:"allow_deep_research,omitempty"`
+	AllowDocDelete        bool              `json:"allow_doc_delete,omitempty"`
+	DiffComplexityDisable bool              `json:"diff_complexity_disable,omitempty"`
+	AuditorTierOverride   string            `json:"auditor_tier_override,omitempty"`
+	PhaseEnables          map[string]string `json:"phase_enables,omitempty"`
+	ConsensusAuditEnabled *bool             `json:"consensus_audit_enabled,omitempty"`
+	// PSMASEnabled enables the Phase Scheduling and Management Advisor
+	// Subsystem. Absent/false = disabled (opt-in). Replaces EVOLVE_PSMAS_SKIP.
+	PSMASEnabled *bool `json:"psmas_enabled,omitempty"`
+}
+
+// WorkflowConfig is the resolved workflow configuration with defaults applied.
+type WorkflowConfig struct {
+	MaxConsecutiveFails   int
+	MaxCyclesCap          int
+	AutoPrune             bool
+	BackfillEnabled       bool
+	CycleBudget           string
+	AllowDeepResearch     bool
+	AllowDocDelete        bool
+	DiffComplexityDisable bool
+	AuditorTierOverride   string
+	PhaseEnables          map[string]string
+	ConsensusAuditEnabled bool
+	PSMASEnabled          bool
+}
+
+// WorkflowConfig returns workflow configuration with built-in defaults resolved.
+func (p Policy) WorkflowConfig() WorkflowConfig {
+	c := WorkflowConfig{
+		MaxConsecutiveFails:   1,
+		MaxCyclesCap:          25,
+		AutoPrune:             true,
+		BackfillEnabled:       true,
+		ConsensusAuditEnabled: true,
+	}
+	if p.Workflow == nil {
+		return c
+	}
+	if p.Workflow.MaxConsecutiveFails > 0 {
+		c.MaxConsecutiveFails = p.Workflow.MaxConsecutiveFails
+	}
+	if p.Workflow.MaxCyclesCap > 0 {
+		c.MaxCyclesCap = p.Workflow.MaxCyclesCap
+	}
+	if p.Workflow.AutoPrune != nil {
+		c.AutoPrune = *p.Workflow.AutoPrune
+	}
+	if p.Workflow.BackfillEnabled != nil {
+		c.BackfillEnabled = *p.Workflow.BackfillEnabled
+	}
+	c.CycleBudget = p.Workflow.CycleBudget
+	c.AllowDeepResearch = p.Workflow.AllowDeepResearch
+	c.AllowDocDelete = p.Workflow.AllowDocDelete
+	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
+	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
+	c.PhaseEnables = p.Workflow.PhaseEnables
+	if p.Workflow.ConsensusAuditEnabled != nil {
+		c.ConsensusAuditEnabled = *p.Workflow.ConsensusAuditEnabled
+	}
+	if p.Workflow.PSMASEnabled != nil {
+		c.PSMASEnabled = *p.Workflow.PSMASEnabled
+	}
+	return c
+}
+
+// RetryPolicy is the .evolve/policy.json "retry" block.
+type RetryPolicy struct {
+	PhaseMaxAttempts          int `json:"phase_max_attempts,omitempty"`
+	RetryBackoffBaseS         int `json:"retry_backoff_base_s,omitempty"`
+	PhaseLatencyCeilingS      int `json:"phase_latency_ceiling_s,omitempty"`
+	ContractCorrectionRetries int `json:"contract_correction_retries,omitempty"`
+
+	retryBackoffBaseSSet         bool
+	contractCorrectionRetriesSet bool
+}
+
+// UnmarshalJSON records explicit zero values for the two settings where zero
+// disables behavior. Plain struct zero values still mean "use defaults".
+func (r *RetryPolicy) UnmarshalJSON(data []byte) error {
+	type retryPolicy RetryPolicy
+	var decoded retryPolicy
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = RetryPolicy(decoded)
+	_, r.retryBackoffBaseSSet = fields["retry_backoff_base_s"]
+	_, r.contractCorrectionRetriesSet = fields["contract_correction_retries"]
+	return nil
+}
+
+// RetryConfig is the resolved retry configuration with defaults applied.
+type RetryConfig struct {
+	PhaseMaxAttempts          int
+	RetryBackoffBaseS         int
+	PhaseLatencyCeilingS      int
+	ContractCorrectionRetries int
+}
+
+const (
+	defaultPhaseMaxAttempts          = 2
+	maxPhaseMaxAttempts              = 5
+	defaultRetryBackoffBaseS         = 5
+	defaultPhaseLatencyCeilingS      = 900
+	defaultContractCorrectionRetries = 2
+	maxContractCorrectionRetries     = 5
+)
+
+// SwarmPolicy is the .evolve/policy.json "swarm" block.
+// Replaces the EVOLVE_SWARM_STAGE and EVOLVE_SWARM_PORT_BASE env reads.
+type SwarmPolicy struct {
+	// Stage selects the swarm dispatch stage: "off" / "shadow" / "advisory" / "enforce".
+	// Empty/absent ⇒ "shadow" (byte-identical delegate to inner runner).
+	Stage string `json:"stage,omitempty"`
+	// PortBase is the operator override for the writer dev-server port base.
+	// Zero/absent ⇒ swarm.DefaultPortBase.
+	PortBase int `json:"port_base,omitempty"`
+}
+
+// SwarmConfig is the resolved swarm configuration with defaults applied.
+type SwarmConfig struct {
+	Stage    string
+	PortBase int
+}
+
+// SwarmConfig returns swarm configuration with built-in defaults resolved.
+// Stage defaults to "shadow" — matching the previous swarmStage() default branch
+// (empty/unknown → stageOff, i.e. shadow/delegate behavior).
+// PortBase defaults to 0 — matching portBaseFromEnv's "unset/invalid → 0" behavior.
+func (p Policy) SwarmConfig() SwarmConfig {
+	c := SwarmConfig{Stage: "shadow"}
+	if p.Swarm == nil {
+		return c
+	}
+	if p.Swarm.Stage != "" {
+		c.Stage = p.Swarm.Stage
+	}
+	c.PortBase = p.Swarm.PortBase
+	return c
+}
+
+// RouterPolicy is the .evolve/policy.json "router" block.
+type RouterPolicy struct {
+	RouterReplan string `json:"router_replan,omitempty"`
+	RoutingJudge bool   `json:"routing_judge,omitempty"`
+	ReconDigest  bool   `json:"recon_digest,omitempty"`
+	ReplanDepth  int    `json:"replan_depth,omitempty"`
+	PlanModel    string `json:"plan_model,omitempty"`
+	ProposeModel string `json:"propose_model,omitempty"`
+	CLI          string `json:"cli,omitempty"`
+	Model        string `json:"model,omitempty"`
+}
+
+// RouterConfig returns router configuration with built-in defaults resolved.
+func (p Policy) RouterConfig() RouterPolicy {
+	c := RouterPolicy{RouterReplan: "shadow", ReplanDepth: 1}
+	if p.Router == nil {
+		return c
+	}
+	if p.Router.RouterReplan != "" {
+		c.RouterReplan = p.Router.RouterReplan
+	}
+	c.RoutingJudge = p.Router.RoutingJudge
+	c.ReconDigest = p.Router.ReconDigest
+	if p.Router.ReplanDepth > 0 {
+		c.ReplanDepth = p.Router.ReplanDepth
+	}
+	c.PlanModel = p.Router.PlanModel
+	c.ProposeModel = p.Router.ProposeModel
+	c.CLI = p.Router.CLI
+	c.Model = p.Router.Model
+	return c
+}
+
+// GatesPolicy is the .evolve/policy.json "gates" block.
+type GatesPolicy struct {
+	ContractGate  string `json:"contract_gate,omitempty"`
+	EvalGate      string `json:"eval_gate,omitempty"`
+	TriageCapGate string `json:"triage_cap_gate,omitempty"`
+	ReviewGate    string `json:"review_gate,omitempty"`
+}
+
+// GatesConfig is the resolved gate configuration with defaults applied.
+type GatesConfig struct {
+	ContractGate  string
+	EvalGate      string
+	TriageCapGate string
+	ReviewGate    string
+}
+
+// GatesConfig returns persistent gate stages with built-in defaults resolved.
+func (p Policy) GatesConfig() GatesConfig {
+	c := GatesConfig{
+		ContractGate:  "enforce",
+		EvalGate:      "enforce",
+		TriageCapGate: "enforce",
+		ReviewGate:    "off",
+	}
+	if p.Gates == nil {
+		return c
+	}
+	if p.Gates.ContractGate != "" {
+		c.ContractGate = p.Gates.ContractGate
+	}
+	if p.Gates.EvalGate != "" {
+		c.EvalGate = p.Gates.EvalGate
+	}
+	if p.Gates.TriageCapGate != "" {
+		c.TriageCapGate = p.Gates.TriageCapGate
+	}
+	if p.Gates.ReviewGate != "" {
+		c.ReviewGate = p.Gates.ReviewGate
+	}
+	return c
+}
+
+// RetryConfig returns retry configuration with defaults and safety bounds.
+func (p Policy) RetryConfig() RetryConfig {
+	c := RetryConfig{
+		PhaseMaxAttempts:          defaultPhaseMaxAttempts,
+		RetryBackoffBaseS:         defaultRetryBackoffBaseS,
+		PhaseLatencyCeilingS:      defaultPhaseLatencyCeilingS,
+		ContractCorrectionRetries: defaultContractCorrectionRetries,
+	}
+	if p.Retry == nil {
+		return c
+	}
+	if p.Retry.PhaseMaxAttempts > 0 {
+		c.PhaseMaxAttempts = min(p.Retry.PhaseMaxAttempts, maxPhaseMaxAttempts)
+	}
+	if p.Retry.retryBackoffBaseSSet {
+		c.RetryBackoffBaseS = max(p.Retry.RetryBackoffBaseS, 0)
+	} else if p.Retry.RetryBackoffBaseS > 0 {
+		c.RetryBackoffBaseS = p.Retry.RetryBackoffBaseS
+	}
+	if p.Retry.PhaseLatencyCeilingS > 0 {
+		c.PhaseLatencyCeilingS = p.Retry.PhaseLatencyCeilingS
+	}
+	if p.Retry.contractCorrectionRetriesSet && p.Retry.ContractCorrectionRetries >= 0 {
+		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
+	} else if p.Retry.ContractCorrectionRetries > 0 {
+		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
+	}
+	return c
 }

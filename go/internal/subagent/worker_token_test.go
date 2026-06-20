@@ -80,7 +80,6 @@ func TestRun_ChallengeTokenOverride(t *testing.T) {
 		ProjectRoot:            tmp,
 		PluginRoot:             tmp,
 		PromptReader:           strings.NewReader("hi"),
-		CachePrefixV2:          true,
 		ChallengeTokenOverride: "parent-tok-worker-x",
 	}, runHappyOpts(t))
 	if err != nil {

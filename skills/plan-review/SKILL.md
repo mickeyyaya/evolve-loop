@@ -5,7 +5,7 @@ description: Use when scout-report.md exists and TDD/Build hasn't started yet. R
 
 # plan-review
 
-> Sprint 2 multi-lens review (v8.16+). Inspired by `garrytan/gstack/autoplan`. Default-off via `EVOLVE_PLAN_REVIEW=0`; enable per cycle.
+> Sprint 2 multi-lens review (v8.16+). Inspired by `garrytan/gstack/autoplan`. Default-off; enable via `workflow.phase_enables.plan-review=on` in policy.json.
 
 ## When to invoke
 
@@ -45,7 +45,7 @@ First line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
 
 | Fact | Value |
 |---|---|
-| Phase | `plan-review` (plan archetype, optional, gated by `EVOLVE_PLAN_REVIEW`) |
+| Phase | `plan-review` (plan archetype, optional, gated by `workflow.phase_enables.plan-review=on`) |
 | Persona | `agents/plan-reviewer.md` |
 | Profile | `.evolve/profiles/plan-reviewer.json` — CLI `claude-tmux`, tier `deep`, fan-out ×4 |
 | Inputs | `scout-report.md` · `triage-report.md` |
@@ -61,7 +61,7 @@ First line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
 
 Invoked by:
 - `/evolve-loop:plan-review`
-- `loop` macro (between Scout and TDD when `EVOLVE_PLAN_REVIEW=1`)
+- `loop` macro (between Scout and TDD when `workflow.phase_enables.plan-review=on`)
 
 The `plan-reviewer` persona uses `parallel_subtasks` (see `.evolve/profiles/plan-reviewer.json`) — the lens sub-personas (count projected into Phase facts above) run concurrently and merge via `aggregator.sh phase=plan-review`.
 

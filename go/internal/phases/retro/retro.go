@@ -29,12 +29,16 @@ type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
+	// Model is the LLM model passed to the bridge for the retrospective run.
+	// Empty string defaults to "auto".
+	Model string
 }
 
 type Phase struct {
 	bridge  core.Bridge
 	prompts *prompts.Loader
 	nowFn   func() time.Time
+	model   string
 }
 
 func New(c Config) *Phase {
@@ -42,7 +46,11 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn}
+	model := c.Model
+	if model == "" {
+		model = "auto"
+	}
+	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -80,15 +88,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	if cli == "" {
 		cli = "claude-tmux"
 	}
-	model := req.Env["EVOLVE_RETRO_MODEL"]
-	if model == "" {
-		model = "auto"
-	}
 
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
 		Profile:      profilePath,
-		Model:        model,
+		Model:        p.model,
 		Prompt:       prompt,
 		Workspace:    req.Workspace,
 		Worktree:     req.Worktree,

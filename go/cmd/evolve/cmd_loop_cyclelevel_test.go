@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -43,9 +44,8 @@ func (r *secondCallErrRunner) Run(context.Context, core.PhaseRequest) (core.Phas
 // TestLoop_CycleLevelFailureContinues — scout AC: "loop with 3 cycles,
 // second fails with ErrCycleLevelFailure → third cycle still runs".
 func TestLoop_CycleLevelFailureContinues(t *testing.T) {
-	t.Setenv("EVOLVE_DISPATCH_POLICY", "off")
-
 	projectRoot := t.TempDir()
+	writeDispatchPolicy(t, filepath.Join(projectRoot, ".evolve"), "off")
 	scout := &secondCallErrRunner{name: "scout"}
 
 	prev := wireOrchestratorDepsFn

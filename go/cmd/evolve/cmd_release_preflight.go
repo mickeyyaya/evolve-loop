@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
 )
@@ -19,21 +18,24 @@ import (
 //	10 — invalid arguments
 func runReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
-		target    string
-		dryRun    bool
-		skipTests bool
+		target     string
+		dryRun     bool
+		skipTests  bool
+		strictPass bool
 	)
 	for _, a := range args {
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests]")
+			fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass]")
 			fmt.Fprintln(stdout, "5-step gate: clean tree | branch attached | semver bump | recent audit PASS | gate-tests green.")
-			fmt.Fprintln(stdout, "Env: EVOLVE_RELEASE_STRICT_PASS=1 to reject WARN verdicts.")
+			fmt.Fprintln(stdout, "  --strict-pass  reject WARN verdicts (treat WARN as FAIL)")
 			return 0
 		case a == "--dry-run":
 			dryRun = true
 		case a == "--skip-tests":
 			skipTests = true
+		case a == "--strict-pass": // flag "strict-pass": reject WARN verdicts
+			strictPass = true
 		case len(a) >= 2 && a[:2] == "--":
 			fmt.Fprintf(stderr, "[preflight] unknown flag: %s\n", a)
 			return 10
@@ -47,12 +49,11 @@ func runReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		}
 	}
 	if target == "" {
-		fmt.Fprintln(stderr, "[preflight] usage: release-preflight <target-version> [--dry-run] [--skip-tests]")
+		fmt.Fprintln(stderr, "[preflight] usage: release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass]")
 		return 10
 	}
 
 	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
-	strictPass := os.Getenv("EVOLVE_RELEASE_STRICT_PASS") == "1"
 
 	opts := releasepreflight.Options{
 		Target:     target,

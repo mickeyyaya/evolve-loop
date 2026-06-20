@@ -23,6 +23,7 @@ func runCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		mode         = commitprefixgate.ModeStaged
 		diffRef      string
 		manifestPath string
+		bypass       bool
 	)
 
 	i := 0
@@ -30,8 +31,8 @@ func runCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		a := args[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Fprintln(stdout, "Usage: evolve commit-prefix-gate --msg \"<commit-msg>\" [--repo-dir <path>] [--staged | --diff-ref <ref>] [--manifest <path>]")
-			fmt.Fprintln(stdout, "Env: EVOLVE_BYPASS_PREFIX_GATE=1 + SHIP_CLASS=manual to bypass.")
+			fmt.Fprintln(stdout, "Usage: evolve commit-prefix-gate --msg \"<commit-msg>\" [--repo-dir <path>] [--staged | --diff-ref <ref>] [--manifest <path>] [--bypass]")
+			fmt.Fprintln(stdout, "Emergency bypass requires --bypass + SHIP_CLASS=manual.")
 			return 0
 		case a == "--msg":
 			i++
@@ -53,6 +54,8 @@ func runCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) i
 			repoDir = a[11:]
 		case a == "--staged":
 			mode = commitprefixgate.ModeStaged
+		case a == "--bypass":
+			bypass = true
 		case a == "--diff-ref":
 			i++
 			if i >= len(args) {
@@ -94,7 +97,7 @@ func runCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		DiffRef:      diffRef,
 		ManifestPath: manifestPath,
 		Stderr:       stderr,
-		BypassEnv:    os.Getenv("EVOLVE_BYPASS_PREFIX_GATE"),
+		Bypass:       bypass,
 		ShipClass:    os.Getenv("SHIP_CLASS"),
 	}
 	_, err := commitprefixgate.Run(opts)

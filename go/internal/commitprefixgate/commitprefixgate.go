@@ -28,6 +28,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/guardslog"
 )
 
 // Sentinel errors.
@@ -55,8 +57,8 @@ type Options struct {
 	GuardsLog    string // defaulted to <RepoDir>/.evolve/guards.log
 	Stderr       io.Writer
 
-	// Env-equivalent toggles (cmd layer wires these from env).
-	BypassEnv string // EVOLVE_BYPASS_PREFIX_GATE
+	// Explicit command inputs.
+	Bypass    bool
 	ShipClass string // SHIP_CLASS
 
 	// Seams for testing.
@@ -126,13 +128,13 @@ func Run(opts Options) (Result, error) {
 	}
 
 	// Bypass check.
-	if opts.BypassEnv == "1" {
+	if opts.Bypass {
 		shipClass := opts.ShipClass
 		if shipClass == "" {
 			shipClass = "cycle"
 		}
 		if shipClass == "manual" {
-			logf("WARN: EVOLVE_BYPASS_PREFIX_GATE=1 + SHIP_CLASS=manual — bypass allowed")
+			logf("WARN: --bypass + SHIP_CLASS=manual — bypass allowed")
 			stderrf("WARN: bypass active (manual class); gate not enforcing")
 			res.Allowed = true
 			res.Reason = "bypass-manual"
@@ -230,7 +232,7 @@ func Run(opts Options) (Result, error) {
 		if !matched {
 			stderrf("DENY: prefix '%s' requires at least one diff path under %v, but diff contains only: %v",
 				prefix, rule.RequiredPaths, diffPaths)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: required_paths failed")
 			return res, fmt.Errorf("%w: required_paths", ErrScopeViolation)
 		}
@@ -256,7 +258,7 @@ func Run(opts Options) (Result, error) {
 		if allForbidden {
 			stderrf("DENY: prefix '%s' diff is entirely under forbidden_only_paths %v. This commit looks like docs/lessons/test work mislabeled as a feature. Use a different prefix (docs:, chore:, test:).",
 				prefix, rule.ForbiddenOnlyPaths)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: forbidden_only_paths")
 			return res, fmt.Errorf("%w: forbidden_only_paths", ErrScopeViolation)
 		}
@@ -281,7 +283,7 @@ func Run(opts Options) (Result, error) {
 		if len(violators) > 0 {
 			stderrf("DENY: prefix '%s' requires diff to be a subset of %v, but these paths violate: %v",
 				prefix, rule.RequiredPaths, violators)
-			stderrf("To bypass (emergency, manual class only): EVOLVE_BYPASS_PREFIX_GATE=1 SHIP_CLASS=manual")
+			stderrf("To bypass (emergency, manual class only): pass --bypass with SHIP_CLASS=manual")
 			logf("DENY: diff_must_be_subset")
 			return res, fmt.Errorf("%w: diff_must_be_subset", ErrScopeViolation)
 		}
@@ -425,17 +427,11 @@ func defaultGetDiffPaths(repoDir string, mode Mode, diffRef string) ([]string, e
 	return result, nil
 }
 
-// appendGuardsLog is a best-effort NDJSON-ish append.
+// appendGuardsLog is a best-effort NDJSON-ish append. The open/write/close is
+// centralized in guardslog.Append (which surfaces the close error so it is
+// testable); this guard is fire-and-forget by design — a read-only sandbox is
+// expected to fail here and must never surface — so the error is discarded
+// explicitly at this boundary.
 func appendGuardsLog(path string, ts time.Time, msg string) {
-	if path == "" {
-		return
-	}
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	_, _ = fmt.Fprintf(f, "[%s] [commit-prefix-gate] %s\n",
-		ts.UTC().Format(time.RFC3339), msg)
+	_ = guardslog.Append(path, "commit-prefix-gate", msg, ts)
 }

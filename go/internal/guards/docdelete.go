@@ -9,9 +9,11 @@ import (
 
 // DocDelete denies rm/mv operations that would remove docs/** or
 // knowledge-base/** content. Port of scripts/hooks/doc-deletion-guard.sh.
-type DocDelete struct{}
+type DocDelete struct {
+	allow bool
+}
 
-func NewDocDelete(_ any) *DocDelete { return &DocDelete{} }
+func NewDocDelete(allow bool) *DocDelete { return &DocDelete{allow: allow} }
 
 func (d *DocDelete) Name() string { return "docdelete" }
 
@@ -23,7 +25,7 @@ var (
 )
 
 func (d *DocDelete) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_ALLOW_DOC_DELETE") {
+	if d.allow {
 		return core.GuardDecision{Allow: true}
 	}
 	if in.ToolName != "Bash" {
@@ -36,7 +38,7 @@ func (d *DocDelete) Decide(_ context.Context, in core.GuardInput) core.GuardDeci
 	if rmDocsRe.MatchString(cmd) {
 		return core.GuardDecision{
 			Allow:  false,
-			Reason: "rm against docs/ or knowledge-base/ is forbidden — archive instead (mv to knowledge-base/research/archived-YYYY-MM-DD/<file>); set EVOLVE_ALLOW_DOC_DELETE=1 to bypass",
+			Reason: "rm against docs/ or knowledge-base/ is forbidden — archive instead (mv to knowledge-base/research/archived-YYYY-MM-DD/<file>); set workflow.allow_doc_delete=true to bypass",
 		}
 	}
 	for _, m := range mvDocsRe.FindAllStringSubmatch(cmd, -1) {

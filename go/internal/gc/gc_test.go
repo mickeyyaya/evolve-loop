@@ -558,3 +558,23 @@ func TestPlan_KeepFullCountsLiveRunsPositionally(t *testing.T) {
 		t.Errorf("dead run beyond the positional window must be deleted, got %+v", it)
 	}
 }
+
+// TestGCPolicyModeDefaultsOff verifies that the zero value of gc.Policy.Mode is ""
+// (which runGCHook treats as "off" — disabled by default).
+func TestGCPolicyModeDefaultsOff(t *testing.T) {
+	pol := Policy{}
+	if pol.Mode != "" {
+		t.Errorf("Policy{}.Mode = %q, want \"\" (zero value == off behavior in runGCHook)", pol.Mode)
+	}
+}
+
+// TestGCPolicyModeRecognized verifies that gc.Policy.Mode correctly stores the
+// valid mode values off, shadow, and enforce.
+func TestGCPolicyModeRecognized(t *testing.T) {
+	for _, mode := range []string{"off", "shadow", "enforce"} {
+		pol := Policy{Mode: mode}
+		if pol.Mode != mode {
+			t.Errorf("Policy{Mode: %q}.Mode = %q, want %q", mode, pol.Mode, mode)
+		}
+	}
+}

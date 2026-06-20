@@ -203,6 +203,10 @@ func stripBypassEnv(env []string) []string {
 	return out
 }
 
+// defaultGoBinFn resolves the Go binary name used by defaultSimulationRunner.
+// Tests replace this var (with t.Cleanup restore) to inject a fake binary.
+var defaultGoBinFn = func() string { return "go" }
+
 // defaultSimulationRunner runs the auto-respond regression coverage that
 // guards against manifest/policy regressions. The bash bats simulation suite
 // (tools/agent-bridge/tests/simulation) was removed in the v12 Go-bridge
@@ -212,10 +216,7 @@ func stripBypassEnv(env []string) []string {
 // Returns an error if `go` is missing or any auto-respond test fails. The
 // caller logs the error as WARN — advisory in v12.1.5, blocking in v12.2.0.
 func defaultSimulationRunner(repoRoot string) error {
-	goBin := os.Getenv("EVOLVE_GO_BIN_TEST")
-	if goBin == "" {
-		goBin = "go"
-	}
+	goBin := defaultGoBinFn()
 	cmd := exec.Command(goBin, "test", "./internal/bridge/", "-run", "AutoRespond|SendKeySequence|RealizeFor")
 	cmd.Dir = filepath.Join(repoRoot, "go")
 	if out, err := cmd.CombinedOutput(); err != nil {

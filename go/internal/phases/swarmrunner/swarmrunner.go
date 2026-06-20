@@ -6,10 +6,10 @@
 // It is the ONE piece that turns the (otherwise inert) swarm building blocks
 // into a live, orchestrator-managed multi-subagent phase. The orchestrator's
 // dispatch call site is unchanged — it still calls runner.Run; this Decorator
-// is wired in at the composition root (cmd/evolve/wire_runners.go) wrapping the
+// is wired in at the composition root (cmd/evolve/cmd_cycle.go) wrapping the
 // build (writer) and scout (reader) runners.
 //
-// Rollout via EVOLVE_SWARM_STAGE (mirrors dynamic-routing):
+// Rollout via Config.Stage (sourced from policy.json "swarm.stage"):
 //   - off/shadow (default): delegate to the inner runner BYTE-FOR-BYTE. Zero risk.
 //   - advisory: Dispatch runs LIVE (proving the parallel path + guaranteed
 //     teardown) but the inner runner still produces the authoritative result;
@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -41,18 +40,29 @@ const (
 	stageEnforce
 )
 
+// Config holds the swarm dispatch configuration sourced from policy.SwarmConfig().
+// Both fields carry the same defaults as the removed env readers: Stage="shadow"
+// (maps to stageOff, the byte-identical delegate path) and PortBase=0
+// (swarm.DefaultPortBase sentinel).
+type Config struct {
+	Stage    string
+	PortBase int
+}
+
 // Decorator wraps a phase runner with swarm dispatch. Construct via New.
 type Decorator struct {
 	inner       core.PhaseRunner
 	bridge      core.Bridge
 	mode        swarm.Mode
 	concurrency int
+	cfg         Config
 }
 
 // New returns a Decorator wrapping inner for the given mode (writer phases like
 // build, reader phases like scout). bridge is adapted to a swarm.Launcher.
-func New(inner core.PhaseRunner, bridge core.Bridge, mode swarm.Mode) *Decorator {
-	return &Decorator{inner: inner, bridge: bridge, mode: mode, concurrency: 2}
+// cfg carries the policy-resolved swarm stage and port base (see policy.SwarmConfig).
+func New(inner core.PhaseRunner, bridge core.Bridge, mode swarm.Mode, cfg Config) *Decorator {
+	return &Decorator{inner: inner, bridge: bridge, mode: mode, concurrency: 2, cfg: cfg}
 }
 
 // Name implements core.PhaseRunner (transparent — the orchestrator sees the
@@ -61,7 +71,7 @@ func (d *Decorator) Name() string { return d.inner.Name() }
 
 // Run implements core.PhaseRunner.
 func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	st := swarmStage(req.Env)
+	st := parseSwarmStage(d.cfg.Stage)
 	if st == stageOff {
 		return d.inner.Run(ctx, req) // shadow/off → byte-identical delegate
 	}
@@ -113,17 +123,9 @@ func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 	}
 	if d.mode == swarm.ModeWriter {
 		deps.Provisioner = swarm.NewGitWorkerProvisioner(nil)
-		deps.PortBase = portBaseFromEnv(req.Env) // 0 → swarm.DefaultPortBase
+		deps.PortBase = d.cfg.PortBase // 0 → swarm.DefaultPortBase
 	}
 	return deps
-}
-
-// portBaseFromEnv resolves the operator override for the writer dev-server port
-// base (EVOLVE_SWARM_PORT_BASE). Unset/invalid → 0, which the dispatcher reads as
-// "use swarm.DefaultPortBase".
-func portBaseFromEnv(env map[string]string) int {
-	n, _ := strconv.Atoi(env["EVOLVE_SWARM_PORT_BASE"])
-	return n
 }
 
 // enforce reduces the swarm to ONE authoritative PhaseResponse: writers run the
@@ -207,9 +209,10 @@ func branchByID(plan swarm.SwarmPlan) map[string]string {
 	return out
 }
 
-// swarmStage parses EVOLVE_SWARM_STAGE. Unknown/empty/off/shadow → off (delegate).
-func swarmStage(env map[string]string) stage {
-	switch strings.ToLower(strings.TrimSpace(env["EVOLVE_SWARM_STAGE"])) {
+// parseSwarmStage parses a stage string (from policy.SwarmConfig().Stage).
+// Unknown/empty/off/shadow → stageOff (byte-identical delegate).
+func parseSwarmStage(s string) stage {
+	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "advisory":
 		return stageAdvisory
 	case "enforce":

@@ -43,7 +43,7 @@ Tests MUST fail when run against the current codebase. A test that passes immedi
 
 | Fact | Value |
 |---|---|
-| Phase | `tdd` (plan archetype, optional, gated by `EVOLVE_TEST_PHASE_ENABLED`) |
+| Phase | `tdd` (plan archetype, optional, gated by `workflow.phase_enables.tdd=on`) |
 | Persona | `agents/evolve-tdd-engineer.md` |
 | Profile | `.evolve/profiles/tdd-engineer.json` — CLI `claude-tmux`, tier `balanced`, single-writer |
 | Inputs | `scout-report.md` · `plan-review-report.md` |

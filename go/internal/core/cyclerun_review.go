@@ -27,8 +27,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	// aborts the cycle without recording the phase as a success. The
 	// default reviewer is noopReviewer (every phase approved) so opt-out
 	// is byte-identical to pre-E2. On reject the correction loop below
-	// re-dispatches up to EVOLVE_CONTRACT_CORRECTION_RETRIES times (default
-	// 2; 0 = immediate abort, the pre-feature behavior) before aborting.
+	// re-dispatches up to the configured correction limit before aborting.
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
 		rin := ReviewInput{
 			Phase:       string(next),
@@ -40,11 +39,10 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		rr := cr.o.reviewer.Review(cr.ctx, rin)
 		// Contract-correction retry: on a deliverable-contract reject,
 		// re-dispatch the phase with the violation injected as a
-		// "## Correction" directive (bounded by EVOLVE_CONTRACT_CORRECTION_RETRIES,
-		// default 2). 0 disables → immediate abort, byte-identical to the
-		// pre-feature behavior. This re-runs runner.Run directly (no
+		// "## Correction" directive (bounded by policy, default 2). This re-runs
+		// runner.Run directly (no
 		// bridge-timeout retry on corrections — see the design's scope note).
-		maxCorrections := resolveContractCorrectionRetries(dr.phaseReq.Env)
+		maxCorrections := cr.retryConfig.ContractCorrectionRetries
 		// ADR-0045 I1: a correction re-dispatch is an interaction — every
 		// rung of ONE correction decision shares a DecisionID, and each
 		// re-dispatch records an outcome resolved by its verdict + the

@@ -118,7 +118,7 @@ func PhaseEnabled(phase string, e config.Enable) Brick {
 	return func(s *ScenarioSpec) { ensureEnable(s); s.Enable[phase] = e }
 }
 func IntentRequired() Brick {
-	return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_REQUIRE_INTENT"] = "1" }
+	return func(s *ScenarioSpec) { ensureEnable(s); s.Enable["intent"] = config.EnableOn }
 }
 func StrictAudit() Brick {
 	return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_STRICT_AUDIT"] = "1" }

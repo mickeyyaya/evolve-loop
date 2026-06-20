@@ -1,6 +1,6 @@
 # Artifact Backfill
 
-**Status:** default-on (gate: `EVOLVE_BACKFILL_ENABLED != 0`, default `1`)  
+**Status:** default-on (`workflow.backfill_enabled`, default `true`)
 **Implemented:** cycle-171  
 **Package:** `go/internal/backfill/`  
 **Orchestrator wiring:** `go/internal/core/orchestrator.go`
@@ -21,7 +21,7 @@ The work is lost, and the cycle dies, even though the output is recoverable.
 
 After `ErrArtifactTimeout` exhaustion (`phaseMaxAttempts` reached):
 
-1. The orchestrator checks `EVOLVE_BACKFILL_ENABLED`.
+1. The orchestrator checks the resolved `WorkflowConfig.BackfillEnabled` value.
 2. If not `"0"`, it calls `backfill.TryExtract(workspace, phase, artifactPath, 200)`.
 3. `TryExtract` reads `<workspace>/<phase>-stdout.clean.txt`, locates the **last
    occurrence** of the phase's canonical markdown header, extracts header-to-EOF
@@ -91,15 +91,18 @@ looking for the dedicated `kind=backfill` ledger entry.
 
 ## Enabling
 
-```bash
-export EVOLVE_BACKFILL_ENABLED=1
-evolve loop ...
+```json
+{
+  "workflow": {
+    "backfill_enabled": true
+  }
+}
 ```
 
-Or via `CycleRequest.Env`:
+Or via the orchestrator constructor:
 
 ```go
-req.Env["EVOLVE_BACKFILL_ENABLED"] = "1"
+core.WithWorkflowConfig(policy.WorkflowConfig{BackfillEnabled: true})
 ```
 
 ---
@@ -111,4 +114,4 @@ req.Env["EVOLVE_BACKFILL_ENABLED"] = "1"
 - `go/internal/phases/retro/retro.go` — `retro` phase runner updated to align with agent output
 - `docs/architecture/self-healing-gaps.md` — self-healing gaps registry
 - `docs/architecture/adr/0026-self-healing-review-layer.md` — Stage 1 backlog
-- `CLAUDE.md` — env-var table entry for `EVOLVE_BACKFILL_ENABLED`
+- `.evolve/policy.json` — persistent `workflow.backfill_enabled` setting

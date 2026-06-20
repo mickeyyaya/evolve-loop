@@ -114,7 +114,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	// Enforce: count the block; the breaker demotes to advisory at threshold.
 	n := incrBreaker(bp)
 	if n >= r.threshold {
-		r.logf("[contract-gate] CIRCUIT OPEN: %d consecutive contract blocks — demoting enforce→advisory so the loop is not bricked. Inspect EVOLVE_CONTRACT_GATE / the failing phase %q. Last reason: %s", n, in.Phase, reason)
+		r.logf("[contract-gate] CIRCUIT OPEN: %d consecutive contract blocks — demoting enforce→advisory so the loop is not bricked. Inspect policy.gates.contract_gate / the failing phase %q. Last reason: %s", n, in.Phase, reason)
 		return core.ReviewResult{Approve: true}
 	}
 	r.logf("[contract-gate] %s: %s (stage=enforce, BLOCK %d/%d)", in.Phase, reason, n, r.threshold)

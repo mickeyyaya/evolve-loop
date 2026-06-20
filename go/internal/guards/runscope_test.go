@@ -21,8 +21,6 @@ import (
 )
 
 func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
-	t.Setenv("EVOLVE_BYPASS_ROLE_GATE", "")
-	t.Setenv("EVOLVE_BYPASS_PHASE_GATE", "")
 
 	root := t.TempDir()
 	// The DECIDED paths use a fake non-/tmp worktree: on Linux t.TempDir()
@@ -66,20 +64,20 @@ func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": filepath.Join(wt, "go", "x.go")},
 	}
-	if d := NewRole(ownStore).Decide(ctx, edit); !d.Allow {
+	if d := NewRole(ownStore, false).Decide(ctx, edit); !d.Allow {
 		t.Errorf("role gate read the wrong run's state: denied own-worktree build write: %s", d.Reason)
 	}
 	// … whereas the global view (the other run: scout, no worktree) denies it —
 	// the exact cross-run poisoning CB.4 closes.
 	globalStore := storage.New(filepath.Join(root, ".evolve"))
-	if d := NewRole(globalStore).Decide(ctx, edit); d.Allow {
+	if d := NewRole(globalStore, false).Decide(ctx, edit); d.Allow {
 		t.Error("fixture self-check: the global (other-run) state should deny this write")
 	}
 
 	// Phase guard: Agent stays denied during the run's own cycle, and the
 	// denial must cite the run's OWN phase (build), not the other run's.
 	agent := core.GuardInput{ToolName: "Agent", ToolInput: map[string]any{}}
-	d := NewPhase(ownStore).Decide(ctx, agent)
+	d := NewPhase(ownStore, false).Decide(ctx, agent)
 	if d.Allow {
 		t.Fatal("phase guard must deny Agent during the run's own active cycle")
 	}

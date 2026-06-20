@@ -30,7 +30,7 @@ func TestRun_Bypass_EmptyShipClassDefaultsToCycle(t *testing.T) {
 	res, err := Run(Options{
 		CommitMsg:    "feat: msg",
 		RepoDir:      repo,
-		BypassEnv:    "1",
+		Bypass:       true,
 		ShipClass:    "", // unset → defaults to "cycle" → bypass denied
 		GetDiffPaths: stubDiffPaths(nil),
 	})

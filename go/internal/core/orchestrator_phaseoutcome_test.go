@@ -236,7 +236,7 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 // that ran (or exhausted its attempts), with abort_reason set.
 func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 	t.Parallel()
-	maxAtt := resolvePhaseMaxAttempts(nil)
+	maxAtt := 2
 	cases := []struct {
 		name string
 		// arrange mutates the harness; returns the phase whose record we check.

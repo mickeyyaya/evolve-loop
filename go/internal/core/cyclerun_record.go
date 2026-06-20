@@ -86,7 +86,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 				Env:            cr.envSnap,
 				Plan:           cr.clampedPlan,
 				IntentRequired: cr.cs.IntentRequired,
-				PSMASEnabled:   envchain.BoolValue(cr.envSnap["EVOLVE_PSMAS_SKIP"], false),
+				PSMASEnabled:   cr.workflowConfig.PSMASEnabled,
 			})
 		} else {
 			branch, extraEnv, reason = cr.o.decideAfterRetro(dr.resp.Verdict, cr.state.FailedAt)

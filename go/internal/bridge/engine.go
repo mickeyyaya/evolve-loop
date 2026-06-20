@@ -57,6 +57,11 @@ type Deps struct {
 	// Env is the request-local environment overlay consulted ahead of
 	// os.Getenv (via envchain). nil is treated as empty.
 	Env map[string]string
+	// Typed timing fields (from BridgePolicy). Zero = use bridge built-in default.
+	ScrollbackLines    int
+	BootTimeoutS       int
+	ArtifactTimeoutS   int
+	ArtifactMaxExtends int
 	// Stdout/Stderr are the bridge's own diagnostic streams (NOT the
 	// inner CLI's stdout/stderr — a driver redirects those to the log
 	// files named in Config). Drivers write their `[driver] ...` notes
@@ -142,6 +147,15 @@ type SandboxWrapRequest struct {
 	RepoRoot  string // absolute path; the read-only main repo root
 }
 
+// defaultIfZero returns val if val > 0, otherwise returns def.
+// Used to resolve typed Deps int fields where 0 means "not configured".
+func defaultIfZero(val, def int) int {
+	if val > 0 {
+		return val
+	}
+	return def
+}
+
 // withDefaults returns a copy of d with any zero-value seam replaced by
 // its production default. Keeps NewEngine and tests from each repeating
 // the defaulting logic.
@@ -174,8 +188,7 @@ func (d Deps) withDefaults() Deps {
 		d.LookPath = exec.LookPath
 	}
 	if d.Reviewer == nil {
-		// envInt reads via d.LookupEnv, defaulted just above.
-		d.Reviewer = newDeterministicReviewer(envInt(d, "EVOLVE_ARTIFACT_MAX_EXTENDS", defaultArtifactMaxExtends))
+		d.Reviewer = newDeterministicReviewer(defaultIfZero(d.ArtifactMaxExtends, defaultArtifactMaxExtends))
 	}
 	if d.MkScratchDir == nil {
 		d.MkScratchDir = os.MkdirTemp
@@ -240,6 +253,9 @@ type Config struct {
 	// BootSmokeTest / the loop readiness gate to verify the bridge can boot the
 	// CLI before any real work (and LLM budget) is committed.
 	BootOnly bool
+	// codexConfigPath overrides the default ~/.codex/config.toml path used by
+	// pretrustCodexProjects. Set in tests to avoid touching the real user config.
+	codexConfigPath string
 }
 
 // Engine is the core.Bridge implementation and the Template Method host:

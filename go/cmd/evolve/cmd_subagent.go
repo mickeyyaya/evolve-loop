@@ -33,16 +33,14 @@ Subcommands:
                      Always exits 0; advisory printed to stderr.
   validate-profile   Validate agent profile JSON + adapter capabilities +
                      dispatch plan log; runs adapter with VALIDATE_ONLY=1
-                     ( validate-profile <agent> )
+                     ( validate-profile [--dispatch-plan-log PATH] <agent> )
                      Honors EVOLVE_PROFILES_DIR_OVERRIDE,
-                     EVOLVE_ADAPTERS_DIR_OVERRIDE,
-                     EVOLVE_DISPATCH_PLAN_LOG.
+                     EVOLVE_ADAPTERS_DIR_OVERRIDE.
   run                Execute one phase agent end-to-end (v2 cache-prefix
                      prompt + adapter exec + verify + ledger).
                      ( run <agent> <cycle> <workspace_path> )
                      Prompt read from stdin (or PROMPT_FILE_OVERRIDE).
-                     Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT,
-                     EVOLVE_CACHE_PREFIX_V2.
+                     Honors MODEL_TIER_HINT, ADVERSARIAL_AUDIT.
                      (LEGACY_AGENT_DISPATCH is retired — bridge is the only path.)
   dispatch-parallel  Fan-out N workers per profile.parallel_subtasks[],
                      run via fanoutdispatch + aggregator merge.
@@ -152,7 +150,7 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 		switch a {
 		case "--help", "-h":
 			fmt.Fprintln(stdout, "Usage: evolve subagent resolve-tier --profile PATH --cycle N [--project-root PATH] [--worktree PATH]")
-			fmt.Fprintln(stdout, "Honors MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, EVOLVE_DIFF_COMPLEXITY_DISABLE.")
+			fmt.Fprintln(stdout, "Honors MODEL_TIER_HINT and .evolve/policy.json workflow settings.")
 			return 0
 		case "--profile":
 			i++
@@ -183,6 +181,7 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		projectRoot = envOrCwd("EVOLVE_PROJECT_ROOT")
 	}
+	wc := loadWorkflowConfig(filepath.Join(projectRoot, ".evolve"))
 	tier, err := subagent.ResolveModelTier(
 		subagent.ResolveModelTierRequest{
 			ProfilePath:            profile,
@@ -190,8 +189,8 @@ func runSubagentResolveTier(args []string, stdout, stderr io.Writer) int {
 			ProjectRoot:            projectRoot,
 			WorktreePath:           worktree,
 			ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
-			AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-			DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
+			AuditorTierOverride:    wc.AuditorTierOverride,
+			DiffComplexityDisabled: wc.DiffComplexityDisable,
 		},
 		subagent.ResolveModelTierOptions{},
 	)
@@ -249,10 +248,24 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 
 func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
-		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile <agent>")
-		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE,")
-		fmt.Fprintln(stdout, "     EVOLVE_DISPATCH_PLAN_LOG")
+		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile [--dispatch-plan-log PATH] <agent>")
+		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE")
 		return 0
+	}
+	var dispatchPlanLog string
+	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		a := args[0]
+		switch {
+		case a == "--dispatch-plan-log" && len(args) > 1:
+			dispatchPlanLog = args[1]
+			args = args[2:]
+		case strings.HasPrefix(a, "--dispatch-plan-log="):
+			dispatchPlanLog = strings.TrimPrefix(a, "--dispatch-plan-log=")
+			args = args[1:]
+		default:
+			fmt.Fprintf(stderr, "evolve subagent validate-profile: unknown flag: %s\n", a)
+			return 2
+		}
 	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "evolve subagent validate-profile: expected <agent>")
@@ -270,7 +283,7 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 			CapabilityDir:   layout.CapabilityDir,
 			ProjectRoot:     layout.ProjectRoot,
 			WorktreePath:    os.Getenv("WORKTREE_PATH"),
-			DispatchPlanLog: os.Getenv("EVOLVE_DISPATCH_PLAN_LOG"),
+			DispatchPlanLog: dispatchPlanLog,
 		},
 		subagent.ValidateProfileOptions{},
 	)
@@ -294,9 +307,9 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
 		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
-		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, EVOLVE_AUDITOR_TIER_OVERRIDE, ADVERSARIAL_AUDIT,")
-		fmt.Fprintln(stdout, "     EVOLVE_CACHE_PREFIX_V2, EVOLVE_DIFF_COMPLEXITY_DISABLE,")
+		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT,")
 		fmt.Fprintln(stdout, "     WORKTREE_PATH")
+		fmt.Fprintln(stdout, "Config: .evolve/policy.json workflow settings")
 		fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
 		return 0
 	}
@@ -329,6 +342,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	flags := readSubagentRunFlags()
+	wc := loadWorkflowConfig(layout.EvolveDir)
 
 	res, err := subagent.Run(context.Background(), subagent.RunRequest{
 		Agent:                  agent,
@@ -343,9 +357,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		LedgerPath:             layout.LedgerFile,
 		PromptReader:           promptReader,
 		ModelTierHint:          os.Getenv("MODEL_TIER_HINT"),
-		AuditorTierOverride:    os.Getenv("EVOLVE_AUDITOR_TIER_OVERRIDE"),
-		DiffComplexityDisabled: envchain.Bool("EVOLVE_DIFF_COMPLEXITY_DISABLE", nil, false),
-		CachePrefixV2:          flags.cachePrefixV2,
+		AuditorTierOverride:    wc.AuditorTierOverride,
+		DiffComplexityDisabled: wc.DiffComplexityDisable,
 		AdversarialAudit:       flags.adversarialAudit,
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
@@ -478,18 +491,16 @@ func sourceRoot() string {
 
 // subagentRunFlags holds the run-specific env-derived boolean knobs for
 // `subagent run`, read through envchain so the truthy/falsy/default vocabulary
-// is uniform (P2). CachePrefixV2 / AdversarialAudit are default-on (`!= "0"`);
+// is uniform (P2). AdversarialAudit is default-on (`!= "0"`);
 // LegacyAgentDispatch is default-off (`== "1"`). DiffComplexityDisabled is read
 // inline (shared with the resolve-tier handler), not via this struct.
 type subagentRunFlags struct {
-	cachePrefixV2       bool
 	adversarialAudit    bool
 	legacyAgentDispatch bool
 }
 
 func readSubagentRunFlags() subagentRunFlags {
 	return subagentRunFlags{
-		cachePrefixV2:       envchain.Bool("EVOLVE_CACHE_PREFIX_V2", nil, true),
 		adversarialAudit:    envchain.Bool("ADVERSARIAL_AUDIT", nil, true),
 		legacyAgentDispatch: envchain.Bool("LEGACY_AGENT_DISPATCH", nil, false),
 	}

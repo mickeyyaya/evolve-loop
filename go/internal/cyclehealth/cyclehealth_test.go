@@ -577,9 +577,8 @@ func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
 		t.Error("expected phase_latency warning anomaly, not found")
 	}
 
-	// Test with custom ceiling override
-	t.Setenv("EVOLVE_PHASE_LATENCY_CEILING_S", "1000") // 1000s ceiling
-	r, err = Check(Options{Cycle: 1, Workspace: ws})
+	// Test with a custom policy ceiling.
+	r, err = Check(Options{Cycle: 1, Workspace: ws, PhaseLatencyCeilingS: 1000})
 	if err != nil {
 		t.Fatal(err)
 	}

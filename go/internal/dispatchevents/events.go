@@ -173,6 +173,6 @@ func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 		Severity:        SeverityError,
 		Cycle:           cycle,
 		Details:         fmt.Sprintf("same cycle number %d reported %d consecutive times (threshold=%d) — dispatcher deadlocked", cycle, streak, threshold),
-		RemediationHint: "Set EVOLVE_SKIP_WORKTREE=1 or raise EVOLVE_DISPATCH_REPEAT_THRESHOLD; inspect cycle workspace orchestrator-report.md",
+		RemediationHint: "Use the explicit no-worktree operator mode or raise EVOLVE_DISPATCH_REPEAT_THRESHOLD; inspect cycle workspace orchestrator-report.md",
 	})
 }

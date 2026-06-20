@@ -37,6 +37,7 @@
 ./internal/evalgate
 ./internal/gitexec
 ./internal/goalhash
+./internal/guardslog
 ./internal/logfilter
 ./internal/paths
 ./internal/phaseio

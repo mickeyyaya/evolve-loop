@@ -28,12 +28,11 @@ import (
 func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 
 	cfgs := []*Config{
-		{Worktree: "/amp/wt-alpha"},
-		{Worktree: "/amp/wt-beta"},
-		{Worktree: "/amp/wt-gamma"},
+		{Worktree: "/amp/wt-alpha", codexConfigPath: path},
+		{Worktree: "/amp/wt-beta", codexConfigPath: path},
+		{Worktree: "/amp/wt-gamma", codexConfigPath: path},
 	}
 
 	var wantHeaders []string
@@ -88,10 +87,9 @@ func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.
 func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 
 	// Seed a single entry first, outside the concurrent section.
-	seed := &Config{Worktree: "/amp/wt-seed"}
+	seed := &Config{Worktree: "/amp/wt-seed", codexConfigPath: path}
 	if err := pretrustCodexProjects(seed); err != nil {
 		t.Fatalf("seed pretrustCodexProjects: %v", err)
 	}
@@ -99,8 +97,8 @@ func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 
 	// Now concurrently add two more entries.
 	concurrent := []*Config{
-		{Worktree: "/amp/wt-concurrent-A"},
-		{Worktree: "/amp/wt-concurrent-B"},
+		{Worktree: "/amp/wt-concurrent-A", codexConfigPath: path},
+		{Worktree: "/amp/wt-concurrent-B", codexConfigPath: path},
 	}
 	start := make(chan struct{})
 	var wg sync.WaitGroup
@@ -149,9 +147,8 @@ func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 func TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 
-	shared := &Config{Worktree: "/amp/wt-shared-path"}
+	shared := &Config{Worktree: "/amp/wt-shared-path", codexConfigPath: path}
 	header := codexProjectHeader(shared.Worktree)
 
 	start := make(chan struct{})
@@ -196,11 +193,10 @@ func TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines(t *testing.T)
 	const n = 10
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 
 	cfgs := make([]*Config, n)
 	for i := range n {
-		cfgs[i] = &Config{Worktree: fmt.Sprintf("/amp/stress/wt-%02d", i)}
+		cfgs[i] = &Config{Worktree: fmt.Sprintf("/amp/stress/wt-%02d", i), codexConfigPath: path}
 	}
 
 	start := make(chan struct{})
@@ -247,10 +243,9 @@ func TestPretrustCodexProjects_Concurrent_MultiRoundTwoGoroutines(t *testing.T) 
 	for round := range rounds {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "config.toml")
-		t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 
-		cfgA := &Config{Worktree: fmt.Sprintf("/amp/round-%02d/wt-A", round)}
-		cfgB := &Config{Worktree: fmt.Sprintf("/amp/round-%02d/wt-B", round)}
+		cfgA := &Config{Worktree: fmt.Sprintf("/amp/round-%02d/wt-A", round), codexConfigPath: path}
+		cfgB := &Config{Worktree: fmt.Sprintf("/amp/round-%02d/wt-B", round), codexConfigPath: path}
 		hA := codexProjectHeader(cfgA.Worktree)
 		hB := codexProjectHeader(cfgB.Worktree)
 

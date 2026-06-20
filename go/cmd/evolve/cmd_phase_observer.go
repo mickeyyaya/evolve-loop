@@ -10,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
@@ -119,5 +118,9 @@ func stallPolicyFromEnv() recovery.StallPolicy {
 	if strings.ToLower(strings.TrimSpace(os.Getenv("EVOLVE_PHASE_RECOVERY"))) != "enforce" {
 		return nil
 	}
-	return recovery.NewChainStallPolicy(envchain.Int("EVOLVE_ARTIFACT_MAX_EXTENDS", nil, 0))
+	pol, err := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))
+	if err != nil {
+		pol = policy.Policy{}
+	}
+	return recovery.NewChainStallPolicy(pol.BridgeConfig().ArtifactMaxExtends)
 }

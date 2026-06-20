@@ -2,27 +2,21 @@ package config
 
 import "testing"
 
-// Locks the legacy per-phase flag mapping that PhasePolicy depends on to
-// reproduce pre-routing run/skip behavior. Loads with a missing registry so
-// only defaults() + env overrides apply.
+// Locks the default per-phase enable values from defaults() when no env overrides apply.
+// Env-based overrides (EVOLVE_TRIAGE_DISABLE, EVOLVE_TEST_PHASE_ENABLED, EVOLVE_BUILD_PLANNER)
+// were removed in cycle-39: phase enables are now configured via WorkflowPolicy.PhaseEnables.
 func TestLoad_LegacyPhaseFlags(t *testing.T) {
 	cases := []struct {
 		name  string
-		env   map[string]string
 		phase string
 		want  Enable
 	}{
-		{"default triage runs", map[string]string{}, "triage", EnableOn},
-		{"default tdd runs", map[string]string{}, "tdd", EnableOn},
-		{"default build-planner skipped", map[string]string{}, "build-planner", EnableOff},
-		{"EVOLVE_TRIAGE_DISABLE=1 off", map[string]string{"EVOLVE_TRIAGE_DISABLE": "1"}, "triage", EnableOff},
-		{"EVOLVE_TRIAGE_DISABLE=0 on", map[string]string{"EVOLVE_TRIAGE_DISABLE": "0"}, "triage", EnableOn},
-		{"EVOLVE_TEST_PHASE_ENABLED=0 off", map[string]string{"EVOLVE_TEST_PHASE_ENABLED": "0"}, "tdd", EnableOff},
-		{"EVOLVE_TEST_PHASE_ENABLED=1 on", map[string]string{"EVOLVE_TEST_PHASE_ENABLED": "1"}, "tdd", EnableOn},
-		{"EVOLVE_BUILD_PLANNER=1 on", map[string]string{"EVOLVE_BUILD_PLANNER": "1"}, "build-planner", EnableOn},
+		{"default triage runs", "triage", EnableOn},
+		{"default tdd runs", "tdd", EnableOn},
+		{"default build-planner skipped", "build-planner", EnableOff},
 	}
 	for _, c := range cases {
-		cfg, _ := Load("/nonexistent/phase-registry.json", c.env)
+		cfg, _ := Load("/nonexistent/phase-registry.json", map[string]string{})
 		if got := cfg.PhaseEnable[c.phase]; got != c.want {
 			t.Errorf("%s: PhaseEnable[%q]=%v, want %v", c.name, c.phase, got, c.want)
 		}

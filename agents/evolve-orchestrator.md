@@ -75,20 +75,20 @@ When phase-observer reporting is enabled by policy, each subagent spawns a phase
 
 ## EGPS Tester Phase (default-on as of cycle-86)
 
-`EVOLVE_TEST_PHASE_ENABLED` defaults to `1` as of cycle-86 (predicate-quality Layer 4). The phase flow **always includes TDD between Triage and Build**:
+The `tdd` phase is default-on (enabled via `workflow.phase_enables.tdd=on` in policy.json) as of cycle-86 (predicate-quality Layer 4). The phase flow **always includes TDD between Triage and Build**:
 
 ```
 Scout → Triage → TDD-Engineer → Builder → Auditor → Ship
 ```
 
-When `EVOLVE_TEST_PHASE_ENABLED=1` (default):
+When tdd phase enabled (default):
 1. After Triage: `cycle-state.sh advance test tdd-engineer`
 2. Run: `subagent-run.sh tdd-engineer $CYCLE $WORKSPACE`
 3. TDD-Engineer writes `acs/cycle-N/*.sh` behavioral predicates BEFORE Builder runs.
 4. Builder implements to make those predicates pass.
 5. After Builder: Tester validates Builder's predicates with lint + mutation checks.
 
-When `EVOLVE_TEST_PHASE_ENABLED=0` (opt-out): Builder writes its own predicates (v10.1 fallback). This degrades predicate quality — avoid unless debugging.
+When tdd phase opted out (`workflow.phase_enables.tdd=off`): Builder writes its own predicates (v10.1 fallback). This degrades predicate quality — avoid unless debugging.
 
 Full protocol + gate rationale: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `egps-tester-phase`.
 
@@ -118,7 +118,7 @@ Read [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-refere
 
 ## PSMAS Phase-Skip (P3, opt-in)
 
-When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-report.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
+When `workflow.psmas_enabled=true` in `.evolve/policy.json`, read `triage.phase_skip[]` from `triage-report.md` immediately after the Triage phase completes. For each phase name in `phase_skip[]`, the orchestrator:
 
 1. Emits a `kind:phase_skipped` ledger entry for that phase before advancing past it:
    ```json
@@ -133,7 +133,7 @@ When `EVOLVE_PSMAS_SKIP=1`, read `triage.phase_skip[]` from `triage-report.md` i
 effective_skips = union(adapter.skip_phases[], triage.phase_skip[])
 ```
 
-Applied only when `EVOLVE_PSMAS_SKIP=1`. When the flag is unset/`0`, use only `adapter.skip_phases[]` (no change from pre-P3 behavior).
+Applied only when `workflow.psmas_enabled=true` in `.evolve/policy.json`. When the config is absent or false, use only `adapter.skip_phases[]` (no change from pre-P3 behavior).
 
 **Resume-safe:** A `kind:phase_skipped` ledger entry for phase X means `--resume` must treat X as already completed and must not re-execute it.
 
@@ -145,7 +145,7 @@ If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files mod
 
 *Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*. For complete legacy phase sequence, see [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
 
-**phase-gate-precondition.sh enforces this sequence at the kernel layer.** If you try to invoke `subagent-run.sh builder` while phase=calibrate, the hook denies the call. There is no way around it short of `EVOLVE_BYPASS_PHASE_GATE=1` — and bypassing is a CRITICAL violation per CLAUDE.md.
+**The phase guard enforces this sequence at the kernel layer.** If you try to invoke Builder while phase=calibrate, the hook denies the call. The explicit `evolve guard phase --bypass` emergency path is a CRITICAL violation per CLAUDE.md.
 
 ### Per-phase prompt context (Layer B)
 

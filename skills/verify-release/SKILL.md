@@ -31,7 +31,7 @@ bash legacy/scripts/release/marketplace-poll.sh <args>
 
 - **After a manual ship** that didn't go through `/publish` (e.g., hot fix via `bash legacy/scripts/lifecycle/ship.sh`). The marketplace doesn't auto-pull; this verifies it caught up.
 - **Diagnosing stale-plugin reports.** If a user says "I'm running v8.13.2 but the marketplace shows v8.13.1," run `/verify-release 8.13.2` to force a marketplace pull and registry refresh.
-- **After a `git push origin main`** that bypassed the ship-gate (e.g., merging a feature branch back to main with `EVOLVE_BYPASS_SHIP_GATE=1`).
+- **After a `git push origin main`** that used the explicit `evolve guard ship --bypass` emergency path.
 
 ## When NOT to use this skill
 

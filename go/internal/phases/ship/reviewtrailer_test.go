@@ -34,7 +34,7 @@ func TestReviewedByTrailer(t *testing.T) {
 	// on-disk attestation must NOT produce a trailer (else the commit falsely
 	// asserts it was reviewed).
 	t.Run("bypass + valid attestation → empty (not reviewed)", func(t *testing.T) {
-		opts := &Options{Class: ClassManual, ProjectRoot: repo, Env: map[string]string{"EVOLVE_BYPASS_COMMIT_GATE": "1"}}
+		opts := &Options{Class: ClassManual, ProjectRoot: repo, BypassCommitGate: true}
 		if g := reviewedByTrailer(opts); g != "" {
 			t.Errorf("bypassed commit got trailer %q, want empty", g)
 		}

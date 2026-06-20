@@ -12,8 +12,6 @@ package build
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -40,15 +38,8 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
 	}
-	if req.Workspace != "" && req.Env["EVOLVE_BUILD_PLANNER"] == "1" {
-		// ADR-0050 Phase 3.7: prefer the envelope-served build-plan (populated at
-		// the dispatch seam at advisory+); fall back to the original disk read at
-		// off/shadow — byte-identical, including the empty-file case.
-		if req.BuildPlan != "" {
-			fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
-		} else if data, err := os.ReadFile(filepath.Join(req.Workspace, "build-plan.md")); err == nil {
-			fmt.Fprintf(&b, "\n\n## Build Plan\n%s", data)
-		}
+	if req.BuildPlan != "" {
+		fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
 	}
 	return b.String()
 }

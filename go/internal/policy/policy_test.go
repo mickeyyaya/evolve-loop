@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -245,5 +246,65 @@ func TestPolicy_ConfigAccessors(t *testing.T) {
 	}
 	if observer.StallS == nil || *observer.StallS != 600 {
 		t.Error("default ObserverPolicy.StallS must be 600")
+	}
+}
+
+func TestWorkflowConfig(t *testing.T) {
+	disabled := false
+	got := (Policy{Workflow: &WorkflowPolicy{
+		MaxConsecutiveFails:   3,
+		MaxCyclesCap:          8,
+		AutoPrune:             &disabled,
+		DiffComplexityDisable: true,
+		AuditorTierOverride:   "deep",
+	}}).WorkflowConfig()
+	if got.MaxConsecutiveFails != 3 || got.MaxCyclesCap != 8 || got.AutoPrune ||
+		!got.DiffComplexityDisable || got.AuditorTierOverride != "deep" {
+		t.Fatalf("WorkflowConfig() = %+v, want configured values", got)
+	}
+
+	defaults := (Policy{Workflow: &WorkflowPolicy{}}).WorkflowConfig()
+	if defaults.MaxConsecutiveFails != 1 || defaults.MaxCyclesCap != 25 || !defaults.AutoPrune {
+		t.Fatalf("WorkflowConfig() defaults = %+v, want max fails=1 max cycles=25 auto prune=true", defaults)
+	}
+}
+
+func TestGatesConfig(t *testing.T) {
+	got := (Policy{Gates: &GatesPolicy{
+		ContractGate: "shadow",
+		ReviewGate:   "enforce",
+	}}).GatesConfig()
+
+	if got.ContractGate != "shadow" || got.EvalGate != "enforce" ||
+		got.TriageCapGate != "enforce" || got.ReviewGate != "enforce" {
+		t.Fatalf("GatesConfig() = %+v, want partial overrides with defaults retained", got)
+	}
+}
+
+func TestRetryConfig(t *testing.T) {
+	defaults := (Policy{}).RetryConfig()
+	if defaults.PhaseMaxAttempts != 2 || defaults.RetryBackoffBaseS != 5 ||
+		defaults.PhaseLatencyCeilingS != 900 || defaults.ContractCorrectionRetries != 2 {
+		t.Fatalf("RetryConfig() defaults = %+v", defaults)
+	}
+
+	got := (Policy{Retry: &RetryPolicy{
+		PhaseMaxAttempts:          9,
+		RetryBackoffBaseS:         3,
+		PhaseLatencyCeilingS:      120,
+		ContractCorrectionRetries: 9,
+	}}).RetryConfig()
+	if got.PhaseMaxAttempts != 5 || got.RetryBackoffBaseS != 3 ||
+		got.PhaseLatencyCeilingS != 120 || got.ContractCorrectionRetries != 5 {
+		t.Fatalf("RetryConfig() configured = %+v", got)
+	}
+
+	var loaded Policy
+	if err := json.Unmarshal([]byte(`{"retry":{"retry_backoff_base_s":0,"contract_correction_retries":0}}`), &loaded); err != nil {
+		t.Fatal(err)
+	}
+	disabled := loaded.RetryConfig()
+	if disabled.RetryBackoffBaseS != 0 || disabled.ContractCorrectionRetries != 0 {
+		t.Fatalf("RetryConfig() explicit zero = %+v", disabled)
 	}
 }

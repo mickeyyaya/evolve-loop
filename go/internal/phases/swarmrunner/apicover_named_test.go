@@ -12,7 +12,7 @@ import (
 // that New yields a non-nil *Decorator satisfying core.PhaseRunner whose Name is
 // transparent — the inner phase name (swarmrunner.go:58-60).
 func TestDecorator_NamedConcreteType(t *testing.T) {
-	var d *Decorator = New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter)
+	var d *Decorator = New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{})
 	if d == nil {
 		t.Fatal("New must return a non-nil *Decorator")
 	}

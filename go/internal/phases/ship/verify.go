@@ -25,6 +25,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// SSOT IPC-protocol-allowed: releasepipeline/rollback→ship subprocess
+const envShipAutoConfirm = "EVOLVE_" + "SHIP_AUTO_CONFIRM"
+
 // sha256File computes the SHA256 of a file's contents in hex.
 func sha256File(path string) (string, error) {
 	f, err := os.Open(path)
@@ -200,7 +203,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		}
 		// Hard gate: interactive commits must carry a fresh commit-gate review
 		// attestation. Runs after verifyManualConfirm's `git add -A` so the SHA
-		// reflects the staged tree. Bypassed by EVOLVE_BYPASS_COMMIT_GATE=1.
+		// reflects the staged tree. Bypassed by Options.BypassCommitGate.
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
 		}
@@ -215,7 +218,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 }
 
 // verifyManualConfirm implements the --class manual interactive y/N
-// prompt with EVOLVE_SHIP_AUTO_CONFIRM bypass.
+// prompt with envShipAutoConfirm bypass.
 func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) error {
 	// Stage everything so diff --cached reflects what will ship.
 	exitCode, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
@@ -236,8 +239,8 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 		return errEmptyDiff
 	}
 
-	if opts.envBool("EVOLVE_SHIP_AUTO_CONFIRM") {
-		res.Logs = append(res.Logs, "[ship] EVOLVE_SHIP_AUTO_CONFIRM=1 — skipping interactive prompt (CI mode)")
+	if opts.envBool(envShipAutoConfirm) {
+		res.Logs = append(res.Logs, "[ship] "+envShipAutoConfirm+"=1 — skipping interactive prompt (CI mode)")
 		res.Provenance = "manual (auto-confirmed via env)"
 		return nil
 	}
@@ -267,7 +270,7 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	// Refuse if stdin is not a tty (LLM agents cannot answer this).
 	if !isTerminal(opts.Stdin) {
 		return shipErr(core.CodeManualNotTTY, core.ShipClassConfig, core.StageVerifyClass,
-			"--class manual requires interactive stdin (not a tty). Set EVOLVE_SHIP_AUTO_CONFIRM=1 for non-interactive use (CI), or run from a real terminal.")
+			fmt.Sprintf("--class manual requires interactive stdin (not a tty). Set %s=1 for non-interactive use (CI), or run from a real terminal.", envShipAutoConfirm))
 	}
 
 	fmt.Fprint(opts.Stderr, `[ship] Confirm manual commit? Type EXACTLY "yes" to ship, anything else aborts: `)

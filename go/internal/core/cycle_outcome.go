@@ -42,6 +42,6 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 	return CycleOutcomeSkippedUnknown
 }
 
-// phaseMaxAttempts bounds per-phase retries on a recoverable bridge
+// The retry policy bounds per-phase retries on a recoverable bridge
 // ArtifactTimeout (Fix D). 2 = one relaunch after the first timeout; a
 // deterministic timeout still aborts the cycle after the cap.

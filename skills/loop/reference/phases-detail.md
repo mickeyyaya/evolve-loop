@@ -28,9 +28,9 @@ bash legacy/scripts/lifecycle/cycle-state.sh clear
 ```
 
 Bypasses (emergency only, logged WARN):
-- `EVOLVE_BYPASS_ROLE_GATE=1`
-- `EVOLVE_BYPASS_PHASE_GATE=1`
-- `EVOLVE_BYPASS_SHIP_GATE=1`
+- `evolve guard role --bypass`
+- `evolve guard phase --bypass`
+- `evolve guard ship --bypass`
 
 ---
 

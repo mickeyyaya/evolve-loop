@@ -8,7 +8,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
 
@@ -110,7 +109,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// build-plan via the typed envelope (read once here at the seam) instead of
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
 	// reads disk as before (byte-identical dispatch).
-	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.envSnap, cr.cs.WorkspacePath)
+	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
 	// ADR-0050 Phase 3.4 (SHADOW) + Phase 3.10 (ENFORCE input). When
 	// EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the same
 	// upstream this phase is about to receive, compare it to the legacy routing
@@ -143,7 +142,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// recovery phase instead of aborting; the caller continues the outer loop
 	// (skipping verdict/ledger handling for the failed ship).
 	shipRecovered := false
-	maxAttempts := resolvePhaseMaxAttempts(phaseReq.Env)
+	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	var attemptCount int
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
@@ -175,11 +174,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.
-				// Default-on; disabled only if EVOLVE_BACKFILL_ENABLED is "0" in the
-				// per-cycle env SNAPSHOT (ADR-0049 N9: read the snapshot, not live
-				// os.Getenv, so a concurrent fleet cycle's env can't flip this cycle's
-				// backfill. The snapshot already carries the operator's shell value).
-				backfillEnabled := envchain.BoolValue(cr.envSnap["EVOLVE_BACKFILL_ENABLED"], true)
+				// Default-on; policy.json can disable artifact backfill for the cycle.
+				backfillEnabled := cr.workflowConfig.BackfillEnabled
 				if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
 					artifactPath := backfillArtifactPath(cr.cs.WorkspacePath, string(next))
 					if ok, berr := backfill.TryExtract(cr.cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
@@ -275,7 +271,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}); lerr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
-			executeRetryBackoff(attempt, phaseReq.Env)
+			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue
 		}
 		if err == nil && !IsVerdict(resp.Verdict) {
@@ -299,7 +295,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}); lerr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
-			executeRetryBackoff(attempt, phaseReq.Env)
+			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue
 		}
 	}

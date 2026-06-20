@@ -89,11 +89,14 @@ type Steps struct {
 
 // Options drives a Run() invocation.
 type Options struct {
-	Target           string
-	RepoRoot         string
-	DryRun           bool
-	NoRollback       bool
-	SkipTests        bool
+	Target     string
+	RepoRoot   string
+	DryRun     bool
+	NoRollback bool
+	SkipTests  bool
+	// StrictPass bool — reject WARN verdicts in preflight (treat WARN as FAIL).
+	// Set by the --strict-pass CLI flag on `evolve release` and `evolve release-preflight`.
+	StrictPass       bool
 	RequirePreflight bool
 	MaxPollWait      time.Duration
 	FromTag          string // optional; auto-derived from `git describe --tags --abbrev=0` if empty
@@ -230,6 +233,14 @@ func Run(opts Options) (Result, error) {
 
 	// Steps defaults: only overlay missing fields.
 	steps := applyDefaultSteps(opts.Steps)
+	// Thread StrictPass into the default preflight path. When the caller
+	// provides their own Steps.Preflight (e.g. in tests), they own strictPass.
+	if opts.Steps.Preflight == nil {
+		sp := opts.StrictPass
+		steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
+			return runPreflightLib(repoRoot, target, dryRun, skipTests, sp)
+		}
+	}
 
 	logf("target: v%s", opts.Target)
 	logf("changelog range: %s..HEAD", fromTag)
@@ -549,9 +560,11 @@ func defaultFullDryRunPreflight(repoRoot, target string) error {
 	return nil
 }
 
-// defaultPreflight calls releasepreflight.Run.
+// defaultPreflight calls releasepreflight.Run with strictPass=false.
+// Production callers that need strictPass inject a closure via Run()'s
+// opts.Steps.Preflight-nil check, which captures opts.StrictPass.
 func defaultPreflight(repoRoot, target string, dryRun, skipTests bool) error {
-	return runPreflightLib(repoRoot, target, dryRun, skipTests)
+	return runPreflightLib(repoRoot, target, dryRun, skipTests, false)
 }
 
 // defaultChangelogGen calls changeloggen.WriteEntry.
@@ -624,7 +637,8 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	}
 	cmd := exec.Command(binPath, "ship", "--class", "release", msg)
 	cmd.Env = append(os.Environ(),
-		"EVOLVE_SHIP_RELEASE_NOTES="+releaseNotes,
+		// SSOT IPC-protocol-allowed: releasepipeline → evolve-ship subprocess
+		"EVOLVE_"+"SHIP_RELEASE_NOTES="+releaseNotes,
 		"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {

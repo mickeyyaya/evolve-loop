@@ -13,15 +13,15 @@ A self-evolving development pipeline that orchestrates 4 specialized agents (Sco
 These rules apply regardless of which CLI you are running under. They are STRUCTURAL — enforced by kernel hooks, not by prompt instructions.
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`evolve guard phase`) denies any subagent invocation that violates the sequence. There is no bypass short of an emergency operator override (`EVOLVE_BYPASS_PHASE_GATE=1`) which is logged loudly and considered a CRITICAL violation.
+Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`evolve guard phase`) denies any subagent invocation that violates the sequence. The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag; use is logged loudly and considered a CRITICAL violation.
 
 ### 2. Subagents are spawned through the native bridge, never via in-process tool calls
 Every phase agent is spawned by the native runner (`evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher driven by `evolve loop` / `evolve cycle run`). This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
 
 ### 3. Commits go through `evolve ship`, never bare `git commit / git push`
-The ship-gate kernel hook (`evolve guard ship`) denies bare git commit/push/gh release create. The only canonical entry point is the native `evolve ship`. It enforces audit verification, cycle binding (HEAD + tree_state_sha match), and version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or `EVOLVE_BYPASS_SHIP_GATE=1` (emergency).
+The ship-gate kernel hook (`evolve guard ship`) denies bare git commit/push/gh release create. The only canonical entry point is the native `evolve ship`. It enforces audit verification, cycle binding (HEAD + tree_state_sha match), and version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or the explicit `evolve guard ship --bypass` emergency flag.
 
-Interactive `--class manual` commits additionally require a fresh **commit-gate review attestation** (v13.0.0+): `.commit-gate/attestation.json` whose `tree_state_sha` matches the staged tree. Produce it with `/commit` (code-simplifier + code-reviewer + language reviewer + lint + targeted tests). `EVOLVE_BYPASS_COMMIT_GATE=1` skips the check — routine use is a CLAUDE.md violation, identical in spirit to the `EVOLVE_BYPASS_SHIP_GATE` emergency hatch.
+Interactive `--class manual` commits additionally require a fresh **commit-gate review attestation** (v13.0.0+): `.commit-gate/attestation.json` whose `tree_state_sha` matches the staged tree. Produce it with `/commit` (code-simplifier + code-reviewer + language reviewer + lint + targeted tests). `evolve ship --bypass-commit-gate` skips the check — routine use is a CLAUDE.md violation, identical in spirit to the ship-guard emergency bypass.
 
 ### 4. Builder writes only inside its worktree
 Each cycle gets a per-cycle git worktree (provisioned natively by the orchestrator in `go/internal/core`, recorded in `cycle-state.json:active_worktree`). Builder's profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`evolve guard role`) denies edits outside that boundary, including interpreter-execution Bash-redirect leaks.
@@ -42,7 +42,7 @@ The auditor profile defaults to Opus, but the native diff-complexity check (`go/
 
 > **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. Place runtime references in `docs/research/`, archival dossiers in `knowledge-base/research/`. **Never delete; always archive.** When superseding a doc, MOVE it to `knowledge-base/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
 
-Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: `EVOLVE_ALLOW_DOC_DELETE=1` (logged; emergency only).
+Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
 
 ## 12 Core agent rules
 

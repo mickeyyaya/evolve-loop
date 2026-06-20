@@ -70,7 +70,7 @@ These hooks are configured in `.claude-plugin/plugin.json`. They are the structu
 
 ## When to NOT use the strict dispatcher
 
-The dispatcher is mandatory for `/evolve-loop` invocations. The only documented exception is `EVOLVE_DISPATCH_POLICY=off`, which skips per-cycle ledger verification — used solely for debugging the dispatcher itself. Setting it for real cycles disables the only structural enforcement of pipeline completeness; do not.
+The dispatcher is mandatory for `/evolve-loop` invocations. The only documented exception is `dispatch.policy: "off"` in `.evolve/policy.json`, which skips per-cycle ledger verification — used solely for debugging the dispatcher itself. Setting it for real cycles disables the only structural enforcement of pipeline completeness; do not.
 
 ## Failure modes
 

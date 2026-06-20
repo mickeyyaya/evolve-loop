@@ -10,7 +10,7 @@ package cyclebudget
 
 import "strings"
 
-// Stage is the rollout dial (EVOLVE_CYCLE_BUDGET), mirroring the project's other
+// Stage is the cycle-budget policy dial, mirroring the project's other
 // off→advisory→enforce axes so this lands default-off (no behavior change) and
 // can soak in advisory before driving the loop.
 type Stage int
@@ -39,7 +39,7 @@ func (s Stage) String() string {
 	}
 }
 
-// ParseStage maps an EVOLVE_CYCLE_BUDGET value to a Stage; unknown/empty ⇒ Off
+// ParseStage maps a workflow cycle-budget value to a Stage; unknown/empty ⇒ Off
 // (fail-safe to today's behavior).
 func ParseStage(v string) Stage {
 	switch strings.ToLower(strings.TrimSpace(v)) {

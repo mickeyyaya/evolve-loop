@@ -93,16 +93,16 @@ func TestRun_StdoutFilter_OffEnvSkipsFilter(t *testing.T) {
 			called++
 			return nil
 		},
+		DisableStdoutFilter: true,
 	})
 
 	if _, err := r.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_STDOUT_FILTER": "off"},
 	}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if called != 0 {
-		t.Fatalf("StdoutFilter must NOT be called when EVOLVE_STDOUT_FILTER=off; called=%d", called)
+		t.Fatalf("StdoutFilter must NOT be called when DisableStdoutFilter=true; called=%d", called)
 	}
 }
 

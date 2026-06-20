@@ -55,7 +55,9 @@ type outcomeRollup struct {
 // FAILED_UNEXPLAINED — an unreadable record cannot explain anything.
 func ClassifyOutcome(workspace string) (Outcome, string) {
 	var timing []outcomeTimingEntry
+	timingPresent := false
 	if raw, err := os.ReadFile(filepath.Join(workspace, "phase-timing.json")); err == nil {
+		timingPresent = true
 		_ = json.Unmarshal(raw, &timing)
 	}
 
@@ -98,6 +100,10 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 		if e.Verdict == "FAIL" {
 			return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL (no abort — cycle completed through its failure path)", e.Phase)
 		}
+	}
+
+	if !timingPresent {
+		return OutcomeFailedExplained, "cycle initialization failed before phase timing was recorded"
 	}
 
 	return OutcomeFailedUnexplained, "no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint"

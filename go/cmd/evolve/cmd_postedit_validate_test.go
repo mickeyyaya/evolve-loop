@@ -74,17 +74,16 @@ func TestCmd_PostEditValidate_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestCmd_PostEditValidate_BypassEnv(t *testing.T) {
+func TestCmd_PostEditValidate_BypassFlag(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "bad.json")
 	if err := os.WriteFile(p, []byte(`{`), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
-	t.Setenv("EVOLVE_BYPASS_POSTEDIT_VALIDATE", "1")
 	payload := []byte(`{"tool_input":{"file_path":"` + p + `"}}`)
 	var stdout, stderr bytes.Buffer
-	rc := runPostEditValidate(nil, bytes.NewReader(payload), &stdout, &stderr)
+	rc := runPostEditValidate([]string{"--bypass"}, bytes.NewReader(payload), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}

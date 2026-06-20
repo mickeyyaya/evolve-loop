@@ -25,9 +25,9 @@ func homeDir() string {
 //     state.json
 //   - Always-safe: /tmp/**, $HOME/.claude/**
 //   - Read/Bash tools pass through (different guards handle them)
-//   - EVOLVE_BYPASS_ROLE_GATE=1 bypasses
+//   - Constructor-injected bypass=true bypasses
 func TestRole_Name(t *testing.T) {
-	g := NewRole(nil)
+	g := NewRole(nil, false)
 	if g.Name() != "role" {
 		t.Errorf("name=%q", g.Name())
 	}
@@ -44,7 +44,7 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 		// (CB.4). The role decisions below never reference this path.
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-42"),
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 
 	// In worktree: allow.
 	dec := g.Decide(context.Background(), core.GuardInput{
@@ -81,7 +81,7 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 		// workspace location plays no part in the decision.
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-50"),
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Write",
@@ -104,7 +104,7 @@ func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 		// Writable for the CB.4 run.json mirror; not referenced by the decision.
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-51"),
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Write",
@@ -124,7 +124,7 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 		Phase:         "audit",
 		WorkspacePath: ws,
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 
 	// audit-report.md inside workspace: allow.
 	dec := g.Decide(context.Background(), core.GuardInput{
@@ -147,7 +147,7 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 
 func TestRole_AlwaysSafeDirs(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
-	g := NewRole(s)
+	g := NewRole(s, false)
 	for _, path := range []string{
 		"/tmp/scratch/foo.go",
 		filepath.Join(homeDir(), ".claude/somefile"),
@@ -164,7 +164,7 @@ func TestRole_AlwaysSafeDirs(t *testing.T) {
 
 func TestRole_NonEditWriteToolsPass(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
-	g := NewRole(s)
+	g := NewRole(s, false)
 	for _, tool := range []string{"Bash", "Read", "Grep", "Glob"} {
 		dec := g.Decide(context.Background(), core.GuardInput{ToolName: tool})
 		if !dec.Allow {
@@ -173,12 +173,11 @@ func TestRole_NonEditWriteToolsPass(t *testing.T) {
 	}
 }
 
-func TestRole_BypassEnvAllows(t *testing.T) {
-	t.Setenv("EVOLVE_BYPASS_ROLE_GATE", "1")
+func TestRole_BypassAllows(t *testing.T) {
 	// t.TempDir()-rooted for the CB.4 run.json mirror; not referenced below.
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build",
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1")})
-	g := NewRole(s)
+	g := NewRole(s, true)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/some/forbidden/path.go"},
@@ -190,7 +189,7 @@ func TestRole_BypassEnvAllows(t *testing.T) {
 
 func TestRole_OutsideCyclePasses(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
-	g := NewRole(s)
+	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/repo/src/foo.go"},
@@ -201,7 +200,7 @@ func TestRole_OutsideCyclePasses(t *testing.T) {
 }
 
 func TestRole_NilStorageDenies(t *testing.T) {
-	g := NewRole(nil)
+	g := NewRole(nil, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/foo"},
@@ -213,7 +212,7 @@ func TestRole_NilStorageDenies(t *testing.T) {
 
 func TestRole_ReadCycleStateErrorDenies(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
-	g := NewRole(erroringStorage{s})
+	g := NewRole(erroringStorage{s}, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/foo"},
@@ -250,7 +249,7 @@ func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
 		// by the decision below.
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1"),
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/some/random.go"},
@@ -262,7 +261,7 @@ func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
 
 func TestRole_MissingFilePathAllows(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
-	g := NewRole(s)
+	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{}, // no file_path
@@ -294,7 +293,7 @@ func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
 		Phase:         "scout",
 		WorkspacePath: "./.evolve/runs/cycle-107",
 	})
-	g := NewRole(s)
+	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Write",
 		ToolInput: map[string]any{"file_path": filepath.Join(abs, "scout-report.md")},

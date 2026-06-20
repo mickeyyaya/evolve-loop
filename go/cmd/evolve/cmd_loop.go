@@ -18,7 +18,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -64,7 +63,7 @@ type loopConfig struct {
 	Strategy    string `json:"strategy"`
 	MaxCycles   int    `json:"max_cycles"`
 	// MaxCyclesExplicit records whether the operator set --max-cycles/--cycles
-	// (or a positional count). When false and EVOLVE_CYCLE_BUDGET=enforce, the
+	// (or a positional count). When false and cycle-budget policy is enforce, the
 	// loop defaults its ceiling to the safety cap and lets completion drive the
 	// stop, instead of the legacy default of 1.
 	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
@@ -72,6 +71,9 @@ type loopConfig struct {
 	Reset             bool `json:"reset,omitempty"`
 	ConsensusAudit    bool `json:"consensus_audit,omitempty"`
 	DryRun            bool `json:"dry_run,omitempty"`
+	ForceFresh        bool `json:"force_fresh,omitempty"`
+	SkipPreflight     bool `json:"skip_preflight,omitempty"`
+	SkipPreflightBoot bool `json:"skip_preflight_boot,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -113,13 +115,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if loopOrchOverride != nil {
 		orch = loopOrchOverride
 	}
+	wc := loadWorkflowConfig(cfg.EvolveDir)
 
 	// E2: auto-prune expired failedApproaches at dispatcher start.
-	// Opt-out via EVOLVE_AUTO_PRUNE=0. Non-fatal on error — pruning
+	// Non-fatal on error — pruning
 	// is cosmetic (the failure-adapter already filters expired entries
 	// at read time). Pruning AFTER LoadResumeState so a stale resume
 	// pointer doesn't get culled mid-resume.
-	if os.Getenv("EVOLVE_AUTO_PRUNE") != "0" {
+	if wc.AutoPrune {
 		statePath := filepath.Join(cfg.EvolveDir, "state.json")
 		if pr, err := failurelog.PruneExpired(statePath, time.Now().UTC()); err != nil {
 			fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", err)
@@ -203,9 +206,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// stuck cycle whose number is ahead of lastCycleNumber must not be
 	// silently clobbered: that would lose its history. Force the operator to
 	// choose — continue it (--resume) or seal it (evolve cycle reset, which
-	// archives it for analysis and advances the number). EVOLVE_FORCE_FRESH=1
+	// archives it for analysis and advances the number). --force-fresh
 	// restores the prior silent-clobber behavior as an escape hatch.
-	if os.Getenv("EVOLVE_FORCE_FRESH") != "1" {
+	if !cfg.ForceFresh {
 		cs, csErr := deps.Storage.ReadCycleState(context.Background())
 		last, _ := readLastCycleNumber(context.Background(), deps.Storage)
 		// An UNREADABLE cycle-state (truncated JSON from a SIGKILL'd dispatcher
@@ -220,7 +223,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			}
 			fmt.Fprintln(stderr, "[loop]   • continue it:    evolve loop --resume")
 			fmt.Fprintln(stderr, "[loop]   • seal & move on: evolve cycle reset   (archives the cycle for analysis, advances the number)")
-			fmt.Fprintln(stderr, "[loop]   (or set EVOLVE_FORCE_FRESH=1 to start fresh and overwrite — history NOT sealed)")
+			fmt.Fprintln(stderr, "[loop]   (or pass --force-fresh to start fresh and overwrite — history NOT sealed)")
 			lr.StopReason = "unfinished_cycle"
 			lr.emit(stdout)
 			return 2
@@ -232,8 +235,8 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// pipeline can actually run — wiring, profiles, LLM CLIs, host capabilities,
 	// and a REAL bridge boot — before any cycle spends LLM budget, catching the
 	// cycle-258 ExitREPLBootTimeout at batch start instead of ~30 min in.
-	// EVOLVE_SKIP_PREFLIGHT=1 bypasses the whole gate; EVOLVE_SKIP_PREFLIGHT_BOOT=1
-	// runs the cheap checks but skips the boot test (CI/offline). No cycle exists
+	// --skip-preflight bypasses the whole gate; --skip-preflight-boot runs the cheap
+	// checks but skips the boot test (CI/offline). No cycle exists
 	// yet, so this uses plain emit (cycle=0), mirroring the unfinished-cycle guard.
 	if loopPreflightHalts(cfg, stderr) {
 		lr.StopReason = "preflight_failed"
@@ -244,8 +247,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	lastBeforeGCHook, _ := readLastCycleNumber(context.Background(), deps.Storage)
 	runGCHook(cfg, cycleWorkspace(cfg.ProjectRoot, lastBeforeGCHook+1), stderr)
 
-	policy := resolveDispatchPolicy(stderr)
-	threshold := resolveCircuitBreakerThreshold()
+	dc := loadDispatchConfig(cfg.EvolveDir)
+	dispPolicy := resolveDispatchPolicy(dc.Policy, stderr)
+	threshold := resolveCircuitBreakerThreshold(dc.RepeatThreshold)
 
 	// Circuit-breaker state. PREV_RAN_CYCLE tracks the cycle number
 	// returned by the most-recent RunCycle; SAME_CYCLE_STREAK counts
@@ -253,22 +257,22 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	prevRanCycle := -1
 	sameCycleStreak := 0
 
-	// Consecutive-verdict-FAIL breaker (EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS).
+	// Consecutive-verdict-FAIL breaker.
 	// Default 1 ⇒ stop on the first FAIL (pre-flag contract); >1 lets the
 	// batch absorb isolated work-quality misses so a 3-PASS streak can form,
 	// while the streak cap still halts a genuinely broken run.
-	maxConsecutiveFails := resolveMaxConsecutiveFails()
+	maxConsecutiveFails := wc.MaxConsecutiveFails
 	consecutiveFails := 0
 
-	// Advisor-decided cycle budget (EVOLVE_CYCLE_BUDGET). Off ⇒ the operator's
+	// Advisor-decided cycle budget. Off ⇒ the operator's
 	// --max-cycles governs (byte-identical to today). Enforce with no explicit
 	// --max-cycles ⇒ the ceiling becomes the safety cap and per-cycle completion
 	// (backlog drained) drives the early stop; advisory computes + logs the
 	// would-stop without changing behavior.
-	budgetStage := cyclebudget.ParseStage(os.Getenv("EVOLVE_CYCLE_BUDGET"))
+	budgetStage := cyclebudget.ParseStage(wc.CycleBudget)
 	effectiveMax := cfg.MaxCycles
 	if budgetStage == cyclebudget.Enforce && !cfg.MaxCyclesExplicit {
-		effectiveMax = resolveMaxCyclesCap()
+		effectiveMax = wc.MaxCyclesCap
 		fmt.Fprintf(stderr, "[loop] cycle-budget=enforce: completion-driven, safety cap=%d (no explicit --max-cycles)\n", effectiveMax)
 	}
 
@@ -397,7 +401,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// mode, classify + emit event + continue (recoverable classes)
 		// or break (integrity-breach). On `stop` mode, any verify-fail
 		// halts the batch.
-		if policy != dispatchPolicyOff {
+		if dispPolicy != dispatchPolicyOff {
 			vc := ledgerverify.LoadVerifyContext(workspace, cfg.EvolveDir)
 			vr, vErr := ledgerverify.VerifyCycle(context.Background(), deps.Ledger, ranCycle, ledgerverify.Options(vc))
 			if vErr != nil {
@@ -415,7 +419,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				}
 				fmt.Fprintf(stderr, "[loop] cycle %d incomplete: missing %v classification=%s\n", ranCycle, vr.Missing, class.Class)
 
-				if policy == dispatchPolicyStop {
+				if dispPolicy == dispatchPolicyStop {
 					lr.StopReason = "verify_failed_stop"
 					lr.emitFatal(stdout, stderr, cfg, ranCycle)
 					return 2
@@ -500,7 +504,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if result.FinalVerdict == core.VerdictFAIL {
 			recordAbsorbedFail(cfg, ranCycle, stderr)
 			lr.ContinuedFailures++
-			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS)\n",
+			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
 		}
 
@@ -538,18 +542,6 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 3
 	}
 	return 0
-}
-
-// resolveMaxCyclesCap returns the safety ceiling for advisor-budgeted runs:
-// EVOLVE_MAX_CYCLES_CAP if set to a positive int, else 25. It bounds runaway
-// when completion never triggers (an open-ended goal whose backlog never drains).
-func resolveMaxCyclesCap() int {
-	if v := os.Getenv("EVOLVE_MAX_CYCLES_CAP"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return n
-		}
-	}
-	return 25
 }
 
 // readCarryoverCount returns the number of carryoverTodos in state.json — the

@@ -1,6 +1,6 @@
 ---
 name: evolve-swarm-planner
-description: Swarm-planning agent for the Evolve Loop (ADR-0032). Partitions one phase's task into N independent worker assignments for the multi-CLI swarm harness. Mode-aware — writers require disjoint file ownership (strict), readers allow overlapping focus regions (lenient). Default-off (EVOLVE_SWARM_STAGE=shadow). Never writes production code.
+description: Swarm-planning agent for the Evolve Loop (ADR-0032). Partitions one phase's task into N independent worker assignments for the multi-CLI swarm harness. Mode-aware — writers require disjoint file ownership (strict), readers allow overlapping focus regions (lenient). Default-off (swarm stage=shadow via `.evolve/policy.json` `swarm.stage`). Never writes production code.
 model: tier-1
 capabilities: [file-read, file-write, shell, search]
 tools: ["Read", "Write", "Bash", "Grep", "Glob", "Edit"]

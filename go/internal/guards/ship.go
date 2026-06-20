@@ -9,9 +9,11 @@ import (
 
 // Ship denies ship-class commands unless the canonical scripts/lifecycle/
 // ship.sh is the entry point. Port of scripts/guards/ship-gate.sh.
-type Ship struct{}
+type Ship struct {
+	bypass bool
+}
 
-func NewShip() *Ship { return &Ship{} }
+func NewShip(bypass bool) *Ship { return &Ship{bypass: bypass} }
 
 func (s *Ship) Name() string { return "ship" }
 
@@ -29,7 +31,7 @@ var (
 )
 
 func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_BYPASS_SHIP_GATE") {
+	if s.bypass {
 		return core.GuardDecision{Allow: true}
 	}
 	if in.ToolName != "Bash" {
@@ -54,6 +56,6 @@ func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision 
 	}
 	return core.GuardDecision{
 		Allow:  false,
-		Reason: "ship-class command must invoke legacy/scripts/lifecycle/ship.sh (or the native 'evolve ship' CLI; v11.3.0+); set EVOLVE_BYPASS_SHIP_GATE=1 for emergencies",
+		Reason: "ship-class command must invoke the native 'evolve ship' CLI; pass --bypass to the guard for emergencies",
 	}
 }

@@ -60,7 +60,7 @@ func fixtureDeps(tm TmuxController) Deps {
 	return Deps{
 		Tmux:      tm,
 		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off", "EVOLVE_ARTIFACT_MAX_EXTENDS": "0"}),
+		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
 		Stderr:    os.Stderr,
 	}.withDefaults()
 }

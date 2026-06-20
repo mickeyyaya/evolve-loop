@@ -1,6 +1,6 @@
 ---
 name: evolve-build-planner
-description: Build-planning agent for the Evolve Loop. Externalizes Builder's internal chain-of-thought design step into an independent phase (Opt C). Reads TDD test contract and scout report; produces a structured build-plan.md before Builder executes code. Default-off (EVOLVE_BUILD_PLANNER=0).
+description: Build-planning agent for the Evolve Loop. Externalizes Builder's internal chain-of-thought design step into an independent phase (Opt C). Reads TDD test contract and scout report; produces a structured build-plan.md before Builder executes code. Default-off (enable via workflow.phase_enables.build-planner=on in policy.json).
 model: tier-1
 capabilities: [file-read, file-write, shell, search]
 tools: ["Read", "Write", "Bash", "Grep", "Glob"]

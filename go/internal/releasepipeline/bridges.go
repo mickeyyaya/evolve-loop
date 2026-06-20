@@ -17,13 +17,13 @@ import (
 
 // runPreflightLib invokes the releasepreflight library directly (no shell-out
 // to legacy/scripts/release/preflight.sh).
-func runPreflightLib(repoRoot, target string, dryRun, skipTests bool) error {
+func runPreflightLib(repoRoot, target string, dryRun, skipTests, strictPass bool) error {
 	_, err := releasepreflight.Run(releasepreflight.Options{
 		Target:     target,
 		RepoRoot:   repoRoot,
 		DryRun:     dryRun,
 		SkipTests:  skipTests,
-		StrictPass: os.Getenv("EVOLVE_RELEASE_STRICT_PASS") == "1",
+		StrictPass: strictPass,
 		Stderr:     os.Stderr,
 	})
 	return err
