@@ -106,7 +106,11 @@ jobs:
           if [ -z "$pkgs" ]; then echo "no enforced packages — skipping"; exit 0; fi
           go build -o bin/apicover ./cmd/apicover
           go tool cover -func=coverage.txt > coverage.func.txt
-          dirs=$(echo "$pkgs" | xargs go list -f '{{.Dir}}')
+          # -e: tolerate build-tag-gated packages (e.g. acs/cycleN need -tags acs).
+          # Without it, `go list` exits non-zero on those and `set -e` aborts the
+          # step before apicover even runs. Their dirs still resolve; apicover
+          # finds 0 exported symbols in the test-only acs packages and passes.
+          dirs=$(echo "$pkgs" | xargs go list -e -f '{{.Dir}}')
           echo "enforcing apicover (-enforce) on:"; echo "$dirs"
           echo "$dirs" | xargs bin/apicover -enforce -cover coverage.func.txt
       - uses: actions/upload-artifact@v4
