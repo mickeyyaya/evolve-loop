@@ -24,6 +24,7 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 		dryRun           bool
 		noRollback       bool
 		skipTests        bool
+		strictPass       bool
 		requirePreflight bool
 		maxPollWaitS     = 300
 		fromTag          string
@@ -38,10 +39,10 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 			fmt.Fprintln(stdout, "  --dry-run               simulate, no mutations")
 			fmt.Fprintln(stdout, "  --no-rollback           do not auto-rollback on post-push failure")
 			fmt.Fprintln(stdout, "  --skip-tests            skip preflight gate tests (hot fixes)")
+			fmt.Fprintln(stdout, "  --strict-pass           reject WARN verdicts in preflight (treat WARN as FAIL)")
 			fmt.Fprintln(stdout, "  --require-preflight     run full-dry-run.sh harness before any step")
 			fmt.Fprintln(stdout, "  --max-poll-wait-s N     marketplace propagation deadline (default 300)")
 			fmt.Fprintln(stdout, "  --from-tag <tag>        changelog range start (default: previous tag)")
-			fmt.Fprintln(stdout, "     EVOLVE_RELEASE_STRICT_PASS=1 to reject WARN verdicts in preflight.")
 			return 0
 		case a == "--dry-run":
 			dryRun = true
@@ -49,6 +50,8 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 			noRollback = true
 		case a == "--skip-tests":
 			skipTests = true
+		case a == "--strict-pass":
+			strictPass = true
 		case a == "--require-preflight":
 			requirePreflight = true
 		case a == "--max-poll-wait-s":
@@ -96,6 +99,7 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 		DryRun:           dryRun,
 		NoRollback:       noRollback,
 		SkipTests:        skipTests,
+		StrictPass:       strictPass,
 		RequirePreflight: requirePreflight,
 		MaxPollWait:      time.Duration(maxPollWaitS) * time.Second,
 		FromTag:          fromTag,

@@ -92,13 +92,12 @@ func TestCLIPreflight_CodexPreflightReturnsHelperError(t *testing.T) {
 func TestCodexTmuxPreflightDismissesUpdateNag(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 	versionPath := filepath.Join(t.TempDir(), "version.json")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", configPath)
 	old := codexVersionPathFn
 	t.Cleanup(func() { codexVersionPathFn = old })
 	codexVersionPathFn = func() (string, error) { return versionPath, nil }
 
 	d := codexTmuxDriver{}
-	cfg := &Config{Worktree: t.TempDir(), Workspace: t.TempDir()}
+	cfg := &Config{Worktree: t.TempDir(), Workspace: t.TempDir(), codexConfigPath: configPath}
 	if err := d.Preflight(context.Background(), cfg, Deps{}); err != nil {
 		t.Fatalf("Preflight: %v", err)
 	}

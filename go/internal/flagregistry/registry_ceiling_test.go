@@ -30,7 +30,12 @@ import "testing"
 //
 //	Task A: FlagCeiling = 53 after removing EVOLVE_FORCE_FRESH (CLI flag --force-fresh migration)
 //	Task B: FlagCeiling = 52 after removing EVOLVE_LANE (split-const bootstrap-locator)
-const FlagCeiling = 52
+//
+// Cycle 50 removes 2 flags in two tasks:
+//
+//	Task A: FlagCeiling = 51 after removing EVOLVE_CODEX_CONFIG_PATH (DI field on bridge.Config)
+//	Task B: FlagCeiling = 50 after removing EVOLVE_RELEASE_STRICT_PASS (CLI flag --strict-pass)
+const FlagCeiling = 50
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

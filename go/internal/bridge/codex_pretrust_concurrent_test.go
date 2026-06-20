@@ -27,10 +27,8 @@ import (
 func TestPretrustCodexProjects_ConcurrentTwoGoroutines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
-
-	cfgA := &Config{Worktree: "/tmp/pretrust-conc-wt-A"}
-	cfgB := &Config{Worktree: "/tmp/pretrust-conc-wt-B"}
+	cfgA := &Config{Worktree: "/tmp/pretrust-conc-wt-A", codexConfigPath: path}
+	cfgB := &Config{Worktree: "/tmp/pretrust-conc-wt-B", codexConfigPath: path}
 
 	start := make(chan struct{})
 	errs := make([]error, 2)

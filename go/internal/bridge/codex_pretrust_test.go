@@ -174,9 +174,7 @@ trust_level = "trusted"
 					t.Fatalf("seed existing: %v", err)
 				}
 			}
-			t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
-
-			cfg := &Config{Worktree: tt.worktree, Workspace: tt.workspace}
+			cfg := &Config{Worktree: tt.worktree, Workspace: tt.workspace, codexConfigPath: path}
 			if err := pretrustCodexProjects(cfg); err != nil {
 				t.Fatalf("pretrustCodexProjects: %v", err)
 			}
@@ -245,13 +243,11 @@ trust_level = "trusted"
 func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
-
 	cfgs := []*Config{
-		{Worktree: "/tmp/wt-A", Workspace: "/tmp/ws-A"},
-		{Worktree: "/tmp/wt-B", Workspace: "/tmp/ws-B"},
-		{Worktree: "/tmp/wt-C", Workspace: "/tmp/ws-C"},
-		{Worktree: "/tmp/wt-D", Workspace: "/tmp/ws-D"},
+		{Worktree: "/tmp/wt-A", Workspace: "/tmp/ws-A", codexConfigPath: path},
+		{Worktree: "/tmp/wt-B", Workspace: "/tmp/ws-B", codexConfigPath: path},
+		{Worktree: "/tmp/wt-C", Workspace: "/tmp/ws-C", codexConfigPath: path},
+		{Worktree: "/tmp/wt-D", Workspace: "/tmp/ws-D", codexConfigPath: path},
 	}
 	var wantHeaders []string
 	for _, c := range cfgs {
@@ -299,9 +295,8 @@ func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
 	dir := t.TempDir()
 	nested := filepath.Join(dir, "codex-home", ".codex", "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", nested)
 
-	cfg := &Config{Worktree: "/tmp/wt"}
+	cfg := &Config{Worktree: "/tmp/wt", codexConfigPath: nested}
 	if err := pretrustCodexProjects(cfg); err != nil {
 		t.Fatalf("pretrustCodexProjects: %v", err)
 	}
@@ -323,7 +318,6 @@ func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
 func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
 	if err := pretrustCodexProjects(nil); err != nil {
 		t.Fatalf("nil cfg should be no-op: %v", err)
 	}
@@ -340,8 +334,7 @@ func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", path)
-	cfg := &Config{Worktree: filepath.Join(dir, "wt"), Workspace: filepath.Join(dir, "ws")}
+	cfg := &Config{Worktree: filepath.Join(dir, "wt"), Workspace: filepath.Join(dir, "ws"), codexConfigPath: path}
 	if err := pretrustCodexProjects(cfg); err != nil {
 		t.Fatalf("pretrust: %v", err)
 	}

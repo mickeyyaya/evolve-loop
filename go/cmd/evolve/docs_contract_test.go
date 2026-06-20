@@ -78,7 +78,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_PROMPTS_DIR":             true, // prompts.NewForProject dev override (used)
 	"EVOLVE_QUOTA_RESET_AT":          true, // quotareset
 	"EVOLVE_QUOTA_RESET_HOURS":       true, // quotareset
-	"EVOLVE_RELEASE_STRICT_PASS":     true, // releasepreflight strict mode
 	"EVOLVE_RESUME":                  true, // cmd_loop resume signal
 	"EVOLVE_RESUME_ALLOW_HEAD_MOVED": true, // checkpoint flag
 	"EVOLVE_RESUME_MODE":             true, // checkpoint flag
