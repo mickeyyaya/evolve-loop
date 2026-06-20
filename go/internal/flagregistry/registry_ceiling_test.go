@@ -25,7 +25,12 @@ import "testing"
 //
 //	Task A: FlagCeiling = 55 after removing EVOLVE_CACHE_PREFIX_V2 (dead field in RunRequest)
 //	Task B: FlagCeiling = 54 after removing EVOLVE_GUARDS_LOG (env read → DI logPath param)
-const FlagCeiling = 54
+//
+// Cycle 49 removes 2 flags in two tasks:
+//
+//	Task A: FlagCeiling = 53 after removing EVOLVE_FORCE_FRESH (CLI flag --force-fresh migration)
+//	Task B: FlagCeiling = 52 after removing EVOLVE_LANE (split-const bootstrap-locator)
+const FlagCeiling = 52
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

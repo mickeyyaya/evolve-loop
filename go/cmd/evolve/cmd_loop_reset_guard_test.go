@@ -92,18 +92,17 @@ func TestRunLoop_CorruptedCycleStateRefuses(t *testing.T) {
 }
 
 func TestRunLoop_ForceFreshBypassesGuard(t *testing.T) {
-	t.Setenv("EVOLVE_FORCE_FRESH", "1")
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	restore := installStubDeps(t, storage.New(evolveDir), ledger.New(evolveDir))
 	defer restore()
 
 	var stdout, stderr bytes.Buffer
-	rc := runLoop([]string{"--goal-text", "x", "--max-cycles", "1", "--project-root", projectRoot}, nil, &stdout, &stderr)
+	rc := runLoop([]string{"--goal-text", "x", "--max-cycles", "1", "--project-root", projectRoot, "--force-fresh"}, nil, &stdout, &stderr)
 	// With the override the guard does not fire — the loop proceeds (stub
 	// runners), so the stop_reason is anything BUT unfinished_cycle.
 	var lr map[string]any
 	_ = json.Unmarshal(stdout.Bytes(), &lr)
 	if lr["stop_reason"] == "unfinished_cycle" {
-		t.Fatalf("EVOLVE_FORCE_FRESH=1 must bypass the guard; rc=%d stderr=%q", rc, stderr.String())
+		t.Fatalf("--force-fresh must bypass the guard; rc=%d stderr=%q", rc, stderr.String())
 	}
 }

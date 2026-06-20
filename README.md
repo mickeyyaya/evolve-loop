@@ -504,7 +504,7 @@ If a cycle can't be resumed (corrupt state, abandoned work), a fresh `/evolve-lo
 evolve cycle reset
 ```
 
-Reset never deletes history — it archives the workspace + a `cycle-state.json` snapshot + a `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, and writes an auditable ledger entry. (`EVOLVE_FORCE_FRESH=1` restores the legacy silent-clobber, which does NOT seal history.)
+Reset never deletes history — it archives the workspace + a `cycle-state.json` snapshot + a `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, and writes an auditable ledger entry. (`evolve loop --force-fresh` restores the legacy silent-clobber as an escape hatch, which does NOT seal history.)
 
 ### Strategy presets
 

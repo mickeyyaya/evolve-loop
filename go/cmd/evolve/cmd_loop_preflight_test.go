@@ -82,7 +82,6 @@ func TestRunLoop_PreflightHalt_AbortsBeforeCycle(t *testing.T) {
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result { return forcedHalt() }
 
 	t.Setenv("EVOLVE_SKIP_PREFLIGHT", "")
-	t.Setenv("EVOLVE_FORCE_FRESH", "1") // skip the unfinished-cycle guard; isolate the preflight gate
 
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{
@@ -90,6 +89,7 @@ func TestRunLoop_PreflightHalt_AbortsBeforeCycle(t *testing.T) {
 		"--evolve-dir", evolveDir,
 		"--goal-text", "anything",
 		"--cycles", "1",
+		"--force-fresh", // skip the unfinished-cycle guard; isolate the preflight gate
 	}, nil, &stdout, &stderr)
 
 	if rc != 2 {

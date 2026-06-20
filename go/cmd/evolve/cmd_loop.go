@@ -71,6 +71,7 @@ type loopConfig struct {
 	Reset             bool `json:"reset,omitempty"`
 	ConsensusAudit    bool `json:"consensus_audit,omitempty"`
 	DryRun            bool `json:"dry_run,omitempty"`
+	ForceFresh        bool `json:"force_fresh,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -203,9 +204,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// stuck cycle whose number is ahead of lastCycleNumber must not be
 	// silently clobbered: that would lose its history. Force the operator to
 	// choose — continue it (--resume) or seal it (evolve cycle reset, which
-	// archives it for analysis and advances the number). EVOLVE_FORCE_FRESH=1
+	// archives it for analysis and advances the number). --force-fresh
 	// restores the prior silent-clobber behavior as an escape hatch.
-	if os.Getenv("EVOLVE_FORCE_FRESH") != "1" {
+	if !cfg.ForceFresh {
 		cs, csErr := deps.Storage.ReadCycleState(context.Background())
 		last, _ := readLastCycleNumber(context.Background(), deps.Storage)
 		// An UNREADABLE cycle-state (truncated JSON from a SIGKILL'd dispatcher
@@ -220,7 +221,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			}
 			fmt.Fprintln(stderr, "[loop]   • continue it:    evolve loop --resume")
 			fmt.Fprintln(stderr, "[loop]   • seal & move on: evolve cycle reset   (archives the cycle for analysis, advances the number)")
-			fmt.Fprintln(stderr, "[loop]   (or set EVOLVE_FORCE_FRESH=1 to start fresh and overwrite — history NOT sealed)")
+			fmt.Fprintln(stderr, "[loop]   (or pass --force-fresh to start fresh and overwrite — history NOT sealed)")
 			lr.StopReason = "unfinished_cycle"
 			lr.emit(stdout)
 			return 2

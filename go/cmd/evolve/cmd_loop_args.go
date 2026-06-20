@@ -30,6 +30,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		dryRun         bool
 		reset          bool
 		consensusAudit bool
+		forceFresh     bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
@@ -50,6 +51,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
 	fs.BoolVar(&consensusAudit, "consensus-audit", false, "opt-in cross-CLI auditor consensus mode")
+	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
 
 	// WS-G2 repeatable per-agent overrides:
 	//   --cli  auditor=claude-tmux              (one --cli per agent)
@@ -172,6 +174,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		Reset:             reset,
 		ConsensusAudit:    consensusAudit,
 		DryRun:            dryRun,
+		ForceFresh:        forceFresh,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}, 0
