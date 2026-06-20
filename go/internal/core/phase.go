@@ -147,6 +147,11 @@ type PhaseRequest struct {
 	// on a re-dispatch after a deliverable reject; the runner copies it into the
 	// BridgeRequest. Empty on the first dispatch.
 	CorrectionDirective string `json:"correction_directive,omitempty"`
+	// OperatorDirectives is the rendered runtime operator-directives block the
+	// orchestrator snapshots once at cycle start (internal/directives) and passes
+	// to every phase this cycle; the runner copies it into the BridgeRequest.
+	// Empty = no directives configured (byte-identical dispatch).
+	OperatorDirectives string `json:"operator_directives,omitempty"`
 
 	// Spec is the brick's own declarative definition. A spec-driven (kind:llm)
 	// phase reads all of its behavior from here; built-in Go phases ignore it.

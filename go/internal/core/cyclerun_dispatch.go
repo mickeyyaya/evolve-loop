@@ -102,6 +102,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		PreviousPhase: string(cr.current),
 		Env:           cr.envSnap,
 		Context:       phaseCtx,
+		// Runtime operator directives snapshotted once at cycle start (same value
+		// for every phase this cycle); empty ⇒ byte-identical dispatch.
+		OperatorDirectives: cr.directivesSet.Merged,
 	}
 	// ADR-0050 Phase 3.7: at advisory+, serve the build phase's upstream
 	// build-plan via the typed envelope (read once here at the seam) instead of

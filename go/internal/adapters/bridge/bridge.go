@@ -132,14 +132,15 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	}
 	inproc := req
 	// Prompt assembly order (top of string → bottom):
-	//   Correction (outermost, re-dispatch only) > Rules > Policy > Contract block > Body > path footer.
+	//   Correction (outermost, re-dispatch only) > Operator Directives > Rules > Policy > Contract block > Body > path footer.
 	// The contract's invariant block sits in the cacheable prefix; the volatile
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
 	// optimal. See injectContract.
 	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
-	inproc.Prompt = injectCorrectionPrefix(withRules, req.CorrectionDirective)
+	withDirectives := injectOperatorDirectives(withRules, req.OperatorDirectives)
+	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
 
 	// When an onStopReview callback is wired (production path), build the engine
 	// directly so we can inject the cycle-scoped OnStopReview into Deps.
@@ -270,4 +271,18 @@ func injectCorrectionPrefix(prompt, directive string) string {
 		return prompt
 	}
 	return "## Correction\n\n" + directive + "\n\n---\n\n" + prompt
+}
+
+// injectOperatorDirectives prepends the runtime operator-directives block (the
+// pre-rendered global + per-loop guidance snapshotted at cycle start). Empty
+// directives pass through unchanged (byte-identical to no directives). Applied at
+// the same CLI-agnostic seam as injectRulesPrefix, sitting just below Correction
+// so standing operator guidance is prominent without displacing an active
+// contract-correction. The block is already a complete "## Operator Directives"
+// section (rendered by internal/directives), so it is prepended verbatim.
+func injectOperatorDirectives(prompt, directives string) string {
+	if directives == "" {
+		return prompt
+	}
+	return directives + "\n\n---\n\n" + prompt
 }

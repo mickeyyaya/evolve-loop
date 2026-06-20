@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -46,6 +47,7 @@ type cycleRun struct {
 	preCycleHEAD      string              // read post-loop by finalizeCycle
 	benchedCLIs       []router.BenchedCLI // CLI-health snapshot; read in selectNext Decide
 	clampedPlan       *router.PhasePlan   // clamped whole-cycle plan; nil ⇒ static spine
+	directivesSet     directives.Set      // runtime operator-directives snapshot; read in dispatch (cr.directivesSet.Merged)
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
 	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle
@@ -340,11 +342,12 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 // before any phase ran, the CLI-health snapshot, and the clamped whole-cycle plan
 // (nil ⇒ routing falls back to the static spine).
 type cyclePlan struct {
-	envSnap      map[string]string
-	ctxSnap      map[string]string
-	preCycleHEAD string
-	benchedCLIs  []router.BenchedCLI
-	clampedPlan  *router.PhasePlan
+	envSnap       map[string]string
+	ctxSnap       map[string]string
+	preCycleHEAD  string
+	benchedCLIs   []router.BenchedCLI
+	clampedPlan   *router.PhasePlan
+	directivesSet directives.Set
 }
 
 // advisorPlanInput builds the RouteInput for a whole-cycle advisor decision —
@@ -394,6 +397,26 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	if o.catalogRefresh != nil {
 		if err := o.catalogRefresh(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
+		}
+	}
+
+	// Cycle-start runtime operator-directives snapshot (global + per-loop). The
+	// injected provider owns ALL config — home/lane/path resolution — and is
+	// fail-open; this flow only snapshots the result for the whole cycle and stamps
+	// its version into the ledger for audit/reproducibility. nil provider ⇒ no-op.
+	var directivesSet directives.Set
+	if o.directivesProvider != nil {
+		directivesSet = o.directivesProvider(ctx, cycle)
+		if directivesSet.Version != "" {
+			if err := o.ledger.Append(ctx, LedgerEntry{
+				TS:     o.now().UTC().Format(time.RFC3339),
+				Cycle:  cycle,
+				Role:   "orchestrator",
+				Kind:   "operator_directives",
+				Action: directivesSet.Version,
+			}); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN operator-directives ledger stamp failed: %v\n", err)
+			}
 		}
 	}
 
@@ -500,10 +523,11 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	}
 
 	return cyclePlan{
-		envSnap:      envSnap,
-		ctxSnap:      ctxSnap,
-		preCycleHEAD: preCycleHEAD,
-		benchedCLIs:  benchedCLIs,
-		clampedPlan:  clampedPlan,
+		envSnap:       envSnap,
+		ctxSnap:       ctxSnap,
+		preCycleHEAD:  preCycleHEAD,
+		benchedCLIs:   benchedCLIs,
+		clampedPlan:   clampedPlan,
+		directivesSet: directivesSet,
 	}
 }
