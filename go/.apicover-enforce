@@ -33,6 +33,7 @@
 ./internal/changedpkgs
 ./internal/codequality
 ./internal/detectnested
+./internal/directives
 ./internal/evalgate
 ./internal/gitexec
 ./internal/goalhash

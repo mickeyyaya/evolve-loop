@@ -34,6 +34,7 @@ import (
 // env-agnostic standard. Paths are module-root-relative. ADD YOUR PACKAGE HERE
 // when you convert a flag to a typed input parameter.
 var paramPackages = []string{
+	"internal/directives",
 	"internal/policy",
 	"internal/quotareset",
 }
