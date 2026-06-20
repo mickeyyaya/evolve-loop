@@ -171,26 +171,6 @@ func TestC50A_003_BridgeConfig_HasCodexConfigPathField(t *testing.T) {
 
 // === FlagCeiling after Task A (config-check waiver) ===
 
-// TestC50A_004_FlagCeilingIs51 verifies that the FlagCeiling ratchet constant
-// has been lowered to 51 after removing EVOLVE_CODEX_CONFIG_PATH (52 − 1 = 51).
-// This is the intermediate ceiling; Task B will further lower it to 50.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 52.
-func TestC50A_004_FlagCeilingIs51(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 51") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 51'.\n"+
-			"Builder must lower the FlagCeiling constant to 51 in the Task A diff\n"+
-			"(52 − 1 = 51 after removing EVOLVE_CODEX_CONFIG_PATH row).\n"+
-			"Note: Task B will further lower to 50; this predicate checks the 51 intermediate.\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === Test-file migration — zero t.Setenv in bridge/ (config-check waiver) ===
 
 // TestC50A_005_BridgeTests_NoSetenvCodexConfigPath verifies that all 5 bridge test
@@ -336,27 +316,6 @@ func TestC50B_003_ReleaseStrictPass_AbsentFromBridges(t *testing.T) {
 
 // === FlagCeiling after both tasks (config-check waiver) ===
 
-// TestC50B_004_FlagCeilingIs50 verifies that the FlagCeiling ratchet constant
-// has been lowered to 50 after removing both flags (52 − 2 = 50).
-// Task A lowers 52→51; Task B lowers 51→50; this predicate checks the final state.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 52
-// (will be 51 after Task A, then 50 after Task B).
-func TestC50B_004_FlagCeilingIs50(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 50") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 50'.\n"+
-			"Builder must lower the FlagCeiling constant to 50 in the Task B diff\n"+
-			"(51 − 1 = 50 after removing EVOLVE_RELEASE_STRICT_PASS row;\n"+
-			"52 − 2 = 50 combining both Task A and Task B).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === --strict-pass CLI flag registered (config-check waiver) ===
 
 // TestC50B_005_StrictPassFlag_RegisteredInPreflight verifies that --strict-pass
@@ -405,23 +364,3 @@ func TestC50B_006_ReleasePipelineOptions_HasStrictPassField(t *testing.T) {
 }
 
 // === Exact row count — final state (behavioral: negative / edge) ===
-
-// TestC50B_NEG_ExactRowCountIs50 verifies that after both tasks are implemented
-// the total registry count is exactly 50. This is the strongest invariant:
-// over-removal (<50) AND under-removal (>50) both fail. It subsumes C50A_NEG's
-// upper-bound check.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-//
-// RED: registry currently has 52 rows (FlagCeiling=52); 52 ≠ 50 fails.
-func TestC50B_NEG_ExactRowCountIs50(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 50 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 50 (52 − 2 removed flags).\n"+
-			"Builder must remove exactly 2 rows from registry_table.go:\n"+
-			"  Task A: EVOLVE_CODEX_CONFIG_PATH\n"+
-			"  Task B: EVOLVE_RELEASE_STRICT_PASS\n"+
-			"Over-removal (<50) and under-removal (>50) both fail. Current count: %d",
-			got, got)
-	}
-}

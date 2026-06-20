@@ -55,7 +55,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_AUDIT_PERMISSION_MODE":         true,
 	"EVOLVE_BUILD_PLAN_INPUT":              true,
 	"EVOLVE_BUILD_PLAN_OUTPUT":             true,
-	"EVOLVE_PLAN_WORKSPACE":                true,
 	"EVOLVE_TDD_ENGINEER_MODEL":            true,
 	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":  true,
 	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE": true,
@@ -67,7 +66,6 @@ var allowedUndocumented = map[string]bool{
 	// either (a) documented in runtime-reference.md OR (b) removed from
 	// code. Tracked as technical debt; the contract test still catches
 	// NEW additions.
-	"EVOLVE_GUARDS_LOG":                true, // observability shunt
 	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
 	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
@@ -82,14 +80,10 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_QUOTA_RESET_HOURS":         true, // quotareset
 	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true, // releasepipeline flag
 	"EVOLVE_RELEASE_STRICT_PASS":       true, // releasepreflight strict mode
-	"EVOLVE_RESET":                     true, // cycle-state reset signal
 	"EVOLVE_RESUME":                    true, // cmd_loop resume signal
 	"EVOLVE_RESUME_ALLOW_HEAD_MOVED":   true, // checkpoint flag
 	"EVOLVE_RESUME_MODE":               true, // checkpoint flag
-	"EVOLVE_RETRO_MODEL":               true, // retro per-phase model
-	"EVOLVE_SHIP_RELEASE_NOTES":        true, // ship release-notes path
 	"EVOLVE_SHIP_SCRIPT":               true, // legacy ship.sh override
-	"EVOLVE_STRATEGY":                  true, // cmd_loop default strategy
 	"EVOLVE_TRACKER_TTL_DAYS":          true, // tracker telemetry TTL
 	"EVOLVE_USE_PHASE_REGISTRY":        true, // v12.1 internal toggle
 }

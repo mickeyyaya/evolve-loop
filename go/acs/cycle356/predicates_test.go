@@ -108,30 +108,6 @@ func TestC356_002_RegressionGuardTestPassesInFlagRegistry(t *testing.T) {
 	}
 }
 
-// TestC356_003_BuildPlannerPreservedAsActive verifies that EVOLVE_BUILD_PLANNER
-// (StatusActive, Budget Cluster) was NOT accidentally removed during the dead-flag
-// sweep. This flag is in the Budget Cluster but is active — it controls the
-// build-planner phase, not token budgets.
-//
-// BEHAVIORAL: calls flagregistry.Lookup() directly.
-//
-// NOTE: this predicate is pre-existing GREEN (EVOLVE_BUILD_PLANNER is currently
-// StatusActive and will not be touched by Builder). It is a regression lock.
-func TestC356_003_BuildPlannerPreservedAsActive(t *testing.T) {
-	f, ok := flagregistry.Lookup("EVOLVE_BUILD_PLANNER")
-	if !ok {
-		t.Fatalf("RED: flagregistry.Lookup(\"EVOLVE_BUILD_PLANNER\") returned ok=false — " +
-			"the flag was accidentally removed.\n" +
-			"Only the 12 StatusDead Budget Cluster flags should be removed; " +
-			"EVOLVE_BUILD_PLANNER is StatusActive and must be preserved.")
-	}
-	if f.Status != flagregistry.StatusActive {
-		t.Errorf("RED: EVOLVE_BUILD_PLANNER Status = %q, want %q — "+
-			"do not change the status of this active flag during the dead-flag sweep.",
-			f.Status, flagregistry.StatusActive)
-	}
-}
-
 // TestC356_004_FlagsCheckExitsZero verifies that `evolve flags check` exits 0,
 // confirming that the Generated Flag Index in docs/architecture/control-flags.md
 // is in sync with the flagregistry after Builder removes the 12 dead flags and

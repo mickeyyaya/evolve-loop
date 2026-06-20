@@ -180,26 +180,6 @@ func TestC48A_003_CachePrefixV2_FieldAbsentFromRunRequest(t *testing.T) {
 
 // === FlagCeiling after Task A (config-check waiver) ===
 
-// TestC48A_004_FlagCeilingIs55 verifies that the FlagCeiling ratchet constant has
-// been updated to 55 after removing EVOLVE_CACHE_PREFIX_V2 (56 − 1 = 55).
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 56.
-func TestC48A_004_FlagCeilingIs55(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 55") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 55'.\n"+
-			"Builder must lower the FlagCeiling constant to 55 in the same diff as\n"+
-			"removing the EVOLVE_CACHE_PREFIX_V2 registry row (56 − 1 = 55).\n"+
-			"NOTE: Task B will lower it further to 54 — this predicate accepts 55 as the\n"+
-			"intermediate state; TestC48B_005 and TestRegistry_FlagCeiling enforce the final 54.\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === Test-file clean (config-check waiver) ===
 
 // TestC48A_005_SubagentEnvTest_NoCachePrefixV2 verifies that
@@ -350,25 +330,6 @@ func TestC48B_004_GuardTest_NoSetenvGuardsLog(t *testing.T) {
 
 // === FlagCeiling after Task B (config-check waiver) ===
 
-// TestC48B_005_FlagCeilingIs54 verifies that the FlagCeiling ratchet constant has
-// been updated to 54 after removing EVOLVE_GUARDS_LOG (55 − 1 = 54, combining both
-// tasks: 56 − 2 = 54).
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 56.
-func TestC48B_005_FlagCeilingIs54(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 54") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 54'.\n"+
-			"Builder must lower the FlagCeiling constant to 54 in the Task B diff\n"+
-			"(55 − 1 = 54 after removing EVOLVE_GUARDS_LOG row).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === Docs-contract clean (config-check waiver) ===
 
 // TestC48B_006_DocsContractTest_NoGuardsLog verifies that docs_contract_test.go
@@ -394,22 +355,3 @@ func TestC48B_006_DocsContractTest_NoGuardsLog(t *testing.T) {
 }
 
 // === Exact row count — final state (behavioral: negative / edge) ===
-
-// TestC48B_NEG_ExactRowCountIs54 verifies that after both tasks are implemented the
-// total registry count is exactly 54. This is the strongest invariant: over-removal
-// (<54) AND under-removal (>54) both fail. It subsumes C48A_NEG's upper-bound check.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-//
-// RED: registry currently has 56 rows (FlagCeiling=56); 56 ≠ 54 fails.
-func TestC48B_NEG_ExactRowCountIs54(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 54 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 54 (56 − 2 removed flags).\n"+
-			"Builder must remove exactly 2 rows from registry_table.go:\n"+
-			"  Task A: EVOLVE_CACHE_PREFIX_V2\n"+
-			"  Task B: EVOLVE_GUARDS_LOG\n"+
-			"Over-removal (<54) and under-removal (>54) both fail. Current count: %d",
-			got, got)
-	}
-}

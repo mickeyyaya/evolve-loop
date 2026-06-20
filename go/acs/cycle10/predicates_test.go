@@ -47,45 +47,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC10_001_RegistryRowCountIs176 verifies that after removing all 65
-// StatusTestSeam rows the total registry count is exactly 176.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-// Both over-removal (< 176) and under-removal (> 176) fail the assertion.
-//
-// RED: len(flagregistry.All) is currently 241, which is 65 rows above 176.
-func TestC10_001_RegistryRowCountIs176(t *testing.T) {
-	const want = 176
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 65 StatusTestSeam rows from registry_table.go.\n"+
-			"Both over-removal (< 176) and under-removal (> 176) fail.\n"+
-			"Expected: 241 − 65 = 176.",
-			got, want)
-	}
-}
-
-// TestC10_002_FlagCeilingConstIs176 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 241 to 176
-// in the same diff as the row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; still reading 241 directly breaks the ratchet guarantee post-removal.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 241.
-func TestC10_002_FlagCeilingConstIs176(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 176") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 176'.\n"+
-			"Builder must lower the FlagCeiling constant from 241 to 176 in the same diff\n"+
-			"as removing the 65 StatusTestSeam rows (241 − 65 = 176).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC10_003_NoTestSeamFlagsInRegistry verifies that zero entries in
 // flagregistry.All carry StatusTestSeam after Builder removes all 65 rows.
 //

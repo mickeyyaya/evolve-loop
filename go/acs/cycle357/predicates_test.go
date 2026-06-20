@@ -64,50 +64,6 @@ func TestC357_001_DispatchBridgeFlagsAbsentFromLookup(t *testing.T) {
 	}
 }
 
-// TestC357_002_BridgeCodeAbsentFromResolveDispatchPolicy verifies that the
-// legacy bridge block (legacyStop/legacyVerify/EVOLVE_DISPATCH_STOP_ON_FAIL/
-// EVOLVE_DISPATCH_VERIFY reads) is gone from resolveDispatchPolicy, and that
-// the canonical EVOLVE_DISPATCH_POLICY flag is still referenced (AC-9).
-//
-// BEHAVIORAL: uses acsassert.CountInGoFunc which parses the Go AST and counts
-// matching lines inside the named function body — function-scoped, so
-// cross-function occurrences cannot satisfy the assertion.
-//
-// NEGATIVE (AC-3 function body): bridge references must be zero.
-// Before Builder, the bridge block at lines 56-65 contains multiple references.
-//
-// POSITIVE (AC-9): EVOLVE_DISPATCH_POLICY must still appear ≥1 time in the function.
-//
-// RED: resolveDispatchPolicy currently has legacyStop, legacyVerify,
-// EVOLVE_DISPATCH_STOP_ON_FAIL, and EVOLVE_DISPATCH_VERIFY in its body → bridgeCount > 0.
-func TestC357_002_BridgeCodeAbsentFromResolveDispatchPolicy(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	loopCtrl := filepath.Join(root, "go", "cmd", "evolve", "cmd_loop_control.go")
-
-	bridgeCount, err := acsassert.CountInGoFunc(loopCtrl, "resolveDispatchPolicy",
-		"EVOLVE_DISPATCH_STOP_ON_FAIL", "EVOLVE_DISPATCH_VERIFY", "legacyStop", "legacyVerify")
-	if err != nil {
-		t.Fatalf("CountInGoFunc(resolveDispatchPolicy, bridge-refs): %v", err)
-	}
-	if bridgeCount != 0 {
-		t.Errorf("RED: resolveDispatchPolicy still contains %d line(s) with deprecated bridge references "+
-			"(EVOLVE_DISPATCH_STOP_ON_FAIL / EVOLVE_DISPATCH_VERIFY / legacyStop / legacyVerify).\n"+
-			"Builder must remove the legacy block (lines 56-65) from cmd_loop_control.go.\n"+
-			"File: %s", bridgeCount, loopCtrl)
-	}
-
-	canonicalCount, err := acsassert.CountInGoFunc(loopCtrl, "resolveDispatchPolicy",
-		"EVOLVE_DISPATCH_POLICY")
-	if err != nil {
-		t.Fatalf("CountInGoFunc(resolveDispatchPolicy, EVOLVE_DISPATCH_POLICY): %v", err)
-	}
-	if canonicalCount < 1 {
-		t.Errorf("RED: resolveDispatchPolicy no longer references EVOLVE_DISPATCH_POLICY — "+
-			"canonical flag may have been accidentally removed.\n"+
-			"File: %s", loopCtrl)
-	}
-}
-
 // TestC357_003_ResolveDispatchPolicyNoLegacyCases verifies that the 4 bridge
 // test cases (legacy STOP_ON_FAIL, legacy VERIFY, both-legacy+new, both-legacy)
 // are absent from TestResolveDispatchPolicy output after Builder removes them

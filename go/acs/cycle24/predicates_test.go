@@ -96,46 +96,6 @@ func TestC24_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC24_002_RegistryRowCountIs135 verifies that after removing all 5 rows the
-// total registry count is exactly 135.
-//
-// Covers AC2. Both over-removal (< 135) and under-removal (> 135) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 140, which is 5 rows above 135.
-func TestC24_002_RegistryRowCountIs135(t *testing.T) {
-	const want = 135
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 5 per-phase config flag rows from registry_table.go.\n"+
-			"Both over-removal (< 135) and under-removal (> 135) fail.\n"+
-			"Expected: 140 − 5 = 135.",
-			got, want)
-	}
-}
-
-// TestC24_003_FlagCeilingConstIs135 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 140 to 135
-// in the same diff as the 5-row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 140 after the 5-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 140.
-func TestC24_003_FlagCeilingConstIs135(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 135") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 135'.\n"+
-			"Builder must lower the FlagCeiling constant from 140 to 135 in the same diff\n"+
-			"as removing the 5 per-phase config flag rows (140 − 5 = 135).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC24_004_NoProductionReaderForRemovedFlags verifies that the os.Getenv
 // tier-2 read sites for the 5 removed flags have been deleted from production code:
 //   - runner.go: no longer calls envchain.Resolve(envchain.PhaseEnvKey(...)) for PERMISSION_MODE

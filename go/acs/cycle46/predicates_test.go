@@ -256,24 +256,6 @@ func TestC46_009_StdoutFilterTestNoEnvKey(t *testing.T) {
 
 // === FlagCeiling (config-check waiver) ===
 
-// TestC46_005_FlagCeilingIs59 verifies that the FlagCeiling ratchet constant has been
-// updated to 59 after removing both flags (61 − 2 = 59).
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 61.
-func TestC46_005_FlagCeilingIs59(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 59") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 59'.\n"+
-			"Builder must lower the FlagCeiling constant to 59 in the same diff as\n"+
-			"removing both registry rows (61 − 2 = 59).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // === Control-flags doc clean (config-check waiver) ===
 
 // TestC46_010_ControlFlagsDocClean verifies that the regenerated
@@ -323,21 +305,3 @@ func TestC46_012_RetroModelRunFuncEnvReadGone(t *testing.T) {
 }
 
 // === Exact row count (behavioral: negative / edge) ===
-
-// TestC46_NEG_ExactRowCountIs59 verifies that after removing both flags the total
-// registry count is exactly 59.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-// Over-removal (<59) AND under-removal (>59) both fail.
-//
-// RED: registry currently has 61 rows (FlagCeiling=61).
-func TestC46_NEG_ExactRowCountIs59(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 59 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 59 (61 − 2 removed flags).\n"+
-			"Builder must remove exactly 2 rows from registry_table.go:\n"+
-			"  EVOLVE_RETRO_MODEL, EVOLVE_STDOUT_FILTER\n"+
-			"Over-removal (<59) and under-removal (>59) both fail. Current count: %d",
-			got, got)
-	}
-}

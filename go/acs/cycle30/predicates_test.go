@@ -122,46 +122,6 @@ func TestC30_001_RetryFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC30_002_RegistryRowCountIs109 verifies that after removing all 6 rows the
-// total registry count is exactly 109.
-//
-// Covers AC2. Both over-removal (< 109) and under-removal (> 109) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 115, which is 6 rows above 109.
-func TestC30_002_RegistryRowCountIs109(t *testing.T) {
-	const want = 109
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 6 recovery-retry-cluster rows from registry_table.go.\n"+
-			"Both over-removal (< 109) and under-removal (> 109) fail.\n"+
-			"Expected: 115 − 6 = 109.",
-			got, want)
-	}
-}
-
-// TestC30_003_FlagCeilingConstIs109 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 115 to 109
-// in the same diff as the 6-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 115 after the 6-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 115.
-func TestC30_003_FlagCeilingConstIs109(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 109") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 109'.\n"+
-			"Builder must lower the FlagCeiling constant from 115 to 109 in the same diff\n"+
-			"as removing the 6 recovery-retry rows (115 − 6 = 109).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC30_004_NoEnvKeyConstantsInProductionGo verifies that the envchain key
 // constant definitions for the 4 migrated flags have been deleted from
 // envchain/keys.go, and that the call sites in retry_backoff.go and

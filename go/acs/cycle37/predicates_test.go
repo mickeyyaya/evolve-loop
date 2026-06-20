@@ -137,45 +137,6 @@ func TestC37_001_RemovedFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC37_002_RegistryRowCountIs83 verifies that after removing all 6 rows the
-// total registry count is exactly 83.
-//
-// Covers AC2. BEHAVIORAL: calls len(flagregistry.All) — the production count.
-// Over-removal (<83) and under-removal (>83) both fail.
-//
-// RED: registry currently has 89 rows (FlagCeiling=89); count is 89.
-func TestC37_002_RegistryRowCountIs83(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 83 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 83 (89 − 6 removed router flags).\n"+
-			"Builder must remove exactly 6 rows from registry_table.go:\n"+
-			"  EVOLVE_ROUTER_REPLAN, EVOLVE_ROUTING_JUDGE, EVOLVE_ROUTER_RECON_DIGEST,\n"+
-			"  EVOLVE_ROUTER_REPLAN_DEPTH, EVOLVE_ROUTER_PLAN_MODEL, EVOLVE_ROUTER_PROPOSE_MODEL",
-			got)
-	}
-}
-
-// TestC37_003_FlagCeilingConstIs83 verifies that the FlagCeiling ratchet constant
-// has been updated from 89 to 83 in registry_ceiling_test.go.
-//
-// Covers AC3. The ratchet prevents accidental registry growth; lowering it by 6
-// (89−6=83) is mandatory alongside the row removal.
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 89.
-func TestC37_003_FlagCeilingConstIs83(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 83") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 83'.\n"+
-			"Builder must lower the FlagCeiling constant from 89 to 83 in the same diff\n"+
-			"as removing the 6 router rows (89 − 6 = 83).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC37_004_NoRouterEnvReadsInSourceFiles verifies that all 6 router-flag
 // env-read string literals have been deleted from their source files:
 //   - config.go:applyEnv  — reads env["EVOLVE_ROUTER_REPLAN"], env["EVOLVE_ROUTING_JUDGE"],

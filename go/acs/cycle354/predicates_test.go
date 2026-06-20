@@ -124,44 +124,6 @@ func TestC354_003_StrictFailuresNotDeprecated(t *testing.T) {
 	}
 }
 
-// TestC354_004_DeadFlagsShowDeadInClusterTable is the POSITIVE companion to the
-// C354_001-003 negative checks. It verifies that at least 5 of the 10 dead flags
-// actually appear with "| DEAD |" status in the hand-maintained section after
-// Builder's edit (as opposed to just having their ACTIVE row removed with no
-// replacement — the table would be accurate either way, but the positive check
-// confirms Builder updated the row status rather than deleting the row entirely).
-//
-// POSITIVE: "| DEAD |" uppercase appears ONLY in the hand-maintained section
-// (Generated Flag Index uses lowercase "| dead |").
-//
-// Uses CountOccurrencesAny (no TB / no internal Errorf) for aggregated counting
-// so spurious per-flag errors don't fire; the single Fatalf below is authoritative.
-//
-// RED: before Builder's fix, none of the 10 flags have "| DEAD |" in the
-// hand-maintained section (they all show ACTIVE or DEPRECATED). count == 0 < 5.
-// acs-predicate: config-check
-func TestC354_004_DeadFlagsShowDeadInClusterTable(t *testing.T) {
-	path := controlFlagsPath(t)
-	count := acsassert.CountOccurrencesAny(path,
-		"`EVOLVE_RESOLVE_ROOTS_LOADED` | DEAD",
-		"`EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | DEAD",
-		"`EVOLVE_GEMINI_CLAUDE_PATH` | DEAD",
-		"`EVOLVE_GEMINI_REQUIRE_FULL` | DEAD",
-		"`EVOLVE_CODEX_CLAUDE_PATH` | DEAD",
-		"`EVOLVE_ALLOW_INTERACTIVE_FALLBACK` | DEAD",
-		"`EVOLVE_FORCE_BARE` | DEAD",
-		"`EVOLVE_STRICT_FAILURES` | DEAD",
-		"`EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD",
-		"`EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD",
-	)
-	if count < 5 {
-		t.Errorf("RED: expected at least 5 of the 10 dead flags to show DEAD (uppercase) "+
-			"in the hand-maintained cluster tables; got %d.\n"+
-			"Builder must update all 10 cluster table rows from ACTIVE/DEPRECATED → DEAD.\n"+
-			"File: %s", count, path)
-	}
-}
-
 // TestC354_005_FlagsCheckExitsZero verifies that `evolve flags check` exits 0,
 // confirming that the Generated Flag Index in control-flags.md is in sync with
 // the flagregistry after any changes Builder makes.

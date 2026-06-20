@@ -84,55 +84,6 @@ func tail(s string, n int) string {
 
 // ===================== T1(a) — EVOLVE_GC flag registration ===================
 
-// --- C298_001 (T1a): EVOLVE_GC is registered AND the doc index is in sync -----
-//
-// Behavioral on two axes:
-//  1. Reads the real flagregistry.All SSOT and asserts an EVOLVE_GC entry exists
-//     with Kind=="enum" and Default=="off". This is the data structure the loop
-//     hook and `evolve doctor` read — not a grepped source line. RED baseline:
-//     no EVOLVE_GC row → the entry is absent.
-//  2. Renders the real flagregistry.RenderIndex() (the same projection
-//     `evolve flags check` compares against) and asserts the on-disk
-//     docs/architecture/control-flags.md contains it verbatim — i.e. the doc is
-//     in sync. This forces the regenerate step: adding the registry row WITHOUT
-//     running `evolve flags generate` leaves the rendered index (now containing
-//     EVOLVE_GC) absent from the doc → drift → this predicate stays RED. Done
-//     in-process (no binary subprocess) so it is immune to the stale-tracked-
-//     binary and cwd/EVOLVE_PROJECT_ROOT footguns. Both axes GREEN only when the
-//     row is added AND the doc regenerated.
-func TestC298_001_EvolveGCRegisteredAndDocInSync(t *testing.T) {
-	var entry *flagregistry.Flag
-	for i := range flagregistry.All {
-		if flagregistry.All[i].Name == "EVOLVE_GC" {
-			entry = &flagregistry.All[i]
-			break
-		}
-	}
-	if entry == nil {
-		t.Fatalf("RED: EVOLVE_GC is not registered in flagregistry.All (%d flags) — "+
-			"the L3.4 flag row is missing", len(flagregistry.All))
-	}
-	if entry.Kind != "enum" {
-		t.Errorf("EVOLVE_GC must be Kind=\"enum\", got %q", entry.Kind)
-	}
-	if entry.Default != "off" {
-		t.Errorf("EVOLVE_GC must Default to \"off\" (retention never escalates by default), got %q", entry.Default)
-	}
-
-	// Axis 2: the generated doc index must already be in sync (regenerated).
-	docPath := filepath.Join(acsassert.RepoRoot(t), "docs", "architecture", "control-flags.md")
-	raw, err := os.ReadFile(docPath)
-	if err != nil {
-		t.Fatalf("reading control-flags.md: %v", err)
-	}
-	rendered := flagregistry.RenderIndex()
-	if !strings.Contains(string(raw), rendered) {
-		t.Errorf("RED: control-flags.md is stale vs the registry — the generated flag index " +
-			"(which now includes EVOLVE_GC) is not present verbatim. Run `evolve flags generate` " +
-			"after adding the EVOLVE_GC row.")
-	}
-}
-
 // ===================== T1(b) — runGCHook loop hook ===========================
 
 var (

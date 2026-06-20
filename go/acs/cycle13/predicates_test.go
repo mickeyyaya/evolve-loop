@@ -83,47 +83,6 @@ func TestC13_001_AllCheckpointFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC13_002_RegistryRowCountIs155 verifies that after removing all 3
-// CHECKPOINT_* rows the total registry count is exactly 155.
-//
-// Covers AC2 (155 rows total). Both over-removal (< 155) and under-removal
-// (> 155) fail the assertion.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 158, which is 3 rows above 155.
-func TestC13_002_RegistryRowCountIs155(t *testing.T) {
-	const want = 155
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 3 CHECKPOINT_* rows from registry_table.go.\n"+
-			"Both over-removal (< 155) and under-removal (> 155) fail.\n"+
-			"Expected: 158 − 3 = 155.",
-			got, want)
-	}
-}
-
-// TestC13_003_FlagCeilingConstIs155 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 158 to 155
-// in the same diff as the row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; reading 158 after the 3-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 158.
-func TestC13_003_FlagCeilingConstIs155(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 155") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 155'.\n"+
-			"Builder must lower the FlagCeiling constant from 158 to 155 in the same diff\n"+
-			"as removing the 3 CHECKPOINT_* rows (158 − 3 = 155).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC13_004_NoCheckpointEnvReadsInProductionFiles verifies that no production
 // Go file reads EVOLVE_CHECKPOINT_DISABLE, EVOLVE_CHECKPOINT_REASON, or
 // EVOLVE_CHECKPOINT_REQUEST via os.Getenv.

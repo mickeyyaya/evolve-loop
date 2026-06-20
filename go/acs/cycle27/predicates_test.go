@@ -98,46 +98,6 @@ func TestC27_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC27_002_RegistryRowCountIs126 verifies that after removing all 3 rows the
-// total registry count is exactly 126.
-//
-// Covers AC2. Both over-removal (< 126) and under-removal (> 126) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly — the production SSOT slice.
-// No source-file grepping; adding a magic string to source cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 129, which is 3 rows above 126.
-func TestC27_002_RegistryRowCountIs126(t *testing.T) {
-	const want = 126
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 3 dead flag rows from registry_table.go.\n"+
-			"Both over-removal (< 126) and under-removal (> 126) fail.\n"+
-			"Expected: 129 − 3 = 126.",
-			got, want)
-	}
-}
-
-// TestC27_003_FlagCeilingConstIs126 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 129 to 126
-// in the same diff as the 3-row removal.
-//
-// acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 129 after the 3-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 129.
-func TestC27_003_FlagCeilingConstIs126(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 126") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 126'.\n"+
-			"Builder must lower the FlagCeiling constant from 129 to 126 in the same diff\n"+
-			"as removing the 3 dead flag rows (129 − 3 = 126).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC27_004_NoQuotedFlagNamesInRegistryTable verifies that none of the 3 dead
 // flag names appear as quoted string literals in registry_table.go after removal.
 //

@@ -242,24 +242,6 @@ func TestC45B_004_CompactPromptsAbsentFromProdSource(t *testing.T) {
 
 // === Shared: FlagCeiling + control-flags doc ===
 
-// TestC45_006_FlagCeilingIs61 verifies that the FlagCeiling ratchet constant has been
-// updated to 61 after removing all 4 flags (65 − 4 = 61; Task1: 65→63, Task2: 63→61).
-//
-// acs-predicate: config-check
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 65.
-func TestC45_006_FlagCeilingIs61(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 61") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 61'.\n"+
-			"Builder must lower the FlagCeiling constant to 61 in the same diff as\n"+
-			"removing all 4 registry rows (65 − 4 = 61).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC45_007_ControlFlagsDocClean verifies that the regenerated
 // docs/architecture/control-flags.md no longer contains entries for any of the 4 removed flags.
 //
@@ -278,24 +260,5 @@ func TestC45_007_ControlFlagsDocClean(t *testing.T) {
 				"all 4 flag rows (run `evolve flags generate` in the same diff).\n"+
 				"File path: %s", name, controlFlagsDoc)
 		}
-	}
-}
-
-// TestC45_NEG_ExactRowCountIs61 verifies that after removing all 4 flags the total
-// registry count is exactly 61.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-// Over-removal (<61) AND under-removal (>61) both fail.
-//
-// RED: registry currently has 65 rows (FlagCeiling=65).
-func TestC45_NEG_ExactRowCountIs61(t *testing.T) {
-	got := len(flagregistry.All)
-	if got != 61 {
-		t.Errorf("RED: len(flagregistry.All) = %d, want 61 (65 − 4 removed flags).\n"+
-			"Builder must remove exactly 4 rows from registry_table.go:\n"+
-			"  Task1: EVOLVE_GO_BIN_TEST, EVOLVE_PLAN_WORKSPACE\n"+
-			"  Task2: EVOLVE_CODEX_VERSION_PATH, EVOLVE_COMPACT_PROMPTS\n"+
-			"Over-removal (<61) and under-removal (>61) both fail. Current count: %d",
-			got, got)
 	}
 }

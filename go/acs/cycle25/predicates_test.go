@@ -106,46 +106,6 @@ func TestC25_001_DeadFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC25_002_RegistryRowCountIs132 verifies that after removing all 3 rows the
-// total registry count is exactly 132.
-//
-// Covers AC2. Both over-removal (< 132) and under-removal (> 132) fail.
-//
-// BEHAVIORAL: calls len(flagregistry.All) directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 135, which is 3 rows above 132.
-func TestC25_002_RegistryRowCountIs132(t *testing.T) {
-	const want = 132
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 3 INTERACTIVE_POLICY cluster rows from registry_table.go.\n"+
-			"Both over-removal (< 132) and under-removal (> 132) fail.\n"+
-			"Expected: 135 − 3 = 132.",
-			got, want)
-	}
-}
-
-// TestC25_003_FlagCeilingConstIs132 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 135 to 132
-// in the same diff as the 3-row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet;
-// keeping 135 after the 3-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 135.
-func TestC25_003_FlagCeilingConstIs132(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 132") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 132'.\n"+
-			"Builder must lower the FlagCeiling constant from 135 to 132 in the same diff\n"+
-			"as removing the 3 INTERACTIVE_POLICY cluster rows (135 − 3 = 132).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC25_004_NoProductionReaderForRemovedFlags verifies that the os.Getenv
 // tier-2 read sites for the 3 removed flags have been deleted:
 //

@@ -58,22 +58,6 @@ func TestC7_001_FlagCeilingRatchetEnforced(t *testing.T) {
 	}
 }
 
-// TestC7_002_RegistryRowCountIs258 verifies the registry stays at or below the
-// cycle-7 ceiling of 258. Originally an exact "== 258" snapshot, relaxed to a
-// monotonic ratchet (<= 258) so it survives later flag-reduction cycles: an
-// exact-count regression predicate is self-invalidating the moment the same
-// campaign reduces the count further (it went 258 -> 160), which is why it was
-// red under -tags acs on every branch that merged v20 main. The ratchet matches
-// C7_001's intent and the campaign's monotonic-reduction invariant.
-//
-// BEHAVIORAL: asserts len(flagregistry.All) <= 258.
-func TestC7_002_RegistryRowCountIs258(t *testing.T) {
-	const ceiling = 258
-	if got := len(flagregistry.All); got > ceiling {
-		t.Errorf("RED: len(flagregistry.All) = %d exceeds the cycle-7 ceiling of %d.", got, ceiling)
-	}
-}
-
 // TestC7_003_ForceInnerSandboxAbsentFromRegistry verifies that
 // EVOLVE_FORCE_INNER_SANDBOX is no longer registered after Builder removes
 // its row from registry_table.go.

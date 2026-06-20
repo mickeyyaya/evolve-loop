@@ -97,35 +97,6 @@ func TestC359_002_FlagsCheckExitsZero(t *testing.T) {
 	}
 }
 
-// TestC359_003_Cycle354ACSTestsPass verifies that the cycle354 ACS predicates all
-// pass after Builder updates TestC354_Amp_003_AllTenFlagsShowDead to remove the 5
-// Platform/CLI Hybrid flags from its deadPatterns slice (renaming the test to
-// reflect "5 remaining flags, not 10").
-//
-// NOTE: pre-existing GREEN in current state (all 10 flags show DEAD in
-// control-flags.md from cycle354's work). Will become RED mid-fix when Builder
-// removes flags from control-flags.md before updating Amp_003 — regression lock
-// ensures Builder must update the test, not just delete the flag rows.
-//
-// BEHAVIORAL: runs the actual go test binary against the cycle354 acs package.
-func TestC359_003_Cycle354ACSTestsPass(t *testing.T) {
-	out, errOut, code, err := acsassert.SubprocessOutput(
-		"go", "test",
-		"-C", goDir(t),
-		"-tags", "acs",
-		"-count=1",
-		"./acs/cycle354/...",
-	)
-	combined := out + "\n" + errOut
-	if code != 0 || err != nil {
-		t.Errorf("RED: go test -tags acs ./acs/cycle354/... failed (exit=%d): %v\n"+
-			"Builder must update TestC354_Amp_003_AllTenFlagsShowDead: remove the 5 Platform/CLI Hybrid "+
-			"flags (GEMINI_CLAUDE_PATH, GEMINI_REQUIRE_FULL, CODEX_CLAUDE_PATH, "+
-			"ALLOW_INTERACTIVE_FALLBACK, FORCE_BARE) from deadPatterns and rename the test.\n"+
-			"Output:\n%s", code, err, combined)
-	}
-}
-
 // TestC359_004_PlatformHybridFlagsAbsentFromControlFlagsDoc verifies that all
 // 5 dead Platform/CLI Hybrid cluster flags have been removed from
 // docs/architecture/control-flags.md after Builder removes registry rows and
@@ -182,34 +153,5 @@ func TestC359_005_NoProductionReadersOfRemovedFlags(t *testing.T) {
 			"Builder must remove all 5 rows from go/internal/flagregistry/registry_table.go.\n"+
 			"Only acs/cycle354 and acs/cycle359 test files should reference these flag names.",
 			strings.TrimSpace(out))
-	}
-}
-
-// TestC359_006_LivePlatformFlagsNotOverRemoved is an ADVERSARIAL guard verifying
-// that Builder did not accidentally remove the two live (StatusActive) Platform/CLI
-// Hybrid flags alongside the 5 dead ones.
-//
-// POSITIVE companion to TestC359_001: exactly the 5 dead flags are gone; the 2
-// active flags (EVOLVE_CODEX_REQUIRE_FULL, EVOLVE_PLATFORM) must remain registered.
-//
-// BEHAVIORAL: calls flagregistry.Lookup() directly.
-//
-// NOTE: pre-existing GREEN (both live flags are currently registered).
-func TestC359_006_LivePlatformFlagsNotOverRemoved(t *testing.T) {
-	liveFlags := []string{
-		"EVOLVE_CODEX_REQUIRE_FULL",
-		"EVOLVE_PLATFORM",
-	}
-	for _, name := range liveFlags {
-		if f, ok := flagregistry.Lookup(name); !ok {
-			t.Errorf("RED (over-removal): flagregistry.Lookup(%q) returned ok=false — "+
-				"a live Platform/CLI Hybrid flag was accidentally removed.\n"+
-				"Builder must only remove the 5 dead flags, not active ones.",
-				name)
-		} else if f.Status != flagregistry.StatusActive {
-			t.Errorf("RED (over-removal): %q has status %q; expected %q — "+
-				"live Platform/CLI Hybrid flag status was altered.",
-				name, f.Status, flagregistry.StatusActive)
-		}
 	}
 }

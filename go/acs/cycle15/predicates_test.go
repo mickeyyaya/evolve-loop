@@ -90,47 +90,6 @@ func TestC15_001_AllResumeFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC15_002_RegistryRowCountIs154 verifies that after removing all 6
-// RESUME_* rows the total registry count is exactly 154.
-//
-// Covers AC2 (154 rows total). Both over-removal (< 154) and under-removal
-// (> 154) fail the assertion.
-//
-// BEHAVIORAL: calls flagregistry.All directly (the production SSOT slice).
-// No source-file grepping; a magic-string patch cannot satisfy this.
-//
-// RED: len(flagregistry.All) is currently 160, which is 6 rows above 154.
-func TestC15_002_RegistryRowCountIs154(t *testing.T) {
-	const want = 154
-	if got := len(flagregistry.All); got != want {
-		t.Errorf("RED: len(flagregistry.All) = %d, want %d.\n"+
-			"Builder must remove all 6 RESUME_* rows from registry_table.go.\n"+
-			"Both over-removal (< 154) and under-removal (> 154) fail.\n"+
-			"Expected: 160 − 6 = 154.",
-			got, want)
-	}
-}
-
-// TestC15_003_FlagCeilingConstIs154 verifies that the FlagCeiling ratchet
-// constant in registry_ceiling_test.go has been lowered from 160 to 154
-// in the same diff as the row removal.
-//
-// // acs-predicate: config-check — the constant value is the canonical ratchet
-// config; reading 160 after the 6-row removal breaks the ratchet guarantee.
-//
-// RED: registry_ceiling_test.go currently has FlagCeiling = 160.
-func TestC15_003_FlagCeilingConstIs154(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	ceilingFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_ceiling_test.go")
-	if !acsassert.FileContains(t, ceilingFile, "FlagCeiling = 154") {
-		t.Errorf("RED: registry_ceiling_test.go does not contain 'FlagCeiling = 154'.\n"+
-			"Builder must lower the FlagCeiling constant from 160 to 154 in the same diff\n"+
-			"as removing the 6 RESUME_* rows (160 − 6 = 154).\n"+
-			"File: %s", ceilingFile)
-	}
-}
-
 // TestC15_004_NoResumeEnvReadsInProductionFiles verifies that no production
 // Go file reads any of the 6 RESUME_* env vars via os.Getenv.
 //

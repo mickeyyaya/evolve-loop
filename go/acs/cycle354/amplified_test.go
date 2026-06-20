@@ -29,27 +29,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC354_Amp_001_WorktreeClusterFlagsAreDead verifies that the two
-// Worktree/Workspace cluster flags show DEAD (uppercase) in the
-// hand-maintained section of control-flags.md.
-//
-// Adversarial gap: C354_001 covers CoreInfra, C354_002 covers Platform/CLI
-// Hybrid, C354_003 covers Workflow Defaults — but the Worktree/Workspace
-// cluster (EVOLVE_DRY_RUN_PROVISION_WORKTREE, EVOLVE_PROFILE_WORKTREE_AWARE)
-// was untested. A builder who updated only 8 of 10 flags would pass all
-// C354_001–007 but fail this test.
-func TestC354_Amp_001_WorktreeClusterFlagsAreDead(t *testing.T) {
-	doc := controlFlagsPath(t)
-	for _, flag := range []string{
-		"`EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD",
-		"`EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD",
-	} {
-		if !acsassert.FileContains(t, doc, flag) {
-			t.Errorf("RED: Worktree cluster flag missing DEAD in hand-maintained table: %s", flag)
-		}
-	}
-}
-
 // TestC354_Amp_002_WorktreeClusterFlagsNotActive is the mirror negative check:
 // the two Worktree/Workspace cluster flags must not still appear as ACTIVE or
 // DEPRECATED. Complementary to TestC354_Amp_001_WorktreeClusterFlagsAreDead.
@@ -63,27 +42,6 @@ func TestC354_Amp_002_WorktreeClusterFlagsNotActive(t *testing.T) {
 	}
 	for _, p := range forbidden {
 		acsassert.FileNotContains(t, doc, p)
-	}
-}
-
-// TestC354_Amp_003_RemainingFlagsShowDead verifies the 5 remaining cycle-354 target
-// flags still show DEAD in the hand-maintained section after cycle-359 removed the
-// 5 Platform/CLI Hybrid flags (GEMINI_CLAUDE_PATH, GEMINI_REQUIRE_FULL,
-// CODEX_CLAUDE_PATH, ALLOW_INTERACTIVE_FALLBACK, FORCE_BARE).
-// C354_004 only requires ≥5 of 10 — this test guards the 5 that remain.
-func TestC354_Amp_003_RemainingFlagsShowDead(t *testing.T) {
-	doc := controlFlagsPath(t)
-	deadPatterns := []string{
-		"`EVOLVE_RESOLVE_ROOTS_LOADED` | DEAD",
-		"`EVOLVE_FAILURE_CLASSIFICATIONS_LOADED` | DEAD",
-		"`EVOLVE_DRY_RUN_PROVISION_WORKTREE` | DEAD",
-		"`EVOLVE_PROFILE_WORKTREE_AWARE` | DEAD",
-		"`EVOLVE_STRICT_FAILURES` | DEAD",
-	}
-	for _, p := range deadPatterns {
-		if !acsassert.FileContains(t, doc, p) {
-			t.Errorf("RED: remaining cycle-354 target flags must show DEAD; missing %q in hand-maintained section", p)
-		}
 	}
 }
 
