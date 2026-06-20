@@ -96,6 +96,15 @@ type Config struct {
 	// costs nothing on the common no-stall path. Nil → no probe; stdout-log +
 	// workspace growth govern alone (byte-identical to the pre-probe path).
 	LivenessProbe func() bool
+
+	// OnEvent, when non-nil, is invoked synchronously for every emission with the
+	// typed Event, after the NDJSON sink write and OUTSIDE the sink lock. It makes
+	// the observer's events subscribable in-process so a consumer (or a test) can
+	// react to a stall/started/stopped emission without tailing the NDJSON file.
+	// Implementations MUST NOT block (use a buffered or non-blocking send) — a slow
+	// subscriber would otherwise stall the watch loop. Nil → no hook (byte-identical
+	// to the sink-only path).
+	OnEvent func(Event)
 }
 
 // Observer watches one phase's stdout-log for activity and emits
@@ -247,11 +256,14 @@ func (o *Observer) emit(eventType, severity, reason string) {
 		Agent:    o.cfg.Agent,
 		Reason:   reason,
 	}
-	b, err := json.Marshal(e)
-	if err != nil {
-		return
-	}
 	o.encMu.Lock()
-	defer o.encMu.Unlock()
-	_, _ = o.sink.Write(append(b, '\n'))
+	if b, err := json.Marshal(e); err == nil {
+		_, _ = o.sink.Write(append(b, '\n'))
+	}
+	o.encMu.Unlock()
+	// In-process subscribers (nil in production) react to the typed event after the
+	// sink write, outside the lock so a blocking subscriber can't stall other emits.
+	if o.cfg.OnEvent != nil {
+		o.cfg.OnEvent(e)
+	}
 }
