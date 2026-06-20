@@ -96,6 +96,7 @@
     "all"
   ],
   "stream_output": true,
-  "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY \u2014 router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm.",
-  "generated_from": "hand-authored"
+  "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY — router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm.",
+  "generated_from": "hand-authored",
+  "cli_fallback": []
 }

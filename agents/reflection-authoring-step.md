@@ -14,7 +14,7 @@ tools: []
 
 ## Purpose
 
-Every phase agent surfaces a bounded reflection on its own execution so the Learn phase can aggregate per-phase friction and cross-cycle patterns. This is process retrospection, not code-quality review (distinct from `EVOLVE_BUILDER_SELF_REVIEW`).
+Every phase agent surfaces a bounded reflection on its own execution so the Learn phase can aggregate per-phase friction and cross-cycle patterns. This is process retrospection, not code-quality review (distinct from the self-review loop).
 
 ## Workflow (3 steps, before posting your completion ledger entry)
 

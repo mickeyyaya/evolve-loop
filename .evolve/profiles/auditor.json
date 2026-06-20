@@ -146,7 +146,7 @@
   "parallel_subtasks": [
     {
       "name": "eval-replay",
-      "prompt_template": "You are auditor-eval-replay for cycle {cycle}. Re-run every eval in .evolve/evals/cycle-*/ via scripts/verify-eval.sh and report PASS/FAIL per eval. The first content line of your report MUST be 'Verdict: PASS' (all evals pass) or 'Verdict: FAIL' (any eval fails). Body lists each eval and its outcome. DO NOT do lint or regression work \u2014 those are other workers."
+      "prompt_template": "You are auditor-eval-replay for cycle {cycle}. Re-run every eval in .evolve/evals/cycle-*/ via scripts/verify-eval.sh and report PASS/FAIL per eval. The first content line of your report MUST be 'Verdict: PASS' (all evals pass) or 'Verdict: FAIL' (any eval fails). Body lists each eval and its outcome. DO NOT do lint or regression work — those are other workers."
     },
     {
       "name": "lint",
@@ -154,7 +154,7 @@
     },
     {
       "name": "regression",
-      "prompt_template": "You are auditor-regression for cycle {cycle}. Run scripts/run-all-regression-tests.sh and parse the JSON output. First content line: 'Verdict: PASS' (zero failures) or 'Verdict: FAIL' (any failures, even pre-existing \u2014 Builder is responsible for not regressing further). Body summarizes total/passed/failed counts and lists any new failures vs. baseline."
+      "prompt_template": "You are auditor-regression for cycle {cycle}. Run scripts/run-all-regression-tests.sh and parse the JSON output. First content line: 'Verdict: PASS' (zero failures) or 'Verdict: FAIL' (any failures, even pre-existing — Builder is responsible for not regressing further). Body summarizes total/passed/failed counts and lists any new failures vs. baseline."
     },
     {
       "name": "build-quality",
@@ -216,7 +216,7 @@
   "allowed_clis": [
     "all"
   ],
-  "_note": "Cross-family with builder (builder=codex/OpenAI, auditor=claude/Anthropic -> different families, adversarial-audit invariant satisfied). NO cli_fallback by design: the only non-claude option was codex, which would collide with the codex builder and breach the builder!=auditor floor; agy is banned from all fallback chains (operator 2026-06-07). allowed_clis=all. codex-tmux remains reachable only via consensus mode (consensus.cli_voters); there the claude-only raw flags (--plugin-dir, --strict-mcp-config, ...) do NOT apply \u2014 codex realizes only -m <model> and runs the verification scripts via its own shell; extra_flags_by_cli.codex-tmux is intentionally empty. The claude-tmux flag set is active now that the auditor runs on claude.",
+  "_note": "Cross-family with builder (builder=codex/OpenAI, auditor=claude/Anthropic -> different families, adversarial-audit invariant satisfied). NO cli_fallback by design: the only non-claude option was codex, which would collide with the codex builder and breach the builder!=auditor floor; agy is banned from all fallback chains (operator 2026-06-07). allowed_clis=all. codex-tmux remains reachable only via consensus mode (consensus.cli_voters); there the claude-only raw flags (--plugin-dir, --strict-mcp-config, ...) do NOT apply — codex realizes only -m <model> and runs the verification scripts via its own shell; extra_flags_by_cli.codex-tmux is intentionally empty. The claude-tmux flag set is active now that the auditor runs on claude.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

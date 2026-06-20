@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -208,17 +207,4 @@ func jsonStringEscape(s string) string {
 	s = strings.ReplaceAll(s, "\r", `\r`)
 	s = strings.ReplaceAll(s, "\t", `\t`)
 	return s
-}
-
-// parseQuotaDangerPct parses EVOLVE_QUOTA_DANGER_PCT with bash's 80 default.
-// Exported so callers in the CLI don't reimplement.
-func ParseQuotaDangerPct(raw string) int {
-	if raw == "" {
-		return 80
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 0 {
-		return 80
-	}
-	return n
 }

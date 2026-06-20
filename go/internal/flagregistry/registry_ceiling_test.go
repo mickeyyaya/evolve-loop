@@ -13,7 +13,7 @@ import "testing"
 // (EVOLVE_CYCLE_BUDGET + EVOLVE_MAX_CYCLES_CAP). These are new capabilities, not
 // regressions; the ratchet records the new post-integration floor. The
 // consolidation campaign resumes lowering it from here toward <30.
-const FlagCeiling = 160
+const FlagCeiling = 126
 
 // TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
 // never exceed FlagCeiling rows. Raising this constant without a matching

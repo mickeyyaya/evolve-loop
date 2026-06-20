@@ -488,24 +488,3 @@ func TestSHA256Hex(t *testing.T) {
 		t.Errorf("sha256Hex empty mismatch")
 	}
 }
-
-func TestParseQuotaDangerPct(t *testing.T) {
-	tests := []struct {
-		raw  string
-		want int
-	}{
-		{"", 80},
-		{"50", 50},
-		{"0", 0},
-		{"100", 100},
-		{"not-a-number", 80},
-		{"-5", 80},
-	}
-	for _, tc := range tests {
-		t.Run(tc.raw, func(t *testing.T) {
-			if got := ParseQuotaDangerPct(tc.raw); got != tc.want {
-				t.Errorf("got %d, want %d", got, tc.want)
-			}
-		})
-	}
-}

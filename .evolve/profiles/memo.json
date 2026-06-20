@@ -1,7 +1,7 @@
 {
   "name": "memo",
   "role": "memo",
-  "cli": "codex-tmux",
+  "cli": "agy-tmux",
   "cli_fallback": [
     "claude-tmux"
   ],

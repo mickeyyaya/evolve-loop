@@ -136,5 +136,6 @@
     "kb_search": 20
   },
   "stream_output": true,
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "cli_fallback": []
 }

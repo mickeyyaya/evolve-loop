@@ -1,10 +1,8 @@
 {
   "name": "okr-draft",
   "role": "okr-draft",
-  "cli": "codex-tmux",
-  "cli_fallback": [
-    "claude-tmux"
-  ],
+  "cli": "claude-tmux",
+  "cli_fallback": [],
   "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",

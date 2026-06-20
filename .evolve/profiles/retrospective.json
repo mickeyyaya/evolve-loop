@@ -2,9 +2,7 @@
   "name": "retrospective",
   "role": "retrospective",
   "cli": "claude-tmux",
-  "cli_fallback": [
-    "codex-tmux"
-  ],
+  "cli_fallback": [],
   "model_tier_default": "deep",
   "model_tier_overrides": {
     "systemic_failure": "deep",

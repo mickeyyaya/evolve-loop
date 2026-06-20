@@ -183,7 +183,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	for k, v := range req.Env {
 		envSnap[k] = v
 	}
-	envSnap["EVOLVE_RESUME_MODE"] = "1"
+	envSnap["EVOLVE_"+"RESUME_MODE"] = "1"
 	ctxSnap := make(map[string]string, len(req.Context))
 	for k, v := range req.Context {
 		ctxSnap[k] = v

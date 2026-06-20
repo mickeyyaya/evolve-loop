@@ -110,7 +110,8 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
+  "_note": "Restricted to claude — same safety reasoning as builder.",
   "stream_output": true,
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "cli_fallback": []
 }

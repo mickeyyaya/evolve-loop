@@ -6,7 +6,7 @@
 
 A self-evolving development pipeline that orchestrates 4 specialized agents (Scout, Builder, Auditor, Orchestrator) through 6 lean phases per cycle (Calibrate → Intent → Scout → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce phase ordering, role-scoped write paths, atomic ship semantics, ledger SHA verification, and v8.37+ tamper-evident hash-chained recording.
 
-> **Runtime note (Go-only):** The Go binary (`go/bin/evolve`) is the sole runtime entrypoint. The bash `legacy/scripts/` tree and its `EVOLVE_USE_LEGACY_BASH` rollback hatch were removed in the Go-only consolidation — there is no bash fallback. Every operation below is a native `evolve <subcommand>` or a function in `go/internal/...`. For the history of the bash→Go port, see [docs/migration-from-bash.md](docs/migration-from-bash.md).
+> **Runtime note (Go-only):** The Go binary (`go/bin/evolve`) is the sole runtime entrypoint. The bash `legacy/scripts/` tree were removed in the Go-only consolidation — there is no bash fallback. Every operation below is a native `evolve <subcommand>` or a function in `go/internal/...`. For the history of the bash→Go port, see [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
 ## Cross-CLI invariants (the universal rules)
 

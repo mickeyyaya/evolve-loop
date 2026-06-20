@@ -26,7 +26,7 @@ Each entry in `## Artifact Index` is a single prose line stating the relative pa
 
 ### Skill Suggestions format
 
-Each suggestion is one imperative sentence naming the carryover ID it targets, the recommended persona or flag, and optionally why. Two to four entries. Suggestions map directly to evolve-loop persona actions: a specific `EVOLVE_TASK_MODE`, a `subagent-run.sh` invocation variant, or an env flag to enable. Keep each suggestion to one sentence.
+Each suggestion is one imperative sentence naming the carryover ID it targets, the recommended persona or configuration, and optionally why. Two to four entries. Suggestions map directly to evolve-loop persona actions: a `subagent-run.sh` invocation variant or an env flag to enable. Keep each suggestion to one sentence.
 
 ### carryoverTodo Guidance format
 

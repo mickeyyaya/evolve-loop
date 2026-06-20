@@ -209,17 +209,17 @@ func (a *CoreAdapter) channelSourcePaths(req core.PhaseRequest, phase string) (s
 		filepath.Join(req.Workspace, phase+"-breadcrumbs.live")
 }
 
-// phaseCLI resolves the per-phase CLI/driver name, mirroring llmroute's
-// precedence head (EVOLVE_<AGENT>_CLI > EVOLVE_CLI), checking the per-cycle
-// req.Env snapshot before the process env, and defaulting to llmroute's default
-// "claude-tmux". The agent key uppercases the phase with hyphens → underscores
+// phaseCLI resolves the per-phase CLI/driver name from the per-cycle request
+// snapshot and defaults to llmroute's "claude-tmux". Persistent per-agent
+// selection belongs to the profile SSOT; this best-effort observer does not
+// load profiles. The agent key uppercases the phase with hyphens → underscores
 // (tdd-engineer → EVOLVE_TDD_ENGINEER_CLI).
 func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 	look := func(k string) string {
 		if v, ok := req.Env[k]; ok && v != "" {
 			return v
 		}
-		return a.envGet(k)
+		return ""
 	}
 	agentKey := "EVOLVE_" + strings.ToUpper(strings.ReplaceAll(phase, "-", "_")) + "_CLI"
 	if v := look(agentKey); v != "" {

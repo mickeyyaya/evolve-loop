@@ -12,13 +12,8 @@ var refNow = time.Date(2026, 5, 23, 14, 0, 0, 0, time.UTC)
 
 func TestCompute_OperatorOverrideISO(t *testing.T) {
 	r, err := Compute("", Options{
-		Env: func(name string) string {
-			if name == "EVOLVE_QUOTA_RESET_AT" {
-				return "2026-05-23T20:00:00+0000"
-			}
-			return ""
-		},
-		Now: func() time.Time { return refNow },
+		ResetAt: "2026-05-23T20:00:00+0000",
+		Now:     func() time.Time { return refNow },
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -33,13 +28,8 @@ func TestCompute_OperatorOverrideISO(t *testing.T) {
 
 func TestCompute_OperatorOverrideUnparseable(t *testing.T) {
 	r, err := Compute("", Options{
-		Env: func(name string) string {
-			if name == "EVOLVE_QUOTA_RESET_AT" {
-				return "not-a-timestamp"
-			}
-			return ""
-		},
-		Now: func() time.Time { return refNow },
+		ResetAt: "not-a-timestamp",
+		Now:     func() time.Time { return refNow },
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -169,13 +159,8 @@ func TestCompute_DefaultFallback(t *testing.T) {
 
 func TestCompute_EnvOverrideHours(t *testing.T) {
 	r, err := Compute("", Options{
-		Env: func(name string) string {
-			if name == "EVOLVE_QUOTA_RESET_HOURS" {
-				return "2.5"
-			}
-			return ""
-		},
-		Now: func() time.Time { return refNow },
+		DefaultHours: 2.5,
+		Now:          func() time.Time { return refNow },
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -209,13 +194,8 @@ func TestCompute_OperatorOverrideValidRFC3339(t *testing.T) {
 	// unparseable branch.
 	override := "2026-05-23T20:00:00+00:00"
 	r, err := Compute("", Options{
-		Env: func(name string) string {
-			if name == "EVOLVE_QUOTA_RESET_AT" {
-				return override
-			}
-			return ""
-		},
-		Now: func() time.Time { return refNow },
+		ResetAt: override,
+		Now:     func() time.Time { return refNow },
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)

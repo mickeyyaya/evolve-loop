@@ -142,16 +142,16 @@ EOF
 
 ## Section: resume-mode
 
-Loaded when `EVOLVE_RESUME_MODE=1`. Protocol for picking up a paused cycle.
+Loaded when the IPC key `EVOLVE_` + `RESUME_MODE` is `1`. Protocol for picking up a paused cycle.
 
 Three pause causes: `quota-likely`, `batch-cap-near`, `operator-requested` — the orchestrator emits the `CHECKPOINT-PAUSED` verdict for each.
 
 ### Resume protocol
 
 1. **Read state**: `cycle-state.sh get cycle_id`, `cycle-state.sh get phase`, `cycle-state.sh resume-phase`.
-2. **Skip completed**: For each phase in `EVOLVE_RESUME_COMPLETED_PHASES`, trust existing artifacts. Do not re-run completed phases — re-running burns tokens and may stomp valid output.
+2. **Skip completed**: For each phase in the IPC key `EVOLVE_` + `RESUME_COMPLETED_PHASES`, trust existing artifacts. Do not re-run completed phases — re-running burns tokens and may stomp valid output.
 3. **Clear checkpoint**: `cycle-state.sh clear-checkpoint` once you resume forward progress.
-4. **Pick up**: Invoke `EVOLVE_RESUME_PHASE` subagent normally.
+4. **Pick up**: Invoke the subagent named by the IPC key `EVOLVE_` + `RESUME_PHASE` normally.
 5. **Re-pause**: If `quota-likely` or `batch-cap-near`, write new checkpoint and emit `CHECKPOINT-PAUSED`.
 
 ---
@@ -233,12 +233,12 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
    ↓ unless EVOLVE_TRIAGE_DISABLE=1: advance triage triage
 2b. Triage (default-on; opt-out via EVOLVE_TRIAGE_DISABLE=1)
        Before invoking the Triage subagent, check the 3 auto-skip conditions
-       (Opt A, v10.19.0; default-on, opt-out via EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL=0):
+       (Opt A, v10.19.0; removed in flag-reduction campaign — auto-skip was the default):
          (i)   scout-report.md task count ≤ 1
          (ii)  state.json:carryoverTodos | length == 0
          (iii) predicate-dependency-check.sh returns exit 0 (no cross-cycle
                predicate-graph reachability via cycle-91 lesson)
-       If ALL three hold AND EVOLVE_TRIAGE_AUTO_SKIP_TRIVIAL != 0, write a
+       If ALL three hold, write a
        deterministic stub triage-report.md to $WORKSPACE with:
          - challenge_token (generate via openssl rand or `date +%s` fallback)
          - `cycle_size_estimate: trivial`

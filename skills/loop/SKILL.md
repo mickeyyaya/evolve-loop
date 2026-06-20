@@ -12,7 +12,7 @@ argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 
 Tool and command names in this file use **Claude Code conventions** (`Read`, `Bash`, `Skill`, `Agent`, etc.). If you are running this skill from a different CLI (Gemini, Codex, generic), read [reference/platform-detect.md](reference/platform-detect.md) FIRST — it tells you which translation overlay to load (`reference/<platform>-tools.md` for tool names, `reference/<platform>-runtime.md` for invocation patterns). As of v12.0.0 the runtime is the Go binary (`go/bin/evolve`); cross-CLI subagent execution is handled by `evolve subagent run` and the `evolve serve-phase <name>` phaseproto wire. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for the support matrix.
 
-> **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher remains archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` as the operator-only `EVOLVE_USE_LEGACY_BASH=1` rollback hatch — not for general use.
+> **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher is archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — not for general use.
 
 > **What this does in one paragraph:** Each `/evolve-loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
 
@@ -49,7 +49,7 @@ Single quotes inside the goal are fine when the goal itself is double-quoted. Av
 ```
 The native dispatcher locates the most recent paused cycle, validates state (git HEAD unchanged, worktree exists), and re-runs the orchestrator from the paused phase boundary. Trust kernel is preserved — phase-gate, role-gate, ship-gate enforce the same invariants during resume. See [docs/architecture/checkpoint-resume.md](../../docs/architecture/checkpoint-resume.md) for the full protocol.
 
-**Rollback hatch (v11.5.0+):** If the native dispatcher misbehaves, `EVOLVE_USE_LEGACY_BASH=1` exec's to the archived bash dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`. Same argv, same exit codes. Only the dispatch path differs.
+**Rollback hatch (removed in v12):** The legacy bash dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` is archived. The native dispatcher is the sole path.
 
 **DO NOT** invent paths like `<plugin_root>/skills/loop/go/bin/...` — the binary lives at `<plugin_root>/go/bin/evolve`, NOT under `skills/`. The skill (this file) and the binary live in sibling directories under the plugin root.
 
@@ -279,7 +279,7 @@ Instead of running the loop from inside this skill's prompt, the native binary's
 
 The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine; the `evolve guard phase` PreToolUse hook reads cycle-state to validate that the next subagent invocation matches the expected order.
 
-Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs. Pre-v11.5.0 operators who depend on the bash dispatch path can set `EVOLVE_USE_LEGACY_BASH=1` to exec the archived dispatcher at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`.
+Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs.
 
 ## Agents
 

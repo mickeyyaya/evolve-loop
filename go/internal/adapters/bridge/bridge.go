@@ -20,8 +20,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Interactive policy values for EVOLVE_INTERACTIVE_POLICY and the
-// per-agent override EVOLVE_<AGENT>_INTERACTIVE_POLICY. The bridge
+// Interactive policy values for the typed profile policy and the per-agent
+// request override EVOLVE_<AGENT>_INTERACTIVE_POLICY. The bridge
 // prepends a deterministic policy block to the prompt body so phase
 // agents self-resolve interactive prompts (AskUserQuestion, y/N) without
 // blocking the autonomous loop. See docs/architecture/plan-mode-dispatch.md
@@ -137,7 +137,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
 	// optimal. See injectContract.
 	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
-	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env))
+	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
 	inproc.Prompt = injectCorrectionPrefix(withRules, req.CorrectionDirective)
 
@@ -173,26 +173,26 @@ func validate(req core.BridgeRequest) error {
 	return nil
 }
 
-// resolvePolicy returns the effective interactive policy for the given
-// agent. The lookup chain is two layered envchain.Resolve calls — the
-// per-agent override layer first, then the global EVOLVE_INTERACTIVE_POLICY
-// layer — so the precedence semantics live in envchain and stay aligned
-// with the runner's per-phase env resolution and any future config-knob site.
+// resolvePolicy returns the effective interactive policy for the given agent.
+// The request-local env is the explicit override surface and profilePolicy is
+// the typed profile value resolved by the runner. Process env is intentionally
+// excluded so the profile remains the persistent SSOT.
 //
 // Effective precedence:
 //
 //  1. reqEnv[EVOLVE_<AGENT>_INTERACTIVE_POLICY]
-//  2. os.Getenv(EVOLVE_<AGENT>_INTERACTIVE_POLICY)
-//  3. reqEnv[EVOLVE_INTERACTIVE_POLICY]
-//  4. os.Getenv(EVOLVE_INTERACTIVE_POLICY)
-//  5. PolicyRecommendedOrFirst (default-on autonomy posture)
-func resolvePolicy(agent string, reqEnv map[string]string) string {
+//  2. profilePolicy
+//  3. PolicyRecommendedOrFirst (default-on autonomy posture)
+func resolvePolicy(agent string, reqEnv map[string]string, profilePolicy string) string {
 	if agent != "" {
-		if v := envchain.Resolve(perAgentPolicyEnv(agent), reqEnv, "", ""); v != "" {
+		if v := reqEnv[perAgentPolicyEnv(agent)]; v != "" {
 			return v
 		}
 	}
-	return envchain.Resolve("EVOLVE_INTERACTIVE_POLICY", reqEnv, "", PolicyRecommendedOrFirst)
+	if profilePolicy != "" {
+		return profilePolicy
+	}
+	return PolicyRecommendedOrFirst
 }
 
 // perAgentPolicyEnv maps an agent name to the per-agent override env

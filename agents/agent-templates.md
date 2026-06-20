@@ -324,6 +324,4 @@ A human-readable shared narrative document at `.evolve/runs/cycle-N/team-context
 
 ### Phase-gate hook (opt-in)
 
-When `EVOLVE_REQUIRE_TEAM_CONTEXT=1` is exported in the dispatcher environment, `phase-gate-precondition.sh` blocks Builder invocations until both Scout's and TDD-Engineer's sections are populated in the bus. Default off for backward compatibility with cycles that predate the bus.
-
 See [legacy/scripts/utility/team-context.sh](../legacy/scripts/utility/team-context.sh) for the implementation.

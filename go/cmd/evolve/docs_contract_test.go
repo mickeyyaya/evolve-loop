@@ -41,29 +41,24 @@ var allowedUndocumented = map[string]bool{
 	// Per-phase env-var FAMILIES — documented as a pattern, not per-phase.
 	// The base pattern (e.g., EVOLVE_<PHASE>_PERMISSION_MODE) IS in
 	// runtime-reference.md.
-	"EVOLVE_BUILD_MODEL":                      true,
-	"EVOLVE_SCOUT_MODEL":                      true,
-	"EVOLVE_INTENT_MODEL":                     true,
-	"EVOLVE_TRIAGE_MODEL":                     true,
-	"EVOLVE_TDD_MODEL":                        true,
-	"EVOLVE_AUDIT_MODEL":                      true,
-	"EVOLVE_BUILD_PERMISSION_MODE":            true,
-	"EVOLVE_SCOUT_PERMISSION_MODE":            true,
-	"EVOLVE_INTENT_PERMISSION_MODE":           true,
-	"EVOLVE_TRIAGE_PERMISSION_MODE":           true,
-	"EVOLVE_TDD_PERMISSION_MODE":              true,
-	"EVOLVE_AUDIT_PERMISSION_MODE":            true,
-	"EVOLVE_BUILD_PLAN_INPUT":                 true,
-	"EVOLVE_BUILD_PLAN_OUTPUT":                true,
-	"EVOLVE_PLAN_WORKSPACE":                   true,
-	"EVOLVE_TDD_ENGINEER_MODEL":               true,
-	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":     true,
-	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE":    true,
-	"EVOLVE_SCOUT_INTERACTIVE_POLICY":         true,
-	"EVOLVE_BUILDER_INTERACTIVE_POLICY":       true,
-	"EVOLVE_AUDITOR_INTERACTIVE_POLICY":       true,
-	"EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY":  true,
-	"EVOLVE_PLAN_REVIEWER_INTERACTIVE_POLICY": true,
+	"EVOLVE_BUILD_MODEL":                   true,
+	"EVOLVE_SCOUT_MODEL":                   true,
+	"EVOLVE_INTENT_MODEL":                  true,
+	"EVOLVE_TRIAGE_MODEL":                  true,
+	"EVOLVE_TDD_MODEL":                     true,
+	"EVOLVE_AUDIT_MODEL":                   true,
+	"EVOLVE_BUILD_PERMISSION_MODE":         true,
+	"EVOLVE_SCOUT_PERMISSION_MODE":         true,
+	"EVOLVE_INTENT_PERMISSION_MODE":        true,
+	"EVOLVE_TRIAGE_PERMISSION_MODE":        true,
+	"EVOLVE_TDD_PERMISSION_MODE":           true,
+	"EVOLVE_AUDIT_PERMISSION_MODE":         true,
+	"EVOLVE_BUILD_PLAN_INPUT":              true,
+	"EVOLVE_BUILD_PLAN_OUTPUT":             true,
+	"EVOLVE_PLAN_WORKSPACE":                true,
+	"EVOLVE_TDD_ENGINEER_MODEL":            true,
+	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":  true,
+	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE": true,
 	// Internal markers / unused literal names referenced in tests.
 	"EVOLVE_SKIP_CYCLE_HEALTH": true, // documented as inline operator escape in cyclehealth doc comment
 
@@ -83,9 +78,6 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override
 	"EVOLVE_PROJECT_ROOT":              true, // dispatcher root resolve
 	"EVOLVE_PROMPTS_DIR":               true, // prompts.NewForProject dev override (used)
-	"EVOLVE_QUOTA_DANGER_PCT":          true, // quotareset
-	"EVOLVE_QUOTA_RESET_AT":            true, // quotareset
-	"EVOLVE_QUOTA_RESET_HOURS":         true, // quotareset
 	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true, // releasepipeline flag
 	"EVOLVE_RELEASE_STRICT_PASS":       true, // releasepreflight strict mode
 	"EVOLVE_RESET":                     true, // cycle-state reset signal

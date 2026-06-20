@@ -203,3 +203,17 @@ func TestValidatePin_UnclassifiableModelSkipsEnvelope(t *testing.T) {
 		t.Errorf("unclassifiable model must skip envelope check, got %v", err)
 	}
 }
+
+// TestPolicy_QuotaResetConfig pins the accessor that replaced the
+// EVOLVE_QUOTA_RESET_AT / EVOLVE_QUOTA_RESET_HOURS env reads (flag-reduction
+// drift repair): absent ⇒ zero value (quotareset built-in defaults apply),
+// present ⇒ the operator-supplied config is returned verbatim.
+func TestPolicy_QuotaResetConfig(t *testing.T) {
+	if got := (Policy{}).QuotaResetConfig(); got != (QuotaResetConfig{}) {
+		t.Errorf("absent QuotaReset must yield zero config, got %+v", got)
+	}
+	want := QuotaResetConfig{ResetAt: "2026-06-20T12:00:00Z", DefaultHours: 5.5}
+	if got := (Policy{QuotaReset: &want}).QuotaResetConfig(); got != want {
+		t.Errorf("QuotaResetConfig() = %+v, want %+v", got, want)
+	}
+}

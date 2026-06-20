@@ -316,3 +316,5 @@
 # fix-preliminary-study-metadata, cmd-campaign-dispatch-coverage.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle17
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle15

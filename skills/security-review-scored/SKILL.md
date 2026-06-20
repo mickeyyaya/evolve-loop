@@ -139,15 +139,15 @@ Invoke after implementation changes, before writing `build-report.md`:
 
 ```
 Builder → Skill("security-review-scored") → parse "Composite Score: X.XX"
-        → if score < EVOLVE_BUILDER_REVIEW_THRESHOLD: note findings in build-report
+        → if score < threshold (0.75 default): note findings in build-report
         → include "security-review-scored=X.XX" in ## Self-Review section
 ```
 
 **Env-var configuration:**
 
 ```bash
-export EVOLVE_BUILDER_REVIEW_SKILLS="code-review-simplify,security-review-scored"
-export EVOLVE_BUILDER_SELF_REVIEW=1
+# reviewSkills: code-review-simplify,security-review-scored
+# selfReview: 1
 ```
 
 ### Standalone Invocation

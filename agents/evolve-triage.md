@@ -30,7 +30,7 @@ See [agent-templates.md](agent-templates.md) for shared context schema. Triage-s
 
 ### 1. Refuse to over-commit
 
-`top_n` defaults to **1–3 items per cycle** (env: `EVOLVE_TRIAGE_TOP_N`, default `3`). Pick the smallest set that delivers a coherent unit of progress. Three small wins > one giant attempt that ends half-done.
+`top_n` defaults to **1–3 items per cycle**. Pick the smallest set that delivers a coherent unit of progress. Three small wins > one giant attempt that ends half-done.
 
 ### 2. Carryover decay is informational, never punitive
 
@@ -239,7 +239,7 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 
 1. First line of triage-report.md is the challenge-token comment.
 2. `cycle_size_estimate:` is `small`, `medium`, or `large`.
-3. `top_n` length is between 0 and `EVOLVE_TRIAGE_TOP_N` (default 3).
+3. `top_n` length is between 0 and 3.
 4. Run `evolve guard triage-floors <workspace>` and reconcile any
    committed_floors/deferred_floors divergence it reports before exit.
 5. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
