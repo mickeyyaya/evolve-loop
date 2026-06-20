@@ -5,23 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
-
-const phaseMaxAttempts = envchain.DefPhaseMaxAttempts
-
-// resolvePhaseMaxAttempts reads EVOLVE_PHASE_MAX_ATTEMPTS and clamps it to
-// [1, MaxPhaseMaxAttempts]. A sub-1 or unparseable value is treated as
-// invalid → default; an over-max value is capped. (IntMin handles the lower
-// bound + invalid-input → default; the explicit cap handles the upper bound.)
-func resolvePhaseMaxAttempts(env map[string]string) int {
-	n := envchain.IntMin(envchain.KeyPhaseMaxAttempts, env, phaseMaxAttempts, 1)
-	if n > envchain.MaxPhaseMaxAttempts {
-		return envchain.MaxPhaseMaxAttempts
-	}
-	return n
-}
 
 // composeCorrection turns a deliverable-reject reason into the correction
 // directive injected into the phase re-dispatch (## Correction prompt block).
@@ -30,32 +14,6 @@ func composeCorrection(reason string) string {
 		reason +
 		"\n\nFix the deliverable so it satisfies the contract — write it at the EXACT contracted path " +
 		"with all required sections / valid structure — then finish. Do not change unrelated files."
-}
-
-// resolveContractCorrectionRetries reads EVOLVE_CONTRACT_CORRECTION_RETRIES.
-// 0 is valid (disable → immediate abort). Negative/unparseable → default 2;
-// above the ceiling → clamped to 5. (envchain.Int returns the default on an
-// empty/unparseable value; the explicit guards handle the negative-but-parseable
-// and over-max cases.)
-func resolveContractCorrectionRetries(env map[string]string) int {
-	n := envchain.Int(envchain.KeyContractCorrectionRetries, env, envchain.DefContractCorrectionRetries)
-	if n < 0 {
-		return envchain.DefContractCorrectionRetries
-	}
-	if n > envchain.MaxContractCorrectionRetries {
-		return envchain.MaxContractCorrectionRetries
-	}
-	return n
-}
-
-// resolveRetryBackoffBase reads EVOLVE_RETRY_BACKOFF_BASE_S, flooring a
-// negative value at 0 (disabled). Unset / empty / unparseable → default.
-func resolveRetryBackoffBase(env map[string]string) int {
-	n := envchain.Int(envchain.KeyRetryBackoffBaseS, env, envchain.DefRetryBackoffBaseS)
-	if n < 0 {
-		return 0
-	}
-	return n
 }
 
 // backoffSleep is the sleep seam for executeRetryBackoff. Production uses the
@@ -72,8 +30,7 @@ func resolveRetryBackoffBase(env map[string]string) int {
 // the exact per-test churn this seam removes.
 var backoffSleep = time.Sleep
 
-func executeRetryBackoff(attempt int, env map[string]string) {
-	base := resolveRetryBackoffBase(env)
+func executeRetryBackoff(attempt, base int) {
 	if base <= 0 {
 		return
 	}

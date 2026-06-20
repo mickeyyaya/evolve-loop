@@ -22,8 +22,8 @@ import (
 // dispatch at off/shadow (the campaign's master no-regression invariant). The
 // read is best-effort: a missing/unreadable file yields "" (the phase's own
 // fallback then also reads nothing), never an error.
-func readUpstreamBuildPlan(stage config.Stage, phase Phase, env map[string]string, workspace string) string {
-	if stage < config.StageAdvisory || phase != PhaseBuild || workspace == "" || env["EVOLVE_BUILD_PLANNER"] != "1" {
+func readUpstreamBuildPlan(stage config.Stage, phase Phase, phaseEnables map[string]string, workspace string) string {
+	if stage < config.StageAdvisory || phase != PhaseBuild || workspace == "" || phaseEnables["build-planner"] != "on" {
 		return ""
 	}
 	if data, err := os.ReadFile(filepath.Join(workspace, "build-plan.md")); err == nil {

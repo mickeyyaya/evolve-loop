@@ -17,19 +17,22 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.SetOutput(stderr)
 
 	var (
-		projectRoot    string
-		evolveDir      string
-		goalHash       string
-		goalText       string
-		strategy       string
-		maxCyclesFlag  int
-		cyclesFlag     int
-		budgetUSD      float64
-		batchCapUSD    float64
-		resume         bool
-		dryRun         bool
-		reset          bool
-		consensusAudit bool
+		projectRoot       string
+		evolveDir         string
+		goalHash          string
+		goalText          string
+		strategy          string
+		maxCyclesFlag     int
+		cyclesFlag        int
+		budgetUSD         float64
+		batchCapUSD       float64
+		resume            bool
+		dryRun            bool
+		reset             bool
+		consensusAudit    bool
+		forceFresh        bool
+		skipPreflight     bool
+		skipPreflightBoot bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
@@ -50,6 +53,9 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
 	fs.BoolVar(&consensusAudit, "consensus-audit", false, "opt-in cross-CLI auditor consensus mode")
+	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
+	fs.BoolVar(&skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
+	fs.BoolVar(&skipPreflightBoot, "skip-preflight-boot", false, "run cheap checks but skip the real bridge-boot probe (CI/offline)")
 
 	// WS-G2 repeatable per-agent overrides:
 	//   --cli  auditor=claude-tmux              (one --cli per agent)
@@ -172,6 +178,9 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		Reset:             reset,
 		ConsensusAudit:    consensusAudit,
 		DryRun:            dryRun,
+		ForceFresh:        forceFresh,
+		SkipPreflight:     skipPreflight,
+		SkipPreflightBoot: skipPreflightBoot,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}, 0
@@ -242,11 +251,10 @@ func buildCycleContext(cfg loopConfig) map[string]string {
 //
 //  1. Copy every EVOLVE_* var from osEnv. This is how operator-set
 //     flags (REQUIRE_INTENT, SANDBOX_FALLBACK_ON_EPERM, TRIAGE_DISABLE,
-//     BUILD_PLANNER, STDOUT_FILTER, …) reach the orchestrator + every
-//     downstream subagent.
-//  2. Apply dispatcher-derived overrides (Strategy, ConsensusAudit,
-//     Resume, Reset). CLI-derived choices win over env so an operator
-//     passing `--strategy harden` overrides EVOLVE_STRATEGY=balanced.
+//     BUILD_PLANNER, …) reach the orchestrator + every downstream subagent.
+//  2. Apply dispatcher-derived IPC overrides (Resume). Strategy flows
+//     via Context["strategy"] — not env. cfg.Reset is consumed at
+//     cmd_loop.go before buildCycleEnv is called — neither writes env.
 //
 // Non-EVOLVE_* vars are intentionally skipped — only this prefix is
 // part of the documented operator surface. The orchestrator reads from
@@ -264,18 +272,11 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 		}
 		out[kv[:eq]] = kv[eq+1:]
 	}
-	// Dispatcher-derived overrides — CLI > env.
-	out["EVOLVE_STRATEGY"] = cfg.Strategy
-	if cfg.ConsensusAudit {
-		out["EVOLVE_CONSENSUS_AUDIT"] = "1"
-	}
+	// Dispatcher-derived IPC overrides.
 	if cfg.Resume {
 		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
 		// does not classify this parent-to-child handoff as a configurable flag.
 		out["EVOLVE_"+"RESUME"] = "1"
-	}
-	if cfg.Reset {
-		out["EVOLVE_RESET"] = "1"
 	}
 	// WS-G2: per-agent --cli / --model launch flags translate to
 	// EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL env keys (matching

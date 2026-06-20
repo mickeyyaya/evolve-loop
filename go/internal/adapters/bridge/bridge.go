@@ -12,12 +12,14 @@ package bridge
 import (
 	"context"
 	"errors"
+	"path/filepath"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // Interactive policy values for the typed profile policy and the per-agent
@@ -76,6 +78,9 @@ type Adapter struct {
 	// self-report failure via a structured sentinel; default StageOff keeps the
 	// dispatched prompt byte-identical to pre-3.8b.
 	phaseIO config.Stage
+	// bridgeConfig carries the timing overrides loaded from policy.json at
+	// construction time. Zero values mean "use bridge built-in defaults".
+	bridgeConfig policy.BridgePolicy
 }
 
 // New constructs an Adapter backed by the native-Go bridge.Engine. Tests
@@ -89,12 +94,15 @@ func New() *Adapter {
 	}
 }
 
-// NewDefault constructs the production Adapter. projectRoot is accepted
-// for call-site stability (every phase passes req.ProjectRoot) and is
-// reserved for future project-root-relative manifest resolution; the
-// Engine currently resolves paths from the request, so it is unused here.
-func NewDefault(projectRoot string) *Adapter { //nolint:unparam // projectRoot reserved for call-site stability
-	return New()
+// NewDefault constructs the production Adapter, loading timing overrides
+// from <projectRoot>/.evolve/policy.json when available (fail-open: a
+// missing or unparseable policy.json falls back to bridge built-in defaults).
+func NewDefault(projectRoot string) *Adapter {
+	a := New()
+	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
+		a.bridgeConfig = pol.BridgeConfig()
+	}
+	return a
 }
 
 // SetOnStopReview wires a callback invoked for every stop-review verdict the
@@ -150,7 +158,14 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		cycle := req.Cycle
 		cb := a.onStopReview
 		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
-		return gobridge.NewEngine(gobridge.Deps{Env: req.Env, OnStopReview: onSR}).Launch(ctx, inproc)
+		return gobridge.NewEngine(gobridge.Deps{
+			Env:                req.Env,
+			OnStopReview:       onSR,
+			BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
+			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
+			ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
+			ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
+		}).Launch(ctx, inproc)
 	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
 }

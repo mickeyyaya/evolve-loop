@@ -53,7 +53,7 @@ Invoke directly when:
 
 Invoke via:
 - `/plan-review` slash command
-- `evolve-loop` macro (between Scout and TDD when `EVOLVE_PLAN_REVIEW=1`)
+- `evolve-loop` macro (between Scout and TDD when `workflow.phase_enables.plan-review=on`)
 
 Do NOT invoke from another persona. Plan-reviewer is itself the orchestration layer for the four lens sub-personas (via `parallel_subtasks`).
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // recordingReviewer is a DeliverableReviewer test double that records every
@@ -283,12 +285,14 @@ func TestCorrectionLoop_DisabledIsImmediateAbort(t *testing.T) {
 	}
 	runners := buildRunners(nil)
 	buildR := runners[PhaseBuild].(*fakeRunner)
-	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
+	retryCfg := policy.Policy{}.RetryConfig()
+	retryCfg.ContractCorrectionRetries = 0
+	o := NewOrchestrator(st, led, runners, WithReviewer(rev), WithRetryConfig(retryCfg))
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: "/tmp/p",
 		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "0"},
+		Env:         map[string]string{},
 	})
 	if err == nil {
 		t.Fatal("expected immediate abort when corrections disabled; got nil")

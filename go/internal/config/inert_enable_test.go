@@ -1,9 +1,6 @@
 package config
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
 // inertEnableWarn extracts the inert-phase-enable warning from ws, or returns
 // ("", false) when none is present. Helper so tests assert on the typed code
@@ -17,57 +14,26 @@ func inertEnableWarn(ws []Warning) (Warning, bool) {
 	return Warning{}, false
 }
 
-// TestLoad_PlanReviewEnabled_StageOff_EmitsInertWarning is the canonical
-// trigger surfaced by the cycle-120 retrospective: an operator sets
-// EVOLVE_PLAN_REVIEW=1 expecting plan-review to run, but the default static
-// state machine ignores it (plan-review is router-only). Pre-fix this was a
-// silent no-op — the warning makes the inert flag loud.
-func TestLoad_PlanReviewEnabled_StageOff_EmitsInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{"EVOLVE_PLAN_REVIEW": "1", "EVOLVE_DYNAMIC_ROUTING": "off"})
-	w, ok := inertEnableWarn(ws)
-	if !ok {
-		t.Fatalf("expected an inert-phase-enable warning; got %+v", ws)
-	}
-	if !strings.Contains(w.Message, "plan-review") {
-		t.Errorf("warning should name the phase; got %q", w.Message)
-	}
-}
-
-// TestLoad_PlanReviewEnabled_StageAdvisory_NoInertWarning proves the warning
-// is SCOPED to Stage<Advisory. At Stage>=Advisory the router consults
-// PhaseEnable, so plan-review IS reachable and the enable is not inert.
+// TestLoad_PlanReviewEnabled_StageAdvisory_NoInertWarning proves the inert
+// warning is SCOPED to Stage<Advisory. At Stage>=Advisory the router consults
+// PhaseEnable, so a non-spine phase enable is not inert.
+// (The env-based EVOLVE_PLAN_REVIEW trigger was removed in cycle-39; this
+// baseline checks that no spurious warning fires with empty env.)
 func TestLoad_PlanReviewEnabled_StageAdvisory_NoInertWarning(t *testing.T) {
 	_, ws := Load("", map[string]string{
-		"EVOLVE_PLAN_REVIEW":     "1",
 		"EVOLVE_DYNAMIC_ROUTING": "advisory",
 	})
 	if _, ok := inertEnableWarn(ws); ok {
-		t.Errorf("inert-warning fired at Stage=Advisory; got %+v", ws)
+		t.Errorf("inert-warning fired with no enables at Stage=Advisory; got %+v", ws)
 	}
 }
 
-// TestLoad_PlanReviewEnabled_StageShadow_EmitsInertWarning pins the
-// reviewer-flagged Stage==Shadow case: shadow computes+logs the would-have-
-// routed plan but the STATIC state machine still drives execution, so
-// non-spine phases remain unreachable. The warning must still fire to keep the
-// operator-confusion failure mode plugged across the full sub-advisory range.
-func TestLoad_PlanReviewEnabled_StageShadow_EmitsInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{
-		"EVOLVE_PLAN_REVIEW":     "1",
-		"EVOLVE_DYNAMIC_ROUTING": "shadow",
-	})
-	if _, ok := inertEnableWarn(ws); !ok {
-		t.Errorf("expected inert-warning at Stage=Shadow (static still drives); got %+v", ws)
-	}
-}
-
-// TestLoad_SpinePhaseEnabled_NoInertWarning proves the warning is also scoped
-// to NON-spine phases. A force-enable of a spine phase (tdd here) is honored
-// by the static state machine, so it's not inert.
+// TestLoad_SpinePhaseEnabled_NoInertWarning proves the inert warning is scoped
+// to NON-spine phases. With empty env the spine defaults produce no inert warning.
 func TestLoad_SpinePhaseEnabled_NoInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{"EVOLVE_TEST_PHASE_ENABLED": "1"})
+	_, ws := Load("", map[string]string{})
 	if _, ok := inertEnableWarn(ws); ok {
-		t.Errorf("inert-warning fired on a spine phase (tdd); got %+v", ws)
+		t.Errorf("inert-warning fired with spine defaults; got %+v", ws)
 	}
 }
 
@@ -79,26 +45,17 @@ func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
 	}
 }
 
-// TestLoad_OtherWarningsStillEmit ensures the new pass does not suppress the
-// existing weak-spine warning when an operator both weakens the spine AND
-// inert-enables a phase. Both must surface.
+// TestLoad_OtherWarningsStillEmit ensures the weak-spine warning surfaces
+// when audit+ship are dropped from the mandatory spine.
 func TestLoad_OtherWarningsStillEmit(t *testing.T) {
 	_, ws := Load("", map[string]string{
-		"EVOLVE_PLAN_REVIEW":      "1",
-		"EVOLVE_DYNAMIC_ROUTING":  "off",         // force StageOff so plan-review is inert
 		"EVOLVE_MANDATORY_PHASES": "scout,build", // omits audit+ship → weak-spine
 	})
-	var sawInert, sawWeak bool
+	var sawWeak bool
 	for _, w := range ws {
-		if w.Code == "inert-phase-enable" {
-			sawInert = true
-		}
 		if w.Code == "weak-spine" {
 			sawWeak = true
 		}
-	}
-	if !sawInert {
-		t.Error("expected inert-phase-enable warning")
 	}
 	if !sawWeak {
 		t.Error("expected weak-spine warning (audit+ship dropped)")

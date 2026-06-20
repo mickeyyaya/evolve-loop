@@ -1,68 +1,54 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/pruneephemeral"
 )
 
-// runPruneEphemeral is `evolve prune-ephemeral [--dry-run] [--quiet]`.
+// runPruneEphemeral is `evolve prune-ephemeral [--dry-run] [--quiet]
+//
+//	[--tracker-ttl-days N] [--dispatch-log-ttl-days N]`.
+//
 // Mirrors legacy/scripts/observability/prune-ephemeral.sh exit codes:
 //
 //	0  — success (whether anything was pruned or not)
 //	10 — bad arguments
 //
-// Env honored (matches bash):
+// Env honored:
 //
-//	EVOLVE_TRACKER_TTL_DAYS       (default 7)
-//	EVOLVE_DISPATCH_LOG_TTL_DAYS  (default 30)
-//	EVOLVE_PROJECT_ROOT           (default: cwd)
+//	EVOLVE_PROJECT_ROOT  (default: cwd)
 func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("prune-ephemeral", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		dryRun bool
-		quiet  bool
+		dryRun         bool
+		quiet          bool
+		trackerTTLDays int
+		logTTLDays     int
 	)
+	fs.BoolVar(&dryRun, "dry-run", false, "dry run — show what would be pruned without deleting")
+	fs.BoolVar(&quiet, "quiet", false, "suppress progress output")
+	fs.IntVar(&trackerTTLDays, "tracker-ttl-days", 7, "tracker retention days")
+	fs.IntVar(&logTTLDays, "dispatch-log-ttl-days", 30, "dispatch log retention days")
+	// intercept -h/--help before fs.Parse to write to stdout
 	for _, a := range args {
-		switch {
-		case a == "--help" || a == "-h":
-			fmt.Fprintln(stdout, "Usage: evolve prune-ephemeral [--dry-run] [--quiet]")
+		if a == "-h" || a == "--help" {
+			fmt.Fprintln(stdout, "Usage: evolve prune-ephemeral [--dry-run] [--quiet] [--tracker-ttl-days N] [--dispatch-log-ttl-days N]")
 			fmt.Fprintln(stdout, "TTL retention for .evolve/runs/cycle-*/.ephemeral and .evolve/dispatch-logs/batch-*.log")
-			fmt.Fprintln(stdout, "Env: EVOLVE_TRACKER_TTL_DAYS (7), EVOLVE_DISPATCH_LOG_TTL_DAYS (30), EVOLVE_PROJECT_ROOT")
+			fmt.Fprintln(stdout, "Env: EVOLVE_PROJECT_ROOT")
 			return 0
-		case a == "--dry-run":
-			dryRun = true
-		case a == "--quiet":
-			quiet = true
-		case len(a) >= 2 && a[:2] == "--":
-			fmt.Fprintf(stderr, "[prune-ephemeral] unknown flag: %s\n", a)
-			return 10
-		default:
-			fmt.Fprintf(stderr, "[prune-ephemeral] unexpected arg: %s\n", a)
-			return 10
 		}
 	}
-
-	trackerTTLDays := 7
-	if v := os.Getenv("EVOLVE_TRACKER_TTL_DAYS"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			fmt.Fprintln(stderr, "[prune-ephemeral] EVOLVE_TRACKER_TTL_DAYS must be integer")
-			return 10
-		}
-		trackerTTLDays = n
+	if err := fs.Parse(args); err != nil {
+		return 10
 	}
-	logTTLDays := 30
-	if v := os.Getenv("EVOLVE_DISPATCH_LOG_TTL_DAYS"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			fmt.Fprintln(stderr, "[prune-ephemeral] EVOLVE_DISPATCH_LOG_TTL_DAYS must be integer")
-			return 10
-		}
-		logTTLDays = n
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "[prune-ephemeral] unexpected arg: %s\n", fs.Arg(0))
+		return 10
 	}
 
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")

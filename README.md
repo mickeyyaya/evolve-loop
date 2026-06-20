@@ -97,7 +97,7 @@ INTENT ─→ SCOUT ─→ TRIAGE ─→ [PLAN-REVIEW] ─→ [TDD] ─→ BUILD
    └─ Structure the vague goal: 8 fields + Ask-when-Needed classifier + ≥1 challenged premise (v8.19.1+)
 ```
 
-**Opt-in shortcuts (default-off, v10.17+):** PSMAS phase-skip — when `EVOLVE_PSMAS_SKIP=1`, Triage may recommend skipping `tdd-engineer` (trivial cycles) or `retrospective` (small PASS cycles) to save tokens. The skip leaves a ledger entry so `--resume` and audit-binding both see it as deliberate. See [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md).
+**Opt-in shortcuts (default-off, v10.17+):** PSMAS phase-skip — when `workflow.psmas_enabled=true` in `.evolve/policy.json`, Triage may recommend skipping `tdd-engineer` (trivial cycles) or `retrospective` (small PASS cycles) to save tokens. The skip leaves a ledger entry so `--resume` and audit-binding both see it as deliberate. See [docs/architecture/psmas-phase-scheduling.md](docs/architecture/psmas-phase-scheduling.md).
 
 ### Phase artifacts you'll see
 
@@ -175,7 +175,7 @@ Capability detection (the Go preflight in `go/internal/preflight`, surfaced by `
 
 | Default | Catches |
 |---|---|
-| Intent capture (`EVOLVE_REQUIRE_INTENT=1`) | Vague goals → 8-field structured intent |
+| Intent capture (`workflow.phase_enables.intent=on`) | Vague goals → 8-field structured intent |
 | Fan-out for read-only roles | Same-model judge sycophancy in Scout/Auditor/Retrospective |
 | Mutation testing on evals | Tautological predicates (AC-by-grep, echo-PASS) |
 | Adversarial Auditor mode | Same-family judge bias (Builder=Sonnet → Auditor=Opus by default) |
@@ -504,7 +504,7 @@ If a cycle can't be resumed (corrupt state, abandoned work), a fresh `/evolve-lo
 evolve cycle reset
 ```
 
-Reset never deletes history — it archives the workspace + a `cycle-state.json` snapshot + a `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, and writes an auditable ledger entry. (`EVOLVE_FORCE_FRESH=1` restores the legacy silent-clobber, which does NOT seal history.)
+Reset never deletes history — it archives the workspace + a `cycle-state.json` snapshot + a `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, and writes an auditable ledger entry. (`evolve loop --force-fresh` restores the legacy silent-clobber as an escape hatch, which does NOT seal history.)
 
 ### Strategy presets
 

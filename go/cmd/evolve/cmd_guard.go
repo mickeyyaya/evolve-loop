@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -32,18 +33,13 @@ var guardLogTag = map[string]string{
 	"chain":     "chain",
 }
 
-// appendGuardsLog writes one line to .evolve/guards.log mirroring the
+// appendGuardsLog writes one line to the given logPath mirroring the
 // bash `echo "[ts] [<tag>] <line>" >> guards.log` pattern. Best-effort:
 // failures are silent so hook latency isn't impacted by audit-log I/O.
-func appendGuardsLog(evolveDir, guardName string, allow bool, reason string) {
+func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 	tag, ok := guardLogTag[guardName]
 	if !ok {
 		tag = guardName
-	}
-	// EVOLVE_GUARDS_LOG override mirrors the bash convention.
-	logPath := os.Getenv("EVOLVE_GUARDS_LOG")
-	if logPath == "" {
-		logPath = filepath.Join(evolveDir, "guards.log")
 	}
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return
@@ -73,7 +69,9 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string
+	var bypass bool
 	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.BoolVar(&bypass, "bypass", false, "emergency: bypass this guard")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -94,18 +92,30 @@ func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if name == "triage-floors" {
 		return runGuardTriageFloors(fs.Args()[1:], stdout, stderr)
 	}
+	guardFS := flag.NewFlagSet("evolve guard "+name, flag.ContinueOnError)
+	guardFS.SetOutput(stderr)
+	guardFS.StringVar(&evolveDir, "evolve-dir", evolveDir, "path to .evolve/ state directory")
+	guardFS.BoolVar(&bypass, "bypass", bypass, "emergency: bypass this guard")
+	if err := guardFS.Parse(fs.Args()[1:]); err != nil {
+		return 10
+	}
+	if guardFS.NArg() != 0 {
+		fmt.Fprintf(stderr, "evolve guard %s: unexpected arguments: %v\n", name, guardFS.Args())
+		return 10
+	}
 	in, err := readGuardInput(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard %s: stdin parse: %v\n", name, err)
 		return 10
 	}
-	g, err := buildGuard(name, evolveDir)
+	g, err := buildGuard(name, evolveDir, bypass)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard: %v\n", err)
 		return 10
 	}
 	dec := g.Decide(context.Background(), in)
-	appendGuardsLog(evolveDir, name, dec.Allow, dec.Reason)
+	logPath := filepath.Join(evolveDir, "guards.log")
+	appendGuardsLog(logPath, name, dec.Allow, dec.Reason)
 	payload := map[string]any{"guard": name, "allow": dec.Allow, "reason": dec.Reason}
 	if buf, mErr := json.Marshal(payload); mErr == nil {
 		fmt.Fprintf(stdout, "%s\n", buf)
@@ -234,18 +244,26 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 	return 0
 }
 
-func buildGuard(name, evolveDir string) (core.Guard, error) {
+func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
+	var workflow policy.WorkflowConfig
+	if name == "docdelete" || name == "quota" {
+		pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+		if err != nil {
+			return nil, err
+		}
+		workflow = pol.WorkflowConfig()
+	}
 	switch name {
 	case "ship":
-		return guards.NewShip(), nil
+		return guards.NewShip(bypass), nil
 	case "phase":
-		return guards.NewPhase(storage.New(evolveDir)), nil
+		return guards.NewPhase(storage.New(evolveDir), bypass), nil
 	case "role":
-		return guards.NewRole(storage.New(evolveDir)), nil
+		return guards.NewRole(storage.New(evolveDir), bypass), nil
 	case "docdelete":
-		return guards.NewDocDelete(nil), nil
+		return guards.NewDocDelete(workflow.AllowDocDelete), nil
 	case "quota":
-		return guards.NewQuota(guards.QuotaConfig{}), nil
+		return guards.NewQuota(guards.QuotaConfig{AllowDeepResearch: workflow.AllowDeepResearch}), nil
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:

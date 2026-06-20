@@ -41,9 +41,9 @@ func setupStorageNoCS(t *testing.T) (*storage.FilesystemStorage, string) {
 //     is denied (in-process Agent calls bypass subagent-run.sh's
 //     audit-binding contract).
 //   - Outside an active cycle, Agent passes through.
-//   - EVOLVE_BYPASS_PHASE_GATE=1 bypasses.
+//   - Constructor-injected bypass=true bypasses.
 func TestPhase_Name(t *testing.T) {
-	g := NewPhase(nil)
+	g := NewPhase(nil, false)
 	if g.Name() != "phase" {
 		t.Errorf("name=%q", g.Name())
 	}
@@ -51,7 +51,7 @@ func TestPhase_Name(t *testing.T) {
 
 func TestPhase_AgentDuringCycleDenied(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 42, Phase: "build", ActiveAgent: "builder"})
-	g := NewPhase(s)
+	g := NewPhase(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if dec.Allow {
 		t.Error("Agent during cycle must deny")
@@ -60,17 +60,16 @@ func TestPhase_AgentDuringCycleDenied(t *testing.T) {
 
 func TestPhase_AgentOutsideCycleAllowed(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
-	g := NewPhase(s)
+	g := NewPhase(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if !dec.Allow {
 		t.Errorf("Agent outside cycle must allow, got: %s", dec.Reason)
 	}
 }
 
-func TestPhase_BypassEnvAllowsAgent(t *testing.T) {
-	t.Setenv("EVOLVE_BYPASS_PHASE_GATE", "1")
+func TestPhase_BypassAllowsAgent(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 42, Phase: "build"})
-	g := NewPhase(s)
+	g := NewPhase(s, true)
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if !dec.Allow {
 		t.Errorf("bypass must allow Agent: %s", dec.Reason)
@@ -79,7 +78,7 @@ func TestPhase_BypassEnvAllowsAgent(t *testing.T) {
 
 func TestPhase_NonAgentToolsPass(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
-	g := NewPhase(s)
+	g := NewPhase(s, false)
 	for _, tool := range []string{"Bash", "Edit", "Write", "Read"} {
 		dec := g.Decide(context.Background(), core.GuardInput{ToolName: tool})
 		if !dec.Allow {
@@ -97,7 +96,7 @@ func (e erroringStorage) ReadCycleState(_ context.Context) (core.CycleState, err
 
 func TestPhase_ReadCycleStateErrorDenies(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
-	g := NewPhase(erroringStorage{s})
+	g := NewPhase(erroringStorage{s}, false)
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if dec.Allow {
 		t.Error("read error must deny by default")
@@ -105,7 +104,7 @@ func TestPhase_ReadCycleStateErrorDenies(t *testing.T) {
 }
 
 func TestPhase_NilStorageDenies(t *testing.T) {
-	g := NewPhase(nil)
+	g := NewPhase(nil, false)
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if dec.Allow {
 		t.Error("nil storage must deny by default")

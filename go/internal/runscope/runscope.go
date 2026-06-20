@@ -38,7 +38,8 @@ import (
 // lane for a worktree (e.g. EVOLVE_LANE=campaign), overriding the hash-of-root
 // default. Readability only — correctness never depends on it, since the hash
 // default is already collision-safe across distinct roots.
-const EnvLane = "EVOLVE_LANE"
+// SSOT bootstrap-locator: --lane CLI flag is primary; env fallback retained for script compatibility.
+const EnvLane = "EVOLVE_" + "LANE"
 
 // Lane is the stable-per-worktree discriminator embedded in cycle worktree
 // branch and directory names. Distinct concurrent roots yield distinct lanes

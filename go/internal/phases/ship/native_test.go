@@ -164,12 +164,12 @@ func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 	// EVOLVE_BYPASS_SHIP_VERIFY is silently ignored; ClassManual+AUTO_CONFIRM
 	// ships normally because of the explicit class, not the retired flag.
 	res, _ := runShip(t, repo, Options{
-		Class:         ClassManual,
-		CommitMessage: "emergency",
+		Class:            ClassManual,
+		CommitMessage:    "emergency",
+		BypassCommitGate: true,
 		Env: map[string]string{
 			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
 			"EVOLVE_BYPASS_SHIP_VERIFY": "1", // silently ignored
-			"EVOLVE_BYPASS_COMMIT_GATE": "1",
 		},
 	})
 	if res.ExitCode != ExitOK {
@@ -222,11 +222,12 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "ci.txt"), "ci change\n")
 	addRemote(t, repo)
 	res, _ := runShip(t, repo, Options{
-		Class:         ClassManual,
-		CommitMessage: "ci change",
+		Class:            ClassManual,
+		CommitMessage:    "ci change",
+		BypassCommitGate: true,
 		// Bypass commit-gate: this test exercises the manual auto-confirm ship
 		// mechanics, not the review-attestation gate (covered in commitgate_test.go).
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_COMMIT_GATE": "1"},
+		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -449,11 +450,12 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 	addRemote(t, repo)
 
 	res, _ := runShip(t, repo, Options{
-		Class:         ClassManual,
-		CommitMessage: "manual: ad-hoc fix",
+		Class:            ClassManual,
+		CommitMessage:    "manual: ad-hoc fix",
+		BypassCommitGate: true,
 		// Bypass commit-gate: this test asserts lastCycleNumber semantics, not
 		// the review-attestation gate (covered in commitgate_test.go).
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_COMMIT_GATE": "1"},
+		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)

@@ -4,10 +4,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // runCycleHealth implements `evolve cycle-health <N> <workspace>`.
@@ -32,10 +35,21 @@ func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve cycle-health: invalid cycle %q\n", rest[0])
 		return 10
 	}
+	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
+	if projectRoot == "" {
+		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(rest[1])))
+	}
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve cycle-health: %v\n", err)
+		return 1
+	}
+	retryCfg := pol.RetryConfig()
 	res, err := cyclehealth.Check(cyclehealth.Options{
-		Cycle:     cycle,
-		Workspace: rest[1],
-		NowFn:     time.Now,
+		Cycle:                cycle,
+		Workspace:            rest[1],
+		NowFn:                time.Now,
+		PhaseLatencyCeilingS: retryCfg.PhaseLatencyCeilingS,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle-health: %v\n", err)

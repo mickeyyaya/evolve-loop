@@ -21,9 +21,10 @@ type Quota struct {
 // (web_search=3, web_fetch=5, kb_search=20). A negative value disables
 // the bucket (always deny).
 type QuotaConfig struct {
-	WebSearch int
-	WebFetch  int
-	KbSearch  int
+	WebSearch         int
+	WebFetch          int
+	KbSearch          int
+	AllowDeepResearch bool
 }
 
 func NewQuota(cfg QuotaConfig) *Quota {
@@ -42,7 +43,7 @@ func NewQuota(cfg QuotaConfig) *Quota {
 func (q *Quota) Name() string { return "quota" }
 
 func (q *Quota) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
-	if envBypass("EVOLVE_ALLOW_DEEP_RESEARCH") {
+	if q.cfg.AllowDeepResearch {
 		return core.GuardDecision{Allow: true}
 	}
 	bucket, cap := q.bucketFor(in)
@@ -61,7 +62,7 @@ func (q *Quota) Decide(_ context.Context, in core.GuardInput) core.GuardDecision
 		return core.GuardDecision{
 			Allow: false,
 			Reason: "research quota exceeded: agent=" + agent + " bucket=" + bucket +
-				"; EVOLVE_ALLOW_DEEP_RESEARCH=1 to lift",
+				"; set workflow.allow_deep_research=true to lift",
 		}
 	}
 	q.counters[key]++

@@ -13,8 +13,6 @@ var bypassEnvVars = []string{
 	"EVOLVE_BYPASS_ROLE_GATE",
 	"EVOLVE_BYPASS_SHIP_GATE",
 	"EVOLVE_BYPASS_PHASE_GATE",
-	"EVOLVE_ALLOW_DOC_DELETE",
-	"EVOLVE_ALLOW_DEEP_RESEARCH",
 }
 
 // TestMain neutralizes the operator's ambient bypass env vars before any test

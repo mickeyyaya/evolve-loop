@@ -125,10 +125,12 @@ func TestClassifyOutcome(t *testing.T) {
 			want: OutcomeShipped,
 		},
 		{
-			// Empty/no records at all: nothing ran — unexplained.
-			name:   "empty_workspace",
-			timing: nil,
-			want:   OutcomeFailedUnexplained,
+			// Empty/no records means initialization failed before any phase
+			// timing could be written. This is explained, not an alarm.
+			name:    "empty_workspace",
+			timing:  nil,
+			want:    OutcomeFailedExplained,
+			wantSub: "initialization failed",
 		},
 	}
 	for _, tc := range cases {

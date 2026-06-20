@@ -34,10 +34,14 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	var class string
 	var dryRun bool
+	var bypassCommitGate bool
+	var bypassPrefixGate bool
 	var projectRoot string
 	var pluginRoot string
 	fs.StringVar(&class, "class", "cycle", "commit class (cycle|manual|release|trivial)")
 	fs.BoolVar(&dryRun, "dry-run", false, "run all read-only checks but skip commit/push/release")
+	fs.BoolVar(&bypassCommitGate, "bypass-commit-gate", false, "emergency: skip manual commit-gate attestation")
+	fs.BoolVar(&bypassPrefixGate, "bypass-prefix-gate", false, "emergency: skip commit-prefix gate for manual class")
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.StringVar(&pluginRoot, "plugin-root", "", "plugin root (default: $EVOLVE_PLUGIN_ROOT or project root)")
 	if err := fs.Parse(args); err != nil {
@@ -73,14 +77,16 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	opts := ship.Options{
-		Class:         ship.Class(class),
-		CommitMessage: fs.Arg(0),
-		DryRun:        dryRun,
-		ProjectRoot:   projectRoot,
-		PluginRoot:    pluginRoot,
-		Stdin:         stdin,
-		Stdout:        stdout,
-		Stderr:        stderr,
+		Class:            ship.Class(class),
+		CommitMessage:    fs.Arg(0),
+		DryRun:           dryRun,
+		BypassCommitGate: bypassCommitGate,
+		BypassPrefixGate: bypassPrefixGate,
+		ProjectRoot:      projectRoot,
+		PluginRoot:       pluginRoot,
+		Stdin:            stdin,
+		Stdout:           stdout,
+		Stderr:           stderr,
 	}
 
 	res, err := ship.Run(context.Background(), opts)

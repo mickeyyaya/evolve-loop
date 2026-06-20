@@ -50,7 +50,7 @@ func TestFlagsGenerateThenCheck_RoundTrip(t *testing.T) {
 	for _, want := range []string{
 		"Hand-written prose ABOVE",   // prose preserved
 		"GENERATED:flag-index BEGIN", // markers present
-		"`EVOLVE_TRIAGE_CAP_GATE`",   // registry content rendered
+		"`EVOLVE_PHASE_RECOVERY`",    // registry content rendered
 	} {
 		if !strings.Contains(string(doc), want) {
 			t.Errorf("generated doc missing %q", want)
@@ -81,7 +81,7 @@ func TestFlagsCheck_DriftExitsTwo(t *testing.T) {
 	}
 	p := filepath.Join(root, "docs", "architecture", "control-flags.md")
 	doc, _ := os.ReadFile(p)
-	tampered := strings.Replace(string(doc), "`EVOLVE_TRIAGE_CAP_GATE`", "`EVOLVE_TAMPERED_FLAG`", 1)
+	tampered := strings.Replace(string(doc), "`EVOLVE_PHASE_RECOVERY`", "`EVOLVE_TAMPERED_FLAG`", 1)
 	if err := os.WriteFile(p, []byte(tampered), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -52,38 +52,39 @@ func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_CLIOverridesEnv asserts that dispatcher-derived
-// choices win over operator env. If the operator sets
-// EVOLVE_STRATEGY=balanced but runs `evolve loop ... harden`, the CLI
-// arg should produce Strategy=harden.
-func TestBuildCycleEnv_CLIOverridesEnv(t *testing.T) {
+// TestBuildCycleEnv_StrategyNotWrittenByDispatcher asserts that
+// EVOLVE_STRATEGY is NOT written to the env map by the dispatcher.
+// Strategy flows via Context["strategy"] — not via the cycle env.
+func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 	cfg := loopConfig{Strategy: "harden"}
-	osEnv := []string{"EVOLVE_STRATEGY=balanced"}
-	got := buildCycleEnv(cfg, osEnv)
-	if got["EVOLVE_STRATEGY"] != "harden" {
-		t.Errorf("CLI must win over env; got %q want harden", got["EVOLVE_STRATEGY"])
+	got := buildCycleEnv(cfg, nil)
+	if _, present := got["EVOLVE_STRATEGY"]; present {
+		t.Errorf("EVOLVE_STRATEGY must not be written by dispatcher; Strategy flows via Context[\"strategy\"]; got %q", got["EVOLVE_STRATEGY"])
 	}
 }
 
-// TestBuildCycleEnv_DispatcherFlagsPropagate covers the 3 explicitly-set
-// dispatcher flags (ConsensusAudit, Resume, Reset) — present iff bool set.
+// TestBuildCycleEnv_DispatcherFlagsPropagate covers the explicitly-set
+// dispatcher IPC flags (Resume) — present iff bool set.
+// ConsensusAudit is no longer written to the cycle env; it is configured
+// via policy.json workflow.consensus_audit_enabled instead.
+// EVOLVE_RESET is no longer written: cfg.Reset is consumed at cmd_loop.go
+// before buildCycleEnv is called (dead env write removed, cycle-44).
 func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
-	t.Run("all set", func(t *testing.T) {
-		cfg := loopConfig{Strategy: "balanced", ConsensusAudit: true, Resume: true, Reset: true}
+	t.Run("resume set", func(t *testing.T) {
+		cfg := loopConfig{Strategy: "balanced", Resume: true, Reset: true}
 		got := buildCycleEnv(cfg, nil)
-		for _, k := range []string{"EVOLVE_CONSENSUS_AUDIT", "EVOLVE_RESUME", "EVOLVE_RESET"} {
-			if got[k] != "1" {
-				t.Errorf("%s not set; got=%v", k, got)
-			}
+		if got["EVOLVE_RESUME"] != "1" {
+			t.Errorf("EVOLVE_RESUME not set; got=%v", got)
+		}
+		if _, present := got["EVOLVE_RESET"]; present {
+			t.Errorf("EVOLVE_RESET must not be written to env (dead env write); got=%q", got["EVOLVE_RESET"])
 		}
 	})
 	t.Run("none set", func(t *testing.T) {
 		cfg := loopConfig{Strategy: "balanced"}
 		got := buildCycleEnv(cfg, nil)
-		for _, k := range []string{"EVOLVE_CONSENSUS_AUDIT", "EVOLVE_RESUME", "EVOLVE_RESET"} {
-			if _, present := got[k]; present {
-				t.Errorf("%s must not be set when flag false; got=%q", k, got[k])
-			}
+		if _, present := got["EVOLVE_RESUME"]; present {
+			t.Errorf("EVOLVE_RESUME must not be set when flag false; got=%q", got["EVOLVE_RESUME"])
 		}
 	})
 }
@@ -136,7 +137,7 @@ func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 
 // TestBuildCycleEnv_BroadDocumentedFlagsSurface spot-checks several
 // documented EVOLVE_* flags from CLAUDE.md (intent, sandbox, triage,
-// build-planner, stdout-filter) to lock in the propagation contract.
+// build-planner) to lock in the propagation contract.
 func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
@@ -144,7 +145,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1",
 		"EVOLVE_TRIAGE_DISABLE=1",
 		"EVOLVE_BUILD_PLANNER=1",
-		"EVOLVE_STDOUT_FILTER=off",
 		"EVOLVE_STRICT_AUDIT=1",
 	}
 	got := buildCycleEnv(cfg, osEnv)
@@ -153,7 +153,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1",
 		"EVOLVE_TRIAGE_DISABLE":            "1",
 		"EVOLVE_BUILD_PLANNER":             "1",
-		"EVOLVE_STDOUT_FILTER":             "off",
 		"EVOLVE_STRICT_AUDIT":              "1",
 	} {
 		if got[k] != want {

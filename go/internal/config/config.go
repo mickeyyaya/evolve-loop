@@ -134,8 +134,8 @@ type RolloutStages struct {
 	// materialization) + Gate B (tdd predicate-quality) run + log but always
 	// approve; StageEnforce — a CERTAIN violation (a stat'd-missing eval file
 	// or a definite tautology) aborts the cycle. The gates fail OPEN on any
-	// ambiguity, so enforce-default never false-blocks a healthy cycle. Set
-	// from EVOLVE_EVAL_GATE via applyEnv; default StageEnforce.
+	// ambiguity, so enforce-default never false-blocks a healthy cycle.
+	// Configured through policy.GatesConfig; default StageEnforce.
 	EvalGate Stage
 	// ContractGate is the deliverable-contract gate rollout stage
 	// (internal/deliverable, ADR-0034): StageOff — no contract gate
@@ -144,8 +144,8 @@ type RolloutStages struct {
 	// confirmed well-formedness violation (missing/misplaced/malformed
 	// deliverable) rejects the phase. The gate fails OPEN on ambiguity, and a
 	// runtime circuit breaker demotes enforce→advisory after N consecutive
-	// blocks so a miscalibrated gate cannot brick the loop. Set from
-	// EVOLVE_CONTRACT_GATE via applyEnv; default StageEnforce.
+	// blocks so a miscalibrated gate cannot brick the loop. Configured through
+	// policy.GatesConfig; default StageEnforce.
 	ContractGate Stage
 	// TriageCapGate is the R9.2 triage capacity clamp rollout stage
 	// (internal/triagecap): StageOff — no clamp; StageShadow — overpacked
@@ -154,8 +154,7 @@ type RolloutStages struct {
 	// reject the triage deliverable through the correction ladder with a
 	// cap directive (inbox coverage-floor-overpacking: three consecutive
 	// coverage cycles burned on the same overpacked shape). Fails OPEN on
-	// any ambiguity. Set from EVOLVE_TRIAGE_CAP_GATE via applyEnv; default
-	// StageEnforce.
+	// any ambiguity. Configured through policy.GatesConfig; default StageEnforce.
 	TriageCapGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
@@ -215,9 +214,8 @@ type RolloutStages struct {
 	//   StageAdvisory — the re-plan replaces the clamped plan after the floor
 	//                   re-clamps it (opt-in, post-soak).
 	// PRECEDENCE NOTE: like the other rollout dials this is the composition-root
-	// view, set from EVOLVE_ROUTER_REPLAN by applyEnv; the re-plan call site
-	// (WS2-S3) reads it. Default StageShadow (set in defaults()); a typo falls
-	// back to off via parseStage (fail-safe — never silently enables the re-plan).
+	// view, loaded from policy; the re-plan call site (WS2-S3) reads it.
+	// Default StageShadow (set in defaults()).
 	RouterReplan Stage
 }
 
@@ -253,30 +251,28 @@ type RoutingConfig struct {
 	// Registry-sourced only; nil when no registry supplies it (projection renders empty).
 	GoalRecipes map[string][]string
 	// RoutingJudge is the ADR-0052 advisor-maximization WS4 route-quality judge
-	// toggle (EVOLVE_ROUTING_JUDGE). false (DEFAULT) — no judge call,
+	// toggle. false (DEFAULT) — no judge call,
 	// byte-identical. true — the fast-tier LLM-as-judge scores the emitted route
 	// for forensics, strictly off the build path (never gates ship, never alters
 	// the plan). It is a plain bool, NOT a Stage: the judge cannot move behavior,
 	// so the off→shadow→advisory ladder would be meaningless (shadow≡advisory≡on).
-	// Composition-root view set by applyEnv; the scoring call site reads it. A
-	// typo/unknown value falls back to false (fail-safe — never silently enables).
+	// Composition-root view loaded from policy; the scoring call site reads it.
 	RoutingJudge bool
 	// ReconDigest is the ADR-0052 advisor-maximization WS2-S0b toggle for the
-	// deterministic pre-plan recon digest (EVOLVE_ROUTER_RECON_DIGEST). false
+	// deterministic pre-plan recon digest. false
 	// (DEFAULT) — the initial Plan prompt is byte-identical to pre-slice. true —
 	// the advisor renders measured repo facts (langs/tests/hotspots, goal-keyword
 	// hits, backlog/carryover) under "## Pre-plan recon (deterministic)" so
 	// upfront selection is grounded in evidence, not goal-text inference alone.
 	// A plain bool (not a Stage): it injects deterministic facts the floor still
 	// clamps, so there is no shadow/advisory distinction. Composition-root view
-	// set by applyEnv; composePlanPrompt reads it. Typo/unknown → false (fail-safe).
+	// loaded from policy; composePlanPrompt reads it.
 	ReconDigest bool
 	// RePlanMaxDepth caps how many post-scout re-plans a single cycle may run
 	// (ADR-0052 WS2-S5; research P4 — cap depth, escalate not loop). Default 1
 	// (set in defaults()): one measured re-plan per cycle, then escalate to the
-	// debugger rather than thrash. Set via EVOLVE_ROUTER_REPLAN_DEPTH (a
-	// cycle-scoped counter cr.replanDepth, NOT env, tracks the live depth — env
-	// can reset across subprocesses). A non-positive/typo value falls back to 1.
+	// debugger rather than thrash. A cycle-scoped counter cr.replanDepth tracks
+	// the live depth. A non-positive policy value falls back to 1.
 	RePlanMaxDepth int
 }
 
@@ -292,39 +288,6 @@ const (
 type Warning struct {
 	Code    string // "weak-spine" | "unknown-value" | "unknown-key" | "inert-phase-enable" | "deprecated-flag"
 	Message string
-}
-
-// legacyEnableFlags maps a legacy per-phase env flag to (phase, valueWhenSet).
-// Absorbing them here keeps the flags out of the phase code (no os.Getenv in
-// triage/buildplanner/scout/audit/retro after the PhasePolicy refactor).
-type legacyFlag struct {
-	phase    string
-	whenOne  Enable // value when env == "1"
-	whenZero Enable // value when env == "0"
-	// deprecated, when non-empty, is the migration guidance WARNed (code
-	// "deprecated-flag") whenever the operator sets the flag — the binding
-	// still applies for one more release.
-	deprecated string
-}
-
-var legacyFlags = map[string]legacyFlag{
-	"EVOLVE_REQUIRE_INTENT": {phase: "intent", whenOne: EnableOn, whenZero: EnableContent},
-	// EVOLVE_TRIAGE_DISABLE: =1 disables triage; =0 explicitly enables it
-	// (legacy default is on, so =0 must map to On, NOT Content — Content with
-	// no trigger would wrongly skip).
-	"EVOLVE_TRIAGE_DISABLE": {phase: "triage", whenOne: EnableOff, whenZero: EnableOn},
-	"EVOLVE_PLAN_REVIEW":    {phase: "plan-review", whenOne: EnableOn, whenZero: EnableOff},
-	// EVOLVE_TEST_PHASE_ENABLED is the real runtime flag the tdd phase reads
-	// (=1 on, =0 off); the registry's enable_var metadata historically said
-	// EVOLVE_TDD_PHASE, which never matched the phase code. config.Load is now
-	// the single interpreter, so it binds the flag the phase actually honors.
-	"EVOLVE_TEST_PHASE_ENABLED": {phase: "tdd", whenOne: EnableOn, whenZero: EnableOff},
-	"EVOLVE_BUILD_PLANNER":      {phase: "build-planner", whenOne: EnableOn, whenZero: EnableOff},
-	// Swarm planner (ADR-0032) — opt-in like build-planner. EVOLVE_SWARM_STAGE
-	// (shadow|advisory|enforce) is the rollout dial; any non-empty value other
-	// than off/shadow enables the planner phase. config.Load maps the legacy =1
-	// form here; the orchestrator reads the stage for dispatch behavior.
-	"EVOLVE_SWARM_PLANNER": {phase: "swarm-plan", whenOne: EnableOn, whenZero: EnableOff},
 }
 
 // registryDoc is the subset of phase-registry.json this loader reads.
@@ -387,10 +350,10 @@ var staticSpinePhases = map[string]struct{}{
 
 // validateInertEnables warns when PhaseEnable[p]=EnableOn but p is neither
 // mandatory, in the static spine, nor reachable via the router (Stage<Advisory).
-// The classic trigger is EVOLVE_PLAN_REVIEW=1 with default routing: plan-review
-// only runs at Stage>=Advisory, so the enable is silently inert at Stage=Off
-// AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but the
-// STATIC state machine still drives execution — so non-spine phases remain
+// The classic trigger is plan-review enabled via policy.json with default routing:
+// plan-review only runs at Stage>=Advisory, so the enable is silently inert at
+// Stage=Off AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but
+// the STATIC state machine still drives execution — so non-spine phases remain
 // unreachable). Surfacing this prevents the operator-confusion failure mode
 // from cycle 120.
 func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
@@ -514,33 +477,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
-	if v := env["EVOLVE_REVIEW_GATE"]; v != "" {
-		// Same off/shadow/enforce trichotomy as CommitEvidence — no advisory
-		// intermediate. Reuses parseEvidenceStage to share the warning text +
-		// fallback (typo defaults to off, never silently enables a kill-path).
-		cfg.ReviewGate = parseEvidenceStage(v, "EVOLVE_REVIEW_GATE", ws)
-	}
-	if v := env["EVOLVE_EVAL_GATE"]; v != "" {
-		// Structural eval gates (internal/evalgate). Same off/shadow/enforce
-		// trichotomy; reuses parseEvidenceStage so a typo defaults to off
-		// rather than silently enabling a kill-path. Default (no env) is
-		// enforce, set in defaults().
-		cfg.EvalGate = parseEvidenceStage(v, "EVOLVE_EVAL_GATE", ws)
-	}
-	if v := env["EVOLVE_CONTRACT_GATE"]; v != "" {
-		// Deliverable-contract gate (internal/deliverable, ADR-0034). Same
-		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
-		// defaults to off rather than silently enabling the kill-path. Default
-		// (no env) is enforce, set in defaults().
-		cfg.ContractGate = parseEvidenceStage(v, "EVOLVE_CONTRACT_GATE", ws)
-	}
-	if v := env["EVOLVE_TRIAGE_CAP_GATE"]; v != "" {
-		// Triage capacity clamp (internal/triagecap, R9.2). Same
-		// off/shadow/enforce trichotomy; reuses parseEvidenceStage so a typo
-		// defaults to off rather than silently enabling the kill-path.
-		// Default (no env) is enforce, set in defaults().
-		cfg.TriageCapGate = parseEvidenceStage(v, "EVOLVE_TRIAGE_CAP_GATE", ws)
-	}
 	if v := env["EVOLVE_PHASE_RECOVERY"]; v != "" {
 		// ADR-0044 Unified Phase Recovery — the one dial for the whole
 		// program. Same trichotomy; a typo defaults to off, never silently
@@ -554,59 +490,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 		// state. Default (no env) is enforce as of the 3.10 cutover, set in
 		// defaults(); set EVOLVE_PHASE_IO=off to roll back.
 		cfg.PhaseIO = parseStage(v, "EVOLVE_PHASE_IO", ws)
-	}
-	if v := env["EVOLVE_ROUTER_REPLAN"]; v != "" {
-		// ADR-0052 advisor-maximization — the post-scout re-plan rollout dial
-		// (WS2). Reuses parseStage (off→shadow→advisory→enforce); the dial only
-		// documents off/shadow/advisory but enforce parses harmlessly. A typo
-		// falls back to off (fail-safe). Default (no env) is shadow, set in
-		// defaults(). Behavior wires in WS2-S3; this reserves the parse + view.
-		cfg.RouterReplan = parseStage(v, "EVOLVE_ROUTER_REPLAN", ws)
-	}
-	if v := env["EVOLVE_ROUTING_JUDGE"]; v != "" {
-		// ADR-0052 advisor-maximization WS4 — the route-quality judge toggle.
-		// Simple off/on bool (NOT a Stage: the judge is off the build path and
-		// cannot move behavior, so the shadow/advisory ladder is meaningless —
-		// hence no parseStage). A typo falls back to off (fail-safe). Default
-		// (no env) is the false zero value. Behavior wires at the scoring call
-		// site (WS4-S3 GradePlan); this reserves the parse + view.
-		switch strings.TrimSpace(v) {
-		case "1", "on":
-			cfg.RoutingJudge = true
-		case "0", "off":
-			cfg.RoutingJudge = false
-		default:
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTING_JUDGE=%q unknown (want on|off), defaulting to off", v)})
-		}
-	}
-	if v := env["EVOLVE_ROUTER_RECON_DIGEST"]; v != "" {
-		// ADR-0052 advisor-maximization WS2-S0b — the deterministic pre-plan recon
-		// toggle. Simple off/on bool (NOT a Stage: it injects deterministic facts
-		// the floor still clamps, so off/shadow/advisory are indistinguishable). A
-		// typo falls back to off (fail-safe — byte-identical default). Read by
-		// composePlanPrompt to gate rendering the recon section.
-		switch strings.TrimSpace(v) {
-		case "1", "on":
-			cfg.ReconDigest = true
-		case "0", "off":
-			cfg.ReconDigest = false
-		default:
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTER_RECON_DIGEST=%q unknown (want on|off), defaulting to off", v)})
-		}
-	}
-	if v := env["EVOLVE_ROUTER_REPLAN_DEPTH"]; v != "" {
-		// ADR-0052 advisor-maximization WS2-S5 — the post-scout re-plan depth cap.
-		// A positive int; a non-positive/unparseable value falls back to the
-		// default 1 (fail-safe — never an unbounded or zero cap). The live depth is
-		// the cycle-scoped cr.replanDepth, not env (env can reset across subprocs).
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
-			cfg.RePlanMaxDepth = n
-		} else {
-			*ws = append(*ws, Warning{"unknown-value",
-				fmt.Sprintf("EVOLVE_ROUTER_REPLAN_DEPTH=%q invalid (want a positive int), defaulting to 1", v)})
-		}
 	}
 	if v := env["EVOLVE_SANDBOX"]; v != "" {
 		switch strings.TrimSpace(v) {
@@ -635,21 +518,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 			cfg.MaxInsertions = n
 		} else {
 			*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("EVOLVE_MAX_OPTIONAL_INSERTIONS=%q not an int", v)})
-		}
-	}
-	// Legacy per-phase enable flags absorbed here (kept out of phase code).
-	for flag, lf := range legacyFlags {
-		v := env[flag]
-		if v != "1" && v != "0" {
-			continue
-		}
-		if lf.deprecated != "" {
-			*ws = append(*ws, Warning{"deprecated-flag", fmt.Sprintf("%s is deprecated — %s", flag, lf.deprecated)})
-		}
-		if v == "1" {
-			cfg.PhaseEnable[lf.phase] = lf.whenOne
-		} else {
-			cfg.PhaseEnable[lf.phase] = lf.whenZero
 		}
 	}
 }
@@ -684,8 +552,7 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 // ladder, unlike parseEvidenceStage's off/shadow/enforce trichotomy). varName
 // names the offending key in the unknown-value warning; an unknown value
 // defaults to off (a typo must never silently enable a kill-path or a staged
-// rollout). Shared by EVOLVE_DYNAMIC_ROUTING, EVOLVE_PHASE_IO (ADR-0050), and
-// EVOLVE_ROUTER_REPLAN (ADR-0052).
+// rollout). Shared by dynamic routing and unified phase I/O.
 func parseStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
@@ -705,8 +572,8 @@ func parseStage(v, varName string, ws *[]Warning) Stage {
 // parseEvidenceStage parses an off/shadow/enforce dial. Unlike parseStage it has
 // no "advisory" middle state — these axes are compute-and-log (shadow) vs act
 // (enforce). Any unknown value defaults to off with a warning (a typo must never
-// silently enable a kill-path). Shared by EVOLVE_COMMIT_EVIDENCE / _REVIEW_GATE /
-// _EVAL_GATE; varName names the offending env var in the warning.
+// silently enable a kill-path). Used by the remaining environment-backed
+// rollout stages; varName names the offending env var in the warning.
 func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	switch strings.TrimSpace(v) {
 	case "0", "off":

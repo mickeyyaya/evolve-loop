@@ -145,7 +145,7 @@ func TestRun_Bypass_ManualClass(t *testing.T) {
 	res, err := Run(Options{
 		CommitMsg:    "anything: msg",
 		RepoDir:      repo,
-		BypassEnv:    "1",
+		Bypass:       true,
 		ShipClass:    "manual",
 		GetDiffPaths: stubDiffPaths(nil),
 	})
@@ -162,7 +162,7 @@ func TestRun_Bypass_CycleClass(t *testing.T) {
 	_, err := Run(Options{
 		CommitMsg:    "feat: msg",
 		RepoDir:      repo,
-		BypassEnv:    "1",
+		Bypass:       true,
 		ShipClass:    "cycle",
 		GetDiffPaths: stubDiffPaths(nil),
 	})

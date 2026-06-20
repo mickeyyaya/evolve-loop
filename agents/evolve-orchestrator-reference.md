@@ -188,7 +188,7 @@ The observer is purely advisory; it never SIGTERMs the subagent (phase-watchdog 
 
 ## Section: egps-tester-phase
 
-Loaded only when `EVOLVE_TEST_PHASE_ENABLED=1` (default 0).
+Loaded when tdd phase enabled via `workflow.phase_enables.tdd=on` (default off).
 
 After Builder completes (build-report.md + production code in worktree), spawn the Tester subagent before advancing to Audit:
 
@@ -206,8 +206,9 @@ The Tester adds ~3-5 minutes wall time per cycle but breaks the AC-by-grep gamin
 **Gate rationale:** `tester.json` profile and `agents/evolve-tester.md` are present but the phase is not yet default-on; forcing it previously caused 241s watchdog kills when subagent-run.sh's allowlist was missing `tester`.
 
 ```bash
-# Orchestrator pattern (only when EVOLVE_TEST_PHASE_ENABLED=1):
-if [ "${EVOLVE_TEST_PHASE_ENABLED:-0}" = "1" ]; then
+# Orchestrator pattern (only when tdd phase enabled via workflow.phase_enables.tdd=on):
+# Tdd phase is config-driven; the orchestrator checks WorkflowConfig.PhaseEnables["tdd"]=="on"
+if tddPhaseEnabled; then
     cycle-state.sh advance test tester
     subagent-run.sh tester "$CYCLE" "$WORKSPACE"
 fi
@@ -230,8 +231,8 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
 1b. Intent (only when intent_required) → subagent-run.sh intent $CYCLE $WORKSPACE
    ↓ advance research scout
 2. Research / Discover  →  subagent-run.sh scout $CYCLE $WORKSPACE
-   ↓ unless EVOLVE_TRIAGE_DISABLE=1: advance triage triage
-2b. Triage (default-on; opt-out via EVOLVE_TRIAGE_DISABLE=1)
+   ↓ unless triage opted out via workflow.phase_enables.triage=off: advance triage triage
+2b. Triage (default-on; opt-out via workflow.phase_enables.triage=off in policy.json)
        Before invoking the Triage subagent, check the 3 auto-skip conditions
        (Opt A, v10.19.0; removed in flag-reduction campaign — auto-skip was the default):
          (i)   scout-report.md task count ≤ 1
@@ -252,19 +253,19 @@ Execute phases strictly in this order. After each agent finishes, the runner doe
        with top_n[]/deferred[]/dropped[]/cycle_size_estimate. phase-gate
        (`triage-to-plan-review`) blocks on cycle_size_estimate=large (split required).
        phase-gate (`discover-to-build`) emits a soft WARN if Triage was skipped
-       without explicit EVOLVE_TRIAGE_DISABLE=1 (first-rollout: WARN, not FAIL).
-   ↓ if EVOLVE_PLAN_REVIEW=1: advance plan-review plan-reviewer (Sprint 2)
+       without explicit opt-out via workflow.phase_enables.triage=off (first-rollout: WARN, not FAIL).
+   ↓ if workflow.phase_enables.plan-review=on: advance plan-review plan-reviewer (Sprint 2)
 2c. Plan-review (opt-in) → see Sprint 2 docs
    ↓ advance build builder
    (if size == trivial: skip TDD)
-2d. Build-planner (opt-in) →
-                          if [ "${EVOLVE_BUILD_PLANNER:-1}" = "1" ]; then
+2d. Build-planner (opt-in, enable via workflow.phase_enables.build-planner=on) →
+                          if buildPlannerEnabled; then
                               advance build-planner build-planner
                               subagent-run.sh build-planner $CYCLE $WORKSPACE
                               phase-gate.sh build-planner-to-build $CYCLE $WORKSPACE
                           fi
-   (EVOLVE_BUILD_PLANNER=1 by default since v10.20 — advisory mode. Produces build-plan.md; Builder reads it as a sanity check.
-    Revert: EVOLVE_BUILD_PLANNER=0. Enforce mode in cycle-105. See ADR-0019 for 3-cycle rollout: shadow→advisory→enforce.)
+   (build-planner enabled in advisory mode since v10.20 — advisory mode. Produces build-plan.md; Builder reads it as a sanity check.
+    Enforce mode in cycle-105. See ADR-0019 for 3-cycle rollout: shadow→advisory→enforce.)
 3. Build                →  subagent-run.sh builder $CYCLE $WORKSPACE
    ↓ advance audit auditor
    (if size == trivial: skip Audit → jump to ship)

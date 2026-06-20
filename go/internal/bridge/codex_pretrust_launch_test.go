@@ -32,10 +32,9 @@ import (
 // "Press enter to confirm" modal (the cycle-122 tdd hang).
 func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", cfgPath)
 	freshWorktree := t.TempDir() // fresh = no prior trust entry anywhere
 
-	cfg := &Config{CLI: "codex-tmux", Worktree: freshWorktree, Workspace: t.TempDir()}
+	cfg := &Config{CLI: "codex-tmux", Worktree: freshWorktree, Workspace: t.TempDir(), codexConfigPath: cfgPath}
 	if err := (codexTmuxDriver{}).Preflight(context.Background(), cfg, Deps{}.withDefaults()); err != nil {
 		t.Fatalf("Preflight: %v", err)
 	}
@@ -60,11 +59,10 @@ func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 // codex-family CLIs itself.
 func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", cfgPath)
 	freshWorktree := t.TempDir()
 
 	deps := recipeDeps(&fakeTmux{})
-	if _, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Worktree: freshWorktree, Agent: "recipe"}, deps, "codex-tmux"); err != nil {
+	if _, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Worktree: freshWorktree, Agent: "recipe", codexConfigPath: cfgPath}, deps, "codex-tmux"); err != nil {
 		t.Fatalf("newRecipeDriver: %v", err)
 	}
 	b, err := os.ReadFile(cfgPath)
@@ -81,10 +79,9 @@ func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
 // pretrusts codex-family CLIs only.
 func TestRecipeDriverSkipsPretrustForNonCodex(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
-	t.Setenv("EVOLVE_CODEX_CONFIG_PATH", cfgPath)
 
 	deps := recipeDeps(&fakeTmux{})
-	if _, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "recipe"}, deps, "claude-tmux"); err != nil {
+	if _, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "recipe", codexConfigPath: cfgPath}, deps, "claude-tmux"); err != nil {
 		t.Fatalf("newRecipeDriver: %v", err)
 	}
 	if _, err := os.Stat(cfgPath); !os.IsNotExist(err) {

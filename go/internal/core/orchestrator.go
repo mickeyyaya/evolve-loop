@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
@@ -189,6 +190,12 @@ type Orchestrator struct {
 	// the non-removable evaluator regardless, so this can only relax build/tdd.
 	shipFloor []string
 
+	// retryConfig is resolved once from policy.json at the composition root.
+	retryConfig policy.RetryConfig
+
+	// workflowConfig is resolved once from policy.json at the composition root.
+	workflowConfig policy.WorkflowConfig
+
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
 	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
@@ -297,6 +304,16 @@ func WithShipFloor(floor []string) Option {
 	}
 }
 
+// WithRetryConfig injects the resolved retry policy.
+func WithRetryConfig(cfg policy.RetryConfig) Option {
+	return func(o *Orchestrator) { o.retryConfig = cfg }
+}
+
+// WithWorkflowConfig injects the resolved workflow policy.
+func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
+	return func(o *Orchestrator) { o.workflowConfig = cfg }
+}
+
 // WithWorktreeProvisioner injects a worktree provisioner. Tests pass a fake to
 // avoid real git; nil is ignored so the gitWorktree default stands.
 func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
@@ -382,17 +399,19 @@ func WithGitDirtyPaths(fn func(ctx context.Context, repoRoot string) ([]string, 
 // off unless a WithRouting option supplies an enabled-stage config.
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
-		storage:       storage,
-		ledger:        ledger,
-		runners:       runners,
-		sm:            NewStateMachine(),
-		now:           time.Now,
-		gitHEAD:       defaultGitHEAD,
-		gitDirtyPaths: defaultGitDirtyPaths,
-		worktree:      gitWorktree{},
-		strategy:      router.StaticPreset{},
-		reviewer:      noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
-		observer:      noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+		storage:        storage,
+		ledger:         ledger,
+		runners:        runners,
+		sm:             NewStateMachine(),
+		now:            time.Now,
+		gitHEAD:        defaultGitHEAD,
+		gitDirtyPaths:  defaultGitDirtyPaths,
+		worktree:       gitWorktree{},
+		strategy:       router.StaticPreset{},
+		retryConfig:    policy.Policy{}.RetryConfig(),
+		workflowConfig: policy.Policy{}.WorkflowConfig(),
+		reviewer:       noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
+		observer:       noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -445,6 +464,8 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		result:            CycleResult{Cycle: init.cycle, FinalVerdict: VerdictPASS},
 		current:           PhaseStart,
 		lastVerdict:       VerdictPASS,
+		retryConfig:       o.retryConfig,
+		workflowConfig:    o.workflowConfig,
 		// scheduledNext "", routingSeq 0, recoveryDepth 0, preserveWorktree false,
 		// cycleCompletedNormally false — zero-valued by construction.
 	}

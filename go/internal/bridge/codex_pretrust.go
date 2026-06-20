@@ -67,7 +67,7 @@ func pretrustCodexProjects(cfg *Config) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	configPath, err := codexConfigPath()
+	configPath, err := resolveCodexConfigPath(cfg)
 	if err != nil {
 		return fmt.Errorf("resolve codex config path: %w", err)
 	}
@@ -136,12 +136,16 @@ func codexPretrustPaths(cfg *Config) []string {
 	return out
 }
 
-// codexConfigPath resolves the TOML path. Honors EVOLVE_CODEX_CONFIG_PATH
-// for tests; otherwise ~/.codex/config.toml.
-func codexConfigPath() (string, error) {
-	if v := os.Getenv("EVOLVE_CODEX_CONFIG_PATH"); v != "" {
-		return v, nil
+// resolveCodexConfigPath returns cfg.codexConfigPath when set, otherwise
+// falls back to the default ~/.codex/config.toml.
+func resolveCodexConfigPath(cfg *Config) (string, error) {
+	if cfg != nil && cfg.codexConfigPath != "" {
+		return cfg.codexConfigPath, nil
 	}
+	return defaultCodexConfigPath()
+}
+
+func defaultCodexConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -149,15 +153,20 @@ func codexConfigPath() (string, error) {
 	return filepath.Join(home, ".codex", "config.toml"), nil
 }
 
-func codexVersionPath() (string, error) {
-	if v := os.Getenv("EVOLVE_CODEX_VERSION_PATH"); v != "" {
-		return v, nil
-	}
+// codexVersionPathFn is the DI seam for resolving the codex version file path.
+// Tests replace this var (with t.Cleanup restore) to inject a temporary path.
+var codexVersionPathFn func() (string, error) = defaultCodexVersionPath
+
+func defaultCodexVersionPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(home, ".codex", "version.json"), nil
+}
+
+func codexVersionPath() (string, error) {
+	return codexVersionPathFn()
 }
 
 func dismissCodexUpdateNag() error {

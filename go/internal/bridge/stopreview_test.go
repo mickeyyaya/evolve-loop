@@ -217,15 +217,15 @@ func TestRunTmuxREPL_ContextCancelledBreaks(t *testing.T) {
 }
 
 // runTmuxRev mirrors runTmux but injects a custom StopReviewer so a test can
-// drive the artifact-wait review loop deterministically.
-func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer, lookup map[string]string, extra ...string) (int, string) {
+// drive the artifact-wait review loop deterministically. extraDeps carries
+// typed Deps overrides (e.g. ArtifactTimeoutS); use Deps{} for no overrides.
+func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer, extraDeps Deps, extra ...string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(lookup),
-		Reviewer:  rev,
-	})
+	d := extraDeps
+	d.Tmux = tmux
+	d.Sleep = func(time.Duration) {}
+	d.Reviewer = rev
+	eng := NewEngine(d)
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
 	return code, stderr.String()
@@ -243,7 +243,7 @@ func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 		{Action: ReviewPause, Reason: "stalled"},
 	}}
 	// Tiny interval so each loop iteration crosses a review boundary.
-	code, stderr := runTmuxRev(t, fx, tmux, rev, map[string]string{"EVOLVE_ARTIFACT_TIMEOUT_S": "2"}, "--allow-bypass")
+	code, stderr := runTmuxRev(t, fx, tmux, rev, Deps{ArtifactTimeoutS: 2}, "--allow-bypass")
 
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout after pause); stderr=%q", code, ExitArtifactTimeout, stderr)
@@ -272,7 +272,7 @@ func TestRunTmuxREPL_ArtifactAppears_NoReview(t *testing.T) {
 	}
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{}
-	code, stderr := runTmuxRev(t, fx, tmux, rev, nil, "--allow-bypass")
+	code, stderr := runTmuxRev(t, fx, tmux, rev, Deps{}, "--allow-bypass")
 
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)

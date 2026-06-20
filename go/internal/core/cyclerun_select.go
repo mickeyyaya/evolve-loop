@@ -84,7 +84,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 			// or on planner failure ⇒ shouldRun runs the legacy trigger path.
 			Plan:           cr.clampedPlan,
 			IntentRequired: cr.cs.IntentRequired,
-			PSMASEnabled:   envchain.BoolValue(cr.envSnap["EVOLVE_PSMAS_SKIP"], false),
+			PSMASEnabled:   cr.workflowConfig.PSMASEnabled,
 		})
 		if cr.o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
 			if forced, ok := cr.o.enforceNext(cr.current, next, signals, dec, planRunsShip(cr.clampedPlan)); ok {

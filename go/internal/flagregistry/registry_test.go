@@ -74,11 +74,9 @@ func TestLookup_SpotChecks(t *testing.T) {
 		name       string
 		wantStatus Status
 	}{
-		{"EVOLVE_EVAL_GATE", StatusActive},
-		{"EVOLVE_CONTRACT_GATE", StatusActive},
-		{"EVOLVE_TRIAGE_CAP_GATE", StatusActive}, // added this wave (R9.2)
 		{"EVOLVE_PHASE_RECOVERY", StatusActive},
 		{"EVOLVE_SANDBOX", StatusActive},
+		{"EVOLVE_WORKTREE_PATH", StatusInternal},
 	}
 	for _, tt := range tests {
 		f, ok := Lookup(tt.name)

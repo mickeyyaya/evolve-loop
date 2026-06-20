@@ -2,7 +2,7 @@
 //
 // Probes whether evolve-loop is running inside Claude Code. Used by the
 // dispatcher to auto-enable EVOLVE_SANDBOX_FALLBACK_ON_EPERM and
-// EVOLVE_SKIP_WORKTREE when the parent process is itself sandboxed (the
+// the explicit no-worktree operator mode when the parent process is itself sandboxed (the
 // canonical macOS Darwin 25.4+ nested-sandbox EPERM case).
 package detectnested
 

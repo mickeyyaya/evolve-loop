@@ -116,7 +116,7 @@ func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
 	}
 }
 
-// EVOLVE_BYPASS_COMMIT_GATE=1 → ships without an attestation.
+// BypassCommitGate=true → ships without an attestation.
 func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -124,14 +124,15 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nbypassed change\n")
 
 	res, _ := runShip(t, repo, Options{
-		Class:         ClassManual,
-		CommitMessage: "bypassed change",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1", "EVOLVE_BYPASS_COMMIT_GATE": "1"},
+		Class:            ClassManual,
+		CommitMessage:    "bypassed change",
+		BypassCommitGate: true,
+		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	if !containsLog(res, "EVOLVE_BYPASS_COMMIT_GATE=1") {
+	if !containsLog(res, "--bypass-commit-gate") {
 		t.Errorf("missing bypass log in: %v", res.Logs)
 	}
 }
@@ -153,8 +154,8 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 //     blocking on them would brick every ship including this cycle's own.
 //   - missing agents/ or profiles dir → skip with a log (repos without
 //     personas — including every other ship test fixture — are unaffected).
-//   - EVOLVE_BYPASS_COMMIT_GATE=1 → lint skipped (consistent with the
-//     attestation bypass; routine use is a CLAUDE.md violation).
+//   - BypassCommitGate=true → lint skipped (consistent with the attestation
+//     bypass; routine use is a policy violation).
 //
 // NOTE for Builder: the real repo has 7 "disallowed" contradictions across
 // doc-sync/intent/scout personas. Those persona/profile pairs MUST be
@@ -184,14 +185,10 @@ func writePersonaFixture(t *testing.T, root, name string, personaTools, allowedT
 }
 
 // lintOpts builds the minimal Options for unit-calling runPersonaLint.
-// EVOLVE_BYPASS_COMMIT_GATE is explicitly pinned off so an ambient env var
-// can't silently turn these tests into no-ops (envBool falls back to
-// os.Getenv when the key is absent from Env).
 func lintOpts(root string) *Options {
 	return &Options{
 		Class:       ClassCycle,
 		ProjectRoot: root,
-		Env:         map[string]string{"EVOLVE_BYPASS_COMMIT_GATE": "0"},
 	}
 }
 
@@ -248,18 +245,18 @@ func TestPersonaLint_MissingDirsSkips(t *testing.T) {
 	}
 }
 
-// EVOLVE_BYPASS_COMMIT_GATE=1 skips the lint even over a blocking violation.
-func TestPersonaLint_BypassEnvSkipsLint(t *testing.T) {
+// BypassCommitGate skips the lint even over a blocking violation.
+func TestPersonaLint_BypassSkipsLint(t *testing.T) {
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"}) // would block
 
 	opts := lintOpts(root)
-	opts.Env["EVOLVE_BYPASS_COMMIT_GATE"] = "1"
+	opts.BypassCommitGate = true
 	res := &RunResult{}
 	if err := runPersonaLint(context.Background(), opts, res); err != nil {
 		t.Fatalf("bypass env must skip persona lint, got %v", err)
 	}
-	if !containsLog(*res, "EVOLVE_BYPASS_COMMIT_GATE") {
+	if !containsLog(*res, "--bypass-commit-gate") {
 		t.Errorf("bypass must be logged (loud, not silent); logs=%v", res.Logs)
 	}
 }
@@ -277,7 +274,6 @@ func TestCommitGate_CyclePersonaLint(t *testing.T) {
 	res, err := runShip(t, repo, Options{
 		Class:         ClassCycle,
 		CommitMessage: "evolve-cycle 1: goal=test",
-		Env:           map[string]string{"EVOLVE_BYPASS_COMMIT_GATE": "0"},
 	})
 	if err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("clean cycle ship: want ExitOK, got exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)

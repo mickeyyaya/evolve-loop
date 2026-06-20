@@ -35,6 +35,7 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	fs := flag.NewFlagSet("plan-and-execute", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	planOutput := fs.String("plan-output", "", "path where pass A writes the plan (default: <workspace>/<phase>-plan.md)")
+	workspace := fs.String("workspace", "", "workspace directory; used to derive the plan artifact path when --plan-output is absent")
 	skipExecute := fs.Bool("skip-execute", false, "run only pass A (plan mode); useful for review-then-resume workflows")
 	if err := fs.Parse(args); err != nil {
 		return 10
@@ -63,12 +64,11 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	}
 
 	// Resolve plan-output path. Default: <workspace>/<phase>-plan.md.
-	// We don't have workspace from the bare CLI; derive from the JSON
-	// envelope (best-effort) or from the env-var, otherwise use cwd.
+	// We don't have workspace from the bare CLI; derive from --workspace or use cwd.
 	planPath := *planOutput
 	if planPath == "" {
-		if w := os.Getenv("EVOLVE_PLAN_WORKSPACE"); w != "" {
-			planPath = filepath.Join(w, phase+"-plan.md")
+		if *workspace != "" {
+			planPath = filepath.Join(*workspace, phase+"-plan.md")
 		} else {
 			planPath = filepath.Join(".", phase+"-plan.md")
 		}

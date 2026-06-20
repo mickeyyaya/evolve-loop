@@ -110,72 +110,25 @@ func TestLoad_EnvOverridesRegistryAndDefault(t *testing.T) {
 	}
 }
 
-func TestLoad_EvalGateStage(t *testing.T) {
+func TestLoad_GateStagesUseDefaults(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// Default (no env): enforce — the structural eval gates are on by default.
-	if cfg, _ := Load(absent, map[string]string{}); cfg.EvalGate != StageEnforce {
+	cfg, ws := Load(absent, map[string]string{
+		"EVOLVE_EVAL_GATE":       "off",
+		"EVOLVE_CONTRACT_GATE":   "shadow",
+		"EVOLVE_TRIAGE_CAP_GATE": "off",
+	})
+	if cfg.EvalGate != StageEnforce {
 		t.Errorf("default EvalGate = %v, want StageEnforce", cfg.EvalGate)
 	}
-
-	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
-		if cfg, _ := Load(absent, map[string]string{"EVOLVE_EVAL_GATE": v}); cfg.EvalGate != want {
-			t.Errorf("EVOLVE_EVAL_GATE=%q → %v, want %v", v, cfg.EvalGate, want)
-		}
-	}
-
-	// A typo defaults to off (never silently keeps a kill-path) and warns.
-	cfg, ws := Load(absent, map[string]string{"EVOLVE_EVAL_GATE": "banana"})
-	if cfg.EvalGate != StageOff {
-		t.Errorf("typo EVOLVE_EVAL_GATE → %v, want StageOff", cfg.EvalGate)
-	}
-	if !hasWarning(ws, "unknown-value") {
-		t.Error("typo EVOLVE_EVAL_GATE should warn unknown-value")
-	}
-}
-
-func TestLoad_ContractGateStage(t *testing.T) {
-	absent := filepath.Join(t.TempDir(), "absent.json")
-
-	// Default (no env): enforce — the deliverable-contract gate is on by default (ADR-0034).
-	if cfg, _ := Load(absent, map[string]string{}); cfg.ContractGate != StageEnforce {
+	if cfg.ContractGate != StageEnforce {
 		t.Errorf("default ContractGate = %v, want StageEnforce", cfg.ContractGate)
 	}
-	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
-		if cfg, _ := Load(absent, map[string]string{"EVOLVE_CONTRACT_GATE": v}); cfg.ContractGate != want {
-			t.Errorf("EVOLVE_CONTRACT_GATE=%q → %v, want %v", v, cfg.ContractGate, want)
-		}
-	}
-	// A typo defaults to off (never silently keeps a kill-path) and warns.
-	cfg, ws := Load(absent, map[string]string{"EVOLVE_CONTRACT_GATE": "banana"})
-	if cfg.ContractGate != StageOff {
-		t.Errorf("typo EVOLVE_CONTRACT_GATE → %v, want StageOff", cfg.ContractGate)
-	}
-	if !hasWarning(ws, "unknown-value") {
-		t.Error("typo EVOLVE_CONTRACT_GATE should warn unknown-value")
-	}
-}
-
-func TestLoad_TriageCapGateStage(t *testing.T) {
-	absent := filepath.Join(t.TempDir(), "absent.json")
-
-	// Default (no env): enforce — the R9.2 capacity clamp is on by default
-	// (deterministic counter, replay-tested, correction-ladder-bounded).
-	if cfg, _ := Load(absent, map[string]string{}); cfg.TriageCapGate != StageEnforce {
+	if cfg.TriageCapGate != StageEnforce {
 		t.Errorf("default TriageCapGate = %v, want StageEnforce", cfg.TriageCapGate)
 	}
-	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
-		if cfg, _ := Load(absent, map[string]string{"EVOLVE_TRIAGE_CAP_GATE": v}); cfg.TriageCapGate != want {
-			t.Errorf("EVOLVE_TRIAGE_CAP_GATE=%q → %v, want %v", v, cfg.TriageCapGate, want)
-		}
-	}
-	// A typo defaults to off (never silently keeps a kill-path) and warns.
-	cfg, ws := Load(absent, map[string]string{"EVOLVE_TRIAGE_CAP_GATE": "banana"})
-	if cfg.TriageCapGate != StageOff {
-		t.Errorf("typo EVOLVE_TRIAGE_CAP_GATE → %v, want StageOff", cfg.TriageCapGate)
-	}
-	if !hasWarning(ws, "unknown-value") {
-		t.Error("typo EVOLVE_TRIAGE_CAP_GATE should warn unknown-value")
+	if hasWarning(ws, "unknown-value") {
+		t.Errorf("removed gate env keys should be ignored without warnings: %+v", ws)
 	}
 }
 
@@ -225,19 +178,6 @@ func TestLoad_PerPhaseEnabledAndTriggers(t *testing.T) {
 	c := tb.InsertWhen[0]
 	if c.Field != "build.acs_red" || c.Op != "gt" {
 		t.Errorf("tester condition = %+v, want build.acs_red gt 0", c)
-	}
-}
-
-func TestLoad_LegacyFlagAbsorption(t *testing.T) {
-	cfg, _ := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
-		"EVOLVE_TRIAGE_DISABLE": "1",
-		"EVOLVE_REQUIRE_INTENT": "1",
-	})
-	if cfg.PhaseEnable["triage"] != EnableOff {
-		t.Errorf("triage enable = %v, want EnableOff (EVOLVE_TRIAGE_DISABLE=1)", cfg.PhaseEnable["triage"])
-	}
-	if cfg.PhaseEnable["intent"] != EnableOn {
-		t.Errorf("intent enable = %v, want EnableOn (EVOLVE_REQUIRE_INTENT=1)", cfg.PhaseEnable["intent"])
 	}
 }
 

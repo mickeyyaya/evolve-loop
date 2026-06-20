@@ -85,7 +85,6 @@ func TestRunCmd_HappyPath(t *testing.T) {
 		ProjectRoot:      tmp,
 		PluginRoot:       tmp,
 		PromptReader:     strings.NewReader("Do the thing.\n"),
-		CachePrefixV2:    true,
 		AdversarialAudit: true,
 	}, opts)
 	if err != nil {

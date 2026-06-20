@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // fakeVerifier implements ContractVerifier over a configurable contracted
@@ -441,13 +442,15 @@ func TestLadder_ZeroCorrections_SalvageFails_LegacyAbortMessage(t *testing.T) {
 	cfg := config.RoutingConfig{}
 	cfg.PhaseRecovery = config.StageEnforce
 	runners := buildRunners(nil)
+	retryCfg := policy.Policy{}.RetryConfig()
+	retryCfg.ContractCorrectionRetries = 0
 	o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 0}}, &fakeLedger{}, runners,
-		WithReviewer(rev), WithContractVerifier(fv), WithRouting(cfg, nil))
+		WithReviewer(rev), WithContractVerifier(fv), WithRouting(cfg, nil), WithRetryConfig(retryCfg))
 	buildR := runners[PhaseBuild].(*fakeRunner)
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: root, GoalHash: "g",
-		Env: map[string]string{"EVOLVE_CONTRACT_CORRECTION_RETRIES": "0"},
+		Env: map[string]string{},
 	})
 	if err == nil {
 		t.Fatal("expected the zero-corrections abort")

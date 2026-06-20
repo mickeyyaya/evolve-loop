@@ -7,13 +7,10 @@ import "testing"
 // `!= "0"` (default-on) / `== "1"` (default-off) idioms for envchain.Bool.
 
 func TestReadSubagentRunFlags_Defaults(t *testing.T) {
-	for _, k := range []string{"EVOLVE_CACHE_PREFIX_V2", "ADVERSARIAL_AUDIT", "LEGACY_AGENT_DISPATCH"} {
+	for _, k := range []string{"ADVERSARIAL_AUDIT", "LEGACY_AGENT_DISPATCH"} {
 		t.Setenv(k, "")
 	}
 	f := readSubagentRunFlags()
-	if !f.cachePrefixV2 {
-		t.Error("cachePrefixV2 default = false, want true (`!= \"0\"`)")
-	}
 	if !f.adversarialAudit {
 		t.Error("adversarialAudit default = false, want true (`!= \"0\"`)")
 	}
@@ -23,11 +20,10 @@ func TestReadSubagentRunFlags_Defaults(t *testing.T) {
 }
 
 func TestReadSubagentRunFlags_Toggle(t *testing.T) {
-	t.Setenv("EVOLVE_CACHE_PREFIX_V2", "0")
 	t.Setenv("ADVERSARIAL_AUDIT", "0")
 	t.Setenv("LEGACY_AGENT_DISPATCH", "1")
 	f := readSubagentRunFlags()
-	if f.cachePrefixV2 || f.adversarialAudit {
+	if f.adversarialAudit {
 		t.Error(`"0" should disable the default-on flags`)
 	}
 	if !f.legacyAgentDispatch {

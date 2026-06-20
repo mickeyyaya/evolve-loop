@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -42,12 +43,14 @@ type cycleRun struct {
 	req               CycleRequest
 	cycle             int
 	mainDirtyBaseline map[string]bool
-	envSnap           map[string]string   // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
-	ctxSnap           map[string]string   // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
-	preCycleHEAD      string              // read post-loop by finalizeCycle
-	benchedCLIs       []router.BenchedCLI // CLI-health snapshot; read in selectNext Decide
-	clampedPlan       *router.PhasePlan   // clamped whole-cycle plan; nil ⇒ static spine
-	directivesSet     directives.Set      // runtime operator-directives snapshot; read in dispatch (cr.directivesSet.Merged)
+	envSnap           map[string]string     // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
+	ctxSnap           map[string]string     // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
+	preCycleHEAD      string                // read post-loop by finalizeCycle
+	benchedCLIs       []router.BenchedCLI   // CLI-health snapshot; read in selectNext Decide
+	clampedPlan       *router.PhasePlan     // clamped whole-cycle plan; nil ⇒ static spine
+	directivesSet     directives.Set        // runtime operator-directives snapshot; read in dispatch (cr.directivesSet.Merged)
+	retryConfig       policy.RetryConfig    // resolved once at orchestrator construction
+	workflowConfig    policy.WorkflowConfig // resolved once at orchestrator construction
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
 	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle
@@ -233,10 +236,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	startedAt := o.now().UTC().Format(time.RFC3339)
 	// IntentRequired is the gate for the start→intent vs start→scout
 	// edge. Source priority: explicit Context["intent_required"]=="true"
-	// from the caller > env EVOLVE_REQUIRE_INTENT=="1" > false. This
-	// mirrors the bash dispatcher's check at run-cycle.sh:build_context.
+	// from the caller > policy WorkflowConfig.PhaseEnables["intent"]=="on" > false.
 	intentRequired := req.Context["intent_required"] == "true" ||
-		envchain.BoolValue(req.Env["EVOLVE_REQUIRE_INTENT"], false)
+		o.workflowConfig.PhaseEnables["intent"] == "on"
 	// CA.5: one ULID per run — persisted in the cycle state; the
 	// construction-time stampingLedger stamps it on every ledger entry for
 	// as long as it is the current id (cleared on every exit path).
@@ -382,7 +384,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
 		BenchedCLIs:    benchedCLIs,
 		IntentRequired: cs.IntentRequired,
-		PSMASEnabled:   envchain.BoolValue(env["EVOLVE_PSMAS_SKIP"], false),
+		PSMASEnabled:   o.workflowConfig.PSMASEnabled,
 	}
 }
 

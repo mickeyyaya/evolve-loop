@@ -149,7 +149,7 @@ When a transient bridge failure (exit code 80, 85, or 86) or an artifact timeout
 
 ### Recovery Signal (`kind=backfill`)
 
-If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but successfully reconstructs the missing report/artifact from the terminal scrollback (via `backfill.TryExtract` with `EVOLVE_BACKFILL_ENABLED=1`), the orchestrator writes a `kind=backfill` entry to the ledger.
+If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but successfully reconstructs the missing report/artifact from the terminal scrollback (via `backfill.TryExtract` with `workflow.backfill_enabled=true`), the orchestrator writes a `kind=backfill` entry to the ledger.
 
 - **Role** (string): Set to the name of the backfilled phase (e.g. `"scout"`).
 - **ExitCode** (integer): Set to `81`, the original timeout exit code that initiated the backfill.
@@ -180,7 +180,6 @@ Phase name normalization: `strings.ToUpper` + `"-"` → `"_"`.  Examples:
 |-------|-----------------|
 | `scout` | `EVOLVE_SCOUT_LATENCY_CEILING_S` |
 | `build` | `EVOLVE_BUILD_LATENCY_CEILING_S` |
-| `build-planner` | `EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S` |
 
 When a per-phase override is absent or invalid (non-numeric, ≤ 0), the global ceiling applies.
 

@@ -15,7 +15,7 @@ import (
 // the Go shim wrote them.
 func TestAppendGuardsLog_AllowLine(t *testing.T) {
 	dir := t.TempDir()
-	appendGuardsLog(dir, "ship", true, "")
+	appendGuardsLog(filepath.Join(dir, "guards.log"), "ship", true, "")
 
 	got := readLog(t, filepath.Join(dir, "guards.log"))
 	// Format: `[YYYY-MM-DDTHH:MM:SSZ] [ship-gate] ALLOW\n`
@@ -29,7 +29,7 @@ func TestAppendGuardsLog_AllowLine(t *testing.T) {
 
 func TestAppendGuardsLog_DenyLine(t *testing.T) {
 	dir := t.TempDir()
-	appendGuardsLog(dir, "ship", false, "ship-class command must invoke ship.sh")
+	appendGuardsLog(filepath.Join(dir, "guards.log"), "ship", false, "ship-class command must invoke ship.sh")
 
 	got := readLog(t, filepath.Join(dir, "guards.log"))
 	if !strings.Contains(got, "] [ship-gate] DENY: ship-class command must invoke ship.sh") {
@@ -53,7 +53,7 @@ func TestAppendGuardsLog_TagMapping(t *testing.T) {
 	}
 	for _, tc := range cases {
 		dir := t.TempDir()
-		appendGuardsLog(dir, tc.guardName, true, "")
+		appendGuardsLog(filepath.Join(dir, "guards.log"), tc.guardName, true, "")
 		got := readLog(t, filepath.Join(dir, "guards.log"))
 		wantFrag := "[" + tc.wantTag + "] ALLOW"
 		if !strings.Contains(got, wantFrag) {
@@ -66,26 +66,25 @@ func TestAppendGuardsLog_TagMapping(t *testing.T) {
 // Matches bash behavior where no-op tags pass through.
 func TestAppendGuardsLog_UnknownGuardFallsThrough(t *testing.T) {
 	dir := t.TempDir()
-	appendGuardsLog(dir, "novel", true, "")
+	appendGuardsLog(filepath.Join(dir, "guards.log"), "novel", true, "")
 	got := readLog(t, filepath.Join(dir, "guards.log"))
 	if !strings.Contains(got, "[novel] ALLOW") {
 		t.Errorf("unknown guard tag not preserved: %q", got)
 	}
 }
 
-// EVOLVE_GUARDS_LOG override matches the bash convention; lets operators
-// redirect audit output without touching --evolve-dir.
-func TestAppendGuardsLog_EnvOverride(t *testing.T) {
+// TestAppendGuardsLog_CustomPath verifies that appendGuardsLog writes to the
+// logPath passed directly, not to the default guards.log location.
+func TestAppendGuardsLog_CustomPath(t *testing.T) {
 	dir := t.TempDir()
 	custom := filepath.Join(dir, "subdir", "custom.log")
-	t.Setenv("EVOLVE_GUARDS_LOG", custom)
-	appendGuardsLog(dir, "ship", true, "")
+	appendGuardsLog(custom, "ship", true, "")
 
 	if _, err := os.Stat(custom); err != nil {
-		t.Fatalf("EVOLVE_GUARDS_LOG path not written: %v", err)
+		t.Fatalf("custom log path not written: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "guards.log")); !os.IsNotExist(err) {
-		t.Errorf("default path written despite env override")
+		t.Errorf("default path written despite custom logPath")
 	}
 }
 
@@ -100,8 +99,7 @@ func TestAppendGuardsLog_UnwritablePathSilent(t *testing.T) {
 			t.Fatalf("panic on unwritable path: %v", r)
 		}
 	}()
-	t.Setenv("EVOLVE_GUARDS_LOG", "/proc/nonexistent/cannot/write/here.log")
-	appendGuardsLog("/tmp/ignored", "ship", true, "")
+	appendGuardsLog("/proc/nonexistent/cannot/write/here.log", "ship", true, "")
 }
 
 func readLog(t *testing.T, path string) string {
@@ -126,5 +124,18 @@ func TestRunGuard_EmitsAuditLine(t *testing.T) {
 	got := readLog(t, filepath.Join(dir, "guards.log"))
 	if !strings.Contains(got, "[chain]") {
 		t.Errorf("audit line missing tag: %q", got)
+	}
+}
+
+func TestRunGuard_BypassFlagAfterName(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	input := `{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`
+	rc := runGuard([]string{"ship", "--evolve-dir", dir, "--bypass"}, strings.NewReader(input), &stdout, &stderr)
+	if rc != 0 {
+		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"allow":true`) {
+		t.Fatalf("bypass result missing allow=true: %q", stdout.String())
 	}
 }

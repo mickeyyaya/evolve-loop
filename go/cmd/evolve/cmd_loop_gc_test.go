@@ -35,6 +35,17 @@ import (
 
 const gcManifestName = "gc-shadow-manifest.json"
 
+// gcSetMode overwrites policy.json in evolveDir to set gc.mode, preserving the
+// aggressive runs retention policy written by gcEnv. Called after gcEnv to set
+// a non-default mode (the default, empty Mode, is treated as "off").
+func gcSetMode(t *testing.T, evolveDir, mode string) {
+	t.Helper()
+	pol := `{"gc":{"mode":"` + mode + `","runs":{"keep_full":1,"delete_after_days":1}}}`
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(pol), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // gcMkRun creates a discovered run dir (run.json marker) with a set mtime.
 func gcMkRun(t *testing.T, runsDir, name string, mod time.Time) string {
 	t.Helper()
@@ -102,8 +113,8 @@ func gcManifestHasPath(m gc.Manifest, path string) bool {
 // TestGCShadow: shadow mode writes a valid manifest naming the delete target
 // but performs NO filesystem mutation (the target dir survives).
 func TestGCShadow(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "shadow")
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
+	gcSetMode(t, evolveDir, "shadow")
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
@@ -126,8 +137,8 @@ func TestGCShadow(t *testing.T) {
 
 // TestGCOff: off mode (and unset) writes no manifest and touches nothing.
 func TestGCOff(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "off")
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
+	// policy.json has no gc.mode → defaults to "off"
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
@@ -146,8 +157,8 @@ func TestGCOff(t *testing.T) {
 // TestGCEnforce: enforce mode writes the manifest AND applies it — the delete
 // target is actually removed while the kept run survives.
 func TestGCEnforce(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "enforce")
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
+	gcSetMode(t, evolveDir, "enforce")
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
@@ -167,8 +178,8 @@ func TestGCEnforce(t *testing.T) {
 // TestGCInvalidMode: an unrecognized value warns and returns — no manifest, no
 // mutation, no panic.
 func TestGCInvalidMode(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "bogus")
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
+	gcSetMode(t, evolveDir, "bogus")
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
@@ -190,9 +201,12 @@ func TestGCInvalidMode(t *testing.T) {
 // TestGCShadowMissingRunsDir: shadow mode against an .evolve with no runs/ dir
 // fails open — empty manifest, no error, no crash.
 func TestGCShadowMissingRunsDir(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "shadow")
 	evolveDir := t.TempDir() // deliberately no runs/ subdir
 	workspace := t.TempDir()
+	pol := `{"gc":{"mode":"shadow"}}`
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(pol), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
@@ -211,8 +225,8 @@ func TestGCShadowMissingRunsDir(t *testing.T) {
 // as the in-flight workspace is LIVE and must never appear in the manifest, even
 // when it is old enough to be a delete target.
 func TestGCShadowLiveRunExcluded(t *testing.T) {
-	t.Setenv("EVOLVE_GC", "shadow")
 	evolveDir, workspace, _, targetPath := gcEnv(t)
+	gcSetMode(t, evolveDir, "shadow")
 	// Mark the would-be delete target LIVE via cycle-state.json.
 	state := `{"cycle_id":298,"workspace_path":"` + targetPath + `"}`
 	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(state), 0o644); err != nil {

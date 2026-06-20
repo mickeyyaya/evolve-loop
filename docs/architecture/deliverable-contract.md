@@ -53,7 +53,7 @@ check and the harness's post-phase gate can never drift.
 
 ## Host gate
 
-`EVOLVE_CONTRACT_GATE` (default **enforce**) mounts `deliverable.NewReviewer` at the orchestrator
+`.evolve/policy.json` `gates.contract_gate` (default **enforce**) mounts `deliverable.NewReviewer` at the orchestrator
 `DeliverableReviewer` seam, chained after evalgate:
 
 | stage | behavior |
@@ -78,9 +78,9 @@ regex-on-prose, so older reports still classify. This removes the verdict-format
 
 ## Rollout / rollback
 
-- Ship at the enforce default; run one `EVOLVE_CONTRACT_GATE=shadow` cycle pre-merge to confirm no
+- Ship at the enforce default; run one `gates.contract_gate=shadow` policy cycle pre-merge to confirm no
   false-block.
-- Rollback: `EVOLVE_CONTRACT_GATE=off`.
+- Rollback: set `gates.contract_gate` to `off` in `.evolve/policy.json`.
 - Tune the breaker threshold in `internal/deliverable/reviewer.go` (`defaultBreakerThreshold`).
 
 ## Sandbox note
