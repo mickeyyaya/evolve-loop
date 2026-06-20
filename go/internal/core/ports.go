@@ -352,6 +352,11 @@ type BridgeRequest struct {
 	// block (the orchestrator's contract-correction retry — the previous
 	// deliverable was rejected; fix it). Empty = no-op. See injectCorrectionPrefix.
 	CorrectionDirective string `json:"correction_directive,omitempty"`
+	// OperatorDirectives, when non-empty, is the rendered runtime operator-directives
+	// block (internal/directives) snapshotted at cycle start. Prepended as a
+	// "## Operator Directives" block so every phase agent sees the current global +
+	// per-loop guidance. Empty = no-op (byte-identical). See injectOperatorDirectives.
+	OperatorDirectives string `json:"operator_directives,omitempty"`
 	// SessionName, when non-empty, pins the tmux session to a deterministic,
 	// caller-controlled name (claude-tmux/*-tmux only; headless drivers ignore
 	// it). The swarm harness (ADR-0032) sets this and REGISTERS the name before

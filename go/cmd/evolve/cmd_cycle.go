@@ -484,6 +484,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir)))
 
+	// Runtime operator-directives provider: the ONLY place that resolves directives
+	// config (home dir + runscope lane + file paths). The orchestrator stays
+	// config-agnostic and just consumes the snapshot each cycle.
+	opts = append(opts, core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)))
+
 	// WS2 knowledge-base recall: wire the lessons corpus so the advisor plans
 	// with recall memory (prior failures + lessons). Lookup is best-effort and
 	// only consulted at plan time; an absent corpus is a no-op.

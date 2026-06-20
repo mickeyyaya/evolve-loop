@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -134,6 +135,12 @@ type Orchestrator struct {
 	// best-effort: errors WARN and never block the cycle. nil ⇒ no auto-refresh
 	// (the composition root wires the closure; core never imports modelcatalog).
 	catalogRefresh func(ctx context.Context) error
+
+	// directivesProvider optionally returns the runtime operator-directives snapshot
+	// for a cycle (WithDirectivesProvider). The injected closure owns ALL config —
+	// home/lane/path resolution — so core stays config- and environment-agnostic; it
+	// is fail-open (returns a possibly-empty Set, never errors). nil ⇒ no directives.
+	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
@@ -324,6 +331,16 @@ func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 	return func(o *Orchestrator) { o.catalogRefresh = fn }
 }
 
+// WithDirectivesProvider injects the runtime operator-directives provider. The
+// closure (wired at the composition root) owns ALL config — home/lane/path
+// resolution — and re-reads the directive files each cycle so live operator edits
+// propagate at the next cycle boundary; the orchestrator snapshots the result once
+// per cycle, stamps its version into the ledger, and threads it to every phase. A
+// nil fn leaves directives off (byte-identical dispatch).
+func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.Set) Option {
+	return func(o *Orchestrator) { o.directivesProvider = fn }
+}
+
 // WithReviewer injects a per-phase deliverable reviewer (Workstream E2). The
 // orchestrator calls reviewer.Review(...) after each phase's runner.Run returns
 // a non-error, non-SKIPPED verdict, BEFORE the ledger append or
@@ -447,6 +464,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	cr.preCycleHEAD = plan.preCycleHEAD
 	cr.benchedCLIs = plan.benchedCLIs
 	cr.clampedPlan = plan.clampedPlan
+	cr.directivesSet = plan.directivesSet
 
 	// Deferred write of phase-timing.json runs even when RunCycle returns an
 	// error so partial timing data is preserved for operator inspection.

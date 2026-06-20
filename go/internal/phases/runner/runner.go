@@ -492,6 +492,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			InteractivePolicy:   interactivePolicy,
 			SystemPrompt:        sysPrompt,
 			CorrectionDirective: req.CorrectionDirective,
+			OperatorDirectives:  req.OperatorDirectives,
 		})
 		// Normalize per attempt so the final events file reflects the
 		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
