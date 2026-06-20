@@ -295,6 +295,27 @@ func TestWatch_WorkspaceConfiguredButIdle_StillStalls(t *testing.T) {
 	}
 }
 
+// awaitEvent blocks until an event of eventType is delivered on ch, or timeout
+// elapses. The timeout is a GENEROUS safety bound, not a tuned window: the check
+// passes the instant the trigger fires (however slow the -race / CI runner) and
+// only fails if the event never fires. This replaces fixed wall-clock windows —
+// the source of the macOS -race flakiness — with event-triggered synchronization.
+func awaitEvent(t *testing.T, ch <-chan Event, eventType string, timeout time.Duration) bool {
+	t.Helper()
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	for {
+		select {
+		case e := <-ch:
+			if e.Type == eventType {
+				return true
+			}
+		case <-deadline.C:
+			return false
+		}
+	}
+}
+
 // TestWatch_ObserverEventsFileDoesNotMaskStall — the observer's own events
 // sink, when it lives inside WorkspaceDir, must be excluded from the activity
 // scan. Otherwise the "started" (and later "stall") writes would advance the
@@ -308,44 +329,54 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The events file the production adapter creates: <phase>-observer-events.ndjson.
+	// The observer's OWN events file: it must be EXCLUDED from the activity scan,
+	// so its growth can never reset the stall timer and mask a genuine stall.
 	eventsFile := filepath.Join(tmp, "build-observer-events.ndjson")
+
+	events := make(chan Event, 64)
 	var sink syncBuffer
 	o := New(Config{
-		StallS: 150 * time.Millisecond,
-		PollS:  10 * time.Millisecond,
-		Cycle:  3, Phase: "build", Agent: "build",
-		StdoutLog:    logFile,
-		WorkspaceDir: tmp,
+		StallS: 40 * time.Millisecond, PollS: 5 * time.Millisecond,
+		Cycle: 3, Phase: "build", Agent: "build",
+		StdoutLog: logFile, WorkspaceDir: tmp,
+		// Non-blocking subscriber — the event-triggered result check reads this.
+		OnEvent: func(e Event) {
+			select {
+			case events <- e:
+			default:
+			}
+		},
 	}, &sink)
 
-	stop := make(chan struct{})
+	// Keep the observer's own events file growing throughout — the masking source.
+	stopWriter := make(chan struct{})
 	go func() {
-		tick := time.NewTicker(20 * time.Millisecond)
+		tick := time.NewTicker(5 * time.Millisecond)
 		defer tick.Stop()
 		for {
 			select {
-			case <-stop:
+			case <-stopWriter:
 				return
 			case <-tick.C:
-				f, _ := os.OpenFile(eventsFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+				f, err := os.OpenFile(eventsFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+				if err != nil {
+					continue
+				}
 				_, _ = f.Write([]byte("{}\n"))
 				_ = f.Close()
 			}
 		}
 	}()
+	defer close(stopWriter)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_ = o.Watch(ctx)
-	close(stop)
-	hasStall := false
-	for _, e := range parseEvents(t, sink.bytes()) {
-		if e.Type == "stall_no_output" {
-			hasStall = true
-		}
-	}
-	if !hasStall {
+	go func() { _ = o.Watch(ctx) }()
+	defer func() { _ = o.Stop() }()
+
+	// Event-triggered: pass the instant the stall fires; the generous bound only
+	// trips on a real regression (events-file growth wrongly masking the stall).
+	if !awaitEvent(t, events, "stall_no_output", 5*time.Second) {
 		t.Error("stall must fire even though the observer's own events file keeps growing (it must be excluded from the activity scan)")
 	}
 }
