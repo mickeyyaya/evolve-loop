@@ -15,6 +15,7 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -46,7 +47,7 @@ var commands = []subcommand{
 	{Name: "help", Aliases: []string{"--help", "-h"}, Summary: "Show usage", Run: runHelp},
 
 	// Phase 1 + Phase 2 core surface.
-	{Name: "doctor", Summary: "Probe environment", Run: runDoctor},
+	{Name: "doctor", Summary: "Probe environment", Run: opscmd.RunDoctor},
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
 	{Name: "install", Summary: "Manual install of agents + loop skill into ~/.claude (install [--ci])", Run: runInstall},
 	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},
@@ -84,17 +85,17 @@ var commands = []subcommand{
 	{Name: "preflight-environment", Summary: "Probe host capabilities", Run: guardcmd.RunPreflight},
 	{Name: "phase-observer", Summary: "Stream-json tail + stall detect", Run: runPhaseObserver},
 	{Name: "subagent", Summary: "Subagent helpers", Run: runSubagent},
-	{Name: "changelog-gen", Summary: "Generate changelog from git log", Run: runChangelogGen},
-	{Name: "version-bump", Summary: "Atomic version bump", Run: runVersionBump},
-	{Name: "marketplace-poll", Summary: "Verify marketplace propagation", Run: runMarketplacePoll},
-	{Name: "release-preflight", Summary: "Pre-publish 5-step gate", Run: runReleasePreflight},
-	{Name: "rollback", Summary: "Auto-revert failed release", Run: runRollback},
-	{Name: "release", Aliases: []string{"release-pipeline"}, Summary: "Self-healing release pipeline", Run: runReleasePipeline},
+	{Name: "changelog-gen", Summary: "Generate changelog from git log", Run: opscmd.RunChangelogGen},
+	{Name: "version-bump", Summary: "Atomic version bump", Run: opscmd.RunVersionBump},
+	{Name: "marketplace-poll", Summary: "Verify marketplace propagation", Run: opscmd.RunMarketplacePoll},
+	{Name: "release-preflight", Summary: "Pre-publish 5-step gate", Run: opscmd.RunReleasePreflight},
+	{Name: "rollback", Summary: "Auto-revert failed release", Run: opscmd.RunRollback},
+	{Name: "release", Aliases: []string{"release-pipeline"}, Summary: "Self-healing release pipeline", Run: opscmd.RunReleasePipeline},
 	{Name: "prune-ephemeral", Summary: "TTL retention for .ephemeral/", Run: runPruneEphemeral},
 	{Name: "postedit-validate", Summary: "PostToolUse validator", Run: guardcmd.RunPostEditValidate},
 	{Name: "inbox-mover", Summary: "Inbox lifecycle ops", Run: runInboxMover},
 	{Name: "commit-prefix-gate", Summary: "Conventional-commits prefix check", Run: guardcmd.RunCommitPrefixGate},
-	{Name: "release-consistency", Summary: "Verify version markers", Run: runReleaseConsistency},
+	{Name: "release-consistency", Summary: "Verify version markers", Run: opscmd.RunReleaseConsistency},
 
 	// v12.1 utilities + composition.
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},

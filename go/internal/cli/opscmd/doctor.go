@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"flag"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
@@ -12,7 +13,7 @@ import (
 // discovery), `boot <driver>` (real bridge-boot smoke-test), and
 // `live <driver>` (boot + submit one trivial prompt — the probe that can see
 // a quota wall). Returns the process exit code.
-func runDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver>)")
 		return 10
@@ -37,7 +38,7 @@ func runDoctorProbe(args []string, stdout, stderr io.Writer) int {
 	var quiet bool
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
 	fs.BoolVar(&quiet, "quiet", false, "suppress stdout on success/failure")
-	if err := fs.Parse(reorderArgs(args)); err != nil {
+	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
 		return 10
 	}
 	if fs.NArg() != 1 {

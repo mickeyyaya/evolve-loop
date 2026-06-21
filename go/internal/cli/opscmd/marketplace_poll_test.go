@@ -1,4 +1,4 @@
-package main
+package opscmd
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ func cmdMakeMarketplace(t *testing.T, version string) string {
 
 func TestCmd_MarketplacePoll_Help(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{"--help"}, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll([]string{"--help"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -38,7 +38,7 @@ func TestCmd_MarketplacePoll_Help(t *testing.T) {
 
 func TestCmd_MarketplacePoll_NoTarget(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll(nil, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll(nil, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -46,7 +46,7 @@ func TestCmd_MarketplacePoll_NoTarget(t *testing.T) {
 
 func TestCmd_MarketplacePoll_UnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{"--bogus"}, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll([]string{"--bogus"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -54,7 +54,7 @@ func TestCmd_MarketplacePoll_UnknownFlag(t *testing.T) {
 
 func TestCmd_MarketplacePoll_BadMaxWait(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{"--max-wait-s", "abc", "1.0.0"}, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll([]string{"--max-wait-s", "abc", "1.0.0"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -62,7 +62,7 @@ func TestCmd_MarketplacePoll_BadMaxWait(t *testing.T) {
 
 func TestCmd_MarketplacePoll_BadPollInterval(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{"--poll-interval-s", "0", "1.0.0"}, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll([]string{"--poll-interval-s", "0", "1.0.0"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -71,7 +71,7 @@ func TestCmd_MarketplacePoll_BadPollInterval(t *testing.T) {
 func TestCmd_MarketplacePoll_DryRun(t *testing.T) {
 	m := cmdMakeMarketplace(t, "0.9.0")
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{
+	rc := RunMarketplacePoll([]string{
 		"1.2.3",
 		"--marketplace-dir", m,
 		"--max-wait-s", "2",
@@ -88,7 +88,7 @@ func TestCmd_MarketplacePoll_DryRun(t *testing.T) {
 
 func TestCmd_MarketplacePoll_MissingDir(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{
+	rc := RunMarketplacePoll([]string{
 		"1.0.0",
 		"--marketplace-dir", "/tmp/does-not-exist-mkpoll-cmd-xyz",
 		"--max-wait-s", "1",
@@ -101,7 +101,7 @@ func TestCmd_MarketplacePoll_MissingDir(t *testing.T) {
 
 func TestCmd_MarketplacePoll_ExtraPositional(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{"1.0.0", "extra"}, nil, &stdout, &stderr)
+	rc := RunMarketplacePoll([]string{"1.0.0", "extra"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -112,7 +112,7 @@ func TestCmd_MarketplacePoll_ExtraPositional(t *testing.T) {
 func TestCmd_MarketplacePoll_BadSemver(t *testing.T) {
 	m := cmdMakeMarketplace(t, "1.0.0")
 	var stdout, stderr bytes.Buffer
-	rc := runMarketplacePoll([]string{
+	rc := RunMarketplacePoll([]string{
 		"garbage",
 		"--marketplace-dir", m,
 		"--max-wait-s", "2",

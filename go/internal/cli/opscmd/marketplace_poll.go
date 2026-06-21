@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"strconv"
@@ -20,7 +21,7 @@ import (
 //	1  — timeout
 //	2  — runtime error (missing dir, bad plugin.json, semver, release.sh fail)
 //	10 — invalid arguments
-func runMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		target         string
 		maxWaitS       = 300
@@ -97,7 +98,7 @@ func runMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) in
 		return 10
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := marketplacepoll.Options{
 		Target:         target,
 		MarketplaceDir: marketplaceDir,

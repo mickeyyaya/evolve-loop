@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"time"
@@ -12,7 +13,7 @@ import (
 
 // runChangelogGen is `evolve changelog-gen <from-ref> <to-ref> <version> [--dry-run]`.
 // Mirrors legacy/scripts/release/changelog-gen.sh.
-func runChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		fromRef, toRef, version string
 		dryRun                  bool
@@ -51,7 +52,7 @@ func runChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	clPath := changeloggen.ResolveChangelogPath(repoRoot)
 
 	// Idempotency pre-check: matches bash behavior of returning OK before

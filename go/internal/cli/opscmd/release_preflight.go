@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
@@ -16,7 +17,7 @@ import (
 //	0  — all checks pass
 //	1  — some check failed
 //	10 — invalid arguments
-func runReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		target     string
 		dryRun     bool
@@ -53,7 +54,7 @@ func runReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		return 10
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 
 	opts := releasepreflight.Options{
 		Target:     target,
