@@ -110,3 +110,24 @@ lock, never build∧audit∧tdd); Supervisor concurrency (stable Index, semaphor
    in `campaign-quarantine.json` (Fix A repository).
 3. **A/B/C/E-failure-learning hand-built on this branch** (trust-boundary substrate); D +
    E-clihealth may later be campaign cycle-tasks.
+
+## 7. Remaining work (status as of 2026-06-21, after Fixes A–E + derived-artifact #182/#185 merged)
+
+Fixes A–E and the two derived-artifact fixes (#182 rebase-regen, #185 post-build projection regen)
+are **MERGED on `84de1011`**. The §4 "fix-on-the-way" items were deliberately deferred and several
+are still open; one new blocker surfaced during the live run. Tracked here so nothing stays invisible.
+
+| # | Item | Source | Status | Blocks 47→0? |
+|---|------|--------|--------|--------------|
+| **F** | **Cross-session campaign ownership lease** (reap-loop fix; found in the live run, in no prior doc) | live run; **ADR-0059** | **DONE on `feat/campaign-ownership-lease`** (`flock.TryLock` + `internal/campaign` ownership lease + `runCampaignRun` refuse-or-attach; TDD, 159 pkgs green) | Indirectly — it kept killing the run |
+| 16 | Worktree GC for `.evolve/worktrees/` (405MB/9-dir bloat on long runs) | §4 issue 16 | OPEN | No (disk grows per FAIL cycle) |
+| 18 | `campaign.max_cycles` policy knob | §4 issue 18 | OPEN — still `const 50` (`campaign.go:26`) | No (plan has 11 cycles) |
+| 13/15/17 | Post-commit diff-vs-declared-scope guard (underdeclaration) | §4 issue 13/15/17 | OPEN | No |
+| 11 | Closed-loop adaptive replan in `campaign run` | §4 issue 11 | OPEN | No (velocity only) |
+| 12 | Post-rebase recovery routes BUILD not AUDIT | §4 issue 12 | LIKELY SUPERSEDED by #182/#185 — verify | No |
+| §6.2 | Env-deprecation `evolve doctor` WARN (7 operator dials) + CHANGELOG migration table | flag design §6.2 | OPEN — not in the campaign plan JSON | Terminal/UX of 47→0 |
+| DA-a/b | Derived-artifact follow-ups: `maxRecoveryDepth=2` starvation; SSOT adjacent-row deletion → debugger | derived-artifact doc | ACCEPTED (fail-closed) | No |
+
+**Decision (2026-06-21):** implement **F** now (the proven blocker); CAPTURE 16/18/13/11/12/§6.2/DA as
+their own later scoped efforts (several are good campaign cycle-tasks once F lands). 16, 18, 13, 12 are
+file-disjoint and eligible to be run by the loop they harden.
