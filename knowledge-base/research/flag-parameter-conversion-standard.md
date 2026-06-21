@@ -52,11 +52,39 @@ across its value space — controlled entirely through the component's public AP
    deref-safety), without re-driving the downstream runtime behavior (that
    package owns those tests).
 
+6. **Re-wire the deleted behavior — NO DEAD ACCESSORS.** If removing the env read
+   also deletes a production behavior (a guard, a default, a branch), that
+   behavior MUST be reconnected through the new parameter at EVERY production call
+   site — not merely defined on an accessor. A `policy.X()` accessor that no
+   production code consumes is window-dressing: the behavior is *silently dropped*.
+   After the conversion, `grep` the accessor name — it MUST have ≥1 non-`_test`
+   consumer wiring it into the runtime (e.g. `cfg.ProxyMode = pol.ClaudeProxyBaseURL() != ""`
+   at the driver AND `setup.go`). (cycle-2 H1: the proxy cost-leak guard was deleted
+   and `ClaudeProxyBaseURL()` left with zero production consumers → protection lost.)
+
+7. **Migrate EVERY dependent test caller.** The env→parameter switch breaks any
+   PRE-EXISTING test that drove behavior via the old env var (`t.Setenv("EVOLVE_X")`
+   + call-with-no-opts). Find them all (`grep -rn EVOLVE_X --include=*_test.go`) and
+   migrate each to pass the new typed input. A variadic/optional signature that
+   preserves COMPILATION does NOT preserve the SEMANTICS those tests assert — left
+   unmigrated they silently stop testing anything, or fail. (cycle-2 H2:
+   `TestClassify_HangClassifier_ReclassifiesSHIPPED` kept `t.Setenv` and broke.)
+
 ## Verification (run before claiming done)
+
+**Run the FULL unit tests for EVERY changed package — not the ACS/EGPS suite, and
+not only the new param package.** A deleted env read most often breaks a CONSUMER
+or a pre-existing test in a DIFFERENT package than the one holding the new accessor.
+The ACS/EGPS slice does NOT run those unit tests, so **"ACS green" is NOT "code
+green"** (cycle-2 M1: `green=97 red=0` on ACS masked two failing unit tests → audit
+FAIL two attempts later). The orchestrator now runs a deterministic post-build
+`go test` for changed packages (`build-selfcheck`, writing `.evolve/build-selfcheck.json`)
+as a backstop, but the builder MUST run it FIRST and turn every red green before handoff:
 
 ```bash
 cd go
-go test ./internal/<pkg>/...                       # suite green, env-agnostic guard green
+go test ./<each changed package>/...               # ALL changed packages green (cost-guard, classifier, …)
+go test ./internal/<pkg>/...                        # new param suite green, env-agnostic guard green
 gofmt -l -s internal/<pkg> ; go vet ./internal/<pkg>/...
 go test -coverprofile=cov.txt ./internal/<pkg>/... && go tool cover -func=cov.txt   # accessor/Compute = 100.0%
 go build -o bin/apicover ./cmd/apicover
@@ -71,6 +99,12 @@ bin/apicover -enforce -cover <(go tool cover -func=cov.txt) "$(go list -f '{{.Di
 - "Liar" tests asserting only `!= nil`; tests that touch lines without asserting
   resolved values; one giant test per accessor instead of per-edge-case rows.
 - Deleting defensive error handling solely to hit 100% on an unexported helper.
+- A new exported accessor with ZERO production consumers (dead accessor) — the
+  behavior it was meant to carry is silently dropped (cycle-2 H1).
+- Claiming "tests pass / code clean" on the ACS/EGPS slice alone while a changed
+  package's unit tests are red — ACS green ≠ `go test` green (cycle-2 M1).
+- Leaving a pre-existing `t.Setenv("EVOLVE_X")` test untouched after deleting the
+  env read it depended on (cycle-2 H2).
 
 ## Reference template
 
