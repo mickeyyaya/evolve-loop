@@ -42,6 +42,11 @@ type Todo struct {
 	// Priority orders todos when scheduling is budget-limited (higher runs first);
 	// advisory — it never affects dependency correctness.
 	Priority int `json:"priority,omitempty"`
+	// Optional marks a best-effort cycle: if it still fails after retries the
+	// campaign QUARANTINES it (records the id, continues) instead of aborting. A
+	// required (Optional=false) cycle's exhausted failure aborts the wave, since
+	// its dependents cannot safely proceed. Default false = required.
+	Optional bool `json:"optional,omitempty"`
 	// OutputContract is the one-line done-definition the launched cycle must
 	// satisfy — the explicit per-cycle objective that prevents duplicated/missed
 	// work (2026 multi-agent lesson). Carried through to the cycle.

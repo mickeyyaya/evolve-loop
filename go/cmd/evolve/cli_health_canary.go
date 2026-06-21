@@ -1,13 +1,27 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
+
+// defaultLiveProbe is the production canary probe: a bounded LiveSmokeTest of the
+// driver. Shared by the loop and the campaign runner so the probe semantics (and
+// its 4-minute bound) cannot drift between them.
+func defaultLiveProbe(projectRoot string, stderr io.Writer) liveProbe {
+	return func(driver string) (int, string, string) {
+		probeCtx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		defer cancel()
+		return bridge.LiveSmokeTest(probeCtx, driver,
+			&bridge.Config{ProjectRoot: projectRoot}, bridge.Deps{Stderr: stderr})
+	}
+}
 
 // liveProbe is the canary's probe seam: production passes a closure over
 // bridge.LiveSmokeTest; tests inject a fake. Returns the bridge exit code,
@@ -28,7 +42,7 @@ func runCLIHealthCanary(projectRoot string, env map[string]string, probe livePro
 		return
 	}
 	store := clihealth.NewStore(projectRoot, nil)
-	for family, prev := range store.Expired() {
+	for family := range store.Expired() {
 		driver := family + "-tmux"
 		rc, pattern, scrollback := probe(driver)
 		switch {
@@ -36,8 +50,7 @@ func runCLIHealthCanary(projectRoot string, env map[string]string, probe livePro
 			_ = store.Clear(family)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s recovered (probe OK) — bench cleared\n", family)
 		case clihealth.Benchable(pattern):
-			entry := clihealth.NewBenchEntry(prev, family, pattern, scrollback, time.Now())
-			_ = store.Bench(entry)
+			entry, _ := store.BenchWall(family, pattern, scrollback)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s still walled (pattern=%s) — re-benched until %s (strikes=%d)\n",
 				family, pattern, entry.BenchedUntil.Format(time.RFC3339), entry.Strikes)
 		default:

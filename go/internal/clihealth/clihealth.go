@@ -7,11 +7,13 @@
 // preflight reports active ones. Stdlib-only leaf — importable by llmroute,
 // runner, cmd, and looppreflight without cycles.
 //
-// The store is deliberately tiny and last-writer-wins: concurrent writers
-// (runner mid-cycle, loop between cycles) write the same idempotent fact
-// ("family X is walled until T"), so a lost update is harmless. Writes are
-// temp+rename atomic; a corrupt or missing file degrades to empty, never
-// fatal — bench state is advice, losing it only costs one re-discovery.
+// The "walled until T" fact is idempotent, but the per-family Strikes counter is
+// ACCUMULATIVE — concurrent fleet cycles walling the same family must each see the
+// prior strike. An unlocked read-modify-write loses increments and under-escalates
+// the cooldown, so the full RMW (BenchWall/Bench/Clear) runs under the "<file>.lock"
+// sidecar flock (the project-wide convention; EVOLVE_FLEET=1 skips the global cycle
+// lock that previously serialized these writers). Writes stay temp+rename atomic; a
+// corrupt or missing file degrades to empty, never fatal.
 package clihealth
 
 import (
@@ -21,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
@@ -146,21 +149,54 @@ func (s *Store) Load() (map[string]Entry, error) {
 	return f.Benches, nil
 }
 
-// Bench upserts e (keyed by e.Family) via read-modify-write + temp+rename.
-func (s *Store) Bench(e Entry) error {
-	benches, _ := s.Load()
-	benches[e.Family] = e
-	return s.write(benches)
+// BenchWall atomically records a classified wall for family: under the sidecar
+// lock it reads the CURRENT entry, accumulates strikes via NewBenchEntry, and
+// writes — so concurrent fleet cycles walling the same family never lose a strike
+// increment (which would under-escalate the cooldown). It is the single home for
+// the read-prev→compose→write sequence both the runner bench-writer and the loop
+// canary need. Returns the composed entry.
+func (s *Store) BenchWall(family, pattern, paneText string) (Entry, error) {
+	var entry Entry
+	err := s.withLock(func() error {
+		benches, _ := s.Load()
+		entry = NewBenchEntry(benches[family], family, pattern, paneText, s.now())
+		benches[family] = entry
+		return s.write(benches)
+	})
+	return entry, err
 }
 
-// Clear removes family's entry; clearing an absent family is a no-op.
+// Bench upserts e (keyed by e.Family) via a locked read-modify-write + temp+rename.
+func (s *Store) Bench(e Entry) error {
+	return s.withLock(func() error {
+		benches, _ := s.Load()
+		benches[e.Family] = e
+		return s.write(benches)
+	})
+}
+
+// Clear removes family's entry under the sidecar lock; clearing an absent family
+// is a no-op.
 func (s *Store) Clear(family string) error {
-	benches, _ := s.Load()
-	if _, ok := benches[family]; !ok {
-		return nil
+	return s.withLock(func() error {
+		benches, _ := s.Load()
+		if _, ok := benches[family]; !ok {
+			return nil
+		}
+		delete(benches, family)
+		return s.write(benches)
+	})
+}
+
+// withLock serializes a read-modify-write on the bench file. The "<file>.lock"
+// sidecar lives beside the data file, so the dir must exist before we can create
+// the lock — MkdirAll first (the data file itself is rename-replaced, so locking
+// a sidecar, not the inode, is the project convention).
+func (s *Store) withLock(fn func() error) error {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return fmt.Errorf("clihealth: mkdir: %w", err)
 	}
-	delete(benches, family)
-	return s.write(benches)
+	return flock.WithPathLock(s.path, fn)
 }
 
 // Active returns entries still within their bench window (now < BenchedUntil).

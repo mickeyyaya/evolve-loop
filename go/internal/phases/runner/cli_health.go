@@ -100,12 +100,8 @@ func (b *BaseRunner) maybeBenchOnEscalation(projectRoot, workspace, candidateCLI
 	}
 	store := clihealth.NewStore(projectRoot, b.nowFn)
 	family := llmroute.Family(candidateCLI)
-	var prev clihealth.Entry
-	if all, lerr := store.Load(); lerr == nil {
-		prev = all[family]
-	}
-	entry := clihealth.NewBenchEntry(prev, family, rep.Pattern, rep.PaneTail, b.nowFn())
-	if err := store.Bench(entry); err != nil {
+	entry, err := store.BenchWall(family, rep.Pattern, rep.PaneTail)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "[runner] WARN cli-health bench write failed: %v\n", err)
 		return
 	}

@@ -99,7 +99,7 @@ func TestCampaignLocalizedRetrySucceeds(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	if code := runCampaignRun([]string{"--plan", planPath}, &stdout, &stderr); code != 0 {
+	if code := runCampaignRun([]string{"--plan", planPath, "--project-root", filepath.Dir(planPath)}, &stdout, &stderr); code != 0 {
 		t.Fatalf("runCampaignRun code = %d, want 0; stderr=%s", code, stderr.String())
 	}
 	if attempts != 2 {
@@ -118,7 +118,7 @@ func TestCampaignLocalizedRetryFails(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	if code := runCampaignRun([]string{"--plan", planPath}, &stdout, &stderr); code != 1 {
+	if code := runCampaignRun([]string{"--plan", planPath, "--project-root", filepath.Dir(planPath)}, &stdout, &stderr); code != 1 {
 		t.Fatalf("runCampaignRun code = %d, want 1", code)
 	}
 	if attempts != 2 {
@@ -145,7 +145,7 @@ func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	if code := runCampaignRun([]string{"--plan", planPath, "--concurrency", "1"}, &stdout, &stderr); code != 0 {
+	if code := runCampaignRun([]string{"--plan", planPath, "--concurrency", "1", "--project-root", filepath.Dir(planPath)}, &stdout, &stderr); code != 0 {
 		t.Fatalf("runCampaignRun code = %d, want 0; stderr=%s", code, stderr.String())
 	}
 	if got := atomic.LoadInt32(&maxActive); got != 1 {

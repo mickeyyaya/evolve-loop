@@ -40,13 +40,18 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 		}
 		var specs []CycleSpec
 		for _, group := range groupByFiles(levelTodos) {
-			ids := make([]string, len(group))
+			specIDs := make([]string, len(group))
+			optional := true // a group is skippable only if EVERY todo in it is optional
 			for i, td := range group {
-				ids[i] = td.ID
+				specIDs[i] = td.ID
+				if !td.Optional {
+					optional = false
+				}
 			}
 			specs = append(specs, CycleSpec{
-				Scope: ids,
-				Env:   map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
+				Scope:    specIDs,
+				Env:      map[string]string{fleetScopeEnvKey: strings.Join(specIDs, ",")},
+				Optional: optional,
 			})
 		}
 		waves = append(waves, specs)
@@ -65,8 +70,7 @@ func groupByFiles(todos []Todo) [][]Todo {
 	for i := range parent {
 		parent[i] = i
 	}
-	var find func(int) int
-	find = func(x int) int {
+	find := func(x int) int { // iterative path-halving (no self-reference → no split decl needed)
 		for parent[x] != x {
 			parent[x] = parent[parent[x]] // path-halving
 			x = parent[x]
