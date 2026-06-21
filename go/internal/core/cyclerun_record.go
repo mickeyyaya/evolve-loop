@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -64,11 +65,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict
 
-	// Retro is the one phase whose successor isn't verdict-driven;
-	// the failure-adapter consults cycle history (state.FailedAt) and
-	// the retro verdict to pick {ship | tdd | end}. Set scheduledNext
-	// so the next loop iteration runs the chosen phase.
-	if cr.current == PhaseRetro {
+	// Retro is the one phase whose successor isn't verdict-driven: the
+	// failure-adapter consults cycle history (state.FailedAt) and the retro
+	// verdict to pick {ship | tdd | end}. Set scheduledNext so the next loop
+	// iteration runs the chosen phase. The history-branch gate is config-driven
+	// (ADR-0058) — successorStrategy resolves the completed phase's
+	// branching_strategy and owns the byte-identity degrade.
+	if cr.o.successorStrategy(cr.current) == phasespec.BranchingHistory {
 		var branch Phase
 		var extraEnv map[string]string
 		var reason string

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // ResumePoint describes a checkpointed cycle that can be resumed.
@@ -305,7 +306,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		current = next
 		lastVerdict = resp.Verdict
 
-		if current == PhaseRetro {
+		// History-branch gate (ADR-0058): the branch-entry CONDITION is lockstep
+		// with recordAndBranch (both key on successorStrategy == history, which
+		// owns the degrade). The branch BODY differs by design — resume takes the
+		// deterministic decideAfterRetro, whereas the live loop additionally
+		// routes via decideAfterRetroRouted at advisory stage.
+		if o.successorStrategy(current) == phasespec.BranchingHistory {
 			branch, extraEnv, reason := o.decideAfterRetro(resp.Verdict, state.FailedAt)
 			for k, v := range extraEnv {
 				envSnap[k] = v

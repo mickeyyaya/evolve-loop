@@ -85,10 +85,29 @@ type PhaseSpec struct {
 	// (e.g. "build" → runs between build and audit). Empty defaults to running
 	// just before "audit" — the canonical post-build check slot.
 	After string `json:"after,omitempty"`
-	// Verdict branch hints (Stage 3 routing inversion). Reserved; unused in Stage 1.
+	// Verdict branch targets (ADR-0058): the phase a verdict-branching phase
+	// transitions to on PASS/WARN (OnPass) and FAIL (OnFail). The state
+	// machine's Next consults these for the audit branch (S1); empty degrades
+	// to the literal table.
 	OnPass string `json:"on_pass,omitempty"`
 	OnFail string `json:"on_fail,omitempty"`
+	// BranchingStrategy (ADR-0058) selects how this phase's successor is chosen:
+	// "" / "verdict" = verdict-driven (the linear default); "history" = the
+	// failure-adapter consults cycle history rather than this phase's own
+	// verdict (retrospective). The orchestrator's successorStrategy reads it;
+	// empty — or an unset catalog — degrades to the literal phase-identity
+	// default (retro→history), keeping the flow byte-identical.
+	BranchingStrategy string `json:"branching_strategy,omitempty"`
 }
+
+// Branching strategy values for PhaseSpec.BranchingStrategy (ADR-0058). The
+// empty value is treated as BranchingVerdict (the linear default), so a minimal
+// phase.json need not declare one. BranchingSignal (the debugger decision gate)
+// is reserved for S3.
+const (
+	BranchingVerdict = "verdict" // successor chosen by this phase's own verdict
+	BranchingHistory = "history" // successor chosen by the failure-adapter from cycle history
+)
 
 // KindOrDefault returns Kind, defaulting to "llm".
 func (s PhaseSpec) KindOrDefault() string {
