@@ -95,6 +95,12 @@ type Policy struct {
 	// Router configures advisor routing behavior and per-decision model
 	// overrides. Absent ⇒ built-in defaults apply.
 	Router *RouterPolicy `json:"router,omitempty"`
+	// MergeGate configures the merge-to-main gate: its rollout stage and the
+	// cadence-scaling thresholds the advisor reads to decide when a completed
+	// milestone is promoted to main. Absent ⇒ built-in defaults apply
+	// (stage="shadow" — byte-neutral; the gate records its would-be verdict
+	// but promotes nothing).
+	MergeGate *MergeGatePolicy `json:"merge_gate,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -689,6 +695,78 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ReviewGate != "" {
 		c.ReviewGate = p.Gates.ReviewGate
+	}
+	return c
+}
+
+// MergeGatePolicy is the .evolve/policy.json "merge_gate" block — the config-as-code
+// surface for the merge-to-main gate (no flags). Stage drives the
+// shadow→advisory→enforce rollout; the remaining fields are the cadence-scaling
+// thresholds the advisor reads to decide when accumulated milestone work is
+// promoted to main.
+type MergeGatePolicy struct {
+	// Stage selects the rollout stage: "off" / "shadow" / "advisory" / "enforce".
+	// Empty/absent ⇒ "shadow" (gate runs and records its would-be verdict but
+	// promotes nothing — byte-neutral first deploy over the riskiest action). The
+	// composition root translates this string to a config.Stage via parseStage,
+	// whose closed vocabulary maps any UNKNOWN value (e.g. a "enforced" typo) to
+	// StageOff — a fail-safe that disables the gate rather than guessing, so a
+	// misspelling can never silently arm auto-merge.
+	Stage string `json:"stage,omitempty"`
+	// BatchWaveCount is how many completed campaign waves accumulate before the
+	// advisor fires the gate (cadence scaling). Zero/absent ⇒ 1 (gate per wave).
+	BatchWaveCount int `json:"batch_wave_count,omitempty"`
+	// BatchChurnLOC is the diff-size ceiling (changed LOC) above which the advisor
+	// prefers batching over per-wave promotion. Zero/absent ⇒ 800.
+	BatchChurnLOC int `json:"batch_churn_loc,omitempty"`
+	// BlockSeverity is the build severity at or above which the gate hard-defers
+	// promotion. Empty/absent ⇒ "HIGH".
+	BlockSeverity string `json:"block_severity,omitempty"`
+	// CarryoverStallCycles is the anti-starvation bound: when a feature's oldest
+	// unpicked P0/P1 carryover has aged this many cycles, force a feature-complete
+	// promotion attempt. Zero/absent ⇒ 8.
+	CarryoverStallCycles int `json:"carryover_stall_cycles,omitempty"`
+}
+
+// MergeGateConfig is the resolved merge-gate configuration with defaults applied.
+type MergeGateConfig struct {
+	Stage                string
+	BatchWaveCount       int
+	BatchChurnLOC        int
+	BlockSeverity        string
+	CarryoverStallCycles int
+}
+
+// MergeGateConfig returns merge-gate configuration with built-in defaults
+// resolved. The zero-value Policy{} yields the safe defaults (stage="shadow",
+// so an absent block is provably behavior-neutral). Each numeric threshold
+// overrides only when > 0 and each string only when non-empty, so a partial
+// block can never silently produce an unsafe zero threshold. Pure.
+func (p Policy) MergeGateConfig() MergeGateConfig {
+	c := MergeGateConfig{
+		Stage:                "shadow",
+		BatchWaveCount:       1,
+		BatchChurnLOC:        800,
+		BlockSeverity:        "HIGH",
+		CarryoverStallCycles: 8,
+	}
+	if p.MergeGate == nil {
+		return c
+	}
+	if p.MergeGate.Stage != "" {
+		c.Stage = p.MergeGate.Stage
+	}
+	if p.MergeGate.BatchWaveCount > 0 {
+		c.BatchWaveCount = p.MergeGate.BatchWaveCount
+	}
+	if p.MergeGate.BatchChurnLOC > 0 {
+		c.BatchChurnLOC = p.MergeGate.BatchChurnLOC
+	}
+	if p.MergeGate.BlockSeverity != "" {
+		c.BlockSeverity = p.MergeGate.BlockSeverity
+	}
+	if p.MergeGate.CarryoverStallCycles > 0 {
+		c.CarryoverStallCycles = p.MergeGate.CarryoverStallCycles
 	}
 	return c
 }

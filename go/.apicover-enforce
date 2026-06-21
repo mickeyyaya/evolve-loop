@@ -39,6 +39,7 @@
 ./internal/goalhash
 ./internal/guardslog
 ./internal/logfilter
+./internal/mergegate
 ./internal/paths
 ./internal/phaseio
 ./internal/phaseorder

@@ -1,0 +1,35 @@
+{
+  "name": "merge-to-main-gate",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-merge-to-main-gate",
+  "description": "Verifies a completed milestone's already-integrated work is ready to be promoted to main and emits a PASS/WARN/FAIL promotion-readiness verdict plus merge_gate.* signals.",
+  "when_to_use": "Invoked by the campaign executor at a milestone/wave boundary (per the cadence advisor) to gate promoting accumulated, audited integration-branch work to main — never per-cycle.",
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/audit-report.md"
+    ],
+    "signals": [
+      "audit.verdict",
+      "audit.red_count"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/merge-to-main-gate-report.md"
+    ],
+    "signals": [
+      "merge_gate.ready",
+      "merge_gate.milestone_complete",
+      "merge_gate.cadence",
+      "merge_gate.hold_reason"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Readiness Evidence",
+      "Milestone Status",
+      "Verdict"
+    ]
+  }
+}

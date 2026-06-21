@@ -217,6 +217,22 @@ type RolloutStages struct {
 	// view, loaded from policy; the re-plan call site (WS2-S3) reads it.
 	// Default StageShadow (set in defaults()).
 	RouterReplan Stage
+
+	// MergeGate is the merge-to-main gate rollout dial. Like RouterReplan/PhaseIO
+	// it uses the FULL off→shadow→advisory→enforce ladder:
+	//   StageOff      — the gate is never inserted; byte-identical legacy (the
+	//                   per-cycle ship path to main is unaffected).
+	//   StageShadow   — the gate runs and records its would-be promotion verdict
+	//                   to the ledger/dossier, but promotes nothing (DEFAULT).
+	//   StageAdvisory — the gate's verdict surfaces as a recommendation; still no
+	//                   automatic promotion.
+	//   StageEnforce  — on a PASS verdict the kernel auto-promotes the completed
+	//                   milestone's integration branch to main through the
+	//                   hardened ship/merge-train path (armed auto-rollback).
+	// This is the composition-root view, loaded from policy.MergeGateConfig; the
+	// promoter call site reads it. Default StageShadow (set in defaults()) — the
+	// auto-merge in enforce activates only after a human-watched shadow soak.
+	MergeGate Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -392,7 +408,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
