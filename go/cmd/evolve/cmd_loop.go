@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 
@@ -281,12 +280,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
 		// ones re-bench with a doubled cooldown, instead of a full phase
 		// re-discovering the wall the expensive way (cycle-283).
-		runCLIHealthCanary(cfg.ProjectRoot, cycleEnv, func(driver string) (int, string, string) {
-			probeCtx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
-			defer cancel()
-			return bridge.LiveSmokeTest(probeCtx, driver,
-				&bridge.Config{ProjectRoot: cfg.ProjectRoot}, bridge.Deps{Stderr: stderr})
-		}, stderr)
+		runCLIHealthCanary(cfg.ProjectRoot, cycleEnv, defaultLiveProbe(cfg.ProjectRoot, stderr), stderr)
 
 		// Snapshot state.LastCycleNumber so we can detect
 		// counter-non-advance after RunCycle returns.

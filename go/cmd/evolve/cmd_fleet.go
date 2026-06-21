@@ -14,6 +14,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
@@ -146,11 +150,21 @@ func cycleRunArgs(goalHash string, simulate bool, projectRoot string) []string {
 }
 
 func execCycleLaunch(binPath string, simulate bool, projectRoot string, stdout, stderr io.Writer) fleet.LaunchFn {
+	var logMu sync.Mutex // serializes interleaved output across concurrent cycles
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
+		prefix := "[" + cycleLogTag(spec) + "] "
+		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
+		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
+		defer func() { ow.Flush(); ew.Flush() }()
 		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
+		cmd.Stdout = ow
+		cmd.Stderr = ew
+		// On ctx cancel/timeout (Ctrl-C or per-cycle deadline), SIGTERM the child
+		// for a graceful exit, then let WaitDelay escalate to SIGKILL if it ignores
+		// the term — so a wedged cycle is reaped, never left orphaned.
+		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+		cmd.WaitDelay = 10 * time.Second
 		if err := cmd.Run(); err != nil {
 			var ee *exec.ExitError
 			if errors.As(err, &ee) {
@@ -160,6 +174,18 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot string, stdout, 
 		}
 		return 0, nil
 	}
+}
+
+// cycleLogTag identifies a cycle in interleaved fleet output: its todo scope, or
+// a short goal hash when no scope is assigned.
+func cycleLogTag(spec fleet.CycleSpec) string {
+	if len(spec.Scope) > 0 {
+		return strings.Join(spec.Scope, "+")
+	}
+	if len(spec.GoalHash) >= 8 {
+		return spec.GoalHash[:8]
+	}
+	return spec.GoalHash
 }
 
 func envPairs(overlay map[string]string) []string {

@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/campaign"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -23,7 +27,8 @@ import (
 const campaignUsage = `Usage:
   evolve campaign study --workspace <cycle-workspace>
   evolve campaign replan --workspace <cycle-workspace> --feedback <text>
-  evolve campaign run --plan <campaign-plan.json> [--simulate] [--concurrency <n>] [--project-root <path>]
+  evolve campaign run --plan <campaign-plan.json> [--simulate] [--concurrency <n>] [--project-root <path>] [--ignore-progress]
+  evolve campaign status --plan <campaign-plan.json> [--project-root <path>]
 `
 
 var campaignLaunchFactory = execCycleLaunch
@@ -40,6 +45,8 @@ func runCampaign(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCampaignReplan(args[1:], stdout, stderr)
 	case "run":
 		return runCampaignRun(args[1:], stdout, stderr)
+	case "status":
+		return runCampaignStatus(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve campaign: unknown subcommand %q\n%s", args[0], campaignUsage)
 		return 2
@@ -112,6 +119,8 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	simulate := fs.Bool("simulate", false, "exercise wave execution without LLM calls")
 	concurrency := fs.Int("concurrency", campaign.MaxWaveWidth, "max concurrent cycles")
 	projectRoot := fs.String("project-root", "", "project root passed to each cycle")
+	ignoreProgress := fs.Bool("ignore-progress", false, "start fresh, ignoring saved progress (default: auto-resume completed waves when the plan is unchanged)")
+	cycleTimeout := fs.Duration("cycle-timeout", 2*time.Hour, "per-cycle deadline; a cycle exceeding it is reaped so it can't hang the whole campaign (0 = no deadline)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -142,28 +151,126 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve campaign run: resolve binary: %v\n", err)
 		return 1
 	}
-	goalHash := fmt.Sprintf("%x", sha256.Sum256([]byte(plan.Goal)))
-	supervisor := &fleet.Supervisor{
-		Concurrency: *concurrency,
-		Launch:      campaignLaunchFactory(binPath, *simulate, *projectRoot, stdout, stderr),
+	goalHash := campaignGoalHash(plan)
+	rawPlan, rerr := os.ReadFile(*planPath)
+	if rerr != nil {
+		fmt.Fprintf(stderr, "evolve campaign run: read plan for progress key: %v\n", rerr)
+		return 1
 	}
-	for waveIndex, wave := range waves {
-		for i := range wave {
-			wave[i].GoalHash = goalHash
+	progressPath := campaign.ProgressPath(campaignEvolveDir(*projectRoot), goalHash)
+	for wi := range waves {
+		for i := range waves[wi] {
+			waves[wi][i].GoalHash = goalHash
 		}
-		fmt.Fprintf(stderr, "[campaign] wave %d/%d: %d cycle(s)\n", waveIndex+1, len(waves), len(wave))
-		results := supervisor.Run(context.Background(), wave)
-		for _, result := range results {
-			if result.Err == nil && result.ExitCode == 0 {
-				continue
-			}
-			fmt.Fprintf(stderr, "[campaign] wave %d cycle %d failed; retrying only that cycle\n", waveIndex+1, result.Index)
-			retry := supervisor.Run(context.Background(), []fleet.CycleSpec{wave[result.Index]})
-			if len(retry) != 1 || retry[0].Err != nil || retry[0].ExitCode != 0 {
-				fmt.Fprintf(stderr, "evolve campaign run: wave %d cycle %d failed after localized retry\n", waveIndex+1, result.Index)
-				return 1
+	}
+	// SIGINT/SIGTERM cancels in-flight cycles (exec.CommandContext reaps the
+	// children); RunWaves then returns and the progress checkpoint up to the last
+	// completed wave survives, so --resume picks up where the interrupt hit.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	supervisor := &fleet.Supervisor{
+		Concurrency:  *concurrency,
+		CycleTimeout: *cycleTimeout,
+		Launch:       campaignLaunchFactory(binPath, *simulate, *projectRoot, stdout, stderr),
+	}
+	runner := func(rctx context.Context, wave []fleet.CycleSpec) []fleet.Result {
+		fmt.Fprintf(stderr, "[campaign] running wave: %d cycle(s)\n", len(wave))
+		return supervisor.Run(rctx, wave)
+	}
+	if err := campaign.RunWaves(ctx, waves, runner, campaign.RunOptions{
+		ProgressPath: progressPath,
+		PlanSHA:      campaign.HashPlan(rawPlan),
+		Resume:       !*ignoreProgress,
+		MaxRetries:   1, // one batched retry of a wave's failed cycles before abort
+		Cooldown:     campaignQuotaCooldown(*projectRoot),
+		BeforeWave: func() {
+			// Clear recovered quota benches before each wave so a wave doesn't
+			// re-hit a wall that already lifted (and re-bench ones still walled).
+			runCLIHealthCanary(*projectRoot, nil, defaultLiveProbe(*projectRoot, stderr), stderr)
+		},
+	}); err != nil {
+		fmt.Fprintf(stderr, "evolve campaign run: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// campaignGoalHash is the SSOT for the campaign goal hash — used both as each
+// cycle's --goal-hash and as the progress-file key, so run and status agree.
+func campaignGoalHash(plan *campaign.Plan) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(plan.Goal)))
+}
+
+// campaignQuotaCooldown returns a Cooldown hook reporting how long to wait before
+// a retry for the longest-active CLI quota bench to expire (capped at MaxCooldown),
+// so a walled wave backs off instead of retrying straight into the wall. 0 when no
+// family is benched (the common, non-quota failure path retries immediately).
+func campaignQuotaCooldown(projectRoot string) func() time.Duration {
+	return func() time.Duration {
+		store := clihealth.NewStore(projectRoot, nil)
+		var wait time.Duration
+		for _, e := range store.Active() {
+			if d := time.Until(e.BenchedUntil); d > wait {
+				wait = d
 			}
 		}
+		if wait > clihealth.MaxCooldown {
+			wait = clihealth.MaxCooldown
+		}
+		return wait
+	}
+}
+
+// campaignEvolveDir resolves the writable .evolve directory that holds campaign
+// progress state, mirroring the projectRoot/.evolve convention used elsewhere.
+func campaignEvolveDir(projectRoot string) string {
+	root := projectRoot
+	if root == "" {
+		if wd, err := os.Getwd(); err == nil {
+			root = wd
+		}
+	}
+	return filepath.Join(root, ".evolve")
+}
+
+// runCampaignStatus reports a campaign's wave/cycle progress from the durable
+// checkpoint — the single queryable view an operator needs for a multi-hour run.
+func runCampaignStatus(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve campaign status", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	planPath := fs.String("plan", "", "campaign-plan.json to report on")
+	projectRoot := fs.String("project-root", "", "project root (locates .evolve progress)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *planPath == "" {
+		fmt.Fprintln(stderr, "evolve campaign status: --plan is required")
+		return 2
+	}
+	plan, err := loadVerifiedCampaignPlan(*planPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve campaign status: %v\n", err)
+		return 1
+	}
+	waves, err := plan.Waves()
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve campaign status: %v\n", err)
+		return 1
+	}
+	goalHash := campaignGoalHash(plan)
+	prog, err := campaign.LoadProgress(campaign.ProgressPath(campaignEvolveDir(*projectRoot), goalHash))
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve campaign status: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "campaign %s: %d/%d waves complete, %d cycles shipped, %d quarantined\n",
+		goalHash[:8], len(prog.CompletedWaves), len(waves), len(prog.CompletedCycleIDs), len(prog.FailedCycleIDs))
+	for i, wave := range waves {
+		state := "pending"
+		if prog.IsWaveComplete(i) {
+			state = "done"
+		}
+		fmt.Fprintf(stdout, "  wave %d/%d [%s]: %d cycle(s)\n", i+1, len(waves), state, len(wave))
 	}
 	return 0
 }

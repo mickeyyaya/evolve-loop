@@ -429,9 +429,72 @@ func (o *Orchestrator) writeFailureLearningState(ctx context.Context, state *Sta
 	if state == nil {
 		return
 	}
-	if err := o.storage.WriteState(ctx, *state); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write state: %v\n", err)
+	su, ok := o.storage.(StateUpdater)
+	if !ok {
+		// Legacy single-mode storage: no serialized RMW available.
+		if err := o.storage.WriteState(ctx, *state); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write state: %v\n", err)
+		}
+		return
 	}
+	// Under EVOLVE_FLEET the global cycle lock is skipped, so a peer run can write
+	// state.json concurrently. Merge this run's outcome records into the on-disk
+	// state (union, incoming wins per key) rather than clobbering the peer's via a
+	// whole-state WriteState (which would also drop unmodeled state.json keys).
+	if _, err := su.UpdateState(ctx, func(s *State) {
+		s.FailedAt = mergeFailedRecords(s.FailedAt, state.FailedAt)
+		s.CarryoverTodos = mergeCarryoverTodos(s.CarryoverTodos, state.CarryoverTodos)
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: update state: %v\n", err)
+	}
+}
+
+// mergeFailedRecords unions disk and incoming failure records, keyed by
+// (cycle, ts, verdict, recordedAt). A peer's disk-only record is preserved; the
+// incoming record wins for a shared key so this run's own update (e.g. the
+// Retrospected flag) is not lost. Order = disk-first appearance, then new keys.
+//
+// Two CONCURRENT fleet runs never collide on this key: each run holds a UNIQUE
+// lease-allocated cycle number (AllocateCycleNumber — no two allocators get the
+// same number), so a peer's records carry a different Cycle and key separately. A
+// shared key therefore only ever identifies the SAME record (this run's updated
+// copy of one it already loaded), where incoming-wins is exactly right.
+func mergeFailedRecords(disk, incoming []FailedRecord) []FailedRecord {
+	key := func(r FailedRecord) string {
+		return fmt.Sprintf("%d\x00%s\x00%s\x00%s", r.Cycle, r.TS, r.Verdict, r.RecordedAt)
+	}
+	byKey := make(map[string]FailedRecord, len(disk)+len(incoming))
+	order := make([]string, 0, len(disk)+len(incoming))
+	add := func(r FailedRecord) {
+		k := key(r)
+		if _, seen := byKey[k]; !seen {
+			order = append(order, k)
+		}
+		byKey[k] = r
+	}
+	for _, r := range disk {
+		add(r)
+	}
+	for _, r := range incoming {
+		add(r) // incoming overrides disk for a shared key
+	}
+	out := make([]FailedRecord, 0, len(order))
+	for _, k := range order {
+		out = append(out, byKey[k])
+	}
+	return out
+}
+
+// mergeCarryoverTodos unions disk and incoming todos, deduped by ID (disk-first),
+// so a concurrent peer's queued todo survives this run's write.
+func mergeCarryoverTodos(disk, incoming []CarryoverTodo) []CarryoverTodo {
+	out := append([]CarryoverTodo(nil), disk...)
+	for _, td := range incoming {
+		if !carryoverTodoExists(out, td.ID) {
+			out = append(out, td)
+		}
+	}
+	return out
 }
 
 func carryoverTodoExists(todos []CarryoverTodo, id string) bool {

@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 // fleetEnvKey is forced to "1" on every launched cycle so RunCycle skips the
@@ -32,6 +33,9 @@ type CycleSpec struct {
 	GoalHash string            // --goal-hash for `evolve cycle run`
 	Scope    []string          // todo IDs this cycle owns (disjoint across specs); also in Env[fleetScopeEnvKey]
 	Env      map[string]string // base env overlay; EVOLVE_FLEET is forced on
+	// Optional is true only when EVERY todo in this cycle's group is optional, so
+	// an exhausted failure quarantines+continues rather than aborting the campaign.
+	Optional bool
 }
 
 // Result is one launched cycle's outcome (input order).
@@ -50,6 +54,10 @@ type LaunchFn func(ctx context.Context, spec CycleSpec) (exitCode int, err error
 type Supervisor struct {
 	Launch      LaunchFn
 	Concurrency int // max concurrent cycles; <=0 → all at once
+	// CycleTimeout bounds each launch: a positive value gives every cycle its own
+	// deadline, so a wedged child (e.g. a tmux REPL that never boots) is reaped
+	// instead of hanging the whole wave forever. 0 = no per-cycle deadline.
+	CycleTimeout time.Duration
 }
 
 // Validate reports a misconfigured supervisor — a nil LaunchFn — so the caller
@@ -109,6 +117,11 @@ func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec) Resul
 	env[fleetEnvKey] = "1"
 	spec.Env = env
 
+	if s.CycleTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.CycleTimeout)
+		defer cancel()
+	}
 	code, err := s.Launch(ctx, spec)
 	return Result{Index: i, ExitCode: code, Err: err}
 }

@@ -74,9 +74,15 @@ func (o *Orchestrator) persistCycleEndState(ctx context.Context, state State) er
 	}
 	_, err := su.UpdateState(ctx, func(s *State) {
 		diskLease, diskRev := s.LastAllocatedCycleNumber, s.StateRevision
+		diskFailed, diskCarry := s.FailedAt, s.CarryoverTodos
 		*s = state
 		s.LastAllocatedCycleNumber = max(s.LastAllocatedCycleNumber, diskLease)
 		s.StateRevision = diskRev // UpdateState's own ++ owns the bump
+		// Under EVOLVE_FLEET the global lock is skipped, so a peer run may have
+		// appended outcome records after this run loaded; union them so the blind
+		// *s=state cannot drop a concurrent peer's FailedAt/CarryoverTodos.
+		s.FailedAt = mergeFailedRecords(diskFailed, state.FailedAt)
+		s.CarryoverTodos = mergeCarryoverTodos(diskCarry, state.CarryoverTodos)
 	})
 	return err
 }
