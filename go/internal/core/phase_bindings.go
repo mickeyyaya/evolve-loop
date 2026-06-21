@@ -349,6 +349,10 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	// changing, so non-flag cycles pay no `go run` cost.
 	if completed == PhaseBuild {
 		o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
+		// Deterministic false-green backstop: run the changed packages' unit
+		// tests AFTER the regen (so the tested tree matches what audit binds) and
+		// record ground-truth. Best-effort; never aborts — audit is the backstop.
+		o.buildSelfCheck(ctx, cs.ActiveWorktree)
 	}
 }
 
