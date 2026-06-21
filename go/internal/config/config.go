@@ -562,6 +562,26 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 			Message: "mandatory_phases omits " + strings.Join(missing, "+") + " — audit-before-ship guarantee weakened",
 		})
 	}
+	// The artifact-backed floor (core.SpineSatisfiedUpTo) walks the mandatory
+	// anchors in their configured-order position, so a scrambled order that places
+	// ship before audit would let ship's gate skip the shippable-audit check. The
+	// legality graph + audit verdict branch still independently block it, but
+	// surface the misordering loudly so it is never the sole guard.
+	auditPos, shipPos := -1, -1
+	for i, p := range cfg.Order {
+		switch p {
+		case "audit":
+			auditPos = i
+		case "ship":
+			shipPos = i
+		}
+	}
+	if auditPos >= 0 && shipPos >= 0 && auditPos > shipPos {
+		*ws = append(*ws, Warning{
+			Code:    "spine-order",
+			Message: "phase order places ship before audit — audit must precede ship for the shippable-audit floor to gate ship",
+		})
+	}
 }
 
 // parseStage parses a full off→shadow→advisory→enforce dial (the 4-value
