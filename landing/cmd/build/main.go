@@ -7,13 +7,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"evolveloop-landing/internal/buildsite"
 )
 
-func main() {
-	cfg := buildsite.Config{
+// config returns the build configuration: the five landing-page versions plus
+// the gallery, and where content/templates/assets/output live.
+func config() buildsite.Config {
+	return buildsite.Config{
 		ContentPath:  "shared/content.json",
 		TemplateGlob: "templates/*.html",
 		AssetsDir:    "assets",
@@ -27,14 +30,29 @@ func main() {
 			{Slug: "aurora-glass", Title: "Aurora Glass", Tagline: "Liquid-glass, modern Apple.", Template: "aurora"},
 		},
 	}
+}
 
+// run builds the site, prints the written file list to stdout, and returns a
+// process exit code (1 on error, 0 on success). Build errors are reported to
+// stderr to match the original command behavior.
+func run(stdout io.Writer) int {
+	cfg := config()
 	written, err := buildsite.Build(cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "build error:", err)
-		os.Exit(1)
+		return 1
 	}
-	fmt.Printf("built %d files into %s/\n", len(written), cfg.OutDir)
+	fmt.Fprintf(stdout, "built %d files into %s/\n", len(written), cfg.OutDir)
 	for _, w := range written {
-		fmt.Println("  ", w)
+		fmt.Fprintln(stdout, "  ", w)
 	}
+	return 0
+}
+
+// osExit is a seam so a test can verify main() forwards run()'s exit code
+// without terminating the test process. At runtime it is exactly os.Exit.
+var osExit = os.Exit
+
+func main() {
+	osExit(run(os.Stdout))
 }
