@@ -34,9 +34,43 @@ type StateMachine struct {
 	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table. Injected
 	// by the orchestrator (which owns the catalog) via WithCatalog.
 	specFor func(Phase) (phasespec.PhaseSpec, bool)
-	// orderNext yields the cfg.Order successor. Plumbed for a later slice
-	// (ADR-0058 S5); not yet consulted — the literal table stays the live path.
-	orderNext func(Phase) Phase
+}
+
+// spineOrder is the canonical linear successor sequence — the mandatory-default
+// spine the state machine walks for any phase that is not a verdict branch
+// (audit), a control sentinel (retro/debugger), or the intent-independent start
+// edge. spineNext walks it so the LINEAR transition is a data lookup, not a
+// per-phase switch (ADR-0058 S5). Like the legality graph (§1) it is a config-
+// INDEPENDENT trust anchor: config SELECTS among already-legal edges
+// (on_pass/on_fail), it can never move the spine itself. NB: this is NOT
+// cfg.Order — cfg.Order interleaves optional insertions (spec-verify, tester, …)
+// the static spine skips; reproducing the literal spine needs its own SSOT.
+//
+// audit appears so build→audit resolves, but its OWN successor is never taken via
+// spineNext: Next intercepts audit in the explicit switch (the verdict branch)
+// before the spine walk. end is the terminal waypoint for ship→end.
+var spineOrder = []Phase{
+	PhaseIntent,
+	PhaseScout,
+	PhaseTriage,
+	PhaseTDD,
+	PhaseBuildPlanner,
+	PhaseBuild,
+	PhaseAudit,
+	PhaseShip,
+	PhaseEnd,
+}
+
+// spineNext returns the phase immediately following p in spineOrder, and whether
+// p is on the spine. A miss (sentinel, swarm-plan, or the terminal end) leaves
+// the caller to handle p explicitly.
+func spineNext(p Phase) (Phase, bool) {
+	for i, sp := range spineOrder {
+		if sp == p && i+1 < len(spineOrder) {
+			return spineOrder[i+1], true
+		}
+	}
+	return "", false
 }
 
 // WithCatalog gives the StateMachine config-driven transition resolution: a
@@ -44,11 +78,9 @@ type StateMachine struct {
 // from config instead of a hardcoded phase-name case (ADR-0058). When unset
 // (bare unit-test SMs) or when a phase declares no on_pass/on_fail, Next
 // degrades to the exact literal table — so the kernel stays byte-identical for
-// catalog-less orchestrators and a registry missing the fields. orderNext is
-// accepted now but consulted in a later slice (kept dark behind the oracle).
-func (sm *StateMachine) WithCatalog(specFor func(Phase) (phasespec.PhaseSpec, bool), orderNext func(Phase) Phase) *StateMachine {
+// catalog-less orchestrators and a registry missing the fields.
+func (sm *StateMachine) WithCatalog(specFor func(Phase) (phasespec.PhaseSpec, bool)) *StateMachine {
 	sm.specFor = specFor
-	sm.orderNext = orderNext
 	return sm
 }
 
@@ -167,22 +199,14 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 			}
 		}
 	}
+	// Non-linear cases the spine table cannot express, handled explicitly:
 	switch current {
 	case PhaseStart:
+		// Intent-independent by design (NextFromStart, not Next, gates intent).
 		return PhaseScout, nil
-	case PhaseIntent:
-		return PhaseScout, nil
-	case PhaseScout:
-		return PhaseTriage, nil
-	case PhaseTriage:
-		return PhaseTDD, nil
-	case PhaseTDD:
-		return PhaseBuildPlanner, nil
-	case PhaseBuildPlanner:
-		return PhaseBuild, nil
-	case PhaseBuild:
-		return PhaseAudit, nil
 	case PhaseAudit:
+		// Verdict branch — the literal fallback when no catalog declares
+		// on_pass/on_fail (the config branch above handles the wired case).
 		switch verdict {
 		case VerdictPASS, VerdictWARN:
 			return PhaseShip, nil
@@ -191,19 +215,18 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 		default:
 			return "", fmt.Errorf("%w: audit verdict %q", ErrTransitionInvalid, verdict)
 		}
-	case PhaseShip:
-		return PhaseEnd, nil
-	case PhaseDebugger:
-		// Decision-driven (RESHIP / RERUN_PHASE / BLOCK): the orchestrator
-		// overrides via scheduledNext from the debug-decision, mirroring the
-		// retro branch. Default end so callers can override explicitly.
-		return PhaseEnd, nil
-	case PhaseRetro:
-		// Default: failure-adapter is consulted by orchestrator. State
-		// machine returns end so callers can override explicitly.
+	case PhaseDebugger, PhaseRetro:
+		// Decision/failure-adapter driven (RESHIP / RERUN_PHASE / BLOCK and the
+		// retro recovery): the orchestrator overrides via scheduledNext. Default
+		// end so callers can override explicitly.
 		return PhaseEnd, nil
 	case PhaseEnd:
 		return "", fmt.Errorf("%w: end is terminal", ErrTransitionInvalid)
+	}
+	// Linear spine (ADR-0058 S5): the successor is the next entry in the canonical
+	// spine table — a data walk, byte-identical to the former per-phase switch.
+	if next, ok := spineNext(current); ok {
+		return next, nil
 	}
 	return "", fmt.Errorf("%w: no successor for %s", ErrTransitionInvalid, current)
 }

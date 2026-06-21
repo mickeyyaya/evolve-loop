@@ -466,11 +466,12 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	for _, opt := range opts {
 		opt(o)
 	}
-	// ADR-0058: hand the state machine its config-driven transition resolution
-	// now that the catalog + cfg (hence specFor / nextInOrder) are settled by
-	// options. Without a catalog, specFor misses and Next stays on the literal
-	// table (byte-identical). nextInOrder is plumbed but not yet consulted.
-	o.sm.WithCatalog(o.specFor, o.nextInOrder)
+	// ADR-0058: hand the state machine its config-driven verdict-branch
+	// resolution now that the catalog (hence specFor) is settled by options.
+	// Without a catalog, specFor misses and Next stays on the literal table
+	// (byte-identical). The linear spine is the config-independent spineOrder
+	// trust anchor (S5), so no order function is threaded here.
+	o.sm.WithCatalog(o.specFor)
 	// CA.5: the run-id stamping decorator wraps the (possibly option-
 	// replaced) ledger exactly once at construction. The per-run identity
 	// flows through the atomic currentRunID — RunCycle never mutates the
