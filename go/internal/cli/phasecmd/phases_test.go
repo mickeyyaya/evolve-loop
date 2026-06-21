@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -41,7 +41,7 @@ func writeUserPhaseFile(t *testing.T, root, name, body string) {
 
 func TestRunPhases_NoArgs(t *testing.T) {
 	var out, errb bytes.Buffer
-	if rc := runPhases(nil, nil, &out, &errb); rc != 10 {
+	if rc := RunPhases(nil, nil, &out, &errb); rc != 10 {
 		t.Errorf("rc = %d, want 10; stderr=%s", rc, errb.String())
 	}
 }
@@ -51,7 +51,7 @@ func TestRunPhases_List(t *testing.T) {
 	writeUserPhaseFile(t, root, "security-scan", `{"name":"security-scan","optional":true,"kind":"llm"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"list"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"list"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	s := out.String()
@@ -66,7 +66,7 @@ func TestRunPhases_ValidateClean(t *testing.T) {
 	root := newPhasesProject(t)
 	writeUserPhaseFile(t, root, "security-scan", `{"name":"security-scan","optional":true,"kind":"llm"}`)
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("rc = %d, want 0; out=%s", rc, out.String())
 	}
 }
@@ -76,7 +76,7 @@ func TestRunPhases_ValidateFail(t *testing.T) {
 	// not optional → floor violation
 	writeUserPhaseFile(t, root, "bad-phase", `{"name":"bad-phase","optional":false}`)
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate"}, nil, &out, &errb); rc != 2 {
+	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 2 {
 		t.Errorf("rc = %d, want 2; out=%s", rc, out.String())
 	}
 	if !strings.Contains(out.String(), "must be optional") {
@@ -87,7 +87,7 @@ func TestRunPhases_ValidateFail(t *testing.T) {
 func TestRunPhases_AddThenValidate(t *testing.T) {
 	root := newPhasesProject(t)
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("add rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	// scaffolded files exist
@@ -99,11 +99,11 @@ func TestRunPhases_AddThenValidate(t *testing.T) {
 	}
 	// the scaffolded spec validates clean
 	out.Reset()
-	if rc := runPhases([]string{"validate", "my-check"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"validate", "my-check"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("validate scaffolded rc = %d, want 0; out=%s", rc, out.String())
 	}
 	// re-add refuses
-	if rc := runPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 1 {
+	if rc := RunPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 1 {
 		t.Errorf("re-add rc = %d, want 1 (exists)", rc)
 	}
 }
@@ -114,7 +114,7 @@ func TestRunPhases_BadName(t *testing.T) {
 	// mkdir (ValidateUserSpec's kebab-case floor), closing the escape vector.
 	for _, bad := range []string{"Bad Name", "../escape", "a/b"} {
 		var out, errb bytes.Buffer
-		if rc := runPhases([]string{"add", bad}, nil, &out, &errb); rc != 10 {
+		if rc := RunPhases([]string{"add", bad}, nil, &out, &errb); rc != 10 {
 			t.Errorf("add %q: rc = %d, want 10 (rejected name)", bad, rc)
 		}
 	}

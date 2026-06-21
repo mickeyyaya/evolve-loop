@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -56,9 +57,9 @@ var commands = []subcommand{
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
-	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
-	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: runPhases},
-	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: runServePhase},
+	{Name: "phase", Summary: "Run a single phase in-process", Run: phasecmd.RunPhase},
+	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
+	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.RunServePhase},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
 	{Name: "fleet", Summary: "Launch N concurrent cycles (ADR-0049 S6)", Run: runFleet},
 	{Name: "campaign", Summary: "Multi-cycle campaign planner (study|replan|run|status)", Run: runCampaign},
@@ -72,18 +73,18 @@ var commands = []subcommand{
 	// Phase 3a + 3b dispatch helpers (ported from bash).
 	{Name: "detect-cli", Summary: "Identify driving AI CLI", Run: runDetectCLI},
 	{Name: "detect-nested-claude", Summary: "Detect nested claude -p", Run: runDetectNested},
-	{Name: "phase-order", Summary: "List phases from registry", Run: runPhaseOrder},
+	{Name: "phase-order", Summary: "List phases from registry", Run: phasecmd.RunPhaseOrder},
 	{Name: "routing", Summary: "Explain a recorded routing decision (read-only)", Run: runRouting},
 	{Name: "estimate-quota-reset", Summary: "Predict quota reset timestamp", Run: runQuotaReset},
 	{Name: "build-invocation-context", Summary: "Emit subagent bedrock prefix", Run: runBedrock},
 	{Name: "resolve-llm", Summary: "Route phase role → cli + model", Run: runResolveLLM},
 	{Name: "consensus-dispatch", Summary: "Cross-CLI consensus auditor", Run: runConsensusDispatch},
 	{Name: "cycle-simulator", Summary: "No-LLM cycle plumbing simulator", Run: runCycleSimulator},
-	{Name: "phase-watchdog", Summary: "Activity-based stall watchdog", Run: runPhaseWatchdog},
+	{Name: "phase-watchdog", Summary: "Activity-based stall watchdog", Run: phasecmd.RunPhaseWatchdog},
 	{Name: "aggregator", Summary: "Merge fan-out worker artifacts", Run: runAggregator},
 	{Name: "fanout-dispatch", Summary: "Bounded-concurrency parallel dispatcher", Run: runFanoutDispatch},
 	{Name: "preflight-environment", Summary: "Probe host capabilities", Run: guardcmd.RunPreflight},
-	{Name: "phase-observer", Summary: "Stream-json tail + stall detect", Run: runPhaseObserver},
+	{Name: "phase-observer", Summary: "Stream-json tail + stall detect", Run: phasecmd.RunPhaseObserver},
 	{Name: "subagent", Summary: "Subagent helpers", Run: runSubagent},
 	{Name: "changelog-gen", Summary: "Generate changelog from git log", Run: opscmd.RunChangelogGen},
 	{Name: "version-bump", Summary: "Atomic version bump", Run: opscmd.RunVersionBump},
@@ -101,7 +102,7 @@ var commands = []subcommand{
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
 	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
 	{Name: "flags", Summary: "Project the EVOLVE_* flag registry into control-flags.md (generate|check; check exits 2 on drift) — L2 flag SSOT", Run: runFlags},
-	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: runPhaseInventory},
+	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: phasecmd.RunPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},

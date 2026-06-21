@@ -12,7 +12,7 @@
 //	stderr: human-readable diagnostics
 //	exit:   0 normally (handler errors are wire-level via error envelope);
 //	        1 on framing / I/O failure; 10 on bad CLI args.
-package main
+package phasecmd
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
-func runServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintf(stderr, "evolve serve-phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10

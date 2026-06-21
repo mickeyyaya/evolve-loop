@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 
 // runPhaseWatchdog is the `evolve phase-watchdog <workspace> <pgid> <cycle> <cycle-state>` subcommand.
 // Ports legacy/scripts/dispatch/phase-watchdog.sh.
-func runPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {
 		switch a {

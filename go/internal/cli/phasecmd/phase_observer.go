@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 
 // runPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.
 // Ports the core stall-detection behavior of legacy/scripts/dispatch/phase-observer.sh.
-func runPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	enforce := false
 	scope := phaseobserver.ScopePhase
 	var pos []string

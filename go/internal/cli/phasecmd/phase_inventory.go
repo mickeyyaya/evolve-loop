@@ -1,10 +1,13 @@
-package main
+package phasecmd
 
 import (
 	"flag"
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseinventory"
 )
@@ -14,7 +17,7 @@ import (
 //   - 0  success (cache hit or fresh build)
 //   - 10 bad args / unknown subcommand
 //   - 1  internal error
-func runPhaseInventory(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunPhaseInventory(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve phase-inventory: missing subcommand (build)")
 		return 10
@@ -39,11 +42,11 @@ func runPhaseInventoryBuild(args []string, stdout, stderr io.Writer) int {
 	}
 	root := *projectRoot
 	if root == "" {
-		root = envOrCwd("EVOLVE_PROJECT_ROOT")
+		root = cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	}
 	res, err := phaseinventory.Build(phaseinventory.Options{
 		ProjectRoot: root,
-		Roots:       phaseRoots(root),
+		Roots:       phasespec.Roots(root),
 		TTL:         *ttl,
 		NowFn:       time.Now,
 		Force:       *force,

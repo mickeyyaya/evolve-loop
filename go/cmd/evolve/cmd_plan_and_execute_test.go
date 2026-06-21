@@ -49,7 +49,7 @@ func TestRunPlanAndExecute_TwoPass_HappyPath(t *testing.T) {
 	planPath := filepath.Join(planDir, "build-plan.md")
 	stub := &twoPassStub{planPath: planPath}
 
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("build", func(req core.PhaseRequest) core.PhaseRunner {
 		// Wrap stub in a real core.PhaseRunner-satisfying type.
@@ -110,7 +110,7 @@ func TestRunPlanAndExecute_MissingPhase_Exit10(t *testing.T) {
 
 // TestRunPlanAndExecute_UnknownPhase_Exit10 — phase not in registry.
 func TestRunPlanAndExecute_UnknownPhase_Exit10(t *testing.T) {
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	var stdout, stderr bytes.Buffer
 	code := runPlanAndExecute([]string{"nope"}, bytes.NewReader(nil), &stdout, &stderr)
@@ -128,7 +128,7 @@ func TestRunPlanAndExecute_SkipExecute_OnlyRunsPassA(t *testing.T) {
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "build-plan.md")
 	stub := &twoPassStub{planPath: planPath}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("build", func(req core.PhaseRequest) core.PhaseRunner {
 		return &realStubRunner{stub: stub}
@@ -154,7 +154,7 @@ func TestRunPlanAndExecute_PlanArtifactMissing_Exit11(t *testing.T) {
 	planPath := filepath.Join(planDir, "no-plan-written.md")
 	// stub.planPath is empty so the stub does NOT write the artifact.
 	stub := &twoPassStub{}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("build", func(req core.PhaseRequest) core.PhaseRunner {
 		return &realStubRunner{stub: stub}
@@ -180,23 +180,5 @@ func TestJoinNames_EmptyAndMulti(t *testing.T) {
 	}
 	if got := joinNames([]string{"a", "b", "c"}); got != "a, b, c" {
 		t.Errorf("multi → %q, want 'a, b, c'", got)
-	}
-}
-
-// TestBytesReader_RoundTrip — tiny helper coverage.
-func TestBytesReader_RoundTrip(t *testing.T) {
-	r := bytesReader([]byte("hello"))
-	buf := make([]byte, 100)
-	n, err := r.Read(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n != 5 || string(buf[:n]) != "hello" {
-		t.Errorf("first read: n=%d buf=%q", n, buf[:n])
-	}
-	// Second read should EOF.
-	_, err = r.Read(buf)
-	if err == nil {
-		t.Error("second read should EOF")
 	}
 }

@@ -18,7 +18,7 @@
 //
 // Layout: agents at <project>/agents/evolve-<name>.md, profiles at
 // <project>/.evolve/profiles/<name>.json, project = EVOLVE_PROJECT_ROOT.
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -80,7 +80,7 @@ func TestRunPhases_ProvenanceWarnsByDefault(t *testing.T) {
 		`{"name":"naked","role":"naked","cli":"claude-tmux","model_tier_default":"sonnet"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0 (default mode is advisory); stderr=%s", rc, errb.String())
 	}
 	combined := out.String() + errb.String()
@@ -99,7 +99,7 @@ func TestRunPhases_ProvenanceStrictExitsTwoOnMissing(t *testing.T) {
 		`{"name":"naked","role":"naked","cli":"claude-tmux","model_tier_default":"sonnet"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate", "--strict-provenance"}, nil, &out, &errb); rc != 2 {
+	if rc := RunPhases([]string{"validate", "--strict-provenance"}, nil, &out, &errb); rc != 2 {
 		t.Errorf("rc = %d, want 2 (--strict-provenance with unstamped profile); out=%s stderr=%s",
 			rc, out.String(), errb.String())
 	}
@@ -111,7 +111,7 @@ func TestRunPhases_ProvenanceStrictPassesWhenAllStamped(t *testing.T) {
 		`{"name":"stamped","role":"stamped","cli":"claude-tmux","model_tier_default":"sonnet","generated_from":"hand-authored"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate", "--strict-provenance"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"validate", "--strict-provenance"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("rc = %d, want 0 (all profiles stamped); out=%s stderr=%s",
 			rc, out.String(), errb.String())
 	}
@@ -135,7 +135,7 @@ func TestRunPhases_ProvenanceHonorsProfileDirEnv(t *testing.T) {
 	t.Setenv("EVOLVE_PROFILE_DIR", alt)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	combined := out.String() + errb.String()
@@ -153,7 +153,7 @@ func TestRunPhases_CheckCoherenceCleanExitsZero(t *testing.T) {
 		`{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read","Bash(scripts/x:*)"]}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("rc = %d, want 0; out=%s stderr=%s", rc, out.String(), errb.String())
 	}
 	if strings.Contains(out.String()+errb.String(), "WARN") {
@@ -168,7 +168,7 @@ func TestRunPhases_CheckCoherenceReportsDriftAsWarn(t *testing.T) {
 		`{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0 (default is advisory); stderr=%s", rc, errb.String())
 	}
 	s := out.String()
@@ -186,7 +186,7 @@ func TestRunPhases_CheckCoherenceStrictExitsTwoOnDrift(t *testing.T) {
 		`{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-coherence", "--strict"}, nil, &out, &errb); rc != 2 {
+	if rc := RunPhases([]string{"check-coherence", "--strict"}, nil, &out, &errb); rc != 2 {
 		t.Errorf("rc = %d, want 2 (--strict with drift); out=%s", rc, out.String())
 	}
 }
@@ -207,7 +207,7 @@ func TestRunPhases_CheckCoherencePersonaOverrideEnv(t *testing.T) {
 	t.Setenv("EVOLVE_PERSONA_OVERRIDE", override+":widget")
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	s := out.String()
@@ -229,7 +229,7 @@ func TestRunPhases_CheckArtifactCoherenceCleanExitsZero(t *testing.T) {
 		`{"name":"builder","role":"builder","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/build-report.md"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-artifact-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"check-artifact-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("rc = %d, want 0; out=%s stderr=%s", rc, out.String(), errb.String())
 	}
 	if strings.Contains(out.String()+errb.String(), "WARN") {
@@ -246,7 +246,7 @@ func TestRunPhases_CheckArtifactCoherenceReportsMismatch(t *testing.T) {
 		`{"name":"plan-review","role":"plan-review","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/plan-review-report.md"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-artifact-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"check-artifact-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0 (default is advisory); stderr=%s", rc, errb.String())
 	}
 	s := out.String()
@@ -265,7 +265,7 @@ func TestRunPhases_CheckArtifactCoherenceStrictExitsTwoOnMismatch(t *testing.T) 
 		`{"name":"plan-review","role":"plan-review","cli":"claude-tmux","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/plan-review-report.md"}`)
 
 	var out, errb bytes.Buffer
-	if rc := runPhases([]string{"check-artifact-coherence", "--strict"}, nil, &out, &errb); rc != 2 {
+	if rc := RunPhases([]string{"check-artifact-coherence", "--strict"}, nil, &out, &errb); rc != 2 {
 		t.Errorf("rc = %d, want 2 (--strict with mismatch); out=%s", rc, out.String())
 	}
 }

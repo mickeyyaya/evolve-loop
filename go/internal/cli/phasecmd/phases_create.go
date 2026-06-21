@@ -4,7 +4,7 @@
 // designs a spec, pipes it here, and self-corrects from the machine-parseable
 // JSON envelope this command prints to stdout. The thin `phase-create` skill
 // is documentation around this command, not a second implementation.
-package main
+package phasecmd
 
 import (
 	"encoding/json"
@@ -88,7 +88,7 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 	warnings := softLintWarnings(spec)
 
 	// Collision check across built-ins and every discovery root.
-	roots := phaseRoots(project)
+	roots := phasespec.Roots(project)
 	if collision := findCollision(project, roots, spec.Name); collision != "" {
 		return emitEnvelope(stdout, createEnvelopeOut{
 			OK: false, Phase: spec.Name, Errors: []string{collision}, Hint: createHint,

@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -26,32 +26,12 @@ func (s *stubPhase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	return s.resp, s.err
 }
 
-// snapshotRegistry captures every currently-registered phase and
-// returns a restore func that re-establishes them. Tests that want a
-// controlled (one-phase) registry pair this with ResetForTesting +
-// Register inside the test body.
-func snapshotRegistry(t *testing.T) func() {
-	t.Helper()
-	names := registry.Names()
-	snap := make(map[string]registry.Factory, len(names))
-	for _, n := range names {
-		f, _ := registry.For(n)
-		snap[n] = f
-	}
-	return func() {
-		registry.ResetForTesting()
-		for n, f := range snap {
-			registry.Register(n, f)
-		}
-	}
-}
-
 func TestRunPhase_DispatchesToFactory(t *testing.T) {
 	stub := &stubPhase{resp: core.PhaseResponse{
 		Phase:   "intent",
 		Verdict: core.VerdictPASS,
 	}}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
@@ -60,7 +40,7 @@ func TestRunPhase_DispatchesToFactory(t *testing.T) {
 	stdin := bytes.NewReader(reqJSON)
 	var stdout, stderr bytes.Buffer
 
-	code := runPhase([]string{"intent"}, stdin, &stdout, &stderr)
+	code := RunPhase([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code=%d, want 0 (stderr=%s)", code, stderr.String())
 	}
@@ -78,7 +58,7 @@ func TestRunPhase_DispatchesToFactory(t *testing.T) {
 
 func TestRunPhase_MissingPhaseName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runPhase(nil, bytes.NewReader(nil), &stdout, &stderr)
+	code := RunPhase(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d, want 10", code)
 	}
@@ -89,7 +69,7 @@ func TestRunPhase_MissingPhaseName(t *testing.T) {
 
 func TestRunPhase_UnknownPhase(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runPhase([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := RunPhase([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d, want 10", code)
 	}
@@ -99,12 +79,12 @@ func TestRunPhase_UnknownPhase(t *testing.T) {
 }
 
 func TestRunPhase_MalformedJSON(t *testing.T) {
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
-	code := runPhase([]string{"intent"}, strings.NewReader("not-json"), &stdout, &stderr)
+	code := RunPhase([]string{"intent"}, strings.NewReader("not-json"), &stdout, &stderr)
 	if code != 11 {
 		t.Errorf("code=%d, want 11", code)
 	}
@@ -115,14 +95,14 @@ func TestRunPhase_RunnerErrorExits1(t *testing.T) {
 		resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictFAIL},
 		err:  errors.New("oops"),
 	}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	req := core.PhaseRequest{Cycle: 1}
 	rJSON, _ := json.Marshal(req)
 	var stdout, stderr bytes.Buffer
-	code := runPhase([]string{"intent"}, bytes.NewReader(rJSON), &stdout, &stderr)
+	code := RunPhase([]string{"intent"}, bytes.NewReader(rJSON), &stdout, &stderr)
 	if code != 1 {
 		t.Errorf("code=%d, want 1", code)
 	}

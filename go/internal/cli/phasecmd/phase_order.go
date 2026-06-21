@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 // legacy/scripts/dispatch/list-phase-order.sh — emits the phase names
 // in order from phase-registry.json, falling back to a hardcoded order
 // when EVOLVE_USE_PHASE_REGISTRY=0 or registry is missing.
-func runPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, a := range args {
 		switch a {
 		case "--help", "-h":
