@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "goal": "Flag-reduction campaign 47 to 0 via design patterns (config-as-code policy.json, DI seams, cobra flags, split-const IPC). Each cycle DELETES the os.Getenv/envchain read so the value flows from a Config struct loaded once; NEVER hide a config read behind split-const (cycle-8 anti-gaming rule). Per-flag targets, waves, and the anti-gaming gate are in knowledge-base/research/flag-reduction-47-to-0-design-2026-06-21.md. Lower FlagCeiling to the wave's target in the same diff that removes rows.",
+  "research": {
+    "summary": "Design-of-record from the ultracode deep-dive (29 units, 47 flags, adversarially verified). 5 waves, FlagCeiling 47->35->24->15->3->0. Wave 4 is the load-bearing config.Load env->RolloutInput DTO inversion (one atomic diff + parity test). Wave 5 adds the flagreaders protocolAllowlist for the irreducible prompt-IPC literal (EVOLVE_REFLECTION_JOURNAL). Subsystem files are declared per cycle so file-disjoint cycles run concurrently; the shared registry_table.go + registry_ceiling_test.go edits are reconciled at the serialized ship.",
+    "citations": [
+      {"title": "Flag-Reduction 47->0 Execution Design", "url": "", "note": "knowledge-base/research/flag-reduction-47-to-0-design-2026-06-21.md"},
+      {"title": "Flag -> Parameter Conversion Standard (DoD)", "url": "", "note": "knowledge-base/research/flag-parameter-conversion-standard.md"}
+    ]
+  },
+  "cycles": [
+    {
+      "id": "w1-dead-flags",
+      "files": ["go/cmd/evolve/cmd_compose.go", "go/internal/looppreflight/preflight.go"],
+      "output_contract": "Delete the 5 dead flags (COMPOSE_PHASES, PROMPT_MAX_TOKENS, SANDBOX_FALLBACK_ON_EPERM, TESTING, WORKTREE_PATH): remove registry rows + dead readers/setenv per the design table; FlagCeiling toward 35. No new env reads."
+    },
+    {
+      "id": "w1-config-singletons",
+      "files": ["go/internal/cycleclassify/classify.go", "go/cmd/evolve/cmd_models_live.go", "go/internal/adapters/bridge/driver_claudetmux.go"],
+      "output_contract": "Convert ANTHROPIC_BASE_URL, HANG_CLASSIFIER, MODELCATALOG_AUTOREFRESH to policy.json typed fields + accessors (FanoutConfig/ObserverConfig shape); DELETE the os.Getenv reads; same-package apicover test per new exported symbol."
+    },
+    {
+      "id": "w1-di-bootstrap",
+      "files": ["go/internal/core/phase_advisor.go", "go/internal/phases/runner/runner.go"],
+      "output_contract": "ADVISOR_DEPTH + DISABLE_WORKSPACE_GUARD -> DI seams (read moves to _test.go); POLICY_BYPASS -> --bypass-policy cobra flag; PLATFORM + MARKETPLACE_DIR -> cobra flags. Delete the production env reads."
+    },
+    {
+      "id": "w2-ipc-fleet",
+      "depends_on": ["w1-dead-flags", "w1-config-singletons", "w1-di-bootstrap"],
+      "files": ["go/internal/fleet/fleet.go", "go/internal/acssuite/acssuite.go"],
+      "output_contract": "Reclassify FLEET, FLEET_SCOPE, WORKTREE_ROOT to split-const IPC consts at one def site each (// SSOT IPC-protocol-allowed) and route EVERY reader through the const (no bare literal). Rows leave the registry."
+    },
+    {
+      "id": "w2-paths-config",
+      "depends_on": ["w1-dead-flags", "w1-config-singletons", "w1-di-bootstrap"],
+      "files": ["go/internal/research/kb.go", "go/internal/bridge/catalog_overlay.go"],
+      "output_contract": "ACS_GO_TIMEOUT_S, CLI_MAX_CONCURRENT_CODEX, KB_SEARCH_PATHS, PHASE_ROOTS -> policy.json (ACSConfig/ConcurrencyConfig/PathsConfig); MODEL_CATALOG_DIR -> DI setter. Delete env reads; rewrite the acs cycle3/cycle5 predicates in the same diff."
+    },
+    {
+      "id": "w2-profile-seams",
+      "depends_on": ["w1-dead-flags", "w1-config-singletons", "w1-di-bootstrap"],
+      "files": ["go/internal/phases/ship/ship.go", "go/internal/systemprompt/systemprompt.go"],
+      "output_contract": "PERSONA_OVERRIDE + PROFILE_DIR -> cobra flags (keep req.Env precedence on the cycle path ship.go:110); SYSTEM_PROMPT -> profile SSOT (drop os.Getenv, keep per-dispatch req.Env tier)."
+    },
+    {
+      "id": "w3-cli-config",
+      "depends_on": ["w2-ipc-fleet", "w2-paths-config", "w2-profile-seams"],
+      "files": ["go/internal/llmroute/llmroute.go", "go/internal/core/resume.go"],
+      "output_contract": "CLI (global), CLI_HEALTH, INTENT_DELTA, STRICT_AUDIT -> policy.json typed fields; thread on ALL construction paths (specrunner/registrar minted, resume.go:251, cycle ship). Delete env reads; e2e harness writes policy.json not ExtraEnv."
+    },
+    {
+      "id": "w3-bootstrap-locators",
+      "depends_on": ["w2-ipc-fleet", "w2-paths-config", "w2-profile-seams"],
+      "files": ["go/internal/paths/paths.go", "go/internal/binpath/binpath.go"],
+      "output_contract": "GO_BIN, PLUGIN_ROOT, PROJECT_ROOT, WORKTREE_BASE -> cobra flag primary + split-const env fallback at ONE resolver each (// SSOT bootstrap-cli-flag); GO_BIN re-injects into child cmd.Env. PROMPTS_DIR -> split-const IPC (load-bearing e2e handoff), NOT deleted."
+    },
+    {
+      "id": "w4-configload-inversion",
+      "depends_on": ["w3-cli-config", "w3-bootstrap-locators"],
+      "files": ["go/internal/config/config.go", "go/cmd/evolve/cmd_cycle.go"],
+      "output_contract": "THE LOAD-BEARING ATOMIC DIFF. Invert config.Load(env) -> config.Load(RolloutInput DTO) built at wireOrchestratorDeps from pol.{OperatorRouting,Gates,Router,Recovery,Sandbox}Config(); config stays a leaf (no policy import), reuse the unexported parsers. Subsumes DYNAMIC_ROUTING, ROUTING_MODE, MANDATORY_PHASES, CONDITIONAL_MANDATORY, MAX_OPTIONAL_INSERTIONS, COMMIT_EVIDENCE, PHASE_IO, PHASE_RECOVERY, SANDBOX, USE_PHASE_REGISTRY + delete the *_DIR_OVERRIDE branches from paths.Resolve (LEDGER/PROFILES/ADAPTERS). Ship config_rollout_parity_test.go proving byte-identical RoutingConfig for both Load callers. applyEnv has ZERO EVOLVE_ reads after."
+    },
+    {
+      "id": "w5-terminal-allowlist",
+      "depends_on": ["w4-configload-inversion"],
+      "files": ["go/acs/regression/flagreaders/readers_test.go"],
+      "output_contract": "TERMINAL. Add a protocolAllowlist to the flagreaders guard for EVOLVE_REFLECTION_JOURNAL (markdown prompt-IPC, ~18 agents/*.md sites, cannot split-const) with a one-line justification; wire policy.WorkflowConfig().ReflectionJournal to gate the env injection; KEEP the literal in agents/*.md. Lower FlagCeiling to 0; assert len(All)==0 and every remaining production EVOLVE_ literal is a // SSOT split-const or a justified allowlist entry."
+    }
+  ]
+}
