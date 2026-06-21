@@ -5,6 +5,7 @@ package render
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 )
@@ -14,7 +15,19 @@ func FuncMap() template.FuncMap {
 	return template.FuncMap{
 		"dict": dict,
 		"inc":  func(i int) int { return i + 1 },
+		"json": jsonScript,
 	}
+}
+
+// jsonScript marshals a value to a JSON literal a template can embed for client
+// JS, e.g. <script type="application/json">{{json .X}}</script>. json.Marshal
+// HTML-escapes <, >, and & so the data can't break out of the script tag.
+func jsonScript(v any) (template.JS, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return template.JS(b), nil
 }
 
 // dict builds a map from alternating key/value arguments, letting a template

@@ -62,3 +62,20 @@ func TestInc(t *testing.T) {
 		t.Error("inc(0) != 1")
 	}
 }
+
+// json lets a template hand structured data to client-side JS as a safe literal.
+func TestJSONScript_MarshalsValue(t *testing.T) {
+	out, err := jsonScript(map[string]any{"a": 1, "b": "x"})
+	if err != nil {
+		t.Fatalf("jsonScript: %v", err)
+	}
+	if s := string(out); !strings.Contains(s, `"a":1`) || !strings.Contains(s, `"b":"x"`) {
+		t.Errorf("jsonScript = %q, want JSON containing a and b", s)
+	}
+}
+
+func TestFuncMap_HasJSON(t *testing.T) {
+	if FuncMap()["json"] == nil {
+		t.Error("FuncMap missing 'json' helper")
+	}
+}

@@ -64,3 +64,172 @@
 })();
 </script>
 {{end}}
+
+{{define "pipelinedemo"}}
+<style>
+  .pld{--pl-ink:var(--ink,#161616);--pl-mut:var(--muted,#7a7a7a);--pl-acc:var(--accent,#0071e3);
+    --pl-bg:color-mix(in srgb,var(--ink,#000) 4%,transparent);
+    --pl-line:color-mix(in srgb,var(--ink,#000) 16%,transparent);
+    --pl-ok:#1fa971;--pl-warn:#e0533d;
+    max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .pld-kicker{font-family:var(--mono,ui-monospace,monospace);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pl-acc);margin:0}
+  .pld-h{font-family:var(--serif,inherit);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--pl-ink)}
+  .pld-sub{color:var(--pl-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem)}
+  .pld-tasks{display:flex;flex-wrap:wrap;gap:10px;margin:30px 0 0}
+  .pld-task{font:inherit;font-size:.92rem;color:var(--pl-mut);background:transparent;border:1px solid var(--pl-line);border-radius:999px;padding:9px 16px;cursor:pointer;transition:.2s}
+  .pld-task:hover{color:var(--pl-ink);border-color:var(--pl-acc)}
+  .pld-task.on{color:var(--pl-acc);border-color:var(--pl-acc);background:color-mix(in srgb,var(--pl-acc) 10%,transparent)}
+  .pld-task:focus-visible{outline:2px solid var(--pl-acc);outline-offset:2px}
+  .pld-stage{margin-top:22px;border:1px solid var(--pl-line);border-radius:16px;background:var(--pl-bg);padding:20px;min-height:240px}
+  .pld-prompt{font-family:var(--mono,ui-monospace,monospace);font-size:.9rem;color:var(--pl-ink);display:flex;align-items:center;gap:8px;padding-bottom:18px;border-bottom:1px solid var(--pl-line)}
+  .pld-caret{color:var(--pl-acc)}
+  .pld-cur{color:var(--pl-acc);animation:pld-blink 1s steps(1) infinite}
+  @keyframes pld-blink{50%{opacity:0}}
+  .pld-track{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;padding:22px 0 4px}
+  .pld-link{align-self:center;width:20px;height:1px;background:var(--pl-line);flex:0 0 auto}
+  .pld-node{display:flex;align-items:center;gap:11px;border:1px solid var(--pl-line);border-radius:11px;padding:11px 14px;background:color-mix(in srgb,var(--pl-ink) 3%,transparent);opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s,border-color .35s}
+  .pld-node.in{opacity:1;transform:none}
+  .pld-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--pl-line);flex:0 0 auto;position:relative;transition:.3s}
+  .pld-node.active .pld-dot{border-color:var(--pl-acc);animation:pld-pulse 1.1s infinite}
+  @keyframes pld-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pl-acc) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .pld-node.done .pld-dot{border-color:var(--pl-ok);background:var(--pl-ok)}
+  .pld-node.done .pld-dot::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;font-size:.6rem;color:#fff;font-weight:700}
+  .pld-node.fail .pld-dot{border-color:var(--pl-warn);background:var(--pl-warn)}
+  .pld-node.fail .pld-dot::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;font-size:.66rem;color:#fff;font-weight:800}
+  .pld-node.fail{border-color:color-mix(in srgb,var(--pl-warn) 50%,transparent)}
+  .pld-node.done{border-color:color-mix(in srgb,var(--pl-ok) 42%,transparent)}
+  .pld-body{display:flex;flex-direction:column;line-height:1.2}
+  .pld-name{font-weight:600;font-size:.92rem;color:var(--pl-ink)}
+  .pld-deliv{font-size:.74rem;color:var(--pl-mut);margin-top:2px}
+  .pld-heal{flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--pl-warn);background:color-mix(in srgb,var(--pl-warn) 9%,transparent);border:1px solid color-mix(in srgb,var(--pl-warn) 32%,transparent);border-radius:9px;padding:8px 12px;margin:2px 0;opacity:0;transform:translateY(-4px);transition:.3s}
+  .pld-heal.in{opacity:1;transform:none}
+  .pld-heal.out{opacity:.45}
+  .pld-heal-x{font-weight:800}
+  .pld-heal-r{margin-left:auto;color:var(--pl-acc);font-weight:600}
+  .pld-foot{display:flex;align-items:center;gap:16px;margin-top:18px;min-height:34px}
+  .pld-result{display:flex;align-items:center;gap:14px;opacity:0;transform:translateY(6px);transition:.4s}
+  .pld-result.show{opacity:1;transform:none}
+  .pld-ship{font-family:var(--mono,ui-monospace,monospace);font-weight:600;letter-spacing:.04em;color:#06281c;background:var(--pl-ok);padding:6px 13px;border-radius:8px;white-space:nowrap}
+  .pld-out{color:var(--pl-mut);font-size:.92rem}
+  .pld-replay{font:inherit;font-size:.85rem;color:var(--pl-mut);background:transparent;border:1px solid var(--pl-line);border-radius:999px;padding:7px 14px;cursor:pointer;margin-left:auto}
+  .pld-replay:hover{color:var(--pl-acc);border-color:var(--pl-acc)}
+  @media(max-width:640px){.pld-link{display:none}.pld-node{flex:1 1 100%}}
+</style>
+<section class="pld" id="pipeline" data-reveal>
+  <p class="pld-kicker">{{.Site.PipelineDemo.Kicker}}</p>
+  <h2 class="pld-h">{{.Site.PipelineDemo.Heading}}</h2>
+  <p class="pld-sub">{{.Site.PipelineDemo.Sub}}</p>
+  <div class="pld-tasks" role="tablist" aria-label="Choose a task to run">
+    {{range $i, $s := .Site.PipelineDemo.Scenarios}}<button class="pld-task{{if eq $i 0}} on{{end}}" type="button" role="tab" data-i="{{$i}}" aria-selected="{{if eq $i 0}}true{{else}}false{{end}}">{{$s.Label}}</button>{{end}}
+  </div>
+  <div class="pld-stage">
+    <div class="pld-prompt"><span class="pld-caret">$</span><span class="pld-tasktext"></span><span class="pld-cur">▍</span></div>
+    <div class="pld-track" aria-live="polite"></div>
+    <div class="pld-foot">
+      <div class="pld-result"></div>
+      <button class="pld-replay" type="button" hidden>↻ Run again</button>
+    </div>
+  </div>
+  <script type="application/json" class="pld-scenarios">{{json .Site.PipelineDemo.Scenarios}}</script>
+  <script type="application/json" class="pld-phases">{{json .Site.PhaseSpine}}</script>
+</section>
+{{end}}
+
+{{define "pipelinejs"}}
+<script>
+(function () {
+  var root = document.getElementById('pipeline');
+  if (!root) { return; }
+  var scenarios = JSON.parse(root.querySelector('.pld-scenarios').textContent);
+  var phases = JSON.parse(root.querySelector('.pld-phases').textContent);
+  var pmap = {}; phases.forEach(function (p) { pmap[p.phase] = p; });
+  var track = root.querySelector('.pld-track');
+  var result = root.querySelector('.pld-result');
+  var taskText = root.querySelector('.pld-tasktext');
+  var replay = root.querySelector('.pld-replay');
+  var tasks = [].slice.call(root.querySelectorAll('.pld-task'));
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var timers = [], current = 0, userActed = false;
+  function clearAll() { timers.forEach(clearTimeout); timers = []; }
+  function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function nodeHTML(name) {
+    var m = pmap[name] || { phase: name, artifact: '' };
+    return '<div class="pld-node"><span class="pld-dot"></span><span class="pld-body">' +
+      '<span class="pld-name">' + esc(m.phase) + '</span>' +
+      '<span class="pld-deliv">' + esc(m.artifact) + '</span></span></div>';
+  }
+  function selectTab(idx) {
+    tasks.forEach(function (t, i) {
+      t.classList.toggle('on', i === idx);
+      t.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+    });
+  }
+  function run(idx) {
+    clearAll();
+    current = idx;
+    selectTab(idx);
+    var sc = scenarios[idx];
+    taskText.textContent = ' ' + sc.task + ' ';
+    track.innerHTML = '';
+    result.className = 'pld-result';
+    result.innerHTML = '';
+    replay.hidden = true;
+    var step = 520;
+    function finish() {
+      result.innerHTML = '<span class="pld-ship">' + (sc.healAt ? 'SHIPPED · clean' : 'SHIP ✓') + '</span>' +
+        '<span class="pld-out">' + esc(sc.outcome) + '</span>';
+      result.classList.add('show');
+      replay.hidden = false;
+    }
+    if (reduce) {
+      sc.phases.forEach(function (p) {
+        track.insertAdjacentHTML('beforeend', nodeHTML(p));
+        var n = track.lastElementChild; n.classList.add('in', 'done');
+      });
+      finish();
+      return;
+    }
+    var i = 0;
+    (function next() {
+      if (i >= sc.phases.length) { after(step, finish); return; }
+      var p = sc.phases[i];
+      if (i > 0) { track.insertAdjacentHTML('beforeend', '<span class="pld-link"></span>'); }
+      track.insertAdjacentHTML('beforeend', nodeHTML(p));
+      var node = track.lastElementChild;
+      after(20, function () { node.classList.add('in', 'active'); });
+      if (sc.healAt === p) {
+        after(step, function () {
+          node.classList.remove('active'); node.classList.add('fail');
+          track.insertAdjacentHTML('beforeend', '<div class="pld-heal"><span class="pld-heal-x">✕</span> ' +
+            esc(sc.healLesson) + ' <span class="pld-heal-r">↻ retry</span></div>');
+          var banner = track.lastElementChild;
+          after(40, function () { banner.classList.add('in'); });
+          after(Math.round(step * 1.7), function () {
+            banner.classList.add('out');
+            node.classList.remove('fail'); node.classList.add('active');
+            after(Math.round(step * 0.9), function () {
+              node.classList.remove('active'); node.classList.add('done'); i++; next();
+            });
+          });
+        });
+      } else {
+        after(step, function () { node.classList.remove('active'); node.classList.add('done'); i++; next(); });
+      }
+    })();
+  }
+  tasks.forEach(function (t) {
+    t.addEventListener('click', function () { userActed = true; run(parseInt(t.getAttribute('data-i'), 10)); });
+  });
+  replay.addEventListener('click', function () { run(current); });
+  if ('IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { io.disconnect(); if (!userActed) { run(0); } } });
+    }, { threshold: 0.35 });
+    io.observe(root);
+  } else {
+    run(0);
+  }
+})();
+</script>
+{{end}}
