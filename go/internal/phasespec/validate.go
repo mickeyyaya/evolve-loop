@@ -95,3 +95,29 @@ func ValidateUserSpec(s PhaseSpec) []string {
 
 	return v
 }
+
+// ValidateActivatingFields returns well-formedness violations for the ADR-0058
+// transition-activating fields on a spec, or nil when valid. It is the load-time
+// validator (Load calls it): the registry is a contract, so a malformed
+// activating field fails loudly rather than silently degrading to the literal
+// kernel. It checks SHAPE, not presence — an empty field is valid (the byte-
+// identical default); requiring a specific field is the registry-guard's job.
+//
+//   - branching_strategy must be a known strategy (verdict/history/signal) or empty.
+//   - on_pass and on_fail are a verdict-branch PAIR: declare both or neither.
+//     Next consults them only when both are set, so a half-set is dead config.
+func ValidateActivatingFields(s PhaseSpec) []string {
+	var v []string
+	switch s.BranchingStrategy {
+	case "", BranchingVerdict, BranchingHistory, BranchingSignal:
+		// known or unset
+	default:
+		v = append(v, fmt.Sprintf("branching_strategy %q must be one of %s/%s/%s (or empty)",
+			s.BranchingStrategy, BranchingVerdict, BranchingHistory, BranchingSignal))
+	}
+	if (s.OnPass == "") != (s.OnFail == "") {
+		v = append(v, fmt.Sprintf("on_pass/on_fail must be declared together (a verdict branch needs both targets); got on_pass=%q on_fail=%q",
+			s.OnPass, s.OnFail))
+	}
+	return v
+}
