@@ -87,16 +87,11 @@ func TestContent_PipelineDemoLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := site.PipelineDemo
-	if d.Heading == "" {
-		t.Error("PipelineDemo.Heading missing")
+	if d.Heading == "" || d.Task == "" || d.Outcome == "" {
+		t.Error("PipelineDemo Heading/Task/Outcome must all be set")
 	}
-	if len(d.Scenarios) < 2 {
-		t.Fatalf("PipelineDemo.Scenarios = %d, want >= 2", len(d.Scenarios))
-	}
-	for i, s := range d.Scenarios {
-		if s.Label == "" || s.Task == "" || len(s.Phases) == 0 || s.Outcome == "" {
-			t.Errorf("scenario %d is incomplete: %+v", i, s)
-		}
+	if len(d.Phases) < 3 {
+		t.Fatalf("PipelineDemo.Phases = %d, want >= 3 (the model-composed pipeline)", len(d.Phases))
 	}
 }
 

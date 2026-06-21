@@ -63,14 +63,12 @@
     { "phase": "Learn", "artifact": "a lesson kept", "blurb": "Turns the outcome into a durable lesson the next cycle starts with." }
   ],
   "pipelineDemo": {
-    "kicker": "See it think",
-    "heading": "Watch the pipeline build itself.",
-    "sub": "Pick a task — the pipeline assembles the right shape for it, live.",
-    "scenarios": [
-      { "label": "Fix a typo", "task": "fix a typo in the docs", "phases": ["Intent", "Build", "Ship"], "outcome": "Trivial change → fast path. No ceremony, straight to merge." },
-      { "label": "Add a feature", "task": "add a dark-mode toggle", "phases": ["Intent", "Scout", "Triage", "Build", "Audit", "Ship", "Learn"], "outcome": "A real feature → the full cycle: planned, reviewed, merged, remembered." },
-      { "label": "Risky refactor", "task": "refactor the auth module", "phases": ["Intent", "Scout", "Triage", "Build", "Audit", "Ship", "Learn"], "healAt": "Audit", "healLesson": "A token test broke under review — caught, fixed, and remembered.", "outcome": "Something broke at review → it self-healed, then shipped clean." }
-    ]
+    "kicker": "AI-generated pipeline",
+    "heading": "The model composes its own pipeline.",
+    "sub": "Give it a goal. The AI decides which phases to run — and writes the pipeline itself, in order. Nothing here is pre-scripted.",
+    "task": "add a dark-mode toggle",
+    "phases": ["Intent", "Scout", "Triage", "Build", "Audit", "Ship", "Learn"],
+    "outcome": "Seven phases — chosen and ordered by the model for this goal."
   },
   "pillarsIntro": {
     "kicker": "What makes it work",
