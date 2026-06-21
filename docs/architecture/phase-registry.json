@@ -333,6 +333,7 @@
       "name": "retrospective",
       "role": "retrospective",
       "optional": true,
+      "branching_strategy": "history",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",

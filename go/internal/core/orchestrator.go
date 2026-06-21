@@ -75,6 +75,32 @@ func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
 	return o.catalog.Get(canonicalCatalogName(p))
 }
 
+// successorStrategy resolves how phase p's successor is chosen — the
+// branching_strategy declared on its descriptor (ADR-0058). On a catalog miss,
+// or an entry that omits the field, it degrades to the literal phase-identity
+// default (literalSuccessorStrategy), keeping the flow byte-identical when the
+// catalog is unset. "Config selects, code constrains": this only routes the
+// orchestrator among branches the state machine already deems legal — it never
+// invents an edge.
+func (o *Orchestrator) successorStrategy(p Phase) string {
+	if spec, ok := o.specFor(p); ok && spec.BranchingStrategy != "" {
+		return spec.BranchingStrategy
+	}
+	return literalSuccessorStrategy(p)
+}
+
+// literalSuccessorStrategy is the unconfigured backstop: the successor-selection
+// strategy each phase used before ADR-0058 made it config-driven. Retrospective
+// is the one phase whose successor is history-driven (the failure-adapter
+// consults cycle history), not verdict-driven; every other phase is
+// verdict-driven (the empty default). S3 adds the debugger's signal strategy.
+func literalSuccessorStrategy(p Phase) string {
+	if p == PhaseRetro {
+		return phasespec.BranchingHistory
+	}
+	return ""
+}
+
 // PhaseMinter registers a minted phase config into a dispatchable runner. The
 // orchestrator depends on this narrow port (not phaseregistrar directly) so
 // core stays decoupled from specrunner/phaseregistrar; the composition root
