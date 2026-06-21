@@ -1,0 +1,375 @@
+{{define "blueprint"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2358A6FF' stroke-width='3'/%3E%3C/svg%3E">
+<title>{{.Site.Product.Name}} — {{.Site.Product.MentalModel}}</title>
+<meta name="description" content="{{.Site.Hero.Subhead}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D1117; --surface:#161B22; --raised:#1C2230;
+    --ink:#C9D1D9; --muted:#8B949E; --faint:#6E7681;
+    --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.16);
+    --accent:#58A6FF; --accent-soft:rgba(88,166,255,.10); --accent-line:rgba(88,166,255,.35);
+    --ok:#3FB950; --ok-soft:rgba(63,185,80,.12);
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --wrap:1120px;
+    --grid:34px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-weight:400; line-height:1.65; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* faint schematic grid background */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      repeating-linear-gradient(0deg, var(--line) 0 1px, transparent 1px var(--grid)),
+      repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--grid));
+    mask-image:radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 92%);
+    opacity:.5;
+  }
+  .wrap{max-width:var(--wrap); margin:0 auto; padding:0 28px; position:relative; z-index:1}
+  section{position:relative; z-index:1}
+  a{color:inherit; text-decoration:none}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px}
+  .accent{color:var(--accent)}
+  .mono{font-family:var(--mono)}
+
+  /* labels / kickers — engineer-native */
+  .kicker{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); display:inline-flex; align-items:center; gap:9px}
+  .kicker::before{content:"//"; color:var(--faint)}
+
+  /* reveal */
+  [data-reveal]{opacity:0; transform:translateY(20px); transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1)}
+  [data-reveal].in-view{opacity:1; transform:none}
+  [data-reveal][data-d="1"]{transition-delay:.07s}
+  [data-reveal][data-d="2"]{transition-delay:.14s}
+  [data-reveal][data-d="3"]{transition-delay:.21s}
+  [data-reveal][data-d="4"]{transition-delay:.28s}
+  [data-reveal][data-d="5"]{transition-delay:.35s}
+
+  /* nav */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(12px); background:rgba(13,17,23,.78); border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:60px}
+  .brand{display:flex; align-items:center; gap:11px; font-family:var(--mono); font-weight:700; font-size:.98rem; letter-spacing:-.01em; color:var(--ink)}
+  .brand .glyph{font-family:var(--mono); color:var(--accent)}
+  .brand .ver{font-family:var(--mono); font-weight:400; font-size:.72rem; color:var(--faint); border:1px solid var(--line); border-radius:5px; padding:2px 7px; margin-left:2px}
+  .navlinks{display:flex; align-items:center; gap:22px; font-family:var(--mono); font-size:.84rem; color:var(--muted)}
+  .navlinks a:hover{color:var(--ink)}
+  .navlinks a:focus-visible,.copy:focus-visible,.ghost:focus-visible,.ghbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+  .navlinks .ghbtn{color:var(--ink); border:1px solid var(--line-strong); padding:7px 13px; border-radius:6px; font-size:.8rem}
+  .navlinks .ghbtn:hover{border-color:var(--accent-line); color:var(--accent)}
+
+  /* hero */
+  .hero{padding:74px 0 64px; overflow:hidden}
+  .hero__schema{position:absolute; inset:0; background:url("{{.Assets}}/hero.png") right -6% top 40%/46% no-repeat; opacity:.10; mask-image:linear-gradient(270deg,#000 10%, transparent 70%); pointer-events:none; z-index:0}
+  @media(max-width:880px){.hero__schema{display:none}}
+  .hero .wrap{position:relative; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center}
+  @media(max-width:880px){.hero .wrap{grid-template-columns:1fr; gap:36px}}
+  .hero h1{font-family:var(--mono); font-weight:700; font-size:clamp(1.65rem,4.6vw,3.35rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); overflow-wrap:break-word}
+  .hero h1 em{font-style:normal; color:var(--accent)}
+  .hero .sub{margin-top:22px; max-width:46ch; color:var(--muted); font-size:clamp(1rem,1.4vw,1.12rem); line-height:1.62}
+  .ctas{display:flex; flex-wrap:wrap; gap:13px; margin-top:30px; align-items:center}
+  .install{display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:9px 9px 9px 14px; max-width:100%}
+  .install code{font-family:var(--mono); font-size:.85rem; color:var(--ink); white-space:nowrap; min-width:0; overflow-x:auto; flex:1 1 auto}
+  .install .pfx{color:var(--accent); margin-right:7px; user-select:none}
+  .copy{font-family:var(--mono); font-size:.75rem; color:var(--muted); background:var(--raised); border:1px solid var(--line); padding:6px 11px; border-radius:5px; cursor:pointer; transition:.18s; flex:0 0 auto}
+  .copy:hover{color:var(--ink); border-color:var(--accent-line)}
+  .copy.is-copied{color:var(--ok); border-color:var(--ok)}
+  .ghost{display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); color:var(--muted); font-size:.85rem; padding:9px 4px}
+  .ghost:hover{color:var(--accent)}
+
+  /* terminal window (hero centerpiece + verdict pane) */
+  .term{background:var(--surface); border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; box-shadow:0 30px 70px -45px rgba(0,0,0,.85)}
+  .term__bar{display:flex; align-items:center; gap:7px; padding:11px 14px; border-bottom:1px solid var(--line); background:var(--raised)}
+  .term__bar .tl{width:11px; height:11px; border-radius:50%; display:inline-block}
+  .tl.r{background:#ff5f56} .tl.y{background:#ffbd2e} .tl.g{background:#27c93f}
+  .term__bar .fn{margin-left:9px; font-family:var(--mono); font-size:.76rem; color:var(--faint)}
+  .term__body{padding:18px 18px 20px; font-family:var(--mono); font-size:.86rem; line-height:1.85}
+  .term__cmd{color:var(--ink)}
+  .term__cmd .pfx{color:var(--ok); margin-right:8px}
+  /* blinking cursor — static under reduced motion */
+  .cursor{display:inline-block; width:8px; height:1.05em; background:var(--accent); margin-left:3px; vertical-align:-2px; animation:blink 1.05s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion: reduce){.cursor{animation:none}}
+  .term__pipe{margin-top:10px; color:var(--muted); font-size:.82rem; display:flex; flex-wrap:wrap; gap:7px; align-items:center}
+  .term__pipe .node{color:var(--ink)}
+  .term__pipe .arr{color:var(--faint)}
+  .term__pipe .ship{color:var(--ok)}
+
+  /* verdict pane (signature moment) — terminal-framed */
+  .verdict{background:var(--surface); border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; box-shadow:0 30px 70px -45px rgba(0,0,0,.85)}
+  .verdict__bar{display:flex; align-items:center; gap:7px; padding:11px 14px; border-bottom:1px solid var(--line); background:var(--raised); font-family:var(--mono); font-size:.76rem; color:var(--faint)}
+  .verdict__bar .tl{width:11px; height:11px; border-radius:50%}
+  .verdict__bar .fn{margin-left:9px}
+  .verdict__body{padding:16px 18px 18px}
+  .verdict__head{font-family:var(--mono); font-size:.74rem; color:var(--faint); letter-spacing:.04em; margin-bottom:13px}
+  .verdict__checks{list-style:none; display:flex; flex-direction:column; gap:9px}
+  .verdict__checks li{display:flex; align-items:center; gap:12px; font-family:var(--mono); font-size:.88rem; color:var(--faint); transition:color .4s}
+  .verdict__checks li .box{position:relative; width:16px; height:16px; border-radius:3px; border:1.5px solid #30363D; flex:0 0 auto; transition:.4s; display:grid; place-items:center}
+  .verdict__checks li .box::after{content:"✓"; font-size:.68rem; line-height:1; color:#03210C; font-weight:700; opacity:0; transition:.4s}
+  .verdict__checks li.ok{color:var(--ink)}
+  .verdict__checks li.ok .box{border-color:var(--ok); background:var(--ok); box-shadow:0 0 12px rgba(63,185,80,.45)}
+  .verdict__checks li.ok .box::after{opacity:1}
+  .verdict__result{display:flex; align-items:center; justify-content:space-between; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); opacity:0; transform:translateY(6px); transition:.5s}
+  .verdict__result.show{opacity:1; transform:none}
+  .verdict__count{font-family:var(--mono); font-size:.86rem; color:var(--muted)}
+  .verdict__count b{color:var(--ok)}
+  .verdict__ship{font-family:var(--mono); font-weight:700; letter-spacing:.06em; color:#03210C; background:var(--ok); padding:6px 14px; border-radius:6px; box-shadow:0 0 18px rgba(63,185,80,.4)}
+
+  /* proof bar */
+  .proof{border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--surface)}
+  .proof .wrap{display:flex; flex-wrap:wrap; gap:18px 0; padding:0; justify-content:stretch}
+  .proof .stat{flex:1 1 0; min-width:140px; display:flex; flex-direction:column; gap:4px; padding:24px 28px; border-right:1px solid var(--line)}
+  .proof .stat:last-child{border-right:none}
+  @media(max-width:760px){.proof .stat{flex:1 1 50%; border-bottom:1px solid var(--line)}}
+  .proof .v{font-family:var(--mono); font-weight:700; font-size:1.55rem; color:var(--ink)}
+  .proof .l{font-family:var(--mono); font-size:.72rem; color:var(--faint); letter-spacing:.1em; text-transform:uppercase}
+
+  /* generic section */
+  .band{padding:clamp(64px,9vw,118px) 0}
+  .band--alt{background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+  .band h2{font-family:var(--mono); font-weight:700; font-size:clamp(1.7rem,3.4vw,2.6rem); line-height:1.14; letter-spacing:-.018em; max-width:22ch; margin-top:18px}
+  .lead{color:var(--muted); font-size:clamp(1rem,1.4vw,1.14rem); max-width:64ch; margin-top:20px; line-height:1.7}
+  .lead + .lead{margin-top:15px}
+
+  /* phase spine — horizontal terminal pipeline */
+  .spine{display:flex; gap:0; margin-top:48px; flex-wrap:wrap; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; background:var(--surface)}
+  .phase{flex:1 1 150px; min-width:150px; padding:20px 18px; border-right:1px solid var(--line); position:relative; background:transparent}
+  .phase:last-child{border-right:none}
+  .phase::after{content:"→"; position:absolute; right:-9px; top:50%; transform:translateY(-50%); color:var(--faint); font-family:var(--mono); font-size:.9rem; z-index:2; background:var(--surface); padding:2px 0}
+  .phase:last-child::after{display:none}
+  @media(max-width:760px){.phase{flex:1 1 100%; border-right:none; border-bottom:1px solid var(--line)} .phase:last-child{border-bottom:none} .phase::after{content:"↓"; right:50%; top:auto; bottom:-9px; transform:translateX(50%)}}
+  .phase .n{font-family:var(--mono); font-size:.7rem; color:var(--accent); letter-spacing:.1em}
+  .phase .nm{font-family:var(--mono); font-weight:700; font-size:1.08rem; margin-top:8px; color:var(--ink)}
+  .phase .ar{font-family:var(--mono); font-size:.72rem; color:var(--ok); margin-top:7px; word-break:break-all}
+  .phase .ar::before{content:"› "; color:var(--faint)}
+  .phase .bl{font-size:.85rem; color:var(--muted); margin-top:11px; line-height:1.55}
+
+  /* pillars */
+  .pillars{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; margin-top:48px; background:var(--line); border:1px solid var(--line-strong); border-radius:10px; overflow:hidden}
+  @media(max-width:760px){.pillars{grid-template-columns:1fr}}
+  .pillar{background:var(--bg); padding:30px 28px; transition:background .2s}
+  .pillar:hover{background:var(--surface)}
+  .pillar .pn{font-family:var(--mono); font-size:.72rem; color:var(--faint); letter-spacing:.1em}
+  .pillar .pt{font-family:var(--mono); font-weight:700; font-size:1.12rem; line-height:1.25; margin-top:10px; color:var(--ink)}
+  .pillar .pc{font-family:var(--mono); color:var(--accent); font-size:.86rem; margin-top:10px; line-height:1.5}
+  .pillar .pp{color:var(--muted); font-size:.93rem; margin-top:13px; line-height:1.6}
+
+  /* comparison — styled like a diff */
+  .difftable{margin-top:42px; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; background:var(--surface)}
+  table{width:100%; border-collapse:collapse; font-size:.92rem}
+  thead th{font-family:var(--mono); font-size:.74rem; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); text-align:left; padding:13px 18px; border-bottom:1px solid var(--line-strong); background:var(--raised)}
+  thead th:nth-child(2)::before{content:"- "; color:#f85149; font-weight:700}
+  thead th:last-child{color:var(--ok)}
+  thead th:last-child::before{content:"+ "; color:var(--ok); font-weight:700}
+  tbody th{font-family:var(--mono); font-weight:500; color:var(--ink); text-align:left; padding:15px 18px; border-bottom:1px solid var(--line); white-space:nowrap; font-size:.84rem; background:var(--raised)}
+  tbody td{color:var(--muted); padding:15px 18px; border-bottom:1px solid var(--line); vertical-align:top; font-size:.9rem}
+  tbody td:nth-child(2){border-left:2px solid rgba(248,81,73,.4)}
+  tbody td:last-child{color:var(--ink); background:var(--ok-soft); border-left:2px solid rgba(63,185,80,.45)}
+  tbody tr:last-child th,tbody tr:last-child td{border-bottom:none}
+  .note{margin-top:24px; color:var(--faint); font-size:.9rem; max-width:74ch; line-height:1.65}
+
+  /* incident — log/callout pane */
+  .incident{background:var(--surface); border:1px solid var(--line-strong); border-left:3px solid var(--accent); border-radius:10px; padding:clamp(28px,4vw,48px); margin-top:8px}
+  .incident h3{font-family:var(--mono); font-weight:700; font-size:clamp(1.4rem,2.8vw,2rem); margin-top:13px; max-width:24ch; color:var(--ink)}
+  .incident p{color:var(--muted); margin-top:18px; max-width:72ch; font-size:1.02rem; line-height:1.75}
+
+  /* quickstart */
+  .steps{display:flex; flex-direction:column; gap:11px; margin-top:42px}
+  .step{display:flex; align-items:center; gap:16px; background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:13px 16px}
+  .step .si{font-family:var(--mono); color:var(--accent); font-size:.8rem; width:30px; flex:0 0 auto}
+  .step .sl{font-family:var(--mono); color:var(--muted); font-size:.82rem; width:160px; flex:0 0 auto}
+  .step code{font-family:var(--mono); color:var(--ink); font-size:.86rem; flex:1; overflow-x:auto; white-space:nowrap}
+  @media(max-width:640px){.step{flex-wrap:wrap; gap:8px} .step .sl{width:auto}}
+  .presets{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px}
+  .preset{font-family:var(--mono); font-size:.78rem; color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:7px 13px; background:var(--surface)}
+  .preset b{color:var(--accent); font-weight:500}
+
+  /* final cta */
+  .final{text-align:center; padding:clamp(80px,11vw,150px) 0}
+  .final h2{margin:0 auto; max-width:24ch}
+  .final .sub{color:var(--muted); margin:16px auto 0; max-width:54ch; font-size:1.04rem}
+  .final .ctas{justify-content:center}
+
+  /* footer */
+  footer{border-top:1px solid var(--line); padding:44px 0; background:var(--surface)}
+  footer .wrap{display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between}
+  .flinks{display:flex; flex-wrap:wrap; gap:20px; font-family:var(--mono); font-size:.84rem; color:var(--muted)}
+  .flinks a:hover{color:var(--accent)}
+  .flinks a:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+  .fmeta{color:var(--faint); font-size:.82rem; max-width:44ch; line-height:1.6}
+  .fmeta .tag{font-family:var(--mono); font-weight:700; font-size:.92rem; color:var(--muted); display:block; margin-bottom:6px}
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="glyph">$_</span>{{.Site.Product.Name}}<span class="ver">{{.Site.Product.Version}}</span></a>
+    <div class="navlinks">
+      <a href="{{(index .Site.Footer.Links 1).Href}}">docs</a>
+      <a class="ghbtn" href="{{.Site.Product.RepoURL}}">★ GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero__schema" aria-hidden="true"></div>
+  <div class="wrap">
+    <div>
+      <h1 data-reveal>{{.Site.Hero.HeadlineLead}}<em>{{.Site.Hero.HeadlineEmphasis}}</em></h1>
+      <p class="sub" data-reveal data-d="1">{{.Site.Hero.Subhead}}</p>
+      <div class="ctas" data-reveal data-d="2">
+        <div class="install">
+          <code><span class="pfx">$</span>{{.Site.Hero.CTAPrimary.Command}}</code>
+          <button class="copy" data-copy="{{.Site.Hero.CTAPrimary.Command}}">Copy</button>
+        </div>
+        <a class="ghost" href="{{.Site.Hero.CTASecondary.Href}}">{{.Site.Hero.CTASecondary.Label}} →</a>
+      </div>
+      <div class="term" data-reveal data-d="3" style="margin-top:34px" aria-label="Terminal session running an evolve loop cycle">
+        <div class="term__bar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="fn mono">evolve — loop</span></div>
+        <div class="term__body">
+          <div class="term__cmd"><span class="pfx">$</span>evolve loop --cycles 3 "add dark mode"<span class="cursor" aria-hidden="true"></span></div>
+          <div class="term__pipe">
+            <span class="node">scout</span><span class="arr">-&gt;</span>
+            <span class="node">triage</span><span class="arr">-&gt;</span>
+            <span class="node">build</span><span class="arr">-&gt;</span>
+            <span class="node">audit</span><span class="arr">-&gt;</span>
+            <span class="ship">ship ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-reveal data-d="3">
+      <div class="verdict" data-verdict>
+        <div class="verdict__bar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="fn mono">{{.Site.Hero.Verdict.File}}</span></div>
+        <div class="verdict__body">
+          <div class="verdict__head">$ evolve guard egps --verdict</div>
+          <ul class="verdict__checks">
+            {{range .Site.Hero.Verdict.Checks}}<li data-check><span class="box" aria-hidden="true"></span>{{.}}</li>{{end}}
+          </ul>
+          <div class="verdict__result" data-verdict-result>
+            <span class="verdict__count"><b>{{.Site.Hero.Verdict.Result}}</b></span>
+            <span class="verdict__ship">{{.Site.Hero.Verdict.Outcome}} ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="proof">
+  <div class="wrap">
+    {{range .Site.ProofBar}}<div class="stat"><span class="v">{{.Value}}</span><span class="l">{{.Label}}</span></div>{{end}}
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Problem.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Problem.Heading}}</h2>
+    {{range .Site.Problem.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+  </div>
+</section>
+
+<section class="band band--alt">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.TheTurn.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.TheTurn.Heading}}</h2>
+    {{range .Site.TheTurn.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+    <div class="spine" data-reveal data-d="2">
+      {{range $i, $p := .Site.PhaseSpine}}
+      <div class="phase"><div class="n">0{{inc $i}}</div><div class="nm">{{$p.Phase}}</div><div class="ar mono">{{$p.Artifact}}</div><div class="bl">{{$p.Blurb}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.PillarsIntro.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.PillarsIntro.Heading}}</h2>
+    <div class="pillars">
+      {{range $i, $p := .Site.Pillars}}
+      <div class="pillar" data-reveal data-d="{{inc $i}}"><div class="pn">[ {{inc $i}} ]</div><div class="pt">{{$p.Title}}</div><div class="pc">{{$p.Claim}}</div><div class="pp">{{$p.Proof}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band band--alt">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Comparison.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Comparison.Heading}}</h2>
+    <div class="difftable" data-reveal data-d="2">
+      <table>
+        <thead><tr>{{range .Site.Comparison.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+        <tbody>
+          {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+    <p class="note" data-reveal data-d="2">{{.Site.Comparison.Note}}</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="incident" data-reveal>
+      <p class="kicker">{{.Site.Incident.Kicker}}</p>
+      <h3>{{.Site.Incident.Heading}}</h3>
+      <p>{{.Site.Incident.Body}}</p>
+    </div>
+  </div>
+</section>
+
+<section class="band band--alt">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Quickstart.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Quickstart.Heading}}</h2>
+    <div class="steps">
+      {{range $i,$s := .Site.Quickstart.Install}}
+      <div class="step" data-reveal data-d="{{inc $i}}"><span class="si">0{{inc $i}}</span><span class="sl">{{$s.Step}}</span><code>{{$s.Command}}</code><button class="copy" data-copy="{{$s.Command}}">Copy</button></div>
+      {{end}}
+    </div>
+    <div class="presets" data-reveal data-d="2">
+      {{range .Site.Quickstart.Presets}}<span class="preset"><b>{{.Label}}</b> · {{.Blurb}}</span>{{end}}
+    </div>
+  </div>
+</section>
+
+<section class="final band">
+  <div class="wrap">
+    <h2 data-reveal>{{.Site.FinalCTA.Heading}}</h2>
+    <p class="sub" data-reveal data-d="1">{{.Site.FinalCTA.Subhead}}</p>
+    <div class="ctas" data-reveal data-d="2">
+      <div class="install"><code><span class="pfx">$</span>{{.Site.FinalCTA.Primary.Command}}</code><button class="copy" data-copy="{{.Site.FinalCTA.Primary.Command}}">Copy</button></div>
+      <a class="ghost" href="{{.Site.FinalCTA.Secondary.Href}}">{{.Site.FinalCTA.Secondary.Label}} →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="flinks">
+      {{range .Site.Footer.Links}}<a href="{{.Href}}">{{.Label}}</a>{{end}}
+    </div>
+    <div class="fmeta"><span class="tag mono">{{.Site.Footer.Tagline}}</span>{{.Site.Footer.Grounding}}</div>
+  </div>
+</footer>
+
+{{template "copyjs"}}
+{{template "reveal"}}
+{{template "verdictjs"}}
+</body>
+</html>
+{{end}}
