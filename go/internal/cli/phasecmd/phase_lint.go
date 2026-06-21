@@ -1,9 +1,11 @@
-package main
+package phasecmd
 
 import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -25,9 +27,9 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	name := strings.ToLower(strings.TrimSpace(args[0]))
-	project := envOrCwd("EVOLVE_PROJECT_ROOT")
+	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 
-	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
+	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(phasespec.Roots(project))
 	for _, w := range discWarns {
 		fmt.Fprintln(stdout, "WARN:", w)
 	}

@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -63,7 +63,7 @@ func parseEnvelope(t *testing.T, out string) createEnvelope {
 func runCreate(t *testing.T, stdin string, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errb bytes.Buffer
-	code := runPhases(append([]string{"create"}, args...), strings.NewReader(stdin), &out, &errb)
+	code := RunPhases(append([]string{"create"}, args...), strings.NewReader(stdin), &out, &errb)
 	return code, out.String(), errb.String()
 }
 

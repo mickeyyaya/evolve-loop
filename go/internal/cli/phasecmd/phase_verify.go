@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -96,8 +98,8 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 // no-drift invariant (ADR-0050 §3.8). A registry that cannot be read degrades to
 // env + code defaults, never a hard failure.
 func phaseVerifyPhaseIO() config.Stage {
-	registryPath := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), "docs", "architecture", "phase-registry.json")
-	cfg, _ := config.Load(registryPath, filterEvolveEnv(os.Environ()))
+	registryPath := filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), "docs", "architecture", "phase-registry.json")
+	cfg, _ := config.Load(registryPath, cmdutil.FilterEvolveEnv(os.Environ()))
 	return cfg.PhaseIO
 }
 
@@ -106,7 +108,7 @@ func phaseVerifyPhaseIO() config.Stage {
 // built-in-only resolution so the self-check never hard-fails on a catalog
 // glitch — built-in phases always verify.
 func phaseVerifyResolver() phasecontract.Resolver {
-	project := envOrCwd("EVOLVE_PROJECT_ROOT")
+	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	cat, _, _, err := mergedCatalog(project)
 	if err != nil {
 		return phasecontract.BuiltinResolver{}

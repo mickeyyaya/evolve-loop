@@ -2,7 +2,7 @@
 // surface for the user-definable-phases framework. It is READ-ONLY except for
 // `add`, which scaffolds a new .evolve/phases/<name>/ skeleton. Distinct from
 // `evolve phase` (run one phase in-process) and `evolve phase-order`.
-package main
+package phasecmd
 
 import (
 	"fmt"
@@ -12,6 +12,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -19,12 +21,12 @@ import (
 
 // runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
 // failure, 10 usage error, 1 I/O error.
-func runPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>|create --spec <file|->>")
 		return 10
 	}
-	project := envOrCwd("EVOLVE_PROJECT_ROOT")
+	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	switch args[0] {
 	case "list":
 		return phasesList(project, stdout, stderr)
@@ -113,7 +115,7 @@ func phasesValidate(project string, args []string, stdout, stderr io.Writer) int
 		}
 	}
 
-	user, _, warns := phasespec.DiscoverUserSpecsFromRoots(phaseRoots(project))
+	user, _, warns := phasespec.DiscoverUserSpecsFromRoots(phasespec.Roots(project))
 	for _, w := range warns {
 		fmt.Fprintln(stderr, "WARN:", w)
 	}

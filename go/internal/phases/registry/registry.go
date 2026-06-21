@@ -94,3 +94,26 @@ func ResetForTesting() {
 	defer mu.Unlock()
 	factories = map[string]Factory{}
 }
+
+// SnapshotForTest captures the currently-registered factories and returns a
+// restore func that re-establishes exactly that set (discarding any
+// registrations made in between). ONLY for tests that mutate the registry and
+// must restore it afterward; pair with ResetForTesting + Register in the test
+// body. Production code MUST NOT call this. Single home for the snapshot/restore
+// idiom that the cmd test suites previously each re-implemented.
+func SnapshotForTest() func() {
+	mu.Lock()
+	snap := make(map[string]Factory, len(factories))
+	for n, f := range factories {
+		snap[n] = f
+	}
+	mu.Unlock()
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		factories = make(map[string]Factory, len(snap))
+		for n, f := range snap {
+			factories[n] = f
+		}
+	}
+}

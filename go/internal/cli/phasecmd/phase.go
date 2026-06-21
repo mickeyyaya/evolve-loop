@@ -11,20 +11,19 @@
 // orchestrator) AND as the per-phase subprocess override via
 // EVOLVE_PHASE_<NAME>_BIN. The subprocess override lets third parties
 // implement a phase in any language as long as it speaks this protocol.
-package main
+package phasecmd
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 
 	// Blank imports drive the init()-time registry.Register calls for
 	// every built-in phase. Adding a new phase = new package + import
@@ -48,7 +47,7 @@ func init() {
 }
 
 // runPhase implements `evolve phase <name>`.
-func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintf(stderr, "evolve phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
@@ -96,16 +95,6 @@ func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// newPromptsLoader resolves the prompts source:
-//   - $EVOLVE_PROMPTS_DIR if set (dev override)
-//   - <project_root> otherwise (loads from agents/, skills/ in the repo)
-func newPromptsLoader(projectRoot string) *prompts.Loader {
-	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
-		return prompts.NewFromDir(d)
-	}
-	return prompts.NewFromDir(projectRoot)
-}
-
 // Most phase factories (intent/scout/triage/tdd/build/audit) self-
 // register in their package init() and don't appear here. Ship and
 // retro keep manual factories because their construction shape differs
@@ -119,7 +108,7 @@ func newShip(_ core.PhaseRequest) core.PhaseRunner {
 func newRetro(req core.PhaseRequest) core.PhaseRunner {
 	return retro.New(retro.Config{
 		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: newPromptsLoader(req.ProjectRoot),
+		Prompts: cmdutil.NewPromptsLoader(req.ProjectRoot),
 		Model:   "auto",
 	})
 }

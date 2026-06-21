@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -136,27 +139,7 @@ func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, std
 			}
 		}
 	}()
-	return runPhase([]string{phase}, bytesReader(req), stdout, stderr)
-}
-
-// bytesReader wraps a byte slice as an io.Reader. tiny helper to
-// avoid importing bytes only for this one purpose.
-func bytesReader(b []byte) io.Reader {
-	return &byteReader{b: b}
-}
-
-type byteReader struct {
-	b   []byte
-	pos int
-}
-
-func (r *byteReader) Read(p []byte) (int, error) {
-	if r.pos >= len(r.b) {
-		return 0, io.EOF
-	}
-	n := copy(p, r.b[r.pos:])
-	r.pos += n
-	return n, nil
+	return phasecmd.RunPhase([]string{phase}, bytes.NewReader(req), stdout, stderr)
 }
 
 // joinNames is a small slice-to-comma-separated helper. Could use

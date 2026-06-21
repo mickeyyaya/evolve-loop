@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
@@ -202,19 +203,11 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 // selection (EVOLVE_CLI), model overrides (EVOLVE_*_MODEL), and ship
 // behaviour (EVOLVE_SHIP_SCRIPT). BRIDGE_TESTING / BRIDGE_*_BINARY are
 // also propagated so test invocations can swap CLI binaries.
+// filterEvolveEnv forwards to cmdutil.FilterEvolveEnv — the implementation now
+// lives in the cmd/evolve/cmdutil leaf so the decomposed internal/cli/* groups
+// share ONE definition. Thin forwarder kept so this file's callers are unchanged.
 func filterEvolveEnv(environ []string) map[string]string {
-	out := map[string]string{}
-	for _, kv := range environ {
-		eq := strings.IndexByte(kv, '=')
-		if eq <= 0 {
-			continue
-		}
-		k := kv[:eq]
-		if strings.HasPrefix(k, "EVOLVE_") || strings.HasPrefix(k, "BRIDGE_") {
-			out[k] = kv[eq+1:]
-		}
-	}
-	return out
+	return cmdutil.FilterEvolveEnv(environ)
 }
 
 // wireOrchestrator returns an orchestrator wired with production
@@ -262,7 +255,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 			Message: reason,
 		})
 	})
-	prm := newPromptsLoader(projectRoot)
+	prm := cmdutil.NewPromptsLoader(projectRoot)
 
 	// Composition root: the SOLE reader of routing env+config. config.Load
 	// maps the central registry + contained env overrides into one immutable

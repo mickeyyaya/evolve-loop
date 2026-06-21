@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ func TestPhasesList_MultiRootShowsProvenance(t *testing.T) {
 	t.Setenv("EVOLVE_PHASE_ROOTS", ".evolve/phases:"+pluginRoot)
 
 	var out, errb bytes.Buffer
-	if code := runPhases([]string{"list"}, nil, &out, &errb); code != 0 {
+	if code := RunPhases([]string{"list"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("list exit = %d (stderr=%q)", code, errb.String())
 	}
 	listing := out.String()
@@ -39,7 +39,7 @@ func TestPhasesList_MultiRootShowsProvenance(t *testing.T) {
 
 	// validate must see the plugin phase too.
 	out.Reset()
-	if code := runPhases([]string{"validate", "plugin-check"}, nil, &out, &errb); code != 0 {
+	if code := RunPhases([]string{"validate", "plugin-check"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("validate exit = %d (stdout=%q)", code, out.String())
 	}
 	if !strings.Contains(out.String(), "OK") {

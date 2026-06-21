@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 		Phase:   "intent",
 		Verdict: core.VerdictPASS,
 	}}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
@@ -53,7 +53,7 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 	stdin := bytes.NewReader(envelopeStdin(t, req))
 	var stdout, stderr bytes.Buffer
 
-	code := runServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	code := RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code=%d want 0; stderr=%s", code, stderr.String())
 	}
@@ -79,7 +79,7 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 
 func TestRunServePhase_MissingPhaseName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runServePhase(nil, bytes.NewReader(nil), &stdout, &stderr)
+	code := RunServePhase(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d want 10", code)
 	}
@@ -90,7 +90,7 @@ func TestRunServePhase_MissingPhaseName(t *testing.T) {
 
 func TestRunServePhase_UnknownPhase(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runServePhase([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := RunServePhase([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d want 10", code)
 	}
@@ -104,7 +104,7 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 		resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictFAIL},
 		err:  errors.New("intent boom"),
 	}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
@@ -114,7 +114,7 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 	// the process still exits 0 because the envelope IS the response —
 	// surfaced as a transport error on the parent side. (CodeChildCrashed
 	// is reserved for non-zero exit codes.)
-	code := runServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	code := RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("code=%d want 0 (handler errors are wire-level, not exit-level); stderr=%s", code, stderr.String())
 	}
@@ -131,12 +131,12 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 }
 
 func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
-	code := runServePhase([]string{"intent"}, strings.NewReader("not-an-envelope\n"), &stdout, &stderr)
+	code := RunServePhase([]string{"intent"}, strings.NewReader("not-an-envelope\n"), &stdout, &stderr)
 	if code != 1 {
 		t.Errorf("code=%d want 1", code)
 	}
@@ -145,16 +145,18 @@ func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
 	}
 }
 
-// Confirms the dispatcher routes "serve-phase" to runServePhase.
-func TestDispatch_RoutesServePhase(t *testing.T) {
+// Exercises RunServePhase end-to-end: an envelope-framed request round-trips to
+// a response envelope. (Dispatcher routing for "serve-phase" → RunServePhase is
+// covered separately in cmd/evolve/dispatch_test.go.)
+func TestRunServePhase_EnvelopeRoundTrip(t *testing.T) {
 	stub := &stubPhase{resp: core.PhaseResponse{Phase: "scout", Verdict: core.VerdictPASS}}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("scout", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 2}))
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"serve-phase", "scout"}, stdin, &stdout, &stderr)
+	code := RunServePhase([]string{"scout"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("dispatch serve-phase exit=%d stderr=%s", code, stderr.String())
 	}
@@ -179,13 +181,13 @@ func (s *ctxCapturingPhase) Run(ctx context.Context, req core.PhaseRequest) (cor
 
 func TestRunServePhase_PlumbsContext(t *testing.T) {
 	stub := &ctxCapturingPhase{stubPhase: stubPhase{resp: core.PhaseResponse{Phase: "intent", Verdict: core.VerdictPASS}}}
-	defer snapshotRegistry(t)()
+	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return stub })
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer
-	_ = runServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	_ = RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
 	if stub.ctx == nil {
 		t.Error("handler invoked with nil ctx")
 	}

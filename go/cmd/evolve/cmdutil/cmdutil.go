@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // HasHelp reports whether args contains the conventional help flags
@@ -67,4 +68,34 @@ func ReorderArgs(args []string) []string {
 		}
 	}
 	return append(flags, pos...)
+}
+
+// FilterEvolveEnv extracts the EVOLVE_* and BRIDGE_* variables from an environ
+// slice ("KEY=VALUE" entries) into a map[KEY]VALUE — the env subset threaded
+// into phase dispatch. Entries without '=' or with an empty key are skipped.
+// Extracted from cmd_cycle.go so the decomposed internal/cli/* groups share one
+// implementation.
+func FilterEvolveEnv(environ []string) map[string]string {
+	out := map[string]string{}
+	for _, kv := range environ {
+		eq := strings.IndexByte(kv, '=')
+		if eq <= 0 {
+			continue
+		}
+		k := kv[:eq]
+		if strings.HasPrefix(k, "EVOLVE_") || strings.HasPrefix(k, "BRIDGE_") {
+			out[k] = kv[eq+1:]
+		}
+	}
+	return out
+}
+
+// NewPromptsLoader builds a prompts.Loader rooted at the EVOLVE_PROMPTS_DIR
+// override when set, else at projectRoot. Extracted from the phase dispatch so
+// cmd handlers and the cycle wiring share one loader-construction policy.
+func NewPromptsLoader(projectRoot string) *prompts.Loader {
+	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
+		return prompts.NewFromDir(d)
+	}
+	return prompts.NewFromDir(projectRoot)
 }

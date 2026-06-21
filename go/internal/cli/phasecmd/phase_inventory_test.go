@@ -1,4 +1,4 @@
-package main
+package phasecmd
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ func TestPhaseInventory_BuildFromPhaseRoots(t *testing.T) {
 	t.Setenv("EVOLVE_PHASE_ROOTS", "")
 
 	var out, errb bytes.Buffer
-	code := runPhaseInventory([]string{"build", "--force"}, nil, &out, &errb)
+	code := RunPhaseInventory([]string{"build", "--force"}, nil, &out, &errb)
 	if code != 0 {
 		t.Fatalf("build exit = %d (stderr=%q)", code, errb.String())
 	}
@@ -37,7 +37,7 @@ func TestPhaseInventory_BuildFromPhaseRoots(t *testing.T) {
 
 func TestPhaseInventory_UnknownSubcommand(t *testing.T) {
 	var out, errb bytes.Buffer
-	if code := runPhaseInventory([]string{"wat"}, nil, &out, &errb); code != 10 {
+	if code := RunPhaseInventory([]string{"wat"}, nil, &out, &errb); code != 10 {
 		t.Errorf("unknown subcommand exit = %d, want 10", code)
 	}
 }
