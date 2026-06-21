@@ -113,13 +113,19 @@ func writeFile(path string, data []byte) error {
 	return nil
 }
 
+// relFn computes the path of an entry relative to the walk root. It is a
+// package-level seam so a test can exercise copyDir's rel-error branch, which
+// the real filesystem never reaches (both arguments are always absolute and
+// share a root). Behaviour is identical to filepath.Rel at runtime.
+var relFn = filepath.Rel
+
 // copyDir recursively copies regular files from src into dst.
 func copyDir(src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(src, path)
+		rel, err := relFn(src, path)
 		if err != nil {
 			return err
 		}

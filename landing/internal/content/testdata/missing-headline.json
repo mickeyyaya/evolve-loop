@@ -1,0 +1,9 @@
+{
+  "product": {
+    "name": "Evolve Loop",
+    "version": "v1.0.0"
+  },
+  "hero": {
+    "subhead": "a subhead is present but the headline is intentionally absent"
+  }
+}

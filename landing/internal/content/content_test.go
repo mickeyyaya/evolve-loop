@@ -85,6 +85,27 @@ func TestLoad_BadJSONFailsLoudly(t *testing.T) {
 	}
 }
 
+// A file that is well-formed JSON but missing a required content field must be
+// rejected by Load via Validate — not just by a direct Validate() call. This
+// covers Load's validate-error branch and proves the error names the field and
+// is wrapped under the "invalid content" prefix.
+func TestLoad_ValidJSONButInvalidContentFailsLoudly(t *testing.T) {
+	site, err := Load("testdata/missing-headline.json")
+	if err == nil {
+		t.Fatal("Load(missing-headline) returned nil error, want a validation error")
+	}
+	if site != nil {
+		t.Errorf("Load returned a non-nil *Site (%v) on validation failure, want nil", site)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "hero.headline") {
+		t.Errorf("error %q does not name the missing field 'hero.headline'", msg)
+	}
+	if !strings.Contains(msg, "invalid content") {
+		t.Errorf("error %q is not wrapped with the Load validate-stage prefix 'invalid content'", msg)
+	}
+}
+
 func TestLoad_MissingFileFailsLoudly(t *testing.T) {
 	if _, err := Load("testdata/does-not-exist.json"); err == nil {
 		t.Fatal("Load(missing) returned nil error, want a file error")

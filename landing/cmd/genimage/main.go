@@ -25,7 +25,13 @@ import (
 	"time"
 )
 
-const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+// apiEndpoint is a var (not a const) so tests can point it at an httptest server.
+var apiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+
+// jsonMarshal is an indirection over json.Marshal so tests can exercise the
+// otherwise-unreachable marshal-failure path in buildRequestBody. At runtime it
+// is exactly json.Marshal — behavior is identical.
+var jsonMarshal = json.Marshal
 
 // --- wire types --------------------------------------------------------------
 
@@ -88,7 +94,7 @@ func buildRequestBody(prompt, aspect string, refs []refImage) ([]byte, error) {
 	if aspect != "" {
 		req.GenerationConfig.ImageConfig = &imageConfig{AspectRatio: aspect}
 	}
-	return json.Marshal(req)
+	return jsonMarshal(req)
 }
 
 // extractImageBytes decodes the first inline image in the response, or returns a
@@ -127,24 +133,41 @@ func (r *repeatable) Set(v string) error {
 	return nil
 }
 
+// osExit is a seam so a test can verify main() forwards run()'s exit code
+// without terminating the test process. At runtime it is exactly os.Exit.
+var osExit = os.Exit
+
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "ERROR:", err)
-		os.Exit(1)
-	}
+	osExit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-func run() error {
+// run holds all program logic so it is fully testable. It parses args via a
+// local FlagSet (never the global flag package), performs the request, writes
+// the output file, prints errors to stderr, and returns 1 on any error, 0 on
+// success.
+func run(args []string, stdout, stderr io.Writer) int {
+	if err := doRun(args, stdout); err != nil {
+		fmt.Fprintln(stderr, "ERROR:", err)
+		return 1
+	}
+	return 0
+}
+
+func doRun(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("genimage", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 	var (
-		prompt     = flag.String("prompt", "", "image prompt text")
-		promptFile = flag.String("prompt-file", "", "read prompt from this file instead")
-		out        = flag.String("out", "", "output PNG path (required)")
-		model      = flag.String("model", "gemini-3-pro-image", "Gemini image model")
-		aspect     = flag.String("aspect", "", "aspect ratio, e.g. 16:9, 1:1, 4:5")
+		prompt     = fs.String("prompt", "", "image prompt text")
+		promptFile = fs.String("prompt-file", "", "read prompt from this file instead")
+		out        = fs.String("out", "", "output PNG path (required)")
+		model      = fs.String("model", "gemini-3-pro-image", "Gemini image model")
+		aspect     = fs.String("aspect", "", "aspect ratio, e.g. 16:9, 1:1, 4:5")
 		refs       repeatable
 	)
-	flag.Var(&refs, "ref", "reference image path (repeatable)")
-	flag.Parse()
+	fs.Var(&refs, "ref", "reference image path (repeatable)")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("parse flags: %w", err)
+	}
 
 	if *out == "" {
 		return fmt.Errorf("--out is required")
@@ -176,7 +199,7 @@ func run() error {
 	}
 
 	client := &http.Client{Timeout: 240 * time.Second}
-	resp, err := client.Post(fmt.Sprintf(endpoint, *model, key), "application/json", bytes.NewReader(body))
+	resp, err := client.Post(fmt.Sprintf(apiEndpoint, *model, key), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("request: %w", err)
 	}
@@ -197,7 +220,7 @@ func run() error {
 	if err := os.WriteFile(*out, img, 0o644); err != nil {
 		return fmt.Errorf("write %q: %w", *out, err)
 	}
-	fmt.Printf("OK %s (%d bytes) via %s\n", *out, len(img), *model)
+	fmt.Fprintf(stdout, "OK %s (%d bytes) via %s\n", *out, len(img), *model)
 	return nil
 }
 
