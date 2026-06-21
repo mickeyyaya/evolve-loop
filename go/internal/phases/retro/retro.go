@@ -19,7 +19,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -176,4 +178,21 @@ func hasFailureLesson(ws string) bool {
 		}
 	}
 	return false
+}
+
+// init self-registers the retro phase factory with the phase registry, like
+// every other built-in phase. The subprocess dispatcher (internal/cli/phasecmd)
+// resolves phases by name and never constructs retro directly — keeping the
+// flow phase-agnostic (ADR-0035/0038). The factory builds the default
+// project-rooted bridge + prompts loader (Model "auto"), matching the prior
+// phasecmd wiring byte-for-byte (cmdutil.NewPromptsLoader was a duplicate of
+// prompts.NewForProject).
+func init() {
+	registry.Register(string(core.PhaseRetro), func(req core.PhaseRequest) core.PhaseRunner {
+		return New(Config{
+			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Prompts: prompts.NewForProject(req.ProjectRoot),
+			Model:   "auto",
+		})
+	})
 }

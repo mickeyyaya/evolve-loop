@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -182,4 +183,17 @@ func addRepairSignals(signals map[string]any, res RunResult) {
 		signals["ship.repair_attempted"] = res.RepairAttempted
 		signals["ship.repair_outcome"] = res.RepairOutcome
 	}
+}
+
+// init self-registers the ship phase factory with the phase registry, like
+// every other built-in phase. The subprocess dispatcher (internal/cli/phasecmd)
+// resolves phases by name and never constructs ship directly — keeping the flow
+// phase-agnostic (ADR-0035/0038). The orchestrator's in-process path
+// (cmd_cycle.go) builds ship with a stage-threaded constructor; this registry
+// factory serves the `evolve phase ship` subprocess entrypoint with the
+// default (StageOff) runner, matching the prior phasecmd wiring byte-for-byte.
+func init() {
+	registry.Register(string(core.PhaseShip), func(_ core.PhaseRequest) core.PhaseRunner {
+		return NewWithDefaultRunner()
+	})
 }
