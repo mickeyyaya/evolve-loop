@@ -36,18 +36,21 @@ func wrapCycleLevelError(phase Phase, err error) error {
 
 // optionalInfraSkip reports whether a phase whose retries exhausted may
 // degrade to WARN+advance instead of aborting the cycle (the Workstream-D
-// intent documented on ErrArtifactTimeout; cycle-283). Three conditions, all
+// intent documented on ErrArtifactTimeout; cycle-283). Four conditions, all
 // required: the error is INFRA-shaped (artifact timeout / transient bridge —
-// never integrity or logic failures), the phase is catalog-Optional, and the
-// phase sits outside the resolved ship floor — so the skip can never weaken
-// `ship ⇒ build ∧ audit ∧ tdd`. Ship is always mandatory by convention; its
-// explicit guard is belt-and-suspenders against a misconfigured catalog
-// (ship is not in the floor set, so the floor loop would not catch it).
+// never integrity or logic failures), the phase is NOT configured-mandatory,
+// the phase is catalog-Optional, and the phase sits outside the resolved ship
+// floor — so the skip can never weaken `ship ⇒ build ∧ audit ∧ tdd`. The
+// mandatory guard is generic and config-driven (the orchestrator reads
+// cfg.Mandatory, not a hardcoded phase name): it subsumes the former ship
+// special-case — ship is a mandatory anchor — while protecting any mandatory
+// phase mis-marked Optional (the floor loop alone would miss ship, which is
+// not in the floor set). Phase-agnostic flow per ADR-0035/0038.
 func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	if !errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err) {
 		return false
 	}
-	if p == PhaseShip {
+	if isConfiguredMandatory(o.cfg, string(p)) {
 		return false
 	}
 	spec, ok := o.catalog.Get(string(p))

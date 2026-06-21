@@ -161,3 +161,41 @@ func TestOptionalPhaseNonInfraErrorStaysCycleFatal(t *testing.T) {
 		t.Errorf("cycle-level failure phase=%q, want amplify-tests", clf.Phase)
 	}
 }
+
+// TestMandatoryPhaseNeverInfraSkipped pins the generalized infra-skip guard:
+// a configured-mandatory phase is NEVER infra-skipped, even if its catalog spec
+// is (mis)marked Optional. This generalizes the former ship-only special case —
+// the engine consults the mandatory SET (config), not a hardcoded phase name
+// (phase-agnostic flow, ADR-0035/0038). RED until optionalInfraSkip reads
+// isConfiguredMandatory: the old `if p == PhaseShip` guard protects only ship,
+// so a mandatory-but-optional non-ship phase is wrongly skip-eligible.
+func TestMandatoryPhaseNeverInfraSkipped(t *testing.T) {
+	t.Parallel()
+	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
+		{Name: "amplify-tests", Optional: true, After: "build"},
+	})
+	if err != nil {
+		t.Fatalf("setup: catalog merge: %v", err)
+	}
+	cfg := config.RoutingConfig{Mandatory: []string{"amplify-tests"}}
+	o := NewOrchestrator(nil, nil, nil, WithCatalog(cat), WithRouting(cfg, nil))
+
+	if o.optionalInfraSkip(Phase("amplify-tests"), infraTimeoutErr("amplify-tests")) {
+		t.Error("a configured-mandatory phase must never be infra-skipped, even when its spec is Optional; " +
+			"the guard must read the mandatory set (config), not a hardcoded ship check")
+	}
+}
+
+// TestShipNeverInfraSkipped is the byte-identity characterization for the
+// former ship special-case: ship (a mandatory anchor) must never be infra-
+// skipped — it is the ship gate itself. Green before AND after the
+// generalization (old: hardcoded ship check; new: ship ∈ mandatory).
+func TestShipNeverInfraSkipped(t *testing.T) {
+	t.Parallel()
+	cfg := config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}}
+	o := NewOrchestrator(nil, nil, nil, WithRouting(cfg, nil))
+
+	if o.optionalInfraSkip(PhaseShip, infraTimeoutErr("ship")) {
+		t.Error("ship must never be infra-skipped (it is the ship gate itself)")
+	}
+}
