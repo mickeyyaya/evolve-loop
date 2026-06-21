@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseregistrar"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -163,6 +165,25 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 			waves[wi][i].GoalHash = goalHash
 		}
 	}
+	// Cross-session ownership lease (ADR-0059): a real run takes the exclusive
+	// goal-hash lease in the git common dir (shared by every worktree) so a
+	// second autonomous session on the SAME plan refuses-or-attaches instead of
+	// clobbering the incumbent. --simulate is a dry plumbing check, not an owned
+	// run, so it does not take ownership. The flock frees on our exit (defer) or
+	// death, so a dead owner never blocks the next run.
+	if !*simulate {
+		lease, lerr := campaign.AcquireOwnership(campaignLeaseDir(*projectRoot), goalHash, campaignOwnerSelf(*projectRoot))
+		if lerr != nil {
+			var held *campaign.HeldError
+			if errors.As(lerr, &held) {
+				fmt.Fprintf(stderr, "evolve campaign run: %v\n", held)
+				return 1
+			}
+			fmt.Fprintf(stderr, "evolve campaign run: ownership lease: %v\n", lerr)
+			return 1
+		}
+		defer lease.Release()
+	}
 	// SIGINT/SIGTERM cancels in-flight cycles (exec.CommandContext reaps the
 	// children); RunWaves then returns and the progress checkpoint up to the last
 	// completed wave survives, so --resume picks up where the interrupt hit.
@@ -242,6 +263,53 @@ func campaignEvolveDir(projectRoot string) string {
 		fmt.Fprintf(os.Stderr, "[campaign] WARN: could not absolutize progress root %q: %v\n", root, err)
 	}
 	return filepath.Join(root, ".evolve")
+}
+
+// campaignLeaseDir resolves the directory that holds the cross-session ownership
+// lease (ADR-0059). It uses the git COMMON dir — shared by every linked worktree
+// of a repo — so two sessions running the same plan from different worktrees
+// contend on the SAME lease file. Off a git repo (tests, non-repo roots) it
+// falls back to the worktree-local .evolve so each isolated root self-contains.
+func campaignLeaseDir(projectRoot string) string {
+	root := projectRoot
+	if root == "" {
+		if wd, err := os.Getwd(); err == nil {
+			root = wd
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if out, err := gitexec.Default(root).Output(ctx, "rev-parse", "--git-common-dir"); err == nil {
+		if cd := strings.TrimSpace(out); cd != "" {
+			if !filepath.IsAbs(cd) {
+				cd = filepath.Join(root, cd)
+			}
+			if abs, aerr := filepath.Abs(cd); aerr == nil {
+				cd = abs
+			}
+			return filepath.Join(cd, "evolve", "campaign-leases")
+		}
+	}
+	return filepath.Join(campaignEvolveDir(projectRoot), "campaign-leases")
+}
+
+// campaignOwnerSelf builds this process's ownership record for the lease — PID,
+// worktree, host, and start time are informational (the flock is the liveness
+// signal), surfaced in the refuse message and `campaign status`.
+func campaignOwnerSelf(projectRoot string) campaign.Owner {
+	worktree := projectRoot
+	if worktree == "" {
+		if wd, err := os.Getwd(); err == nil {
+			worktree = wd
+		}
+	}
+	host, _ := os.Hostname()
+	return campaign.Owner{
+		PID:       os.Getpid(),
+		Worktree:  worktree,
+		Host:      host,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+	}
 }
 
 // runCampaignStatus reports a campaign's wave/cycle progress from the durable
