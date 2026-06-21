@@ -223,12 +223,23 @@ func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 
 // campaignEvolveDir resolves the writable .evolve directory that holds campaign
 // progress state, mirroring the projectRoot/.evolve convention used elsewhere.
+// The root is always absolutized so a relative --project-root on the `status`
+// path resolves the SAME progress file the `run` path wrote (run absolutizes its
+// root before this; status calls in with the raw flag) — otherwise --resume reads
+// a different (empty) checkpoint and never sees completed waves.
 func campaignEvolveDir(projectRoot string) string {
 	root := projectRoot
 	if root == "" {
 		if wd, err := os.Getwd(); err == nil {
 			root = wd
 		}
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	} else {
+		// Abs only fails if Getwd fails (cwd deleted mid-run); a relative root here
+		// would silently reproduce the resume/status mismatch this guards against.
+		fmt.Fprintf(os.Stderr, "[campaign] WARN: could not absolutize progress root %q: %v\n", root, err)
 	}
 	return filepath.Join(root, ".evolve")
 }

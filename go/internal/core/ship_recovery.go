@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -19,9 +22,12 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	// recovered by rebasing the cycle branch onto the new main BEFORE the
 	// re-audit (the router routes this code to audit). A clean rebase replays
 	// this cycle's patches onto the peer's changes → re-audit re-binds the merged
-	// tree → re-ship fast-forwards. A rebase CONFLICT is genuinely overlapping
-	// work the advisor's partition should have kept apart — abort loud rather
-	// than auto-resolve.
+	// tree → re-ship fast-forwards. A conflict confined to GENERATED projections
+	// (e.g. control-flags.md) is auto-resolved by regenerating them from the
+	// merged source (rebaseWithDerivedRegen) — every flag cycle rewrites that
+	// projection, so the partition cannot separate them and a debugger round-trip
+	// would be pure waste. A conflict touching any NON-derived path is genuine
+	// overlapping work the partition should have kept apart — abort loud.
 	// The code/class used for the routing decision; a fleet rebase may reclassify
 	// a clean RebaseNeeded into a CONFLICT (G13a) that routes to the debugger.
 	recoverCode, recoverClass := se.Code, se.Class
@@ -29,7 +35,8 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
 		switch {
 		case ok:
-			// Clean replay → router routes RebaseNeeded to audit (re-bind merged tree).
+			// Clean (or derived-only, regenerated) replay → router routes
+			// RebaseNeeded to audit (re-bind the merged tree).
 		case conflict:
 			// Genuine overlapping work — a re-audit cannot resolve it. Reclassify to
 			// the integrity-class conflict code so recovery routes to the debugger.
@@ -64,27 +71,169 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	return cand, true
 }
 
+// gitFn runs a git subcommand in dir and returns (stdout, exitCode, err); it
+// matches gitCapture so production wiring passes gitCapture directly while tests
+// inject a fake — the Humble Object seam for rebaseWithDerivedRegen.
+type gitFn = func(ctx context.Context, dir string, args ...string) (string, int, error)
+
+// regenFn regenerates the derived projection identified by relPath from the
+// worktree's (post-rebase, merged) source-of-truth. relPath identifies WHICH
+// projection (the registry key); the callee decides where to write it (the
+// production impl writes via EVOLVE_WORKTREE_ROOT, not worktree/relPath directly).
+type regenFn = func(ctx context.Context, worktree, relPath string) error
+
+// derivedArtifactRegenArgs is the single classifier for GENERATED projections a
+// rebase may legitimately conflict on and that are auto-resolvable by re-running
+// their projection from the merged source-of-truth. The value is the `evolve`
+// subcommand that regenerates the projection (run from the worktree).
+//
+// control-flags.md is the flag registry's projection (cmd_flags.go: `evolve flags
+// generate` splices flagregistry.RenderIndex() into a marker region). Every
+// flag-reduction cycle rewrites its whole marker region, so two cycles removing
+// different flags conflict structurally — the partition cannot separate them.
+// Resolving by regeneration IS the projection re-run (single-source-with-
+// projection: no second renderer), so such a conflict never needs the debugger.
+//
+// Keep in sync with TestDerivedArtifactRegenArgs_MapIntegrity (each key must be a
+// real on-disk file carrying a GENERATED marker).
+var derivedArtifactRegenArgs = map[string][]string{
+	"docs/architecture/control-flags.md": {"flags", "generate"},
+}
+
+// isDerivedArtifact reports whether a repo-relative path is a registered,
+// auto-resolvable GENERATED projection.
+func isDerivedArtifact(relPath string) bool {
+	_, ok := derivedArtifactRegenArgs[relPath]
+	return ok
+}
+
+// maxRebaseContinueSteps bounds the replay loop so a pathological rebase can never
+// spin forever (each cycle branch has only a handful of commits).
+const maxRebaseContinueSteps = 100
+
 // rebaseCycleBranchOntoMain rebases the cycle's worktree branch onto the current
 // main so a fleet cycle whose ff-merge diverged (a peer moved main) can re-audit
-// + re-ship the merged tree (ADR-0049 S5b). Returns ok=true on a clean replay.
-// On failure it distinguishes (G13a) a genuine merge CONFLICT (unmerged paths —
-// overlapping work the partition should have separated, route to the debugger)
-// from an infra failure (conflict=false, abort the cycle). Either way it aborts
-// the in-progress rebase so the worktree is left clean (no half-applied rebase).
-// An empty worktree returns (false, false) — a degraded run never rebases.
+// + re-ship the merged tree (ADR-0049 S5b). Returns ok=true on a clean replay OR
+// when every conflict was confined to derived projections that were regenerated
+// from the merged source: the re-audit re-binds the regenerated tree, so the
+// ship-time tree-SHA binding (ship/gitops.go) still holds — integrity-safe. A
+// conflict touching any NON-derived path (genuine overlapping work, incl. the
+// SSOT itself) returns conflict=true → the debugger. Infra failures and failed
+// regenerations return (false,false). The in-progress rebase is always aborted on
+// a non-ok return so the worktree is left clean. An empty worktree returns
+// (false,false) — a degraded run never rebases.
 func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) (ok bool, conflict bool) {
 	if worktree == "" {
 		return false, false
 	}
-	if _, exit, err := gitCapture(ctx, worktree, "rebase", "main"); err != nil || exit != 0 {
-		// Detect a real conflict BEFORE aborting (abort clears the unmerged index).
-		unmerged, _, _ := gitCapture(ctx, worktree, "diff", "--name-only", "--diff-filter=U")
-		conflict = strings.TrimSpace(unmerged) != ""
-		_, _, _ = gitCapture(ctx, worktree, "rebase", "--abort")
-		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed (exit=%d, err=%v, conflict=%v); rebase aborted\n", worktree, exit, err, conflict)
-		return false, conflict
+	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, isDerivedArtifact)
+}
+
+// rebaseWithDerivedRegen is the testable core of the fleet rebase recovery (Humble
+// Object): pure orchestration over an injected git runner + regenerator. See
+// rebaseCycleBranchOntoMain for the contract.
+func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, regen regenFn, isDerived func(string) bool) (ok bool, conflict bool) {
+	// abort cleans up an in-progress rebase. It runs under a DETACHED context so a
+	// cancelled ctx (per-cycle deadline / SIGINT mid-rebase) can never leave the
+	// worktree half-rebased — the work calls below use ctx (cancellation interrupts
+	// the actual rebase), but the cleanup must still complete.
+	abort := func() {
+		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, _, _ = git(cctx, worktree, "rebase", "--abort")
 	}
-	return true, false
+	if _, exit, err := git(ctx, worktree, "rebase", "main"); err == nil && exit == 0 {
+		return true, false
+	}
+	// The rebase paused or failed. A genuine conflict leaves unmerged paths; none
+	// means an infra failure (not a conflict) — abort and let the cycle fail.
+	if len(unmergedRebasePaths(ctx, worktree, git)) == 0 {
+		abort()
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed without conflicts (infra); aborted\n", worktree)
+		return false, false
+	}
+	for step := 0; step < maxRebaseContinueSteps; step++ {
+		unmerged := unmergedRebasePaths(ctx, worktree, git)
+		if len(unmerged) == 0 {
+			// A replayed commit became empty after resolution (a peer already made the
+			// same change) → skip it; the rebase proceeds to the next commit.
+			if _, c, e := git(ctx, worktree, "rebase", "--skip"); e == nil && c == 0 {
+				return true, false
+			}
+			continue
+		}
+		// Classify the WHOLE set before touching anything: if any conflict is on a
+		// non-derived path we abort without regenerating its derived siblings, since
+		// the rebase aborts anyway and a partial regen would be wasted.
+		for _, p := range unmerged {
+			if !isDerived(p) {
+				abort()
+				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: non-derived conflict on %s (overlapping work) → debugger\n", worktree, p)
+				return false, true
+			}
+		}
+		for _, p := range unmerged {
+			if rerr := regen(ctx, worktree, p); rerr != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: regenerate %s failed: %v; aborting\n", worktree, p, rerr)
+				abort()
+				return false, false
+			}
+			if _, c, e := git(ctx, worktree, "add", "--", p); e != nil || c != 0 {
+				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: git add %s failed (rc=%d, err=%v); aborting\n", worktree, p, c, e)
+				abort()
+				return false, false
+			}
+			fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: regenerated derived projection %s from merged source\n", worktree, p)
+		}
+		// core.editor=true makes `--continue`'s commit-message edit a no-op (reuse the
+		// replayed message) instead of blocking on an interactive editor. A non-zero
+		// `--continue` means a SUBSEQUENT replayed commit conflicts (or emptied) — the
+		// loop re-classifies it; exit 0 means the entire replay finished.
+		if _, c, e := git(ctx, worktree, "-c", "core.editor=true", "rebase", "--continue"); e == nil && c == 0 {
+			return true, false
+		}
+	}
+	abort()
+	fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s exceeded %d replay steps; aborted\n", worktree, maxRebaseContinueSteps)
+	return false, false
+}
+
+// unmergedRebasePaths returns the repo-relative paths with conflict markers
+// (--diff-filter=U) during an in-progress rebase, one per line. The outer
+// TrimSpace drops the trailing newline; git path entries carry no interior
+// whitespace, so no per-line trimming is needed.
+func unmergedRebasePaths(ctx context.Context, worktree string, git gitFn) []string {
+	out, _, _ := git(ctx, worktree, "diff", "--name-only", "--diff-filter=U")
+	var paths []string
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+		if l != "" {
+			paths = append(paths, l)
+		}
+	}
+	return paths
+}
+
+// regenerateDerivedArtifact re-projects the derived artifact identified by relPath
+// from the worktree's MERGED source by compiling + running the registered `evolve`
+// projection subcommand. The projection writes via EVOLVE_WORKTREE_ROOT (NOT via
+// worktree/relPath directly) — relPath is the classifier/registry key. It builds
+// from source (`go run`) deliberately: the running campaign binary's
+// flagregistry.All is the pre-campaign flag set and would re-inflate the doc.
+// EVOLVE_WORKTREE_ROOT points sourceRoot() at the worktree so the projection
+// writes the worktree's copy (precedence WORKTREE>PROJECT>cwd, cmd_subagent.go).
+func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) error {
+	args, ok := derivedArtifactRegenArgs[relPath]
+	if !ok {
+		return fmt.Errorf("no regenerator registered for %q", relPath)
+	}
+	goArgs := append([]string{"run", "./cmd/evolve"}, args...)
+	cmd := exec.CommandContext(ctx, "go", goArgs...)
+	cmd.Dir = filepath.Join(worktree, "go")
+	cmd.Env = append(os.Environ(), "EVOLVE_WORKTREE_ROOT="+worktree)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("regenerate %s via `evolve %s`: %w: %s", relPath, strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // decideAfterDebugger maps the debugger phase's recovery decision (surfaced on
