@@ -1,0 +1,330 @@
+{{define "luminous"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%230071E3' stroke-width='3'/%3E%3C/svg%3E">
+<title>{{.Site.Product.Name}} — {{.Site.Product.MentalModel}}</title>
+<meta name="description" content="{{.Site.Hero.Subhead}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF; --surface:#F6F7F9; --ink:#111114; --muted:#6B6B73;
+    --hair:#E6E7EB; --accent:#0071E3; --accent-soft:rgba(0,113,227,.06);
+    --accent-tint:rgba(0,113,227,.045); --ok:#1AA06D; --ok-soft:rgba(26,160,109,.10);
+    --display:"Fraunces",Georgia,"Times New Roman",serif;
+    --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --wrap:1080px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-weight:400; line-height:1.65; -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility; letter-spacing:-.006em; overflow-x:hidden;
+  }
+  .wrap{max-width:var(--wrap); margin:0 auto; padding:0 28px}
+  .narrow{max-width:760px; margin:0 auto; padding:0 28px}
+  section{position:relative}
+  a{color:inherit; text-decoration:none}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px}
+  .accent{color:var(--accent)}
+  .display{font-family:var(--display)}
+  .mono{font-family:var(--mono)}
+  .kicker{font-family:var(--mono); font-size:.72rem; letter-spacing:.2em; text-transform:uppercase; color:var(--accent)}
+  .hr{height:1px; background:var(--hair); border:0; margin:0}
+
+  /* reveal */
+  [data-reveal]{opacity:0; transform:translateY(20px); transition:opacity 1s cubic-bezier(.22,.7,.2,1), transform 1s cubic-bezier(.22,.7,.2,1)}
+  [data-reveal].in-view{opacity:1; transform:none}
+  [data-reveal][data-d="1"]{transition-delay:.08s}
+  [data-reveal][data-d="2"]{transition-delay:.16s}
+  [data-reveal][data-d="3"]{transition-delay:.24s}
+  [data-reveal][data-d="4"]{transition-delay:.32s}
+  [data-reveal][data-d="5"]{transition-delay:.40s}
+
+  /* nav */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:saturate(180%) blur(16px); background:rgba(255,255,255,.78); border-bottom:1px solid var(--hair)}
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:60px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:-.02em; font-size:1.02rem}
+  .brand .mark{width:22px; height:13px; flex:0 0 auto}
+  .navlinks{display:flex; align-items:center; gap:24px; font-size:.93rem; color:var(--muted)}
+  .navlinks a:hover{color:var(--ink)}
+  .navlinks .ghbtn{color:#fff; background:var(--accent); padding:8px 16px; border-radius:999px; font-size:.86rem; font-weight:500; letter-spacing:0}
+  .navlinks .ghbtn:hover{background:#0063c8}
+
+  /* hero */
+  .hero{padding:64px 0 26px; text-align:center}
+  .hero .heroimg{
+    width:100%; max-width:720px; margin:0 auto 12px; display:block;
+    aspect-ratio:16/8; object-fit:contain;
+    filter:saturate(108%);
+  }
+  .hero h1{font-family:var(--display); font-weight:500; font-size:clamp(2.1rem,6.1vw,4.7rem); line-height:1.03; letter-spacing:-.024em; max-width:16ch; margin:0 auto; overflow-wrap:break-word}
+  .hero h1 em{font-style:italic; font-weight:400; color:var(--accent)}
+  .hero .sub{margin:26px auto 0; max-width:54ch; color:var(--muted); font-size:clamp(1.04rem,1.55vw,1.2rem); line-height:1.6}
+  .ctas{display:flex; flex-wrap:wrap; gap:14px; margin-top:34px; align-items:center; justify-content:center}
+  .install{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:10px 11px 10px 16px; max-width:100%}
+  .install code{font-family:var(--mono); font-size:.86rem; color:var(--ink); white-space:nowrap; min-width:0; flex:1 1 auto; overflow-x:auto}
+  .install .pfx{color:var(--accent); margin-right:6px}
+  .copy{font-family:var(--sans); font-weight:500; font-size:.8rem; color:#fff; background:var(--accent); border:1px solid var(--accent); padding:7px 14px; border-radius:8px; cursor:pointer; transition:background .2s,border-color .2s,color .2s}
+  .copy:hover{background:#0063c8; border-color:#0063c8}
+  .copy.is-copied{background:var(--ok); border-color:var(--ok); color:#fff}
+  .ghost{display:inline-flex; align-items:center; gap:8px; color:var(--accent); font-size:.94rem; font-weight:500; padding:11px 6px}
+  .ghost:hover{color:#0063c8}
+
+  /* verdict card (signature moment) */
+  .verdict-wrap{margin:60px auto 0; max-width:440px}
+  .verdict{background:#fff; border:1px solid var(--hair); border-radius:18px; padding:0; box-shadow:0 26px 60px -34px rgba(17,17,20,.22), 0 2px 8px -3px rgba(17,17,20,.06); overflow:hidden; text-align:left}
+  .verdict__bar{display:flex; align-items:center; gap:7px; padding:13px 18px; border-bottom:1px solid var(--hair); font-family:var(--mono); font-size:.78rem; color:var(--muted); background:var(--surface)}
+  .verdict__bar i{width:10px; height:10px; border-radius:50%; background:#D6D8DD; display:inline-block}
+  .verdict__bar i:nth-child(1){background:#E0A2A0}
+  .verdict__bar i:nth-child(2){background:#E3C99A}
+  .verdict__bar i:nth-child(3){background:#A8D3BC}
+  .verdict__bar .fn{margin-left:8px; color:var(--ink)}
+  .verdict__body{padding:22px 22px 24px}
+  .verdict__checks{list-style:none; display:flex; flex-direction:column; gap:13px}
+  .verdict__checks li{display:flex; align-items:center; gap:13px; font-family:var(--mono); font-size:.93rem; color:#A6A7AE; transition:color .45s}
+  .verdict__checks li::before{content:""; width:19px; height:19px; border-radius:50%; border:1.5px solid var(--hair); flex:0 0 auto; transition:.45s; position:relative}
+  .verdict__checks li.ok{color:var(--ink)}
+  .verdict__checks li.ok::before{border-color:var(--ok); background:var(--ok)}
+  .verdict__checks li.ok::after{content:"✓"; position:absolute; width:19px; text-align:center; font-size:.66rem; line-height:19px; color:#fff; font-weight:700}
+  .verdict__result{display:flex; align-items:center; justify-content:space-between; margin-top:22px; padding-top:18px; border-top:1px solid var(--hair); opacity:0; transform:translateY(8px); transition:.6s}
+  .verdict__result.show{opacity:1; transform:none}
+  .verdict__count{font-family:var(--mono); font-size:.9rem; color:var(--muted)}
+  .verdict__count b{color:var(--ok)}
+  .verdict__ship{font-family:var(--mono); font-weight:600; letter-spacing:.05em; color:#fff; background:var(--ok); padding:7px 16px; border-radius:8px}
+
+  /* proof bar */
+  .proof{border-top:1px solid var(--hair); border-bottom:1px solid var(--hair)}
+  .proof .wrap{display:flex; flex-wrap:wrap; gap:18px 64px; padding:36px 28px; justify-content:center}
+  .proof .stat{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center}
+  .proof .v{font-family:var(--display); font-weight:500; font-size:2rem; color:var(--ink); line-height:1; letter-spacing:-.02em}
+  .proof .l{font-size:.78rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase}
+
+  /* generic section */
+  .band{padding:clamp(76px,11vw,140px) 0}
+  .band--tint{background:var(--surface); border-top:1px solid var(--hair); border-bottom:1px solid var(--hair)}
+  .band h2{font-family:var(--display); font-weight:500; font-size:clamp(2rem,4.2vw,3.15rem); line-height:1.1; letter-spacing:-.02em; max-width:20ch; margin:14px auto 0; text-align:center}
+  .band h2 em{font-style:italic; font-weight:400; color:var(--accent)}
+  .kicker.center{display:block; text-align:center}
+  .lead{color:var(--muted); font-size:clamp(1.04rem,1.5vw,1.18rem); max-width:62ch; margin:24px auto 0; text-align:center}
+  .lead + .lead{margin-top:18px}
+
+  /* phase spine */
+  .spine{display:flex; gap:0; margin:60px auto 0; flex-wrap:wrap; border:1px solid var(--hair); border-radius:16px; overflow:hidden; background:#fff}
+  .phase{flex:1 1 130px; min-width:130px; padding:24px 22px; border-right:1px solid var(--hair); border-bottom:1px solid var(--hair)}
+  .phase .n{font-family:var(--mono); font-size:.72rem; color:var(--accent); letter-spacing:.1em}
+  .phase .nm{font-family:var(--display); font-weight:500; font-size:1.34rem; margin-top:10px; letter-spacing:-.01em}
+  .phase .ar{font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-top:6px}
+  .phase .bl{font-size:.86rem; color:var(--muted); margin-top:13px; line-height:1.5}
+
+  /* pillars — airy hairline cards */
+  .pillars{display:grid; grid-template-columns:repeat(2,1fr); margin-top:58px; border-top:1px solid var(--hair)}
+  .pillar{padding:36px 34px; border-bottom:1px solid var(--hair); border-right:1px solid var(--hair)}
+  .pillar:nth-child(2n){border-right:0}
+  .pillar .pt{font-family:var(--display); font-weight:500; font-size:1.42rem; line-height:1.2; letter-spacing:-.012em}
+  .pillar .pc{color:var(--accent); font-size:.96rem; margin-top:12px; font-weight:500}
+  .pillar .pp{color:var(--muted); font-size:.95rem; margin-top:14px; line-height:1.62}
+
+  /* comparison */
+  .tablewrap{margin:50px auto 0; overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:.95rem; min-width:560px}
+  thead th{font-family:var(--mono); font-size:.74rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); text-align:left; padding:14px 18px; border-bottom:1px solid var(--ink); font-weight:500}
+  thead th:last-child{color:var(--accent)}
+  tbody th{font-weight:500; color:var(--ink); text-align:left; padding:17px 18px; border-bottom:1px solid var(--hair); white-space:nowrap; font-family:var(--sans)}
+  tbody td{color:var(--muted); padding:17px 18px; border-bottom:1px solid var(--hair); vertical-align:top}
+  tbody td:last-child{color:var(--ink); background:var(--accent-tint)}
+  thead th:last-child{background:var(--accent-tint)}
+  .note{margin:28px auto 0; color:var(--muted); font-size:.92rem; max-width:72ch; line-height:1.6; text-align:center}
+
+  /* incident */
+  .incident{background:#fff; border:1px solid var(--hair); border-left:3px solid var(--accent); border-radius:18px; padding:clamp(34px,5vw,56px); margin:0 auto; max-width:880px; box-shadow:0 20px 50px -38px rgba(17,17,20,.2)}
+  .incident h3{font-family:var(--display); font-weight:500; font-size:clamp(1.7rem,3.2vw,2.4rem); margin-top:14px; max-width:22ch; letter-spacing:-.018em}
+  .incident p{color:var(--muted); margin-top:20px; max-width:70ch; font-size:1.04rem; line-height:1.72}
+
+  /* quickstart */
+  .steps{display:flex; flex-direction:column; gap:12px; margin:50px auto 0; max-width:820px}
+  .step{display:flex; align-items:center; gap:18px; background:#fff; border:1px solid var(--hair); border-radius:12px; padding:15px 16px}
+  .step .si{font-family:var(--mono); color:var(--accent); font-size:.85rem; width:22px; flex:0 0 auto}
+  .step .sl{color:var(--muted); font-size:.9rem; width:150px; flex:0 0 auto}
+  .step code{font-family:var(--mono); color:var(--ink); font-size:.88rem; flex:1; overflow-x:auto}
+  @media(max-width:640px){.step{flex-wrap:wrap; gap:8px} .step .sl{width:auto}}
+  .presets{display:flex; flex-wrap:wrap; gap:10px; margin:20px auto 0; max-width:820px; justify-content:center}
+  .preset{font-family:var(--mono); font-size:.8rem; color:var(--muted); border:1px solid var(--hair); background:#fff; border-radius:999px; padding:8px 15px}
+  .preset b{color:var(--accent); font-weight:600}
+
+  /* final cta */
+  .final{text-align:center; padding:clamp(96px,13vw,168px) 0}
+  .final h2{margin:0 auto; max-width:18ch}
+  .final .sub{color:var(--muted); margin:20px auto 0; max-width:50ch; font-size:1.06rem}
+  .final .ctas{justify-content:center}
+
+  /* footer */
+  footer{border-top:1px solid var(--hair); padding:52px 0}
+  footer .wrap{display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between}
+  .flinks{display:flex; flex-wrap:wrap; gap:24px; font-size:.9rem; color:var(--muted)}
+  .flinks a:hover{color:var(--accent)}
+  .fmeta{color:var(--muted); font-size:.82rem; max-width:42ch}
+  .fmeta .tag{font-family:var(--display); font-weight:500; font-size:1.05rem; color:var(--ink); display:block; margin-bottom:6px; letter-spacing:-.01em}
+
+  @media(max-width:760px){
+    .pillars{grid-template-columns:1fr}
+    .pillar{border-right:0 !important}
+    .proof .wrap{gap:22px 40px}
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg class="mark" viewBox="0 0 44 26" fill="none" aria-hidden="true"><path d="M22 13C18 4 6 4 6 13s12 9 16 0 12-9 16 0-12 9-16 0Z" stroke="#0071E3" stroke-width="2.4" stroke-linecap="round"/></svg>
+      {{.Site.Product.Name}}
+    </a>
+    <div class="navlinks">
+      <a href="{{(index .Site.Footer.Links 1).Href}}">Docs</a>
+      <a class="ghbtn" href="{{.Site.Product.RepoURL}}">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="narrow">
+    <img class="heroimg" src="{{.Assets}}/hero.png" alt="The Evolve Loop — a continuous, self-correcting cycle" data-reveal>
+    <h1 data-reveal data-d="1">{{.Site.Hero.HeadlineLead}}<em>{{.Site.Hero.HeadlineEmphasis}}</em></h1>
+    <p class="sub" data-reveal data-d="2">{{.Site.Hero.Subhead}}</p>
+    <div class="ctas" data-reveal data-d="3">
+      <div class="install">
+        <code><span class="pfx">$</span>{{.Site.Hero.CTAPrimary.Command}}</code>
+        <button class="copy" data-copy="{{.Site.Hero.CTAPrimary.Command}}">Copy</button>
+      </div>
+      <a class="ghost" href="{{.Site.Hero.CTASecondary.Href}}">{{.Site.Hero.CTASecondary.Label}} →</a>
+    </div>
+  </div>
+  <div class="narrow verdict-wrap" data-reveal data-d="4">
+    <div class="verdict" data-verdict>
+      <div class="verdict__bar"><i></i><i></i><i></i><span class="fn mono">{{.Site.Hero.Verdict.File}}</span></div>
+      <div class="verdict__body">
+        <ul class="verdict__checks">
+          {{range .Site.Hero.Verdict.Checks}}<li data-check>{{.}}</li>{{end}}
+        </ul>
+        <div class="verdict__result" data-verdict-result>
+          <span class="verdict__count"><b>{{.Site.Hero.Verdict.Result}}</b></span>
+          <span class="verdict__ship">{{.Site.Hero.Verdict.Outcome}} ✓</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="proof">
+  <div class="wrap">
+    {{range .Site.ProofBar}}<div class="stat"><span class="v">{{.Value}}</span><span class="l">{{.Label}}</span></div>{{end}}
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker center" data-reveal>{{.Site.Problem.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Problem.Heading}}</h2>
+    {{range .Site.Problem.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+  </div>
+</section>
+
+<section class="band band--tint">
+  <div class="wrap">
+    <p class="kicker center" data-reveal>{{.Site.TheTurn.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.TheTurn.Heading}}</h2>
+    {{range .Site.TheTurn.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+    <div class="spine" data-reveal data-d="3">
+      {{range $i, $p := .Site.PhaseSpine}}
+      <div class="phase"><div class="n">0{{inc $i}}</div><div class="nm">{{$p.Phase}}</div><div class="ar mono">{{$p.Artifact}}</div><div class="bl">{{$p.Blurb}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker center" data-reveal>{{.Site.PillarsIntro.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.PillarsIntro.Heading}}</h2>
+    <div class="pillars">
+      {{range $i, $p := .Site.Pillars}}
+      <div class="pillar" data-reveal data-d="{{inc $i}}"><div class="pt">{{$p.Title}}</div><div class="pc">{{$p.Claim}}</div><div class="pp">{{$p.Proof}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band band--tint">
+  <div class="wrap">
+    <p class="kicker center" data-reveal>{{.Site.Comparison.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Comparison.Heading}}</h2>
+    <div class="tablewrap" data-reveal data-d="2">
+      <table>
+        <thead><tr>{{range .Site.Comparison.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+        <tbody>
+          {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+    <p class="note" data-reveal data-d="2">{{.Site.Comparison.Note}}</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="incident" data-reveal>
+      <p class="kicker">{{.Site.Incident.Kicker}}</p>
+      <h3>{{.Site.Incident.Heading}}</h3>
+      <p>{{.Site.Incident.Body}}</p>
+    </div>
+  </div>
+</section>
+
+<section class="band band--tint">
+  <div class="wrap">
+    <p class="kicker center" data-reveal>{{.Site.Quickstart.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Quickstart.Heading}}</h2>
+    <div class="steps">
+      {{range $i,$s := .Site.Quickstart.Install}}
+      <div class="step" data-reveal data-d="{{inc $i}}"><span class="si">0{{inc $i}}</span><span class="sl">{{$s.Step}}</span><code>{{$s.Command}}</code><button class="copy" data-copy="{{$s.Command}}">Copy</button></div>
+      {{end}}
+    </div>
+    <div class="presets" data-reveal data-d="2">
+      {{range .Site.Quickstart.Presets}}<span class="preset"><b>{{.Label}}</b> · {{.Blurb}}</span>{{end}}
+    </div>
+  </div>
+</section>
+
+<section class="final band">
+  <div class="wrap">
+    <h2 class="display" data-reveal>{{.Site.FinalCTA.Heading}}</h2>
+    <p class="sub" data-reveal data-d="1">{{.Site.FinalCTA.Subhead}}</p>
+    <div class="ctas" data-reveal data-d="2">
+      <div class="install"><code><span class="pfx">$</span>{{.Site.FinalCTA.Primary.Command}}</code><button class="copy" data-copy="{{.Site.FinalCTA.Primary.Command}}">Copy</button></div>
+      <a class="ghost" href="{{.Site.FinalCTA.Secondary.Href}}">{{.Site.FinalCTA.Secondary.Label}} →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="flinks">
+      {{range .Site.Footer.Links}}<a href="{{.Href}}">{{.Label}}</a>{{end}}
+    </div>
+    <div class="fmeta"><span class="tag display">{{.Site.Footer.Tagline}}</span>{{.Site.Footer.Grounding}}</div>
+  </div>
+</footer>
+
+{{template "copyjs"}}
+{{template "reveal"}}
+{{template "verdictjs"}}
+</body>
+</html>
+{{end}}

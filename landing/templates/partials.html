@@ -1,0 +1,66 @@
+{{define "copyjs"}}
+<script>
+(function () {
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy');
+      if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+      var original = btn.innerHTML;
+      btn.classList.add('is-copied');
+      btn.innerHTML = 'Copied';
+      setTimeout(function () {
+        btn.classList.remove('is-copied');
+        btn.innerHTML = original;
+      }, 1400);
+    });
+  });
+})();
+</script>
+{{end}}
+
+{{define "reveal"}}
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var els = document.querySelectorAll('[data-reveal]');
+  if (reduce || !('IntersectionObserver' in window)) {
+    els.forEach(function (el) { el.classList.add('in-view'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (el) { io.observe(el); });
+})();
+</script>
+{{end}}
+
+{{define "verdictjs"}}
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll('[data-verdict]').forEach(function (card) {
+    var checks = card.querySelectorAll('[data-check]');
+    var result = card.querySelector('[data-verdict-result]');
+    function settle() {
+      checks.forEach(function (c) { c.classList.add('ok'); });
+      if (result) { result.classList.add('show'); }
+    }
+    if (reduce || !('IntersectionObserver' in window)) { settle(); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) { return; }
+        io.unobserve(e.target);
+        checks.forEach(function (c, i) {
+          setTimeout(function () { c.classList.add('ok'); }, 380 * (i + 1));
+        });
+        setTimeout(function () { if (result) { result.classList.add('show'); } }, 380 * (checks.length + 1));
+      });
+    }, { threshold: 0.5 });
+    io.observe(card);
+  });
+})();
+</script>
+{{end}}

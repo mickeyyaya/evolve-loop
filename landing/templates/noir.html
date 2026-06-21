@@ -1,0 +1,322 @@
+{{define "noir"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ff6a5f' stroke-width='3'/%3E%3C/svg%3E">
+<title>{{.Site.Product.Name}} — {{.Site.Product.MentalModel}}</title>
+<meta name="description" content="{{.Site.Hero.Subhead}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#09090a; --surface:#141416; --raised:#1c1c20;
+    --ink:#f4f4f5; --muted:#9a9aa2; --faint:#65656d;
+    --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
+    --accent:#ff6a5f; --accent-ink:#ff8b82; --accent-soft:rgba(255,106,95,.13);
+    --ok:#46d39a;
+    --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
+    --sans:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --wrap:1080px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-weight:400; line-height:1.65; -webkit-font-smoothing:antialiased;
+    letter-spacing:-.01em; overflow-x:hidden;
+  }
+  /* film grain */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:var(--wrap); margin:0 auto; padding:0 28px}
+  section{position:relative}
+  a{color:inherit; text-decoration:none}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px}
+  .accent{color:var(--accent-ink)}
+  .serif{font-family:var(--serif)}
+  .mono{font-family:var(--mono)}
+  .kicker{font-family:var(--mono); font-size:.74rem; letter-spacing:.22em; text-transform:uppercase; color:var(--accent-ink)}
+
+  /* reveal */
+  [data-reveal]{opacity:0; transform:translateY(26px); transition:opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1)}
+  [data-reveal].in-view{opacity:1; transform:none}
+  [data-reveal][data-d="1"]{transition-delay:.08s}
+  [data-reveal][data-d="2"]{transition-delay:.16s}
+  [data-reveal][data-d="3"]{transition-delay:.24s}
+  [data-reveal][data-d="4"]{transition-delay:.32s}
+
+  /* nav */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(14px); background:rgba(9,9,10,.62); border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:62px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:500; letter-spacing:-.02em}
+  .brand .dot{width:11px; height:11px; border-radius:50%; background:var(--accent); box-shadow:0 0 16px var(--accent)}
+  .navlinks{display:flex; align-items:center; gap:26px; font-size:.92rem; color:var(--muted)}
+  .navlinks a:hover{color:var(--ink)}
+  .navlinks .ghbtn{color:var(--ink); border:1px solid var(--line-strong); padding:7px 14px; border-radius:999px; font-size:.85rem}
+  .navlinks .ghbtn:hover{border-color:var(--accent); color:var(--accent-ink)}
+
+  /* hero */
+  .hero{min-height:92vh; display:flex; align-items:center; padding:90px 0 70px; overflow:hidden}
+  .hero::before{ /* spotlight */
+    content:""; position:absolute; top:-30%; left:50%; transform:translateX(-50%);
+    width:120vw; height:120vh;
+    background:radial-gradient(46% 42% at 50% 8%, rgba(255,106,95,.16), rgba(255,106,95,.04) 36%, transparent 64%);
+    pointer-events:none;
+  }
+  .hero__img{position:absolute; inset:0; background:url("{{.Assets}}/hero.png") center 38%/cover no-repeat; opacity:.34; mask-image:radial-gradient(60% 60% at 50% 42%, #000 30%, transparent 78%)}
+  .hero .wrap{position:relative; z-index:2; display:grid; grid-template-columns:1.05fr .95fr; gap:54px; align-items:center}
+  @media(max-width:880px){.hero .wrap{grid-template-columns:1fr; gap:40px}}
+  .hero h1{font-family:var(--serif); font-weight:400; font-size:clamp(2.2rem,6.4vw,5rem); line-height:1.02; letter-spacing:-.018em; overflow-wrap:break-word}
+  .hero h1 em{font-style:italic; color:var(--accent-ink)}
+  .hero .sub{margin-top:24px; max-width:34ch; color:var(--muted); font-size:clamp(1rem,1.5vw,1.16rem); line-height:1.62}
+  .ctas{display:flex; flex-wrap:wrap; gap:14px; margin-top:34px; align-items:center}
+  .install{display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line-strong); border-radius:12px; padding:11px 12px 11px 16px; max-width:100%}
+  .install code{font-family:var(--mono); font-size:.88rem; color:var(--ink); white-space:nowrap; min-width:0; flex:1 1 auto; overflow-x:auto}
+  .install .pfx{color:var(--accent-ink); margin-right:2px}
+  .copy{font-family:var(--sans); font-size:.8rem; color:var(--muted); background:var(--raised); border:1px solid var(--line); padding:6px 11px; border-radius:8px; cursor:pointer; transition:.2s}
+  .copy:hover{color:var(--ink); border-color:var(--accent)}
+  .copy.is-copied{color:var(--ok); border-color:var(--ok)}
+  .ghost{display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:.92rem; padding:11px 4px}
+  .ghost:hover{color:var(--accent-ink)}
+
+  /* verdict card (signature moment) */
+  .verdict{background:linear-gradient(180deg,var(--raised),var(--surface)); border:1px solid var(--line-strong); border-radius:18px; padding:0; box-shadow:0 40px 90px -50px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.02) inset; overflow:hidden}
+  .verdict__bar{display:flex; align-items:center; gap:8px; padding:13px 16px; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:.78rem; color:var(--faint)}
+  .verdict__bar i{width:11px; height:11px; border-radius:50%; background:#2c2c31; display:inline-block}
+  .verdict__bar .fn{margin-left:8px}
+  .verdict__body{padding:20px 20px 22px}
+  .verdict__checks{list-style:none; display:flex; flex-direction:column; gap:11px}
+  .verdict__checks li{display:flex; align-items:center; gap:12px; font-family:var(--mono); font-size:.92rem; color:var(--faint); transition:color .45s}
+  .verdict__checks li::before{content:""; width:18px; height:18px; border-radius:50%; border:1.5px solid #34343a; flex:0 0 auto; transition:.45s; display:grid; place-items:center}
+  .verdict__checks li.ok{color:var(--ink)}
+  .verdict__checks li.ok::before{border-color:var(--ok); background:var(--ok); box-shadow:0 0 14px rgba(70,211,154,.5)}
+  .verdict__checks li.ok::after{content:"✓"; position:absolute; margin-left:3px; font-size:.7rem; color:#06281c; font-weight:700; transform:translateX(-15px)}
+  .verdict__result{display:flex; align-items:center; justify-content:space-between; margin-top:20px; padding-top:18px; border-top:1px solid var(--line); opacity:0; transform:translateY(8px); transition:.6s}
+  .verdict__result.show{opacity:1; transform:none}
+  .verdict__count{font-family:var(--mono); font-size:.92rem; color:var(--muted)}
+  .verdict__count b{color:var(--ok)}
+  .verdict__ship{font-family:var(--mono); font-weight:500; letter-spacing:.04em; color:#06281c; background:var(--ok); padding:7px 15px; border-radius:8px; box-shadow:0 0 22px rgba(70,211,154,.45)}
+
+  /* proof bar */
+  .proof{border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:rgba(255,255,255,.012)}
+  .proof .wrap{display:flex; flex-wrap:wrap; gap:14px 56px; padding:26px 28px; justify-content:center}
+  .proof .stat{display:flex; align-items:baseline; gap:10px}
+  .proof .v{font-family:var(--serif); font-size:1.7rem; color:var(--ink)}
+  .proof .l{font-size:.82rem; color:var(--faint); letter-spacing:.04em; text-transform:uppercase}
+
+  /* generic section */
+  .band{padding:clamp(72px,11vw,140px) 0}
+  .band h2{font-family:var(--serif); font-weight:400; font-size:clamp(2rem,4.4vw,3.3rem); line-height:1.08; letter-spacing:-.015em; max-width:18ch}
+  .lead{color:var(--muted); font-size:clamp(1.04rem,1.6vw,1.22rem); max-width:60ch; margin-top:22px}
+  .lead + .lead{margin-top:16px}
+
+  /* phase spine */
+  .spine{display:flex; gap:0; margin-top:54px; flex-wrap:wrap; border:1px solid var(--line); border-radius:16px; overflow:hidden}
+  .phase{flex:1 1 130px; min-width:130px; padding:22px 20px; border-right:1px solid var(--line); position:relative; background:var(--surface)}
+  .phase:last-child{border-right:none}
+  .phase .n{font-family:var(--mono); font-size:.72rem; color:var(--accent-ink); letter-spacing:.12em}
+  .phase .nm{font-family:var(--serif); font-size:1.35rem; margin-top:10px}
+  .phase .ar{font-family:var(--mono); font-size:.72rem; color:var(--faint); margin-top:6px}
+  .phase .bl{font-size:.85rem; color:var(--muted); margin-top:12px; line-height:1.5}
+
+  /* pillars */
+  .pillars{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; margin-top:54px; background:var(--line); border:1px solid var(--line); border-radius:18px; overflow:hidden}
+  @media(max-width:760px){.pillars{grid-template-columns:1fr}}
+  .pillar{background:var(--bg); padding:34px 32px}
+  .pillar:hover{background:var(--surface)}
+  .pillar .pt{font-family:var(--serif); font-size:1.5rem; line-height:1.15}
+  .pillar .pc{color:var(--accent-ink); font-size:.96rem; margin-top:10px}
+  .pillar .pp{color:var(--muted); font-size:.95rem; margin-top:14px; line-height:1.6}
+
+  /* comparison */
+  table{width:100%; border-collapse:collapse; margin-top:46px; font-size:.96rem}
+  thead th{font-family:var(--mono); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); text-align:left; padding:14px 18px; border-bottom:1px solid var(--line-strong)}
+  thead th:last-child{color:var(--accent-ink)}
+  tbody th{font-weight:500; color:var(--ink); text-align:left; padding:16px 18px; border-bottom:1px solid var(--line); white-space:nowrap}
+  tbody td{color:var(--muted); padding:16px 18px; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody td:last-child{color:var(--ink); background:var(--accent-soft)}
+  .note{margin-top:26px; color:var(--faint); font-size:.92rem; max-width:70ch; line-height:1.6}
+
+  /* incident */
+  .incident{background:linear-gradient(180deg,var(--surface),var(--bg)); border:1px solid var(--line); border-radius:20px; padding:clamp(34px,5vw,60px); margin-top:10px}
+  .incident h3{font-family:var(--serif); font-size:clamp(1.7rem,3.4vw,2.5rem); margin-top:14px; max-width:20ch}
+  .incident p{color:var(--muted); margin-top:20px; max-width:68ch; font-size:1.06rem; line-height:1.7}
+
+  /* quickstart */
+  .steps{display:flex; flex-direction:column; gap:12px; margin-top:46px}
+  .step{display:flex; align-items:center; gap:18px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
+  .step .si{font-family:var(--mono); color:var(--accent-ink); font-size:.85rem; width:22px; flex:0 0 auto}
+  .step .sl{color:var(--muted); font-size:.9rem; width:150px; flex:0 0 auto}
+  .step code{font-family:var(--mono); color:var(--ink); font-size:.9rem; flex:1}
+  @media(max-width:640px){.step{flex-wrap:wrap; gap:8px} .step .sl{width:auto}}
+  .presets{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px}
+  .preset{font-family:var(--mono); font-size:.8rem; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:7px 14px}
+  .preset b{color:var(--accent-ink); font-weight:500}
+
+  /* final cta */
+  .final{text-align:center; padding:clamp(90px,13vw,170px) 0}
+  .final::before{content:""; position:absolute; inset:0; background:radial-gradient(50% 70% at 50% 40%, rgba(255,106,95,.12), transparent 70%); pointer-events:none}
+  .final h2{margin:0 auto; max-width:20ch}
+  .final .sub{color:var(--muted); margin:18px auto 0; max-width:48ch}
+  .final .ctas{justify-content:center}
+
+  /* footer */
+  footer{border-top:1px solid var(--line); padding:48px 0}
+  footer .wrap{display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between}
+  .flinks{display:flex; flex-wrap:wrap; gap:22px; font-size:.9rem; color:var(--muted)}
+  .flinks a:hover{color:var(--accent-ink)}
+  .fmeta{color:var(--faint); font-size:.82rem; max-width:42ch}
+  .fmeta .tag{font-family:var(--serif); font-size:1.05rem; color:var(--muted); display:block; margin-bottom:6px}
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="dot"></span>{{.Site.Product.Name}}</a>
+    <div class="navlinks">
+      <a href="{{(index .Site.Footer.Links 1).Href}}">Docs</a>
+      <a class="ghbtn" href="{{.Site.Product.RepoURL}}">★ GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero__img" aria-hidden="true"></div>
+  <div class="wrap">
+    <div>
+      <h1 data-reveal>{{.Site.Hero.HeadlineLead}}<em>{{.Site.Hero.HeadlineEmphasis}}</em></h1>
+      <p class="sub" data-reveal data-d="1">{{.Site.Hero.Subhead}}</p>
+      <div class="ctas" data-reveal data-d="2">
+        <div class="install">
+          <code><span class="pfx">$</span>{{.Site.Hero.CTAPrimary.Command}}</code>
+          <button class="copy" data-copy="{{.Site.Hero.CTAPrimary.Command}}">Copy</button>
+        </div>
+        <a class="ghost" href="{{.Site.Hero.CTASecondary.Href}}">{{.Site.Hero.CTASecondary.Label}} →</a>
+      </div>
+    </div>
+    <div data-reveal data-d="3">
+      <div class="verdict" data-verdict>
+        <div class="verdict__bar"><i></i><i></i><i></i><span class="fn mono">{{.Site.Hero.Verdict.File}}</span></div>
+        <div class="verdict__body">
+          <ul class="verdict__checks">
+            {{range .Site.Hero.Verdict.Checks}}<li data-check>{{.}}</li>{{end}}
+          </ul>
+          <div class="verdict__result" data-verdict-result>
+            <span class="verdict__count"><b>{{.Site.Hero.Verdict.Result}}</b></span>
+            <span class="verdict__ship">{{.Site.Hero.Verdict.Outcome}} ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="proof">
+  <div class="wrap">
+    {{range .Site.ProofBar}}<div class="stat"><span class="v">{{.Value}}</span><span class="l">{{.Label}}</span></div>{{end}}
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Problem.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Problem.Heading}}</h2>
+    {{range .Site.Problem.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+  </div>
+</section>
+
+<section class="band" style="background:rgba(255,255,255,.012);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.TheTurn.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.TheTurn.Heading}}</h2>
+    {{range .Site.TheTurn.Body}}<p class="lead" data-reveal data-d="2">{{.}}</p>{{end}}
+    <div class="spine" data-reveal data-d="2">
+      {{range $i, $p := .Site.PhaseSpine}}
+      <div class="phase"><div class="n">0{{inc $i}}</div><div class="nm">{{$p.Phase}}</div><div class="ar mono">{{$p.Artifact}}</div><div class="bl">{{$p.Blurb}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.PillarsIntro.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.PillarsIntro.Heading}}</h2>
+    <div class="pillars">
+      {{range $i, $p := .Site.Pillars}}
+      <div class="pillar" data-reveal data-d="{{inc $i}}"><div class="pt">{{$p.Title}}</div><div class="pc">{{$p.Claim}}</div><div class="pp">{{$p.Proof}}</div></div>
+      {{end}}
+    </div>
+  </div>
+</section>
+
+<section class="band" style="background:rgba(255,255,255,.012);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Comparison.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Comparison.Heading}}</h2>
+    <table data-reveal data-d="2">
+      <thead><tr>{{range .Site.Comparison.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+      <tbody>
+        {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
+      </tbody>
+    </table>
+    <p class="note" data-reveal data-d="2">{{.Site.Comparison.Note}}</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="incident" data-reveal>
+      <p class="kicker">{{.Site.Incident.Kicker}}</p>
+      <h3>{{.Site.Incident.Heading}}</h3>
+      <p>{{.Site.Incident.Body}}</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" style="background:rgba(255,255,255,.012);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <p class="kicker" data-reveal>{{.Site.Quickstart.Kicker}}</p>
+    <h2 data-reveal data-d="1">{{.Site.Quickstart.Heading}}</h2>
+    <div class="steps">
+      {{range $i,$s := .Site.Quickstart.Install}}
+      <div class="step" data-reveal data-d="{{inc $i}}"><span class="si">0{{inc $i}}</span><span class="sl">{{$s.Step}}</span><code>{{$s.Command}}</code><button class="copy" data-copy="{{$s.Command}}">Copy</button></div>
+      {{end}}
+    </div>
+    <div class="presets" data-reveal data-d="2">
+      {{range .Site.Quickstart.Presets}}<span class="preset"><b>{{.Label}}</b> · {{.Blurb}}</span>{{end}}
+    </div>
+  </div>
+</section>
+
+<section class="final band">
+  <div class="wrap">
+    <h2 class="serif" data-reveal>{{.Site.FinalCTA.Heading}}</h2>
+    <p class="sub" data-reveal data-d="1">{{.Site.FinalCTA.Subhead}}</p>
+    <div class="ctas" data-reveal data-d="2">
+      <div class="install"><code><span class="pfx">$</span>{{.Site.FinalCTA.Primary.Command}}</code><button class="copy" data-copy="{{.Site.FinalCTA.Primary.Command}}">Copy</button></div>
+      <a class="ghost" href="{{.Site.FinalCTA.Secondary.Href}}">{{.Site.FinalCTA.Secondary.Label}} →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="flinks">
+      {{range .Site.Footer.Links}}<a href="{{.Href}}">{{.Label}}</a>{{end}}
+    </div>
+    <div class="fmeta"><span class="tag serif">{{.Site.Footer.Tagline}}</span>{{.Site.Footer.Grounding}}</div>
+  </div>
+</footer>
+
+{{template "copyjs"}}
+{{template "reveal"}}
+{{template "verdictjs"}}
+</body>
+</html>
+{{end}}
