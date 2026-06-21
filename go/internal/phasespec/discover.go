@@ -51,6 +51,15 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			s.Name = dir
 		}
 		ApplyArchetypeDefaults(&s)
+		// ADR-0058 trust boundary: transition-activating fields are restricted to
+		// built-in phases. A user phase.json that declares one has it stripped (with
+		// a warning) so an overlay can never inject a verdict/history/signal branch
+		// into the kernel — the restriction is enforced at the real user-file
+		// ingestion point, where provenance is known.
+		if s.OnPass != "" || s.OnFail != "" || s.BranchingStrategy != "" {
+			warnings = append(warnings, "user phase "+s.Name+" in "+path+" declares transition-activating fields (on_pass/on_fail/branching_strategy) — stripped; these are restricted to built-in phases (ADR-0058)")
+			s.OnPass, s.OnFail, s.BranchingStrategy = "", "", ""
+		}
 		specs = append(specs, s)
 	}
 	return specs, warnings

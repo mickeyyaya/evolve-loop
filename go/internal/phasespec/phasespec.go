@@ -271,6 +271,11 @@ func Load(path string) (Catalog, error) {
 		if s.Name == "" {
 			continue
 		}
+		// Load-time validator (ADR-0058 S4): the registry is a contract — a
+		// malformed activating field fails loudly here, never silently degrades.
+		if viol := ValidateActivatingFields(s); len(viol) > 0 {
+			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
+		}
 		if _, ok := cat.byName[s.Name]; ok {
 			continue // first wins; built-ins precede user overlays at merge time
 		}
