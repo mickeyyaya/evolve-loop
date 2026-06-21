@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"errors"
@@ -16,7 +16,7 @@ import (
 //	2 = scope violation
 //	3 = bad arguments
 //	4 = manifest missing or malformed
-func runCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		commitMsg    string
 		repoDir      string

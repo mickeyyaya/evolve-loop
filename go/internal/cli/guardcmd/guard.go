@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"context"
@@ -65,7 +65,7 @@ func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 // runGuard implements `evolve guard <name>` — reads tool_input JSON from
 // stdin, dispatches to the named guard, and exits 0 on Allow or 2 on Deny.
 // Mirrors the bash hook contract (scripts/guards/*.sh).
-func runGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string

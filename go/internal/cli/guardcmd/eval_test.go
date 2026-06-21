@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"bytes"
@@ -50,7 +50,7 @@ func TestRunEval_DiversityCheck_ExitCodes(t *testing.T) {
 				writeEval(t, dir, n, b)
 			}
 			var stdout, stderr bytes.Buffer
-			rc := runEval([]string{"diversity-check", dir}, nil, &stdout, &stderr)
+			rc := RunEval([]string{"diversity-check", dir}, nil, &stdout, &stderr)
 			if rc != tc.wantRC {
 				t.Errorf("rc=%d, want %d (stdout=%s stderr=%s)", rc, tc.wantRC, stdout.String(), stderr.String())
 			}
@@ -61,12 +61,12 @@ func TestRunEval_DiversityCheck_ExitCodes(t *testing.T) {
 // TestRunEval_DiversityCheck_BadArgs covers the missing-path and unknown-dir paths.
 func TestRunEval_DiversityCheck_BadArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if rc := runEval([]string{"diversity-check"}, nil, &stdout, &stderr); rc != 10 {
+	if rc := RunEval([]string{"diversity-check"}, nil, &stdout, &stderr); rc != 10 {
 		t.Errorf("missing path: rc=%d, want 10", rc)
 	}
 	stdout.Reset()
 	stderr.Reset()
-	if rc := runEval([]string{"diversity-check", "/no/such/dir/xyz"}, nil, &stdout, &stderr); rc != 1 {
+	if rc := RunEval([]string{"diversity-check", "/no/such/dir/xyz"}, nil, &stdout, &stderr); rc != 1 {
 		t.Errorf("missing dir: rc=%d, want 1 (internal error)", rc)
 	}
 }
@@ -74,12 +74,12 @@ func TestRunEval_DiversityCheck_BadArgs(t *testing.T) {
 // TestRunEval_UnknownSubcommand covers the dispatch default arm.
 func TestRunEval_UnknownSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if rc := runEval([]string{"bogus"}, nil, &stdout, &stderr); rc != 10 {
+	if rc := RunEval([]string{"bogus"}, nil, &stdout, &stderr); rc != 10 {
 		t.Errorf("unknown subcommand: rc=%d, want 10", rc)
 	}
 	stdout.Reset()
 	stderr.Reset()
-	if rc := runEval(nil, nil, &stdout, &stderr); rc != 10 {
+	if rc := RunEval(nil, nil, &stdout, &stderr); rc != 10 {
 		t.Errorf("no subcommand: rc=%d, want 10", rc)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"bytes"
@@ -117,7 +117,7 @@ func readLog(t *testing.T, path string) string {
 func TestRunGuard_EmitsAuditLine(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"--evolve-dir", dir, "chain"}, strings.NewReader(""), &stdout, &stderr)
+	rc := RunGuard([]string{"--evolve-dir", dir, "chain"}, strings.NewReader(""), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
 	}
@@ -131,7 +131,7 @@ func TestRunGuard_BypassFlagAfterName(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
 	input := `{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`
-	rc := runGuard([]string{"ship", "--evolve-dir", dir, "--bypass"}, strings.NewReader(input), &stdout, &stderr)
+	rc := RunGuard([]string{"ship", "--evolve-dir", dir, "--bypass"}, strings.NewReader(input), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
 	}

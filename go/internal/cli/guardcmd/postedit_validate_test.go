@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 
 func TestCmd_PostEditValidate_Help(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runPostEditValidate([]string{"--help"}, nil, &stdout, &stderr)
+	rc := RunPostEditValidate([]string{"--help"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -23,7 +23,7 @@ func TestCmd_PostEditValidate_NoPayload(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	var stdout, stderr bytes.Buffer
 	// Empty stdin — should succeed (skip).
-	rc := runPostEditValidate(nil, bytes.NewReader(nil), &stdout, &stderr)
+	rc := RunPostEditValidate(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -32,7 +32,7 @@ func TestCmd_PostEditValidate_NoPayload(t *testing.T) {
 func TestCmd_PostEditValidate_UnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	// Even unknown flags exit 0 — PostToolUse can't block.
-	rc := runPostEditValidate([]string{"--bogus"}, bytes.NewReader(nil), &stdout, &stderr)
+	rc := RunPostEditValidate([]string{"--bogus"}, bytes.NewReader(nil), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -47,7 +47,7 @@ func TestCmd_PostEditValidate_ValidJSON(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
 	payload := []byte(`{"tool_input":{"file_path":"` + p + `"}}`)
 	var stdout, stderr bytes.Buffer
-	rc := runPostEditValidate(nil, bytes.NewReader(payload), &stdout, &stderr)
+	rc := RunPostEditValidate(nil, bytes.NewReader(payload), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -65,7 +65,7 @@ func TestCmd_PostEditValidate_InvalidJSON(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
 	payload := []byte(`{"tool_input":{"file_path":"` + p + `"}}`)
 	var stdout, stderr bytes.Buffer
-	rc := runPostEditValidate(nil, bytes.NewReader(payload), &stdout, &stderr)
+	rc := RunPostEditValidate(nil, bytes.NewReader(payload), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 (PostToolUse cannot block)", rc)
 	}
@@ -83,7 +83,7 @@ func TestCmd_PostEditValidate_BypassFlag(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
 	payload := []byte(`{"tool_input":{"file_path":"` + p + `"}}`)
 	var stdout, stderr bytes.Buffer
-	rc := runPostEditValidate([]string{"--bypass"}, bytes.NewReader(payload), &stdout, &stderr)
+	rc := RunPostEditValidate([]string{"--bypass"}, bytes.NewReader(payload), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}

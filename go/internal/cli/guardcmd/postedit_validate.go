@@ -1,10 +1,11 @@
-package main
+package guardcmd
 
 import (
 	"flag"
 	"fmt"
 	"io"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/posteditvalidate"
 )
 
@@ -14,7 +15,7 @@ import (
 //
 // Always exits 0 (PostToolUse cannot block); WARN goes to stderr where
 // Claude Code surfaces it to the LLM as a reminder.
-func runPostEditValidate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunPostEditValidate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve postedit-validate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var bypass bool
@@ -30,7 +31,7 @@ func runPostEditValidate(args []string, stdin io.Reader, stdout, stderr io.Write
 	}
 
 	payload, _ := io.ReadAll(stdin)
-	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	projectRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 
 	posteditvalidate.Run(posteditvalidate.Options{
 		Payload:     payload,
