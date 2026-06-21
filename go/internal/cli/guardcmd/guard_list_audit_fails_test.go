@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ func TestRunGuard_ListAuditFails_TableOutput(t *testing.T) {
 		{"cycle": 87, "classification": "code-audit-fail", "verdict": "FAIL", "recordedAt": "2026-05-13T05:00:00Z", "expiresAt": future, "summary": "XYZ defect"},
 	})
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
+	rc := RunGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d, stderr=%s", rc, stderr.String())
 	}
@@ -66,7 +66,7 @@ func TestRunGuard_ListAuditFails_JSONOutput(t *testing.T) {
 		{"cycle": 5, "classification": "code-audit-fail", "verdict": "FAIL", "recordedAt": "2026-05-10T00:00:00Z", "expiresAt": future, "summary": "alpha"},
 	})
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails", "--json"}, nil, &stdout, &stderr)
+	rc := RunGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails", "--json"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d, stderr=%s", rc, stderr.String())
 	}
@@ -89,7 +89,7 @@ func TestRunGuard_ListAuditFails_NoStateFile(t *testing.T) {
 	}
 	// No state.json on purpose.
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
+	rc := RunGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
 	if rc != 1 {
 		t.Fatalf("expected rc=1 (read error) when state.json missing, got rc=%d", rc)
 	}
@@ -102,7 +102,7 @@ func TestRunGuard_ListAuditFails_EmptyState(t *testing.T) {
 	dir := t.TempDir()
 	seedState(t, dir, nil)
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
+	rc := RunGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("empty state must exit 0, got rc=%d stderr=%s", rc, stderr.String())
 	}
@@ -117,7 +117,7 @@ func TestRunGuard_ListAuditFails_FlagAfterSubcommand(t *testing.T) {
 	dir := t.TempDir()
 	seedState(t, dir, nil)
 	var stdout, stderr bytes.Buffer
-	rc := runGuard([]string{"list-audit-fails", "--evolve-dir", filepath.Join(dir, ".evolve")}, nil, &stdout, &stderr)
+	rc := RunGuard([]string{"list-audit-fails", "--evolve-dir", filepath.Join(dir, ".evolve")}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d, stderr=%s", rc, stderr.String())
 	}

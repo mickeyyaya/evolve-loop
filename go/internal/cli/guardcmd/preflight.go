@@ -1,16 +1,17 @@
-package main
+package guardcmd
 
 import (
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 )
 
 // runPreflight is the `evolve preflight-environment [--write|--summary|--json]` subcommand.
 // Ports legacy/scripts/dispatch/preflight-environment.sh.
-func runPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	mode := "json"
 	write := false
 	for _, a := range args {
@@ -33,7 +34,7 @@ func runPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class).
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
+	root := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if pluginRoot == "" {
 		pluginRoot = root

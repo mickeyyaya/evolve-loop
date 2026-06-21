@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 // cmd_commitgate.go — `evolve commit-gate run` — the native port of
 // commit-gate/commit-gate-runner.sh (bash->Go migration Wave B1).
@@ -27,7 +27,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-func runCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "evolve commit-gate: usage: commit-gate run --reviewers \"<csv>\" [--files \"p1 p2\"] [--no-install] [--project-root P]")
 		return commitgate.ExitBadArgs

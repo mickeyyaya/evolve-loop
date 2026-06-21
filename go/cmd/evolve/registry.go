@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -49,7 +50,7 @@ var commands = []subcommand{
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
 	{Name: "install", Summary: "Manual install of agents + loop skill into ~/.claude (install [--ci])", Run: runInstall},
 	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},
-	{Name: "guard", Summary: "Run a trust-kernel guard", Run: runGuard},
+	{Name: "guard", Summary: "Run a trust-kernel guard", Run: guardcmd.RunGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
@@ -64,7 +65,7 @@ var commands = []subcommand{
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
-	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: runCommitGate},
+	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: guardcmd.RunCommitGate},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 
 	// Phase 3a + 3b dispatch helpers (ported from bash).
@@ -80,7 +81,7 @@ var commands = []subcommand{
 	{Name: "phase-watchdog", Summary: "Activity-based stall watchdog", Run: runPhaseWatchdog},
 	{Name: "aggregator", Summary: "Merge fan-out worker artifacts", Run: runAggregator},
 	{Name: "fanout-dispatch", Summary: "Bounded-concurrency parallel dispatcher", Run: runFanoutDispatch},
-	{Name: "preflight-environment", Summary: "Probe host capabilities", Run: runPreflight},
+	{Name: "preflight-environment", Summary: "Probe host capabilities", Run: guardcmd.RunPreflight},
 	{Name: "phase-observer", Summary: "Stream-json tail + stall detect", Run: runPhaseObserver},
 	{Name: "subagent", Summary: "Subagent helpers", Run: runSubagent},
 	{Name: "changelog-gen", Summary: "Generate changelog from git log", Run: runChangelogGen},
@@ -90,9 +91,9 @@ var commands = []subcommand{
 	{Name: "rollback", Summary: "Auto-revert failed release", Run: runRollback},
 	{Name: "release", Aliases: []string{"release-pipeline"}, Summary: "Self-healing release pipeline", Run: runReleasePipeline},
 	{Name: "prune-ephemeral", Summary: "TTL retention for .ephemeral/", Run: runPruneEphemeral},
-	{Name: "postedit-validate", Summary: "PostToolUse validator", Run: runPostEditValidate},
+	{Name: "postedit-validate", Summary: "PostToolUse validator", Run: guardcmd.RunPostEditValidate},
 	{Name: "inbox-mover", Summary: "Inbox lifecycle ops", Run: runInboxMover},
-	{Name: "commit-prefix-gate", Summary: "Conventional-commits prefix check", Run: runCommitPrefixGate},
+	{Name: "commit-prefix-gate", Summary: "Conventional-commits prefix check", Run: guardcmd.RunCommitPrefixGate},
 	{Name: "release-consistency", Summary: "Verify version markers", Run: runReleaseConsistency},
 
 	// v12.1 utilities + composition.
@@ -100,7 +101,7 @@ var commands = []subcommand{
 	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
 	{Name: "flags", Summary: "Project the EVOLVE_* flag registry into control-flags.md (generate|check; check exits 2 on drift) — L2 flag SSOT", Run: runFlags},
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: runPhaseInventory},
-	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: runEval},
+	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},
 	{Name: "compose", Summary: "Ad-hoc phase composition", Run: runCompose},

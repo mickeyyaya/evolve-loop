@@ -255,6 +255,12 @@
 # re-exports via aliases; shiperr tests name+exercise every export.
 ./internal/shiperr
 
+# Decoupling campaign (2026-06-21): internal/cli/guardcmd holds the guard/gate
+# CLI handlers (guard, commit-gate, commit-prefix-gate, eval, preflight,
+# postedit-validate) extracted from the cmd/evolve package main. registry.go
+# routes to guardcmd.Run*; shared helpers via cmd/evolve/cmdutil.
+./internal/cli/guardcmd
+
 # bash->Go migration Wave B0 (2026-06-18): tree-state SHA extracted from ship's
 # computeTreeStateSHA into a shared leaf so the commit-gate attestation reader and
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by

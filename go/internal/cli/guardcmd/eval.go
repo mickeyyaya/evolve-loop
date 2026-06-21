@@ -1,4 +1,4 @@
-package main
+package guardcmd
 
 import (
 	"flag"
@@ -17,7 +17,7 @@ import (
 // Exit codes from quality-check / diversity-check mirror the bash contract:
 //
 //	0 PASS, 1 WARN, 2 HALT, 10 bad args, 1 internal error.
-func runEval(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunEval(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve eval: missing subcommand (quality-check|diversity-check|verify)")
 		return 10

@@ -453,17 +453,9 @@ func nextArg(args []string, i int) string {
 	return args[i]
 }
 
-func envOrCwd(env string) string {
-	if v := os.Getenv(env); v != "" {
-		// An explicitly-set root may be relative; absolutize it so paths
-		// derived downstream are cwd-independent (the cycle-119 fix class).
-		return paths.AbsoluteRoot(env, v, nil)
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		return cwd // os.Getwd is already absolute
-	}
-	return "."
-}
+// envOrCwd forwards to cmdutil.EnvOrCwd — the implementation lives there so
+// the decomposed internal/cli/* command groups share one definition.
+func envOrCwd(env string) string { return cmdutil.EnvOrCwd(env) }
 
 // sourceRoot resolves the root for reading SOURCE/DOC artifacts that are part
 // of a cycle's committed deliverable — generated-from-source docs such as
