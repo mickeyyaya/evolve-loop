@@ -580,17 +580,17 @@ func TestIsDerivedArtifact(t *testing.T) {
 	}
 }
 
-// TestDerivedArtifactRegenArgs_MapIntegrity locks the single classifier: every
-// registered derived artifact must exist on disk and carry a GENERATED marker
-// pair (so the path is really a projection, not a hand-written file), and its
-// regen command must be non-empty.
-func TestDerivedArtifactRegenArgs_MapIntegrity(t *testing.T) {
+// TestDerivedArtifacts_MapIntegrity locks the single classifier: every registered
+// derived artifact must exist on disk and carry a GENERATED marker pair (so the
+// path is really a projection, not a hand-written file), its regen command must be
+// non-empty, and its ssotPrefix must be a real on-disk source path.
+func TestDerivedArtifacts_MapIntegrity(t *testing.T) {
 	root := repoRootForTest(t)
-	if len(derivedArtifactRegenArgs) == 0 {
-		t.Fatal("derivedArtifactRegenArgs must register at least control-flags.md")
+	if len(derivedArtifacts) == 0 {
+		t.Fatal("derivedArtifacts must register at least control-flags.md")
 	}
-	for rel, args := range derivedArtifactRegenArgs {
-		if len(args) == 0 {
+	for rel, spec := range derivedArtifacts {
+		if len(spec.regenArgs) == 0 {
 			t.Fatalf("%s has an empty regen command", rel)
 		}
 		b, err := os.ReadFile(filepath.Join(root, rel))
@@ -600,6 +600,169 @@ func TestDerivedArtifactRegenArgs_MapIntegrity(t *testing.T) {
 		if !strings.Contains(string(b), "<!-- GENERATED:") {
 			t.Fatalf("%s has no GENERATED marker — not a projection; do not register it", rel)
 		}
+		if spec.ssotPrefix == "" {
+			t.Fatalf("%s has an empty ssotPrefix", rel)
+		}
+		if _, err := os.Stat(filepath.Join(root, spec.ssotPrefix)); err != nil {
+			t.Fatalf("%s ssotPrefix %q does not exist on disk: %v", rel, spec.ssotPrefix, err)
+		}
+	}
+}
+
+func TestDerivedProjectionsForChanges(t *testing.T) {
+	// A change under the registry SSOT prefix marks control-flags.md stale.
+	got := derivedProjectionsForChanges([]string{
+		"go/internal/flagregistry/registry_table.go",
+		"go/internal/core/foo.go",
+	})
+	if len(got) != 1 || got[0] != cflags {
+		t.Fatalf("registry change must flag %s stale, got %v", cflags, got)
+	}
+	// No SSOT change → no projection to regenerate (so non-flag cycles pay no cost).
+	if g := derivedProjectionsForChanges([]string{"go/internal/core/foo.go", "README.md"}); len(g) != 0 {
+		t.Fatalf("non-SSOT changes must trigger no regen, got %v", g)
+	}
+	if g := derivedProjectionsForChanges(nil); len(g) != 0 {
+		t.Fatalf("no changes → no regen, got %v", g)
+	}
+}
+
+func TestRegenStaleProjections_RegeneratesAndStages(t *testing.T) {
+	var regened, staged []string
+	regen := func(_ context.Context, _, rel string) error { regened = append(regened, rel); return nil }
+	stage := func(_ context.Context, _, rel string) error { staged = append(staged, rel); return nil }
+	done := regenStaleProjections(context.Background(), "/wt",
+		[]string{"go/internal/flagregistry/registry_table.go", "go/internal/core/foo.go"}, regen, stage)
+	if len(done) != 1 || done[0] != cflags {
+		t.Fatalf("done = %v, want [%s]", done, cflags)
+	}
+	if len(regened) != 1 || regened[0] != cflags {
+		t.Fatalf("regened = %v", regened)
+	}
+	if len(staged) != 1 || staged[0] != cflags {
+		t.Fatalf("staged = %v", staged)
+	}
+}
+
+func TestRegenStaleProjections_NoSSOTChange_NoOp(t *testing.T) {
+	called := false
+	regen := func(_ context.Context, _, _ string) error { called = true; return nil }
+	done := regenStaleProjections(context.Background(), "/wt",
+		[]string{"go/internal/core/foo.go", "README.md"}, regen, func(context.Context, string, string) error { return nil })
+	if len(done) != 0 || called {
+		t.Fatalf("no SSOT change must be a no-op (done=%v called=%v)", done, called)
+	}
+}
+
+func TestRegenStaleProjections_RegenFails_SkipsWithoutStaging(t *testing.T) {
+	staged := false
+	regen := func(_ context.Context, _, _ string) error { return errors.New("regen boom") }
+	done := regenStaleProjections(context.Background(), "/wt",
+		[]string{"go/internal/flagregistry/registry_table.go"}, regen, func(context.Context, string, string) error { staged = true; return nil })
+	if len(done) != 0 {
+		t.Fatalf("regen failure → not done, got %v", done)
+	}
+	if staged {
+		t.Fatal("must NOT stage when regen failed")
+	}
+}
+
+func TestRegenStaleProjections_StageFails_Skips(t *testing.T) {
+	regen := func(_ context.Context, _, _ string) error { return nil }
+	done := regenStaleProjections(context.Background(), "/wt",
+		[]string{"go/internal/flagregistry/registry_table.go"}, regen, func(context.Context, string, string) error { return errors.New("add boom") })
+	if len(done) != 0 {
+		t.Fatalf("stage failure → not done, got %v", done)
+	}
+}
+
+// initTempRepo creates an empty temp git repo on branch main with a test identity
+// and returns its dir plus a git runner that fails the test on any non-zero git.
+func initTempRepo(t *testing.T) (string, func(...string)) {
+	t.Helper()
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		if _, code, err := gitCapture(context.Background(), dir, args...); err != nil || code != 0 {
+			t.Fatalf("git %v: code=%d err=%v", args, code, err)
+		}
+	}
+	git("init")
+	git("checkout", "-b", "main")
+	git("config", "user.email", "t@example.com")
+	git("config", "user.name", "test")
+	return dir, git
+}
+
+func TestStageWorktreePath_RealGit(t *testing.T) {
+	dir, _ := initTempRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := stageWorktreePath(context.Background(), dir, "f.txt"); err != nil {
+		t.Fatalf("stageWorktreePath: %v", err)
+	}
+	out, _, _ := gitCapture(context.Background(), dir, "diff", "--cached", "--name-only")
+	if strings.TrimSpace(out) != "f.txt" {
+		t.Fatalf("f.txt should be staged, got %q", out)
+	}
+}
+
+func TestStageWorktreePath_NonRepo_Errors(t *testing.T) {
+	// A non-git dir makes `git add` exit non-zero → stageWorktreePath returns the
+	// command-failure error (the code!=0 branch).
+	if err := stageWorktreePath(context.Background(), t.TempDir(), "nope.txt"); err == nil {
+		t.Fatal("staging in a non-repo must return an error")
+	}
+}
+
+func TestNormalizeDerivedProjections_EmptyWorktree_NoOp(t *testing.T) {
+	o := &Orchestrator{}
+	o.normalizeDerivedProjections(context.Background(), "") // guard: must not panic
+}
+
+func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {
+	// A clean repo (no changed paths) → no stale projection → no `go run`, no error.
+	dir, git := initTempRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "-A")
+	git("commit", "-m", "base")
+	o := &Orchestrator{}
+	o.normalizeDerivedProjections(context.Background(), dir) // clean tree → no-op, no panic
+}
+
+func TestChangedWorktreePaths_RealGit(t *testing.T) {
+	dir, git := initTempRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("base\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "-A")
+	git("commit", "-m", "base")
+	// A tracked edit AND an untracked new file must both be reported (the untracked
+	// case is the H1-class gap: a cycle ADDING a registry file must still regen).
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := changedWorktreePaths(context.Background(), dir)
+	want := map[string]bool{"f.txt": false, "new.txt": false}
+	for _, p := range got {
+		if _, ok := want[p]; ok {
+			want[p] = true
+		}
+	}
+	if !want["f.txt"] || !want["new.txt"] {
+		t.Fatalf("changedWorktreePaths must report tracked AND untracked changes, got %v", got)
+	}
+	// A clean tree yields no paths.
+	git("checkout", "--", "f.txt")
+	_ = os.Remove(filepath.Join(dir, "new.txt"))
+	if g := changedWorktreePaths(context.Background(), dir); len(g) != 0 {
+		t.Fatalf("clean tree must yield no changed paths, got %v", g)
 	}
 }
 

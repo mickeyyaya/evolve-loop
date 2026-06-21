@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -82,29 +83,95 @@ type gitFn = func(ctx context.Context, dir string, args ...string) (string, int,
 // production impl writes via EVOLVE_WORKTREE_ROOT, not worktree/relPath directly).
 type regenFn = func(ctx context.Context, worktree, relPath string) error
 
-// derivedArtifactRegenArgs is the single classifier for GENERATED projections a
-// rebase may legitimately conflict on and that are auto-resolvable by re-running
-// their projection from the merged source-of-truth. The value is the `evolve`
-// subcommand that regenerates the projection (run from the worktree).
+// derivedArtifactSpec describes a GENERATED projection: how to regenerate it and
+// the source-of-truth path prefix whose change makes the projection stale.
+type derivedArtifactSpec struct {
+	regenArgs  []string // `evolve <args>` that regenerates the projection from source
+	ssotPrefix string   // repo-relative source-of-truth prefix; a diff touching it means the projection drifted
+}
+
+// derivedArtifacts is the single classifier for GENERATED projections that a flag
+// cycle edits indirectly (via the registry) and that must be regenerated from the
+// merged source — NEVER hand-maintained by the LLM builder (cycle-11 H1). It feeds
+// BOTH the post-build normalizer (normalizeDerivedProjections — deterministic regen
+// before audit, like build-gofmt) and the fleet rebase recovery
+// (rebaseWithDerivedRegen — auto-resolve a rebase conflict confined to these paths).
 //
 // control-flags.md is the flag registry's projection (cmd_flags.go: `evolve flags
 // generate` splices flagregistry.RenderIndex() into a marker region). Every
-// flag-reduction cycle rewrites its whole marker region, so two cycles removing
-// different flags conflict structurally — the partition cannot separate them.
-// Resolving by regeneration IS the projection re-run (single-source-with-
-// projection: no second renderer), so such a conflict never needs the debugger.
+// flag-reduction cycle rewrites its whole marker region, so the projection drifts
+// unless regenerated; regeneration IS the projection re-run (single-source-with-
+// projection: no second renderer).
 //
-// Keep in sync with TestDerivedArtifactRegenArgs_MapIntegrity (each key must be a
-// real on-disk file carrying a GENERATED marker).
-var derivedArtifactRegenArgs = map[string][]string{
-	"docs/architecture/control-flags.md": {"flags", "generate"},
+// Keep in sync with TestDerivedArtifacts_MapIntegrity (each key is a real on-disk
+// file carrying a GENERATED marker; each ssotPrefix is a real source path).
+var derivedArtifacts = map[string]derivedArtifactSpec{
+	"docs/architecture/control-flags.md": {
+		regenArgs:  []string{"flags", "generate"},
+		ssotPrefix: "go/internal/flagregistry/",
+	},
 }
 
 // isDerivedArtifact reports whether a repo-relative path is a registered,
 // auto-resolvable GENERATED projection.
 func isDerivedArtifact(relPath string) bool {
-	_, ok := derivedArtifactRegenArgs[relPath]
+	_, ok := derivedArtifacts[relPath]
 	return ok
+}
+
+// regenStaleProjections regenerates + stages each derived projection whose SSOT
+// was changed (derivedProjectionsForChanges(changed)). Best-effort per projection:
+// a regen or stage failure WARNs and is skipped (the docs/flags gate stays the
+// backstop), never aborting the cycle. Returns the projections successfully
+// regenerated + staged. regen and stage are injected for testability (see regenFn).
+func regenStaleProjections(ctx context.Context, worktree string, changed []string, regen, stage regenFn) []string {
+	var done []string
+	for _, rel := range derivedProjectionsForChanges(changed) {
+		if err := regen(ctx, worktree, rel); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-derived-regen: %s: %v; docs gate remains the backstop\n", rel, err)
+			continue
+		}
+		if err := stage(ctx, worktree, rel); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-derived-regen: stage %s: %v\n", rel, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "[orchestrator] build-derived-regen: regenerated %s from its source-of-truth before audit\n", rel)
+		done = append(done, rel)
+	}
+	return done
+}
+
+// stageWorktreePath force-stages relPath in the worktree so audit's `git diff
+// HEAD` and the shipped tree include a regenerated projection. It is the
+// production `stage` argument to regenStaleProjections.
+func stageWorktreePath(ctx context.Context, worktree, relPath string) error {
+	_, code, err := gitCapture(ctx, worktree, "add", "--", relPath)
+	if err != nil {
+		return err
+	}
+	if code != 0 {
+		return fmt.Errorf("git add %s: exit %d", relPath, code)
+	}
+	return nil
+}
+
+// derivedProjectionsForChanges returns the registered projection paths whose
+// source-of-truth was touched by changedPaths (so the projection is now stale and
+// must be regenerated). Pure + deterministic (sorted) — the gate consulted by
+// normalizeDerivedProjections so a cycle that did not edit a projection's SSOT
+// pays no `go run` cost.
+func derivedProjectionsForChanges(changedPaths []string) []string {
+	var stale []string
+	for path, spec := range derivedArtifacts {
+		for _, c := range changedPaths {
+			if strings.HasPrefix(c, spec.ssotPrefix) {
+				stale = append(stale, path)
+				break
+			}
+		}
+	}
+	sort.Strings(stale)
+	return stale
 }
 
 // maxRebaseContinueSteps bounds the replay loop so a pathological rebase can never
@@ -222,16 +289,16 @@ func unmergedRebasePaths(ctx context.Context, worktree string, git gitFn) []stri
 // EVOLVE_WORKTREE_ROOT points sourceRoot() at the worktree so the projection
 // writes the worktree's copy (precedence WORKTREE>PROJECT>cwd, cmd_subagent.go).
 func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) error {
-	args, ok := derivedArtifactRegenArgs[relPath]
+	spec, ok := derivedArtifacts[relPath]
 	if !ok {
 		return fmt.Errorf("no regenerator registered for %q", relPath)
 	}
-	goArgs := append([]string{"run", "./cmd/evolve"}, args...)
+	goArgs := append([]string{"run", "./cmd/evolve"}, spec.regenArgs...)
 	cmd := exec.CommandContext(ctx, "go", goArgs...)
 	cmd.Dir = filepath.Join(worktree, "go")
 	cmd.Env = append(os.Environ(), "EVOLVE_WORKTREE_ROOT="+worktree)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("regenerate %s via `evolve %s`: %w: %s", relPath, strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("regenerate %s via `evolve %s`: %w: %s", relPath, strings.Join(spec.regenArgs, " "), err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
