@@ -241,6 +241,13 @@
 # packages are now in the apicover hard-fail gate.
 ./internal/core
 
+# Decoupling campaign (2026-06-21): internal/cyclestate is the zero-dependency
+# domain-vocabulary leaf extracted from core (Phase type + verdict/cycle-outcome
+# constants + IsVerdict). core re-exports via alias; cyclestate_test.go names +
+# exercises every export. Bottom-up: the most-depended-on symbols now depend on
+# nothing themselves.
+./internal/cyclestate
+
 # bash->Go migration Wave B0 (2026-06-18): tree-state SHA extracted from ship's
 # computeTreeStateSHA into a shared leaf so the commit-gate attestation reader and
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by

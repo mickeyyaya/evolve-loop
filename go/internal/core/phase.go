@@ -3,79 +3,54 @@ package core
 import (
 	"context"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// Phase is the typed identity of an orchestrator lifecycle stage.
-// Stringly-backed for JSON portability.
-type Phase string
+// Phase, the phase/verdict/cycle-outcome vocabulary, and IsVerdict are defined
+// in the zero-dependency leaf internal/cyclestate (Stable-Dependencies: the
+// most-depended-on symbols in the module now depend on nothing themselves).
+// These re-exports — a type alias + const re-declarations — keep the ~1k
+// existing core.Phase / core.Phase* / core.Verdict* / core.IsVerdict call
+// sites unchanged; new code may depend on internal/cyclestate directly. The
+// Phase methods (String, IsValid) come with the alias, so callers still write
+// p.String() / p.IsValid().
+type Phase = cyclestate.Phase
 
 const (
-	PhaseStart        Phase = "start"
-	PhaseIntent       Phase = "intent"
-	PhaseScout        Phase = "scout"
-	PhaseTriage       Phase = "triage"
-	PhaseTDD          Phase = "tdd"
-	PhaseBuildPlanner Phase = "build-planner"
-	PhaseSwarmPlan    Phase = "swarm-plan"
-	PhaseBuild        Phase = "build"
-	PhaseAudit        Phase = "audit"
-	PhaseShip         Phase = "ship"
-	PhaseRetro        Phase = "retro"
-	// PhaseDebugger is the recovery phase the advisor can recommend when a
-	// phase (typically ship) returns a structured error/blocker. It receives
-	// the ShipError on its input, diagnoses the root cause, and emits a
-	// debug-decision (RESHIP / RERUN_PHASE / BLOCK) the orchestrator executes.
-	// OPTIONAL — never on the mandatory spine.
-	PhaseDebugger Phase = "debugger"
-	PhaseEnd      Phase = "end"
+	PhaseStart        = cyclestate.PhaseStart
+	PhaseIntent       = cyclestate.PhaseIntent
+	PhaseScout        = cyclestate.PhaseScout
+	PhaseTriage       = cyclestate.PhaseTriage
+	PhaseTDD          = cyclestate.PhaseTDD
+	PhaseBuildPlanner = cyclestate.PhaseBuildPlanner
+	PhaseSwarmPlan    = cyclestate.PhaseSwarmPlan
+	PhaseBuild        = cyclestate.PhaseBuild
+	PhaseAudit        = cyclestate.PhaseAudit
+	PhaseShip         = cyclestate.PhaseShip
+	PhaseRetro        = cyclestate.PhaseRetro
+	PhaseDebugger     = cyclestate.PhaseDebugger
+	PhaseEnd          = cyclestate.PhaseEnd
 )
 
-// String implements fmt.Stringer.
-func (p Phase) String() string { return string(p) }
-
-// IsValid reports whether p is one of the known phase constants.
-func (p Phase) IsValid() bool {
-	switch p {
-	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage,
-		PhaseTDD, PhaseBuildPlanner, PhaseSwarmPlan, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd:
-		return true
-	}
-	return false
-}
-
-// Verdict constants — the four outcomes a phase may emit. These match
-// the EGPS gate vocabulary (CLAUDE.md env-var table: WARN removed at
-// v10.0.0 but still accepted by Audit for the pre-EGPS soft-start
-// boundary; SKIPPED used when a phase opted out, e.g. EVOLVE_TRIAGE_DISABLE).
 const (
-	VerdictPASS    = "PASS"
-	VerdictFAIL    = "FAIL"
-	VerdictWARN    = "WARN"
-	VerdictSKIPPED = "SKIPPED"
+	VerdictPASS    = cyclestate.VerdictPASS
+	VerdictFAIL    = cyclestate.VerdictFAIL
+	VerdictWARN    = cyclestate.VerdictWARN
+	VerdictSKIPPED = cyclestate.VerdictSKIPPED
 )
 
-// CycleOutcome constants — cycle-level FinalVerdict labels emitted by
-// finalizeOutcome. Distinct from the per-phase Verdict* set because a
-// cycle outcome covers multiple phases plus commit-movement signal.
-// They disambiguate the bare "SKIPPED" verdict that previously conflated
-// an inline build-ship, a fluent-mode advisory, and a no-signal noop.
 const (
-	CycleOutcomeShippedViaBuild      = "SHIPPED_VIA_BUILD"
-	CycleOutcomeSkippedAuditAdvisory = "SKIPPED_AUDIT_ADVISORY"
-	CycleOutcomeSkippedUnknown       = "SKIPPED_UNKNOWN"
+	CycleOutcomeShippedViaBuild      = cyclestate.CycleOutcomeShippedViaBuild
+	CycleOutcomeSkippedAuditAdvisory = cyclestate.CycleOutcomeSkippedAuditAdvisory
+	CycleOutcomeSkippedUnknown       = cyclestate.CycleOutcomeSkippedUnknown
 )
 
-// IsVerdict reports whether s is one of the canonical verdict strings.
-// Case- and whitespace-sensitive — guards against silent typos.
-func IsVerdict(s string) bool {
-	switch s {
-	case VerdictPASS, VerdictFAIL, VerdictWARN, VerdictSKIPPED:
-		return true
-	}
-	return false
-}
+// IsVerdict re-exports cyclestate.IsVerdict via a thin wrapper (not a var) so
+// the symbol stays an immutable func — identical call signature, can't be
+// reassigned by an importer, and renders as a function in godoc.
+func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }
 
 // TokenUsage records the LLM token counts attributed to a phase run.
 type TokenUsage struct {
