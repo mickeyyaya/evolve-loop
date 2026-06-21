@@ -375,6 +375,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		// no Goal section).
 		Workspace:      cs.WorkspacePath,
 		ProjectRoot:    req.ProjectRoot,
+		ActiveWorktree: cs.ActiveWorktree, // so the advisor's bridge launch has a worktree under EVOLVE_FLEET
 		Cycle:          cycle,
 		Env:            env,
 		LastReason:     lastReason,

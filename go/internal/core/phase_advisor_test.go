@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -28,6 +29,39 @@ func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespons
 	return BridgeResponse{Stdout: f.stdout, ExitCode: 0, DurationMS: f.durationMS}, nil
 }
 func (f *fakeBridge) Probe(_ context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
+
+// TestAdvisorLaunch_ThreadsActiveWorktree: the advisor's bridge launch must carry
+// the cycle's git worktree on BridgeRequest.Worktree. Under EVOLVE_FLEET=1 the tmux
+// driver refuses an empty Worktree (refusing the process-cwd fallback), so an
+// unthreaded worktree silently degrades every cycle to the static spine. The value
+// flows RouteInput.ActiveWorktree -> BridgeRequest.Worktree, mirroring normal-phase
+// dispatch (PhaseRequest.Worktree).
+func TestAdvisorLaunch_ThreadsActiveWorktree(t *testing.T) {
+	t.Parallel()
+	fb := &fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}
+	adv := NewPhaseAdvisor(fb)
+	in := baseRouteInput()
+	in.ActiveWorktree = "/wt/cycle-7"
+	if _, err := adv.Plan(in); err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if fb.gotReq.Worktree != "/wt/cycle-7" {
+		t.Errorf("advisor bridge launch did not thread the worktree: BridgeRequest.Worktree=%q, want %q (empty trips the EVOLVE_FLEET worktree guard)", fb.gotReq.Worktree, "/wt/cycle-7")
+	}
+}
+
+// TestAdvisorPlanInput_ThreadsActiveWorktree: the orchestrator must copy the
+// cycle's provisioned worktree (cs.ActiveWorktree) into the RouteInput it feeds
+// the advisor — value-asserted so a future refactor can't silently break the
+// threading that satisfies the EVOLVE_FLEET worktree guard.
+func TestAdvisorPlanInput_ThreadsActiveWorktree(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{now: func() time.Time { return time.Time{} }}
+	in := o.advisorPlanInput(context.Background(), "build", router.RoutingSignals{}, CycleRequest{}, State{}, CycleState{ActiveWorktree: "/wt/cycle-9"}, 9, nil, nil)
+	if in.ActiveWorktree != "/wt/cycle-9" {
+		t.Errorf("advisorPlanInput did not thread cs.ActiveWorktree into RouteInput: got %q, want /wt/cycle-9", in.ActiveWorktree)
+	}
+}
 
 func baseRouteInput() router.RouteInput {
 	return router.RouteInput{

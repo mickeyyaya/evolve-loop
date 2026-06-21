@@ -42,8 +42,12 @@ type RouteInput struct {
 	// Route() function ignores these, so determinism is preserved.
 	Workspace   string
 	ProjectRoot string
-	Cycle       int
-	Env         map[string]string
+	// ActiveWorktree is the cycle's git source worktree, threaded to the advisor's
+	// bridge launch. Required under EVOLVE_FLEET=1 (the tmux driver refuses an empty
+	// worktree); ignored by the pure Route(), so determinism is preserved.
+	ActiveWorktree string
+	Cycle          int
+	Env            map[string]string
 
 	// BenchedCLIs is ENVIRONMENTAL context (not a handoff signal — it keeps
 	// RoutingSignals handoff-pure): CLI families currently benched by the
