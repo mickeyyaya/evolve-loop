@@ -11,19 +11,20 @@ import (
 
 // Site is the whole content model. Field order mirrors the page narrative arc.
 type Site struct {
-	Product      Product    `json:"product"`
-	Hero         Hero       `json:"hero"`
-	ProofBar     []Stat     `json:"proofBar"`
-	Problem      Section    `json:"problem"`
-	TheTurn      Section    `json:"theTurn"`
-	PhaseSpine   []Phase    `json:"phaseSpine"`
-	PillarsIntro Section    `json:"pillarsIntro"`
-	Pillars      []Pillar   `json:"pillars"`
-	Incident     Incident   `json:"incident"`
-	Comparison   Comparison `json:"comparison"`
-	Quickstart   Quickstart `json:"quickstart"`
-	FinalCTA     FinalCTA   `json:"finalCta"`
-	Footer       Footer     `json:"footer"`
+	Product      Product      `json:"product"`
+	Hero         Hero         `json:"hero"`
+	ProofBar     []Stat       `json:"proofBar"`
+	Problem      Section      `json:"problem"`
+	TheTurn      Section      `json:"theTurn"`
+	PhaseSpine   []Phase      `json:"phaseSpine"`
+	PipelineDemo PipelineDemo `json:"pipelineDemo"`
+	PillarsIntro Section      `json:"pillarsIntro"`
+	Pillars      []Pillar     `json:"pillars"`
+	Incident     Incident     `json:"incident"`
+	Comparison   Comparison   `json:"comparison"`
+	Quickstart   Quickstart   `json:"quickstart"`
+	FinalCTA     FinalCTA     `json:"finalCta"`
+	Footer       Footer       `json:"footer"`
 }
 
 type Product struct {
@@ -78,6 +79,26 @@ type Phase struct {
 	Phase    string `json:"phase"`
 	Artifact string `json:"artifact"`
 	Blurb    string `json:"blurb"`
+}
+
+// PipelineDemo powers the interactive "watch the pipeline build itself" section.
+type PipelineDemo struct {
+	Kicker    string         `json:"kicker"`
+	Heading   string         `json:"heading"`
+	Sub       string         `json:"sub"`
+	Scenarios []DemoScenario `json:"scenarios"`
+}
+
+// DemoScenario is one selectable task and the pipeline shape it assembles. When
+// HealAt names a phase, that phase fails once, learns HealLesson, and retries —
+// the self-healing moment.
+type DemoScenario struct {
+	Label      string   `json:"label"`
+	Task       string   `json:"task"`
+	Phases     []string `json:"phases"`
+	HealAt     string   `json:"healAt,omitempty"`
+	HealLesson string   `json:"healLesson,omitempty"`
+	Outcome    string   `json:"outcome"`
 }
 
 type Pillar struct {

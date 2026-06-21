@@ -79,6 +79,27 @@ func TestContent_AllCopyIsCentralized(t *testing.T) {
 	}
 }
 
+// The live pipeline demo is content-driven: its scenarios (and the shape each
+// one assembles) live in content.json so the interactive section stays in sync.
+func TestContent_PipelineDemoLoads(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := site.PipelineDemo
+	if d.Heading == "" {
+		t.Error("PipelineDemo.Heading missing")
+	}
+	if len(d.Scenarios) < 2 {
+		t.Fatalf("PipelineDemo.Scenarios = %d, want >= 2", len(d.Scenarios))
+	}
+	for i, s := range d.Scenarios {
+		if s.Label == "" || s.Task == "" || len(s.Phases) == 0 || s.Outcome == "" {
+			t.Errorf("scenario %d is incomplete: %+v", i, s)
+		}
+	}
+}
+
 func TestLoad_BadJSONFailsLoudly(t *testing.T) {
 	if _, err := Load("testdata/malformed.json"); err == nil {
 		t.Fatal("Load(malformed) returned nil error, want a parse error")
