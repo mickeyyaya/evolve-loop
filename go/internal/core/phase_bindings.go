@@ -344,6 +344,55 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	// modeltier_amp_test.go dirty AFTER the build-only normalize, re-failing the
 	// gate. Cheap no-op when the worktree is already clean.
 	normalizeBuildGofmt(cs.ActiveWorktree)
+	// Derived-projection regen is build-ONLY: the flag registry (the SSOT) is
+	// edited in the build phase, and the regen is gated on the SSOT actually
+	// changing, so non-flag cycles pay no `go run` cost.
+	if completed == PhaseBuild {
+		o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
+	}
+}
+
+// normalizeDerivedProjections regenerates each GENERATED projection whose
+// source-of-truth this cycle changed (e.g. control-flags.md after a registry
+// edit), in the build worktree, BEFORE the audit/docs gate inspects it. Like
+// build-gofmt, regenerating a derived projection is deterministic work that must
+// NOT depend on the LLM builder remembering: a flag cycle edits registry_table.go
+// but the builder routinely leaves the control-flags.md projection stale
+// (cycle-11 H1), which the docs/flags gate then correctly FAILs. This closes that
+// class at the source — the gate stays the backstop. Best-effort; never aborts.
+//
+// Timing/integrity: this runs in the BUILD iteration of recordAndBranch (after
+// emitPhaseBindings(PhaseBuild), which does NOT compute a tree SHA) and stages the
+// regenerated file. The AUDIT iteration's emitPhaseBindings(PhaseAudit) then runs
+// worktreeContentSHA (git add -A + write-tree), binding the tree that INCLUDES the
+// regenerated projection — so committed_tree == audit_bound_tree holds (no
+// CodeIntegrityTreeDrift).
+func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) {
+	if worktree == "" {
+		return
+	}
+	regenStaleProjections(ctx, worktree, changedWorktreePaths(ctx, worktree), regenerateDerivedArtifact, stageWorktreePath)
+}
+
+// changedWorktreePaths returns the repo-relative paths this cycle changed in the
+// worktree — both tracked changes vs HEAD (`git diff HEAD --name-only`, covering
+// staged + unstaged, and post-soft-reset committed work re-exposed as pending) AND
+// untracked new files (`git ls-files --others`), so a cycle that ADDS a file under
+// a projection's ssotPrefix is not silently missed. The staleness input for
+// normalizeDerivedProjections. Split on newlines (NOT strings.Fields) so a path
+// containing spaces stays one entry.
+func changedWorktreePaths(ctx context.Context, worktree string) []string {
+	tracked, _, _ := gitCapture(ctx, worktree, "diff", "HEAD", "--name-only")
+	untracked, _, _ := gitCapture(ctx, worktree, "ls-files", "--others", "--exclude-standard")
+	var paths []string
+	for _, out := range []string{tracked, untracked} {
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+			if l != "" {
+				paths = append(paths, l)
+			}
+		}
+	}
+	return paths
 }
 
 // normalizeBuildGofmt applies the deterministic `gofmt -w -s` normalization to
