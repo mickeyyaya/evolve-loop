@@ -248,6 +248,13 @@
 # nothing themselves.
 ./internal/cyclestate
 
+# Decoupling campaign (2026-06-21): internal/shiperr is the zero-dependency leaf
+# holding the ship→orchestrator error protocol (ShipError + Code/Class/Stage
+# vocab + NewShipError/AsShipError). Extracted from core so BOTH the ship phase
+# (constructs) and core (matches) import it one-directionally — no cycle. core
+# re-exports via aliases; shiperr tests name+exercise every export.
+./internal/shiperr
+
 # bash->Go migration Wave B0 (2026-06-18): tree-state SHA extracted from ship's
 # computeTreeStateSHA into a shared leaf so the commit-gate attestation reader and
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by
