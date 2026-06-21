@@ -81,24 +81,15 @@ type Phase struct {
 	Blurb    string `json:"blurb"`
 }
 
-// PipelineDemo powers the interactive "watch the pipeline build itself" section.
+// PipelineDemo powers the interactive "the model composes its own pipeline"
+// section: one example goal, and the phases the model generates for it.
 type PipelineDemo struct {
-	Kicker    string         `json:"kicker"`
-	Heading   string         `json:"heading"`
-	Sub       string         `json:"sub"`
-	Scenarios []DemoScenario `json:"scenarios"`
-}
-
-// DemoScenario is one selectable task and the pipeline shape it assembles. When
-// HealAt names a phase, that phase fails once, learns HealLesson, and retries —
-// the self-healing moment.
-type DemoScenario struct {
-	Label      string   `json:"label"`
-	Task       string   `json:"task"`
-	Phases     []string `json:"phases"`
-	HealAt     string   `json:"healAt,omitempty"`
-	HealLesson string   `json:"healLesson,omitempty"`
-	Outcome    string   `json:"outcome"`
+	Kicker  string   `json:"kicker"`
+	Heading string   `json:"heading"`
+	Sub     string   `json:"sub"`
+	Task    string   `json:"task"`
+	Phases  []string `json:"phases"`
+	Outcome string   `json:"outcome"`
 }
 
 type Pillar struct {
