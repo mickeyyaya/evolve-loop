@@ -4,7 +4,7 @@
     "name": "Evolve Loop",
     "version": "v20.2",
     "mentalModel": "CI/CD for AI-written code",
-    "oneLiner": "Any agent can write code overnight. Evolve Loop is the layer that decides whether that code is safe to merge — adversarially, structurally, and with memory that compounds across runs.",
+    "oneLiner": "Any agent can write code overnight. Evolve Loop is the layer that decides whether it's safe to merge — adversarially, structurally, with memory that compounds.",
     "oneBreath": "Your AI wrote the code. A different AI tried to break it. A bash exit code — not an opinion — decided whether it ships.",
     "license": "MIT",
     "repo": "github.com/mickeyyaya/evolve-loop",
@@ -21,7 +21,7 @@
       "An auditor that can't be fooled. A ledger that can't be forged.",
       "CI/CD for AI-written code."
     ],
-    "subhead": "Evolve Loop runs every AI change through an adversarial pipeline: a different model family tries to refute it, a deterministic predicate suite gates the merge, and every failure becomes a lesson the next cycle reads.",
+    "subhead": "Every AI change runs an adversarial pipeline: a rival model tries to break it, exit codes — not opinions — gate the merge, and each failure becomes a lesson the next cycle reads.",
     "ctaPrimary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
     "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
     "verdictAnimation": {
@@ -41,16 +41,16 @@
     "kicker": "The bottleneck moved",
     "heading": "Agents can write the feature now. The hard part is merging it.",
     "body": [
-      "Autonomous agents are good enough to write a feature, fix a bug, or refactor a module unattended. The question is no longer can the agent write the code? — it's can you merge what it wrote without re-reading every diff?",
-      "The industry's default answer is \"ask another LLM if it looks done.\" That judge is the weakest link: a single model grading code — often a sibling of the one that wrote it — shares the same blind spots, prefers its own style, and rewards confident prose over correctness."
+      "Agents can write a feature, fix a bug, or refactor a module — unattended. The question isn't can it write the code? anymore. It's can you merge it without re-reading every diff?",
+      "The usual answer — \"ask another LLM if it looks done\" — is the weakest link. A model grading code, often a sibling of the one that wrote it, shares its blind spots and rewards confident prose over correctness."
     ]
   },
   "theTurn": {
     "kicker": "The design idea",
     "heading": "LLMs do the judgment. Deterministic code owns the verdict.",
     "body": [
-      "Scout decides what to build, Builder decides how, Auditor decides what looks wrong — only a model does these well. But phase ordering, write-path scoping, ship gating, the verdict, ledger hashing — all live in the Go kernel, where the model has no vote.",
-      "A model can be wrong, biased, or adversarial. It cannot reorder phases, write outside its worktree, ship without a green verdict, or forge the ledger. Those aren't prompts — they're code."
+      "Scout finds the work, Builder writes it, Auditor hunts for what's wrong — judgment only a model does well. Everything deterministic — phase order, write scoping, the ship gate, the verdict, the ledger — lives in the Go kernel, where the model gets no vote.",
+      "A model can be wrong, biased, even adversarial. It still can't reorder phases, write outside its worktree, ship without a green verdict, or forge the ledger. Those aren't prompts — they're code."
     ]
   },
   "phaseSpine": [
@@ -58,7 +58,7 @@
     { "phase": "Scout", "artifact": "scout-report.md", "blurb": "Finds the real work, cites research, reads prior lessons before choosing." },
     { "phase": "Triage", "artifact": "triage-decision.md", "blurb": "Bounds the cycle — top_n / deferred / dropped — so scope can't blob." },
     { "phase": "Build", "artifact": "build-report.md", "blurb": "Writes the code + predicates inside an isolated git worktree." },
-    { "phase": "Audit", "artifact": "acs-verdict.json", "blurb": "A different model family cross-checks; the predicate suite runs; the verdict is a binary PASS/FAIL." },
+    { "phase": "Audit", "artifact": "acs-verdict.json", "blurb": "A different model family cross-checks; the predicate suite runs; the verdict is binary PASS/FAIL." },
     { "phase": "Ship", "artifact": "ledger entry", "blurb": "Commits to main only if red_count == 0. Tamper-evident, SHA-chained." },
     { "phase": "Learn", "artifact": "lesson.yaml", "blurb": "Every failure becomes a durable lesson the next cycle's Scout reads." }
   ],
@@ -70,33 +70,33 @@
     {
       "title": "Verdicts are bash exit codes, not LLM prose",
       "claim": "The ship gate reads a number, not a vibe.",
-      "proof": "EGPS predicates are executable scripts; their exit code is the verdict. The model can write prose all day — only acs-verdict.json:red_count == 0 ships. A failed test cannot be hallucinated."
+      "proof": "Predicates are executable scripts; their exit code is the verdict. The model can write prose all day — only acs-verdict.json:red_count == 0 ships. You can't hallucinate a passing test."
     },
     {
       "title": "Three layers of structural anti-gaming",
-      "claim": "It's hard to fool because control is in code, not judgment.",
-      "proof": "Tier 1: PreToolUse hooks + a SHA-chained ledger (tamper any past entry and every later link breaks). Tier 2: OS sandbox + a per-cycle git worktree. Tier 3: adversarial defaults. Tier 1 is non-negotiable."
+      "claim": "Hard to fool, because control lives in code, not judgment.",
+      "proof": "Tier 1: PreToolUse hooks + a SHA-chained ledger — tamper one past entry and every later link breaks. Tier 2: OS sandbox + a per-cycle worktree. Tier 3: adversarial defaults. Tier 1 is non-negotiable."
     },
     {
       "title": "Adversarial by construction",
       "claim": "The reviewer is built to refute, not rubber-stamp.",
-      "proof": "The Auditor is a different model family from the Builder (e.g. Opus auditing Sonnet), prompted to break the work. A TDD-engineer writes the failing predicates before the Builder writes code — author and verifier are never the same."
+      "proof": "The Auditor is a different model family from the Builder (Opus auditing Sonnet), prompted to break the work. A separate TDD engineer writes the failing tests before any code ships — author and verifier are never the same model."
     },
     {
       "title": "Memory that compounds across runs",
-      "claim": "The loop gets smarter; you don't repeat yourself.",
-      "proof": "Failures produce YAML lesson files merged into state. 61 durable lessons now fire across 367 cycles — some authored 90 cycles ago still catch bugs today. This is the Reflexion loop, wired through evidence-bound storage."
+      "claim": "The loop gets smarter so you don't repeat yourself.",
+      "proof": "Failures become YAML lessons merged into state. 61 of them now fire across 367 cycles — some written 90 cycles ago still catch bugs. Reflexion, wired to evidence-bound storage."
     },
     {
       "title": "Vendor-agnostic, per-phase routing",
-      "claim": "The best model for each role — no lock-in.",
-      "proof": "A native Go resolver routes each phase to a CLI/model independently: Scout on one model, Builder on another, Auditor on a third. Claude, Gemini, and Codex adapters ship; the orchestrator doesn't care which ran."
+      "claim": "The best model for each role. No lock-in.",
+      "proof": "A Go resolver routes each phase independently — Scout, Builder, and Auditor can each run a different model. Claude, Gemini, and Codex adapters ship; the orchestrator doesn't care which ran."
     }
   ],
   "incident": {
     "kicker": "Real incident — Cycle 61",
     "heading": "The framework caught its own bugs.",
-    "body": "A Gemini-3.1-pro experiment shipped with damage — 7 distinct bugs: a Builder that skipped Scout's deliverable, an Auditor that cited out-of-scope files, a mis-set capability flag. None reached you silently. The predicate suite, ledger forensics, and retrospective surfaced all seven; within 48 hours each became a structural guard in v10.7.0. The value isn't \"cycles never fail\" — it's \"failures produce durable fixes.\""
+    "body": "A Gemini-3.1-pro experiment shipped 7 bugs — a Builder that skipped Scout's deliverable, an Auditor citing out-of-scope files, a mis-set flag. None reached you silently: the predicate suite, ledger forensics, and retrospective caught all seven, and within 48 hours each became a permanent guard. The point isn't \"cycles never fail\" — it's \"failures become fixes.\""
   },
   "comparison": {
     "kicker": "How it compares",
@@ -110,7 +110,7 @@
       ["Anti-gaming", "Convention + prompts", "3 structural tiers in the kernel"],
       ["Best for", "Fast, low-stakes edits", "Unattended, safe-to-merge production work"]
     ],
-    "note": "Devin, OpenHands and Aider are agents. Evolve Loop is the governance pipeline that can drive them and add verification + learning on top. We don't compete on how fast the agent codes — on whether you can merge what it wrote without reading the diff."
+    "note": "Devin, OpenHands, and Aider are agents. Evolve Loop is the governance layer that drives them and adds verification + memory. We don't race the agent — we decide whether you can merge what it wrote, unread."
   },
   "quickstart": {
     "kicker": "Quick start",
@@ -128,7 +128,7 @@
   },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
-    "subhead": "Open source, MIT-licensed, runs on Claude Code, Gemini CLI, and Codex CLI.",
+    "subhead": "Open source. MIT. Runs on Claude Code, Gemini CLI, and Codex CLI.",
     "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
     "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" }
   },
