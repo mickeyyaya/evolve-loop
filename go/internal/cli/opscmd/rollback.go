@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/rollback"
@@ -15,7 +16,7 @@ import (
 //	1  — rollback partial (some step failed)
 //	2  — journal not found / malformed
 //	10 — invalid arguments
-func runRollback(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunRollback(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		journalPath string
 		reason      string
@@ -58,7 +59,7 @@ func runRollback(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := rollback.Options{
 		JournalPath: journalPath,
 		Reason:      reason,

@@ -1,4 +1,4 @@
-package main
+package opscmd
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 func runChangelogCLI(t *testing.T, args ...string) (stdout, stderr string, rc int) {
 	t.Helper()
 	var o, e bytes.Buffer
-	rc = runChangelogGen(args, nil, &o, &e)
+	rc = RunChangelogGen(args, nil, &o, &e)
 	return o.String(), e.String(), rc
 }
 

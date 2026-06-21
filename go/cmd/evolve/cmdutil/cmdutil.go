@@ -9,6 +9,7 @@ package cmdutil
 
 import (
 	"os"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
@@ -46,4 +47,24 @@ func EnvOrCwd(env string) string {
 		return cwd
 	}
 	return "."
+}
+
+// ReorderArgs moves all flag tokens (starting with "-") ahead of positional
+// tokens so Go's stdlib flag.Parse — which stops at the first positional —
+// accepts flag-after-positional invocations like the bash predicates did
+// (e.g. `probe foo --json`). Assumes flags are bool or use `--flag=value`
+// form; space-separated `--flag value` is not handled (its callers use bool
+// flags only). Extracted from cmd/evolve/args.go so the decomposed
+// internal/cli/* command groups share one implementation.
+func ReorderArgs(args []string) []string {
+	flags := make([]string, 0, len(args))
+	pos := make([]string, 0, len(args))
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			flags = append(flags, a)
+		} else {
+			pos = append(pos, a)
+		}
+	}
+	return append(flags, pos...)
 }

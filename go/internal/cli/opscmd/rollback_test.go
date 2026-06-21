@@ -1,4 +1,4 @@
-package main
+package opscmd
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ const cmdJournalFull = `{
 
 func TestCmd_Rollback_Help(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{"--help"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{"--help"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
@@ -28,7 +28,7 @@ func TestCmd_Rollback_Help(t *testing.T) {
 
 func TestCmd_Rollback_NoArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback(nil, nil, &stdout, &stderr)
+	rc := RunRollback(nil, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -36,7 +36,7 @@ func TestCmd_Rollback_NoArgs(t *testing.T) {
 
 func TestCmd_Rollback_UnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{"--bogus"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{"--bogus"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -44,7 +44,7 @@ func TestCmd_Rollback_UnknownFlag(t *testing.T) {
 
 func TestCmd_Rollback_ReasonMissingValue(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{"--reason"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{"--reason"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -52,7 +52,7 @@ func TestCmd_Rollback_ReasonMissingValue(t *testing.T) {
 
 func TestCmd_Rollback_ExtraPositional(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{"j1.json", "j2.json"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{"j1.json", "j2.json"}, nil, &stdout, &stderr)
 	if rc != 10 {
 		t.Fatalf("rc = %d, want 10", rc)
 	}
@@ -60,7 +60,7 @@ func TestCmd_Rollback_ExtraPositional(t *testing.T) {
 
 func TestCmd_Rollback_MissingJournal(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{"/tmp/does-not-exist-rollback-cmd-xyz.json"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{"/tmp/does-not-exist-rollback-cmd-xyz.json"}, nil, &stdout, &stderr)
 	if rc != 2 {
 		t.Fatalf("rc = %d, want 2\nstderr=%s", rc, stderr.String())
 	}
@@ -74,7 +74,7 @@ func TestCmd_Rollback_DryRun(t *testing.T) {
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{p, "--dry-run", "--reason", "test"}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{p, "--dry-run", "--reason", "test"}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0\nstderr=%s", rc, stderr.String())
 	}
@@ -90,7 +90,7 @@ func TestCmd_Rollback_MalformedJournal(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	var stdout, stderr bytes.Buffer
-	rc := runRollback([]string{p}, nil, &stdout, &stderr)
+	rc := RunRollback([]string{p}, nil, &stdout, &stderr)
 	if rc != 2 {
 		t.Fatalf("rc = %d, want 2 for malformed journal", rc)
 	}

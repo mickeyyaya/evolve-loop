@@ -261,6 +261,11 @@
 # routes to guardcmd.Run*; shared helpers via cmd/evolve/cmdutil.
 ./internal/cli/guardcmd
 
+# Decoupling campaign (2026-06-21): internal/cli/opscmd holds the release/ops CLI
+# handlers (doctor, changelog-gen, version-bump, marketplace-poll, release-*,
+# rollback) extracted from cmd/evolve package main. Shared helpers via cmdutil.
+./internal/cli/opscmd
+
 # bash->Go migration Wave B0 (2026-06-18): tree-state SHA extracted from ship's
 # computeTreeStateSHA into a shared leaf so the commit-gate attestation reader and
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by

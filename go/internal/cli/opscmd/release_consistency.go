@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/releaseconsistency"
@@ -15,7 +16,7 @@ import (
 //
 //	0 = all markers consistent
 //	1 = at least one inconsistency
-func runReleaseConsistency(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunReleaseConsistency(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var target string
 	for _, a := range args {
 		switch {
@@ -36,7 +37,7 @@ func runReleaseConsistency(args []string, _ io.Reader, stdout, stderr io.Writer)
 			}
 		}
 	}
-	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	projectRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	_, err := releaseconsistency.Run(releaseconsistency.Options{
 		ProjectRoot: projectRoot,
 		Target:      target,

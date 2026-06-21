@@ -1,10 +1,11 @@
-package main
+package opscmd
 
 import (
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"time"
@@ -24,7 +25,7 @@ func runDoctorBoot(args []string, stdout, stderr io.Writer) int {
 	var sandbox, asJSON bool
 	fs.BoolVar(&sandbox, "sandbox", false, "exercise the sandboxed write-phase boot path (worktree + build agent)")
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
-	if err := fs.Parse(reorderArgs(args)); err != nil {
+	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
 		return 10
 	}
 	if fs.NArg() != 1 {

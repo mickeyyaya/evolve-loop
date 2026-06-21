@@ -1,8 +1,9 @@
-package main
+package opscmd
 
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"strconv"
 	"time"
@@ -18,7 +19,7 @@ import (
 //	2  — ship.sh failed (nothing pushed)
 //	3  — post-publish failed; auto-rollback ran or was skipped
 //	10 — invalid arguments
-func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		target           string
 		dryRun           bool
@@ -92,7 +93,7 @@ func runReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 		return 10
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := releasepipeline.Options{
 		Target:           target,
 		RepoRoot:         repoRoot,

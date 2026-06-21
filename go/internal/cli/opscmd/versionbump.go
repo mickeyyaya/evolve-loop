@@ -1,7 +1,8 @@
-package main
+package opscmd
 
 import (
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 //	0  — success or no-op idempotent
 //	1  — a write failed
 //	10 — invalid arguments
-func runVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func RunVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		target string
 		dryRun bool
@@ -44,7 +45,7 @@ func runVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	repoRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	paths := versionbump.DefaultPaths(repoRoot)
 	res, err := versionbump.Run(paths, target, dryRun, time.Now())
 	if err != nil {
