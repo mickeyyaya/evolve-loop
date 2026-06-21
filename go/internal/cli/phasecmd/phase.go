@@ -20,31 +20,23 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 
 	// Blank imports drive the init()-time registry.Register calls for
 	// every built-in phase. Adding a new phase = new package + import
-	// line here; no edit to a dispatch switch (OCP).
+	// line here; no edit to a dispatch switch (OCP). Every built-in phase
+	// — ship and retro included — self-registers in its own package init().
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/debugger"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 )
-
-// Ship and retro are not yet migrated to the registry — they keep
-// manual factory wiring here until Phase 2.5 commit 2 follow-up.
-func init() {
-	registry.Register(string(core.PhaseShip), newShip)
-	registry.Register(string(core.PhaseRetro), newRetro)
-}
 
 // runPhase implements `evolve phase <name>`.
 func RunPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -93,22 +85,4 @@ func RunPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stdout, string(buf))
 	return 0
-}
-
-// Most phase factories (intent/scout/triage/tdd/build/audit) self-
-// register in their package init() and don't appear here. Ship and
-// retro keep manual factories because their construction shape differs
-// (ship has no bridge/prompts; retro is bridge-dispatching but predates
-// the BaseRunner migration).
-
-func newShip(_ core.PhaseRequest) core.PhaseRunner {
-	return ship.NewWithDefaultRunner()
-}
-
-func newRetro(req core.PhaseRequest) core.PhaseRunner {
-	return retro.New(retro.Config{
-		Bridge:  bridge.NewDefault(req.ProjectRoot),
-		Prompts: cmdutil.NewPromptsLoader(req.ProjectRoot),
-		Model:   "auto",
-	})
 }

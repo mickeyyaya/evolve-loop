@@ -8,8 +8,9 @@
 // into cmd/evolve/registry.go. The in-process runners dispatch through
 // internal/phases/registry (built-in phases self-register via blank imports);
 // the rest delegate to internal/* packages (phaseinventory, phaseobserver,
-// phasewatchdog, phasespec, phasecontract). Shared CLI helpers come from
-// cmd/evolve/cmdutil; prompts loaders from cmdutil.NewPromptsLoader.
+// phasewatchdog, phasespec, phasecontract). Shared CLI helpers (EnvOrCwd,
+// FilterEvolveEnv) come from cmd/evolve/cmdutil; each built-in phase self-wires
+// its own prompts loader (prompts.NewForProject) in its package init().
 //
 // WHY: cmd/evolve was a 77-handler package main; grouping the phase handlers
 // (SRP) shrinks the composition root and makes them directly testable. cmd is a
