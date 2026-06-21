@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -25,8 +26,30 @@ import (
 //	        └─→ end     (BLOCK)
 //	ship  → end
 type StateMachine struct {
-	// allowed[from] is the set of legal `to` phases.
+	// allowed[from] is the set of legal `to` phases. This legality graph is a
+	// config-INDEPENDENT trust anchor (ADR-0058): config can only select among
+	// edges it already permits, never invent one.
 	allowed map[Phase]map[Phase]bool
+	// specFor resolves a phase's descriptor so Next can read its verdict-branch
+	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table. Injected
+	// by the orchestrator (which owns the catalog) via WithCatalog.
+	specFor func(Phase) (phasespec.PhaseSpec, bool)
+	// orderNext yields the cfg.Order successor. Plumbed for a later slice
+	// (ADR-0058 S5); not yet consulted — the literal table stays the live path.
+	orderNext func(Phase) Phase
+}
+
+// WithCatalog gives the StateMachine config-driven transition resolution: a
+// phase whose descriptor declares on_pass/on_fail resolves its verdict branch
+// from config instead of a hardcoded phase-name case (ADR-0058). When unset
+// (bare unit-test SMs) or when a phase declares no on_pass/on_fail, Next
+// degrades to the exact literal table — so the kernel stays byte-identical for
+// catalog-less orchestrators and a registry missing the fields. orderNext is
+// accepted now but consulted in a later slice (kept dark behind the oracle).
+func (sm *StateMachine) WithCatalog(specFor func(Phase) (phasespec.PhaseSpec, bool), orderNext func(Phase) Phase) *StateMachine {
+	sm.specFor = specFor
+	sm.orderNext = orderNext
+	return sm
 }
 
 // NewStateMachine returns a state machine wired with the canonical
@@ -118,6 +141,31 @@ func (sm *StateMachine) NextFromStart(intentRequired bool) Phase {
 func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 	if !current.IsValid() {
 		return "", fmt.Errorf("%w: %s", ErrPhaseInvalid, current)
+	}
+	// Config-driven verdict branch (ADR-0058): a phase whose descriptor declares
+	// on_pass/on_fail resolves its successor from the verdict via config, not a
+	// hardcoded phase-name case. Targets are denormalized through phaseFromRouter
+	// (registry vocab → core.Phase). The legality graph still gates the chosen
+	// edge downstream, so config can only pick an already-legal successor. Absent
+	// a catalog (bare SM) or the fields, control falls through to the literal
+	// table below — byte-identical, as the transition oracle proves.
+	if sm.specFor != nil {
+		if spec, ok := sm.specFor(current); ok && spec.OnPass != "" && spec.OnFail != "" {
+			switch verdict {
+			case VerdictPASS, VerdictWARN:
+				if next := phaseFromRouter(spec.OnPass); next != "" {
+					return next, nil
+				}
+				return "", fmt.Errorf("%w: %s on_pass %q resolves to no known phase", ErrTransitionInvalid, current, spec.OnPass)
+			case VerdictFAIL:
+				if next := phaseFromRouter(spec.OnFail); next != "" {
+					return next, nil
+				}
+				return "", fmt.Errorf("%w: %s on_fail %q resolves to no known phase", ErrTransitionInvalid, current, spec.OnFail)
+			default:
+				return "", fmt.Errorf("%w: %s verdict %q", ErrTransitionInvalid, current, verdict)
+			}
+		}
 	}
 	switch current {
 	case PhaseStart:

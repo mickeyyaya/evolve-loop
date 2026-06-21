@@ -223,6 +223,18 @@ func phaseFromRouter(s string) Phase {
 	return p
 }
 
+// canonicalCatalogName maps a core.Phase to its catalog/registry key, bridging
+// the core↔router vocabulary skew (PhaseRetro stringifies to "retro" but the
+// registry names the phase "retrospective"). It is the inverse of
+// phaseFromRouter's alias cases — used by specFor so a descriptor lookup cannot
+// silently miss on the skew and fall through to a wrong edge (ADR-0058).
+func canonicalCatalogName(p Phase) string {
+	if p == PhaseRetro {
+		return "retrospective"
+	}
+	return string(p)
+}
+
 // recallForPlan builds the WS2 recall-memory context for the advisor's plan: the
 // short reason of the most recent failure and the prior lessons that match it.
 // It is the orchestrator's I/O (a KB lookup), kept out of the pure advisor so the

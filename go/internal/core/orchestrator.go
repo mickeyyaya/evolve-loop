@@ -66,6 +66,15 @@ func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	return true
 }
 
+// specFor resolves a phase's descriptor from the merged catalog, canonicalizing
+// the name first (PhaseRetro→"retrospective") so the lookup cannot silently miss
+// on the core↔router skew. It is the StateMachine's window onto config-driven
+// transition resolution (ADR-0058); a miss (empty/absent catalog) yields
+// (_, false), which keeps Next on its byte-identical literal path.
+func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
+	return o.catalog.Get(canonicalCatalogName(p))
+}
+
 // PhaseMinter registers a minted phase config into a dispatchable runner. The
 // orchestrator depends on this narrow port (not phaseregistrar directly) so
 // core stays decoupled from specrunner/phaseregistrar; the composition root
@@ -409,6 +418,11 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	for _, opt := range opts {
 		opt(o)
 	}
+	// ADR-0058: hand the state machine its config-driven transition resolution
+	// now that the catalog + cfg (hence specFor / nextInOrder) are settled by
+	// options. Without a catalog, specFor misses and Next stays on the literal
+	// table (byte-identical). nextInOrder is plumbed but not yet consulted.
+	o.sm.WithCatalog(o.specFor, o.nextInOrder)
 	// CA.5: the run-id stamping decorator wraps the (possibly option-
 	// replaced) ledger exactly once at construction. The per-run identity
 	// flows through the atomic currentRunID — RunCycle never mutates the
