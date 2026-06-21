@@ -1,0 +1,10 @@
+# docgo allow-missing — internal packages that do NOT yet carry a substantive
+# package doc comment. SHRINK-ONLY debt list read by acs/regression/docgo.
+#
+# One `./internal/<pkg>` per line. Adding a package doc comment (what/how/why,
+# conventionally in doc.go) graduates the package — remove its line here. The
+# docgo predicate flags stale entries (now-documented or non-existent), so the
+# list can only ratchet toward EMPTY.
+#
+# EMPTY = every internal package has a clear what/how/why definition (the
+# decoupling campaign's documentation invariant, fully enforced).
