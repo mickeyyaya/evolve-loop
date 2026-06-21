@@ -30,7 +30,7 @@ func mustCatalog(t *testing.T, specs ...phasespec.PhaseSpec) phasespec.Catalog {
 func TestNext_AuditVerdictBranchFromSpec(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "retrospective", OnFail: "ship"})
-	sm := NewStateMachine().WithCatalog(specForCatalog(cat), nil)
+	sm := NewStateMachine().WithCatalog(specForCatalog(cat))
 
 	for _, c := range []struct {
 		v    string
@@ -75,7 +75,7 @@ func TestNext_AuditDegradesToLiteralWhenCatalogUnset(t *testing.T) {
 func TestWiredStateMachine_ReproducesAuditOracle(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
-	sm := NewStateMachine().WithCatalog(specForCatalog(cat), nil)
+	sm := NewStateMachine().WithCatalog(specForCatalog(cat))
 	for v, want := range nextGoldenAudit {
 		got, err := sm.Next(PhaseAudit, v)
 		gotErr := ""
@@ -95,7 +95,7 @@ func TestWiredStateMachine_ReproducesAuditOracle(t *testing.T) {
 func TestNext_UnresolvableTargetErrorsLoudly(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "no-such-phase", OnFail: "also-bogus"})
-	sm := NewStateMachine().WithCatalog(specForCatalog(cat), nil)
+	sm := NewStateMachine().WithCatalog(specForCatalog(cat))
 
 	for _, v := range []string{VerdictPASS, VerdictWARN, VerdictFAIL} {
 		got, err := sm.Next(PhaseAudit, v)
