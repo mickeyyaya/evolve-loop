@@ -292,6 +292,8 @@
       "name": "audit",
       "role": "auditor",
       "optional": false,
+      "on_pass": "ship",
+      "on_fail": "retrospective",
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/build-report.md",
