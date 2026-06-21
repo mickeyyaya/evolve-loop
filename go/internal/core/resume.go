@@ -325,6 +325,14 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			}
 			scheduledNext = branch
 		}
+
+		// The debugger signal-branch gate (ADR-0058 S3) is intentionally NOT
+		// mirrored here. Per the ADR the debugger override is live-loop-only: of
+		// the two record/resume override sites, resume duplicates only the retro
+		// (history) override. A cycle resumed at debugger therefore terminates via
+		// Next(debugger,_)→end rather than re-running decideAfterDebugger — the
+		// unchanged pre-ADR behavior. Lifting that to resume is a separate slice,
+		// not an S3 byte-identity change.
 	}
 
 	// Resume completed — preserve LastCycleNumber (already advanced when

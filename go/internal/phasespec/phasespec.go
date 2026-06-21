@@ -93,20 +93,21 @@ type PhaseSpec struct {
 	OnFail string `json:"on_fail,omitempty"`
 	// BranchingStrategy (ADR-0058) selects how this phase's successor is chosen:
 	// "" / "verdict" = verdict-driven (the linear default); "history" = the
-	// failure-adapter consults cycle history rather than this phase's own
-	// verdict (retrospective). The orchestrator's successorStrategy reads it;
-	// empty — or an unset catalog — degrades to the literal phase-identity
-	// default (retro→history), keeping the flow byte-identical.
+	// failure-adapter consults cycle history rather than this phase's own verdict
+	// (retrospective); "signal" = a decision signal on PhaseResponse picks the
+	// successor (debugger). The orchestrator's successorStrategy reads it; empty —
+	// or an unset catalog — degrades to the literal phase-identity default
+	// (retro→history, debugger→signal), keeping the flow byte-identical.
 	BranchingStrategy string `json:"branching_strategy,omitempty"`
 }
 
 // Branching strategy values for PhaseSpec.BranchingStrategy (ADR-0058). The
 // empty value is treated as BranchingVerdict (the linear default), so a minimal
-// phase.json need not declare one. BranchingSignal (the debugger decision gate)
-// is reserved for S3.
+// phase.json need not declare one.
 const (
 	BranchingVerdict = "verdict" // successor chosen by this phase's own verdict
 	BranchingHistory = "history" // successor chosen by the failure-adapter from cycle history
+	BranchingSignal  = "signal"  // successor chosen by the debugger decision signal
 )
 
 // KindOrDefault returns Kind, defaulting to "llm".
