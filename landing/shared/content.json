@@ -4,8 +4,8 @@
     "name": "Evolve Loop",
     "version": "v20.2",
     "mentalModel": "CI/CD for AI-written code",
-    "oneLiner": "Any agent can write code overnight. Evolve Loop is the layer that decides whether it's safe to merge — adversarially, structurally, with memory that compounds.",
-    "oneBreath": "Your AI wrote the code. A different AI tried to break it. A bash exit code — not an opinion — decided whether it ships.",
+    "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
+    "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
     "license": "MIT",
     "repo": "github.com/mickeyyaya/evolve-loop",
     "repoUrl": "https://github.com/mickeyyaya/evolve-loop"
@@ -16,101 +16,106 @@
     "headlineEmphasis": "without reading the diff.",
     "headlineVariants": [
       "Ship the code your agent wrote — without reading the diff.",
-      "red_count == 0 → ship. Everything else is an opinion.",
-      "Merge while you sleep. The lessons survive the crash.",
-      "An auditor that can't be fooled. A ledger that can't be forged.",
+      "AI writes it. AI reviews it. A process you trust ships it.",
+      "Plan. Build. Review. Heal. Repeat.",
+      "An independent reviewer that won't rubber-stamp your AI.",
       "CI/CD for AI-written code."
     ],
-    "subhead": "Every AI change runs an adversarial pipeline: a rival model tries to break it, exit codes — not opinions — gate the merge, and each failure becomes a lesson the next cycle reads.",
+    "subhead": "Evolve Loop wraps your AI coder in a structured, self-healing pipeline: it plans the work, an independent reviewer challenges it, only safe changes merge — and every run makes the next one smarter.",
     "ctaPrimary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
     "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
     "verdictAnimation": {
-      "file": "acs-verdict.json",
-      "checks": ["lint", "regression", "eval-replay", "build-quality"],
-      "result": "red_count: 0",
+      "file": "pre-merge review",
+      "checks": ["Intent met", "Tests green", "Independently reviewed", "No regressions"],
+      "result": "0 blocking issues",
       "outcome": "SHIP"
     }
   },
   "proofBar": [
     { "value": "v20.2", "label": "shipping" },
     { "value": "367+", "label": "cycles run" },
-    { "value": "61", "label": "durable lessons" },
+    { "value": "61", "label": "lessons learned" },
     { "value": "MIT", "label": "open source" }
   ],
   "problem": {
     "kicker": "The bottleneck moved",
     "heading": "Agents can write the feature now. The hard part is merging it.",
     "body": [
-      "Agents can write a feature, fix a bug, or refactor a module — unattended. The question isn't can it write the code? anymore. It's can you merge it without re-reading every diff?",
-      "The usual answer — \"ask another LLM if it looks done\" — is the weakest link. A model grading code, often a sibling of the one that wrote it, shares its blind spots and rewards confident prose over correctness."
+      "AI can write a feature, fix a bug, or refactor a module on its own. Writing code isn't the bottleneck anymore — trusting it enough to merge without reading every line is.",
+      "Most tools stop at \"an AI wrote it.\" The hard part is everything after: was it the right change, is it actually correct, and will it break something downstream?"
     ]
   },
   "theTurn": {
-    "kicker": "The design idea",
-    "heading": "LLMs do the judgment. Deterministic code owns the verdict.",
+    "kicker": "The idea",
+    "heading": "Intelligence proposes. A dependable process decides.",
     "body": [
-      "Scout finds the work, Builder writes it, Auditor hunts for what's wrong — judgment only a model does well. Everything deterministic — phase order, write scoping, the ship gate, the verdict, the ledger — lives in the Go kernel, where the model gets no vote.",
-      "A model can be wrong, biased, even adversarial. It still can't reorder phases, write outside its worktree, ship without a green verdict, or forge the ledger. Those aren't prompts — they're code."
+      "Deciding what to build, how to build it, and what looks wrong is where AI shines — so the pipeline lets it make those calls freely.",
+      "What's safe to ship is decided by a structured, repeatable process with guardrails the AI can't talk its way past. Freedom where it helps, structure where it counts."
     ]
   },
   "phaseSpine": [
-    { "phase": "Intent", "artifact": "intent.md", "blurb": "Turns a vague goal into 8 structured fields + at least one challenged premise." },
-    { "phase": "Scout", "artifact": "scout-report.md", "blurb": "Finds the real work, cites research, reads prior lessons before choosing." },
-    { "phase": "Triage", "artifact": "triage-decision.md", "blurb": "Bounds the cycle — top_n / deferred / dropped — so scope can't blob." },
-    { "phase": "Build", "artifact": "build-report.md", "blurb": "Writes the code + predicates inside an isolated git worktree." },
-    { "phase": "Audit", "artifact": "acs-verdict.json", "blurb": "A different model family cross-checks; the predicate suite runs; the verdict is binary PASS/FAIL." },
-    { "phase": "Ship", "artifact": "ledger entry", "blurb": "Commits to main only if red_count == 0. Tamper-evident, SHA-chained." },
-    { "phase": "Learn", "artifact": "lesson.yaml", "blurb": "Every failure becomes a durable lesson the next cycle's Scout reads." }
+    { "phase": "Intent", "artifact": "a clear goal", "blurb": "Turns a vague ask into a goal everyone agrees on — with the risky assumptions named up front." },
+    { "phase": "Scout", "artifact": "a researched plan", "blurb": "Explores the code and past lessons, then proposes what's actually worth doing." },
+    { "phase": "Triage", "artifact": "a bounded scope", "blurb": "Decides what makes this cycle and what waits — so scope never sprawls." },
+    { "phase": "Build", "artifact": "working changes", "blurb": "Implements the change in isolation, with tests written right alongside it." },
+    { "phase": "Audit", "artifact": "an independent verdict", "blurb": "A different reviewer challenges the work and decides whether it holds up." },
+    { "phase": "Ship", "artifact": "a safe merge", "blurb": "Merges only what passed — cleanly, and on the record." },
+    { "phase": "Learn", "artifact": "a lesson kept", "blurb": "Turns the outcome into a durable lesson the next cycle starts with." }
   ],
   "pillarsIntro": {
-    "kicker": "Why it's different",
-    "heading": "Mechanisms, not claims."
+    "kicker": "What makes it work",
+    "heading": "Designed like a team, not a one-shot prompt."
   },
   "pillars": [
     {
-      "title": "Verdicts are bash exit codes, not LLM prose",
-      "claim": "The ship gate reads a number, not a vibe.",
-      "proof": "Predicates are executable scripts; their exit code is the verdict. The model can write prose all day — only acs-verdict.json:red_count == 0 ships. You can't hallucinate a passing test."
+      "title": "AI-driven, end to end",
+      "claim": "It designs the work — it doesn't just type it.",
+      "proof": "The pipeline decides what to build, how to approach it, and what's risky. Real judgment at every step, instead of one prompt fired into the dark."
     },
     {
-      "title": "Three layers of structural anti-gaming",
-      "claim": "Hard to fool, because control lives in code, not judgment.",
-      "proof": "Tier 1: PreToolUse hooks + a SHA-chained ledger — tamper one past entry and every later link breaks. Tier 2: OS sandbox + a per-cycle worktree. Tier 3: adversarial defaults. Tier 1 is non-negotiable."
+      "title": "A pipeline that adapts",
+      "claim": "Structure that reshapes itself to the task.",
+      "proof": "Every change follows the same clear pipeline — but it flexes. A one-line fix skips the ceremony; a risky feature earns extra review. Structured enough to trust, dynamic enough to stay fast."
     },
     {
-      "title": "Adversarial by construction",
-      "claim": "The reviewer is built to refute, not rubber-stamp.",
-      "proof": "The Auditor is a different model family from the Builder (Opus auditing Sonnet), prompted to break the work. A separate TDD engineer writes the failing tests before any code ships — author and verifier are never the same model."
+      "title": "Agile by nature",
+      "claim": "Plan, build, review, reflect — every cycle.",
+      "proof": "Each cycle runs like a sprint: scope the work, build it, review it, ship it, then learn. Scope stays bounded, so nothing sprawls and progress compounds."
     },
     {
-      "title": "Memory that compounds across runs",
-      "claim": "The loop gets smarter so you don't repeat yourself.",
-      "proof": "Failures become YAML lessons merged into state. 61 of them now fire across 367 cycles — some written 90 cycles ago still catch bugs. Reflexion, wired to evidence-bound storage."
+      "title": "Self-healing",
+      "claim": "Failures don't derail it — they teach it.",
+      "proof": "When something breaks, the pipeline catches it, recovers, and turns the failure into a lasting rule. The same mistake doesn't get to happen twice."
     },
     {
-      "title": "Vendor-agnostic, per-phase routing",
-      "claim": "The best model for each role. No lock-in.",
-      "proof": "A Go resolver routes each phase independently — Scout, Builder, and Auditor can each run a different model. Claude, Gemini, and Codex adapters ship; the orchestrator doesn't care which ran."
+      "title": "An independent second mind",
+      "claim": "Built to challenge the work, not rubber-stamp it.",
+      "proof": "A separate reviewer — a different model entirely — tries to break each change before it ships. No one grading their own homework."
+    },
+    {
+      "title": "Any model. No lock-in.",
+      "claim": "The best LLM for each job — mix and match.",
+      "proof": "Run Claude, Gemini, and Codex side by side and route the strongest model to each role. Switch whenever you like; your process never depends on one vendor."
     }
   ],
   "incident": {
-    "kicker": "Real incident — Cycle 61",
-    "heading": "The framework caught its own bugs.",
-    "body": "A Gemini-3.1-pro experiment shipped 7 bugs — a Builder that skipped Scout's deliverable, an Auditor citing out-of-scope files, a mis-set flag. None reached you silently: the predicate suite, ledger forensics, and retrospective caught all seven, and within 48 hours each became a permanent guard. The point isn't \"cycles never fail\" — it's \"failures become fixes.\""
+    "kicker": "Self-healing, for real",
+    "heading": "The system caught its own mistakes.",
+    "body": "An experiment with a new model slipped several regressions into a single run. Not one reached a human — the pipeline's own reviews caught every one, recovered, and within two days turned each into a permanent safeguard. That's the whole idea: runs can fail, but failures become fixes that stick."
   },
   "comparison": {
     "kicker": "How it compares",
     "heading": "When to reach for it.",
-    "columns": ["", "Single-LLM loop / /goal", "Evolve Loop"],
+    "columns": ["", "A single-LLM loop", "Evolve Loop"],
     "rows": [
-      ["Merge verdict", "Another LLM says \"looks good\"", "Bash exit codes (red_count == 0)"],
-      ["Reviewer bias", "Same-family judge, same blind spots", "Different model family, prompted to refute"],
-      ["Memory across cycles", "Conversation only; stale by cycle 5", "61 durable YAML lessons across 367 cycles"],
-      ["Recovery from failure", "Start over", "Checkpoint-resume; worktree preserved"],
-      ["Anti-gaming", "Convention + prompts", "3 structural tiers in the kernel"],
-      ["Best for", "Fast, low-stakes edits", "Unattended, safe-to-merge production work"]
+      ["Decides what to build", "You spell out every step", "It plans and scopes the work"],
+      ["Quality gate", "An AI says \"looks good\"", "An independent review has to pass"],
+      ["When something breaks", "Start over", "Self-heals, recovers, and learns"],
+      ["Memory", "Forgets between runs", "Compounds — every run teaches the next"],
+      ["Models", "One vendor, one model", "Any model — the best one per job"],
+      ["Best for", "Quick throwaway edits", "Work you actually have to merge"]
     ],
-    "note": "Devin, OpenHands, and Aider are agents. Evolve Loop is the governance layer that drives them and adds verification + memory. We don't race the agent — we decide whether you can merge what it wrote, unread."
+    "note": "Think of the agent as the developer, and Evolve Loop as the team and process around it — the planning, the review, and the discipline that make the output safe to ship."
   },
   "quickstart": {
     "kicker": "Quick start",
@@ -123,12 +128,12 @@
     "presets": [
       { "label": "innovate", "command": "/evolve-loop --cycles 5 innovate \"explore concurrency\"", "blurb": "new features" },
       { "label": "harden", "command": "/evolve-loop --cycles 5 harden", "blurb": "stability + tests" },
-      { "label": "repair", "command": "/evolve-loop --cycles 3 repair \"fix auth bug\"", "blurb": "smallest-diff bug fix" }
+      { "label": "repair", "command": "/evolve-loop --cycles 3 repair \"fix auth bug\"", "blurb": "smallest-change bug fix" }
     ]
   },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
-    "subhead": "Open source. MIT. Runs on Claude Code, Gemini CLI, and Codex CLI.",
+    "subhead": "Open source. MIT. Works with Claude, Gemini, and Codex.",
     "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
     "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" }
   },
@@ -140,6 +145,6 @@
       { "label": "License — MIT", "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/LICENSE" }
     ],
     "tagline": "CI/CD for AI-written code.",
-    "grounding": "Grounded in Reflexion (Shinn et al. 2023) and double-loop learning (Argyris & Schön 1978)."
+    "grounding": "Grounded in reflective self-improvement and double-loop learning."
   }
 }
