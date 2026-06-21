@@ -42,6 +42,16 @@ type RunOptions struct {
 	// BeforeWave runs before each non-skipped wave — e.g. a CLI-health canary that
 	// clears expired benches so the wave doesn't re-hit a recovered wall. nil = no-op.
 	BeforeWave func()
+	// AfterWaveComplete is the merge-to-main gate's seam: it runs once per
+	// newly-completed wave, AFTER the wave's progress is durably saved, so a
+	// promotion attempt always runs against a checkpointed boundary. The
+	// production hook consults the cadence advisor and, when it fires, dispatches
+	// the merge-to-main-gate phase and the promoter. It is FAIL-OPEN by design — a
+	// merge-gate failure must never abort the campaign — so it returns nothing and
+	// owns its own error logging. nil = no-op (legacy behavior). Resumed
+	// (already-complete) waves do not re-fire it. `wave` is 0-indexed (the wave
+	// slice index), matching CampaignProgress.CompletedWaves entries.
+	AfterWaveComplete func(wave int, prog *CampaignProgress)
 }
 
 // RunWaves executes dependency-ordered waves with checkpointing. On Resume it
@@ -87,6 +97,12 @@ func RunWaves(ctx context.Context, waves [][]fleet.CycleSpec, run WaveRunner, op
 		}
 		if err := prog.Save(opts.ProgressPath); err != nil {
 			return err
+		}
+		// Promotion seam: fire only after the wave is durably checkpointed, so a
+		// promotion always advances a saved boundary. Fail-open (the hook owns its
+		// errors) — a merge-gate failure must never abort the campaign.
+		if opts.AfterWaveComplete != nil {
+			opts.AfterWaveComplete(i, prog)
 		}
 	}
 	return nil
