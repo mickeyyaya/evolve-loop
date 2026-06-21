@@ -52,19 +52,14 @@ const (
 // reassigned by an importer, and renders as a function in godoc.
 func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }
 
-// TokenUsage records the LLM token counts attributed to a phase run.
-type TokenUsage struct {
-	Input      int `json:"input"`
-	Output     int `json:"output"`
-	CacheRead  int `json:"cache_read"`
-	CacheWrite int `json:"cache_write"`
-}
-
-// Diagnostic is a single warning/error attached to a PhaseResponse.
-type Diagnostic struct {
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-}
+// TokenUsage, Diagnostic, and CycleResult — the cycle/phase execution-result
+// value types — are defined in the internal/cyclestate leaf and re-exported here
+// so existing call sites are unchanged (see cyclestate/result.go).
+type (
+	TokenUsage  = cyclestate.TokenUsage
+	Diagnostic  = cyclestate.Diagnostic
+	CycleResult = cyclestate.CycleResult
+)
 
 // PhaseRequest is the input envelope to PhaseRunner.Run. JSON-tagged
 // so the subprocess override path (pkg/phaseproto) can serialise the

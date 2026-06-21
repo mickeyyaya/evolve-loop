@@ -93,16 +93,6 @@ type CycleRequest struct {
 	Context map[string]string
 }
 
-// CycleResult summarises what RunCycle did.
-type CycleResult struct {
-	Cycle        int
-	FinalVerdict string
-	PhasesRun    []Phase
-	// RetroDecision is the failure-adapter's verdict on the retro branch,
-	// populated only when retro ran. Format: "<action>: <reason>".
-	RetroDecision string
-}
-
 // Orchestrator drives one cycle through the state machine, calling a
 // PhaseRunner per phase and appending ledger entries. It is pure: all
 // I/O is delegated to the injected Storage and Ledger ports.

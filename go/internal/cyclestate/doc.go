@@ -29,6 +29,7 @@
 //   - CycleOutcome* constants — cycle-level FinalVerdict labels
 //   - [State], [CycleState] (+ [BatchAccrual], [FailedRecord], [CarryoverTodo],
 //     [TriageThroughputEntry]) — the on-disk state.json / cycle-state.json DTOs
+//   - [CycleResult], [TokenUsage], [Diagnostic] — cycle/phase execution-result records
 //
 // Depended on by: internal/core (re-exports), and any package needing the
 // vocabulary directly; depends on: nothing (standard library only).
