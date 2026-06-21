@@ -107,12 +107,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		cr.scheduledNext = branch
 	}
 
-	// The debugger phase is decision-driven (RESHIP / RERUN_PHASE / BLOCK),
-	// not verdict-driven — mirror the retro branch. The debugger runner
-	// surfaces its decision on PhaseResponse.Signals; decideAfterDebugger
-	// maps it to the next phase, which the next iteration runs via
-	// scheduledNext (bypassing the routing override, like retro).
-	if cr.current == PhaseDebugger {
+	// The debugger phase is decision-driven (RESHIP / RERUN_PHASE / BLOCK), not
+	// verdict-driven — mirror the retro branch. The debugger runner surfaces its
+	// decision on PhaseResponse.Signals; decideAfterDebugger maps it to the next
+	// phase, which the next iteration runs via scheduledNext. The signal-branch
+	// gate is config-driven (ADR-0058) — successorStrategy resolves the debugger's
+	// branching_strategy from the builtinControlSpec seam and owns the degrade.
+	if cr.o.successorStrategy(cr.current) == phasespec.BranchingSignal {
 		branch := cr.o.decideAfterDebugger(dr.resp)
 		cr.o.recordDebuggerDecision(cr.ctx, cr.cycle, cr.cs, dr.resp)
 		if branch == PhaseEnd {

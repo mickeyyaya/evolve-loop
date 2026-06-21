@@ -66,13 +66,32 @@ func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	return true
 }
 
-// specFor resolves a phase's descriptor from the merged catalog, canonicalizing
-// the name first (PhaseRetro→"retrospective") so the lookup cannot silently miss
-// on the core↔router skew. It is the StateMachine's window onto config-driven
-// transition resolution (ADR-0058); a miss (empty/absent catalog) yields
-// (_, false), which keeps Next on its byte-identical literal path.
+// specFor resolves a phase's descriptor, canonicalizing the name first
+// (PhaseRetro→"retrospective") so the lookup cannot silently miss on the
+// core↔router skew. The registry is the SSOT and wins; on a registry miss it
+// falls to the builtinControlSpec seam (ADR-0058 §5) for control phases that have
+// no registry home (debugger). A total miss yields (_, false), which keeps Next
+// on its byte-identical literal path. It is the StateMachine's window onto
+// config-driven transition resolution (ADR-0058).
 func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
-	return o.catalog.Get(canonicalCatalogName(p))
+	if spec, ok := o.catalog.Get(canonicalCatalogName(p)); ok {
+		return spec, true // registry SSOT wins over the control seam
+	}
+	return builtinControlSpec(p)
+}
+
+// builtinControlSpec is the control-phase metadata seam (ADR-0058 §5): the one
+// place Go data describes a phase, justified because the control phases
+// (debugger; start/end) are registered as runners in cmd_cycle.go and have no
+// registry `phases[]` home. It supplies ONLY branch metadata — debugger's
+// signal-driven successor — never an OnPass/OnFail edge, so Next stays literal
+// for control phases. A registry entry of the same name overrides it (specFor
+// precedence). Returns (_, false) for any phase the seam does not describe.
+func builtinControlSpec(p Phase) (phasespec.PhaseSpec, bool) {
+	if p == PhaseDebugger {
+		return phasespec.PhaseSpec{Name: string(PhaseDebugger), BranchingStrategy: phasespec.BranchingSignal}, true
+	}
+	return phasespec.PhaseSpec{}, false
 }
 
 // successorStrategy resolves how phase p's successor is chosen — the
@@ -90,13 +109,16 @@ func (o *Orchestrator) successorStrategy(p Phase) string {
 }
 
 // literalSuccessorStrategy is the unconfigured backstop: the successor-selection
-// strategy each phase used before ADR-0058 made it config-driven. Retrospective
-// is the one phase whose successor is history-driven (the failure-adapter
-// consults cycle history), not verdict-driven; every other phase is
-// verdict-driven (the empty default). S3 adds the debugger's signal strategy.
+// strategy each phase used before ADR-0058 made it config-driven. Two phases are
+// not verdict-driven: retrospective is history-driven (the failure-adapter
+// consults cycle history) and debugger is signal-driven (its decision signal
+// picks the successor). Every other phase is verdict-driven (the empty default).
 func literalSuccessorStrategy(p Phase) string {
-	if p == PhaseRetro {
+	switch p {
+	case PhaseRetro:
 		return phasespec.BranchingHistory
+	case PhaseDebugger:
+		return phasespec.BranchingSignal
 	}
 	return ""
 }

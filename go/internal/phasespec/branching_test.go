@@ -15,11 +15,14 @@ import (
 // stable and distinct, and that PhaseSpec.BranchingStrategy round-trips under
 // its documented `branching_strategy` JSON key.
 func TestBranchingStrategy_ConstsAndJSONTag(t *testing.T) {
-	if BranchingVerdict != "verdict" || BranchingHistory != "history" {
-		t.Fatalf("branching strategy wire values drifted: verdict=%q history=%q", BranchingVerdict, BranchingHistory)
+	if BranchingVerdict != "verdict" || BranchingHistory != "history" || BranchingSignal != "signal" {
+		t.Fatalf("branching strategy wire values drifted: verdict=%q history=%q signal=%q",
+			BranchingVerdict, BranchingHistory, BranchingSignal)
 	}
-	if BranchingHistory == BranchingVerdict {
-		t.Fatal("branching strategies must be distinct")
+	distinct := map[string]bool{BranchingVerdict: true, BranchingHistory: true, BranchingSignal: true}
+	if len(distinct) != 3 {
+		t.Fatalf("branching strategies must be distinct: verdict=%q history=%q signal=%q",
+			BranchingVerdict, BranchingHistory, BranchingSignal)
 	}
 
 	raw, err := json.Marshal(PhaseSpec{Name: "retrospective", BranchingStrategy: BranchingHistory})
