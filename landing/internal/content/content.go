@@ -84,12 +84,20 @@ type Phase struct {
 // PipelineDemo powers the interactive "the model composes its own pipeline"
 // section: one example goal, and the phases the model generates for it.
 type PipelineDemo struct {
-	Kicker  string   `json:"kicker"`
-	Heading string   `json:"heading"`
-	Sub     string   `json:"sub"`
-	Task    string   `json:"task"`
-	Phases  []string `json:"phases"`
-	Outcome string   `json:"outcome"`
+	Kicker     string        `json:"kicker"`
+	Heading    string        `json:"heading"`
+	Sub        string        `json:"sub"`
+	Task       string        `json:"task"`
+	Candidates []PhaseChoice `json:"candidates"`
+	Outcome    string        `json:"outcome"`
+}
+
+// PhaseChoice is one phase the model could run. Use marks the phases it selects
+// for this goal; Skip gives the reason it leaves a phase out.
+type PhaseChoice struct {
+	Phase string `json:"phase"`
+	Use   bool   `json:"use"`
+	Skip  string `json:"skip,omitempty"`
 }
 
 type Pillar struct {

@@ -90,8 +90,25 @@ func TestContent_PipelineDemoLoads(t *testing.T) {
 	if d.Heading == "" || d.Task == "" || d.Outcome == "" {
 		t.Error("PipelineDemo Heading/Task/Outcome must all be set")
 	}
-	if len(d.Phases) < 3 {
-		t.Fatalf("PipelineDemo.Phases = %d, want >= 3 (the model-composed pipeline)", len(d.Phases))
+	if len(d.Candidates) < 5 {
+		t.Fatalf("PipelineDemo.Candidates = %d, want >= 5 (the palette the model picks from)", len(d.Candidates))
+	}
+	var used, skipped int
+	for i, c := range d.Candidates {
+		if c.Phase == "" {
+			t.Errorf("candidate %d has no phase name", i)
+		}
+		if c.Use {
+			used++
+		} else {
+			skipped++
+			if c.Skip == "" {
+				t.Errorf("skipped candidate %q must give a reason", c.Phase)
+			}
+		}
+	}
+	if used < 3 || skipped < 1 {
+		t.Errorf("want the model to use >=3 and skip >=1 phases (got used=%d skipped=%d)", used, skipped)
 	}
 }
 

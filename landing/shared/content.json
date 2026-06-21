@@ -65,10 +65,22 @@
   "pipelineDemo": {
     "kicker": "AI-generated pipeline",
     "heading": "The model composes its own pipeline.",
-    "sub": "Give it a goal. The AI decides which phases to run — and writes the pipeline itself, in order. Nothing here is pre-scripted.",
+    "sub": "Give it a goal. From every phase it could run, the model picks the ones this change actually needs — and skips the rest, with reasons. Nothing here is pre-scripted.",
     "task": "add a dark-mode toggle",
-    "phases": ["Intent", "Scout", "Triage", "Build", "Audit", "Ship", "Learn"],
-    "outcome": "Seven phases — chosen and ordered by the model for this goal."
+    "candidates": [
+      { "phase": "Intent", "use": true },
+      { "phase": "Scout", "use": true },
+      { "phase": "Triage", "use": true },
+      { "phase": "Plan-Review", "use": false, "skip": "low-risk UI change" },
+      { "phase": "TDD", "use": true },
+      { "phase": "Build", "use": true },
+      { "phase": "Audit", "use": true },
+      { "phase": "Benchmark", "use": false, "skip": "no perf-sensitive path" },
+      { "phase": "Security review", "use": false, "skip": "no auth or input surface" },
+      { "phase": "Ship", "use": true },
+      { "phase": "Learn", "use": true }
+    ],
+    "outcome": "Eight phases chosen from eleven — the model skipped what this goal didn't need."
   },
   "pillarsIntro": {
     "kicker": "What makes it work",

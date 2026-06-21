@@ -75,21 +75,25 @@
     max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
   .pld-kicker{font-family:var(--pl-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pl-acc);margin:0}
   .pld-h{font-family:var(--serif,inherit);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--pl-ink)}
-  .pld-sub{color:var(--pl-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:60ch}
-  .pld-stage{margin-top:30px;border:1px solid var(--pl-line);border-radius:16px;background:var(--pl-bg);padding:22px;min-height:236px}
+  .pld-sub{color:var(--pl-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:64ch}
+  .pld-stage{margin-top:30px;border:1px solid var(--pl-line);border-radius:16px;background:var(--pl-bg);padding:22px;min-height:250px}
   .pld-prompt{font-family:var(--pl-mono);font-size:.9rem;color:var(--pl-ink);display:flex;align-items:center;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--pl-line)}
-  .pld-tag{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);border:1px solid var(--pl-line);border-radius:5px;padding:3px 7px}
+  .pld-goal{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);border:1px solid var(--pl-line);border-radius:5px;padding:3px 7px}
   .pld-status{display:flex;align-items:center;gap:10px;margin-top:16px;font-family:var(--pl-mono);font-size:.82rem;color:var(--pl-mut);min-height:22px}
   .pld-status.done{color:var(--pl-acc)}
   .pld-spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--pl-line);border-top-color:var(--pl-acc);animation:pld-spin .7s linear infinite;flex:0 0 auto}
   .pld-status.done .pld-spin{display:none}
   @keyframes pld-spin{to{transform:rotate(360deg)}}
   .pld-track{display:flex;flex-wrap:wrap;gap:10px;padding:22px 0 4px}
-  .pld-node{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--pl-line);border-radius:10px;padding:11px 15px 11px 11px;background:color-mix(in srgb,var(--pl-ink) 3%,transparent);opacity:0;transform:translateY(10px);transition:opacity .4s,transform .4s,border-color .4s,background .4s}
-  .pld-node.in{opacity:1;transform:none}
-  .pld-node.gen{border-color:color-mix(in srgb,var(--pl-acc) 50%,transparent);background:var(--pl-acc-soft)}
-  .pld-num{font-family:var(--pl-mono);font-size:.72rem;font-weight:600;color:var(--pl-acc);background:color-mix(in srgb,var(--pl-acc) 15%,transparent);border-radius:6px;min-width:24px;height:24px;padding:0 5px;display:grid;place-items:center;flex:0 0 auto}
-  .pld-name{font-weight:600;font-size:.92rem;color:var(--pl-ink)}
+  .pld-node{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--pl-line);border-radius:10px;padding:10px 14px 10px 11px;background:color-mix(in srgb,var(--pl-ink) 3%,transparent);opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s,border-color .4s,background .4s}
+  .pld-node.in{opacity:.5;transform:none}
+  .pld-node.sel{opacity:1;border-color:color-mix(in srgb,var(--pl-acc) 50%,transparent);background:var(--pl-acc-soft)}
+  .pld-node.skip{opacity:.6}
+  .pld-node.skip .pld-name{text-decoration:line-through;color:var(--pl-mut)}
+  .pld-num{font-family:var(--pl-mono);font-size:.72rem;font-weight:600;color:var(--pl-mut);background:color-mix(in srgb,var(--pl-ink) 8%,transparent);border-radius:6px;min-width:24px;height:24px;padding:0 5px;display:grid;place-items:center;flex:0 0 auto;transition:.3s}
+  .pld-node.sel .pld-num{color:var(--pl-acc);background:color-mix(in srgb,var(--pl-acc) 16%,transparent)}
+  .pld-name{font-weight:600;font-size:.9rem;color:var(--pl-ink)}
+  .pld-tag{font-size:.74rem;color:var(--pl-mut);white-space:nowrap}
   .pld-foot{display:flex;align-items:center;gap:16px;margin-top:18px;min-height:34px}
   .pld-result{display:flex;align-items:center;gap:14px;flex-wrap:wrap;opacity:0;transform:translateY(6px);transition:.4s}
   .pld-result.show{opacity:1;transform:none}
@@ -105,7 +109,7 @@
   <h2 class="pld-h">{{.Site.PipelineDemo.Heading}}</h2>
   <p class="pld-sub">{{.Site.PipelineDemo.Sub}}</p>
   <div class="pld-stage">
-    <div class="pld-prompt"><span class="pld-tag">goal</span><span class="pld-tasktext"></span></div>
+    <div class="pld-prompt"><span class="pld-goal">goal</span><span class="pld-tasktext"></span></div>
     <div class="pld-status"><span class="pld-spin" aria-hidden="true"></span><span class="pld-statustext"></span></div>
     <div class="pld-track" aria-live="polite"></div>
     <div class="pld-foot">
@@ -114,7 +118,6 @@
     </div>
   </div>
   <script type="application/json" class="pld-demo">{{json .Site.PipelineDemo}}</script>
-  <script type="application/json" class="pld-phases">{{json .Site.PhaseSpine}}</script>
 </section>
 {{end}}
 
@@ -124,8 +127,6 @@
   var root = document.getElementById('pipeline');
   if (!root) { return; }
   var demo = JSON.parse(root.querySelector('.pld-demo').textContent);
-  var phases = JSON.parse(root.querySelector('.pld-phases').textContent);
-  var names = {}; phases.forEach(function (p) { names[p.phase] = p.phase; });
   var track = root.querySelector('.pld-track');
   var result = root.querySelector('.pld-result');
   var taskText = root.querySelector('.pld-tasktext');
@@ -137,51 +138,58 @@
   function clearAll() { timers.forEach(clearTimeout); timers = []; }
   function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
-  function nodeHTML(name, i) {
-    var n = (i + 1 < 10 ? '0' : '') + (i + 1);
-    return '<div class="pld-node"><span class="pld-num">' + n + '</span>' +
-      '<span class="pld-name">' + esc(names[name] || name) + '</span></div>';
+  function nodeHTML(c) {
+    return '<div class="pld-node"><span class="pld-num">·</span>' +
+      '<span class="pld-name">' + esc(c.phase) + '</span>' +
+      '<span class="pld-tag"></span></div>';
+  }
+  function decide(node, c, order) {
+    if (c.use) {
+      node.classList.add('sel');
+      node.querySelector('.pld-num').textContent = (order < 10 ? '0' : '') + order;
+    } else {
+      node.classList.add('skip');
+      node.querySelector('.pld-num').textContent = '–';
+      node.querySelector('.pld-tag').textContent = '· skipped — ' + (c.skip || 'not needed');
+    }
   }
   function run() {
     clearAll();
-    var ph = demo.phases || [];
+    var cs = demo.candidates || [];
     taskText.textContent = ' ' + demo.task;
     track.innerHTML = '';
     result.className = 'pld-result'; result.innerHTML = '';
     replay.hidden = true;
     status.className = 'pld-status';
-    function finish() {
+    cs.forEach(function (c) { track.insertAdjacentHTML('beforeend', nodeHTML(c)); });
+    var nodes = track.querySelectorAll('.pld-node');
+    function finish(used) {
       status.className = 'pld-status done';
-      statusText.textContent = '✓ pipeline composed by the model · ' + ph.length + ' phases';
+      statusText.textContent = '✓ composed by the model · ' + used + ' of ' + cs.length + ' phases';
       result.innerHTML = '<span class="pld-done-badge">✓ MODEL-COMPOSED</span>' +
         '<span class="pld-out">' + esc(demo.outcome) + '</span>';
       result.classList.add('show');
       replay.hidden = false;
     }
     if (reduce) {
-      ph.forEach(function (p, i) {
-        track.insertAdjacentHTML('beforeend', nodeHTML(p, i));
-        track.lastElementChild.classList.add('in', 'gen');
-      });
-      finish();
+      var o = 0;
+      cs.forEach(function (c, i) { nodes[i].classList.add('in'); decide(nodes[i], c, c.use ? (++o) : 0); });
+      finish(o);
       return;
     }
+    nodes.forEach(function (nd, i) { after(45 * i, function () { nd.classList.add('in'); }); });
     statusText.textContent = 'the model is composing a pipeline…';
-    var step = 360, i = 0;
-    function emit() {
-      if (i >= ph.length) { after(440, finish); return; }
-      track.insertAdjacentHTML('beforeend', nodeHTML(ph[i], i));
-      var node = track.lastElementChild;
-      after(20, function () { node.classList.add('in', 'gen'); });
-      after(step, function () { i++; emit(); });
-    }
-    after(700, emit);
+    var start = 45 * cs.length + 520, order = 0;
+    cs.forEach(function (c, i) {
+      after(start + 360 * i, function () { decide(nodes[i], c, c.use ? (++order) : 0); });
+    });
+    after(start + 360 * cs.length + 320, function () { finish(order); });
   }
   replay.addEventListener('click', run);
   if ('IntersectionObserver' in window && !reduce) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) { if (e.isIntersecting) { io.disconnect(); run(); } });
-    }, { threshold: 0.35 });
+    }, { threshold: 0.3 });
     io.observe(root);
   } else {
     run();
