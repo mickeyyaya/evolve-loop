@@ -328,13 +328,56 @@ func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSigna
 		return true // non-anchor target: not gated by the spine floor
 	}
 	for i := 0; i < ti; i++ {
-		if !anchorArtifactPresent(anchors[i], sig) {
+		if !sm.gateSatisfied(anchors[i], sig) {
 			return false
 		}
 	}
 	return true
 }
 
+// gateSatisfied reports whether anchor's artifact floor holds against the digest
+// (PA-DDK DDK-4). When the catalog declares the anchor's gate THRESHOLDS
+// (requires_present / verdict_in), those config values decide; otherwise the
+// literal anchorArtifactPresent map is the byte-identical fallback. The digest
+// (which signal proves the handoff) stays trusted Go — only the thresholds are
+// config (ADR-0060).
+func (sm *StateMachine) gateSatisfied(anchor Phase, sig router.RoutingSignals) bool {
+	if sm.specFor != nil {
+		if spec, ok := sm.specFor(anchor); ok && spec.Gate != nil {
+			present, verdict := digestSignalFor(anchor, sig)
+			if spec.Gate.RequiresPresent && !present {
+				return false
+			}
+			if len(spec.Gate.VerdictIn) > 0 && !containsString(spec.Gate.VerdictIn, verdict) {
+				return false
+			}
+			return true
+		}
+	}
+	return anchorArtifactPresent(anchor, sig)
+}
+
+// digestSignalFor reads an anchor's (present, verdict) from the trusted on-disk
+// signal digest. This phase→signal mapping is the VERIFICATION layer, kept in Go
+// by design (ADR-0060): config sets the gate thresholds, code reads the
+// objective artifacts. An anchor with no digest slot is treated as present.
+func digestSignalFor(anchor Phase, sig router.RoutingSignals) (present bool, verdict string) {
+	switch anchor {
+	case PhaseScout:
+		return sig.Scout.Present, ""
+	case PhaseBuild:
+		return sig.Build.Present, ""
+	case PhaseAudit:
+		return sig.Audit.Present, sig.Audit.Verdict
+	}
+	// Fail CLOSED: an anchor with a config gate but no Go digest reader must not
+	// silently pass — it forces the reader to be implemented (anti-fabrication).
+	// Unconfigured anchors never reach here (they take the literal fallback).
+	return false, ""
+}
+
+// anchorArtifactPresent is the literal artifact-floor map — the byte-identical
+// fallback when a phase declares no config gate.
 func anchorArtifactPresent(anchor Phase, sig router.RoutingSignals) bool {
 	switch anchor {
 	case PhaseScout:
@@ -347,6 +390,16 @@ func anchorArtifactPresent(anchor Phase, sig router.RoutingSignals) bool {
 		return true // ship has no pre-artifact of its own
 	}
 	return true
+}
+
+// containsString reports whether s is in ss.
+func containsString(ss []string, s string) bool {
+	for _, x := range ss {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
 
 func isConfiguredMandatory(cfg config.RoutingConfig, phase string) bool {

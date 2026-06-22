@@ -70,6 +70,21 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
+	// Floor-gate verdict safety (PA-DDK DDK-4): a mandatory phase whose artifact
+	// gate constrains the verdict may only accept SHIPPABLE verdicts (PASS/WARN).
+	// This stops a config from weakening the floor to ship a FAILed evaluation.
+	for _, name := range cfg.Mandatory {
+		spec, ok := cat.Get(name)
+		if !ok || spec.Gate == nil {
+			continue
+		}
+		for _, v := range spec.Gate.VerdictIn {
+			if v != VerdictPASS && v != VerdictWARN {
+				violations = append(violations, fmt.Sprintf("mandatory phase %q gate verdict_in %q is not a shippable verdict (only PASS/WARN may gate the floor)", name, v))
+			}
+		}
+	}
+
 	// I9 — anchor reachability: every configured-mandatory anchor must be
 	// reachable from the start node. A stranded anchor cannot gate the floor, so
 	// a config that marks an unreachable phase mandatory is a silent floor hole.

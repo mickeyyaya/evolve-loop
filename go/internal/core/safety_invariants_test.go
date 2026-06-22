@@ -94,6 +94,21 @@ func TestValidateSafetyInvariants_UnknownSpinePhase(t *testing.T) {
 	}
 }
 
+// TestValidateSafetyInvariants_FloorGateAcceptsOnlyShippableVerdict (DDK-4): a
+// mandatory phase whose artifact gate accepts a non-shippable verdict (FAIL)
+// would let the floor ship a failed evaluation — the validator rejects it.
+func TestValidateSafetyInvariants_FloorGateAcceptsOnlyShippableVerdict(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cat := mustCatalog(t, phasespec.PhaseSpec{
+		Name: ref.Evaluator(),
+		Gate: &phasespec.ArtifactGate{RequiresPresent: true, VerdictIn: []string{VerdictFAIL}},
+	})
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), ref.Config, cat), "shippable verdict") {
+		t.Error("a floor gate accepting a non-shippable verdict must be rejected")
+	}
+}
+
 func containsSubstr(ss []string, sub string) bool {
 	for _, s := range ss {
 		if strings.Contains(s, sub) {

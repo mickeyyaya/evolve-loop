@@ -62,6 +62,7 @@
       "name": "scout",
       "role": "scout",
       "optional": false,
+      "gate": { "requires_present": true },
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/intent.md"],
         "state_fields": ["instinctSummary", "ledgerSummary", "carryoverTodos"]
@@ -228,6 +229,7 @@
       "name": "build",
       "role": "builder",
       "optional": false,
+      "gate": { "requires_present": true },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
@@ -295,6 +297,7 @@
       "optional": false,
       "on_pass": "ship",
       "on_fail": "retrospective",
+      "gate": { "requires_present": true, "verdict_in": ["PASS", "WARN"] },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/build-report.md",
