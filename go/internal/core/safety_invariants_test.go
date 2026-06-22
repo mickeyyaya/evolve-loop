@@ -1,122 +1,96 @@
 package core
 
-// safety_invariants_test.go — PA-DDK DDK-1 (ADR-0060): the phase-agnostic
-// load-time safety-invariant validator is the relocated trust anchor. These
-// tests prove it accepts a floor-valid config and rejects the structural
-// attacks that would let a config bypass the non-gameable ship floor. The
-// invariants are quantified over the graph + config roles, never phase names.
+// safety_invariants_test.go — PA-DDK DDK-1/DDK-3 (ADR-0060). The validator is the
+// relocated trust anchor. These tests LOAD the real phase configuration via the
+// kerneltest fixture and reference phases through STRUCTURAL accessors
+// (FirstAnchor/ShipTerminal/Evaluator), never by hardcoded name — so renaming a
+// phase in the registry does not require rewriting any test. Adversarial cases
+// are built by mutating the loaded config with fixture-derived names.
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestValidateSafetyInvariants_CleanConfigPasses: a config whose verdict-branch
-// targets are legal edges and whose mandatory anchors are reachable raises no
-// violation.
-func TestValidateSafetyInvariants_CleanConfigPasses(t *testing.T) {
+// TestValidateSafetyInvariants_ReferenceFlowPasses: the real registry the
+// composition root loads must satisfy the floor invariants. A future registry
+// edit that breaks a branch target, strands an anchor, or adds an illegal spine
+// edge fails here in CI before it can ship.
+func TestValidateSafetyInvariants_ReferenceFlowPasses(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
-	cfg := config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}}
-	if v := ValidateSafetyInvariants(sm, cfg, cat); len(v) != 0 {
-		t.Errorf("clean config must pass; got violations: %v", v)
+	ref := kerneltest.Load(t)
+	if v := ValidateSafetyInvariants(NewStateMachine(), ref.Config, ref.Catalog); len(v) != 0 {
+		t.Errorf("the loaded reference flow must pass the safety invariants; got: %v", v)
 	}
 }
 
 // TestValidateSafetyInvariants_IllegalBranchTarget: a verdict-branch target that
-// is NOT a legal successor of its phase is rejected — config may only SELECT
-// among already-legal edges (ADR-0058 §1, enforced as a data check).
+// is NOT a legal successor is rejected — config may only select among legal
+// edges. The evaluator routed back to the first anchor (e.g. audit→scout) is
+// illegal; both phases come from the loaded config, not literals.
 func TestValidateSafetyInvariants_IllegalBranchTarget(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	// audit's legal successors are {ship, retrospective}; "build" is not one.
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "build", OnFail: "retrospective"})
-	cfg := config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}}
-	v := ValidateSafetyInvariants(sm, cfg, cat)
-	if len(v) == 0 {
-		t.Fatal("an illegal on_pass target must be rejected")
-	}
-	if !containsSubstr(v, "legal successor") {
-		t.Errorf("violation should name the illegal-edge reason; got %v", v)
+	ref := kerneltest.Load(t)
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: ref.Evaluator(), OnPass: ref.FirstAnchor(), OnFail: ref.Evaluator()})
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), ref.Config, cat), "legal successor") {
+		t.Error("an illegal verdict-branch target must be rejected")
 	}
 }
 
-// TestValidateSafetyInvariants_UnknownTarget: a verdict-branch target that
-// resolves to no known phase is rejected.
-func TestValidateSafetyInvariants_UnknownTarget(t *testing.T) {
+// TestValidateSafetyInvariants_UnknownBranchTarget: a target resolving to no
+// known phase is rejected. The sentinel is an intentionally-invalid name, not a
+// real phase, so renaming real phases never affects it.
+func TestValidateSafetyInvariants_UnknownBranchTarget(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "no-such-phase"})
-	cfg := config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}}
-	v := ValidateSafetyInvariants(sm, cfg, cat)
-	if !containsSubstr(v, "no known phase") {
-		t.Errorf("an unresolvable target must be rejected; got %v", v)
+	ref := kerneltest.Load(t)
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: ref.Evaluator(), OnPass: ref.ShipTerminal(), OnFail: "__nonexistent_phase__"})
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), ref.Config, cat), "no known phase") {
+		t.Error("an unresolvable verdict-branch target must be rejected")
 	}
 }
 
-// TestValidateSafetyInvariants_StrandedMandatoryAnchor: a configured-mandatory
-// anchor unreachable from the start node cannot gate the floor and is rejected.
+// TestValidateSafetyInvariants_StrandedMandatoryAnchor: a mandatory anchor
+// unreachable from start cannot gate the floor and is rejected. PhaseSwarmPlan
+// is a structural kernel phase (not an operator-renamed flow phase) that is
+// valid but off any start→ship path — the rename-stable unreachable sentinel.
 func TestValidateSafetyInvariants_StrandedMandatoryAnchor(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
-	// "swarm-plan" is a valid Phase but not on any start→ship path in the graph.
-	cfg := config.RoutingConfig{Mandatory: []string{"scout", "swarm-plan", "build", "audit", "ship"}}
-	v := ValidateSafetyInvariants(sm, cfg, cat)
-	if !containsSubstr(v, "unreachable") {
-		t.Errorf("a stranded mandatory anchor must be rejected; got %v", v)
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	// Mark the unreachable sentinel mandatory AND order-present so it becomes an
+	// anchor (mandatoryAnchorsFor intersects Order ∩ Mandatory).
+	cfg.Order = append([]string{string(PhaseSwarmPlan)}, cfg.Order...)
+	cfg.Mandatory = append([]string{string(PhaseSwarmPlan)}, cfg.Mandatory...)
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "unreachable") {
+		t.Error("a stranded mandatory anchor must be rejected")
 	}
 }
 
 // TestValidateSafetyInvariants_IllegalSpineEdge (DDK-3): a config-declared spine
-// that jumps an illegal edge — scout→ship, bypassing audit — is rejected, since
-// Next walks the spine without re-checking legality.
+// that jumps from the first anchor straight to the ship terminal — bypassing the
+// floor — is rejected, since Next walks the spine without re-checking legality.
 func TestValidateSafetyInvariants_IllegalSpineEdge(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
-	cfg := config.RoutingConfig{
-		Mandatory:  []string{"scout", "build", "audit", "ship"},
-		SpineOrder: []string{"scout", "ship"}, // scout→ship is not a legal edge
-	}
-	if !containsSubstr(ValidateSafetyInvariants(sm, cfg, cat), "not a legal transition") {
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.SpineOrder = []string{ref.FirstAnchor(), ref.ShipTerminal()}
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "not a legal transition") {
 		t.Error("an illegal spine edge must be rejected")
 	}
 }
 
 // TestValidateSafetyInvariants_UnknownSpinePhase (DDK-3): a typo in spine_order
-// (a name that resolves to no phase) is rejected, not silently dropped.
+// (a name resolving to no phase) is rejected, not silently dropped.
 func TestValidateSafetyInvariants_UnknownSpinePhase(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine()
-	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
-	cfg := config.RoutingConfig{
-		Mandatory:  []string{"scout", "build", "audit", "ship"},
-		SpineOrder: []string{"scout", "scouut", "build"}, // typo
-	}
-	if !containsSubstr(ValidateSafetyInvariants(sm, cfg, cat), "no known phase") {
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.SpineOrder = append([]string{"__nonexistent_phase__"}, ref.Spine()...)
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "no known phase") {
 		t.Error("an unknown spine_order phase must be rejected")
-	}
-}
-
-// TestValidateSafetyInvariants_ShippedRegistryPasses is the guard: the real
-// registry the composition root loads must satisfy the floor invariants. If a
-// future registry edit breaks a branch target or strands an anchor, this fails
-// in CI before it can ship.
-func TestValidateSafetyInvariants_ShippedRegistryPasses(t *testing.T) {
-	t.Parallel()
-	cat, err := phasespec.Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
-	if err != nil {
-		t.Fatalf("load shipped registry: %v", err)
-	}
-	cfg, _ := config.Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), nil)
-	if v := ValidateSafetyInvariants(NewStateMachine(), cfg, cat); len(v) != 0 {
-		t.Errorf("shipped registry must satisfy the safety invariants; got: %v", v)
 	}
 }
 

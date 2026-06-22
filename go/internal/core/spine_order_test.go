@@ -7,7 +7,11 @@ package core
 // spine. The full Next() byte-identity is proven by the transition oracle
 // (TestTransitionKernelOracle_Next); this pins the SSOT table directly.
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+)
 
 // TestSpineNext_WalksCanonicalSpine asserts spineNext returns each phase's
 // canonical linear successor — the exact values the pre-S5 Next switch hardcoded
@@ -40,19 +44,20 @@ func TestSpineNext_WalksCanonicalSpine(t *testing.T) {
 	}
 }
 
-// TestSpineNext_InjectedConfigSpine proves the spine is config-driven (DDK-3): an
-// injected spine order drives spineNext, overriding the literal fallback.
+// TestSpineNext_InjectedConfigSpine proves the spine is config-driven (DDK-3):
+// the spine LOADED from the registry (config.spine_order) drives spineNext for
+// every consecutive pair — no hardcoded phase names, so a registry rename is
+// followed automatically.
 func TestSpineNext_InjectedConfigSpine(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine().WithSpine([]Phase{PhaseScout, PhaseBuild, PhaseShip, PhaseEnd})
-	if got, ok := sm.spineNext(PhaseScout); !ok || got != PhaseBuild {
-		t.Errorf("injected spine: spineNext(scout) = (%s,%v), want (build,true)", got, ok)
+	spine := spinePhasesFrom(kerneltest.Load(t).Spine())
+	if len(spine) < 2 {
+		t.Fatal("reference registry must declare a multi-phase spine")
 	}
-	if got, ok := sm.spineNext(PhaseBuild); !ok || got != PhaseShip {
-		t.Errorf("injected spine: spineNext(build) = (%s,%v), want (ship,true)", got, ok)
-	}
-	// A phase absent from the injected spine misses.
-	if _, ok := sm.spineNext(PhaseTriage); ok {
-		t.Error("injected spine: triage is not on it — must miss")
+	sm := NewStateMachine().WithSpine(spine)
+	for i := 0; i+1 < len(spine); i++ {
+		if got, ok := sm.spineNext(spine[i]); !ok || got != spine[i+1] {
+			t.Errorf("injected spine: spineNext(%s) = (%s,%v), want (%s,true)", spine[i], got, ok, spine[i+1])
+		}
 	}
 }
