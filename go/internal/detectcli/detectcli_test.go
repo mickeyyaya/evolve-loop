@@ -9,15 +9,17 @@ func TestDetect_AllProbes(t *testing.T) {
 	cases := []struct {
 		name     string
 		env      map[string]string
+		platform string
 		hasAgy   bool
 		wantCLI  string
 		wantReas string
 	}{
 		{
 			name:     "explicit_override",
-			env:      map[string]string{"EVOLVE_PLATFORM": "custom"},
+			env:      map[string]string{},
+			platform: "custom",
 			wantCLI:  "custom",
-			wantReas: "explicit override via EVOLVE_PLATFORM",
+			wantReas: "explicit override via Options.Platform",
 		},
 		{
 			name:     "claude_interactive",
@@ -70,16 +72,18 @@ func TestDetect_AllProbes(t *testing.T) {
 		},
 		{
 			name:     "explicit_override_beats_claude",
-			env:      map[string]string{"EVOLVE_PLATFORM": "gemini", "CLAUDE_CODE_SESSION_ID": "x"},
+			env:      map[string]string{"CLAUDE_CODE_SESSION_ID": "x"},
+			platform: "gemini",
 			wantCLI:  "gemini",
-			wantReas: "explicit override via EVOLVE_PLATFORM",
+			wantReas: "explicit override via Options.Platform",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			env := c.env
 			r := Detect(Options{
-				Env: func(name string) string { return env[name] },
+				Platform: c.platform,
+				Env:      func(name string) string { return env[name] },
 				LookPath: func(name string) (string, error) {
 					if c.hasAgy && name == "agy" {
 						return "/usr/local/bin/agy", nil

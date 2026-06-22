@@ -137,9 +137,9 @@ func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
 
 	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithCatalog(cat))
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -190,10 +190,10 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 
 	const goal = "redesign the auth subsystem with token rotation"
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
-		Context:     map[string]string{"goal": goal}, // the goal-text key (not "strategy" = mode)
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
+		Context:               map[string]string{"goal": goal}, // the goal-text key (not "strategy" = mode)
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -228,9 +228,9 @@ func TestOrchestrator_ThreadsCarryoverTodosToPlanner(t *testing.T) {
 	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithPlanner(cp))
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -294,7 +294,7 @@ func TestOrchestrator_Shadow_LogsTesterInsert_StaticPathUnchanged(t *testing.T) 
 		ProjectRoot: projectRoot,
 		GoalHash:    "g",
 		// Keep the pre-seeded handoff-build.json from being archived.
-		Env: map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -351,9 +351,9 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 
 	o := NewOrchestrator(st, led, runners, WithRouting(shadowCfg(config.StageEnforce), router.StaticPreset{}))
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -395,9 +395,9 @@ func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
 
 	o := NewOrchestrator(st, led, runners, WithRouting(shadowCfg(config.StageEnforce), router.StaticPreset{}))
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)

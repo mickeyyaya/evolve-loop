@@ -163,6 +163,15 @@ type CycleRequest struct {
 	// requires Context["commit_message"]; Scout reads
 	// Context["strategy"]. Copied like Env.
 	Context map[string]string
+	// DisableWorkspaceGuard skips the pre-cycle workspace archive that
+	// evicts stale phase artifacts from a prior interrupted cycle. Used by
+	// tests that pre-seed workspace files to simulate phase state; operators
+	// may set it via the env snapshot read in cmd_cycle.go.
+	DisableWorkspaceGuard bool
+	// BypassPolicy skips the policy.json pin enforcement for every phase in
+	// this cycle. Used for testing and escape-hatch operator overrides.
+	// Threaded to PhaseRequest.BypassPolicy at dispatch.
+	BypassPolicy bool
 }
 
 // Orchestrator drives one cycle through the state machine, calling a

@@ -362,9 +362,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// overrides env/profile/default resolution. Keyed by phase name. Validated
 	// against the profile guardrails (allowed_clis + model_tier_envelope) — an
 	// out-of-bounds pin hard-fails the phase loudly rather than silently
-	// breaching the trust-kernel constraints. Escape hatch: EVOLVE_POLICY_BYPASS=1.
+	// breaching the trust-kernel constraints. Escape hatch: --bypass-policy flag.
 	var pin *policy.Pin
-	if !envchain.Bool("EVOLVE_POLICY_BYPASS", req.Env, false) {
+	if !req.BypassPolicy {
 		pol, perr := policy.Load(filepath.Join(req.ProjectRoot, ".evolve", "policy.json"))
 		if perr != nil {
 			// Malformed policy must fail loudly, not silently ignore user rules.

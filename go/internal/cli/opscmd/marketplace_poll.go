@@ -23,16 +23,14 @@ import (
 //	10 — invalid arguments
 func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
-		target         string
-		maxWaitS       = 300
-		pollIntervalS  = 15
-		marketplaceDir = os.Getenv("EVOLVE_MARKETPLACE_DIR")
-		dryRun         bool
+		target        string
+		maxWaitS      = 300
+		pollIntervalS = 15
+		dryRun        bool
 	)
-	if marketplaceDir == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			marketplaceDir = home + "/.claude/plugins/marketplaces/evolve-loop"
-		}
+	marketplaceDir := ""
+	if home, err := os.UserHomeDir(); err == nil {
+		marketplaceDir = home + "/.claude/plugins/marketplaces/evolve-loop"
 	}
 
 	i := 0
@@ -43,7 +41,7 @@ func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) in
 			fmt.Fprintln(stdout, "Usage: evolve marketplace-poll <target-version> [flags]")
 			fmt.Fprintln(stdout, "  --max-wait-s N           (default 300)")
 			fmt.Fprintln(stdout, "  --poll-interval-s N      (default 15)")
-			fmt.Fprintln(stdout, "  --marketplace-dir DIR    (default $EVOLVE_MARKETPLACE_DIR or ~/.claude/plugins/marketplaces/evolve-loop)")
+			fmt.Fprintln(stdout, "  --marketplace-dir DIR    (default ~/.claude/plugins/marketplaces/evolve-loop)")
 			fmt.Fprintln(stdout, "  --dry-run")
 			return 0
 		case a == "--dry-run":

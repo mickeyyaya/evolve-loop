@@ -137,29 +137,30 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	}
 
 	cfg := Config{
-		CLI:            raw.cli,
-		Profile:        raw.profile,
-		Model:          effectiveModel,
-		PromptFile:     raw.promptFile,
-		Workspace:      raw.workspace,
-		StdoutLog:      raw.stdoutLog,
-		StderrLog:      raw.stderrLog,
-		Artifact:       raw.artifact,
-		Completion:     raw.completion,
-		Cycle:          cycle,
-		Worktree:       raw.worktree,
-		RunID:          raw.runID,
-		ProjectRoot:    raw.projectRoot,
-		Agent:          raw.agent,
-		PermissionMode: permMode,
-		StreamOutput:   streamOut,
-		SessionName:    sessionName,
-		AllowBypass:    raw.allowBypass,
-		HumanInput:     raw.humanInput,
-		RequireFull:    raw.requireFull,
-		AllowedTools:   prof.AllowedTools,
-		ExtraFlags:     raw.extra,
-		Realization:    RealizeFor(raw.cli, intent),
+		CLI:              raw.cli,
+		Profile:          raw.profile,
+		Model:            effectiveModel,
+		PromptFile:       raw.promptFile,
+		Workspace:        raw.workspace,
+		StdoutLog:        raw.stdoutLog,
+		StderrLog:        raw.stderrLog,
+		Artifact:         raw.artifact,
+		Completion:       raw.completion,
+		Cycle:            cycle,
+		Worktree:         raw.worktree,
+		RunID:            raw.runID,
+		ProjectRoot:      raw.projectRoot,
+		Agent:            raw.agent,
+		PermissionMode:   permMode,
+		StreamOutput:     streamOut,
+		SessionName:      sessionName,
+		AllowBypass:      raw.allowBypass,
+		HumanInput:       raw.humanInput,
+		RequireFull:      raw.requireFull,
+		AllowedTools:     prof.AllowedTools,
+		ExtraFlags:       raw.extra,
+		Realization:      RealizeFor(raw.cli, intent),
+		AnthropicBaseURL: raw.anthropicBaseURL,
 	}
 
 	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →
@@ -219,6 +220,7 @@ type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion                            string
 	permissionMode, sessionName, streamOutput, runID                           string
+	anthropicBaseURL                                                           string
 	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
@@ -296,6 +298,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--project-root": &r.projectRoot, "--run-id": &r.runID,
 		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
+		"--anthropic-base-url": &r.anthropicBaseURL,
 	}
 
 	for i := 0; i < len(args); i++ {

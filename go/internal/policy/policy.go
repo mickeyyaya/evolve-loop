@@ -101,6 +101,13 @@ type Policy struct {
 	// (stage="shadow" — byte-neutral; the gate records its would-be verdict
 	// but promotes nothing).
 	MergeGate *MergeGatePolicy `json:"merge_gate,omitempty"`
+	// Classify configures the cycle-failure classifier. Absent ⇒ built-in
+	// defaults apply (HangClassifier=false — the exit-transport-hang
+	// reclassifier is opt-in).
+	Classify *ClassifyPolicy `json:"classify,omitempty"`
+	// Catalog configures the model catalog subsystem. Absent ⇒ built-in
+	// defaults apply (AutoRefresh=true — the cycle-start live refresh is on).
+	Catalog *CatalogPolicy `json:"catalog,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -414,6 +421,9 @@ type BridgePolicy struct {
 	ArtifactTimeoutS   int `json:"artifact_timeout_s,omitempty"`
 	ArtifactMaxExtends int `json:"artifact_max_extends,omitempty"`
 	ScrollbackLines    int `json:"scrollback_lines,omitempty"`
+	// AnthropicBaseURL is the operator override for the Anthropic API base URL
+	// (proxy mode). Replaces EVOLVE_ANTHROPIC_BASE_URL env read. Empty = no proxy.
+	AnthropicBaseURL string `json:"anthropic_base_url,omitempty"`
 }
 
 // BridgeConfig returns the configured bridge policy. Zero int fields mean
@@ -799,4 +809,49 @@ func (p Policy) RetryConfig() RetryConfig {
 		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
 	}
 	return c
+}
+
+// ClassifyPolicy configures the cycle-failure classifier (internal/cycleclassify).
+// Loaded from .evolve/policy.json "classify" block; absent block ⇒ built-in
+// defaults apply. Replaces EVOLVE_HANG_CLASSIFIER env read.
+type ClassifyPolicy struct {
+	// HangClassifier enables the two-factor exit-transport-hang reclassification:
+	// when true, a SHIPPED-verdict report + matching git commit reclassifies an
+	// apparent integrity-breach as ClassExitTransportHang (1h retention vs 7d).
+	// Default false — hang detection is opt-in so a misconfigured git log never
+	// silently masks a real breach.
+	HangClassifier bool `json:"hang_classifier,omitempty"`
+}
+
+// ClassifyConfig returns the classifier configuration with defaults resolved.
+// An absent block yields ClassifyPolicy{HangClassifier: false} — safe default.
+func (p Policy) ClassifyConfig() ClassifyPolicy {
+	if p.Classify == nil {
+		return ClassifyPolicy{}
+	}
+	return *p.Classify
+}
+
+// CatalogPolicy configures the model catalog subsystem.
+// Loaded from .evolve/policy.json "catalog" block; absent block ⇒ built-in
+// defaults apply. Replaces EVOLVE_MODELCATALOG_AUTOREFRESH env read.
+type CatalogPolicy struct {
+	// AutoRefresh controls whether the cycle-start live model-catalog refresh
+	// runs. Nil/absent ⇒ true (opt-out semantics: default on, set false to
+	// disable). Replaces EVOLVE_MODELCATALOG_AUTOREFRESH=0.
+	AutoRefresh *bool `json:"auto_refresh,omitempty"`
+}
+
+// CatalogConfig returns the catalog configuration with defaults resolved.
+// AutoRefresh defaults to true (opt-out); the returned pointer is never nil.
+func (p Policy) CatalogConfig() CatalogPolicy {
+	enabled := true
+	out := CatalogPolicy{AutoRefresh: &enabled}
+	if p.Catalog == nil {
+		return out
+	}
+	if p.Catalog.AutoRefresh != nil {
+		out.AutoRefresh = p.Catalog.AutoRefresh
+	}
+	return out
 }

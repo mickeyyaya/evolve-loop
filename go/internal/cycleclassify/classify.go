@@ -33,6 +33,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
+// hangClassifierFn reports whether the exit-transport-hang reclassifier is
+// enabled. Default returns false. Production code sets this via SetHangClassifier
+// at startup from policy.ClassifyConfig().HangClassifier. Tests may swap the
+// function var directly (same pattern as gitLogFn).
+var hangClassifierFn = func() bool { return false }
+
+// SetHangClassifier wires the hang-classifier toggle from policy. Called once
+// at loop startup so Classify picks up the operator's preference without an
+// os.Getenv read on every call.
+func SetHangClassifier(enabled bool) {
+	hangClassifierFn = func() bool { return enabled }
+}
+
 // Classification is the typed verdict the classifier returns. The
 // string values are wire-compatible with the bash classifier so the
 // state.json:failedApproaches[].classification field stays unchanged
@@ -153,13 +166,14 @@ func Classify(workspace string) Result {
 	if m := reBuildFail.Find(reportData); m != nil {
 		return Result{Class: ClassBuildFail, Marker: string(m), Source: "orchestrator-report.md"}
 	}
-	// Gap #6: EVOLVE_HANG_CLASSIFIER=1 two-factor reclassification.
+	// Gap #6: hang-classifier two-factor reclassification.
 	// When the orchestrator wrote SHIPPED verdict + a matching cycle
 	// commit exists on main, the cycle actually succeeded — the parent
 	// just hung post-artifact. Reclassify as exit-transport-hang so the
 	// failure adapter doesn't treat this as a 7d-retention breach.
+	// Enabled via policy.ClassifyConfig().HangClassifier (replaces EVOLVE_HANG_CLASSIFIER).
 	// Source: archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:611-634.
-	if os.Getenv("EVOLVE_HANG_CLASSIFIER") == "1" {
+	if hangClassifierFn() {
 		if cls, ok := detectHangShipped(workspace, reportData); ok {
 			return cls
 		}

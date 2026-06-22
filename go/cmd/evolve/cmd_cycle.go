@@ -180,11 +180,14 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	} else {
 		orch = wireOrchestrator(projectRoot, evolveDir)
 	}
+	cycleEnv := filterEvolveEnv(os.Environ())
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    goalHash,
-		Env:         filterEvolveEnv(os.Environ()),
-		Context:     cycleContext(goalHash, goalText),
+		ProjectRoot:           projectRoot,
+		GoalHash:              goalHash,
+		Env:                   cycleEnv,
+		Context:               cycleContext(goalHash, goalText),
+		DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+		BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -404,6 +407,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.WithProposerCLI(advCLI),
 		core.WithProposerModel(advModel),
 		core.WithPersona(advPersona),
+		core.WithDepthCheck(core.AdvisorDepthExceeded),
 	)
 	strategy := router.Select(cfg, advisor)
 	// The same advisor also produces the upfront whole-cycle plan the integrity
@@ -486,8 +490,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(catalog, cfg.PhaseIO)))
 	}
 	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
-	// inside the closure). Opt out with EVOLVE_MODELCATALOG_AUTOREFRESH=0.
-	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir)))
+	// inside the closure). Opt out via policy.json "catalog":{"auto_refresh":false}.
+	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, *pol.CatalogConfig().AutoRefresh)))
 
 	// Runtime operator-directives provider: the ONLY place that resolves directives
 	// config (home dir + runscope lane + file paths). The orchestrator stays

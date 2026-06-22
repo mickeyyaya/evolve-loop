@@ -58,9 +58,9 @@ func TestRunCycle_UnregisteredOptionalPhase_SkippedLoudly(t *testing.T) {
 		WithPlanner(shipPlanner{}),
 		WithCatalog(cat))
 	res, rerr := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if rerr != nil {
 		t.Fatalf("an unregistered OPTIONAL phase must not kill the cycle (cycle-265: memo killed a PASSING batch); got %v", rerr)

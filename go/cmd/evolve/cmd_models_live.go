@@ -14,14 +14,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// autoRefreshDisableEnv opts out of the cycle-start catalog auto-refresh.
-const autoRefreshDisableEnv = "EVOLVE_MODELCATALOG_AUTOREFRESH"
-
-// shouldRefreshCatalog is the pure cycle-start gate: refresh only when not
-// disabled AND the cached catalog is older than the TTL (so the live /model
-// drive runs at most once per day, not every cycle).
-func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, disableEnvVal string) bool {
-	if disableEnvVal == "0" {
+// shouldRefreshCatalog is the pure cycle-start gate: refresh only when enabled
+// AND the cached catalog is older than the TTL (so the live /model drive runs
+// at most once per day, not every cycle). Reads autoRefresh from policy.CatalogConfig().
+func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, autoRefresh bool) bool {
+	if !autoRefresh {
 		return false
 	}
 	return cat.IsStale(now, modelcatalog.DefaultTTL)
@@ -29,9 +26,9 @@ func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, disableEnvVal
 
 // makeCatalogRefresher returns the closure core.WithCatalogRefresher invokes at
 // cycle start. It is TTL-gated (shouldRefreshCatalog) and best-effort; a failure
-// propagates to the orchestrator which only WARNs. Default-on; opt out with
-// EVOLVE_MODELCATALOG_AUTOREFRESH=0.
-func makeCatalogRefresher(projectRoot, evolveDir string) func(context.Context) error {
+// propagates to the orchestrator which only WARNs. Default-on; opt out via
+// policy.json "catalog":{"auto_refresh":false}.
+func makeCatalogRefresher(projectRoot, evolveDir string, autoRefresh bool) func(context.Context) error {
 	return func(ctx context.Context) error {
 		cat, rerr := modelcatalog.Read(evolveDir)
 		if rerr != nil {
@@ -39,7 +36,7 @@ func makeCatalogRefresher(projectRoot, evolveDir string) func(context.Context) e
 			// the corruption rather than papering over it silently.
 			fmt.Fprintf(os.Stderr, "[models] WARN unreadable catalog (will refresh): %v\n", rerr)
 		}
-		if !shouldRefreshCatalog(cat, time.Now(), os.Getenv(autoRefreshDisableEnv)) {
+		if !shouldRefreshCatalog(cat, time.Now(), autoRefresh) {
 			return nil
 		}
 		plugin := os.Getenv("EVOLVE_PLUGIN_ROOT")

@@ -253,6 +253,9 @@ type Config struct {
 	// BootSmokeTest / the loop readiness gate to verify the bridge can boot the
 	// CLI before any real work (and LLM budget) is committed.
 	BootOnly bool
+	// AnthropicBaseURL is the policy-sourced proxy URL override, replacing
+	// the EVOLVE_ANTHROPIC_BASE_URL env read. Non-empty → claude-tmux proxy guard fires.
+	AnthropicBaseURL string
 	// codexConfigPath overrides the default ~/.codex/config.toml path used by
 	// pretrustCodexProjects. Set in tests to avoid touching the real user config.
 	codexConfigPath string

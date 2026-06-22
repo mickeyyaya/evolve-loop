@@ -166,15 +166,16 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	runners := fixtures.BuildRunners(verdictsByPhase(s.Verdicts))
 	o := core.NewOrchestrator(st, led, runners, opts...)
 
-	env := map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"}
+	envCopy := make(map[string]string)
 	for k, v := range s.Env {
-		env[k] = v
+		envCopy[k] = v
 	}
 
 	res, err := o.RunCycle(context.Background(), core.CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		Env:         env,
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
+		Env:                   envCopy,
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)

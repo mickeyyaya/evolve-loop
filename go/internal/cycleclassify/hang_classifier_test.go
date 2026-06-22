@@ -6,12 +6,40 @@ import (
 	"testing"
 )
 
-// TestClassify_HangClassifier_ReclassifiesSHIPPED covers Gap #6: when
-// EVOLVE_HANG_CLASSIFIER=1, a SHIPPED-verdict report + matching git
-// log entry should reclassify integrity-breach as exit-transport-hang.
+// setHangClassifierForTest swaps hangClassifierFn for the duration of a test
+// and restores it via t.Cleanup. NOT t.Parallel-safe.
+func setHangClassifierForTest(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := hangClassifierFn
+	hangClassifierFn = func() bool { return enabled }
+	t.Cleanup(func() { hangClassifierFn = prev })
+}
+
+// TestSetHangClassifier_WiresToggleFromPolicy verifies the exported policy setter
+// actually controls the hang-classifier gate Classify reads. flag-campaign-7
+// replaced the EVOLVE_HANG_CLASSIFIER env read with this setter (env -> policy.json),
+// so the setter — not an os.Getenv — is now the production wiring point.
+func TestSetHangClassifier_WiresToggleFromPolicy(t *testing.T) {
+	// NOT t.Parallel — mutates package-level hangClassifierFn.
+	prev := hangClassifierFn
+	t.Cleanup(func() { hangClassifierFn = prev })
+
+	SetHangClassifier(true)
+	if !hangClassifierFn() {
+		t.Error("SetHangClassifier(true): gate not enabled")
+	}
+	SetHangClassifier(false)
+	if hangClassifierFn() {
+		t.Error("SetHangClassifier(false): gate not disabled")
+	}
+}
+
+// TestClassify_HangClassifier_ReclassifiesSHIPPED covers Gap #6: when the
+// hang-classifier is enabled, a SHIPPED-verdict report + matching git log
+// entry should reclassify integrity-breach as exit-transport-hang.
 func TestClassify_HangClassifier_ReclassifiesSHIPPED(t *testing.T) {
-	// NOT t.Parallel — mutates package-level gitLogFn + env.
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "1")
+	// NOT t.Parallel — mutates package-level gitLogFn + hangClassifierFn.
+	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(cycleNum string) bool {
@@ -37,7 +65,7 @@ SHIPPED
 }
 
 func TestClassify_HangClassifier_NoCommitFalsePositive(t *testing.T) {
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "1")
+	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return false } // no matching commit
@@ -57,7 +85,7 @@ func TestClassify_HangClassifier_NoCommitFalsePositive(t *testing.T) {
 }
 
 func TestClassify_HangClassifier_DisabledByDefault(t *testing.T) {
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "") // explicitly off
+	setHangClassifierForTest(t, false) // explicitly off
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true } // would match if checked
@@ -70,12 +98,12 @@ func TestClassify_HangClassifier_DisabledByDefault(t *testing.T) {
 
 	r := Classify(ws)
 	if r.Class != ClassIntegrityBreach {
-		t.Fatalf("got %q want integrity-breach (env disabled)", r.Class)
+		t.Fatalf("got %q want integrity-breach (disabled)", r.Class)
 	}
 }
 
 func TestClassify_HangClassifier_NonShippedNoReclassify(t *testing.T) {
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "1")
+	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true }
@@ -97,7 +125,7 @@ func TestClassify_HangClassifier_NonShippedNoReclassify(t *testing.T) {
 }
 
 func TestClassify_HangClassifier_BadWorkspacePath(t *testing.T) {
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "1")
+	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true }

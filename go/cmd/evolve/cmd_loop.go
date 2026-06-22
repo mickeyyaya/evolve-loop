@@ -115,6 +115,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		orch = loopOrchOverride
 	}
 	wc := loadWorkflowConfig(cfg.EvolveDir)
+	cycleclassify.SetHangClassifier(loadClassifyConfig(cfg.EvolveDir).HangClassifier)
 
 	// E2: auto-prune expired failedApproaches at dispatcher start.
 	// Non-fatal on error — pruning
@@ -177,10 +178,12 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f\n",
 			rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause)
 		req := core.CycleRequest{
-			ProjectRoot: cfg.ProjectRoot,
-			GoalHash:    cfg.GoalHash,
-			Env:         cycleEnv,
-			Context:     cycleCtx,
+			ProjectRoot:           cfg.ProjectRoot,
+			GoalHash:              cfg.GoalHash,
+			Env:                   cycleEnv,
+			Context:               cycleCtx,
+			DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 		}
 		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
@@ -287,10 +290,12 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		lastBefore, _ := readLastCycleNumber(context.Background(), deps.Storage)
 
 		req := core.CycleRequest{
-			ProjectRoot: cfg.ProjectRoot,
-			GoalHash:    cfg.GoalHash,
-			Env:         cycleEnv,
-			Context:     cycleCtx,
+			ProjectRoot:           cfg.ProjectRoot,
+			GoalHash:              cfg.GoalHash,
+			Env:                   cycleEnv,
+			Context:               cycleCtx,
+			DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 		}
 		result, err := orch.RunCycle(context.Background(), req)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
