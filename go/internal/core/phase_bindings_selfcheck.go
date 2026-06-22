@@ -77,13 +77,35 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 }
 
 // realGoUnitTest runs `go test` (UNIT only — no integration tag) for one package
-// in moduleDir. passed == (exit 0). A bounded timeout keeps a wedged test from
-// hanging the build phase.
+// in moduleDir. passed == (exit 0), EXCEPT a package whose files are all excluded
+// by build tags is "nothing to unit-test" rather than a failure (see
+// goTestExcludedByBuildTags). A bounded timeout keeps a wedged test from hanging
+// the build phase.
 func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, passed bool) {
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", pkg)
 	cmd.Dir = moduleDir
 	out, err := cmd.CombinedOutput()
-	return string(out), err == nil
+	s := string(out)
+	return s, err == nil || goTestExcludedByBuildTags(s)
+}
+
+// goTestExcludedByBuildTags reports whether a non-zero `go test` result is the
+// "the package under test has no Go files under the current (untagged) build
+// constraints" setup condition rather than a real unit-test failure. This check
+// runs untagged by design (no integration tag — see realGoUnitTest), but every
+// cycle materializes a //go:build-gated acceptance package (acs/cycleN); an
+// untagged `go test` of one reports "build constraints exclude all Go files …
+// [setup failed]" — nothing to unit-test here, NOT a regression. Flagging it
+// would WARN on every cycle and bury real signal.
+//
+// The "imports " guard keeps this narrow: when a transitive *dependency* (not the
+// tested package) is the excluded one, `go test` prints an "imports <dep>:" chain
+// and the tested package's own build genuinely failed — that must still be
+// reported. A real compile error ("[build failed]") or assertion ("--- FAIL")
+// also carries different text and is reported.
+func goTestExcludedByBuildTags(output string) bool {
+	return strings.Contains(output, "build constraints exclude all Go files") &&
+		!strings.Contains(output, "imports ")
 }
 
 // buildSelfCheck runs the changed packages' unit tests after the build phase and

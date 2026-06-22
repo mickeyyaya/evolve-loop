@@ -103,6 +103,54 @@ func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {
 	}
 }
 
+// TestRealGoUnitTest_BuildTagExcludedIsNotFailure guards the false-positive a
+// live cycle surfaced: the self-check runs untagged `go test` (by design — no
+// integration tag), but every cycle materializes a //go:build-gated acceptance
+// package (acs/cycleN). An untagged `go test` of such a package reports "build
+// constraints exclude all Go files … [setup failed]" — nothing to unit-test, NOT
+// a regression — so it must report ok, or the self-check WARNs on every cycle.
+func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
+	mod := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(mod, "tagged")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Only file is behind a build tag, mirroring acs/cycleN's //go:build acs.
+	body := "//go:build acs\n\npackage tagged\n\nimport \"testing\"\n\nfunc TestGated(t *testing.T) {}\n"
+	if err := os.WriteFile(filepath.Join(dir, "tagged_test.go"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, ok := realGoUnitTest(context.Background(), mod, "./tagged"); !ok {
+		t.Fatalf("build-tag-excluded package must report ok (nothing to unit-test), output:\n%s", out)
+	}
+}
+
+// TestGoTestExcludedByBuildTags asserts the classifier separates a build-tag
+// exclusion (nothing to test) from genuine failures (compile error / assertion)
+// that must still be reported.
+func TestGoTestExcludedByBuildTags(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{"build-tag exclusion (package under test)", "# x/acs/cycle4\npackage x/acs/cycle4: build constraints exclude all Go files in /p\nFAIL\tx/acs/cycle4 [setup failed]\nFAIL\n", true},
+		{"transitive import excluded — real build failure, not swallowed", "# p1\npackage p1 (test)\n\timports p2\n\timports p3: build constraints exclude all Go files in /p\nFAIL\tp1 [setup failed]\nFAIL\n", false},
+		{"assertion failure", "--- FAIL: TestBad (0.00s)\n    boom\nFAIL\tx\t0.01s\nFAIL\n", false},
+		{"compile error", "# x\nx.go:3:1: undefined: Foo\nFAIL\tx [build failed]\n", false},
+		{"clean pass", "ok  \tx\t0.012s\n", false},
+		{"no-test-files string is not an exclusion", "?   \tx\t[no test files]\n", false},
+	}
+	for _, c := range cases {
+		if got := goTestExcludedByBuildTags(c.output); got != c.want {
+			t.Errorf("%s: goTestExcludedByBuildTags = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestChangedGoTestPackages_DerivesUniqueModulePackages(t *testing.T) {
 	paths := []string{
 		"go/internal/bridge/driver_claudetmux.go",
