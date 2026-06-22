@@ -55,6 +55,37 @@ type Flag struct {
 	RemoveIn   string
 }
 
+// ClusterCoreInfra marks the irreducible process-config flags — writable /
+// read-only roots and test-harness mode — that are NOT operator feature dials
+// and are never consolidated away. The flag-reduction campaign metric
+// (LiveFeatureFlags) excludes them: driving them to zero is neither possible
+// nor desirable. Keep this string identical to the Cluster value on those rows;
+// TestIsCoreInfra_ClusterMarkerConstMatchesData guards the two against drift.
+const ClusterCoreInfra = "Core Infrastructure (never consolidate)"
+
+// IsCoreInfra reports whether f is an irreducible core-infrastructure flag
+// (process configuration, not a feature dial).
+func IsCoreInfra(f Flag) bool { return f.Cluster == ClusterCoreInfra }
+
+// LiveFeatureFlags returns the operator-facing feature flags still read in
+// production: StatusActive minus core-infrastructure. This is the SSOT metric
+// the flag-reduction campaign drives toward zero (no_feature_flags goal —
+// cross-component behavior belongs in policy.json/DI/Strategy, not an env dial).
+//
+// Deprecated / internal / test-seam / dead rows are excluded: deprecating a flag
+// removes its live os.Getenv reader, so the row no longer counts toward the
+// metric even though its tombstone remains in All for back-compat documentation.
+// The result preserves All's by-Name sort.
+func LiveFeatureFlags() []Flag {
+	out := make([]Flag, 0, len(All))
+	for _, f := range All {
+		if f.Status == StatusActive && !IsCoreInfra(f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // Lookup returns the registry row for name.
 func Lookup(name string) (Flag, bool) {
 	i := sort.Search(len(All), func(i int) bool { return All[i].Name >= name })

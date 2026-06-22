@@ -26,12 +26,42 @@ import "testing"
 // ceiling records the post-integration floor; the campaign resumes toward <30.
 const FlagCeiling = 47
 
-// TestRegistry_FlagCeiling enforces the one-way ratchet: the registry may
-// never exceed FlagCeiling rows. Raising this constant without a matching
-// removal is intentionally hard — do not bump it; remove a flag instead.
+// TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
+//
+// NOTE — this is no longer the campaign's progress metric, only a loose
+// completeness backstop. len(All) is ALLOWED to rise when the flagreaders guard
+// discovers a pre-existing unregistered live reader (a row must be added for
+// completeness); the real campaign target is LiveFeatureFlagCeiling below, which
+// counts only live operator dials. So this ceiling may be bumped for a genuine
+// completeness addition, but never to mask a net-new feature flag.
 func TestRegistry_FlagCeiling(t *testing.T) {
 	if got := len(All); got > FlagCeiling {
 		t.Errorf("len(flagregistry.All) = %d exceeds FlagCeiling=%d — "+
 			"remove flags rather than raising the ceiling", got, FlagCeiling)
+	}
+}
+
+// LiveFeatureFlagCeiling is the campaign's real monotonic-decrease ratchet:
+// the count of live operator-facing feature flags (LiveFeatureFlags() =
+// StatusActive minus core-infrastructure) may never exceed it. Every cycle that
+// deprecates a flag (rewiring its env read to policy.json/DI) lowers the live
+// count and must lower this constant in the same diff. The campaign target is 0
+// — at which point only core-infra Active rows + internal/test-seam plumbing
+// remain, i.e. zero operator feature dials (the no_feature_flags goal).
+//
+// Anti-regression teeth: the in-tree count <= ceiling check below is the fast,
+// git-independent floor; go/acs/regression/flagceiling additionally fails the
+// per-cycle gate if the live count rose versus the campaign baseline (main),
+// which is what a same-metric unit test alone cannot enforce — a cycle could
+// otherwise raise this const the way cycle-5 raised FlagCeiling 47->48.
+const LiveFeatureFlagCeiling = 23
+
+// TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
+// Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is
+// additionally blocked against the baseline by the ACS guard.
+func TestRegistry_LiveFeatureFlagCeiling(t *testing.T) {
+	if got := len(LiveFeatureFlags()); got > LiveFeatureFlagCeiling {
+		t.Errorf("len(LiveFeatureFlags) = %d exceeds LiveFeatureFlagCeiling=%d — "+
+			"deprecate a flag to its replacement rather than raising the ceiling", got, LiveFeatureFlagCeiling)
 	}
 }
