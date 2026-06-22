@@ -79,14 +79,38 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 // realGoUnitTest runs `go test` (UNIT only — no integration tag) for one package
 // in moduleDir. passed == (exit 0), EXCEPT a package whose files are all excluded
 // by build tags is "nothing to unit-test" rather than a failure (see
-// goTestExcludedByBuildTags). A bounded timeout keeps a wedged test from hanging
-// the build phase.
+// goTestExcludedByBuildTags). The subprocess env is sanitized (see sanitizeEnv)
+// so the campaign's runtime flags don't flip env-sensitive tests. A bounded
+// timeout keeps a wedged test from hanging the build phase.
 func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, passed bool) {
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", pkg)
 	cmd.Dir = moduleDir
+	cmd.Env = sanitizeEnv(os.Environ())
 	out, err := cmd.CombinedOutput()
 	s := string(out)
 	return s, err == nil || goTestExcludedByBuildTags(s)
+}
+
+// sanitizeEnv drops the loop's per-run EVOLVE_* runtime flags from an env so the
+// self-check's `go test` runs tests in their default (CI-like) configuration.
+// The self-check runs as a subprocess of a cycle, which sets EVOLVE_FLEET=1 (and
+// other phase env); inheriting that flips env-sensitive tests into false failures
+// — e.g. internal/bridge's fleet-mode worktree guard returns exit 10 ("explicit
+// worktree required") under EVOLVE_FLEET, though the package passes cleanly in
+// CI. Prefix match on "EVOLVE_"; everything else (PATH, HOME, GOFLAGS, …) is kept
+// so the toolchain still works. What we strip is only the campaign's *ambient*
+// runtime config: a test in the package under test that needs an EVOLVE_ var sets
+// it at runtime via t.Setenv inside the go-test subprocess, which runs after this
+// sanitization and is unaffected.
+func sanitizeEnv(environ []string) []string {
+	out := make([]string, 0, len(environ))
+	for _, kv := range environ {
+		if strings.HasPrefix(kv, "EVOLVE_") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // goTestExcludedByBuildTags reports whether a non-zero `go test` result is the

@@ -151,6 +151,57 @@ func TestGoTestExcludedByBuildTags(t *testing.T) {
 	}
 }
 
+// TestSanitizeEnv_StripsEvolveRuntimeFlags is the pure classifier for the env
+// the self-check's `go test` subprocess runs under: the campaign's per-run
+// EVOLVE_* flags (EVOLVE_FLEET etc.) must be removed so tests run in their
+// default (CI-like) config, while everything else is preserved. Prefix match,
+// not substring (NOTEVOLVE_X is kept).
+func TestSanitizeEnv_StripsEvolveRuntimeFlags(t *testing.T) {
+	in := []string{"EVOLVE_FLEET=1", "PATH=/bin", "EVOLVE_FLEET_SCOPE=a,b", "HOME=/h", "NOTEVOLVE_FLEET=keep"}
+	got := sanitizeEnv(in)
+	want := []string{"PATH=/bin", "HOME=/h", "NOTEVOLVE_FLEET=keep"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sanitizeEnv = %v, want %v (drop EVOLVE_* by prefix, keep the rest)", got, want)
+	}
+}
+
+// TestRealGoUnitTest_SanitizesCampaignEnv proves end-to-end that the self-check
+// does NOT leak the campaign's runtime env into its `go test` subprocess. A live
+// cycle surfaced this: the self-check inherited EVOLVE_FLEET=1, which flips
+// internal/bridge's fleet-mode worktree guard into a false failure. The temp
+// package's test fails iff it observes EVOLVE_FLEET — so realGoUnitTest passing
+// proves the env was sanitized.
+func TestRealGoUnitTest_SanitizesCampaignEnv(t *testing.T) {
+	t.Setenv("EVOLVE_FLEET", "1") // campaign runtime flag present in the parent env
+	mod := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(mod, "envcheck")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `package envcheck
+
+import (
+	"os"
+	"testing"
+)
+
+func TestNoFleetLeak(t *testing.T) {
+	if os.Getenv("EVOLVE_FLEET") != "" {
+		t.Fatal("EVOLVE_FLEET leaked into the go test subprocess")
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "envcheck_test.go"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, ok := realGoUnitTest(context.Background(), mod, "./envcheck"); !ok {
+		t.Fatalf("self-check must run go test in a sanitized env (no EVOLVE_* leak), output:\n%s", out)
+	}
+}
+
 func TestChangedGoTestPackages_DerivesUniqueModulePackages(t *testing.T) {
 	paths := []string{
 		"go/internal/bridge/driver_claudetmux.go",
