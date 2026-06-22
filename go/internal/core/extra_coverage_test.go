@@ -433,31 +433,6 @@ func TestParseProposal_MalformedJSON(t *testing.T) {
 
 // --- statemachine pure spine-floor functions --------------------------------
 
-// TestPrecedingAnchorBound covers every case of the non-anchor → anchor-bound map.
-func TestPrecedingAnchorBound(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		target Phase
-		want   int
-	}{
-		{PhaseStart, 0},
-		{PhaseIntent, 0},
-		{PhaseScout, 0},
-		{PhaseTriage, 0},
-		{PhaseTDD, 0},
-		{PhaseBuildPlanner, 0},
-		{PhaseBuild, 1},
-		{PhaseRetro, 3},
-		{PhaseEnd, 3},
-		{PhaseShip, 0}, // default
-	}
-	for _, tc := range cases {
-		if got := precedingAnchorBound(tc.target); got != tc.want {
-			t.Errorf("precedingAnchorBound(%s) = %d, want %d", tc.target, got, tc.want)
-		}
-	}
-}
-
 // TestAnchorArtifactPresent covers each anchor branch including the audit
 // verdict gate (only PASS/WARN count) and the default "no pre-artifact" return.
 func TestAnchorArtifactPresent(t *testing.T) {

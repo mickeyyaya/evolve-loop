@@ -231,60 +231,71 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 	return "", fmt.Errorf("%w: no successor for %s", ErrTransitionInvalid, current)
 }
 
-// mandatoryAnchors is the canonical order of the spine anchors. Membership in
-// the *effective* spine is decided per-config; this only fixes their order.
-var mandatoryAnchors = []Phase{PhaseScout, PhaseBuild, PhaseAudit, PhaseShip}
+// mandatoryAnchorsFor is the spine-anchor ORDER, derived ENTIRELY from config
+// (ADR-0058 S6): the mandatory phases in the configured order. No phase is a Go
+// literal here — an operator sets the spine anchors purely by editing the
+// registry's phase order / mandatory_phases. effectiveOrder falls back to
+// cfg.Mandatory when no registry order is loaded, so the floor always has anchors.
+func mandatoryAnchorsFor(cfg config.RoutingConfig) []Phase {
+	var anchors []Phase
+	for _, name := range effectiveOrder(cfg) {
+		if !isConfiguredMandatory(cfg, name) {
+			continue
+		}
+		// Only built-in phases carry artifact-gate semantics; an unrecognized
+		// mandatory name (a user phase) maps to "" — skip it rather than seed the
+		// anchor list with an empty no-op Phase.
+		if p := phaseFromRouter(name); p != "" {
+			anchors = append(anchors, p)
+		}
+	}
+	return anchors
+}
 
-// SpineSatisfiedUpTo is the artifact-backed structural gate: target may run only
-// if every configured-mandatory anchor ordered BEFORE it has produced a real
-// handoff artifact this cycle (Audit additionally requires a PASS/WARN verdict).
+// effectiveOrder is the phase sequence the floor positions anchors against:
+// cfg.Order when the registry supplies one, else cfg.Mandatory (so a registry-
+// less SM still orders its anchors). Pure config — no hardcoded phase order.
+// NB: distinct from router.effectiveOrder, whose fallback is the router's
+// canonicalOrder; the floor falls back to cfg.Mandatory.
+func effectiveOrder(cfg config.RoutingConfig) []string {
+	if len(cfg.Order) > 0 {
+		return cfg.Order
+	}
+	return cfg.Mandatory
+}
+
+// SpineSatisfiedUpTo is the artifact-backed structural gate: an ANCHOR target may
+// run only if every configured-mandatory anchor ordered BEFORE it has produced a
+// real handoff artifact this cycle (Audit additionally requires a PASS/WARN
+// verdict). A non-anchor target is unconstrained here — the spine floor gates
+// only the mandatory anchors; the router's plan + legality gate guard optional/
+// user insertions, and CanTerminateEarly gates end.
 //
 // Because it keys off RoutingSignals.<X>.Present — digested from real on-disk
 // handoffs — the orchestrator cannot reach Ship by merely claiming Audit passed;
 // a real audit artifact with a shippable verdict must exist. This is the
-// non-gameable floor that survives whichever routing Strategy is selected.
+// non-gameable floor that survives whichever routing Strategy is selected. The
+// anchor SET and ORDER are config-driven (mandatoryAnchorsFor); only HOW a
+// handoff is verified (anchorArtifactPresent) is fixed verification logic — an
+// anchor with no declared check (e.g. a never-skip triage) is a no-op.
 func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) bool {
-	ti := anchorIndex(target)
+	anchors := mandatoryAnchorsFor(cfg)
+	ti := -1
+	for i, a := range anchors {
+		if a == target {
+			ti = i
+			break
+		}
+	}
 	if ti < 0 {
-		// target is not an anchor (an optional phase): only require that any
-		// anchors strictly before its nearest preceding anchor are satisfied.
-		ti = precedingAnchorBound(target)
+		return true // non-anchor target: not gated by the spine floor
 	}
 	for i := 0; i < ti; i++ {
-		anchor := mandatoryAnchors[i]
-		if !isConfiguredMandatory(cfg, string(anchor)) {
-			continue // operator removed this anchor from the mandatory set
-		}
-		if !anchorArtifactPresent(anchor, sig) {
+		if !anchorArtifactPresent(anchors[i], sig) {
 			return false
 		}
 	}
 	return true
-}
-
-// anchorIndex returns target's position in mandatoryAnchors, or -1.
-func anchorIndex(target Phase) int {
-	for i, a := range mandatoryAnchors {
-		if a == target {
-			return i
-		}
-	}
-	return -1
-}
-
-// precedingAnchorBound maps a non-anchor target to the number of anchors that
-// must already be satisfied before it can run, based on canonical position.
-func precedingAnchorBound(target Phase) int {
-	switch target {
-	case PhaseStart, PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner:
-		return 0 // before/at the build anchor — only scout precedes, handled by index 0
-	case PhaseBuild:
-		return 1 // scout must be present
-	case PhaseRetro, PhaseEnd:
-		return 3 // after audit
-	default:
-		return 0
-	}
 }
 
 func anchorArtifactPresent(anchor Phase, sig router.RoutingSignals) bool {
