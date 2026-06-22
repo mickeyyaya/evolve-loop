@@ -1,16 +1,12 @@
 package core
 
-import (
-	"strconv"
-	"strings"
-)
-
-// AdvisorDepthExceeded reports whether the dispatch env marks this as a NESTED
-// advisor invocation (EVOLVE_ADVISOR_DEPTH≥1). A malformed/non-numeric value is
-// treated as 0 — the stamp is defense-in-depth, never a reason to break a valid
-// advisor call. EVOLVE_ADVISOR_DEPTH is registered in flagregistry (WS1-S2).
-// Moved here from phase_advisor.go so that file no longer reads the env key.
-func AdvisorDepthExceeded(env map[string]string) bool {
-	n, err := strconv.Atoi(strings.TrimSpace(env["EVOLVE_ADVISOR_DEPTH"]))
-	return err == nil && n >= 1
+// AdvisorDepthExceeded is the injectable recursion-depth guard for PhaseAdvisor
+// (ADR-0052 §4.3, defense-in-depth). The PRIMARY guard is the mint denylist in
+// mintConfigsFrom; this injectable seam is the secondary backstop.
+//
+// EVOLVE_ADVISOR_DEPTH was removed in cycle-10 flag-reduction. The guard now
+// always returns false — the env-map signal is retired; the mint denylist
+// (reservedAdvisorNames) is the sole active recursion gate.
+func AdvisorDepthExceeded(_ map[string]string) bool {
+	return false
 }

@@ -211,17 +211,16 @@ No claude session output. Cycle cost $0.00.
 
 **Hypotheses**:
 1. `sandbox-exec` returns EPERM when the parent Claude Code process is itself sandboxed (Darwin 25.4+ nested-sandbox disallowed)
-2. `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` is not set, so the runner does not retry unsandboxed
+2. The preflight auto-config did not enable the EPERM fallback (check `evolve doctor preflight`)
 
 **Instrumentation target**:
 ```bash
-echo "[DEBUG-XXXX] EVOLVE_SANDBOX_FALLBACK_ON_EPERM=${EVOLVE_SANDBOX_FALLBACK_ON_EPERM:-unset}"
 echo "[DEBUG-XXXX] CLAUDECODE=${CLAUDECODE:-unset}"
 sandbox-exec -n "allow default" echo "sandbox-ok" 2>&1 | sed "s/^/[DEBUG-XXXX] /"
 ```
 
-**Fix check**: Set `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1` and re-run. `legacy/scripts/dispatch/detect-nested-claude.sh`
-should also auto-set this when `CLAUDECODE` env var is present.
+**Fix check**: Run `evolve doctor preflight` to check autoconfig. If nested-Claude is detected,
+the preflight auto-enables sandbox EPERM fallback (cycle-10: auto-computed from nest detection, not an env flag).
 
 ---
 

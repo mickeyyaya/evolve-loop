@@ -13,7 +13,6 @@ import (
 var coreInfraExpected = []string{
 	"EVOLVE_PLUGIN_ROOT",
 	"EVOLVE_PROJECT_ROOT",
-	"EVOLVE_TESTING",
 }
 
 func TestIsCoreInfra_MarksOnlyTheNeverConsolidateSet(t *testing.T) {

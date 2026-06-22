@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -20,8 +19,7 @@ import (
 // Each phase in --phases is run sequentially via the same factory the
 // orchestrator uses. The state machine is NOT consulted; the kernel
 // `evolve guard phase` hook downgrades from BLOCK to WARN when
-// EVOLVE_COMPOSE_PHASES=1 is exported (set automatically by this
-// subcommand).
+// PhaseRequest.ComposePhases is true (set automatically by this subcommand).
 //
 // Ship safety: if "ship" appears in --phases without --ship-anyway,
 // refuse early (the ship gate still enforces at the OS layer, but
@@ -87,17 +85,8 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Export the composition signal so the kernel hook (evolve guard
-	// phase) and any downstream code can soft-WARN instead of BLOCK.
-	prevSignal := os.Getenv("EVOLVE_COMPOSE_PHASES")
-	_ = os.Setenv("EVOLVE_COMPOSE_PHASES", "1")
-	defer func() {
-		if prevSignal == "" {
-			_ = os.Unsetenv("EVOLVE_COMPOSE_PHASES")
-		} else {
-			_ = os.Setenv("EVOLVE_COMPOSE_PHASES", prevSignal)
-		}
-	}()
+	// Signal compose mode via the DI field so the kernel guard can soft-WARN instead of BLOCK.
+	req.ComposePhases = true
 
 	fmt.Fprintf(stdout, "[compose] sequence: %s\n", strings.Join(phases, " -> "))
 	if *dryRun {

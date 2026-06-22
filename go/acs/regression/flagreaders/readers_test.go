@@ -93,6 +93,17 @@ var rootProseExclusions = map[string]bool{
 	"PRIVACY.md": true, "CONTRIBUTING.md": true,
 }
 
+// retiredFlagsByFile maps repo-relative paths (forward-slash) to sets of retired
+// flag tokens that must remain in those files for documented backward-compat. A
+// token listed here is exempt from orphan detection for that file only. These are
+// NOT active readers — the registry row is gone; the reference is documentation.
+var retiredFlagsByFile = map[string]map[string]bool{
+	// agents/evolve-tester.md preserves the dual-var worktree shell pattern required
+	// by the cycle-50/C50_009 regression invariant. EVOLVE_WORKTREE_PATH was retired
+	// in cycle-10; the snippet documents the backward-compat form for reference.
+	"agents/evolve-tester.md": {"EVOLVE_WORKTREE_PATH": true},
+}
+
 // TestEveryProductionReaderHasRegistryRow fails if any standalone EVOLVE_*
 // reference — in production Go, a CI workflow, a skill/agent instruction, or a
 // shell script — lacks a flagregistry row. Broadened beyond Go after cycle-360.
@@ -207,7 +218,18 @@ func scanTextTree(root string, exts map[string]bool, hasRow func(string) bool, o
 		if !exts[strings.ToLower(filepath.Ext(path))] {
 			return nil
 		}
-		return scanTextFile(path, hasRow, orphans)
+		// Wrap hasRow with per-file retired-token exemptions.
+		effectiveHasRow := hasRow
+		slash := filepath.ToSlash(path)
+		for relPath, retired := range retiredFlagsByFile {
+			if strings.HasSuffix(slash, "/"+relPath) {
+				r := retired
+				orig := hasRow
+				effectiveHasRow = func(name string) bool { return orig(name) || r[name] }
+				break
+			}
+		}
+		return scanTextFile(path, effectiveHasRow, orphans)
 	})
 	if err != nil {
 		return fmt.Errorf("walk %s: %w", root, err)

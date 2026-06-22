@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -170,26 +169,22 @@ func TestCompose_DryRun_NoExecution(t *testing.T) {
 	}
 }
 
-// TestCompose_ExportsComposeSignal — EVOLVE_COMPOSE_PHASES=1 is
-// exported during composition (visible to phase factories) and
-// restored afterwards.
+// TestCompose_ExportsComposeSignal — PhaseRequest.ComposePhases is true
+// when the factory is called from evolve compose (cycle-10: replaced the
+// retired EVOLVE_COMPOSE_PHASES env signal with a DI bool).
 func TestCompose_ExportsComposeSignal(t *testing.T) {
 	defer registry.SnapshotForTest()()
-	var observedDuring string
+	var observedDuring bool
 	registry.ResetForTesting()
 	registry.Register("scout", func(req core.PhaseRequest) core.PhaseRunner {
-		observedDuring = os.Getenv("EVOLVE_COMPOSE_PHASES")
+		observedDuring = req.ComposePhases
 		return &composeStubRunner{stub: &composeStub{}, name: "scout"}
 	})
-	t.Setenv("EVOLVE_COMPOSE_PHASES", "") // start clean
 	envJSON, _ := json.Marshal(core.PhaseRequest{Cycle: 1})
 	var stdout, stderr bytes.Buffer
 	_ = runCompose([]string{"--phases", "scout"}, bytes.NewReader(envJSON), &stdout, &stderr)
-	if observedDuring != "1" {
-		t.Errorf("during composition EVOLVE_COMPOSE_PHASES=%q, want 1", observedDuring)
-	}
-	if got := os.Getenv("EVOLVE_COMPOSE_PHASES"); got != "" {
-		t.Errorf("after composition EVOLVE_COMPOSE_PHASES=%q, want '' (restored)", got)
+	if !observedDuring {
+		t.Error("PhaseRequest.ComposePhases must be true during composition")
 	}
 }
 
