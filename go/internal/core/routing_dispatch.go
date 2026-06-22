@@ -209,6 +209,11 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 // phaseFromRouter denormalizes a router phase string back to a core.Phase.
 // The router speaks canonical "retrospective"/"end"; core uses "retro"/
 // PhaseEnd. An unknown string yields "" so enforceNext declines it.
+//
+// The core↔registry vocabulary skew this bridges is a DECIDED permanent boundary
+// (ADR-0060 §57), not debt: do NOT "unify" PhaseRetro's wire string — "retro" is
+// the trust-kernel serialized identity in state.json/ledger (pinned by
+// cyclestate.TestPhaseConstants), so the converter stays; the rename does not.
 func phaseFromRouter(s string) Phase {
 	switch s {
 	case "retrospective":
@@ -227,7 +232,9 @@ func phaseFromRouter(s string) Phase {
 // the core↔router vocabulary skew (PhaseRetro stringifies to "retro" but the
 // registry names the phase "retrospective"). It is the inverse of
 // phaseFromRouter's alias cases — used by specFor so a descriptor lookup cannot
-// silently miss on the skew and fall through to a wrong edge (ADR-0058).
+// silently miss on the skew and fall through to a wrong edge (ADR-0058). The skew
+// is a decided permanent boundary (ADR-0060 §57); this converter is the accepted
+// solution, not a deferred unification.
 func canonicalCatalogName(p Phase) string {
 	if p == PhaseRetro {
 		return "retrospective"
