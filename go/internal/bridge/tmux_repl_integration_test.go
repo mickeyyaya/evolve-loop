@@ -408,7 +408,9 @@ func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = itTmuxCtl.KillSession(ctx, session) })
 
-	out, err := exec.Command("tmux", "display-message", "-p", "-t", session, "#{pane_current_path}").Output()
+	// The session lives on the bridge's isolated socket (itTmuxCtl uses -L
+	// TmuxSocket), so this raw inspection must target the same socket.
+	out, err := exec.Command("tmux", TmuxSocketArgs("display-message", "-p", "-t", session, "#{pane_current_path}")...).Output()
 	if err != nil {
 		t.Fatalf("display-message: %v", err)
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // SessionKiller tears down one worker session. Injected so the reaper/dispatcher
@@ -39,7 +41,9 @@ func ExecTmuxKill(ctx context.Context, session string) error {
 	if session == "" {
 		return fmt.Errorf("refusing to kill tmux session with empty name (tmux would resolve it to the caller's own session)")
 	}
-	_ = tmuxRun(ctx, "kill-session", "-t", session)
+	// -L bridge.TmuxSocket: agent panes live on the bridge's isolated socket, so
+	// teardown must target it — a default-socket kill would leave them orphaned.
+	_ = tmuxRun(ctx, bridge.TmuxSocketArgs("kill-session", "-t", session)...)
 	return nil
 }
 
