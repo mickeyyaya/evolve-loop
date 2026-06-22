@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
@@ -458,7 +459,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 		// (test-the-merged-tree) rather than aborting: a transient
 		// GIT_FLEET_REBASE_NEEDED, not the terminal GIT_FF_MERGE_DIVERGED. The
 		// sequential loop is unaffected (it never has a moving main mid-cycle).
-		if opts.envBool("EVOLVE_FLEET") {
+		if opts.envBool(ipcenv.FleetKey) {
 			return shipErr(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip,
 				fmt.Sprintf("ship: fleet ff-merge %s into %s diverged (a peer cycle moved %s mid-pipeline); rebase + re-verify the merged tree, then re-ship", cycleBranch, branch, branch),
 				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", cycleBranch, "branch", branch)

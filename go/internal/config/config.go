@@ -515,12 +515,6 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
-	if v := env["EVOLVE_PHASE_RECOVERY"]; v != "" {
-		// ADR-0044 Unified Phase Recovery — the one dial for the whole
-		// program. Same trichotomy; a typo defaults to off, never silently
-		// enabling a kill-path. Default (no env) is shadow, set in defaults().
-		cfg.PhaseRecovery = parseEvidenceStage(v, "EVOLVE_PHASE_RECOVERY", ws)
-	}
 	if v := env["EVOLVE_PHASE_IO"]; v != "" {
 		// ADR-0050 Phase 3 — the unified phase-I/O rollout dial. Reuses
 		// parseStage (the 4-value off→shadow→advisory→enforce ladder) so a typo

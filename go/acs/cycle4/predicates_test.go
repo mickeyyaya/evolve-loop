@@ -84,7 +84,8 @@ func TestC4_006_FlagsAreDeprecatedInRegistry(t *testing.T) {
 	}
 	acsassert.FileContains(t, path, `Name: "EVOLVE_ADVISOR_DEPTH", Status: StatusDeprecated`)
 	acsassert.FileContains(t, path, `Name: "EVOLVE_DISABLE_WORKSPACE_GUARD", Status: StatusDeprecated`)
-	acsassert.FileContains(t, path, `Name: "EVOLVE_POLICY_BYPASS", Status: StatusDeprecated`)
+	// EVOLVE_POLICY_BYPASS row deleted in cycle-15 (bypass-policy-flag task) —
+	// row is fully gone, so the StatusDeprecated assertion is removed here.
 	acsassert.FileContains(t, path, `Name: "EVOLVE_PLATFORM", Status: StatusDeprecated`)
 	acsassert.FileContains(t, path, `Name: "EVOLVE_MARKETPLACE_DIR", Status: StatusDeprecated`)
 }

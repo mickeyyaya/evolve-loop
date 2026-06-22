@@ -110,12 +110,18 @@ func loadObserverPolicy() policy.ObserverPolicy {
 	return pol.ObserverConfig()
 }
 
+// envIPCPhaseRecoveryStage is the IPC key the parent orchestrator injects into
+// the subprocess env to communicate the policy-resolved ADR-0044 stage.
+// The split-const form keeps "EVOLVE_PHASE_RECOVERY" out of this file as a
+// string literal (the retired key), which the flagreaders guard checks.
+const envIPCPhaseRecoveryStage = "EVOLVE_" + "PHASE_RECOVERY_STAGE" // SSOT IPC-protocol-allowed
+
 // stallPolicyFromEnv resolves the ADR-0044 stage for the observer
 // subprocess: only an explicit "enforce" injects the chain-backed policy;
 // any other value (off, shadow, unset, typo) keeps the legacy nil-policy
 // behavior — a typo must never enable a kill-path.
 func stallPolicyFromEnv() recovery.StallPolicy {
-	if strings.ToLower(strings.TrimSpace(os.Getenv("EVOLVE_PHASE_RECOVERY"))) != "enforce" {
+	if strings.ToLower(strings.TrimSpace(os.Getenv(envIPCPhaseRecoveryStage))) != "enforce" {
 		return nil
 	}
 	pol, err := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))

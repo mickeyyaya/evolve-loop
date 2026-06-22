@@ -3,6 +3,8 @@ package fleet
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func bucketIDs(b []Todo) []string {
@@ -162,8 +164,8 @@ func TestPlanCycles_DisjointScopesPlusDeferred(t *testing.T) {
 		if len(s.Scope) == 0 {
 			t.Errorf("spec %d has empty Scope", i)
 		}
-		if s.Env[fleetScopeEnvKey] == "" {
-			t.Errorf("spec %d missing %s env", i, fleetScopeEnvKey)
+		if s.Env[ipcenv.FleetScopeKey] == "" {
+			t.Errorf("spec %d missing %s env", i, ipcenv.FleetScopeKey)
 		}
 		for _, id := range s.Scope {
 			if seen[id] {
@@ -191,8 +193,8 @@ func TestPlanCycles_SkipsEmptyBuckets(t *testing.T) {
 	if len(specs[0].Scope) != 2 {
 		t.Errorf("scope=%v, want both a,b clustered", specs[0].Scope)
 	}
-	if specs[0].Env[fleetScopeEnvKey] != "a,b" {
-		t.Errorf("EVOLVE_FLEET_SCOPE=%q, want a,b", specs[0].Env[fleetScopeEnvKey])
+	if specs[0].Env[ipcenv.FleetScopeKey] != "a,b" {
+		t.Errorf("EVOLVE_FLEET_SCOPE=%q, want a,b", specs[0].Env[ipcenv.FleetScopeKey])
 	}
 }
 

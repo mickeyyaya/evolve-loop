@@ -30,10 +30,13 @@ import "testing"
 // flag-campaign-8 wave-1 (salvaged): deleted 13 rows — 5 dead (PROMPT_MAX_TOKENS,
 // SANDBOX_FALLBACK_ON_EPERM, TESTING, WORKTREE_PATH, REAP_ORPHANS), COMPOSE_PHASES
 // (converted to policy then row-deleted), and 7 of the 8 campaign-7 tombstones
-// (readers fully removed) → 48 -> 35. POLICY_BYPASS deliberately KEPT (its env
-// bridge is a live operator escape hatch; --bypass-policy CLI conversion deferred
-// to the audited campaign rather than silently dropping the capability).
-const FlagCeiling = 35
+// (readers fully removed) → 48 -> 35.
+// cycle-15 (bypass-policy-flag): POLICY_BYPASS converted to --bypass-policy CLI flag,
+// row deleted → 35 -> 34. FlagCeiling stays at 35 (upper bound, not exact).
+// flag-campaign-10 wave-1 INTEGRATION (operator ratchet): cycles deleted 5 rows —
+// PHASE_RECOVERY (4-reader IPC+config), FLEET/FLEET_SCOPE/WORKTREE_ROOT (split-const
+// IPC via internal/ipcenv), POLICY_BYPASS (--bypass-policy CLI) → 35 -> 30.
+const FlagCeiling = 30
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
@@ -69,7 +72,12 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // PLATFORM/POLICY_BYPASS → policy.json/DI/CLI) lowered the live count 23 -> 21.
 // flag-campaign-8 wave-1 (salvaged): removed the 3 live dead dials
 // (PROMPT_MAX_TOKENS, REAP_ORPHANS, SANDBOX_FALLBACK_ON_EPERM); 21 -> 18.
-const LiveFeatureFlagCeiling = 18
+// cycle-15 (bypass-policy-flag): POLICY_BYPASS was already StatusDeprecated
+// (not a live feature flag), so LiveFeatureFlagCeiling unchanged at 18.
+// flag-campaign-10 wave-1 INTEGRATION: deleted 4 live Active dials
+// (PHASE_RECOVERY, FLEET, FLEET_SCOPE, WORKTREE_ROOT → IPC/policy); POLICY_BYPASS
+// was Deprecated (not live). 18 -> 14.
+const LiveFeatureFlagCeiling = 14
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is

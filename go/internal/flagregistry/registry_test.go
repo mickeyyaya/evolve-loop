@@ -70,21 +70,15 @@ func TestAll_SortedByName(t *testing.T) {
 // TestLookup_SpotChecks pins known flags against ground truth (the
 // L2.1 acceptance: spot-check vs grep).
 func TestLookup_SpotChecks(t *testing.T) {
-	tests := []struct {
-		name       string
-		wantStatus Status
-	}{
-		{"EVOLVE_PHASE_RECOVERY", StatusActive},
-		{"EVOLVE_SANDBOX", StatusActive},
-	}
-	for _, tt := range tests {
-		f, ok := Lookup(tt.name)
+	// Campaign-robust: verify Lookup round-trips for EVERY registered flag.
+	for _, want := range All {
+		got, ok := Lookup(want.Name)
 		if !ok {
-			t.Errorf("Lookup(%q): missing from registry", tt.name)
+			t.Errorf("Lookup(%q): present in All but missing from the lookup index", want.Name)
 			continue
 		}
-		if f.Status != tt.wantStatus {
-			t.Errorf("%s status = %q, want %q", tt.name, f.Status, tt.wantStatus)
+		if got.Status != want.Status {
+			t.Errorf("Lookup(%q).Status = %q, want %q", want.Name, got.Status, want.Status)
 		}
 	}
 }

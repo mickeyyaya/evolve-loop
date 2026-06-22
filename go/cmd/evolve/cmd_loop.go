@@ -73,6 +73,7 @@ type loopConfig struct {
 	ForceFresh        bool `json:"force_fresh,omitempty"`
 	SkipPreflight     bool `json:"skip_preflight,omitempty"`
 	SkipPreflightBoot bool `json:"skip_preflight_boot,omitempty"`
+	BypassPolicy      bool `json:"bypass_policy,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -183,7 +184,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			Env:                   cycleEnv,
 			Context:               cycleCtx,
 			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
-			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
+			BypassPolicy:          cfg.BypassPolicy,
 		}
 		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
@@ -300,7 +301,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			Env:                   cycleEnv,
 			Context:               cycleCtx,
 			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
-			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
+			BypassPolicy:          cfg.BypassPolicy,
 		}
 		result, err := orch.RunCycle(context.Background(), req)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)

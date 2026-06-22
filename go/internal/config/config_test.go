@@ -213,23 +213,18 @@ func TestStageAndModeString(t *testing.T) {
 func TestLoad_PhaseRecoveryStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// Default (no env): SHADOW — ADR-0044's behavior-neutral first ship
-	// (classify + log only; corrective actions need an explicit enforce).
+	// Default (no env): SHADOW — ADR-0044's behavior-neutral first ship.
 	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseRecovery != StageShadow {
 		t.Errorf("default PhaseRecovery = %v, want StageShadow", cfg.PhaseRecovery)
 	}
-	for v, want := range map[string]Stage{"off": StageOff, "0": StageOff, "shadow": StageShadow, "enforce": StageEnforce} {
-		if cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": v}); cfg.PhaseRecovery != want {
-			t.Errorf("EVOLVE_PHASE_RECOVERY=%q → %v, want %v", v, cfg.PhaseRecovery, want)
+	// EVOLVE_PHASE_RECOVERY is retired (cycle-12 flag retirement). The env var
+	// is ignored by applyEnv; the dial is now policy-driven (policy.RecoveryConfig).
+	// Passing the env var has no effect — PhaseRecovery stays at the default StageShadow.
+	for _, v := range []string{"off", "0", "shadow", "enforce", "banana"} {
+		cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": v})
+		if cfg.PhaseRecovery != StageShadow {
+			t.Errorf("EVOLVE_PHASE_RECOVERY=%q should be ignored (retired flag); got %v, want StageShadow", v, cfg.PhaseRecovery)
 		}
-	}
-	// A typo defaults to off (never silently enabling a kill-path) and warns.
-	cfg, ws := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": "banana"})
-	if cfg.PhaseRecovery != StageOff {
-		t.Errorf("typo EVOLVE_PHASE_RECOVERY → %v, want StageOff", cfg.PhaseRecovery)
-	}
-	if !hasWarning(ws, "unknown-value") {
-		t.Error("typo EVOLVE_PHASE_RECOVERY should warn unknown-value")
 	}
 }
 

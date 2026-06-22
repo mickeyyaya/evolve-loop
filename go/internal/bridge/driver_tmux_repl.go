@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliadmit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
@@ -104,7 +105,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// be another run's tree — fail closed (typed, exit 10 is a non-trigger
 		// code: a config bug must surface, never CLI-fallback). Single mode
 		// keeps the fallback for operator ergonomics, but loudly.
-		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+		if v, _ := lookupEnv(deps, ipcenv.FleetKey); envchain.BoolValue(v, false) {
 			return ExitBadFlags, fmt.Errorf("%s %w", pfx, errWorktreeRequired)
 		}
 		workingDir, _ = os.Getwd()

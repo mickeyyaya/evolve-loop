@@ -115,7 +115,7 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 //     replaces the resolved model outright — bypassing the env/profile/default
 //     chain AND the "auto" expansion (so a pinned model never triggers a
 //     resolvellm/catalog lookup). The caller is responsible for the
-//     EVOLVE_POLICY_BYPASS escape hatch (pass nil to bypass) and for validating
+//     --bypass-policy escape hatch (pass nil to bypass) and for validating
 //     the pin against the profile guardrails (policy.ValidatePin) before here.
 //     The profile fallback CHAIN is still appended after a pinned primary, so a
 //     pinned phase keeps CLI-failure resilience; an operator wanting a strict

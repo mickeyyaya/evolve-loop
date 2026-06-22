@@ -37,18 +37,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// recoveryStageFromEnv resolves the bridge-side EVOLVE_PHASE_RECOVERY stage.
-// The bridge is a subprocess, so it reads env directly (same pattern as
-// EVOLVE_COMMIT_EVIDENCE; config.RolloutStages holds the orchestrator's
-// view). Unset → "shadow" (the behavior-neutral first-ship default); an
-// unrecognized value → "off" — a typo must never silently enable a
-// kill-path (same posture as config.parseEvidenceStage).
+// recoveryStageFromEnv resolves the bridge-side ADR-0044 phase recovery stage.
+// The stage is injected by the orchestrator via Deps.RecoveryStage (policy-resolved);
+// empty → channel.ResolveStage returns "shadow" (the behavior-neutral default).
+// channel.ResolveStage is the single home of the resolution rule so the in-process
+// and subprocess readers can never drift (ADR-0045 I6).
 func recoveryStageFromEnv(deps Deps) string {
-	v, _ := lookupEnv(deps, "EVOLVE_PHASE_RECOVERY")
-	// channel.ResolveStage is the single home of the resolution rule (unset →
-	// shadow, typo → off), shared with the observer adapter so the subprocess
-	// and in-process readers can never drift (ADR-0045 I6).
-	return channel.ResolveStage(v)
+	return channel.ResolveStage(deps.RecoveryStage)
 }
 
 // fatalPaneVerdict consults the fatal-pane registry for one stop-review

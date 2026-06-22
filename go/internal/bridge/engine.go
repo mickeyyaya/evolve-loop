@@ -57,6 +57,10 @@ type Deps struct {
 	// Env is the request-local environment overlay consulted ahead of
 	// os.Getenv (via envchain). nil is treated as empty.
 	Env map[string]string
+	// RecoveryStage is the ADR-0044 Unified Phase Recovery rollout stage,
+	// injected by the orchestrator from the policy-resolved cfg.PhaseRecovery.
+	// Empty ⇒ channel.ResolveStage returns "shadow" (behavior-neutral default).
+	RecoveryStage string
 	// Typed timing fields (from BridgePolicy). Zero = use bridge built-in default.
 	ScrollbackLines    int
 	BootTimeoutS       int

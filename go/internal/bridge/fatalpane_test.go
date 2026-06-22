@@ -130,11 +130,10 @@ func TestFatalPaneVerdict_HealthyPaneNotPreempted(t *testing.T) {
 	}
 }
 
-// TestRecoveryStageFromEnv pins the bridge-side stage resolution
-// (EVOLVE_PHASE_RECOVERY, the one dial for the whole ADR-0044 program):
-// unset → shadow (the behavior-neutral default for the first ship), a typo →
-// off (never silently enabling a kill-path — same posture as
-// config.parseEvidenceStage), explicit values normalized case-insensitively.
+// TestRecoveryStageFromEnv pins the bridge-side stage resolution via
+// Deps.RecoveryStage (policy-injected, ADR-0044): unset → shadow (the
+// behavior-neutral default), a typo → off (never silently enabling a
+// kill-path), explicit values normalized case-insensitively.
 func TestRecoveryStageFromEnv(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ in, want string }{
@@ -146,15 +145,9 @@ func TestRecoveryStageFromEnv(t *testing.T) {
 		{"bogus", "off"}, // typo defaults to off, never to a kill-path
 	}
 	for _, tc := range cases {
-		in := tc.in
-		deps := Deps{LookupEnv: func(k string) (string, bool) {
-			if k == "EVOLVE_PHASE_RECOVERY" && in != "" {
-				return in, true
-			}
-			return "", false
-		}}
+		deps := Deps{RecoveryStage: tc.in}
 		if got := recoveryStageFromEnv(deps); got != tc.want {
-			t.Errorf("EVOLVE_PHASE_RECOVERY=%q → %q, want %q", tc.in, got, tc.want)
+			t.Errorf("RecoveryStage=%q → %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }

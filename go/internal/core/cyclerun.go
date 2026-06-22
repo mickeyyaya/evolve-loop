@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -438,7 +439,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	// Context["fleet_scope"] so the cycle selects ONLY its subset and concurrent
 	// cycles never pick work touching the same files. Read from the env SNAPSHOT
 	// (not live os.Getenv) so it stays per-cycle. Empty/unset ⇒ legacy behavior.
-	if scope := envSnap["EVOLVE_FLEET_SCOPE"]; scope != "" {
+	if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
 		ctxSnap["fleet_scope"] = scope
 	}
 

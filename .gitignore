@@ -147,3 +147,6 @@ coverage.out
 evolve*.log
 release-*.log
 routing-plan.json
+
+# campaign run logs (per-run runtime artifact)
+campaign.log

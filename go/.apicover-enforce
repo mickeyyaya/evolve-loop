@@ -355,3 +355,8 @@
 ./acs/cycle17
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle15
+
+# flag-reduction campaign cycle-14: internal/ipcenv is the IPC-protocol const
+# leaf for EVOLVE_FLEET / EVOLVE_FLEET_SCOPE / EVOLVE_WORKTREE_ROOT — zero
+# intra-repo imports, no flagregistry row (protocol, not operator dial).
+./internal/ipcenv

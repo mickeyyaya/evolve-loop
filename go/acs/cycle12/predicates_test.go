@@ -3,50 +3,51 @@
 // Package cycle12 materializes the cycle-12 acceptance criteria for the
 // committed top_n task:
 //
-//	consolidate-bridge-cluster — remove all 5 BRIDGE_* registry rows; add
-//	BridgePolicy struct to policy.go; add bridgePidfileEnv split-const to
-//	engine.go; update 3 production read sites (manifest.go, capabilities.go,
-//	recipe/loader.go) to use DI seam vars; lower FlagCeiling 163→158.
+//	phase-recovery-flag-retire — retire EVOLVE_PHASE_RECOVERY from the flag
+//	registry by converting all four bare env-var reads to the policy/config-resolved
+//	path (RecoveryConfig in policy.go; Deps.Env overlay for bridge/fatalpane;
+//	RecoveryStage field for CoreAdapter; IPC const for phasecmd subprocess), then
+//	deleting the registry row (35 → 34 rows).
 //
 // AC map (1:1 with triage top_n, scout-report.md ACs):
 //
-//	consolidate-bridge-cluster:
-//	  AC1+NEG2  All 5 BRIDGE_* flags absent from Lookup              → C12_001 (behavioral)
-//	  AC3       Registry row count == 158                             → C12_002 (behavioral, count)
-//	  AC2       FlagCeiling const == 158                              → C12_003 (config-check, waiver)
-//	  AC4+NEG1a BRIDGE_MANIFEST_DIR os.Getenv gone from manifest.go  → C12_004 (config-check, waiver)
-//	  AC4+NEG1b BRIDGE_CATALOG_DIR os.Getenv gone from capabilities  → C12_005 (config-check, waiver)
-//	  AC4+NEG1c BRIDGE_RECIPE_DIR os.Getenv gone from loader.go      → C12_006 (config-check, waiver)
-//	  AC5       BridgePolicy struct present in policy.go              → C12_007 (config-check, waiver)
-//	  AC6       bridgePidfileEnv split-const in engine.go             → C12_008 (config-check, waiver)
-//	  EDGE1     control-flags.md has no BRIDGE_* rows                 → C12_009 (config-check, waiver)
-//
-// ACs with manual+checklist disposition (enforced by CI, no cycle predicate needed):
-//
-//	AC7  (flagreaders ACS guard passes): evolve acs suite — flagreaders regression lane
-//	AC8  (full bridge suite 0 FAIL): CI pipeline — go test ./internal/bridge/... etc.
-//
-// ACs removed / pre-existing GREEN:
-//
-//	EDGE2 (.apicover-enforce has ./acs/cycle12): pre-existing GREEN — TDD adds this
-//	      entry during RED phase; self-referential predicate is unverifiable-remove.
+//	phase-recovery-flag-retire:
+//	  AC1      flagregistry.Lookup("EVOLVE_PHASE_RECOVERY") returns ok=false  → C12_001 (behavioral)
+//	  AC2      registry row count strictly reduced to 34                        → C12_002 (behavioral)
+//	  AC3      no bare env reads in core_adapter.go + phase_observer.go         → C12_003 (config-check, waiver)
+//	  AC4      flagreaders ACS guard still passes                               → manual+checklist (CI regression lane)
+//	  AC5      all affected packages test suite green                           → manual+checklist (CI pipeline)
+//	  AC6      stallPolicyFromEnv reads IPC const, not os.Getenv("...")        → C12_004 (config-check, waiver)
+//	  AC7      CoreAdapter.RecoveryStage field added                            → C12_005 (config-check, waiver)
+//	  EDGE1    control-flags.md has no EVOLVE_PHASE_RECOVERY entry              → C12_006 (config-check, waiver)
 //
 // Adversarial diversity (SKILL §6):
 //
-//	Negative:  C12_001 — Lookup returns ok=false for all 5 flags; cannot be
-//	           satisfied by adding magic strings — the registry row must be absent.
-//	Edge/OOD:  BRIDGE_GO (0 production reads, dead flag) is in C12_001 — the
-//	           pure-delete case where no code migration is required.
-//	Lexical:   Lookup / len() / FileNotContains / FileContains — four distinct verbs.
-//	Semantic:  registry count, flag-absence, env-reads-deleted (3 files), struct-added,
-//	           split-const, docs-updated — six distinct behavioral checks.
+//	Negative:  C12_001 — Lookup must return false; cannot be satisfied by any
+//	           magic-string patch — the row must be deleted from registry_table.go.
+//	           This is the primary anti-no-op signal: cycle-10 w2-phaserecovery-ipc
+//	           shipped with 35→35 rows because only readers were converted; this test
+//	           ensures that mistake is not repeated (flagprogress guard PR #212 added
+//	           after that failure also catches this, but at the metric level).
+//	Edge/OOD:  C12_002 — exact count == 34 (not just "< 35"), pinning the delta so
+//	           accidental additional deletions are caught immediately.
+//	Lexical:   Lookup() / len() / FileNotContains / FileContains — four distinct verbs.
+//	Semantic:  registry-row-absent, count-exact, env-reads-deleted (2 files),
+//	           IPC-const-defined (new protocol), field-added, doc-regenerated.
 //
-// 1:1 enforcement: predicate=9, manual+checklist=2, unverifiable-remove=1,
-// pre-existing-GREEN=1 → total AC=13 ✓
+// 1:1 enforcement: predicate=6, manual+checklist=2 → 7 ACs + 1 EDGE = 8 dispositions ✓
+//
+// Manual+checklist dispositions:
+//
+//	AC4 (flagreaders ACS guard): `go test -tags acs ./acs/regression/flagreaders/...`
+//	    — enforced by the CI regression lane; a cycle predicate would duplicate
+//	    an existing durable guard and add no signal beyond what that guard already provides.
+//	AC5 (full test suite): `go test ./internal/bridge/... ./internal/adapters/observer/...
+//	    ./internal/cli/phasecmd/... ./internal/config/... ./internal/policy/...`
+//	    — enforced by CI on every commit; no additional cycle predicate is needed.
 //
 // Floor binding (R9.3): predicates authored only for the committed top_n task
-// (consolidate-bridge-cluster). Deferred tasks (CHECKPOINT_*, BYPASS_*, etc.)
-// get zero predicates this cycle.
+// (phase-recovery-flag-retire). Deferred tasks get zero predicates.
 package cycle12
 
 import (
@@ -57,203 +58,188 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC12_001_AllBridgeFlagsAbsentFromRegistry verifies that all 5 BRIDGE_*
-// flags are no longer registered after Builder removes their rows from
-// registry_table.go.
+// TestC12_001_PhaseRecoveryFlagAbsentFromRegistry verifies that EVOLVE_PHASE_RECOVERY
+// is no longer registered after Builder removes its row from registry_table.go.
 //
-// Covers AC1 (5 rows absent from registry_table.go) and NEG2 (BRIDGE_PIDFILE
-// specifically absent). Includes all 5 flags: BRIDGE_GO (dead, 0 production
-// reads), BRIDGE_PIDFILE (IPC handoff), BRIDGE_MANIFEST_DIR, BRIDGE_CATALOG_DIR,
-// BRIDGE_RECIPE_DIR (3 path/dir overrides).
+// AC1: flagregistry.Lookup("EVOLVE_PHASE_RECOVERY") must return ok=false.
 //
-// BEHAVIORAL: calls flagregistry.Lookup() for each flag — the production SSOT.
-// A source edit alone cannot satisfy this; the row must be absent for Lookup
-// to return ok=false.
+// BEHAVIORAL: calls flagregistry.Lookup() — the production SSOT function. A source
+// edit alone cannot satisfy this; the row must be absent from registry_table.go for
+// Lookup to return ok=false. This is the primary anti-no-op signal: cycle-10
+// (w2-phaserecovery-ipc) shipped with rows 35→35 because only the readers were
+// converted without deleting the registry entry. The flagprogress guard (PR #212)
+// catches this at the metric level; this predicate asserts the specific row is gone.
 //
-// RED: all 5 flags are currently registered; each Lookup returns (flag, true).
-func TestC12_001_AllBridgeFlagsAbsentFromRegistry(t *testing.T) {
-	// All 5 BRIDGE_* rows from scout-report §Key Findings.
-	// Semantic sub-cases: dead flag (BRIDGE_GO), IPC handoff (BRIDGE_PIDFILE),
-	// 3 path/dir overrides (MANIFEST_DIR, CATALOG_DIR, RECIPE_DIR).
-	allFlags := []string{
-		"EVOLVE_BRIDGE_CATALOG_DIR",
-		"EVOLVE_BRIDGE_GO", // dead: 0 production reads (v12 cutover comment)
-		"EVOLVE_BRIDGE_MANIFEST_DIR",
-		"EVOLVE_BRIDGE_PIDFILE", // IPC handoff: envValue(env slice), NOT os.Getenv
-		"EVOLVE_BRIDGE_RECIPE_DIR",
-	}
-	for _, name := range allFlags {
-		if f, ok := flagregistry.Lookup(name); ok {
-			t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — flag still registered.\n"+
-				"Builder must remove this row from registry_table.go (cycle-12 BRIDGE_* consolidation).\n"+
-				"Current entry: Status=%q Cluster=%q",
-				name, f.Status, f.Cluster)
-		}
+// RED: flagregistry.Lookup currently returns (flag, true) for EVOLVE_PHASE_RECOVERY
+// (row at registry_table.go:30, StatusActive, "Phase Recovery (ADR-0044, Go-native)").
+func TestC12_001_PhaseRecoveryFlagAbsentFromRegistry(t *testing.T) {
+	const name = "EVOLVE_PHASE_RECOVERY"
+	if f, ok := flagregistry.Lookup(name); ok {
+		t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — registry row still present.\n"+
+			"Builder must remove the EVOLVE_PHASE_RECOVERY row from registry_table.go.\n"+
+			"Cycle-10 (w2-phaserecovery-ipc) shipped 35→35 by converting readers without\n"+
+			"deleting this row; that pattern is now blocked by flagprogress guard (PR #212).\n"+
+			"Current entry: Status=%q Cluster=%q",
+			name, f.Status, f.Cluster)
 	}
 }
 
-// TestC12_004_BridgeManifestDirEnvReadGoneFromManifest verifies that the
-// os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR") call at manifest.go:20 has been
-// removed and replaced by a DI seam var backed by BridgePolicy.
+// TestC12_002_RegistryRowCountDroppedTo34 verifies that the registry row count
+// is exactly 34 after Builder removes the EVOLVE_PHASE_RECOVERY row.
 //
-// The scout identified the single production read at manifest.go:20:
-//   - os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR")
+// AC2: the flagprogress gate requires len(flagregistry.All) < 35 (HEAD count).
+// This predicate pins the exact target (34) so any unintended additional deletion
+// or regression is also caught immediately.
 //
-// This is replaced by a package-level seam var bridgeManifestDirFn backed by
-// policy.Load(projectRoot()).BridgeConfig().ManifestDir.
+// BEHAVIORAL: calls len(flagregistry.All) — the production SSOT slice count.
+// Unlike a source-file grep, this cannot be satisfied by editing comments or
+// adding magic strings.
 //
-// // acs-predicate: config-check — the os.Getenv ABSENCE is the structural contract.
-//
-// RED: manifest.go:20 currently has os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR").
-func TestC12_004_BridgeManifestDirEnvReadGoneFromManifest(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	manifestFile := filepath.Join(root, "go", "internal", "bridge", "manifest.go")
-	if !acsassert.FileNotContains(t, manifestFile, `os.Getenv("EVOLVE_BRIDGE_MANIFEST_DIR")`) {
-		t.Errorf("RED: bridge/manifest.go still reads EVOLVE_BRIDGE_MANIFEST_DIR via os.Getenv.\n"+
-			"Builder must add a DI seam var bridgeManifestDirFn and replace bridgeManifestDir()\n"+
-			"body with the seam var (backed by policy.Load().BridgeConfig().ManifestDir).\n"+
-			"File: %s", manifestFile)
+// RED: len(flagregistry.All) is currently 35 (HEAD 52039d82).
+func TestC12_002_RegistryRowCountDroppedTo34(t *testing.T) {
+	const target = 34
+	if got := len(flagregistry.All); got != target {
+		t.Errorf("RED: len(flagregistry.All) = %d, want exactly %d.\n"+
+			"Builder must remove exactly the EVOLVE_PHASE_RECOVERY row from registry_table.go.\n"+
+			"HEAD count: 35. Target after deletion: %d.\n"+
+			"Removing additional rows would also fail this exact-count check.",
+			got, target, target)
 	}
 }
 
-// TestC12_005_BridgeCatalogDirEnvReadGoneFromCapabilities verifies that the
-// os.Getenv("EVOLVE_BRIDGE_CATALOG_DIR") call at capabilities.go:44 has been
-// removed and replaced by a DI seam var backed by BridgePolicy.
+// TestC12_003_NoBarePhaseRecoveryEnvReadsInObserverAndPhasecmd verifies that the
+// two production files holding direct EVOLVE_PHASE_RECOVERY env reads no longer
+// contain them after Builder routes through the policy DI seams.
 //
-// The scout identified the single production read at capabilities.go:44:
-//   - os.Getenv("EVOLVE_BRIDGE_CATALOG_DIR")
+// AC3 (the two files that require code changes):
+//   - core_adapter.go must NOT have `envGet("EVOLVE_PHASE_RECOVERY")` (AC3+AC7 shared)
+//   - phase_observer.go must NOT have `os.Getenv("EVOLVE_PHASE_RECOVERY")` (AC3+AC6 shared)
 //
-// // acs-predicate: config-check — the os.Getenv ABSENCE is the structural contract.
+// Note: fatalpane.go is intentionally excluded from this check. The scout determined
+// that the Deps.Env overlay approach (injecting the resolved stage into bridge.Deps.Env
+// at wireOrchestratorDeps) allows fatalpane.go:47 to remain unchanged — lookupEnv
+// reads the resolved value from the overlay, not directly from os.Getenv. Both the
+// overlay approach and a RecoveryStage field on Deps are valid Builder choices for
+// fatalpane.go; this predicate does not constrain that decision.
 //
-// RED: capabilities.go:44 currently has os.Getenv("EVOLVE_BRIDGE_CATALOG_DIR").
-func TestC12_005_BridgeCatalogDirEnvReadGoneFromCapabilities(t *testing.T) {
+// // acs-predicate: config-check — env-read ABSENCE is the structural contract.
+//
+// RED: core_adapter.go:144 has `a.envGet("EVOLVE_PHASE_RECOVERY")`;
+// phase_observer.go:118 has `os.Getenv("EVOLVE_PHASE_RECOVERY")`.
+func TestC12_003_NoBarePhaseRecoveryEnvReadsInObserverAndPhasecmd(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	capFile := filepath.Join(root, "go", "internal", "bridge", "capabilities", "capabilities.go")
-	if !acsassert.FileNotContains(t, capFile, `os.Getenv("EVOLVE_BRIDGE_CATALOG_DIR")`) {
-		t.Errorf("RED: capabilities/capabilities.go still reads EVOLVE_BRIDGE_CATALOG_DIR via os.Getenv.\n"+
-			"Builder must add a DI seam var catalogDirFn and replace catalogDir()\n"+
-			"body with the seam var (backed by policy.Load().BridgeConfig().CatalogDir).\n"+
-			"File: %s", capFile)
+
+	coreAdapterFile := filepath.Join(root, "go", "internal", "adapters", "observer", "core_adapter.go")
+	if !acsassert.FileNotContains(t, coreAdapterFile, `envGet("EVOLVE_PHASE_RECOVERY")`) {
+		t.Errorf("RED: core_adapter.go still reads EVOLVE_PHASE_RECOVERY via envGet.\n"+
+			"Builder must add RecoveryStage string field to CoreAdapter and replace\n"+
+			"a.envGet(\"EVOLVE_PHASE_RECOVERY\") at line 144 with a.RecoveryStage.\n"+
+			"Wire at wireOrchestratorDeps: RecoveryStage: string(cfg.PhaseRecovery).\n"+
+			"File: %s", coreAdapterFile)
+	}
+
+	phaseObserverFile := filepath.Join(root, "go", "internal", "cli", "phasecmd", "phase_observer.go")
+	if !acsassert.FileNotContains(t, phaseObserverFile, `os.Getenv("EVOLVE_PHASE_RECOVERY")`) {
+		t.Errorf("RED: phasecmd/phase_observer.go still reads EVOLVE_PHASE_RECOVERY via os.Getenv.\n"+
+			"Builder must define an IPC const (e.g. envIPCPhaseRecoveryStage =\n"+
+			"\"EVOLVE_\"+\"PHASE_RECOVERY_STAGE\" // SSOT IPC-protocol-allowed) and replace\n"+
+			"os.Getenv(\"EVOLVE_PHASE_RECOVERY\") in stallPolicyFromEnv() with the IPC const read.\n"+
+			"File: %s", phaseObserverFile)
 	}
 }
 
-// TestC12_006_BridgeRecipeDirEnvReadGoneFromLoader verifies that the
-// os.Getenv("EVOLVE_BRIDGE_RECIPE_DIR") call at recipe/loader.go:35 has been
-// removed and replaced by a DI seam var backed by BridgePolicy.
+// TestC12_004_StallPolicyUsesIPCConst verifies that phase_observer.go defines and
+// uses the new IPC const (EVOLVE_PHASE_RECOVERY_STAGE) rather than the retired
+// env-var name.
 //
-// The scout identified the single production read at recipe/loader.go:35:
-//   - os.Getenv("EVOLVE_BRIDGE_RECIPE_DIR")
+// AC6: stallPolicyFromEnv() must read the IPC const, not os.Getenv("EVOLVE_PHASE_RECOVERY").
+// The scout specifies the split-const form to prevent the flagreaders guard from
+// picking up the key as a live unregistered read:
 //
-// // acs-predicate: config-check — the os.Getenv ABSENCE is the structural contract.
+//	const envIPCPhaseRecoveryStage = "EVOLVE_" + "PHASE_RECOVERY_STAGE" // SSOT IPC-protocol-allowed
 //
-// RED: recipe/loader.go:35 currently has os.Getenv("EVOLVE_BRIDGE_RECIPE_DIR").
-func TestC12_006_BridgeRecipeDirEnvReadGoneFromLoader(t *testing.T) {
+// The parent (wireOrchestratorDeps) injects the resolved stage under the new key;
+// the subprocess reads it via envIPCPhaseRecoveryStage. If the parent doesn't inject
+// the key, stallPolicyFromEnv defaults to nil-policy (same as shadow/off — fail-safe).
+//
+// // acs-predicate: config-check — the IPC const PRESENCE (new key suffix "PHASE_RECOVERY_STAGE")
+// is the structural contract that the subprocess protocol switched to the new env key.
+//
+// RED: phase_observer.go currently uses "EVOLVE_PHASE_RECOVERY" directly;
+// no "PHASE_RECOVERY_STAGE" suffix is present in the file.
+func TestC12_004_StallPolicyUsesIPCConst(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	loaderFile := filepath.Join(root, "go", "internal", "bridge", "recipe", "loader.go")
-	if !acsassert.FileNotContains(t, loaderFile, `os.Getenv("EVOLVE_BRIDGE_RECIPE_DIR")`) {
-		t.Errorf("RED: bridge/recipe/loader.go still reads EVOLVE_BRIDGE_RECIPE_DIR via os.Getenv.\n"+
-			"Builder must add a DI seam var recipeDirFn and replace recipeDir()\n"+
-			"body with the seam var (backed by policy.Load().BridgeConfig().RecipeDir).\n"+
-			"File: %s", loaderFile)
-	}
-}
-
-// TestC12_007_BridgePolicyStructAddedToPolicy verifies that the BridgePolicy
-// struct has been added to internal/policy/policy.go.
-//
-// BridgePolicy is the Configuration Object that replaces BRIDGE_MANIFEST_DIR,
-// BRIDGE_CATALOG_DIR, and BRIDGE_RECIPE_DIR. It is loaded from .evolve/policy.json
-// "bridge" block and injected via DI seam vars. Default values are encoded in
-// Policy.BridgeConfig() (ManifestDir="", CatalogDir="", RecipeDir="" → each
-// subsystem falls back to its default path when the field is empty).
-// Follows the FanoutPolicy (cycle-9) and ObserverPolicy (cycle-11) precedents.
-//
-// // acs-predicate: config-check — verifies the new config surface exists.
-//
-// RED: internal/policy/policy.go currently has no BridgePolicy type.
-func TestC12_007_BridgePolicyStructAddedToPolicy(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	policyFile := filepath.Join(root, "go", "internal", "policy", "policy.go")
-	if !acsassert.FileContains(t, policyFile, "BridgePolicy") {
-		t.Errorf("RED: internal/policy/policy.go has no BridgePolicy struct.\n"+
-			"Builder must add the BridgePolicy struct and Policy.BridgeConfig() method\n"+
-			"following the FanoutPolicy (cycle-9) and ObserverPolicy (cycle-11) precedents.\n"+
-			"Required fields: ManifestDir string, CatalogDir string, RecipeDir string.\n"+
-			"File: %s", policyFile)
-	}
-	// Also verify the BridgeConfig() accessor method is present.
-	if !acsassert.FileContains(t, policyFile, "BridgeConfig()") {
-		t.Errorf("RED: internal/policy/policy.go has no BridgeConfig() method.\n"+
-			"Builder must add Policy.BridgeConfig() that returns BridgePolicy with\n"+
-			"defaults applied (ManifestDir/CatalogDir/RecipeDir default to empty string;\n"+
-			"each subsystem falls back to its built-in default path when the field is empty).\n"+
-			"File: %s", policyFile)
-	}
-}
-
-// TestC12_008_BridgePidfileEnvSplitConstInEngine verifies that the IPC
-// handoff constant bridgePidfileEnv (split-const pattern) has been added to
-// bridge/engine.go, following the FanoutWorkerTokenEnv precedent in recursion.go.
-//
-// The split-const pattern `bridgePidfileEnv = "EVOLVE_" + "BRIDGE_PIDFILE"` keeps
-// the env-var key out of the flagregistry (the key is NEVER operator-facing; it is
-// a parent→child subprocess IPC signal set by driver_claudep.go:81 and read by
-// engine.go:483 via envValue(env, ...) — NOT os.Getenv). The registry row is
-// deleted; the subprocess env-passing mechanism is preserved unchanged.
-//
-// // acs-predicate: config-check — the split-const PRESENCE is the structural contract.
-//
-// RED: engine.go currently uses the string literal "EVOLVE_BRIDGE_PIDFILE" directly.
-func TestC12_008_BridgePidfileEnvSplitConstInEngine(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	engineFile := filepath.Join(root, "go", "internal", "bridge", "engine.go")
-	// The split-const form: "EVOLVE_" + "BRIDGE_PIDFILE" — the two parts must
-	// appear concatenated so the full EVOLVE_BRIDGE_PIDFILE string never appears
-	// in a single token that the flagregistry scanner would pick up.
-	if !acsassert.FileContains(t, engineFile, `"EVOLVE_"`) || !acsassert.FileContains(t, engineFile, `"BRIDGE_PIDFILE"`) {
-		t.Errorf("RED: bridge/engine.go does not have the bridgePidfileEnv split-const.\n"+
+	phaseObserverFile := filepath.Join(root, "go", "internal", "cli", "phasecmd", "phase_observer.go")
+	// Check for the new key's unique suffix. The split-const form ensures the full
+	// "EVOLVE_PHASE_RECOVERY_STAGE" string does not appear as a single literal
+	// (which the flagreaders guard would flag as an unregistered direct read).
+	// "PHASE_RECOVERY_STAGE" appears in the const definition and cannot match the
+	// retired "EVOLVE_PHASE_RECOVERY" name (no "_STAGE" suffix on the old name).
+	if !acsassert.FileContains(t, phaseObserverFile, "PHASE_RECOVERY_STAGE") {
+		t.Errorf("RED: phasecmd/phase_observer.go has no IPC const for the new env key.\n"+
 			"Builder must add:\n"+
-			"  const bridgePidfileEnv = \"EVOLVE_\" + \"BRIDGE_PIDFILE\"\n"+
-			"and replace the two string literals \"EVOLVE_BRIDGE_PIDFILE\" in engine.go\n"+
-			"(lines 481,483) with bridgePidfileEnv. Follows FanoutWorkerTokenEnv precedent.\n"+
-			"File: %s", engineFile)
+			"  const envIPCPhaseRecoveryStage = \"EVOLVE_\" + \"PHASE_RECOVERY_STAGE\" // SSOT IPC-protocol-allowed\n"+
+			"and update stallPolicyFromEnv() to read os.Getenv(envIPCPhaseRecoveryStage).\n"+
+			"The parent wireup (wireOrchestratorDeps) must inject the resolved stage under the new key.\n"+
+			"File: %s", phaseObserverFile)
 	}
 }
 
-// TestC12_009_ControlFlagsMdHasNoBridgeRows verifies that the generated doc
-// docs/architecture/control-flags.md has no EVOLVE_BRIDGE_* entries after
-// the 5 registry rows are removed and the doc regenerated.
+// TestC12_005_CoreAdapterHasRecoveryStageField verifies that CoreAdapter has a
+// RecoveryStage string field, replacing the envGet("EVOLVE_PHASE_RECOVERY") call
+// with a policy-injected DI seam.
 //
-// Covers EDGE1. The doc is generated from the flagregistry (source of truth);
-// its absence of BRIDGE_* rows follows from C12_001 (rows removed) plus the
-// regeneration step ('evolve flags generate').
+// AC7: CoreAdapter.RecoveryStage field used (not envGet("EVOLVE_PHASE_RECOVERY")).
+// The field is set at wireup in wireOrchestratorDeps (cmd_cycle.go):
 //
-// // acs-predicate: config-check — the doc regeneration is a required build step.
+//	RecoveryStage: string(cfg.PhaseRecovery)
 //
-// RED: control-flags.md currently has EVOLVE_BRIDGE_* entries.
-func TestC12_009_ControlFlagsMdHasNoBridgeRows(t *testing.T) {
+// This follows the existing DI seam pattern for observer configuration. After Builder
+// adds the field, the usage at core_adapter.go:144 becomes a.RecoveryStage (covered by
+// the absence check in C12_003).
+//
+// // acs-predicate: config-check — the RecoveryStage field PRESENCE is the structural
+// contract that the DI seam was added to replace the raw env call.
+//
+// RED: core_adapter.go has no RecoveryStage field; the struct reads envGet at line 144.
+func TestC12_005_CoreAdapterHasRecoveryStageField(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	coreAdapterFile := filepath.Join(root, "go", "internal", "adapters", "observer", "core_adapter.go")
+	if !acsassert.FileContains(t, coreAdapterFile, "RecoveryStage") {
+		t.Errorf("RED: core_adapter.go has no RecoveryStage field.\n"+
+			"Builder must add RecoveryStage string to the CoreAdapter struct:\n"+
+			"  RecoveryStage string\n"+
+			"then replace a.envGet(\"EVOLVE_PHASE_RECOVERY\") at line 144 with a.RecoveryStage,\n"+
+			"and wire RecoveryStage: string(cfg.PhaseRecovery) in wireOrchestratorDeps.\n"+
+			"File: %s", coreAdapterFile)
+	}
+}
+
+// TestC12_006_ControlFlagsMdHasNoPhaseRecoveryEntry verifies that the generated
+// docs/architecture/control-flags.md no longer lists EVOLVE_PHASE_RECOVERY after
+// Builder removes the registry row and regenerates the doc.
+//
+// EDGE1: the doc is generated from the flagregistry (source of truth); its absence
+// of EVOLVE_PHASE_RECOVERY follows from C12_001 (row removed) PLUS the regeneration
+// step (`cd go && go run ./cmd/evolve flags generate`). This predicate ensures the
+// regeneration step also ran — the row deletion alone doesn't update the committed doc.
+//
+// // acs-predicate: config-check — doc absence follows from row deletion + regeneration;
+// both steps must complete for this predicate to green.
+//
+// RED: control-flags.md currently lists EVOLVE_PHASE_RECOVERY (1 occurrence).
+func TestC12_006_ControlFlagsMdHasNoPhaseRecoveryEntry(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
 	controlFlags := filepath.Join(root, "docs", "architecture", "control-flags.md")
-	// Check the 5 BRIDGE_* flags that should all be absent post-regeneration.
-	bridgeFlags := []string{
-		"EVOLVE_BRIDGE_CATALOG_DIR",
-		"EVOLVE_BRIDGE_GO",
-		"EVOLVE_BRIDGE_MANIFEST_DIR",
-		"EVOLVE_BRIDGE_PIDFILE",
-		"EVOLVE_BRIDGE_RECIPE_DIR",
-	}
-	for _, flag := range bridgeFlags {
-		if !acsassert.FileNotContains(t, controlFlags, flag) {
-			t.Errorf("RED: control-flags.md still contains %q.\n"+
-				"Builder must remove all 5 BRIDGE_* rows from registry_table.go\n"+
-				"then regenerate the doc via 'evolve flags generate'.\n"+
-				"File: %s", flag, controlFlags)
-		}
+	if !acsassert.FileNotContains(t, controlFlags, "EVOLVE_PHASE_RECOVERY") {
+		t.Errorf("RED: control-flags.md still lists EVOLVE_PHASE_RECOVERY.\n"+
+			"Builder must:\n"+
+			"  1. Remove the EVOLVE_PHASE_RECOVERY row from registry_table.go\n"+
+			"  2. Regenerate the doc: cd go && go run ./cmd/evolve flags generate\n"+
+			"File: %s", controlFlags)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -296,7 +297,7 @@ func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) er
 	goArgs := append([]string{"run", "./cmd/evolve"}, spec.regenArgs...)
 	cmd := exec.CommandContext(ctx, "go", goArgs...)
 	cmd.Dir = filepath.Join(worktree, "go")
-	cmd.Env = append(os.Environ(), "EVOLVE_WORKTREE_ROOT="+worktree)
+	cmd.Env = append(os.Environ(), ipcenv.WorktreeRootKey+"="+worktree)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("regenerate %s via `evolve %s`: %w: %s", relPath, strings.Join(spec.regenArgs, " "), err, strings.TrimSpace(string(out)))
 	}

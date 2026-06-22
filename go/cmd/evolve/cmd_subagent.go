@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
@@ -475,8 +476,8 @@ func envOrCwd(env string) string { return cmdutil.EnvOrCwd(env) }
 // wrong root). Root-cause fix for the cycle-355 trap, where `flags check` read
 // main's stale control-flags.md and red-failed correct work.
 func sourceRoot() string {
-	if v := os.Getenv("EVOLVE_WORKTREE_ROOT"); v != "" {
-		return paths.AbsoluteRoot("EVOLVE_WORKTREE_ROOT", v, nil)
+	if v := os.Getenv(ipcenv.WorktreeRootKey); v != "" {
+		return paths.AbsoluteRoot(ipcenv.WorktreeRootKey, v, nil)
 	}
 	return envOrCwd("EVOLVE_PROJECT_ROOT")
 }

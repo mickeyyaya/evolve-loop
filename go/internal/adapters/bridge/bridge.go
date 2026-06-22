@@ -78,6 +78,10 @@ type Adapter struct {
 	// self-report failure via a structured sentinel; default StageOff keeps the
 	// dispatched prompt byte-identical to pre-3.8b.
 	phaseIO config.Stage
+	// recoveryStage is the ADR-0044 Unified Phase Recovery stage, injected from
+	// cfg.PhaseRecovery (policy-resolved). Passed to Deps.RecoveryStage on each
+	// engine creation so fatalpane.go never reads the env var directly.
+	recoveryStage string
 	// bridgeConfig carries the timing overrides loaded from policy.json at
 	// construction time. Zero values mean "use bridge built-in defaults".
 	bridgeConfig policy.BridgePolicy
@@ -131,6 +135,14 @@ func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
 	a.phaseIO = stage
 }
 
+// SetRecoveryStage wires the ADR-0044 Unified Phase Recovery stage so
+// the bridge engine's fatalpane detector reads the policy-resolved value
+// instead of the retired EVOLVE_PHASE_RECOVERY env var. Default (unset) is
+// "" which channel.ResolveStage normalizes to "shadow" (behavior-neutral).
+func (a *Adapter) SetRecoveryStage(stage string) {
+	a.recoveryStage = stage
+}
+
 // Launch injects the resolved interactive policy into the prompt body and
 // delegates to the Engine, which materializes the prompt, dispatches the
 // driver, and reads the artifact into BridgeResponse.Stdout.
@@ -160,6 +172,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 		return gobridge.NewEngine(gobridge.Deps{
 			Env:                req.Env,
+			RecoveryStage:      a.recoveryStage,
 			OnStopReview:       onSR,
 			BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
 			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,

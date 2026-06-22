@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // scopesOf reduces waves to [wave][spec][todo-id] for assertion.
@@ -100,8 +102,8 @@ func TestPlanWaves_SetsScopeEnv(t *testing.T) {
 		t.Fatalf("want 1 wave of 2 specs, got %v", scopesOf(waves))
 	}
 	for _, s := range waves[0] {
-		if s.Env[fleetScopeEnvKey] != strings.Join(s.Scope, ",") {
-			t.Errorf("spec %v: EVOLVE_FLEET_SCOPE=%q, want %q", s.Scope, s.Env[fleetScopeEnvKey], strings.Join(s.Scope, ","))
+		if s.Env[ipcenv.FleetScopeKey] != strings.Join(s.Scope, ",") {
+			t.Errorf("spec %v: EVOLVE_FLEET_SCOPE=%q, want %q", s.Scope, s.Env[ipcenv.FleetScopeKey], strings.Join(s.Scope, ","))
 		}
 	}
 }

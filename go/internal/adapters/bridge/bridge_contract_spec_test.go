@@ -99,3 +99,15 @@ func TestLaunch_DefaultResolver_NoContractForUserPhase(t *testing.T) {
 		t.Error("default resolver must not inject a contract for an unregistered user phase")
 	}
 }
+
+// TestSetRecoveryStage_WiresField confirms SetRecoveryStage stores the stage value
+// so the bridge can inject it into the engine's Deps.RecoveryStage (ADR-0044 DI seam).
+func TestSetRecoveryStage_WiresField(t *testing.T) {
+	a := New()
+	for _, stage := range []string{"", "shadow", "enforce", "off"} {
+		a.SetRecoveryStage(stage)
+		if a.recoveryStage != stage {
+			t.Errorf("SetRecoveryStage(%q) → a.recoveryStage = %q, want %q", stage, a.recoveryStage, stage)
+		}
+	}
+}

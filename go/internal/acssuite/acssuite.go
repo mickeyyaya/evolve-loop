@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
@@ -187,7 +188,7 @@ func predicateEnv(projectRoot, worktreeRoot string, changedPkgs []string) []stri
 		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
 	}
 	if worktreeRoot != "" {
-		env = append(env, "EVOLVE_WORKTREE_ROOT="+worktreeRoot)
+		env = append(env, ipcenv.WorktreeRootKey+"="+worktreeRoot)
 	}
 	if len(changedPkgs) > 0 {
 		// Space-joining is safe: go package patterns never contain spaces.

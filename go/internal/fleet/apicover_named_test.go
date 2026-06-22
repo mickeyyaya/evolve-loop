@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // TestLaunchFn_InvokedWithFleetEnvForced names the fleet.LaunchFn func type
@@ -19,7 +21,7 @@ func TestLaunchFn_InvokedWithFleetEnvForced(t *testing.T) {
 	var fn LaunchFn = func(_ context.Context, spec CycleSpec) (int, error) {
 		mu.Lock()
 		calls++
-		sawFleet = spec.Env[fleetEnvKey]
+		sawFleet = spec.Env[ipcenv.FleetKey]
 		mu.Unlock()
 		return 7, nil
 	}
