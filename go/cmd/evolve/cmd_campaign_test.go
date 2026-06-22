@@ -155,7 +155,7 @@ func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 
 func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
 	root := t.TempDir()
-	got := strings.Join(cycleRunArgs("abc123", false, root), " ")
+	got := strings.Join(cycleRunArgs("abc123", "", false, root), " ")
 	want := "cycle run --goal-hash abc123 --project-root " + root
 	if got != want {
 		t.Fatalf("cycleRunArgs = %q, want %q", got, want)
@@ -163,7 +163,7 @@ func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
 }
 
 func TestCycleRunArgs_EmptyRootOmitsFlag(t *testing.T) {
-	if got := strings.Join(cycleRunArgs("abc123", false, ""), " "); strings.Contains(got, "project-root") {
+	if got := strings.Join(cycleRunArgs("abc123", "", false, ""), " "); strings.Contains(got, "project-root") {
 		t.Fatalf("cycleRunArgs empty root = %q, want project-root omitted", got)
 	}
 }

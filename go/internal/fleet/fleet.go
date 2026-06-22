@@ -30,9 +30,14 @@ const fleetScopeEnvKey = "EVOLVE_FLEET_SCOPE"
 
 // CycleSpec describes one cycle the supervisor will launch.
 type CycleSpec struct {
-	GoalHash string            // --goal-hash for `evolve cycle run`
-	Scope    []string          // todo IDs this cycle owns (disjoint across specs); also in Env[fleetScopeEnvKey]
-	Env      map[string]string // base env overlay; EVOLVE_FLEET is forced on
+	GoalHash string   // --goal-hash for `evolve cycle run`
+	Scope    []string // todo IDs this cycle owns (disjoint across specs); also in Env[fleetScopeEnvKey]
+	// OutputContract is the plan's per-cycle done-definition, threaded to the
+	// launched cycle as --goal (Context["goal"]) so the scout executes the PLANNED
+	// work instead of free-choosing a task. Combined when a cycle merges several
+	// file-sharing todos. Empty = goal-hash only (the generic campaign goal).
+	OutputContract string
+	Env            map[string]string // base env overlay; EVOLVE_FLEET is forced on
 	// Optional is true only when EVERY todo in this cycle's group is optional, so
 	// an exhausted failure quarantines+continues rather than aborting the campaign.
 	Optional bool

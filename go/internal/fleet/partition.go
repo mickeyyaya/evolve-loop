@@ -23,8 +23,9 @@ func PlanCycles(todos []Todo, count int) (specs []CycleSpec, deferred []Todo) {
 			ids[i] = td.ID
 		}
 		specs = append(specs, CycleSpec{
-			Scope: ids,
-			Env:   map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
+			Scope:          ids,
+			OutputContract: combinedContract(b),
+			Env:            map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
 		})
 	}
 	return specs, deferred
