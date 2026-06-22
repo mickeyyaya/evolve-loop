@@ -40,6 +40,13 @@
       "channel": "controller"
     }
   },
+  "controls": {
+    "usage":     { "send": "/usage", "await": "prompt_marker", "exhausted_regex": "(?i)(limit reached|quota (exceeded|reached)|\\b0%\\s*(left|remaining)|rate.?limit)" },
+    "status":    { "send": "/usage", "await": "prompt_marker" },
+    "clean_ctx": { "send": "/clear" },
+    "model":     { "send": "/model" },
+    "help":      { "send": "/help" }
+  },
   "interactive_prompts": [
     {
       "name": "trust_prompt",

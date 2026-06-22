@@ -37,6 +37,14 @@
       "channel": "controller"
     }
   },
+  "controls": {
+    "usage":     { "send": "/status", "await": "prompt_marker", "exhausted_regex": "(?i)(limit reached|\\b0%\\s*left|rate.?limit|too many requests)" },
+    "status":    { "send": "/status", "await": "prompt_marker" },
+    "clean_ctx": { "send": "/clear" },
+    "compact":   { "send": "/compact" },
+    "model":     { "send": "/model" },
+    "exit":      { "send": "/quit" }
+  },
   "interactive_prompts": [
     {
       "name": "trust_prompt",

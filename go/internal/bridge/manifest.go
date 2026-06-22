@@ -113,6 +113,34 @@ type Manifest struct {
 	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
 	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.
 	Params map[string]ParamSpec `json:"params,omitempty"`
+	// Controls is the per-CLI control mapping table: how each ABSTRACT control
+	// event (usage|status|clean_ctx|…) maps to THIS CLI's concrete slash
+	// command. It is the data half of the CLI-control abstraction — the
+	// pipeline names an abstract event, this table resolves the command, and
+	// the CLI implementation stays hidden behind the abstraction (Adapter).
+	// Absent event → Control() reports not-found, which the Controller turns
+	// into a clean ErrUnsupported (e.g. ollama has no usage command).
+	Controls map[string]ControlSpec `json:"controls,omitempty"`
+}
+
+// ControlSpec is one abstract-event → concrete-command mapping (a manifest
+// `controls.<event>` entry). Send is the literal command pasted into the REPL;
+// Await names the pane condition to wait for after sending (default
+// "prompt_marker"); ExhaustedRegex, when set, is the conservative classifier a
+// consumer matches against the captured response to decide the family is
+// quota-capped (empty → the consumer treats the response as informational only).
+type ControlSpec struct {
+	Send           string `json:"send"`
+	Await          string `json:"await,omitempty"`
+	ExhaustedRegex string `json:"exhausted_regex,omitempty"`
+}
+
+// Control resolves the ControlSpec for an abstract event. ok=false when the CLI
+// declares no mapping for event (or no controls block at all) — a nil map reads
+// cleanly, so callers need no nil guard.
+func (m Manifest) Control(event string) (ControlSpec, bool) {
+	spec, ok := m.Controls[event]
+	return spec, ok
 }
 
 // LoadManifest reads and validates the embedded manifest for cli, then overlays

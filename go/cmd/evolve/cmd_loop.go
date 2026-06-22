@@ -284,6 +284,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// ones re-bench with a doubled cooldown, instead of a full phase
 		// re-discovering the wall the expensive way (cycle-283).
 		runCLIHealthCanary(cfg.ProjectRoot, cycleEnv, defaultLiveProbe(cfg.ProjectRoot, stderr), stderr)
+		// Proactive usage probe (opt-in): concurrently ask each installed family
+		// for its quota standing and bench the capped ones BEFORE the first
+		// phase boots one — so a fresh cap costs zero wasted boots. Off unless
+		// policy.json cli_health.proactive_probe is set.
+		runUsageProbe(cfg.ProjectRoot, cfg.EvolveDir, cycleEnv, stderr)
 
 		// Snapshot state.LastCycleNumber so we can detect
 		// counter-non-advance after RunCycle returns.

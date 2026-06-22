@@ -189,10 +189,13 @@ func newRecipeEngine(cfg *Config, deps Deps, cli string) (*recipe.Engine, error)
 // helpCaptureSettleTicks bounds the post-/help poll for the prompt marker.
 const helpCaptureSettleTicks = 8
 
-// CaptureHelp launches-or-attaches the CLI's REPL, sends `/help`, and returns
-// the resulting pane — the live half of `evolve bridge introspect`. The parse
-// + catalog diff is done by the capabilities package on the returned text.
-func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (string, error) {
+// captureControl launches-or-attaches the CLI's REPL, sends a single command,
+// polls up to settleTicks for the prompt marker to reappear, and returns the
+// captured pane. It is the table-driven generalization of the original /help
+// capture: the command is a parameter, so the same primitive drives `/help`
+// (introspect) and any abstract control event (usage/status/clean_ctx) whose
+// concrete command the caller resolved from the mapping table.
+func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command string, settleTicks int) (string, error) {
 	deps = deps.withDefaults()
 	drv, marker, err := newRecipeDriver(cfg, deps, cli)
 	if err != nil {
@@ -201,11 +204,11 @@ func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (strin
 	if err := drv.EnsureSession(ctx); err != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", err)
 	}
-	if err := drv.SendCommand(ctx, "/help"); err != nil {
+	if err := drv.SendCommand(ctx, command); err != nil {
 		return "", err
 	}
 	var pane string
-	for i := 0; i < helpCaptureSettleTicks; i++ {
+	for i := 0; i < settleTicks; i++ {
 		deps.Sleep(time.Second)
 		if drv.ar != nil {
 			drv.ar.tick(ctx, drv.session) // dismiss any modal; harmless otherwise
@@ -216,6 +219,13 @@ func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (strin
 		}
 	}
 	return pane, nil
+}
+
+// CaptureHelp launches-or-attaches the CLI's REPL, sends `/help`, and returns
+// the resulting pane — the live half of `evolve bridge introspect`. The parse
+// + catalog diff is done by the capabilities package on the returned text.
+func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (string, error) {
+	return captureControl(ctx, cfg, deps, cli, "/help", helpCaptureSettleTicks)
 }
 
 // RunRecipe loads the named recipe and executes it against cli using the tmux

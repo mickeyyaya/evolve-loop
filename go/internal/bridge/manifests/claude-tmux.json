@@ -77,6 +77,15 @@
       "flag": "--allowedTools"
     }
   },
+  "controls": {
+    "usage":     { "send": "/usage",   "await": "prompt_marker", "exhausted_regex": "(?i)(reached your (usage|weekly) limit|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))" },
+    "status":    { "send": "/status",  "await": "prompt_marker" },
+    "clean_ctx": { "send": "/clear" },
+    "compact":   { "send": "/compact" },
+    "model":     { "send": "/model" },
+    "help":      { "send": "/help" },
+    "exit":      { "send": "/exit" }
+  },
   "interactive_prompts": [
     {
       "name": "askuserquestion_multiselect",

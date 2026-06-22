@@ -39,6 +39,8 @@ Subcommands:
   capabilities  Print a CLI's capability catalog ( --cli=NAME [--json] )
   introspect    Diff a CLI's live /help against its catalog
                 ( --cli=NAME [--pane-file=PATH | --workspace=DIR] )
+  control       Drive one abstract control event (usage|status|clean_ctx|…)
+                ( bridge control <family> <event> --workspace=DIR )
   version   Print the bridge/evolve version
   help      Print this help
 
@@ -207,6 +209,9 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	case "introspect":
 		return runBridgeIntrospect(rest, stdout, stderr)
+
+	case "control":
+		return runBridgeControl(rest, stdout, stderr)
 
 	case "doctor":
 		filter, deep, jsonMode := "", false, false
