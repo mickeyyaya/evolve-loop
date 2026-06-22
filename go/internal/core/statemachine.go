@@ -177,6 +177,13 @@ func (sm *StateMachine) CanTerminateEarly(from Phase, shipPlanned bool) bool {
 	if shipPlanned {
 		return false
 	}
+	// Config-driven early-exit set (PA-DDK DDK-7): a phase's descriptor may declare
+	// early_exit explicitly; unset (nil) degrades to the literal pre-build set.
+	if sm.specFor != nil {
+		if spec, ok := sm.specFor(from); ok && spec.EarlyExit != nil {
+			return *spec.EarlyExit
+		}
+	}
 	switch from {
 	case PhaseScout, PhaseTriage:
 		return true

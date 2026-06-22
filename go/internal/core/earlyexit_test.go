@@ -1,0 +1,43 @@
+package core
+
+// earlyexit_test.go — PA-DDK DDK-7 (ADR-0060): the early-exit set is
+// config-driven (per-phase early_exit), with the shipPlanned guard staying Go.
+// Phases resolved via the kerneltest fixture — no hardcoded names.
+
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+)
+
+func TestCanTerminateEarly_ConfigDriven(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	sm := NewStateMachine().WithCatalog(specForCatalog(ref.Catalog))
+	firstAnchor := phaseFromRouter(ref.FirstAnchor())
+
+	if !sm.CanTerminateEarly(firstAnchor, false) {
+		t.Error("the discovery anchor declares early_exit — a no-ship cycle may terminate there")
+	}
+	// The shipPlanned guard (a Go invariant) always blocks early-exit.
+	if sm.CanTerminateEarly(firstAnchor, true) {
+		t.Error("a ship-intended cycle must NEVER early-exit, regardless of config")
+	}
+	// The ship terminal does not declare early_exit → cannot early-exit.
+	if sm.CanTerminateEarly(phaseFromRouter(ref.ShipTerminal()), false) {
+		t.Error("the ship terminal must not be early-exit eligible")
+	}
+}
+
+// TestCanTerminateEarly_DegradesToLiteral: a bare SM (no catalog) uses the
+// literal pre-build set — byte-identical to pre-DDK-7.
+func TestCanTerminateEarly_DegradesToLiteral(t *testing.T) {
+	t.Parallel()
+	sm := NewStateMachine()
+	if !sm.CanTerminateEarly(PhaseScout, false) {
+		t.Error("literal fallback: scout may early-exit")
+	}
+	if sm.CanTerminateEarly(PhaseBuild, false) {
+		t.Error("literal fallback: build may not early-exit")
+	}
+}
