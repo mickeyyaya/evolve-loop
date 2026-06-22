@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -230,6 +231,13 @@ type Orchestrator struct {
 	// path WITHOUT hardcoding them in the Phase enum / state machine. Empty (the
 	// default) ⇒ only built-in phases exist ⇒ byte-identical legacy behavior.
 	catalog phasespec.Catalog
+
+	// safetyViolations is the ValidateSafetyInvariants result computed once at
+	// construction over the wired SM + cfg + catalog (PA-DDK DDK-5). Non-empty ⇒
+	// the loaded transition config could ship without the floor; RunCycle /
+	// RunCycleFromPhase fail closed with ErrUnsafeConfig before any phase runs.
+	// nil (the bare/empty config) ⇒ no violations ⇒ unchanged behavior.
+	safetyViolations []string
 
 	// registrar mints advisor-proposed phases at cycle start (Steps 11/12).
 	// Nil (default) ⇒ MintPhases are ignored ⇒ byte-identical legacy behavior.
@@ -482,7 +490,14 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	// Without a catalog, specFor misses and Next stays on the literal table
 	// (byte-identical). PA-DDK DDK-3: the linear spine is now config-declared
 	// (cfg.SpineOrder); an empty order leaves the SM on the canonical literal.
-	o.sm.WithCatalog(o.specFor).WithSpine(spinePhasesFrom(o.cfg.SpineOrder))
+	o.sm.WithCatalog(o.specFor).WithSpine(spinePhasesFrom(o.cfg.SpineOrder)).
+		WithLegalGraph(legalGraphFrom(o.cfg.LegalSuccessors))
+	// PA-DDK DDK-5 (ADR-0060 §1a): with the legality graph + gates + verdict
+	// branches all config-driven, the floor's only structural guarantee is the
+	// phase-agnostic validator. Compute its verdict once over the fully-wired SM;
+	// RunCycle/RunCycleFromPhase fail closed if it found a floor hole. A bare/empty
+	// config yields no violations, so default orchestrators are unaffected.
+	o.safetyViolations = ValidateSafetyInvariants(o.sm, o.cfg, o.catalog)
 	// CA.5: the run-id stamping decorator wraps the (possibly option-
 	// replaced) ledger exactly once at construction. The per-run identity
 	// flows through the atomic currentRunID — RunCycle never mutates the
@@ -504,7 +519,22 @@ func fleetMode(env map[string]string) bool {
 // summary of what ran. The lock is acquired up front (except in fleet mode,
 // see fleetMode) and released on every exit path. State is updated
 // incrementally so a crash leaves an inspectable trail in .evolve/.
+// ensureSafeConfig fails closed when the loaded transition config violates a
+// safety invariant (PA-DDK DDK-5). It is the run-time half of the relocated
+// trust anchor: the composition root computes the violations at construction;
+// every cycle-run entry refuses to proceed if the floor could be bypassed, so an
+// unsafe registry edit can never run a single phase.
+func (o *Orchestrator) ensureSafeConfig() error {
+	if len(o.safetyViolations) > 0 {
+		return fmt.Errorf("%w: %s", ErrUnsafeConfig, strings.Join(o.safetyViolations, "; "))
+	}
+	return nil
+}
+
 func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleResult, error) {
+	if err := o.ensureSafeConfig(); err != nil {
+		return CycleResult{}, err
+	}
 	// Resource setup (lock, state read, cycle allocation, run-ID mint, CycleState,
 	// workspace-pollution guard, source worktree, cycle-state persist, run lease)
 	// → newCycleRun. It returns a single cleanup closure carrying the four exit

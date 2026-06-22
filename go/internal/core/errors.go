@@ -43,6 +43,13 @@ var (
 	// ErrTransitionInvalid means the supplied (from, verdict) pair has
 	// no defined successor in the state machine.
 	ErrTransitionInvalid = errors.New("core: invalid phase transition")
+
+	// ErrUnsafeConfig means the loaded transition config (legality graph, gates,
+	// verdict branches) violates a safety invariant — a flow that could ship
+	// without the integrity floor. The composition root computes the violations
+	// via ValidateSafetyInvariants at construction; RunCycle/RunCycleFromPhase
+	// fail closed with this before any phase runs (PA-DDK DDK-5, ADR-0060 §1a).
+	ErrUnsafeConfig = errors.New("core: unsafe transition config")
 )
 
 // ErrCycleLevelFailure wraps a phase failure that should escalate to cycle-level

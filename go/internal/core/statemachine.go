@@ -26,9 +26,13 @@ import (
 //	        └─→ end     (BLOCK)
 //	ship  → end
 type StateMachine struct {
-	// allowed[from] is the set of legal `to` phases. This legality graph is a
-	// config-INDEPENDENT trust anchor (ADR-0058): config can only select among
-	// edges it already permits, never invent one.
+	// allowed[from] is the set of legal `to` phases. As of PA-DDK DDK-5 this
+	// graph is config-DRIVEN (registry config.legal_successors, injected via
+	// WithLegalGraph); the literal default below is the byte-identical fallback
+	// when no config supplies it. The trust anchor is no longer the literal — it
+	// is ValidateSafetyInvariants, the phase-agnostic load-time validator the
+	// composition root HARD-fails on (ADR-0060 §1a). Config can declare any graph;
+	// the validator rejects any graph that could ship without the floor.
 	allowed map[Phase]map[Phase]bool
 	// specFor resolves a phase's descriptor so Next can read its verdict-branch
 	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table. Injected
@@ -108,6 +112,45 @@ func spinePhasesFrom(names []string) []Phase {
 		}
 	}
 	return out
+}
+
+// legalGraphFrom builds the kernel legality graph from the registry's
+// config.legal_successors map (PA-DDK DDK-5). Both keys and successor names
+// denormalize through phaseFromRouter (registry vocab → core.Phase, e.g.
+// "retrospective"→retro), so the graph spans the sentinels (start/end/debugger)
+// the registry phases[] array does not list. Returns nil for an empty map — the
+// signal to WithLegalGraph to keep the literal default. Unresolvable names are
+// dropped here; ValidateSafetyInvariants reports them as violations against the
+// source config so the drop is never silent at load.
+func legalGraphFrom(successors map[string][]string) map[Phase]map[Phase]bool {
+	if len(successors) == 0 {
+		return nil
+	}
+	graph := make(map[Phase]map[Phase]bool, len(successors))
+	for fromName, tos := range successors {
+		from := phaseFromRouter(fromName)
+		if from == "" {
+			continue
+		}
+		edges := make(map[Phase]bool, len(tos))
+		for _, toName := range tos {
+			if to := phaseFromRouter(toName); to != "" {
+				edges[to] = true
+			}
+		}
+		graph[from] = edges
+	}
+	return graph
+}
+
+// WithLegalGraph injects the config-driven legality graph (PA-DDK DDK-5). A nil/
+// empty graph leaves the SM on its literal `allowed` default — the byte-identical
+// fallback for catalog-less SMs and a registry omitting config.legal_successors.
+func (sm *StateMachine) WithLegalGraph(graph map[Phase]map[Phase]bool) *StateMachine {
+	if len(graph) > 0 {
+		sm.allowed = graph
+	}
+	return sm
 }
 
 // WithCatalog gives the StateMachine config-driven transition resolution: a

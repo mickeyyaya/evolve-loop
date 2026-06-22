@@ -135,6 +135,9 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 // NOT re-acquire the cycle lock (the caller already holds it, since the
 // checkpoint was written under lock).
 func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, resumePoint *ResumePoint) (CycleResult, error) {
+	if err := o.ensureSafeConfig(); err != nil {
+		return CycleResult{}, err
+	}
 	if resumePoint == nil {
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: resumePoint required")
 	}
