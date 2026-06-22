@@ -5,7 +5,7 @@
 // It is loaded from a single user-owned file (.evolve/policy.json) — distinct
 // from the per-agent profiles (which are defaults the advisor/operator may
 // vary). Policy is the TOP authority: a pin overrides even an operator's
-// EVOLVE_<AGENT>_CLI/_MODEL env override (escape hatch: EVOLVE_POLICY_BYPASS=1),
+// EVOLVE_<AGENT>_CLI/_MODEL env override (escape hatch: --bypass-policy flag),
 // and a pin is validated to stay WITHIN the phase profile's guardrails
 // (allowed_clis + model_tier_envelope) so policy cannot silently breach the
 // trust-kernel constraints.
@@ -112,6 +112,9 @@ type Policy struct {
 	// Catalog configures the model catalog subsystem. Absent ⇒ built-in
 	// defaults apply (AutoRefresh=true — the cycle-start live refresh is on).
 	Catalog *CatalogPolicy `json:"catalog,omitempty"`
+	// Recovery configures the ADR-0044 Unified Phase Recovery rollout stage.
+	// Absent ⇒ built-in default applies (PhaseRecovery="shadow" — behavior-neutral).
+	Recovery *RecoveryPolicy `json:"recovery,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -728,6 +731,26 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ReviewGate != "" {
 		c.ReviewGate = p.Gates.ReviewGate
+	}
+	return c
+}
+
+// RecoveryPolicy is the .evolve/policy.json "recovery" block.
+// It surfaces the ADR-0044 Unified Phase Recovery rollout stage so operators
+// can set phase_recovery = "enforce" in policy.json without an env var.
+type RecoveryPolicy struct {
+	PhaseRecovery string `json:"phase_recovery,omitempty"`
+}
+
+// RecoveryConfig returns recovery configuration with built-in defaults resolved.
+// Empty/absent PhaseRecovery ⇒ "shadow" (behavior-neutral first-ship default).
+func (p Policy) RecoveryConfig() RecoveryPolicy {
+	c := RecoveryPolicy{PhaseRecovery: "shadow"}
+	if p.Recovery == nil {
+		return c
+	}
+	if p.Recovery.PhaseRecovery != "" {
+		c.PhaseRecovery = p.Recovery.PhaseRecovery
 	}
 	return c
 }

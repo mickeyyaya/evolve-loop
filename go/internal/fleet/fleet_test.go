@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // TestSupervisor_Validate: a misconfigured supervisor (nil LaunchFn) is caught
@@ -28,7 +30,7 @@ func TestSupervisor_LaunchesAllWithFleetEnv(t *testing.T) {
 	gotFleet := map[string]string{}
 	s := &Supervisor{Launch: func(_ context.Context, spec CycleSpec) (int, error) {
 		mu.Lock()
-		gotFleet[spec.GoalHash] = spec.Env[fleetEnvKey]
+		gotFleet[spec.GoalHash] = spec.Env[ipcenv.FleetKey]
 		mu.Unlock()
 		switch spec.GoalHash {
 		case "b":
@@ -112,7 +114,7 @@ func TestSupervisor_DoesNotMutateCallerEnv(t *testing.T) {
 	callerEnv := map[string]string{"EVOLVE_CLI": "codex"}
 	s := &Supervisor{Launch: func(_ context.Context, _ CycleSpec) (int, error) { return 0, nil }}
 	s.Run(context.Background(), []CycleSpec{{GoalHash: "a", Env: callerEnv}})
-	if _, leaked := callerEnv[fleetEnvKey]; leaked {
+	if _, leaked := callerEnv[ipcenv.FleetKey]; leaked {
 		t.Errorf("EVOLVE_FLEET leaked into the caller's env map: %v", callerEnv)
 	}
 }

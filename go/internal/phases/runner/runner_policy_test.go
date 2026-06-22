@@ -47,7 +47,7 @@ func TestRun_PolicyPin_HonoredAbsolutely(t *testing.T) {
 	}
 }
 
-// TestRun_PolicyPin_Bypass — EVOLVE_POLICY_BYPASS=1 ignores the pin and falls
+// TestRun_PolicyPin_Bypass — --bypass-policy flag ignores the pin and falls
 // back to normal resolution.
 func TestRun_PolicyPin_Bypass(t *testing.T) {
 	root := t.TempDir()

@@ -43,6 +43,11 @@ type CoreAdapter struct {
 	// EnvLookup overrides os.Getenv for tests. Nil → os.Getenv.
 	EnvLookup func(key string) string
 
+	// RecoveryStage is the ADR-0044 Unified Phase Recovery stage, injected
+	// by the orchestrator from cfg.PhaseRecovery (policy-resolved). Empty →
+	// channel.ResolveStage returns "shadow" (behavior-neutral default).
+	RecoveryStage string
+
 	// Config carries policy.json observer settings.
 	Config policy.ObserverPolicy
 }
@@ -141,7 +146,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 	// bridge driver. Off → byte-identical to pre-channel behavior (no producer,
 	// no feed file).
 	var prodCancel func()
-	chOn := channel.Enabled(channel.ResolveStage(a.envGet("EVOLVE_PHASE_RECOVERY")))
+	chOn := channel.Enabled(channel.ResolveStage(a.RecoveryStage))
 	if chOn {
 		// Transport-aware source (ADR-0037 RT3): a tmux-family driver streams its
 		// live answer to <agent>-pane.live and breadcrumbs to
@@ -183,14 +188,6 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 			}
 		})
 	}
-}
-
-// envGet returns the value of key via EnvLookup when set, else os.Getenv.
-func (a *CoreAdapter) envGet(key string) string {
-	if a.EnvLookup != nil {
-		return a.EnvLookup(key)
-	}
-	return os.Getenv(key)
 }
 
 // channelSourcePaths returns the (stdout, stderr) files the channel Producer

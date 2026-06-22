@@ -11,8 +11,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
+
+// anyRenderedFlagToken returns the backticked name of the first registered flag,
+// for assertions that "some registry content was rendered" without hardcoding a
+// specific flag (the flag-reduction campaign deletes flags, so any pinned name
+// eventually 404s — the cycle-12 lesson). Skips the test when the registry is
+// empty (the campaign's terminal state).
+func anyRenderedFlagToken(t *testing.T) string {
+	t.Helper()
+	if len(flagregistry.All) == 0 {
+		t.Skip("flagregistry is empty; no rendered flag to assert against")
+	}
+	return "`" + flagregistry.All[0].Name + "`"
+}
 
 const flagsDocSeed = `# Control Flags Reference
 
@@ -50,7 +64,7 @@ func TestFlagsGenerateThenCheck_RoundTrip(t *testing.T) {
 	for _, want := range []string{
 		"Hand-written prose ABOVE",   // prose preserved
 		"GENERATED:flag-index BEGIN", // markers present
-		"`EVOLVE_PHASE_RECOVERY`",    // registry content rendered
+		anyRenderedFlagToken(t),      // registry content rendered (campaign-robust)
 	} {
 		if !strings.Contains(string(doc), want) {
 			t.Errorf("generated doc missing %q", want)
@@ -81,7 +95,11 @@ func TestFlagsCheck_DriftExitsTwo(t *testing.T) {
 	}
 	p := filepath.Join(root, "docs", "architecture", "control-flags.md")
 	doc, _ := os.ReadFile(p)
-	tampered := strings.Replace(string(doc), "`EVOLVE_PHASE_RECOVERY`", "`EVOLVE_TAMPERED_FLAG`", 1)
+	flagToken := anyRenderedFlagToken(t)
+	tampered := strings.Replace(string(doc), flagToken, "`EVOLVE_TAMPERED_FLAG`", 1)
+	if tampered == string(doc) {
+		t.Fatalf("tamper no-op: %q not found in generated doc", flagToken)
+	}
 	if err := os.WriteFile(p, []byte(tampered), 0o644); err != nil {
 		t.Fatal(err)
 	}

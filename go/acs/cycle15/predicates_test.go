@@ -1,13 +1,17 @@
 //go:build acs
 
-// Package cycle15 materializes the cycle-15 acceptance criteria for the
-// committed top_n task:
+// Package cycle15 materializes the cycle-15 acceptance criteria for two
+// committed top_n tasks:
 //
 //	consolidate-resume-cluster — remove all 6 RESUME_* registry rows
 //	(EVOLVE_AUTO_RESUME_MAX_ATTEMPTS, EVOLVE_RESUME, EVOLVE_RESUME_ALLOW_HEAD_MOVED,
 //	EVOLVE_RESUME_COMPLETED_PHASES, EVOLVE_RESUME_MODE, EVOLVE_RESUME_PHASE),
 //	lower FlagCeiling 160→154, remove RESUME_* rows from control-flags.md,
 //	and clean up docs_contract_test.go entries.
+//
+//	bypass-policy-flag — convert EVOLVE_POLICY_BYPASS to a proper --bypass-policy
+//	cobra flag on `evolve cycle run` and `evolve loop`, remove 3 cycleEnv bridge
+//	reads, and delete the EVOLVE_POLICY_BYPASS registry row.
 //
 // AC map (1:1 with triage top_n, scout-report.md ACs):
 //
@@ -19,31 +23,40 @@
 //	  AC5       control-flags.md has no RESUME_* rows               → C15_005 (config-check, waiver)
 //	  EDGE1     IPC set preserved: cmd_loop_args.go sets EVOLVE_RESUME=1  → C15_006 (config-check, waiver — PRE-EXISTING GREEN)
 //
+//	bypass-policy-flag:
+//	  AC1   --bypass-policy in `evolve cycle run --help`                   → C15_007 (behavioral, subprocess)
+//	  AC2   bypass_policy field in `evolve loop --dry-run --bypass-policy` → C15_008 (behavioral, subprocess)
+//	  AC3+4 cycleEnv["EVOLVE_POLICY_BYPASS"] absent from cmd files         → C15_009 (config-check, waiver)
+//	  AC5   EVOLVE_POLICY_BYPASS row absent from flagregistry              → C15_010 (behavioral, Lookup)
+//	  EDGE1 No os.Getenv("EVOLVE_POLICY_BYPASS") in production Go files    → PRE-EXISTING GREEN (0 production readers; scout confirmed)
+//
 // ACs with manual+checklist disposition (enforced by CI):
 //
-//	AC6   (full test suite green): `go test ./...` exit 0
+//	AC10  (full test suite green): `go test ./...` exit 0
 //
 // Adversarial diversity (SKILL §6):
 //
-//	Negative:  C15_001 — Lookup returns ok=false for all 6 flags; cannot be
-//	           satisfied by adding magic strings — the registry row must be absent.
-//	Edge/OOD:  EVOLVE_RESUME_ALLOW_HEAD_MOVED (NEG1) — was commented as "dead"
-//	           and referenced only in a comment in resume.go:35; AllowHeadMoved
-//	           field in ResumeOptions stays — only the env var row is removed.
-//	           EVOLVE_AUTO_RESUME_MAX_ATTEMPTS — pure dead: 0 production readers.
-//	Lexical:   Lookup / len() / FileContains / FileNotContains — four distinct verbs.
-//	Semantic:  registry-absence, row-count, ceiling-constant, env-read-absence,
-//	           doc-absence, ipc-set-preserved — six distinct behavioral dimensions.
+//	Negative:  C15_001 (Lookup ok=false for all 6 RESUME_* rows) +
+//	           C15_010 (Lookup ok=false for POLICY_BYPASS row) — neither
+//	           can be satisfied by adding a magic string; the row must be deleted.
+//	Edge/OOD:  C15_009 checks BOTH cmd_cycle.go AND cmd_loop.go (3 env bridge
+//	           sites: line 190 in cycle, lines 186+303 in loop).
+//	Lexical:   SubprocessOutput / FileNotContains / Lookup — three distinct verbs
+//	           across the bypass-policy predicates.
+//	Semantic:  CLI flag registration (C15_007), dry-run JSON field (C15_008),
+//	           env-bridge absence (C15_009), registry-row absence (C15_010) —
+//	           four distinct behavioral dimensions.
 //
-// 1:1 enforcement: predicate=6, manual+checklist=1, unverifiable-remove=0 → total AC=7 ✓
+// 1:1 enforcement (bypass-policy-flag): predicate=4, manual+checklist=1, pre-existing-GREEN=1 → total AC=6 ✓
 //
-// Floor binding (R9.3): predicates authored only for the committed top_n task
-// (consolidate-resume-cluster). Deferred tasks (BYPASS_*, TRIAGE_*, etc.)
-// get zero predicates this cycle.
+// Floor binding (R9.3): predicates authored only for the committed top_n tasks
+// (consolidate-resume-cluster, bypass-policy-flag).
 package cycle15
 
 import (
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
@@ -184,5 +197,128 @@ func TestC15_006_IPCSetPreservedInCmdLoopArgs(t *testing.T) {
 			"Builder must NOT remove the EVOLVE_RESUME= assignment in cmd_loop_args.go:273;\n"+
 			"only the registry row in registry_table.go should be removed.\n"+
 			"File: %s", cmdLoopArgsFile)
+	}
+}
+
+// ─── bypass-policy-flag predicates (C15_007–C15_010) ─────────────────────────
+
+// TestC15_007_BypassPolicyFlagInCycleRunHelp verifies that `evolve cycle run`
+// registers a --bypass-policy flag by checking its usage output.
+//
+// Covers AC1 (bypass-policy-flag). The flag package prints registered flags to
+// stderr when --help is passed; we capture combined output since flag.ContinueOnError
+// returns flag.ErrHelp and the command exits non-zero.
+//
+// BEHAVIORAL: runs `go run ./cmd/evolve cycle run --help` from the worktree's
+// go/ directory; asserts stdout/stderr contains "--bypass-policy". A source-file
+// grep cannot satisfy this — the BoolVar registration must be present.
+//
+// RED: --bypass-policy is not yet registered in runCycleRun; the help output
+// does not contain the flag name. Builder must add fs.BoolVar(&bypassPolicy,
+// "bypass-policy", false, "...") in runCycleRun.
+func TestC15_007_BypassPolicyFlagInCycleRunHelp(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	cmd := exec.Command("go", "run", "./cmd/evolve", "cycle", "run", "--help")
+	cmd.Dir = goDir
+	// flag.ContinueOnError exits non-zero for --help; CombinedOutput captures
+	// both stdout and stderr (usage is on stderr for flag-based commands).
+	out, _ := cmd.CombinedOutput()
+	if !strings.Contains(string(out), "--bypass-policy") {
+		t.Errorf("RED: 'evolve cycle run --help' does not show '--bypass-policy'.\n"+
+			"Builder must add: fs.BoolVar(&bypassPolicy, \"bypass-policy\", false, ...) in runCycleRun.\n"+
+			"Usage output:\n%s", out)
+	}
+}
+
+// TestC15_008_BypassPolicyInLoopDryRunJSON verifies that `evolve loop` exposes
+// --bypass-policy and that the dry-run JSON output includes the bypass_policy field.
+//
+// Covers AC2 (bypass-policy-flag). When --bypass-policy is passed with --dry-run,
+// loopConfig.BypassPolicy is true and marshals to "bypass_policy": true in the
+// config sub-object. omitempty suppresses the field when false, so the test
+// explicitly passes --bypass-policy to force the field into the output.
+//
+// BEHAVIORAL: runs `go run ./cmd/evolve loop --dry-run --bypass-policy` from
+// the worktree's go/ directory. A non-zero exit in RED means --bypass-policy is
+// not yet a recognized flag; a zero exit without "bypass_policy" means the
+// loopConfig field or json tag is missing.
+//
+// RED: parseLoopArgs does not register --bypass-policy; the command exits
+// non-zero (unknown flag) or omits bypass_policy from the JSON output.
+func TestC15_008_BypassPolicyInLoopDryRunJSON(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	goDir := filepath.Join(root, "go")
+	cmd := exec.Command("go", "run", "./cmd/evolve", "loop", "--dry-run", "--bypass-policy")
+	cmd.Dir = goDir
+	var stdoutBuf, stderrBuf strings.Builder
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+	if err := cmd.Run(); err != nil {
+		t.Errorf("RED: 'evolve loop --dry-run --bypass-policy' failed — --bypass-policy not yet registered in parseLoopArgs.\n"+
+			"Builder must add BoolVar for 'bypass-policy' in parseLoopArgs and BypassPolicy bool to loopConfig.\n"+
+			"Error: %v\nStderr:\n%s", err, stderrBuf.String())
+		return
+	}
+	combined := stdoutBuf.String() + stderrBuf.String()
+	if !strings.Contains(combined, `"bypass_policy"`) {
+		t.Errorf("RED: 'evolve loop --dry-run --bypass-policy' output missing 'bypass_policy' key.\n"+
+			"Builder must add BypassPolicy bool with json:\"bypass_policy,omitempty\" tag to loopConfig.\n"+
+			"Got output:\n%s", combined)
+	}
+}
+
+// TestC15_009_PolicyBypassEnvBridgesAbsentFromCmdFiles verifies that the 3
+// cycleEnv["EVOLVE_POLICY_BYPASS"] bridge reads are removed from cmd_cycle.go
+// and cmd_loop.go after Builder wires the --bypass-policy CLI flag.
+//
+// Covers AC3 (cmd_cycle.go:190) and AC4 (cmd_loop.go:186, cmd_loop.go:303).
+// The DI fields CycleRequest.BypassPolicy and PhaseRequest.BypassPolicy are
+// unchanged — only the env bridge reads that populated them are removed.
+//
+// // acs-predicate: config-check — env bridge ABSENCE is the structural contract.
+//
+// RED: all 3 cycleEnv["EVOLVE_POLICY_BYPASS"] reads are still present.
+func TestC15_009_PolicyBypassEnvBridgesAbsentFromCmdFiles(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	files := []struct {
+		name string
+		path string
+	}{
+		{"cmd_cycle.go", filepath.Join(root, "go", "cmd", "evolve", "cmd_cycle.go")},
+		{"cmd_loop.go", filepath.Join(root, "go", "cmd", "evolve", "cmd_loop.go")},
+	}
+	for _, f := range files {
+		if !acsassert.FileNotContains(t, f.path, `cycleEnv["EVOLVE_POLICY_BYPASS"]`) {
+			t.Errorf("RED: %s still contains cycleEnv[\"EVOLVE_POLICY_BYPASS\"] bridge read.\n"+
+				"Builder must replace the bridge read with the --bypass-policy CLI flag value.\n"+
+				"File: %s", f.name, f.path)
+		}
+	}
+}
+
+// TestC15_010_PolicyBypassRowAbsentFromRegistry verifies that the
+// EVOLVE_POLICY_BYPASS row has been deleted from registry_table.go.
+//
+// Covers AC5 (bypass-policy-flag). The row was StatusDeprecated with
+// documentation noting it was bridged for backward compat. After --bypass-policy
+// CLI conversion, the row is fully removed and flagregistry.Lookup must
+// return ok=false.
+//
+// BEHAVIORAL: calls flagregistry.Lookup("EVOLVE_POLICY_BYPASS") — the same
+// production SSOT function used by C10_004. A source-file text change cannot
+// satisfy this; the row struct literal must be absent from registry_table.go
+// for the binary-searched All slice to not contain the entry.
+//
+// Negative: Lookup returning ok=true is the failure signal; the row is present.
+// RED: EVOLVE_POLICY_BYPASS row is still in registry_table.go; Lookup returns
+// (flag, true). Builder must delete that row.
+func TestC15_010_PolicyBypassRowAbsentFromRegistry(t *testing.T) {
+	if f, ok := flagregistry.Lookup("EVOLVE_POLICY_BYPASS"); ok {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_POLICY_BYPASS\") returned (flag, true) — row still registered.\n"+
+			"Builder must delete the EVOLVE_POLICY_BYPASS row from registry_table.go (cycle-15 bypass-policy-flag).\n"+
+			"Current entry: Status=%q Cluster=%q",
+			f.Status, f.Cluster)
 	}
 }

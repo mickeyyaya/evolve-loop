@@ -16,12 +16,7 @@ func TestCoreAdapter_SpawnsProducer_WhenChannelOn(t *testing.T) {
 	ws := t.TempDir()
 	os.WriteFile(filepath.Join(ws, "build-stdout.log"),
 		[]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"), 0o644)
-	a := &CoreAdapter{EnvLookup: func(k string) string {
-		if k == "EVOLVE_PHASE_RECOVERY" {
-			return "enforce"
-		}
-		return ""
-	}}
+	a := &CoreAdapter{RecoveryStage: "enforce"}
 	cancel := a.Start(context.Background(), "build", core.PhaseRequest{Workspace: ws, Cycle: 1})
 	time.Sleep(40 * time.Millisecond)
 	cancel()

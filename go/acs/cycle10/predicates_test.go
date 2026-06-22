@@ -97,9 +97,9 @@ func TestC10_004_TombstoneFlagsAbsentFromRegistry(t *testing.T) {
 		// Tombstones with live env bridges (bridge must be removed before row deletion)
 		"EVOLVE_ADVISOR_DEPTH",
 		"EVOLVE_DISABLE_WORKSPACE_GUARD",
-		// EVOLVE_POLICY_BYPASS intentionally EXCLUDED: its env bridge is a live
-		// operator escape hatch; --bypass-policy CLI conversion deferred, so its
-		// row is deliberately retained (see flagregistry row note).
+		// EVOLVE_POLICY_BYPASS bridge converted to --bypass-policy CLI flag in cycle-15;
+		// row deleted in that cycle (bypass-policy-flag task).
+		"EVOLVE_POLICY_BYPASS",
 		"EVOLVE_PLATFORM",
 		// Internal env signal converted to DI (ComposePhases bool in PhaseRequest)
 		"EVOLVE_COMPOSE_PHASES",
@@ -137,30 +137,29 @@ func TestC10_005_ComposePhasesEnvRefsAbsent(t *testing.T) {
 
 // TestC10_006_EnvBridgesRemovedFromCmdFiles verifies that cmd_cycle.go and
 // cmd_loop.go no longer contain env bridge reads for EVOLVE_DISABLE_WORKSPACE_GUARD
-// and EVOLVE_POLICY_BYPASS after Builder removes the deprecated bridges in
-// w1-tombstones-and-compose.
+// or EVOLVE_POLICY_BYPASS after Builder removes the deprecated bridges in
+// w1-tombstones-and-compose (DISABLE_WORKSPACE_GUARD) and cycle-15
+// bypass-policy-flag (POLICY_BYPASS).
 //
 // BEHAVIORAL (absence): acsassert.FileNotContains fails only when the flag name
 // IS present in the file. The DI replacement fields already exist on CycleRequest
 // (DisableWorkspaceGuard bool) and PhaseRequest (BypassPolicy bool); this predicate
 // verifies the bridge env read is gone, not just that the DI field exists.
 //
-// RED: cmd_cycle.go:189-190 and cmd_loop.go:185-186,297-298 currently contain
-// cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] and cycleEnv["EVOLVE_POLICY_BYPASS"].
+// RED: cmd_cycle.go:190 and cmd_loop.go:186,303 still contain
+// cycleEnv["EVOLVE_POLICY_BYPASS"] (DISABLE_WORKSPACE_GUARD was already removed).
 func TestC10_006_EnvBridgesRemovedFromCmdFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	// EVOLVE_POLICY_BYPASS is intentionally EXCLUDED: its env bridge is a live
-	// operator escape hatch (bypass policy pins). flag-campaign-8 deferred its
-	// --bypass-policy CLI conversion rather than silently dropping the capability,
-	// so the bridge read is deliberately retained in the cmd files for now (see the
-	// flagregistry row note). Only DISABLE_WORKSPACE_GUARD (a test-only seam) is
-	// asserted removed here.
+	// EVOLVE_POLICY_BYPASS bridge converted to --bypass-policy CLI flag in cycle-15;
+	// now included alongside DISABLE_WORKSPACE_GUARD.
 	checks := []struct {
 		file string
 		flag string
 	}{
 		{filepath.Join(root, "go", "cmd", "evolve", "cmd_cycle.go"), "EVOLVE_DISABLE_WORKSPACE_GUARD"},
 		{filepath.Join(root, "go", "cmd", "evolve", "cmd_loop.go"), "EVOLVE_DISABLE_WORKSPACE_GUARD"},
+		{filepath.Join(root, "go", "cmd", "evolve", "cmd_cycle.go"), "EVOLVE_POLICY_BYPASS"},
+		{filepath.Join(root, "go", "cmd", "evolve", "cmd_loop.go"), "EVOLVE_POLICY_BYPASS"},
 	}
 	for _, tc := range checks {
 		if !acsassert.FileNotContains(t, tc.file, tc.flag) {

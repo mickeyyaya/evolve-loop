@@ -142,13 +142,14 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var (
-		projectRoot string
-		goalHash    string
-		goalText    string
-		evolveDir   string
-		budgetUSD   float64
-		batchCapUSD float64
-		simulate    bool
+		projectRoot  string
+		goalHash     string
+		goalText     string
+		evolveDir    string
+		budgetUSD    float64
+		batchCapUSD  float64
+		simulate     bool
+		bypassPolicy bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
 	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
@@ -157,6 +158,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "(DEPRECATED, ignored) former per-cycle USD budget cap")
 	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "(DEPRECATED, ignored) former cumulative batch USD cap")
 	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
+	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -187,7 +189,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		Env:                   cycleEnv,
 		Context:               cycleContext(goalHash, goalText),
 		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
-		BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
+		BypassPolicy:          bypassPolicy,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -303,10 +305,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase}
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()
+	recoveryCfg := pol.RecoveryConfig()
 	cfg.ContractGate = parseGateStage(gatesCfg.ContractGate)
 	cfg.EvalGate = parseGateStage(gatesCfg.EvalGate)
 	cfg.TriageCapGate = parseGateStage(gatesCfg.TriageCapGate)
 	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
+	cfg.PhaseRecovery = parseGateStage(recoveryCfg.PhaseRecovery)
 	cfg.RouterReplan = parseRouterStage(routerCfg.RouterReplan)
 	cfg.RoutingJudge = routerCfg.RoutingJudge
 	cfg.ReconDigest = routerCfg.ReconDigest
@@ -359,6 +363,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// instructs build/scout/triage to self-report failure via a structured
 	// sentinel; default (off) leaves the dispatched prompt byte-identical.
 	br.SetPhaseIOStage(cfg.PhaseIO)
+	br.SetRecoveryStage(cfg.PhaseRecovery.String())
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
@@ -448,7 +453,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// artifact-timeout.
 	observerCfg := pol.ObserverConfig()
 	if *observerCfg.Autospawn {
-		opts = append(opts, core.WithObserver(observer.NewCoreAdapter(observerCfg)))
+		ca := observer.NewCoreAdapter(observerCfg)
+		ca.RecoveryStage = cfg.PhaseRecovery.String()
+		opts = append(opts, core.WithObserver(ca))
 	}
 	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
 	// materialization) + Gate B (tdd predicate-quality), mounted at the

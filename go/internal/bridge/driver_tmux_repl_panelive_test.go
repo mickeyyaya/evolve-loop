@@ -102,7 +102,7 @@ func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	deps := covDeps()
-	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "enforce"})
+	deps.RecoveryStage = "enforce"
 	tmux := &paneScriptTmux{pane: "❯ explain tmux\n\n❯\n"}
 	deps.Tmux = tmux
 
@@ -149,7 +149,7 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	deps := covDeps()
 	deps.Stderr = stderr
-	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "enforce"})
+	deps.RecoveryStage = "enforce"
 	bcPath := filepath.Join(ws, "build-breadcrumbs.live")
 
 	tmux := &paneScriptTmux{pane: "❯"}
@@ -221,7 +221,7 @@ func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	deps := covDeps()
 	deps.Stderr = stderr
-	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "enforce"})
+	deps.RecoveryStage = "enforce"
 	tmux := &paneScriptTmux{pane: "❯"}
 	deps.Tmux = tmux
 

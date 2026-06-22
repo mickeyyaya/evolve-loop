@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
@@ -153,7 +154,7 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	if workingDir == "" {
 		// CB.2: same fail-closed contract as runTmuxREPL — the recipe path is
 		// a second launch surface with the identical silent-cwd hazard.
-		if v, _ := lookupEnv(deps, "EVOLVE_FLEET"); envchain.BoolValue(v, false) {
+		if v, _ := lookupEnv(deps, ipcenv.FleetKey); envchain.BoolValue(v, false) {
 			return nil, "", fmt.Errorf("recipe: %w", errWorktreeRequired)
 		}
 		workingDir, _ = os.Getwd()

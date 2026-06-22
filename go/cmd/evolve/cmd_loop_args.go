@@ -33,6 +33,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		forceFresh        bool
 		skipPreflight     bool
 		skipPreflightBoot bool
+		bypassPolicy      bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
@@ -56,6 +57,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
 	fs.BoolVar(&skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
 	fs.BoolVar(&skipPreflightBoot, "skip-preflight-boot", false, "run cheap checks but skip the real bridge-boot probe (CI/offline)")
+	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 
 	// WS-G2 repeatable per-agent overrides:
 	//   --cli  auditor=claude-tmux              (one --cli per agent)
@@ -150,9 +152,9 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	if resolvedGoalHash == "" && resolvedGoalText != "" {
 		resolvedGoalHash = goalhash.Compute(resolvedGoalText)
 	}
-	// Resume mode is the one path that doesn't require an explicit goal —
-	// the resume protocol reads goal from cycle-state.json.
-	if resolvedGoalHash == "" && !resume {
+	// Resume and dry-run modes don't require an explicit goal —
+	// resume reads the goal from cycle-state.json; dry-run just prints config.
+	if resolvedGoalHash == "" && !resume && !dryRun {
 		fmt.Fprintln(stderr, "evolve loop: a goal is required — pass --goal-hash, --goal-text, or a positional goal (or --resume to continue a checkpointed cycle)")
 		return loopConfig{}, 10
 	}
@@ -181,6 +183,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		ForceFresh:        forceFresh,
 		SkipPreflight:     skipPreflight,
 		SkipPreflightBoot: skipPreflightBoot,
+		BypassPolicy:      bypassPolicy,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}, 0

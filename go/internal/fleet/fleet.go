@@ -14,24 +14,17 @@ import (
 	"errors"
 	"sync"
 	"time"
-)
 
-// fleetEnvKey is forced to "1" on every launched cycle so RunCycle skips the
-// global project lock (orchestrator.fleetMode).
-const fleetEnvKey = "EVOLVE_FLEET"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+)
 
 // errNoLaunch surfaces a misconfigured supervisor instead of a silent no-op.
 var errNoLaunch = errors.New("fleet: no LaunchFn configured")
 
-// fleetScopeEnvKey carries this cycle's assigned todo IDs (comma-joined) to the
-// launched `evolve cycle run`, so its triage selects only its disjoint subset
-// (ADR-0049 E). Empty / unset ⇒ the cycle works the whole backlog (legacy).
-const fleetScopeEnvKey = "EVOLVE_FLEET_SCOPE"
-
 // CycleSpec describes one cycle the supervisor will launch.
 type CycleSpec struct {
 	GoalHash string   // --goal-hash for `evolve cycle run`
-	Scope    []string // todo IDs this cycle owns (disjoint across specs); also in Env[fleetScopeEnvKey]
+	Scope    []string // todo IDs this cycle owns (disjoint across specs); also in Env[ipcenv.FleetScopeKey]
 	// OutputContract is the plan's per-cycle done-definition, threaded to the
 	// launched cycle as --goal (Context["goal"]) so the scout executes the PLANNED
 	// work instead of free-choosing a task. Combined when a cycle merges several
@@ -119,7 +112,7 @@ func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec) Resul
 	for k, v := range spec.Env {
 		env[k] = v
 	}
-	env[fleetEnvKey] = "1"
+	env[ipcenv.FleetKey] = "1"
 	spec.Env = env
 
 	if s.CycleTimeout > 0 {

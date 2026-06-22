@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dag"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // PlanWaves turns a dependency-annotated backlog into an ordered list of waves.
@@ -51,7 +52,7 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 			specs = append(specs, CycleSpec{
 				Scope:          specIDs,
 				OutputContract: combinedContract(group),
-				Env:            map[string]string{fleetScopeEnvKey: strings.Join(specIDs, ",")},
+				Env:            map[string]string{ipcenv.FleetScopeKey: strings.Join(specIDs, ",")},
 				Optional:       optional,
 			})
 		}

@@ -3,6 +3,8 @@ package fleet
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // PlanCycles partitions a backlog into at most `count` concurrent cycle specs,
@@ -25,7 +27,7 @@ func PlanCycles(todos []Todo, count int) (specs []CycleSpec, deferred []Todo) {
 		specs = append(specs, CycleSpec{
 			Scope:          ids,
 			OutputContract: combinedContract(b),
-			Env:            map[string]string{fleetScopeEnvKey: strings.Join(ids, ",")},
+			Env:            map[string]string{ipcenv.FleetScopeKey: strings.Join(ids, ",")},
 		})
 	}
 	return specs, deferred

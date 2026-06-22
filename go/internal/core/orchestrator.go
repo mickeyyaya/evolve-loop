@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -521,7 +522,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 // fresh directory). Returns the underlying error only when stat/rename
 // actually fails. Tests inject a deterministic clock via now.
 func fleetMode(env map[string]string) bool {
-	return envchain.BoolValue(env["EVOLVE_FLEET"], false)
+	return envchain.BoolValue(env[ipcenv.FleetKey], false)
 }
 
 // RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
