@@ -156,6 +156,14 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 // tdd (RED *_test.go) and build (production code) write source; every other
 // phase writes only its artifact into the absolute workspace path. Exported so
 // the role-gate (guards) and the orchestrator share one definition.
+//
+// PA-DDK DDK-7b: the write axis is now ALSO declared in config — tdd/build carry
+// `writes_source: true` in phase-registry.json, and o.worktreePhase reads
+// spec.WritesSource so user phases (and a renamed built-in) opt in by config.
+// This literal stays as the catalog-less floor: the role-gate (internal/guards)
+// has only the CycleState, no catalog, so it relies on this fixed set for the
+// built-in source writers — defense in depth, identical to the config value
+// (TestRegistry_DeclaresWriteAxisForSourceWriters pins the agreement).
 func WorktreePhase(p Phase) bool {
 	return p == PhaseTDD || p == PhaseBuild
 }
