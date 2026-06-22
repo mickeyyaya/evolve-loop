@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
@@ -148,6 +149,90 @@ func TestValidateSafetyInvariants_UnknownLegalSuccessor(t *testing.T) {
 	cfg.LegalSuccessors["__bogus_from__"] = []string{ref.ShipTerminal()}
 	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "no known phase") {
 		t.Error("an unresolvable legal_successors phase name must be rejected at load")
+	}
+}
+
+// TestValidateSafetyInvariants_UnknownLegalSuccessorTarget (DDK-5 hardening): a
+// typo on the SUCCESSOR side of config.legal_successors (the edge VALUE, not the
+// key) is likewise silently dropped by legalGraphFrom — the validator must report
+// it. Sibling to _UnknownLegalSuccessor above, which exercises the key (from) side.
+func TestValidateSafetyInvariants_UnknownLegalSuccessorTarget(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.LegalSuccessors = cloneSuccessors(ref.Config.LegalSuccessors)
+	cfg.LegalSuccessors[ref.FirstAnchor()] = []string{"__bogus_to__"}
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "successor") {
+		t.Error("an unresolvable legal_successors SUCCESSOR name must be rejected at load")
+	}
+}
+
+// TestValidateSafetyInvariants_NoStartNodeRejected: a transition graph in which
+// every node has an incoming edge (a pure cycle, no in-degree-0 source) has no
+// start node, so reachability cannot be rooted and the floor cannot be proven —
+// the validator must reject it. The synthetic 2-cycle is injected via
+// WithLegalGraph; the Phase constants here are arbitrary bare-graph vocabulary
+// (ADR-0060 §"Kernel test vocabulary"), not flow identity.
+func TestValidateSafetyInvariants_NoStartNodeRejected(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cyclic := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
+		PhaseBuild: {PhaseAudit: true},
+		PhaseAudit: {PhaseBuild: true},
+	})
+	if !containsSubstr(ValidateSafetyInvariants(cyclic, ref.Config, ref.Catalog), "no start node") {
+		t.Error("a transition graph with no source node must be rejected")
+	}
+}
+
+// TestValidateSafetyInvariants_EvaluatorBypassRejected (ADR-0060 §4 I1/I2 —
+// graph-dominance, load-bearing half): a legal_successors edge that lets a path
+// reach the ship sink WITHOUT traversing the floor evaluator (here: the first
+// anchor jumps straight to ship, bypassing the audit-class evaluator) is rejected
+// at load. Evaluator and ship sink are identified by ROLE (mandatory
+// shippable-verdict phase / last mandatory anchor), never by name — a rename does
+// not weaken the check. This catches at LOAD what was previously only caught at
+// runtime by SpineSatisfiedUpTo (ADR-0060 §"Implemented invariants vs. design intent").
+func TestValidateSafetyInvariants_EvaluatorBypassRejected(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.LegalSuccessors = cloneSuccessors(ref.Config.LegalSuccessors)
+	cfg.LegalSuccessors[ref.FirstAnchor()] = append(cfg.LegalSuccessors[ref.FirstAnchor()], ref.ShipTerminal())
+	sm := NewStateMachine().WithLegalGraph(legalGraphFrom(cfg.LegalSuccessors))
+	if !containsSubstr(ValidateSafetyInvariants(sm, cfg, ref.Catalog), "dominate the ship sink") {
+		t.Error("an evaluator-bypass edge (a start→ship path avoiding the evaluator) must be rejected at load")
+	}
+}
+
+// TestValidateSafetyInvariants_TwoEvaluatorsCollectiveDominance (ADR-0060 §4): when
+// two evaluators each gate a DISJOINT path to ship, every start→ship path still
+// crosses AN evaluator, so the floor holds and the config is safe. The dominance
+// check must delete the evaluator SET as a whole — deleting only one evaluator
+// would leave the other's path open and false-positive. This locks the
+// collective-dominance semantic against a future one-at-a-time regression. The
+// Phase constants are bare-graph vocabulary (ADR-0060 §"Kernel test vocabulary").
+func TestValidateSafetyInvariants_TwoEvaluatorsCollectiveDominance(t *testing.T) {
+	t.Parallel()
+	shippable := &phasespec.ArtifactGate{RequiresPresent: true, VerdictIn: []string{VerdictPASS, VerdictWARN}}
+	cat := mustCatalog(t,
+		phasespec.PhaseSpec{Name: string(PhaseTriage), Gate: shippable},
+		phasespec.PhaseSpec{Name: string(PhaseAudit), Gate: shippable},
+		phasespec.PhaseSpec{Name: string(PhaseShip)},
+	)
+	cfg := config.RoutingConfig{
+		Order:     []string{string(PhaseIntent), string(PhaseTriage), string(PhaseAudit), string(PhaseShip)},
+		Mandatory: []string{string(PhaseTriage), string(PhaseAudit), string(PhaseShip)},
+	}
+	// Two disjoint evaluator paths to ship: intent→triage→ship and intent→audit→ship.
+	sm := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
+		PhaseIntent: {PhaseTriage: true, PhaseAudit: true},
+		PhaseTriage: {PhaseShip: true},
+		PhaseAudit:  {PhaseShip: true},
+		PhaseShip:   {PhaseEnd: true},
+	})
+	if v := ValidateSafetyInvariants(sm, cfg, cat); len(v) != 0 {
+		t.Errorf("two evaluators collectively dominating ship must pass; got: %v", v)
 	}
 }
 

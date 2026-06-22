@@ -29,10 +29,10 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 	// only SELECT among already-legal edges, never invent one (ADR-0058 §1, now
 	// enforced as a data check rather than by a hardcoded graph).
 	for _, name := range cat.Names() {
-		spec, ok := cat.Get(name)
-		if !ok {
-			continue
-		}
+		// Names() and Get() read the same map populated together by phasespec.Load,
+		// so a name from Names() always resolves; a zero spec (empty branches) would
+		// be harmless here regardless.
+		spec, _ := cat.Get(name)
 		from := phaseFromRouter(name)
 		for _, b := range []struct{ label, target string }{
 			{"on_pass", spec.OnPass},
@@ -118,7 +118,11 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 	// mandatory) leaves the other mandatory phases described, so the check still
 	// fires. A synthetic/empty catalog (unit tests of orchestration mechanics)
 	// cannot describe the evaluator's gate, so judging it would false-positive.
-	if catalogDescribesAnyMandatory(cfg, cat) && !hasMandatoryShippableEvaluator(cfg, cat) {
+	//
+	// evals (the floor evaluator SET) is computed once here and reused by the
+	// graph-dominance check below: existence needs its size, dominance needs the set.
+	evals := mandatoryEvaluators(cfg, cat)
+	if catalogDescribesAnyMandatory(cfg, cat) && len(evals) == 0 {
 		violations = append(violations, "no mandatory phase gates on a shippable verdict (PASS/WARN) — the ship floor has no mandatory evaluator; ship could proceed without a verdict gate")
 	}
 
@@ -132,9 +136,30 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 			violations = append(violations, "transition graph has no start node (every phase has an incoming edge)")
 		} else {
 			reach := sm.reachableFrom(start)
-			for _, m := range mandatoryAnchorsFor(cfg) {
+			anchors := mandatoryAnchorsFor(cfg)
+			for _, m := range anchors {
 				if !reach[m] {
 					violations = append(violations, fmt.Sprintf("mandatory anchor %q is unreachable from the start node", m))
+				}
+			}
+
+			// Evaluator-dominance (ADR-0060 §4 I1/I2, the load-bearing half made a
+			// load-time check): every start→ship path must traverse a floor
+			// evaluator. The evaluator SET is identified by role (mandatory phases
+			// gating a shippable verdict) and the ship sink by role — the LAST
+			// mandatory anchor, which is the ship terminal by registry convention
+			// (mandatoryAnchorsFor preserves cfg.Order, so anchors are ordered and the
+			// terminal is last). If the sink is still reachable with the WHOLE
+			// evaluator set deleted from the graph, some path reaches ship without an
+			// evaluator — the verdict floor is bypassable at the graph level (e.g. a
+			// legal_successors edge straight to ship). Phase-agnostic; never a phase
+			// name. All-anchor dominance (a non-evaluator anchor like a triage step)
+			// stays runtime-backstopped by SpineSatisfiedUpTo — only the evaluator
+			// carries the verdict floor, so only it is proven here at load.
+			if len(evals) > 0 && len(anchors) > 0 {
+				sink := anchors[len(anchors)-1]
+				if sm.reachableAvoiding(start, evals)[sink] {
+					violations = append(violations, "the floor evaluator does not dominate the ship sink — a start→ship path bypasses every evaluator")
 				}
 			}
 		}
@@ -156,12 +181,15 @@ func catalogDescribesAnyMandatory(cfg config.RoutingConfig, cat phasespec.Catalo
 	return false
 }
 
-// hasMandatoryShippableEvaluator reports whether some mandatory phase carries an
-// artifact gate that constrains the verdict to a NON-EMPTY shippable set
-// (⊆ {PASS, WARN}). That phase is the floor's evaluator — the one whose verdict
+// mandatoryEvaluators returns the SET of mandatory phases (as graph nodes) that
+// carry an artifact gate constraining the verdict to a NON-EMPTY shippable set
+// (⊆ {PASS, WARN}). These are the floor's evaluators — the phases whose verdict
 // ship structurally depends on. Phase-agnostic: it inspects roles via the gate,
-// never a phase name, so a renamed evaluator still satisfies the floor.
-func hasMandatoryShippableEvaluator(cfg config.RoutingConfig, cat phasespec.Catalog) bool {
+// never a phase name, so a renamed evaluator still satisfies the floor. The set
+// keys are graph nodes (via phaseFromRouter) so the dominance walk can delete
+// them directly.
+func mandatoryEvaluators(cfg config.RoutingConfig, cat phasespec.Catalog) map[Phase]bool {
+	evals := map[Phase]bool{}
 	for _, name := range cfg.Mandatory {
 		spec, ok := cat.Get(name)
 		if !ok || spec.Gate == nil || len(spec.Gate.VerdictIn) == 0 {
@@ -175,10 +203,10 @@ func hasMandatoryShippableEvaluator(cfg config.RoutingConfig, cat phasespec.Cata
 			}
 		}
 		if shippable {
-			return true
+			evals[phaseFromRouter(name)] = true
 		}
 	}
-	return false
+	return evals
 }
 
 // reachableFrom returns the set of phases reachable from start via legal
@@ -190,6 +218,32 @@ func (sm *StateMachine) reachableFrom(start Phase) map[Phase]bool {
 	var walk func(p Phase)
 	walk = func(p Phase) {
 		if reach[p] {
+			return
+		}
+		reach[p] = true
+		for to := range sm.allowed[p] {
+			walk(to)
+		}
+	}
+	walk(start)
+	return reach
+}
+
+// reachableAvoiding returns the phases reachable from start via legal transitions
+// WITHOUT entering any node in avoid (the avoided nodes are treated as deleted
+// from the graph). It is the dominance primitive: if the ship sink is reachable
+// while avoiding the whole evaluator set, the evaluator does not dominate ship.
+// Mirrors reachableFrom; the visited set keeps it safe on the cyclic graph.
+//
+// If start itself is in avoid the result is empty — correct, not a missed bypass:
+// every path leaves from start, so a start that is an evaluator is on every path
+// and trivially dominates the sink (no violation). Seeding start unconditionally
+// would instead FALSELY flag a direct start→sink edge, so the early return stands.
+func (sm *StateMachine) reachableAvoiding(start Phase, avoid map[Phase]bool) map[Phase]bool {
+	reach := map[Phase]bool{}
+	var walk func(p Phase)
+	walk = func(p Phase) {
+		if reach[p] || avoid[p] {
 			return
 		}
 		reach[p] = true
