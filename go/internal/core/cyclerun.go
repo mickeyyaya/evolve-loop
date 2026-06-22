@@ -12,7 +12,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -270,7 +269,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// mutation) must not flip this cycle's guard. The launch snapshot already
 	// carries the operator's shell value, so this is behavior-preserving for the
 	// live loop while restoring per-cycle isolation.
-	guardDisabled := envchain.BoolValue(req.Env["EVOLVE_DISABLE_WORKSPACE_GUARD"], false)
+	guardDisabled := req.DisableWorkspaceGuard
 	if !guardDisabled {
 		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
 			// Best-effort: WARN but don't block the cycle; the failure

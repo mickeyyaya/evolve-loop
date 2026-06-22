@@ -81,10 +81,9 @@ func TestRunVersionBumpLib_NoMarkers_ReturnsError(t *testing.T) {
 // an actual marketplace directory and with a very short max-wait, the
 // bridge fails quickly.
 func TestRunMarketplacePollLib_FailsFast(t *testing.T) {
-	// EVOLVE_MARKETPLACE_DIR is unset by default in test. Set it to a
-	// non-existent dir; the poll library should fail fast.
-	t.Setenv("EVOLVE_MARKETPLACE_DIR", filepath.Join(t.TempDir(), "no-such-marketplace"))
-	err := runMarketplacePollLib(t.TempDir(), "1.2.3", 1*time.Second)
+	// Pass a non-existent dir; the poll library should fail fast.
+	nonExistent := filepath.Join(t.TempDir(), "no-such-marketplace")
+	err := runMarketplacePollLib(t.TempDir(), "1.2.3", 1*time.Second, nonExistent)
 	if err == nil {
 		t.Error("missing marketplace dir: want error")
 	}
@@ -108,15 +107,11 @@ func TestRunRollbackLib_MissingJournal_ReturnsError(t *testing.T) {
 	}
 }
 
-// TestRunMarketplacePollLib_HomeDirFallback — without
-// EVOLVE_MARKETPLACE_DIR, the bridge derives ~/.claude/plugins/.../evolve-loop.
-// We can't easily test the derivation result without mocking UserHomeDir,
-// but we can confirm the call path doesn't panic on a vanilla env.
-func TestRunMarketplacePollLib_NoEnvVar_NoPanic(t *testing.T) {
-	t.Setenv("EVOLVE_MARKETPLACE_DIR", "")
-	err := runMarketplacePollLib(t.TempDir(), "1.2.3", 100*time.Millisecond)
-	// We expect an error (the derived marketplace dir probably doesn't
-	// exist or is stale), but the call must not panic.
+// TestRunMarketplacePollLib_EmptyDir_NoPanic — passing an empty marketplaceDir
+// string exercises the error path without panic.
+func TestRunMarketplacePollLib_EmptyDir_NoPanic(t *testing.T) {
+	err := runMarketplacePollLib(t.TempDir(), "1.2.3", 100*time.Millisecond, "")
+	// We expect an error (empty marketplace dir), but the call must not panic.
 	_ = err
 }
 

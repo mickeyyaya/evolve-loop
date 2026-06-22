@@ -14,19 +14,19 @@ func TestShouldRefreshCatalog(t *testing.T) {
 	empty := modelcatalog.Catalog{}
 
 	tests := []struct {
-		name    string
-		cat     modelcatalog.Catalog
-		disable string
-		want    bool
+		name        string
+		cat         modelcatalog.Catalog
+		autoRefresh bool
+		want        bool
 	}{
-		{"stale → refresh", stale, "", true},
-		{"empty (never fetched) → refresh", empty, "", true},
-		{"fresh within TTL → skip", fresh, "", false},
-		{"disabled overrides stale", stale, "0", false},
+		{"stale → refresh", stale, true, true},
+		{"empty (never fetched) → refresh", empty, true, true},
+		{"fresh within TTL → skip", fresh, true, false},
+		{"disabled overrides stale", stale, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := shouldRefreshCatalog(tt.cat, now, tt.disable); got != tt.want {
+			if got := shouldRefreshCatalog(tt.cat, now, tt.autoRefresh); got != tt.want {
 				t.Fatalf("shouldRefreshCatalog = %v, want %v", got, tt.want)
 			}
 		})

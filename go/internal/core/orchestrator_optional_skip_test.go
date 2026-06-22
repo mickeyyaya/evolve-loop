@@ -83,9 +83,9 @@ func TestOptionalPhaseInfraTimeoutSkipsAndCycleShips(t *testing.T) {
 	o, auditR, shipR := optionalSkipHarness(t, opt)
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		var clf *ErrCycleLevelFailure
@@ -126,9 +126,9 @@ func TestMandatoryPhaseInfraTimeoutStaysCycleFatal(t *testing.T) {
 	o := NewOrchestrator(st, led, runners)
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	var clf *ErrCycleLevelFailure
 	if !errors.As(err, &clf) {
@@ -149,9 +149,9 @@ func TestOptionalPhaseNonInfraErrorStaysCycleFatal(t *testing.T) {
 	o, _, _ := optionalSkipHarness(t, opt)
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	var clf *ErrCycleLevelFailure
 	if !errors.As(err, &clf) {

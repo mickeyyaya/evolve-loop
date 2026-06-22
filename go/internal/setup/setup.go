@@ -278,7 +278,7 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 func authMode(base string, auth bridge.AuthInfo, env func(string) string) string {
 	if base == "claude" {
 		switch {
-		case env("EVOLVE_ANTHROPIC_BASE_URL") != "" || env("ANTHROPIC_BASE_URL") != "":
+		case env("ANTHROPIC_BASE_URL") != "":
 			return "CUSTOM_PROXY"
 		case env("ANTHROPIC_API_KEY") != "":
 			return "API_KEY"

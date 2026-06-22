@@ -64,9 +64,9 @@ func TestRunCycle_EarlyExit_NoShipConvergence(t *testing.T) {
 		WithRouting(dynamicCfg(), endFromScoutStrategy{}),
 		WithPlanner(noShipPlanner{}))
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -94,9 +94,9 @@ func TestRunCycle_EarlyExit_RefusedWhenShipPlanned(t *testing.T) {
 		WithRouting(dynamicCfg(), endFromScoutStrategy{}),
 		WithPlanner(shipPlanner{}))
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(),
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           t.TempDir(),
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)

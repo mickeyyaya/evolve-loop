@@ -41,8 +41,8 @@ func TestClaudeTmux_CostGuards_BaseURL(t *testing.T) {
 	if code, se := runTmux(t, fx, &fakeTmux{}, map[string]string{"ANTHROPIC_BASE_URL": "http://x"}, "--allow-bypass"); code != ExitCostLeak || !strings.Contains(se, "ANTHROPIC_BASE_URL") {
 		t.Fatalf("base-url guard: code=%d se=%q", code, se)
 	}
-	// EVOLVE_ANTHROPIC_BASE_URL → cost leak
-	if code, se := runTmux(t, fx, &fakeTmux{}, map[string]string{"EVOLVE_ANTHROPIC_BASE_URL": "http://p"}, "--allow-bypass"); code != ExitCostLeak || !strings.Contains(se, "EVOLVE_ANTHROPIC_BASE_URL") {
+	// policy bridge.anthropic_base_url (via --anthropic-base-url flag) → cost leak
+	if code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--anthropic-base-url=http://p"); code != ExitCostLeak || !strings.Contains(se, "anthropic_base_url") {
 		t.Fatalf("evolve-base-url guard: code=%d se=%q", code, se)
 	}
 }

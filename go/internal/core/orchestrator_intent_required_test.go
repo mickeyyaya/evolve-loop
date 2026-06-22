@@ -17,8 +17,6 @@ import (
 )
 
 func TestOrchestrator_ThreadsIntentRequiredToPlannerInput(t *testing.T) {
-	baseEnv := map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"}
-
 	runIntent := func(t *testing.T, wfCfg policy.WorkflowConfig) router.RouteInput {
 		t.Helper()
 		st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -30,9 +28,9 @@ func TestOrchestrator_ThreadsIntentRequiredToPlannerInput(t *testing.T) {
 		o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithPlanner(cp), WithWorkflowConfig(wfCfg))
 
 		if _, err := o.RunCycle(context.Background(), CycleRequest{
-			ProjectRoot: t.TempDir(),
-			GoalHash:    "g",
-			Env:         baseEnv,
+			ProjectRoot:           t.TempDir(),
+			GoalHash:              "g",
+			DisableWorkspaceGuard: true,
 		}); err != nil {
 			t.Fatalf("RunCycle: %v", err)
 		}

@@ -68,10 +68,8 @@ var allowedUndocumented = map[string]bool{
 	// NEW additions.
 	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
-	"EVOLVE_MARKETPLACE_DIR":           true, // marketplace-poll path override
 	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
 	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
-	"EVOLVE_PLATFORM":                  true, // platform-detect override
 	"EVOLVE_PLUGIN_ROOT":               true, // dispatcher root resolve
 	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override
 	"EVOLVE_PROJECT_ROOT":              true, // dispatcher root resolve

@@ -14,7 +14,6 @@ package cycle5
 
 import (
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"

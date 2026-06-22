@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +39,9 @@ type PhaseAdvisor struct {
 	// Injectable so a write failure can be exercised (the capture is fail-open);
 	// NewPhaseAdvisor defaults it to os.WriteFile.
 	writeArtifact func(path string, data []byte) error
+	// checkDepth is an injectable depth guard (defense-in-depth recursion check).
+	// nil = skip the check. Wire AdvisorDepthExceeded via WithDepthCheck for production.
+	checkDepth func(env map[string]string) bool
 }
 
 // PhaseAdvisorOption customizes a PhaseAdvisor.
@@ -63,6 +65,15 @@ func WithProposerModel(model string) PhaseAdvisorOption {
 		if model != "" {
 			p.identity.Model = model
 		}
+	}
+}
+
+// WithDepthCheck injects the recursion-depth guard (defense-in-depth, ADR-0052 §4.3).
+// When fn returns true for the dispatch env, advisorLaunch errors before bridge launch.
+// Pass AdvisorDepthExceeded for production behavior; nil (the zero-field default) skips the check.
+func WithDepthCheck(fn func(env map[string]string) bool) PhaseAdvisorOption {
+	return func(p *PhaseAdvisor) {
+		p.checkDepth = fn
 	}
 }
 
@@ -242,19 +253,12 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 		return BridgeResponse{}, fmt.Errorf("%s: empty workspace", errPfx)
 	}
 	// WS1-S2 recursion guard (defense-in-depth, ADR-0052 §4.3): refuse to dispatch
-	// when the input env marks this as a NESTED advisor invocation
-	// (EVOLVE_ADVISOR_DEPTH≥1), degrading the cycle to the static path rather than
-	// nesting brains. This is a DEFENSIVE READ only — nothing in the kernel SETS
-	// the stamp, because the PRIMARY guard (the mint denylist in mintConfigsFrom)
-	// already prevents a router/advisor phase from ever being registered or
-	// dispatched, so the nested path is unreachable ("may guard an impossible
-	// path", per the ADR's critic note). We do not stamp the child env here: the
-	// only subprocess advisorLaunch starts is the router's own LLM (it writes a
-	// plan artifact, never re-enters the orchestrator), so a stamp there would
-	// protect nothing. The read exists so that any future/external caller that
-	// DOES mark a nested dispatch is still refused at this boundary.
-	if advisorDepthExceeded(in.Env) {
-		return BridgeResponse{}, fmt.Errorf("%s: recursion guard: EVOLVE_ADVISOR_DEPTH≥1", errPfx)
+	// when the injected checkDepth guard signals a nested invocation, degrading the
+	// cycle to the static path rather than nesting brains. The PRIMARY guard is the
+	// mint denylist in mintConfigsFrom; this injectable seam is defense-in-depth.
+	// Wire AdvisorDepthExceeded via WithDepthCheck for production behavior.
+	if p.checkDepth != nil && p.checkDepth(in.Env) {
+		return BridgeResponse{}, fmt.Errorf("%s: recursion guard: depth check failed", errPfx)
 	}
 	profile := p.identity.Profile
 	if profile == "" && in.ProjectRoot != "" {
@@ -802,15 +806,6 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 		return nil, fmt.Errorf("empty phase plan")
 	}
 	return &router.PhasePlan{Entries: entries, MintPhases: mintConfigsFrom(entries)}, nil
-}
-
-// advisorDepthExceeded reports whether the dispatch env marks this as a NESTED
-// advisor invocation (EVOLVE_ADVISOR_DEPTH≥1). A malformed/non-numeric value is
-// treated as 0 — the stamp is defense-in-depth, never a reason to break a valid
-// advisor call. EVOLVE_ADVISOR_DEPTH is registered in flagregistry (WS1-S2).
-func advisorDepthExceeded(env map[string]string) bool {
-	n, err := strconv.Atoi(strings.TrimSpace(env["EVOLVE_ADVISOR_DEPTH"]))
-	return err == nil && n >= 1
 }
 
 // reservedAdvisorNames are the control-plane identities a minted phase may never

@@ -60,7 +60,7 @@ func TestRun_PolicyPin_Bypass(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_POLICY_BYPASS": "1"},
+		BypassPolicy: true,
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

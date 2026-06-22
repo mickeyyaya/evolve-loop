@@ -24,7 +24,10 @@ import "testing"
 // deleted their os.Getenv reads and rewired the consumers to policy.json structs
 // (RouterPolicy / GatesPolicy / WorkflowPolicy), which this merge brings in. The
 // ceiling records the post-integration floor; the campaign resumes toward <30.
-const FlagCeiling = 47
+// cycle-5: +1 for EVOLVE_REAP_ORPHANS (pre-existing flag, previously unregistered; required
+// by ACS cycle-5 predicate); -3 active readers (HANG_CLASSIFIER/MODELCATALOG_AUTOREFRESH/
+// ANTHROPIC_BASE_URL migrated to policy.json) → net active reduction.
+const FlagCeiling = 48
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
@@ -54,7 +57,11 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // per-cycle gate if the live count rose versus the campaign baseline (main),
 // which is what a same-metric unit test alone cannot enforce — a cycle could
 // otherwise raise this const the way cycle-5 raised FlagCeiling 47->48.
-const LiveFeatureFlagCeiling = 23
+//
+// flag-campaign-7 (8 deprecations: ADVISOR_DEPTH/ANTHROPIC_BASE_URL/
+// DISABLE_WORKSPACE_GUARD/HANG_CLASSIFIER/MARKETPLACE_DIR/MODELCATALOG_AUTOREFRESH/
+// PLATFORM/POLICY_BYPASS → policy.json/DI/CLI) lowered the live count 23 -> 21.
+const LiveFeatureFlagCeiling = 21
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is

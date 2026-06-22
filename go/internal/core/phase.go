@@ -113,6 +113,10 @@ type PhaseRequest struct {
 	// any subprocess launch.
 	Input phaseio.PhaseInput `json:"-"`
 
+	// BypassPolicy skips policy.json pin enforcement for this phase.
+	// Set by the orchestrator from CycleRequest.BypassPolicy; operators may
+	// trigger it via --bypass-policy at the cycle or compose call site.
+	BypassPolicy bool `json:"bypass_policy,omitempty"`
 	// CorrectionDirective is set by the orchestrator's contract-correction loop
 	// on a re-dispatch after a deliverable reject; the runner copies it into the
 	// BridgeRequest. Empty on the first dispatch.

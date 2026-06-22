@@ -3,7 +3,6 @@ package releasepipeline
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
@@ -68,15 +67,9 @@ func runVersionBumpLib(repoRoot, target string, dryRun bool) error {
 	return err
 }
 
-// runMarketplacePollLib invokes the marketplacepoll library with the env-var
-// or default marketplace directory.
-func runMarketplacePollLib(repoRoot, target string, maxWait time.Duration) error {
-	marketplaceDir := os.Getenv("EVOLVE_MARKETPLACE_DIR")
-	if marketplaceDir == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			marketplaceDir = filepath.Join(home, ".claude", "plugins", "marketplaces", "evolve-loop")
-		}
-	}
+// runMarketplacePollLib invokes the marketplacepoll library with the provided
+// marketplace directory.
+func runMarketplacePollLib(repoRoot, target string, maxWait time.Duration, marketplaceDir string) error {
 	_, err := marketplacepoll.Run(marketplacepoll.Options{
 		Target:         target,
 		MarketplaceDir: marketplaceDir,

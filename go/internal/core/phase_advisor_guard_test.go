@@ -38,9 +38,9 @@ func TestMintConfigsFrom_RejectsAdvisorRoleMint(t *testing.T) {
 }
 
 // TestAdvisorLaunch_DepthGuard pins the WS1-S2 env-stamp defense-in-depth: an
-// advisor launched with EVOLVE_ADVISOR_DEPTH≥1 in its env errors BEFORE dispatch
-// (degrade to static), so even if the primary denylist were ever bypassed a
-// nested advisor cannot run. depth 0 / unset is byte-identical to today.
+// advisor wired with WithDepthCheck(AdvisorDepthExceeded) errors BEFORE dispatch
+// when EVOLVE_ADVISOR_DEPTH≥1, so even if the primary denylist were ever bypassed
+// a nested advisor cannot run. depth 0 / unset is byte-identical to today.
 func TestAdvisorLaunch_DepthGuard(t *testing.T) {
 	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
@@ -48,7 +48,7 @@ func TestAdvisorLaunch_DepthGuard(t *testing.T) {
 	fb := &fakeBridge{stdout: plan}
 	in := baseRouteInput()
 	in.Env = map[string]string{"EVOLVE_ADVISOR_DEPTH": "1"}
-	if _, err := NewPhaseAdvisor(fb).Plan(in); err == nil {
+	if _, err := NewPhaseAdvisor(fb, WithDepthCheck(AdvisorDepthExceeded)).Plan(in); err == nil {
 		t.Fatal("Plan with EVOLVE_ADVISOR_DEPTH=1 must error (recursion guard → static)")
 	}
 	if fb.calls != 0 {
@@ -59,7 +59,7 @@ func TestAdvisorLaunch_DepthGuard(t *testing.T) {
 	ok := &fakeBridge{stdout: plan}
 	in0 := baseRouteInput()
 	in0.Env = map[string]string{"EVOLVE_ADVISOR_DEPTH": "0"}
-	if _, err := NewPhaseAdvisor(ok).Plan(in0); err != nil {
+	if _, err := NewPhaseAdvisor(ok, WithDepthCheck(AdvisorDepthExceeded)).Plan(in0); err != nil {
 		t.Fatalf("depth 0 must not trip the guard: %v", err)
 	}
 }

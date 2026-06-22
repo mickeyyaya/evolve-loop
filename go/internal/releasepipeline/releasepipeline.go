@@ -686,9 +686,13 @@ func isExecutableFile(path string) bool {
 }
 
 // defaultMarketplacePoll calls marketplacepoll.Run with the default
-// EVOLVE_MARKETPLACE_DIR or ~/.claude/plugins/marketplaces/evolve-loop.
+// marketplace directory (~/.claude/plugins/marketplaces/evolve-loop).
 func defaultMarketplacePoll(repoRoot, target string, maxWait time.Duration) error {
-	return runMarketplacePollLib(repoRoot, target, maxWait)
+	marketplaceDir := ""
+	if home, err := os.UserHomeDir(); err == nil {
+		marketplaceDir = filepath.Join(home, ".claude", "plugins", "marketplaces", "evolve-loop")
+	}
+	return runMarketplacePollLib(repoRoot, target, maxWait, marketplaceDir)
 }
 
 // defaultRollback calls rollback.Run.

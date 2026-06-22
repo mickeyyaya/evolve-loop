@@ -67,9 +67,9 @@ func TestOrchestrator_AdvisoryPlanVetoSurvivesSpineDecline(t *testing.T) {
 		WithPlanner(&fixedPlanner{plan: plan}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		Env:         map[string]string{"EVOLVE_DISABLE_WORKSPACE_GUARD": "1"},
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
+		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)

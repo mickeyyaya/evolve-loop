@@ -20,6 +20,7 @@ func TestBridgeConfig_Resolution(t *testing.T) {
 		{"empty-block-is-zero", policy.Policy{Bridge: &policy.BridgePolicy{}}, policy.BridgePolicy{}},
 		{"all-fields", policy.Policy{Bridge: &policy.BridgePolicy{ManifestDir: "/m", CatalogDir: "/c", RecipeDir: "/r"}}, policy.BridgePolicy{ManifestDir: "/m", CatalogDir: "/c", RecipeDir: "/r"}},
 		{"manifest-only", policy.Policy{Bridge: &policy.BridgePolicy{ManifestDir: "/m"}}, policy.BridgePolicy{ManifestDir: "/m"}},
+		{"anthropic-base-url", policy.Policy{Bridge: &policy.BridgePolicy{AnthropicBaseURL: "https://proxy.example.com"}}, policy.BridgePolicy{AnthropicBaseURL: "https://proxy.example.com"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -40,6 +41,7 @@ func TestLoad_BridgeBlock(t *testing.T) {
 		{"full-block", `{"bridge":{"manifest_dir":"/m","catalog_dir":"/c","recipe_dir":"/r"}}`, policy.BridgePolicy{ManifestDir: "/m", CatalogDir: "/c", RecipeDir: "/r"}},
 		{"absent-block-is-zero", `{}`, policy.BridgePolicy{}},
 		{"partial-block", `{"bridge":{"recipe_dir":"/r"}}`, policy.BridgePolicy{RecipeDir: "/r"}},
+		{"anthropic-base-url", `{"bridge":{"anthropic_base_url":"https://proxy.example.com"}}`, policy.BridgePolicy{AnthropicBaseURL: "https://proxy.example.com"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

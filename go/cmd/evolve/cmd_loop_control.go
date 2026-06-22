@@ -81,6 +81,16 @@ func loadWorkflowConfig(evolveDir string) policy.WorkflowConfig {
 	return pol.WorkflowConfig()
 }
 
+// loadClassifyConfig loads .evolve/policy.json and returns classifier defaults.
+// Absent or malformed policy falls back to built-in defaults (HangClassifier=false).
+func loadClassifyConfig(evolveDir string) policy.ClassifyPolicy {
+	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	if err != nil {
+		return policy.ClassifyPolicy{}
+	}
+	return pol.ClassifyConfig()
+}
+
 // recordAbsorbedFail persists a continue-on-fail-absorbed verdict-FAIL cycle
 // to state.json:failedApproaches. The clean-completion FAIL path (audit
 // FAIL → retro → end, err==nil) is NOT recorded by the orchestrator — only

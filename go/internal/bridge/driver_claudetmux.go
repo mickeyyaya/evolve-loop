@@ -37,8 +37,8 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 			return ExitCostLeak, nil
 		}
 	}
-	if v, ok := lookupEnv(deps, "EVOLVE_ANTHROPIC_BASE_URL"); ok && v != "" {
-		fmt.Fprintln(deps.Stderr, "[claude-tmux] EVOLVE_ANTHROPIC_BASE_URL set — proxy mode; abort")
+	if cfg.AnthropicBaseURL != "" {
+		fmt.Fprintln(deps.Stderr, "[claude-tmux] policy bridge.anthropic_base_url set — proxy mode; abort")
 		return ExitCostLeak, nil
 	}
 
