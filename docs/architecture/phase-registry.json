@@ -338,6 +338,7 @@
       "role": "retrospective",
       "optional": true,
       "branching_strategy": "history",
+      "recovery": { "targets": { "PASS": "ship", "RETRY-WITH-FALLBACK": "tdd", "BLOCK-CODE": "end", "BLOCK-OPERATOR-ACTION": "end", "PROCEED": "end" } },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",

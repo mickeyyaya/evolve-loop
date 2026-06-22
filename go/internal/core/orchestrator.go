@@ -89,7 +89,18 @@ func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
 // precedence). Returns (_, false) for any phase the seam does not describe.
 func builtinControlSpec(p Phase) (phasespec.PhaseSpec, bool) {
 	if p == PhaseDebugger {
-		return phasespec.PhaseSpec{Name: string(PhaseDebugger), BranchingStrategy: phasespec.BranchingSignal}, true
+		return phasespec.PhaseSpec{
+			Name:              string(PhaseDebugger),
+			BranchingStrategy: phasespec.BranchingSignal,
+			// PA-DDK DDK-6: the debugger's recovery targets are config-declared in
+			// the control seam (it has no registry home), mirroring the literal —
+			// RESHIP→ship, RERUN_PHASE→audit (the default upstream), BLOCK→end.
+			Recovery: &phasespec.RecoveryMap{Targets: map[string]string{
+				"RESHIP":      string(PhaseShip),
+				"RERUN_PHASE": string(PhaseAudit),
+				"BLOCK":       string(PhaseEnd),
+			}},
+		}, true
 	}
 	return phasespec.PhaseSpec{}, false
 }

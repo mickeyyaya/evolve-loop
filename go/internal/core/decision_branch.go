@@ -83,18 +83,34 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string) {
 	// retro PASS → ship; no failureadapter consultation.
 	if retroVerdict == VerdictPASS {
-		return PhaseShip, nil, "retro-recovered: ship"
+		return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), nil, "retro-recovered: ship"
 	}
 	entries := entriesFromRecords(history)
 	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
-		return PhaseTDD, dec.SetEnv, "retry-with-fallback: " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseTDD), dec.SetEnv, "retry-with-fallback: " + dec.Reason
 	case failureadapter.ActionBlockCode, failureadapter.ActionBlockOperatorAction:
-		return PhaseEnd, nil, string(dec.Action) + ": " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), nil, string(dec.Action) + ": " + dec.Reason
 	default: // ActionProceed
-		return PhaseEnd, dec.SetEnv, "proceed: " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), dec.SetEnv, "proceed: " + dec.Reason
 	}
+}
+
+// recoveryTarget resolves a control phase's recovery successor from its
+// RecoveryMap (PA-DDK DDK-6): spec.Recovery.Targets[key], denormalized through
+// phaseFromRouter. An unmapped key (or no map / catalog) returns the literal
+// fallback. The chosen edge is still gated by CanTransition at the call site —
+// config selects the target, the legality graph constrains it.
+func (o *Orchestrator) recoveryTarget(p Phase, key string, fallback Phase) Phase {
+	if spec, ok := o.specFor(p); ok && spec.Recovery != nil {
+		if t, ok := spec.Recovery.Targets[key]; ok {
+			if target := phaseFromRouter(t); target != "" {
+				return target
+			}
+		}
+	}
+	return fallback
 }
 
 // recoverFromShipError resolves a ship-phase ShipError via the advisor's
@@ -114,14 +130,14 @@ func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 	action, _ := resp.Signals["debugger.action"].(string)
 	switch action {
 	case "RESHIP":
-		return PhaseShip
+		return o.recoveryTarget(PhaseDebugger, "RESHIP", PhaseShip)
 	case "RERUN_PHASE":
 		// Clamp rerun targets to UPSTREAM phases (audit/build/tdd) — re-shipping
 		// is the dedicated RESHIP action, so a "rerun_phase: ship" must not become
 		// a reship that skips re-establishing the precondition. An unrecognized or
-		// non-upstream target defaults to audit, the dominant binding-recovery
-		// target. (Defense-in-depth: the loop's CanTransition gate independently
-		// rejects illegal edges.)
+		// non-upstream target falls to the config-declared RERUN_PHASE default.
+		// (Defense-in-depth: the loop's CanTransition gate independently rejects
+		// illegal edges.)
 		rerun, _ := resp.Signals["debugger.rerun_phase"].(string)
 		switch o.candidatePhase(rerun) {
 		case PhaseAudit:
@@ -131,10 +147,10 @@ func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 		case PhaseTDD:
 			return PhaseTDD
 		default:
-			return PhaseAudit
+			return o.recoveryTarget(PhaseDebugger, "RERUN_PHASE", PhaseAudit)
 		}
 	default: // BLOCK, empty, unknown
-		return PhaseEnd
+		return o.recoveryTarget(PhaseDebugger, "BLOCK", PhaseEnd)
 	}
 }
 
