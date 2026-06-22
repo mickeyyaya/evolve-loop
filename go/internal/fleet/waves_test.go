@@ -117,3 +117,61 @@ func TestGroupByFiles_TransitiveSharing(t *testing.T) {
 		t.Errorf("transitive sharing: want 1 group of 3, got %d groups", len(groups))
 	}
 }
+
+// TestPlanWaves_ThreadsOutputContract: a single-todo (file-disjoint) cycle
+// carries that todo's OutputContract verbatim onto its CycleSpec, so it reaches
+// the launched cycle as its binding goal (issue 14/22 — the contract was dropped
+// Todo→CycleSpec, leaving the scout to free-choose a non-reducing task).
+func TestPlanWaves_ThreadsOutputContract(t *testing.T) {
+	waves, err := PlanWaves([]Todo{
+		{ID: "a", Files: []string{"x.go"}, OutputContract: "delete EVOLVE_FOO; FlagCeiling toward 35"},
+		{ID: "b", Files: []string{"y.go"}, OutputContract: "delete EVOLVE_BAR"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, spec := range waves[0] {
+		got[spec.Scope[0]] = spec.OutputContract
+	}
+	if got["a"] != "delete EVOLVE_FOO; FlagCeiling toward 35" {
+		t.Errorf("cycle a contract = %q", got["a"])
+	}
+	if got["b"] != "delete EVOLVE_BAR" {
+		t.Errorf("cycle b contract = %q", got["b"])
+	}
+}
+
+// TestPlanWaves_CombinesContractsForFileSharingGroup: when file-sharing todos
+// merge into one cycle, each todo's contract is preserved, labeled by id.
+func TestPlanWaves_CombinesContractsForFileSharingGroup(t *testing.T) {
+	waves, err := PlanWaves([]Todo{
+		{ID: "a", Files: []string{"shared.go"}, OutputContract: "do A"},
+		{ID: "b", Files: []string{"shared.go"}, OutputContract: "do B"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(waves[0]) != 1 {
+		t.Fatalf("file-sharing todos must merge into 1 cycle, got %d specs", len(waves[0]))
+	}
+	oc := waves[0][0].OutputContract
+	if !strings.Contains(oc, "[a] do A") || !strings.Contains(oc, "[b] do B") {
+		t.Fatalf("combined contract must label each todo: %q", oc)
+	}
+}
+
+// TestPlanCycles_ThreadsOutputContract: the flat `evolve fleet --plan` path
+// (PlanCycles) carries the contract onto its specs too, not just the campaign
+// PlanWaves path — both partitioners thread it (reviewer HIGH).
+func TestPlanCycles_ThreadsOutputContract(t *testing.T) {
+	specs, _ := PlanCycles([]Todo{
+		{ID: "a", Files: []string{"x.go"}, OutputContract: "delete EVOLVE_FOO"},
+	}, 4)
+	if len(specs) != 1 {
+		t.Fatalf("want 1 spec, got %d", len(specs))
+	}
+	if specs[0].OutputContract != "delete EVOLVE_FOO" {
+		t.Fatalf("PlanCycles dropped the contract: %q", specs[0].OutputContract)
+	}
+}

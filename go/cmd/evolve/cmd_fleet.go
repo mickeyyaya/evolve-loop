@@ -138,8 +138,20 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // per-spec overlay (which already forced EVOLVE_FLEET=1).
 // cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
 // testable; --simulate threads the no-LLM -simulate flag through.
-func cycleRunArgs(goalHash string, simulate bool, projectRoot string) []string {
+func cycleRunArgs(goalHash, outputContract string, simulate bool, projectRoot string) []string {
 	args := []string{"cycle", "run", "--goal-hash", goalHash}
+	// The plan's per-cycle output contract is the cycle's BINDING goal: threaded
+	// as --goal it reaches the scout (Context["goal"]) so the cycle executes the
+	// PLANNED removal instead of free-choosing a task (campaign-6 cycle-1 shipped
+	// a classify-only cycle and never lowered FlagCeiling). Empty keeps the
+	// generic goal (goal-hash only) — back-compat for plans without contracts.
+	// The contract is the goal text by design: the scout still reads the campaign
+	// docs in-repo for the "why" framing, and the adversarial auditor enforces the
+	// anti-gaming gate regardless of the goal prose — so a terse contract is the
+	// task, not a weakened constraint.
+	if outputContract != "" {
+		args = append(args, "--goal", outputContract)
+	}
 	if simulate {
 		args = append(args, "-simulate")
 	}
@@ -156,7 +168,7 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot string, stdout, 
 		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
 		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
-		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, simulate, projectRoot)...)
+		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, spec.OutputContract, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew

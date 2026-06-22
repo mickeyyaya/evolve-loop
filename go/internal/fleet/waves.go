@@ -49,14 +49,35 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 				}
 			}
 			specs = append(specs, CycleSpec{
-				Scope:    specIDs,
-				Env:      map[string]string{fleetScopeEnvKey: strings.Join(specIDs, ",")},
-				Optional: optional,
+				Scope:          specIDs,
+				OutputContract: combinedContract(group),
+				Env:            map[string]string{fleetScopeEnvKey: strings.Join(specIDs, ",")},
+				Optional:       optional,
 			})
 		}
 		waves = append(waves, specs)
 	}
 	return waves, nil
+}
+
+// combinedContract is the cycle's binding objective built from its group's
+// todos. A single-todo cycle carries that todo's contract verbatim; a cycle that
+// merged several file-sharing todos preserves each, labeled by id, so no todo's
+// objective is lost when they share a worktree. A todo with no contract is still
+// owned by the cycle (it stays in Scope / EVOLVE_FLEET_SCOPE) — only contracts
+// with text appear in the goal prose; an all-empty group yields "" (the cycle
+// keeps the generic goal, goal-hash only).
+func combinedContract(group []Todo) string {
+	if len(group) == 1 {
+		return strings.TrimSpace(group[0].OutputContract)
+	}
+	var parts []string
+	for _, td := range group {
+		if c := strings.TrimSpace(td.OutputContract); c != "" {
+			parts = append(parts, "["+td.ID+"] "+c)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // groupByFiles partitions todos into file-disjoint groups: two todos share a
