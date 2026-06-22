@@ -74,12 +74,13 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	cfg.Scope = scope
 	cfg.Enforce = enforce
 	cfg.ShutdownSig = shutdown
-	// ADR-0044 C3: the chain-backed stall policy executes ONLY at enforce (the
-	// observer subprocess reads the program's one dial from env, same pattern as
-	// the bridge). off/shadow/unset ⇒ nil policy ⇒ byte-identical legacy Enforce
+	// ADR-0044 C3: the chain-backed stall policy executes ONLY at enforce. For
+	// this standalone subcommand the operator's --enforce flag is the live signal
+	// (the IPC stage env key is an accepted fallback for an injecting parent).
+	// off/shadow/unset + no --enforce ⇒ nil policy ⇒ byte-identical legacy Enforce
 	// branch — shadow observability for stalls already exists via the INCIDENT
 	// events themselves.
-	cfg.StallPolicy = stallPolicyFromEnv()
+	cfg.StallPolicy = resolveStallPolicy(enforce)
 	// R3.4: the process-liveness probe is wired unconditionally — it is
 	// deterministic ground truth (signal-0), not policy; nil in Run means
 	// probe-off (fixture Configs). The ACTION on a dead group stays
@@ -116,12 +117,20 @@ func loadObserverPolicy() policy.ObserverPolicy {
 // string literal (the retired key), which the flagreaders guard checks.
 const envIPCPhaseRecoveryStage = "EVOLVE_" + "PHASE_RECOVERY_STAGE" // SSOT IPC-protocol-allowed
 
-// stallPolicyFromEnv resolves the ADR-0044 stage for the observer
-// subprocess: only an explicit "enforce" injects the chain-backed policy;
-// any other value (off, shadow, unset, typo) keeps the legacy nil-policy
-// behavior — a typo must never enable a kill-path.
-func stallPolicyFromEnv() recovery.StallPolicy {
-	if strings.ToLower(strings.TrimSpace(os.Getenv(envIPCPhaseRecoveryStage))) != "enforce" {
+// resolveStallPolicy resolves the ADR-0044 chain-backed stall policy for the
+// observer subprocess. It activates ONLY at enforce, from EITHER source:
+//   - enforce: the operator's --enforce flag on the manual `evolve phase-observer`
+//     command. This is the live signal for the standalone subcommand — the
+//     orchestrator's auto-spawn path uses the in-process observer adapter
+//     (adapters/observer.CoreAdapter, which reads its own RecoveryStage field),
+//     not this subprocess, so nothing injects the IPC stage key here.
+//   - envIPCPhaseRecoveryStage == "enforce": a parent that DOES inject the stage
+//     (kept as an accepted IPC channel for forward-compat).
+//
+// Any other state (off, shadow, unset, typo, --enforce absent) ⇒ nil policy ⇒
+// byte-identical legacy behavior. A typo never enables a kill-path.
+func resolveStallPolicy(enforce bool) recovery.StallPolicy {
+	if !enforce && strings.ToLower(strings.TrimSpace(os.Getenv(envIPCPhaseRecoveryStage))) != "enforce" {
 		return nil
 	}
 	pol, err := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))
