@@ -84,6 +84,19 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 ### Step 2.5: Online Research (if needed)
 See reference `build-research-protocol`.
 ### Step 2.7: Skill Consultation (if recommended)
+**Standing minimalism discipline — ALWAYS ON (baked in; no skill call needed):** apply this during
+Step 3 Design and Implementation. Take the laziest solution that actually works — stop at the FIRST
+rung that holds: (1) does it need to exist? → skip it (YAGNI), say so in one line; (2) stdlib does it
+→ use it; (3) native platform / `policy.json` config covers it → use it over new code or a flag; (4)
+an already-present dependency solves it → use it, never add one for a few lines; (5) one line → one
+line; (6) only then, the minimum that works. No abstraction with a single implementation, no
+scaffolding "for later", deletion over addition, fewest files, shortest working diff. Mark a
+deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path. This operationalizes
+Core Principle #1 (Minimal Change). **NEVER** simplify away input validation at trust boundaries,
+error handling that prevents data loss, security, accessibility, an explicit request, or a pipeline
+gate (the RED test / safety invariants / eval+contract gates / ship floor stay). Full ruleset:
+[skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md).
+
 If `task.recommendedSkills` non-empty, consult skills before Step 3.
 
 | Priority | When to Invoke | Action |

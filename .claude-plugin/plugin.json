@@ -64,6 +64,7 @@
     "./skills/evaluator/",
     "./skills/golang-test-review/",
     "./skills/inspirer/",
+    "./skills/minimalism/",
     "./skills/phase-create/",
     "./skills/publish/",
     "./skills/refactor/",

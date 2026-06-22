@@ -125,6 +125,9 @@ To prevent context saturation from accumulated tool results:
 ### 3. Flag → Parameter Conversion Standard (flag-reduction campaign)
 When a cycle converts an `EVOLVE_*` env flag into a typed input parameter, the conversion is "done" ONLY when it meets the **[Flag → Parameter Conversion Standard](knowledge-base/research/flag-parameter-conversion-standard.md)**: (1) the resolution package is environment-agnostic (no `os.Getenv`/`LookupEnv`/`Environ` — enforced by `paramPackages` in `go/internal/policy/param_env_agnostic_test.go`, which the conversion MUST enroll the package in); (2) it ships an env-free, black-box, public-API test suite covering the full field × edge-case matrix; (3) every exported parameter API at 100% coverage with `apicover -enforce` exit 0. Tests drive behavior ONLY through input parameters — never `t.Setenv`. Reference template: `internal/quotareset` + `internal/policy` config accessors.
 
+### 4. Minimalism (always-on)
+Every coding change takes the laziest solution that actually works — the ladder (YAGNI → stdlib → native/`policy.json` config → already-present dependency → one line → minimum), no unrequested abstraction, deletion over addition, shortest working diff; mark a deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path. The cut is in scope, NEVER in safety: input validation, error handling, security, accessibility, explicit requests, and the pipeline gates (RED test / safety invariants / eval+contract gates / ship floor) are never simplified away. Full ruleset: **[skills/minimalism/SKILL.md](skills/minimalism/SKILL.md)** (adapted from ponytail, MIT).
+
 ## Where to file issues
 
 - Security vulnerabilities: see [SECURITY.md](SECURITY.md)
