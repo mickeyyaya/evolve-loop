@@ -254,6 +254,11 @@ type RoutingConfig struct {
 	// loaded without a registry stays byte-identical to pre-Order behavior).
 	// The composition root may splice user phases into this slice.
 	Order []string
+	// SpineOrder is the config-declared static-spine successor sequence (registry
+	// config.spine_order, PA-DDK DDK-3) — the mandatory-default linear path the
+	// state machine walks, distinct from Order (which interleaves optional
+	// insertions). Empty ⇒ the kernel's canonical spineOrder literal.
+	SpineOrder []string
 	// AuditFailRoutesTo is the failure-floor policy route for the audit-FAIL
 	// edge ("retrospective" | "memo"), merged from .evolve/policy.json:
 	// failure_floor at the composition root — the ONE user surface for this
@@ -312,6 +317,7 @@ type registryDoc struct {
 		DynamicRouting        string              `json:"dynamic_routing"`
 		RoutingMode           string              `json:"routing_mode"`
 		MandatoryPhases       []string            `json:"mandatory_phases"`
+		SpineOrder            []string            `json:"spine_order"`
 		ConditionalMandatory  map[string]string   `json:"conditional_mandatory"`
 		MaxOptionalInsertions *int                `json:"max_optional_insertions"`
 		GoalRecipes           map[string][]string `json:"goal_recipes"`
@@ -455,6 +461,9 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	}
 	if len(c.MandatoryPhases) > 0 {
 		cfg.Mandatory = c.MandatoryPhases
+	}
+	if len(c.SpineOrder) > 0 {
+		cfg.SpineOrder = c.SpineOrder
 	}
 	if c.MaxOptionalInsertions != nil {
 		cfg.MaxInsertions = *c.MaxOptionalInsertions

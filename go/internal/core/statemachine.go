@@ -34,6 +34,11 @@ type StateMachine struct {
 	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table. Injected
 	// by the orchestrator (which owns the catalog) via WithCatalog.
 	specFor func(Phase) (phasespec.PhaseSpec, bool)
+	// spine is the config-declared linear successor sequence (registry
+	// config.spine_order, PA-DDK DDK-3). Empty ⇒ the canonical spineOrder literal
+	// (the byte-identical fallback for catalog-less SMs / a registry that omits
+	// it). Injected via WithSpine at the composition root.
+	spine []Phase
 }
 
 // spineOrder is the canonical linear successor sequence — the mandatory-default
@@ -61,16 +66,48 @@ var spineOrder = []Phase{
 	PhaseEnd,
 }
 
-// spineNext returns the phase immediately following p in spineOrder, and whether
-// p is on the spine. A miss (sentinel, swarm-plan, or the terminal end) leaves
-// the caller to handle p explicitly.
-func spineNext(p Phase) (Phase, bool) {
-	for i, sp := range spineOrder {
-		if sp == p && i+1 < len(spineOrder) {
-			return spineOrder[i+1], true
+// effectiveSpine is the config-declared spine (sm.spine) when present, else the
+// canonical spineOrder literal — the byte-identical fallback that keeps
+// catalog-less SMs and a registry omitting config.spine_order unchanged.
+func (sm *StateMachine) effectiveSpine() []Phase {
+	if len(sm.spine) > 0 {
+		return sm.spine
+	}
+	return spineOrder
+}
+
+// spineNext returns the phase immediately following p in the effective spine,
+// and whether p is on it. A miss (sentinel, swarm-plan, or the terminal end)
+// leaves the caller to handle p explicitly.
+func (sm *StateMachine) spineNext(p Phase) (Phase, bool) {
+	spine := sm.effectiveSpine()
+	for i, sp := range spine {
+		if sp == p && i+1 < len(spine) {
+			return spine[i+1], true
 		}
 	}
 	return "", false
+}
+
+// WithSpine injects the config-declared linear spine (PA-DDK DDK-3). An empty
+// order leaves the SM on the canonical spineOrder literal.
+func (sm *StateMachine) WithSpine(order []Phase) *StateMachine {
+	sm.spine = order
+	return sm
+}
+
+// spinePhasesFrom converts config phase names (registry vocabulary, e.g.
+// "retrospective"/"end") to the kernel's Phase spine, denormalizing through
+// phaseFromRouter. Empty/unknown names are dropped; an empty result leaves the
+// SM on the canonical literal (PA-DDK DDK-3).
+func spinePhasesFrom(names []string) []Phase {
+	var out []Phase
+	for _, n := range names {
+		if p := phaseFromRouter(n); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // WithCatalog gives the StateMachine config-driven transition resolution: a
@@ -225,7 +262,7 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 	}
 	// Linear spine (ADR-0058 S5): the successor is the next entry in the canonical
 	// spine table — a data walk, byte-identical to the former per-phase switch.
-	if next, ok := spineNext(current); ok {
+	if next, ok := sm.spineNext(current); ok {
 		return next, nil
 	}
 	return "", fmt.Errorf("%w: no successor for %s", ErrTransitionInvalid, current)

@@ -73,6 +73,37 @@ func TestValidateSafetyInvariants_StrandedMandatoryAnchor(t *testing.T) {
 	}
 }
 
+// TestValidateSafetyInvariants_IllegalSpineEdge (DDK-3): a config-declared spine
+// that jumps an illegal edge — scout→ship, bypassing audit — is rejected, since
+// Next walks the spine without re-checking legality.
+func TestValidateSafetyInvariants_IllegalSpineEdge(t *testing.T) {
+	t.Parallel()
+	sm := NewStateMachine()
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
+	cfg := config.RoutingConfig{
+		Mandatory:  []string{"scout", "build", "audit", "ship"},
+		SpineOrder: []string{"scout", "ship"}, // scout→ship is not a legal edge
+	}
+	if !containsSubstr(ValidateSafetyInvariants(sm, cfg, cat), "not a legal transition") {
+		t.Error("an illegal spine edge must be rejected")
+	}
+}
+
+// TestValidateSafetyInvariants_UnknownSpinePhase (DDK-3): a typo in spine_order
+// (a name that resolves to no phase) is rejected, not silently dropped.
+func TestValidateSafetyInvariants_UnknownSpinePhase(t *testing.T) {
+	t.Parallel()
+	sm := NewStateMachine()
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
+	cfg := config.RoutingConfig{
+		Mandatory:  []string{"scout", "build", "audit", "ship"},
+		SpineOrder: []string{"scout", "scouut", "build"}, // typo
+	}
+	if !containsSubstr(ValidateSafetyInvariants(sm, cfg, cat), "no known phase") {
+		t.Error("an unknown spine_order phase must be rejected")
+	}
+}
+
 // TestValidateSafetyInvariants_ShippedRegistryPasses is the guard: the real
 // registry the composition root loads must satisfy the floor invariants. If a
 // future registry edit breaks a branch target or strands an anchor, this fails

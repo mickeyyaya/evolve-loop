@@ -469,9 +469,9 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	// ADR-0058: hand the state machine its config-driven verdict-branch
 	// resolution now that the catalog (hence specFor) is settled by options.
 	// Without a catalog, specFor misses and Next stays on the literal table
-	// (byte-identical). The linear spine is the config-independent spineOrder
-	// trust anchor (S5), so no order function is threaded here.
-	o.sm.WithCatalog(o.specFor)
+	// (byte-identical). PA-DDK DDK-3: the linear spine is now config-declared
+	// (cfg.SpineOrder); an empty order leaves the SM on the canonical literal.
+	o.sm.WithCatalog(o.specFor).WithSpine(spinePhasesFrom(o.cfg.SpineOrder))
 	// CA.5: the run-id stamping decorator wraps the (possibly option-
 	// replaced) ledger exactly once at construction. The per-run identity
 	// flows through the atomic currentRunID — RunCycle never mutates the

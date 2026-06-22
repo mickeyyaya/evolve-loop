@@ -6,6 +6,7 @@
     "dynamic_routing": "advisory",
     "routing_mode": "llm",
     "mandatory_phases": ["scout", "triage", "build", "audit", "ship"],
+    "spine_order": ["intent", "scout", "triage", "tdd", "build-planner", "build", "audit", "ship", "end"],
     "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
     "max_optional_insertions": 6,
     "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type → optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' → '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source — ending three-source recipe drift.",
