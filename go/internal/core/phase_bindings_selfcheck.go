@@ -140,6 +140,11 @@ func (o *Orchestrator) buildSelfCheck(ctx context.Context, worktree string) {
 	if worktree == "" {
 		return
 	}
+	// Clear any prior artifact FIRST so a passing (re)build never inherits a stale
+	// failure. The toolchain gate (go/acs/regression/buildselfcheck) reads this
+	// artifact at audit and HARD-FAILS on it; without the clear, a retry that fixes
+	// the build would still see the previous attempt's failures and loop forever.
+	removeBuildSelfCheckArtifact(worktree)
 	pkgs := changedGoTestPackages(changedWorktreePaths(ctx, worktree))
 	if len(pkgs) == 0 {
 		return
@@ -156,12 +161,20 @@ func (o *Orchestrator) buildSelfCheck(ctx context.Context, worktree string) {
 	writeBuildSelfCheckArtifact(worktree, fails)
 }
 
+// removeBuildSelfCheckArtifact deletes any prior build-selfcheck artifact so a
+// passing rebuild does not leave a stale failure for the toolchain gate to read.
+// Best-effort: a missing file (the common case) is not an error.
+func removeBuildSelfCheckArtifact(worktree string) {
+	_ = os.Remove(filepath.Join(worktree, ".evolve", "build-selfcheck.json"))
+}
+
 // writeBuildSelfCheckArtifact records the failing packages under the worktree's
 // .evolve dir so the audit and the next attempt can read the exact failures.
 // Best-effort: a write error is non-fatal (the WARN already surfaced it).
 func writeBuildSelfCheckArtifact(worktree string, fails []selfCheckFailure) {
-	dst := filepath.Join(worktree, ".evolve", "build-selfcheck.json")
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	dir := filepath.Join(worktree, ".evolve")
+	dst := filepath.Join(dir, "build-selfcheck.json")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
 	data, err := json.MarshalIndent(fails, "", "  ")

@@ -54,6 +54,61 @@ func TestBuildSelfCheck_WritesArtifactOnFailure(t *testing.T) {
 	}
 }
 
+func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
+	// A prior failed attempt wrote the artifact; the retry's changed package now
+	// PASSES. The artifact must be cleared so the toolchain gate (which reads it)
+	// does not loop forever on a stale failure. Regression for the gate-hardening
+	// after relaunch cycle 12 shipped vet-failing code.
+	wt := initGitWorktree(t)
+	fp := filepath.Join(wt, "go", "internal", "foo", "foo.go")
+	if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fp, []byte("package foo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Pre-seed a stale failure artifact.
+	if err := os.MkdirAll(filepath.Join(wt, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(wt, ".evolve", "build-selfcheck.json")
+	if err := os.WriteFile(stale, []byte(`[{"pkg":"./internal/foo","output":"old failure"}]`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := buildSelfCheckRunner
+	t.Cleanup(func() { buildSelfCheckRunner = old })
+	buildSelfCheckRunner = func(_ context.Context, _, _ string) (string, bool) { return "", true } // all pass now
+
+	(&Orchestrator{}).buildSelfCheck(context.Background(), wt)
+
+	if _, err := os.Stat(stale); err == nil {
+		t.Fatal("stale build-selfcheck artifact must be cleared when the rebuild passes")
+	}
+}
+
+func TestBuildSelfCheck_NoGoChanges_ClearsStaleArtifact(t *testing.T) {
+	// A non-Go-only cycle must still clear a stale failure artifact (a non-Go
+	// change cannot be a Go regression). Guards the unconditional clear that sits
+	// above the `len(pkgs)==0` early return.
+	wt := initGitWorktree(t)
+	if err := os.WriteFile(filepath.Join(wt, "notes.md"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(wt, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(wt, ".evolve", "build-selfcheck.json")
+	if err := os.WriteFile(stale, []byte(`[{"pkg":"./internal/foo","output":"old"}]`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	(&Orchestrator{}).buildSelfCheck(context.Background(), wt)
+
+	if _, err := os.Stat(stale); err == nil {
+		t.Fatal("stale artifact must be cleared even when no Go packages changed")
+	}
+}
+
 func TestBuildSelfCheck_NoGoChangesIsNoOp(t *testing.T) {
 	wt := initGitWorktree(t)
 	if err := os.WriteFile(filepath.Join(wt, "notes.md"), []byte("hi"), 0o644); err != nil {
