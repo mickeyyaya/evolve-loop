@@ -104,6 +104,20 @@ type PhaseSpec struct {
 	// evaluated against the trusted Go signal digest. nil ⇒ the literal floor map
 	// (byte-identical fallback). See ArtifactGate.
 	Gate *ArtifactGate `json:"gate,omitempty"`
+	// Recovery (PA-DDK DDK-6) config-drives a control phase's recovery SUCCESSOR
+	// targets — the phase a history/signal-branching phase routes to per its
+	// verdict / failure-adapter action / debugger action key. The decision POLICY
+	// (failure-adapter consultation, signal parsing) stays Go; only the target
+	// mapping is config. nil ⇒ the literal target table (byte-identical fallback).
+	Recovery *RecoveryMap `json:"recovery,omitempty"`
+}
+
+// RecoveryMap maps a recovery KEY (a verdict, a failure-adapter Action string,
+// or a debugger action) to a successor phase name. The chosen edge is still
+// gated by the legality graph at the call site — config selects, the graph
+// constrains. An unmapped key falls back to the literal target (PA-DDK DDK-6).
+type RecoveryMap struct {
+	Targets map[string]string `json:"targets,omitempty"`
 }
 
 // ArtifactGate is the declarative artifact-floor threshold for an anchor phase
