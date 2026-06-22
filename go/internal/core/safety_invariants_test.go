@@ -109,6 +109,48 @@ func TestValidateSafetyInvariants_FloorGateAcceptsOnlyShippableVerdict(t *testin
 	}
 }
 
+// TestValidateSafetyInvariants_NoMandatoryEvaluatorRejected (DDK-5 hardening,
+// ADR-0060 §4 F⊆M): dropping the evaluator from mandatory_phases means no
+// mandatory phase gates the verdict, so SpineSatisfiedUpTo would admit ship with
+// no audit (the runtime anchor goes inert). The validator must reject it at load.
+// The evaluator name comes from the loaded config, not a literal.
+func TestValidateSafetyInvariants_NoMandatoryEvaluatorRejected(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.Mandatory = without(cfg.Mandatory, ref.Evaluator())
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "mandatory evaluator") {
+		t.Error("dropping the evaluator from mandatory_phases must be rejected — the ship floor goes inert")
+	}
+}
+
+// TestValidateSafetyInvariants_PresenceOnlyEvaluatorRejected (DDK-5 hardening): an
+// evaluator declared with a presence-only gate (requires_present, no verdict_in)
+// is not a real evaluator — a FAIL verdict slips through. With no other mandatory
+// evaluator the floor has none, so the validator must reject it.
+func TestValidateSafetyInvariants_PresenceOnlyEvaluatorRejected(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: ref.Evaluator(), Gate: &phasespec.ArtifactGate{RequiresPresent: true}})
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), ref.Config, cat), "mandatory evaluator") {
+		t.Error("a presence-only evaluator gate (no verdict_in) must not satisfy the floor-evaluator requirement")
+	}
+}
+
+// TestValidateSafetyInvariants_UnknownLegalSuccessor (DDK-5 hardening): a typo in
+// config.legal_successors (a name resolving to no phase) is silently dropped by
+// legalGraphFrom — the validator must report it loudly, not degrade the graph.
+func TestValidateSafetyInvariants_UnknownLegalSuccessor(t *testing.T) {
+	t.Parallel()
+	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.LegalSuccessors = cloneSuccessors(ref.Config.LegalSuccessors)
+	cfg.LegalSuccessors["__bogus_from__"] = []string{ref.ShipTerminal()}
+	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "no known phase") {
+		t.Error("an unresolvable legal_successors phase name must be rejected at load")
+	}
+}
+
 func containsSubstr(ss []string, sub string) bool {
 	for _, s := range ss {
 		if strings.Contains(s, sub) {
