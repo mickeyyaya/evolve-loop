@@ -259,6 +259,15 @@ type RoutingConfig struct {
 	// state machine walks, distinct from Order (which interleaves optional
 	// insertions). Empty ⇒ the kernel's canonical spineOrder literal.
 	SpineOrder []string
+	// LegalSuccessors is the config-declared transition legality graph (registry
+	// config.legal_successors, PA-DDK DDK-5): phase name → legal successor names.
+	// It keys by NAME — including the graph sentinels start/end and the control
+	// phase debugger, which are not registry phases[] entries — so the whole graph
+	// has one SSOT (mirroring SpineOrder/Mandatory) rather than orphaning sentinel
+	// edges across per-phase fields. Empty ⇒ the kernel's literal `allowed` graph
+	// (byte-identical fallback). The load-time ValidateSafetyInvariants validator
+	// is the trust anchor that gates any operator edit to this map.
+	LegalSuccessors map[string][]string
 	// AuditFailRoutesTo is the failure-floor policy route for the audit-FAIL
 	// edge ("retrospective" | "memo"), merged from .evolve/policy.json:
 	// failure_floor at the composition root — the ONE user surface for this
@@ -318,6 +327,7 @@ type registryDoc struct {
 		RoutingMode           string              `json:"routing_mode"`
 		MandatoryPhases       []string            `json:"mandatory_phases"`
 		SpineOrder            []string            `json:"spine_order"`
+		LegalSuccessors       map[string][]string `json:"legal_successors"`
 		ConditionalMandatory  map[string]string   `json:"conditional_mandatory"`
 		MaxOptionalInsertions *int                `json:"max_optional_insertions"`
 		GoalRecipes           map[string][]string `json:"goal_recipes"`
@@ -464,6 +474,9 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	}
 	if len(c.SpineOrder) > 0 {
 		cfg.SpineOrder = c.SpineOrder
+	}
+	if len(c.LegalSuccessors) > 0 {
+		cfg.LegalSuccessors = c.LegalSuccessors
 	}
 	if c.MaxOptionalInsertions != nil {
 		cfg.MaxInsertions = *c.MaxOptionalInsertions
