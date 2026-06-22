@@ -202,6 +202,7 @@
       "name": "tdd",
       "role": "tdd-engineer",
       "optional": true,
+      "writes_source": true,
       "enable_var": "workflow.phase_enables.tdd=on",
       "enabled": "on",
       "_v3_note": "enable_var migrated from EVOLVE_TEST_PHASE_ENABLED (cycle-39 flag-reduction). tdd is conditional-mandatory (cycle_size!=trivial) in config.conditional_mandatory; enabled:on is the legacy floor honored in Stage:Off.",
@@ -246,6 +247,7 @@
       "name": "build",
       "role": "builder",
       "optional": false,
+      "writes_source": true,
       "gate": { "requires_present": true },
       "inputs": {
         "files": [
