@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 // TmuxController is the seam over the `tmux` operations the *-tmux
@@ -47,13 +48,37 @@ type PaneCommander interface {
 // tmux binary. Mirrors the exact invocations in drivers/claude-tmux.sh.
 type execTmux struct{}
 
-func (execTmux) run(ctx context.Context, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "tmux", args...)
+// tmuxCmdTimeout bounds every tmux subprocess call. tmux ops are sub-second in
+// health, so 30s never throttles a working call — it exists solely so a WEDGED
+// tmux server cannot block a call forever. Without it, `tmux capture-pane`'s
+// read() blocked the completion wait loop indefinitely (flag-campaign-8): the
+// loop only checks ctx between iterations, so a mid-iteration blocking call froze
+// every liveness mechanism (poll, stop-review, ctx-cancel) with the deliverable
+// already on disk. A per-call deadline keeps the loop iterating no matter what
+// tmux does. See TestRunCmdBounded_*.
+const tmuxCmdTimeout = 30 * time.Second
+
+// runCmdBounded runs name+args capturing combined output, with a per-call
+// timeout LAYERED on ctx (it never replaces ctx — parent cancellation still
+// applies). exec.CommandContext SIGKILLs the child when the derived context
+// fires, so a hung subprocess is reaped at the deadline instead of blocking the
+// caller's read() forever.
+func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+	cctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(cctx, name, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	err := cmd.Run()
+	if err != nil && cctx.Err() == context.DeadlineExceeded {
+		return out.String(), fmt.Errorf("%s %s: timed out after %s: %w", name, strings.Join(args, " "), timeout, cctx.Err())
+	}
 	return out.String(), err
+}
+
+func (execTmux) run(ctx context.Context, args ...string) (string, error) {
+	return runCmdBounded(ctx, tmuxCmdTimeout, "tmux", args...)
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {
