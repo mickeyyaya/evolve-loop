@@ -224,6 +224,8 @@
 # 14 merge-train/kill/registry interface seams + report structs via their real
 # impls/producers. No dead exports.
 ./internal/bridge
+./internal/bridge/clicontrol
+./internal/usageprobe
 ./internal/phasecontract
 ./internal/router
 ./internal/interaction

@@ -208,6 +208,9 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 			// Clear recovered quota benches before each wave so a wave doesn't
 			// re-hit a wall that already lifted (and re-bench ones still walled).
 			runCLIHealthCanary(*projectRoot, nil, defaultLiveProbe(*projectRoot, stderr), stderr)
+			// Proactively bench families that are already capped, before the
+			// wave's cycles boot them (opt-in via policy.json cli_health).
+			runUsageProbe(*projectRoot, filepath.Join(*projectRoot, ".evolve"), nil, stderr)
 		},
 	}); err != nil {
 		fmt.Fprintf(stderr, "evolve campaign run: %v\n", err)

@@ -35,6 +35,13 @@
       "channel": "controller"
     }
   },
+  "controls": {
+    "status":    { "send": "/show info", "await": "prompt_marker" },
+    "clean_ctx": { "send": "/clear" },
+    "model":     { "send": "/load" },
+    "help":      { "send": "/help" },
+    "exit":      { "send": "/bye" }
+  },
   "interactive_prompts": [
     {
       "name": "auth_required",

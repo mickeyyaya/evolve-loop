@@ -17,7 +17,9 @@
     { "name": "/memory", "purpose": "Edit CLAUDE.md, toggle auto-memory" },
     { "name": "/resume", "purpose": "Resume a session", "args": "[session]" },
     { "name": "/context", "purpose": "Visualize context usage" },
-    { "name": "/cost", "purpose": "Session cost / usage" },
+    { "name": "/cost", "purpose": "Session cost / token spend (this session)" },
+    { "name": "/usage", "purpose": "Plan usage: % of the 5-hour + weekly rate-limit windows consumed, and reset time" },
+    { "name": "/status", "purpose": "Account / session / auth health" },
     { "name": "/doctor", "purpose": "Diagnose install/settings" },
     { "name": "/exit", "purpose": "Exit the CLI" }
   ],

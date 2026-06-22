@@ -80,6 +80,10 @@ type Policy struct {
 	// Dispatch configures the loop dispatch verification policy. Absent ⇒
 	// built-in defaults apply (Policy="verify", RepeatThreshold=5).
 	Dispatch *DispatchConfig `json:"dispatch,omitempty"`
+	// CLIHealth configures the CLI-health subsystem (proactive per-cycle usage
+	// probe). Absent ⇒ ProactiveProbe=false (opt-in: the probe is dormant until
+	// an operator enables it).
+	CLIHealth *CLIHealthConfig `json:"cli_health,omitempty"`
 	// Workflow configures loop and subagent workflow defaults. Absent ⇒
 	// built-in defaults apply.
 	Workflow *WorkflowPolicy `json:"workflow,omitempty"`
@@ -453,6 +457,25 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 		return QuotaResetConfig{}
 	}
 	return *p.QuotaReset
+}
+
+// CLIHealthConfig configures the CLI-health subsystem. ProactiveProbe enables
+// the per-cycle, concurrent usage/status probe that benches capped families
+// BEFORE any phase boots them — complementing the reactive bench (which only
+// learns of a cap after a phase already burned a boot). Off by default; the
+// EVOLVE_CLI_HEALTH=0 env gate remains the master kill-switch for the whole
+// subsystem (canary + probe).
+type CLIHealthConfig struct {
+	ProactiveProbe bool `json:"proactive_probe,omitempty"`
+}
+
+// CLIHealthConfig returns the CLI-health config; the zero value (absent block)
+// means ProactiveProbe=false.
+func (p Policy) CLIHealthConfig() CLIHealthConfig {
+	if p.CLIHealth == nil {
+		return CLIHealthConfig{}
+	}
+	return *p.CLIHealth
 }
 
 // DispatchConfig configures the loop dispatch verification policy and circuit-breaker.
