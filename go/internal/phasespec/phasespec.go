@@ -99,6 +99,22 @@ type PhaseSpec struct {
 	// or an unset catalog — degrades to the literal phase-identity default
 	// (retro→history, debugger→signal), keeping the flow byte-identical.
 	BranchingStrategy string `json:"branching_strategy,omitempty"`
+	// Gate (PA-DDK DDK-4) declares the artifact-floor THRESHOLDS this anchor's
+	// handoff must meet before a later anchor may run — config-driven policy
+	// evaluated against the trusted Go signal digest. nil ⇒ the literal floor map
+	// (byte-identical fallback). See ArtifactGate.
+	Gate *ArtifactGate `json:"gate,omitempty"`
+}
+
+// ArtifactGate is the declarative artifact-floor threshold for an anchor phase
+// (PA-DDK DDK-4, ADR-0060). RequiresPresent demands a real on-disk handoff this
+// cycle; VerdictIn (when non-empty) additionally requires the digested verdict
+// to be one of the listed values — this is how audit's PASS/WARN soft-pass floor
+// is expressed AS CONFIG. The digest that supplies present/verdict stays trusted
+// Go; only these thresholds are operator-settable.
+type ArtifactGate struct {
+	RequiresPresent bool     `json:"requires_present,omitempty"`
+	VerdictIn       []string `json:"verdict_in,omitempty"`
 }
 
 // Branching strategy values for PhaseSpec.BranchingStrategy (ADR-0058). The
