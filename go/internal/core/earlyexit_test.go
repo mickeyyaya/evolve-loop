@@ -8,7 +8,26 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
+
+// TestCanTerminateEarly_ConfigOverridesLiteral proves the config path WINS over
+// the literal (not merely agrees with it): the discovery anchor, which the
+// literal switch returns true for, is declared early_exit:false in the catalog
+// and must then be NON-early-exit. If the config branch in CanTerminateEarly were
+// deleted this fails (the literal would still return true). Phase resolved via
+// the fixture — no hardcoded name.
+func TestCanTerminateEarly_ConfigOverridesLiteral(t *testing.T) {
+	t.Parallel()
+	no := false
+	ref := kerneltest.Load(t)
+	anchor := ref.FirstAnchor()
+	cat := mustCatalog(t, phasespec.PhaseSpec{Name: anchor, EarlyExit: &no})
+	sm := NewStateMachine().WithCatalog(specForCatalog(cat))
+	if sm.CanTerminateEarly(phaseFromRouter(anchor), false) {
+		t.Error("config early_exit:false must OVERRIDE the literal's early-exit-true for the discovery anchor")
+	}
+}
 
 func TestCanTerminateEarly_ConfigDriven(t *testing.T) {
 	t.Parallel()
