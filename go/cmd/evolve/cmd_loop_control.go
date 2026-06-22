@@ -20,6 +20,13 @@ import (
 
 var wireOrchestratorDepsFn = wireOrchestratorDeps
 
+// disableWorkspaceGuardForTest is a test seam: package-level test harnesses
+// that pre-seed cycle workspaces (M4/M5 dispatch validators, etc.) set this
+// to true so the orchestrator does not archive the pre-seeded files before
+// phases run. Production code always leaves this false. Replaces the retired
+// EVOLVE_DISABLE_WORKSPACE_GUARD env signal (cycle-10 flag-reduction).
+var disableWorkspaceGuardForTest bool
+
 // dispatchPolicy enumerates the dispatch verification policy values.
 type dispatchPolicy int
 

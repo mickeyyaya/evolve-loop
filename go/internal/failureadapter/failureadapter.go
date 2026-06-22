@@ -148,7 +148,6 @@ func Decide(entries []Entry, opts Options) Decision {
 	buildFailDistinct := distinctCyclesByClass(nonExpired, CodeBuildFail)
 
 	awareness := make([]string, 0)
-	setEnv := map[string]string{}
 
 	// Rule 1: intent-rejected (any non-expired) — bash:249-254.
 	if ev.ByClass[string(IntentRejected)] > 0 {
@@ -228,11 +227,9 @@ func Decide(entries []Entry, opts Options) Decision {
 			return Decision{
 				Action:   ActionRetryWithFallback,
 				Reason:   fmt.Sprintf("%d prior infrastructure-transient (within 1d retention); attempting with EPERM fallback enabled", n),
-				SetEnv:   map[string]string{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1"},
 				Evidence: ev,
 			}
 		}
-		setEnv["EVOLVE_SANDBOX_FALLBACK_ON_EPERM"] = "1"
 		awareness = append(awareness, fmt.Sprintf("infra-transient: %d prior; EPERM fallback enabled", n))
 	}
 
@@ -243,7 +240,6 @@ func Decide(entries []Entry, opts Options) Decision {
 			Action:      ActionProceed,
 			Reason:      reason,
 			Remediation: "Awareness only — orchestrator should consider the prior failures when planning. Set EVOLVE_STRICT_AUDIT=1 to restore legacy block-on-recurring-failure behavior.",
-			SetEnv:      setEnv,
 			Evidence:    ev,
 		}
 	}

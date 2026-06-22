@@ -164,7 +164,7 @@ TASK_PROMPT
 
 The helper emits a `## Intent`, `## Scout report`, etc. block — only the artifacts that role should see. Do NOT manually re-include `audit-report.md`, `retrospective-report.md`, or `failedApproaches[]` content in a Builder prompt; the kernel won't block you, but the role-context-builder is the canonical source-of-truth for what each role sees.
 
-If `EVOLVE_PROMPT_MAX_TOKENS` (default 30k) is exceeded, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
+If the role-context prompt exceeds the soft token cap, the helper emits a stderr WARN — your job in that case is to *trim* before re-dispatching (e.g., by extracting only the relevant scout-report sections), not to silently ship an over-cap prompt.
 
 ## Layer-R Reflector Phase Contract (v10.20.0+)
 

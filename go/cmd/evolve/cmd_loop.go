@@ -182,7 +182,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			GoalHash:              cfg.GoalHash,
 			Env:                   cycleEnv,
 			Context:               cycleCtx,
-			DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 		}
 		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
@@ -299,7 +299,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			GoalHash:              cfg.GoalHash,
 			Env:                   cycleEnv,
 			Context:               cycleCtx,
-			DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 			BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 		}
 		result, err := orch.RunCycle(context.Background(), req)

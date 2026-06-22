@@ -6,7 +6,6 @@
 
 | Probe | Match | Conclude | Then read |
 |---|---|---|---|
-| `EVOLVE_PLATFORM` | any non-empty value | use that value verbatim | `reference/<value>-tools.md` + `reference/<value>-runtime.md` |
 | `CLAUDE_CODE_INTERACTIVE` | set | `claude` | `reference/claude-tools.md` + `reference/claude-runtime.md` |
 | `CLAUDE_CODE_SESSION_ID` | set | `claude` | same as above |
 | `GEMINI_CLI` | set | `gemini` | `reference/gemini-tools.md` + `reference/gemini-runtime.md` |
@@ -20,7 +19,6 @@ If you have shell access, the canonical detection lives in the native Go binary:
 
 ```bash
 evolve detect-cli                        # prints one of: claude, gemini, codex, unknown
-EVOLVE_PLATFORM=gemini evolve detect-cli # honours the override; prints: gemini
 ```
 
 This subcommand is platform-neutral — any CLI that can run the binary can call it.

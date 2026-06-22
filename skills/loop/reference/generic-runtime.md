@@ -34,4 +34,4 @@ See [docs/platform-compatibility.md](../../../docs/platform-compatibility.md) "A
 
 ## Detecting your CLI
 
-Set `EVOLVE_PLATFORM=<your-cli-name>` to bypass auto-detection. The skill will then look for `reference/<your-cli-name>-tools.md` and `reference/<your-cli-name>-runtime.md`. If neither exists, you'll fall back to this file.
+Auto-detection runs via `evolve detect-cli` — see `reference/platform-detect.md` for the probe table. If your CLI isn't detected, add a `reference/<your-cli-name>-tools.md` and `reference/<your-cli-name>-runtime.md`; without them you'll stay on this generic runtime.

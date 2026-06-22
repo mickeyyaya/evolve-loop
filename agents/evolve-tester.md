@@ -92,9 +92,7 @@ exit $?
 # Acceptance-of: build-report.md AC#1
 
 set -uo pipefail
-# WORKTREE resolution — dual-var fallback (use this pattern in every predicate
-# that needs per-cycle worktree files). Dispatcher may export either
-# EVOLVE_WORKTREE_PATH or WORKTREE_PATH; the git fallback handles direct invocation.
+# WORKTREE resolution — dispatcher exports WORKTREE_PATH; git fallback handles direct invocation.
 WORKTREE="${EVOLVE_WORKTREE_PATH:-${WORKTREE_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
 # Invoke the actual code path (subagent-run.sh has a --check-ctx-advisory test mode)
 out=$(bash legacy/scripts/dispatch/subagent-run.sh --check-ctx-advisory \
@@ -110,8 +108,7 @@ The right predicate **exercises the production code with controlled inputs** and
 Include this immediately after `set -uo pipefail` in any predicate that reads files from the per-cycle git worktree:
 
 ```bash
-# Dual-var fallback — dispatcher exports EVOLVE_WORKTREE_PATH (primary) OR
-# WORKTREE_PATH (legacy). The git fallback handles standalone invocation.
+# Dispatcher exports WORKTREE_PATH. The git fallback handles standalone invocation.
 WORKTREE="${EVOLVE_WORKTREE_PATH:-${WORKTREE_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
 ```
 

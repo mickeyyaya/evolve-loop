@@ -76,7 +76,6 @@ func TestLookup_SpotChecks(t *testing.T) {
 	}{
 		{"EVOLVE_PHASE_RECOVERY", StatusActive},
 		{"EVOLVE_SANDBOX", StatusActive},
-		{"EVOLVE_WORKTREE_PATH", StatusInternal},
 	}
 	for _, tt := range tests {
 		f, ok := Lookup(tt.name)

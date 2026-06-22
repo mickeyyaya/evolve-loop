@@ -117,6 +117,11 @@ type PhaseRequest struct {
 	// Set by the orchestrator from CycleRequest.BypassPolicy; operators may
 	// trigger it via --bypass-policy at the cycle or compose call site.
 	BypassPolicy bool `json:"bypass_policy,omitempty"`
+	// ComposePhases signals that phases are being run via `evolve compose`
+	// (ad-hoc composition bypassing the state machine). The kernel guard
+	// downgrades from BLOCK to WARN when this field is true. Replaces the
+	// retired EVOLVE_COMPOSE_PHASES env signal (cycle-10 flag-reduction).
+	ComposePhases bool `json:"compose_phases,omitempty"`
 	// CorrectionDirective is set by the orchestrator's contract-correction loop
 	// on a re-dispatch after a deliverable reject; the runner copies it into the
 	// BridgeRequest. Empty on the first dispatch.

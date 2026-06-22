@@ -21,7 +21,7 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
 
 ```bash
-EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1 "${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
+"${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
 ```
 
 The `find` expression locates the Go binary in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install. The whole `"${EVOLVE_GO_BIN:-$(find ...)}"` expression is **one** shell argument from bash's perspective.
@@ -57,9 +57,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 
 **Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable via `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
 
-**Why `EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1`** (v8.20.1+): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. When the orchestrator subagent (already wrapped in sandbox) tries to spawn the builder subagent (which also wraps in sandbox), the inner `sandbox_apply()` returns `EPERM` because the outer sandbox forbids creating new sandbox profiles. This is a kernel-level macOS restriction, not a config bug. The flag tells the adapter: on EPERM, retry the inner subagent without sandbox-exec — preserving sandbox where the kernel allows it, degrading only where the kernel forces it. On Linux (`bwrap`) the flag is a no-op because nested namespaces work. Without this flag, every macOS `/evolve-loop` cycle that needs a builder fails at the orchestrator → builder hand-off with `rc=71 sandbox_apply: Operation not permitted`.
-
-**Both flags are the documented default for the slash command path; do not omit them.**
+**Sandbox EPERM fallback** (v8.20.1+, auto-managed since cycle-10): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. The preflight auto-detects nested-Claude and enables the EPERM fallback automatically — no env flag needed. The adapter retries without sandbox-exec on EPERM, preserving sandbox where the kernel allows it.
 
 **You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
 - Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).

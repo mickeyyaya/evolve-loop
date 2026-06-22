@@ -37,29 +37,24 @@ func TestMintConfigsFrom_RejectsAdvisorRoleMint(t *testing.T) {
 	}
 }
 
-// TestAdvisorLaunch_DepthGuard pins the WS1-S2 env-stamp defense-in-depth: an
-// advisor wired with WithDepthCheck(AdvisorDepthExceeded) errors BEFORE dispatch
-// when EVOLVE_ADVISOR_DEPTH≥1, so even if the primary denylist were ever bypassed
-// a nested advisor cannot run. depth 0 / unset is byte-identical to today.
+// TestAdvisorLaunch_DepthGuard pins the WS1-S2 secondary recursion guard.
+// EVOLVE_ADVISOR_DEPTH was retired in cycle-10 (flag-reduction campaign);
+// AdvisorDepthExceeded is now dormant (always false). The primary guard
+// (reservedAdvisorNames denylist, tested above) remains the live defense.
+// This test verifies WithDepthCheck still compiles and that the dormant guard
+// never blocks the advisor path.
 func TestAdvisorLaunch_DepthGuard(t *testing.T) {
 	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
 
+	// Depth guard is dormant: any env value (including "1") must NOT error.
 	fb := &fakeBridge{stdout: plan}
 	in := baseRouteInput()
-	in.Env = map[string]string{"EVOLVE_ADVISOR_DEPTH": "1"}
-	if _, err := NewPhaseAdvisor(fb, WithDepthCheck(AdvisorDepthExceeded)).Plan(in); err == nil {
-		t.Fatal("Plan with EVOLVE_ADVISOR_DEPTH=1 must error (recursion guard → static)")
+	in.Env = map[string]string{}
+	if _, err := NewPhaseAdvisor(fb, WithDepthCheck(AdvisorDepthExceeded)).Plan(in); err != nil {
+		t.Fatalf("dormant depth guard must not block advisor: %v", err)
 	}
-	if fb.calls != 0 {
-		t.Errorf("guard must short-circuit BEFORE bridge launch; bridge calls=%d, want 0", fb.calls)
-	}
-
-	// Unset / 0 must not trip the guard (no behavior change for the normal path).
-	ok := &fakeBridge{stdout: plan}
-	in0 := baseRouteInput()
-	in0.Env = map[string]string{"EVOLVE_ADVISOR_DEPTH": "0"}
-	if _, err := NewPhaseAdvisor(ok, WithDepthCheck(AdvisorDepthExceeded)).Plan(in0); err != nil {
-		t.Fatalf("depth 0 must not trip the guard: %v", err)
+	if fb.calls != 1 {
+		t.Errorf("bridge must be called once; got %d", fb.calls)
 	}
 }

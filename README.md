@@ -540,12 +540,12 @@ Evolve-loop supports four authentication modes, detected in priority order:
 
 | Mode | Condition | Notes |
 |---|---|---|
-| `CUSTOM_PROXY` | `EVOLVE_ANTHROPIC_BASE_URL` or `ANTHROPIC_BASE_URL` is set | Routes all `claude -p` calls through your endpoint; must speak `POST /v1/messages` |
+| `CUSTOM_PROXY` | `ANTHROPIC_BASE_URL` is set | Routes all `claude -p` calls through your endpoint; must speak `POST /v1/messages` |
 | `API_KEY` | `ANTHROPIC_API_KEY` is set | Deducts from Anthropic API credits per call |
 | `SUBSCRIPTION_OAUTH` | `~/.claude/.credentials.json` has a valid OAuth token | Uses Claude Code subscription auth — no extra config needed |
 | `MISCONFIGURED` | None of the above | Run `claude login` or set `ANTHROPIC_API_KEY` |
 
-`EVOLVE_ANTHROPIC_BASE_URL` is proxy-agnostic — it works with LiteLLM, corporate gateways, or any endpoint that speaks the Anthropic Messages API. It is **not** required for subscription auth.
+`ANTHROPIC_BASE_URL` is proxy-agnostic — it works with LiteLLM, corporate gateways, or any endpoint that speaks the Anthropic Messages API. It is **not** required for subscription auth.
 
 To detect your active auth mode: `evolve doctor`
 
@@ -677,7 +677,7 @@ Active milestones (cycles that shipped substantive structural changes):
 | v10.11 | 2026-05-18 | Stage 10b Scout STOP CRITERION densification |
 | v10.12 | 2026-05-18 | Cycle-isolation; orchestrator profile tightening |
 | v10.13 | 2026-05-18 | Predicate-quality four-layer defense (cycle 80) |
-| v10.14 | 2026-05-19 | Auditor + Builder persona trimming; subscription-auth doctor; proxy-agnostic `EVOLVE_ANTHROPIC_BASE_URL` |
+| v10.14 | 2026-05-19 | Auditor + Builder persona trimming; subscription-auth doctor; proxy-agnostic base-URL override |
 | v10.15 | 2026-05-19 | Research-as-tool full stack (cycle 87-89); doc-stewardship hooks |
 | v10.16 | 2026-05-20 | Trust-kernel hardening (cycle 93); pre-merge tree-SHA verify |
 | v10.17 | 2026-05-20 | Token-economics roadmap batch (cycles 94-98): P1 + P2 + L1 + P3 foundation |

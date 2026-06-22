@@ -27,7 +27,13 @@ import "testing"
 // cycle-5: +1 for EVOLVE_REAP_ORPHANS (pre-existing flag, previously unregistered; required
 // by ACS cycle-5 predicate); -3 active readers (HANG_CLASSIFIER/MODELCATALOG_AUTOREFRESH/
 // ANTHROPIC_BASE_URL migrated to policy.json) → net active reduction.
-const FlagCeiling = 48
+// flag-campaign-8 wave-1 (salvaged): deleted 13 rows — 5 dead (PROMPT_MAX_TOKENS,
+// SANDBOX_FALLBACK_ON_EPERM, TESTING, WORKTREE_PATH, REAP_ORPHANS), COMPOSE_PHASES
+// (converted to policy then row-deleted), and 7 of the 8 campaign-7 tombstones
+// (readers fully removed) → 48 -> 35. POLICY_BYPASS deliberately KEPT (its env
+// bridge is a live operator escape hatch; --bypass-policy CLI conversion deferred
+// to the audited campaign rather than silently dropping the capability).
+const FlagCeiling = 35
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
@@ -61,7 +67,9 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // flag-campaign-7 (8 deprecations: ADVISOR_DEPTH/ANTHROPIC_BASE_URL/
 // DISABLE_WORKSPACE_GUARD/HANG_CLASSIFIER/MARKETPLACE_DIR/MODELCATALOG_AUTOREFRESH/
 // PLATFORM/POLICY_BYPASS → policy.json/DI/CLI) lowered the live count 23 -> 21.
-const LiveFeatureFlagCeiling = 21
+// flag-campaign-8 wave-1 (salvaged): removed the 3 live dead dials
+// (PROMPT_MAX_TOKENS, REAP_ORPHANS, SANDBOX_FALLBACK_ON_EPERM); 21 -> 18.
+const LiveFeatureFlagCeiling = 18
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is

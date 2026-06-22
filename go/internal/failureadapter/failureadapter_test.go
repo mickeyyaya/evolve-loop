@@ -236,10 +236,10 @@ func TestDecide_InfraTransientTailStreak_BrokenByOtherClass(t *testing.T) {
 	}
 }
 
-// TestDecide_OneInfraTransient_RetryWithFallback_BothModes — rule 6:
-// any non-expired infrastructure-transient → RETRY-WITH-FALLBACK +
-// set_env={"EVOLVE_SANDBOX_FALLBACK_ON_EPERM":"1"}, in BOTH modes.
-// bash:291-306.
+// TestDecide_OneInfraTransient_RetryWithFallback_StrictMode — rule 6:
+// any non-expired infrastructure-transient → RETRY-WITH-FALLBACK in strict mode.
+// EVOLVE_SANDBOX_FALLBACK_ON_EPERM was retired in cycle-10; sandbox fallback is
+// now auto-managed by the binary from nest detection, not injected via set_env.
 func TestDecide_OneInfraTransient_RetryWithFallback_StrictMode(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -250,14 +250,10 @@ func TestDecide_OneInfraTransient_RetryWithFallback_StrictMode(t *testing.T) {
 	if d.Action != ActionRetryWithFallback {
 		t.Errorf("Action=%q strict, want RETRY-WITH-FALLBACK", d.Action)
 	}
-	if d.SetEnv["EVOLVE_SANDBOX_FALLBACK_ON_EPERM"] != "1" {
-		t.Errorf("SetEnv=%v missing EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1", d.SetEnv)
-	}
 }
 
-// TestDecide_OneInfraTransient_FluentMergesSetEnv — fluent mode keeps
-// PROCEED but still merges the EPERM-fallback env into set_env.
-// bash:294-306.
+// TestDecide_OneInfraTransient_FluentMergesSetEnv — fluent mode keeps PROCEED.
+// EVOLVE_SANDBOX_FALLBACK_ON_EPERM was retired in cycle-10; no env injection needed.
 func TestDecide_OneInfraTransient_FluentMergesSetEnv(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -267,9 +263,6 @@ func TestDecide_OneInfraTransient_FluentMergesSetEnv(t *testing.T) {
 	d := Decide(entries, Options{Now: now, Strict: false})
 	if d.Action != ActionProceed {
 		t.Errorf("Action=%q fluent, want PROCEED", d.Action)
-	}
-	if d.SetEnv["EVOLVE_SANDBOX_FALLBACK_ON_EPERM"] != "1" {
-		t.Errorf("SetEnv=%v missing EPERM fallback in fluent mode", d.SetEnv)
 	}
 }
 

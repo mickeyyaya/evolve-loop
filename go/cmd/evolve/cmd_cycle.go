@@ -186,7 +186,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		GoalHash:              goalHash,
 		Env:                   cycleEnv,
 		Context:               cycleContext(goalHash, goalText),
-		DisableWorkspaceGuard: cycleEnv["EVOLVE_DISABLE_WORKSPACE_GUARD"] == "1",
+		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 		BypassPolicy:          cycleEnv["EVOLVE_POLICY_BYPASS"] == "1",
 	})
 	if err != nil {
