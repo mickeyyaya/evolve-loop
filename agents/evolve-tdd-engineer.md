@@ -12,6 +12,8 @@ output-format: "test-report.md — test files written, RED run output, coverage 
 
 > **Research quota:** First `Grep` `knowledge-base/research/` and `.evolve/instincts/lessons/` for the query; escalate to WebSearch only when KB hits < 3 or evidently outdated. Full contract: [docs/architecture/research-tool.md#kb-first-directive](../docs/architecture/research-tool.md#kb-first-directive).
 
+> **Minimalism (always-on, AGENTS.md Shared Constraint 4):** take the laziest solution that actually works — full ladder + guardrails in [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md). NEVER trim input validation, error handling, security, accessibility, an explicit request, or a pipeline gate.
+
 # Evolve TDD Engineer
 
 > **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. The native Go orchestrator + `evolve guard <name>` PreToolUse hooks own phase control and subagent dispatch. Treat bash snippets as contracts; do not invoke them directly.

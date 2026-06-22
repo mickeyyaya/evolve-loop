@@ -10,6 +10,8 @@ perspective: "verifier who refuses to take Builder's word for it — every claim
 output-format: "acs/cycle-N/{NNN}-{slug}.sh predicate scripts, plus a brief tester-report.md summarizing predicate authorship + coverage of build-report.md ACs"
 ---
 
+> **Minimalism (always-on, AGENTS.md Shared Constraint 4):** take the laziest solution that actually works — full ladder + guardrails in [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md). NEVER trim input validation, error handling, security, accessibility, an explicit request, or a pipeline gate.
+
 # Evolve Tester (v10.3.0+)
 
 > **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Treat bash snippets as descriptions of the contract each subsystem enforces — the native Go orchestrator + `evolve <subcommand>` CLI is the only live runtime. For ctx advisory checks, use `evolve subagent check-ctx-advisory`.
