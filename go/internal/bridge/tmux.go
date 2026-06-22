@@ -77,8 +77,28 @@ func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args
 	return out.String(), err
 }
 
+// TmuxSocket is the dedicated tmux socket the bridge runs every agent pane on,
+// isolating them from the operator's shared default socket
+// (/tmp/tmux-<uid>/default). A stray `tmux attach` on the default socket can land
+// in a live agent REPL and send the operator's keystrokes to it — the
+// flag-campaign-8 "show progress" leak. Routing the bridge onto its own socket
+// forecloses that: the operator's default-socket tmux never sees agent panes.
+// Session names already carry the run id, so a single shared bridge socket is
+// safe for concurrent runs (no name collisions); the reaper kills by session
+// name, never kill-server, so runs never tear down one another.
+const TmuxSocket = "evolve-bridge"
+
+// TmuxSocketArgs prepends tmux's GLOBAL -L socket selector (which must precede the
+// subcommand) so the invocation targets the isolated bridge server. It is the
+// single SSOT for socket selection across every bridge tmux consumer — execTmux
+// (here), swarm teardown (swarm.ExecTmuxKill), and the observer liveness probe —
+// so none can drift back onto the default socket and go blind to agent panes.
+func TmuxSocketArgs(args ...string) []string {
+	return append([]string{"-L", TmuxSocket}, args...)
+}
+
 func (execTmux) run(ctx context.Context, args ...string) (string, error) {
-	return runCmdBounded(ctx, tmuxCmdTimeout, "tmux", args...)
+	return runCmdBounded(ctx, tmuxCmdTimeout, "tmux", TmuxSocketArgs(args...)...)
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {

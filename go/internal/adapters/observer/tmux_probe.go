@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
@@ -47,6 +48,17 @@ func realTmuxRunner(args ...string) ([]byte, error) {
 	return exec.Command(path, args...).Output()
 }
 
+// socketTmuxRunner wraps a tmuxRunner so every invocation targets the bridge's
+// isolated socket (bridge.TmuxSocket) via the global -L selector. The production
+// probe wraps realTmuxRunner with this so it queries the same socket the driver
+// created the agent panes on; a default-socket query would never see them and
+// the probe would falsely report every agent dead.
+func socketTmuxRunner(run tmuxRunner) tmuxRunner {
+	return func(args ...string) ([]byte, error) {
+		return run(bridge.TmuxSocketArgs(args...)...)
+	}
+}
+
 // newTmuxPaneProbe returns a LivenessProbe that reports the agent alive when
 // the live tmux pane for this cycle/phase changed since the last call.
 //
@@ -62,7 +74,7 @@ func realTmuxRunner(args ...string) ([]byte, error) {
 // single goroutine (the observer's Watch loop — which it is).
 func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() bool {
 	if run == nil {
-		run = realTmuxRunner
+		run = socketTmuxRunner(realTmuxRunner)
 	}
 	infix := fmt.Sprintf("-c%d-%s-", cycle, phase)
 	// CB.6: a probe that knows its run id asserts the run token before
