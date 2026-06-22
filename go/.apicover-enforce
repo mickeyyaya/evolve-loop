@@ -90,6 +90,7 @@
 ./internal/phases/build
 ./internal/phaseconfig
 ./internal/llmroute
+./internal/kerneltest
 ./internal/ledgerverify
 ./internal/guards/treediff
 ./internal/detectcli

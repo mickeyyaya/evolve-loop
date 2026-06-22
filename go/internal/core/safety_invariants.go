@@ -52,6 +52,24 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
+	// Spine-edge legality (PA-DDK DDK-3): a config-declared spine (cfg.SpineOrder)
+	// must resolve to known phases and every consecutive edge must be a legal
+	// transition — a spine cannot route around an anchor via an illegal jump
+	// (scout→ship), since Next walks the spine without re-checking CanTransition.
+	for _, n := range cfg.SpineOrder {
+		if phaseFromRouter(n) == "" {
+			violations = append(violations, fmt.Sprintf("spine_order phase %q resolves to no known phase", n))
+		}
+	}
+	if sm != nil {
+		spine := spinePhasesFrom(cfg.SpineOrder)
+		for i := 0; i+1 < len(spine); i++ {
+			if !sm.CanTransition(spine[i], spine[i+1]) {
+				violations = append(violations, fmt.Sprintf("spine edge %q→%q is not a legal transition", spine[i], spine[i+1]))
+			}
+		}
+	}
+
 	// I9 — anchor reachability: every configured-mandatory anchor must be
 	// reachable from the start node. A stranded anchor cannot gate the floor, so
 	// a config that marks an unreachable phase mandatory is a silent floor hole.
