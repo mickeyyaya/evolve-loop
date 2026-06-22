@@ -40,12 +40,12 @@ bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date
 
 ## Critical runtime facts (full table → runtime-reference.md)
 
-- Gates default-ON: `.evolve/policy.json` `gates.eval_gate=enforce` and `gates.contract_gate=enforce`; EGPS `red_count==0` to ship, tdd phase enabled via `workflow.phase_enables.tdd=on`.
+- Gates default-ON as **compiled Go defaults** (`internal/policy` + `internal/config`), surfaced when the policy block is absent: `eval_gate=enforce`, `contract_gate=enforce`, EGPS `red_count==0` to ship, tdd phase enabled. `.evolve/policy.json` MAY override these via a `gates`/`workflow` block, but the checked-in file sets only `floor` + `cli_health` — it does not contain the gate keys (don't assume policy.json is the source of the defaults).
 - Default execution = tmux-LLM drivers (`claude-tmux` etc.); headless `claude -p` is opt-in only. Claude OAuth detected from macOS Keychain.
 - Commits: bare `git commit` / `git push origin main` are ship-gate-denied. Interactive commits: `/commit` → attestation → `evolve ship --class manual` (`--bypass-commit-gate` routine use is a violation). Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z` — "publish" ≠ "push".
 - Unfinished cycle → `evolve loop --resume` or `evolve cycle reset`; `evolve loop --force-fresh` as last-resort escape hatch (history NOT sealed).
-- Routing: `EVOLVE_DYNAMIC_ROUTING=advisory` default (since 2026-06-06, retro steps 1-3 landed; `=off` is the static escape hatch); integrity floor `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`; policy pins in `.evolve/policy.json` (policy bypass is off by default). Swarm: stage=shadow (set via `.evolve/policy.json` `swarm.stage`).
-- Observer auto-spawn defaults on via `.evolve/policy.json` `observer` settings (stall 600s, tmux liveness probe).
+- Routing: `EVOLVE_DYNAMIC_ROUTING=advisory` default (since 2026-06-06, retro steps 1-3 landed; `=off` is the static escape hatch); integrity floor `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`; policy pins live in `.evolve/policy.json` (`pins`; none set in the checked-in file; policy bypass is off by default). Swarm: stage=shadow — a **compiled default**, overridable via `.evolve/policy.json` `swarm.stage` (not set in the checked-in file).
+- Observer auto-spawn defaults on as a **compiled Go default** (`internal/policy`; stall 600s, tmux liveness probe), overridable via a `.evolve/policy.json` `observer` block (not set in the checked-in file).
 - Run `/clear` before a new evolve-loop batch (session cost isolation).
 
 ## References

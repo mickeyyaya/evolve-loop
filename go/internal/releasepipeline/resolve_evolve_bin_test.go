@@ -3,7 +3,6 @@ package releasepipeline
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -170,63 +169,7 @@ func TestDefaultRebuildBinary_DryRunIsNoop(t *testing.T) {
 	}
 }
 
-// === defaultFullDryRunPreflight — script existence and executability =========
-
-// TestDefaultFullDryRunPreflight_ScriptMissing: when the script does not exist
-// the function returns an error that mentions the script path.
-func TestDefaultFullDryRunPreflight_ScriptMissing(t *testing.T) {
-	dir := t.TempDir()
-	err := defaultFullDryRunPreflight(dir, "1.2.3")
-	if err == nil {
-		t.Fatalf("defaultFullDryRunPreflight with missing script: want error, got nil")
-	}
-	// Error message must identify the missing script path.
-	if !strings.Contains(err.Error(), "full-dry-run.sh") {
-		t.Errorf("error = %q, want mention of full-dry-run.sh", err.Error())
-	}
-}
-
-// TestDefaultFullDryRunPreflight_ScriptNotExecutable: when the script exists
-// but is not executable (mode 0o644), the function returns an error.
-func TestDefaultFullDryRunPreflight_ScriptNotExecutable(t *testing.T) {
-	dir := t.TempDir()
-	scriptDir := filepath.Join(dir, "legacy", "scripts", "release")
-	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	script := filepath.Join(scriptDir, "full-dry-run.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho ok\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	err := defaultFullDryRunPreflight(dir, "1.2.3")
-	if err == nil {
-		t.Fatalf("defaultFullDryRunPreflight with non-executable script: want error, got nil")
-	}
-	if !strings.Contains(err.Error(), "not executable") {
-		t.Errorf("error = %q, want 'not executable'", err.Error())
-	}
-}
-
-// TestDefaultFullDryRunPreflight_ScriptFails: when the script is executable
-// but exits non-zero, the function returns an error wrapping the output.
-func TestDefaultFullDryRunPreflight_ScriptFails(t *testing.T) {
-	dir := t.TempDir()
-	scriptDir := filepath.Join(dir, "legacy", "scripts", "release")
-	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	script := filepath.Join(scriptDir, "full-dry-run.sh")
-	// Script exits 1 with a recognizable error message.
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho 'preflight-failed'\nexit 1\n"), 0o755); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	err := defaultFullDryRunPreflight(dir, "1.2.3")
-	if err == nil {
-		t.Fatalf("defaultFullDryRunPreflight with failing script: want error, got nil")
-	}
-	if !strings.Contains(err.Error(), "preflight-failed") {
-		t.Errorf("error = %q, want mention of script output 'preflight-failed'", err.Error())
-	}
-}
+// NOTE: the former TestDefaultFullDryRunPreflight_Script{Missing,NotExecutable,
+// Fails} tests were removed in ADR-0062/T1.3. They asserted the deleted bash
+// shell-out (legacy/scripts/release/full-dry-run.sh); the Go-native replacement
+// is covered by TestDefaultFullDryRunPreflight_NoDeadScript.

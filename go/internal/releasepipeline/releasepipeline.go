@@ -8,7 +8,7 @@
 //
 // Lifecycle (each step is a no-op when DryRun):
 //
-//  0. (optional) full-dry-run preflight        [legacy bash; only when RequirePreflight]
+//  0. (optional) full-dry-run preflight        [Go dry-run rehearsal; only when RequirePreflight]
 //  1. release preflight (5 gates)              [Go: releasepreflight.Run]
 //  2. changelog-gen                            [Go: changeloggen.Run]
 //  3. version-bump                             [Go: versionbump.Run]
@@ -546,18 +546,16 @@ func extractReleaseNotes(repoRoot, target string) string {
 
 // --- Default step implementations ------------------------------------------
 
-// defaultFullDryRunPreflight shells out to legacy/scripts/release/full-dry-run.sh.
+// defaultFullDryRunPreflight runs the Go-native preflight gates in dry-run,
+// strict mode as a pre-mutation rehearsal (step 0, opt-in via
+// --require-preflight). It REPLACES the deleted
+// legacy/scripts/release/full-dry-run.sh (script→Go migration, ADR-0062/T1.3):
+// the dead script had made --require-preflight an unconditional hard-fail. The
+// real test suite runs at the step-1 preflight, so the rehearsal sets
+// skipTests=true to stay fast and avoid double-running it; dryRun=true mutates
+// nothing; strictPass=true keeps the rehearsal at least as strict as step 1.
 func defaultFullDryRunPreflight(repoRoot, target string) error {
-	script := filepath.Join(repoRoot, "legacy", "scripts", "release", "full-dry-run.sh")
-	if info, err := os.Stat(script); err != nil || (info.Mode()&0o111) == 0 {
-		return fmt.Errorf("%s missing or not executable", script)
-	}
-	cmd := exec.Command("bash", script, "--version", target)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("full-dry-run.sh: %v (output: %s)", err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	return runPreflightLib(repoRoot, target, true /*dryRun*/, true /*skipTests*/, true /*strictPass*/)
 }
 
 // defaultPreflight calls releasepreflight.Run with strictPass=false.

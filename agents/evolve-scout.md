@@ -180,7 +180,7 @@ Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rul
 
 ## STOP CRITERION
 
-**Halt condition:** All five gates satisfied → `Write scout-report.md` once, then stop. No further tool calls.
+**Halt condition:** All six gates satisfied → `Write scout-report.md` once, then stop. No further tool calls.
 
 **Deadlines (hard):** turn 5: no more WebSearch/WebFetch. turn 7: write partial report if not started — prefix Discovery Summary `> TIME-BOUNDED: turn N; dimensions not covered: <list>`. turn 10: write immediately, no exceptions. **Web cap:** 3 WebSearch/WebFetch max, absolute.
 

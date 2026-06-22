@@ -11,6 +11,29 @@
 
 Accepted — D1 committed in `34da46fe`; D2–D4 implemented in cycle 2.
 
+> **Implementation correction (2026-06-23, ADR-0062 / T1.1).** The 2026-06-22
+> doc↔impl audit found D2's recorder was **never wired**: `dossier.Build/Write`
+> existed but had zero production callers, `finalizeCycle` never emitted a
+> dossier, `knowledge-base/cycles/` was empty, and the D3 `dossier-closeout`
+> policy floor was silently ignored (`policy.Policy` had no `floor` field, so
+> `json.Unmarshal` dropped the key). The Consequences note below ("`dossier.Build
+> + Write` runs in `finalizeCycle`") described the *intent*, not the as-built
+> state — Potemkin enforcement. Now corrected:
+> - **Producer wired** — `core.RunCycle` calls `writeCycleDossier` immediately
+>   after `finalizeCycle` (kept out of the behavior-preserving `finalizeCycle`
+>   extraction itself). Best-effort: a closeout-artifact write error WARNs and
+>   does not fail the already-completed cycle.
+> - **Faithful verdict** — `dossier.BuildOpts.FinalVerdict` records the cycle's
+>   real outcome; a FAIL synthesizes a minimal defect + carryover (pointing at
+>   the audit artifacts) so the record is truthful and still passes `Validate`.
+>   The full ledger walk remains the documented future slice.
+> - **Floor made real** — `policy.Policy.Floor []FloorGate` parses the `floor`
+>   key; `policy.FloorEnrolls("dossier-closeout")` drives `evolve dossier
+>   verify`, which now FAILs when the gate is enrolled but no dossiers exist
+>   (previously returned OK on an absent dir).
+> - **Git commit of the dossier** stays the future slice (`dossier.Write(...,
+>   commit=false)`); the artifact is written but not yet auto-committed.
+
 ---
 
 ## Context

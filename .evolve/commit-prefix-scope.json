@@ -1,6 +1,6 @@
 {
-  "_comment": "Layer 1 of Reward-Hacking Defense System (ADR-0012). Maps commit-message prefixes to required/forbidden diff path scopes. The commit-prefix-gate.sh PreToolUse hook rejects commits where the prefix doesn't match the diff.",
-  "_authoritative_as_of": "2026-05-18",
+  "_comment": "Layer 1 of Reward-Hacking Defense System (ADR-0012). Maps commit-message prefixes to required/forbidden diff path scopes. Enforced by the Go gate `evolve commit-prefix-gate` (internal/commitprefixgate), invoked inside `evolve ship` (rc=2 on mismatch; --bypass-prefix-gate is the emergency escape). Paths were repointed from the deleted legacy/scripts + root acs/ tree to the Go tree on 2026-06-23 (ADR-0062 / T1.2) — the script→Go migration had left every scope dead, making the scoped feat()/fix() prefixes un-shippable.",
+  "_authoritative_as_of": "2026-06-23",
   "schema_version": 1,
   "prefixes": {
     "docs": {
@@ -10,46 +10,49 @@
     },
     "feat(guards)": {
       "required_paths": [
-        "scripts/guards/**",
-        "scripts/dispatch/*-gate.sh",
-        "scripts/dispatch/*-precondition.sh",
-        "scripts/lifecycle/ship.sh",
+        "go/internal/guards/**",
+        "go/internal/cli/guardcmd/**",
+        "go/internal/commitgate/**",
+        "go/internal/commitprefixgate/**",
+        "go/internal/phases/ship/**",
         ".evolve/commit-prefix-scope.json",
-        "acs/regression-suite/**",
-        "acs/cycle-*/**"
+        "go/acs/**"
       ],
-      "description": "Kernel guards, their integration in ship.sh, manifests, and regression predicates"
+      "description": "Kernel guards (internal/guards + cli/guardcmd), the commit/ship gates, their ship-path integration, the prefix manifest, and ACS regression predicates"
     },
     "feat(routing)": {
       "required_paths": [
-        "scripts/routing/**",
+        "go/internal/router/**",
+        "go/internal/llmroute/**",
+        "go/internal/resolvellm/**",
         ".evolve/profiles/**.json",
-        "agents/evolve-*.md",
-        "scripts/dispatch/resolve-llm.sh"
+        "agents/evolve-*.md"
       ],
-      "description": "Adaptive model routing changes (ADR adaptive routing)"
+      "description": "Adaptive model/CLI routing changes (router + llmroute + resolvellm + profiles)"
     },
     "feat(token-opt)": {
       "required_paths": [
-        "scripts/lifecycle/role-context-builder.sh",
+        "go/internal/systemprompt/**",
+        "go/internal/modelcatalog/**",
         "agents/evolve-*.md",
-        ".evolve/profiles/**.json",
-        "scripts/routing/tier-map.json"
+        ".evolve/profiles/**.json"
       ],
       "forbidden_only_paths": [
         "docs/**",
         ".evolve/instincts/lessons/**",
-        "acs/**"
+        "go/acs/**"
       ],
-      "description": "Token optimization. Must touch at least one required_path AND must not be ENTIRELY under forbidden_only_paths"
+      "description": "Token/context optimization (system-prompt assembly, model catalog, profiles). Must touch at least one required_path AND must not be ENTIRELY under forbidden_only_paths"
     },
     "feat(audit)": {
       "required_paths": [
         "agents/evolve-auditor.md",
-        "scripts/verification/**",
+        "go/internal/acssuite/**",
+        "go/internal/redteamcheck/**",
+        "go/internal/evalgate/**",
         "docs/architecture/audit-constitution.md"
       ],
-      "description": "Audit-layer changes (Layer 4 constitutional audit, Layer 5 verdict-elevation)"
+      "description": "Audit-layer changes (EGPS suite, red-team checks, eval gate, auditor persona)"
     },
     "feat(posthoc)": {
       "required_paths": [
@@ -64,20 +67,21 @@
         "agents/evolve-auditor.md",
         "agents/evolve-scout.md",
         "agents/evolve-builder.md",
-        "scripts/lifecycle/carryover-todos-merger.sh"
+        "go/internal/cyclestate/**",
+        "go/internal/faillearn/**"
       ],
-      "description": "Hypothesis-falsification carryover (Layer 2)"
+      "description": "Hypothesis-falsification carryover (Layer 2): carryover/lesson state now lives in cyclestate + faillearn"
     },
     "fix(role-gate)": {
-      "required_paths": ["scripts/guards/role-gate.sh"],
-      "description": "role-gate.sh fix"
+      "required_paths": ["go/internal/guards/**"],
+      "description": "role-gate fix (ported to internal/guards/role.go)"
     },
     "fix(ship-gate)": {
-      "required_paths": ["scripts/guards/ship-gate.sh", "scripts/lifecycle/ship.sh"],
-      "description": "ship-gate or ship.sh fix"
+      "required_paths": ["go/internal/guards/**", "go/internal/phases/ship/**", "go/cmd/evolve/cmd_ship.go"],
+      "description": "ship-gate or ship-dispatch fix"
     },
     "fix(prefix-gate)": {
-      "required_paths": ["scripts/guards/commit-prefix-gate.sh", ".evolve/commit-prefix-scope.json"],
+      "required_paths": ["go/internal/commitprefixgate/**", ".evolve/commit-prefix-scope.json"],
       "description": "Layer 1 prefix-gate fix"
     },
     "fix": {
@@ -104,10 +108,10 @@
         "skills/loop/SKILL.md",
         ".agents/skills/loop/SKILL.md"
       ],
-      "description": "Version-bump release (per scripts/release-pipeline.sh)"
+      "description": "Version-bump release (per `evolve release`)"
     },
     "test": {
-      "required_paths": ["scripts/tests/**", "acs/**", "**/*-test.sh", "**/*.test.*"],
+      "required_paths": ["go/**/*_test.go", "go/acs/**", "**/*.test.*"],
       "description": "Test-only changes"
     }
   },

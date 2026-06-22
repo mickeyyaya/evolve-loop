@@ -137,15 +137,18 @@ func TestResolveEvolveBin_NotFound(t *testing.T) {
 	}
 }
 
-// TestResolveBashOrNative_Native covers the native-binary branch: a resolvable
-// EVOLVE_GO_BIN yields `<bin> <subcmd> <args...>`.
-func TestResolveBashOrNative_Native(t *testing.T) {
+// TestResolveNativeDispatch_Native covers the native-binary path: a resolvable
+// EVOLVE_GO_BIN yields `<bin> <subcmd> <args...>` with no error.
+func TestResolveNativeDispatch_Native(t *testing.T) {
 	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	writeExec(t, bin, "#!/bin/sh\nexit 0\n")
 	t.Setenv("EVOLVE_GO_BIN", bin)
-	cmd := resolveBashOrNative(dir, "fanout-dispatch", []string{"a.tsv", "b.tsv"})
+	cmd, err := resolveNativeDispatch(dir, "fanout-dispatch", []string{"a.tsv", "b.tsv"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	want := []string{bin, "fanout-dispatch", "a.tsv", "b.tsv"}
 	if len(cmd.Args) != len(want) {
 		t.Fatalf("args = %v, want %v", cmd.Args, want)
@@ -157,19 +160,16 @@ func TestResolveBashOrNative_Native(t *testing.T) {
 	}
 }
 
-// TestResolveBashOrNative_BashFallback covers the legacy bash-script branch
-// when no native binary resolves.
-func TestResolveBashOrNative_BashFallback(t *testing.T) {
+// TestResolveNativeDispatch_RequiresNativeBin covers the v12 contract: with no
+// native binary resolvable, dispatch errors — the legacy bash fallback
+// (<dir>/<subcmd>.sh) was removed with legacy/scripts/dispatch/ (ADR-0062/T1.7),
+// so there is nothing to fall back to.
+func TestResolveNativeDispatch_RequiresNativeBin(t *testing.T) {
 	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
-	dir := t.TempDir()
-	cmd := resolveBashOrNative(dir, "aggregator", []string{"out.md"})
-	if cmd.Args[0] != "bash" {
-		t.Errorf("expected bash fallback, got %v", cmd.Args)
-	}
-	if cmd.Args[1] != filepath.Join(dir, "aggregator.sh") {
-		t.Errorf("script path = %q", cmd.Args[1])
+	if _, err := resolveNativeDispatch(t.TempDir(), "aggregator", []string{"out.md"}); err == nil {
+		t.Error("expected error when no native evolve binary is available (bash fallback removed in v12)")
 	}
 }
 

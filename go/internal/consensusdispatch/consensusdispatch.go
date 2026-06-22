@@ -177,9 +177,13 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 		return ExitRuntimeErr
 	}
 
-	// ── shell-out to fanout-dispatch (native binary preferred; bash fallback) ──
+	// ── dispatch to fanout-dispatch via the native evolve binary ──
 	logf("dispatching %d parallel cross-CLI workers...", workerCount)
-	cmd := resolveBashOrNative(in.DispatchDir, "fanout-dispatch", []string{commandsTSV, resultsTSV})
+	cmd, err := resolveNativeDispatch(in.DispatchDir, "fanout-dispatch", []string{commandsTSV, resultsTSV})
+	if err != nil {
+		logf("FAIL: %v", err)
+		return ExitRuntimeErr
+	}
 	cmd.Stdout = stderr
 	cmd.Stderr = stderr
 	cmd.Env = os.Environ()
@@ -202,11 +206,15 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 		return ExitRuntimeErr
 	}
 
-	// ── shell-out to aggregator (native binary preferred; bash fallback) ──
+	// ── dispatch to aggregator via the native evolve binary ──
 	aggOutput := filepath.Join(in.WorkspacePath, "audit-report.md")
 	logf("aggregating via cross-cli-vote...")
 	aggSubArgs := append([]string{"cross-cli-vote", aggOutput}, workerArtifacts...)
-	aggCmd := resolveBashOrNative(in.DispatchDir, "aggregator", aggSubArgs)
+	aggCmd, err := resolveNativeDispatch(in.DispatchDir, "aggregator", aggSubArgs)
+	if err != nil {
+		logf("FAIL: %v", err)
+		return ExitRuntimeErr
+	}
 	aggCmd.Stdout = stderr
 	aggCmd.Stderr = stderr
 	aggCmd.Env = os.Environ()

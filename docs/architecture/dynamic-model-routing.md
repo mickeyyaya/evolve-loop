@@ -1,5 +1,7 @@
 # Dynamic Model Routing (Multi-CLI Adaptive Allocation)
 
+> **⚠️ SUPERSEDED / unbuilt proposal (banner added 2026-06-23, ADR-0062/T2.2).** This 5-layer adaptive-routing design (and its `llm_config.json` premise) was NOT shipped as written — `llm_config.json` was deleted (step9) and live routing is implemented in `go/internal/router` + `go/internal/llmroute` (advisor-driven, ADR-0052). **Crucially, the "cross-family invariant enforcement" / `rc=2` sections below describe a PROPOSED kernel gate that does NOT exist.** Cross-family separation (builder family ≠ auditor family) is an **advisory preference** carried as profile metadata (`cross_family_with` in `internal/setup`), not a kernel gate: `go/internal/router/floor.go` has no family logic. The sole kernel trust boundary is the integrity floor (`ship ⇒ build ∧ audit ∧ (tdd unless trivial)`); the live adversarial-separation mechanism is the model-level default (Opus auditor vs Sonnet builder, `ADVERSARIAL_AUDIT` default-on). Read this doc as historical design intent only.
+>
 > **Target path:** `docs/architecture/dynamic-model-routing.md` (in evolve-loop repo)
 > **Status:** Phase 0 (static baseline) staged 2026-05-17. Phases 1–5 pending batch boundary.
 > **See also:** [model-routing.md](../reference/model-routing.md) (operator reference table), [multi-llm-review.md](multi-llm-review.md) (cross-CLI audit), [capability-schema.md](capability-schema.md) (agent capability declarations).

@@ -60,19 +60,10 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	cfg.CommandsFile = pos[0]
 	cfg.ResultsFile = pos[1]
 	cfg.CachePrefixFile = cachePrefix
-	cfg.CycleStateHelperBin = locateCycleStateHelper()
+	// CycleStateHelperBin intentionally left unset (zero value disables
+	// worker-status tracking). The legacy bash probe that pointed at
+	// legacy/scripts/lifecycle/cycle-state.sh was removed in v12 (ADR-0062/T1.7);
+	// the generic Config.CycleStateHelperBin seam remains for callers that inject
+	// their own helper.
 	return fanoutdispatch.Run(cfg, stderr)
-}
-
-// locateCycleStateHelper returns the path to the bash cycle-state helper
-// if present. In v12.0.0+ legacy/ is removed so this returns empty,
-// signalling callers to use their native Go path.
-func locateCycleStateHelper() string {
-	if pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT"); pluginRoot != "" {
-		p := pluginRoot + "/legacy/scripts/lifecycle/cycle-state.sh"
-		if info, err := os.Stat(p); err == nil && !info.IsDir() {
-			return p
-		}
-	}
-	return ""
 }
