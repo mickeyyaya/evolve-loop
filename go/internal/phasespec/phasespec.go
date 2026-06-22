@@ -110,6 +110,12 @@ type PhaseSpec struct {
 	// (failure-adapter consultation, signal parsing) stays Go; only the target
 	// mapping is config. nil ⇒ the literal target table (byte-identical fallback).
 	Recovery *RecoveryMap `json:"recovery,omitempty"`
+	// EarlyExit (PA-DDK DDK-7) declares whether this phase may legally terminate a
+	// no-ship convergence cycle (→ end). A pointer so unset (nil) degrades to the
+	// literal pre-build set ({scout, triage}); an explicit value lets config fully
+	// own the early-exit set. The shipPlanned guard (a ship-intended cycle can
+	// never early-exit) stays in Go — it is the invariant, not a per-phase dial.
+	EarlyExit *bool `json:"early_exit,omitempty"`
 }
 
 // RecoveryMap maps a recovery KEY (a verdict, a failure-adapter Action string,

@@ -62,6 +62,7 @@
       "name": "scout",
       "role": "scout",
       "optional": false,
+      "early_exit": true,
       "gate": { "requires_present": true },
       "inputs": {
         "files": [".evolve/runs/cycle-{cycle}/intent.md"],
@@ -88,6 +89,7 @@
       "name": "triage",
       "role": "triage",
       "optional": true,
+      "early_exit": true,
       "enable_var": "workflow.phase_enables.triage",
       "enabled": "on",
       "inputs": {
