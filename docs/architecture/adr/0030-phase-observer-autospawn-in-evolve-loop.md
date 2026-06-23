@@ -1,6 +1,24 @@
 # ADR-0030: Phase-Observer Auto-Spawn in `evolve loop`
 
-**Status:** Accepted | **Date:** 2026-05-28 | **PR:** _pending (cycle-122 remediation, commit 4)_ | **Supersedes:** N/A | **Builds on:** [ADR-0029 CLI Fallback Chain](./0029-cli-fallback-chain-and-per-agent-overrides.md), [ADR-0027 commit-as-evidence](./0027-commit-as-evidence.md)
+**Status:** Accepted (auto-spawn shipped) | **Date:** 2026-05-28 | **PR:** _pending (cycle-122 remediation, commit 4)_ | **Supersedes:** N/A | **Builds on:** [ADR-0029 CLI Fallback Chain](./0029-cli-fallback-chain-and-per-agent-overrides.md), [ADR-0027 commit-as-evidence](./0027-commit-as-evidence.md)
+
+> **Implementation correction (2026-06-23, ADR-0062 / T1.4).** The auto-spawn
+> (Decision §1–3) shipped: the observer is wired per-phase and the stall
+> detector kills a no-output phase. BUT the **`FileNeverCreatedGraceS` 90s
+> fast-grace (Decision §4 / `EVOLVE_OBSERVER_GRACE_S`) was NOT implemented** —
+> the 2026-06-22 doc↔impl audit found only `EOFGraceS` (=10, post-first-event)
+> exists; there is no 90s file-never-created threshold and no
+> `EVOLVE_OBSERVER_GRACE_S` reader. Correctness is nonetheless covered:
+> `obs.lastEventTS` is initialized to phase start (`phaseobserver.go:226`), so a
+> phase that never emits an event trips the **600s stall** (`stuck_no_output`)
+> regardless. Since this ADR was written, two newer mechanisms also catch the
+> cycle-122 wedged-pane shape faster than 600s — the **tmux liveness probe**
+> (`internal/adapters/observer/tmux_probe.go`) and the **per-call tmux timeout**
+> (commit `ab065345`). The 90s fast-grace is therefore a deferred *latency*
+> optimization (faster kill for wedge-at-boot), not a correctness gap; it is
+> intentionally not built to avoid adding false-positive kill-logic to the
+> phase-killer. Config note: observer dials moved from `EVOLVE_OBSERVER_*` env
+> vars to the `.evolve/policy.json` `observer` block (`stall_s` default 600).
 
 ---
 

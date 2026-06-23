@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -32,10 +33,25 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
 		root = r
 	}
+	// ADR-0055 D3: when the policy floor enrolls "dossier-closeout", an absent or
+	// empty knowledge-base/cycles/ is a FAILURE — the gate exists precisely to
+	// catch the no-dossier-written case. Without enrollment, absence stays a
+	// no-op success (safe to run mid-batch). A malformed policy fails loudly.
+	pol, perr := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
+	if perr != nil {
+		fmt.Fprintf(stderr, "dossier verify: load policy: %v\n", perr)
+		return 1
+	}
+	enforced := pol.FloorEnrolls("dossier-closeout")
+
 	dir := filepath.Join(root, "knowledge-base", "cycles")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if enforced {
+				fmt.Fprintln(stderr, `dossier verify: FAIL — policy floor enrolls "dossier-closeout" but knowledge-base/cycles/ is absent (no dossiers written)`)
+				return 1
+			}
 			fmt.Fprintln(stdout, "dossier verify: knowledge-base/cycles/ absent — no dossiers to verify (OK)")
 			return 0
 		}
@@ -43,10 +59,12 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	errs := 0
+	found := 0
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 			continue
 		}
+		found++
 		path := filepath.Join(dir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -66,6 +84,10 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 			continue
 		}
 		fmt.Fprintf(stdout, "dossier verify: OK %s\n", e.Name())
+	}
+	if enforced && found == 0 {
+		fmt.Fprintln(stderr, `dossier verify: FAIL — policy floor enrolls "dossier-closeout" but knowledge-base/cycles/ contains no dossiers`)
+		return 1
 	}
 	if errs > 0 {
 		return 1

@@ -68,7 +68,7 @@ See `docs/architecture/observer-severity.md` for severity semantics.
 
 | Rule | Trigger | Severity | Suggested action_type |
 |---|---|---|---|
-| `stuck_no_output` | `now - last_event_ts >= EVOLVE_OBSERVER_STALL_S` (default 240s) | INCIDENT | `terminate_phase` (reason `STUCK_NO_OUTPUT`) |
+| `stuck_no_output` | `now - last_event_ts >= stall threshold` (default 600s; configured via `.evolve/policy.json` `observer.stall_s`, not the retired `EVOLVE_OBSERVER_STALL_S` env var) | INCIDENT | `terminate_phase` (reason `STUCK_NO_OUTPUT`) |
 | `infinite_loop` | Same `(tool_name + sha256(args))` repeated >= `EVOLVE_OBSERVER_LOOP_N` (default 6) in `EVOLVE_OBSERVER_LOOP_WINDOW_S` (default 120s) | INCIDENT | `terminate_phase` (reason `INFINITE_LOOP`) |
 | `error_spike` | `is_error=true / total_tool_results > EVOLVE_OBSERVER_ERROR_RATE` (default 0.3); requires >= 5 sample | WARN | `continue` (reason `ERROR_SPIKE`) |
 | `cost_anomaly` | `(current_cost - baseline_mean) / baseline_stddev >= EVOLVE_OBSERVER_COST_SIGMA` (default 2); requires baseline | WARN | `continue` (reason `COST_ANOMALY`) — not wired in v1; needs rollup baselines |
@@ -173,7 +173,7 @@ These watchdog env vars still work but emit `[phase-observer] DEPRECATED` warnin
 |---|---|---|
 | `EVOLVE_OBSERVER_ENABLED` | `0` (v1) | Master switch in `run-cycle.sh`. Set to `1` to spawn observers. |
 | `EVOLVE_OBSERVER_POLL_S` | `5` | Poll interval (seconds) |
-| `EVOLVE_OBSERVER_STALL_S` | `240` | Stuck threshold |
+| `EVOLVE_OBSERVER_STALL_S` (retired → `.evolve/policy.json` `observer.stall_s`) | `600` | Stuck threshold |
 | `EVOLVE_OBSERVER_LOOP_N` | `6` | Infinite-loop repeat count |
 | `EVOLVE_OBSERVER_LOOP_WINDOW_S` | `120` | Infinite-loop window |
 | `EVOLVE_OBSERVER_ERROR_RATE` | `0.3` | Error-spike threshold (decimal 0..1) |

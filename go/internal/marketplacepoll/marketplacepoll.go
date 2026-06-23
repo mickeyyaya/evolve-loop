@@ -26,7 +26,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
@@ -119,24 +118,14 @@ func DefaultPull(dir string) error {
 	return nil
 }
 
-// DefaultReleaseSh runs the bash release.sh if still present (cache-refresh
-// side-effects: marketplace pull + installed_plugins.json registry update).
-// In v12.0.0 the bash script is removed; this becomes a graceful no-op that
-// logs the skip but never errors. The pure-consistency-check half is
-// already covered by go/internal/releaseconsistency.
+// DefaultReleaseSh is a Go-native no-op. It formerly shelled out to
+// legacy/scripts/utility/release.sh for a cache-refresh side-effect (marketplace
+// pull + installed_plugins.json registry update). That script was removed in the
+// v12 script→Go migration; the cache-refresh side-effect is obsolete and release
+// consistency is covered by go/internal/releaseconsistency. The injectable
+// Options.ReleaseSh seam remains for callers that want a real check (ADR-0062/
+// T1.7 — no bash shell-out remains; a stray legacy release.sh is NOT executed).
 func DefaultReleaseSh(repoRoot, target string) error {
-	script := filepath.Join(repoRoot, "legacy", "scripts", "utility", "release.sh")
-	if _, err := os.Stat(script); err != nil {
-		// v12.0.0+: legacy/scripts/utility/release.sh removed. Skip cache
-		// refresh; consistency is already covered by releaseconsistency.
-		return nil
-	}
-	cmd := exec.Command("bash", script, target)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("release.sh exited non-zero: %w (output: %s)",
-			err, strings.TrimSpace(string(out)))
-	}
 	return nil
 }
 

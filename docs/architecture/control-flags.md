@@ -1,6 +1,6 @@
 # Control Flags Reference — `EVOLVE_*`
 
-> The authoritative flag inventory is the **[Generated Flag Index](#generated-flag-index)** below — projected from `go/internal/flagregistry` (the SSOT) and regenerated via `evolve flags generate`. As of **v20.2.0** the operator registry is **47 rows**.
+> The authoritative flag inventory is the **[Generated Flag Index](#generated-flag-index)** below — projected from `go/internal/flagregistry` (the SSOT) and regenerated via `evolve flags generate`. As of **v20.2.0** the operator registry is **35 rows** (flag-campaign-8 banked 48→35; trust the generated table below over any hand-written count).
 >
 > The historical hand-maintained cluster tables were removed in the flag-consolidation campaign: they duplicated the registry and drifted stale (a `never_duplicate` violation). The campaign retires the scattered `os.Getenv` override surface — capabilities move into typed `.evolve/policy.json` config, profile SSOT, DI, or documented subprocess protocol. Background: `knowledge-base/research/flag-consolidation-campaign-2026-06-19.md`.
 

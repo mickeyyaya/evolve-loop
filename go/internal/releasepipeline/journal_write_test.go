@@ -63,24 +63,7 @@ func TestInitJournal_WriteJournalFails(t *testing.T) {
 	}
 }
 
-// === defaultFullDryRunPreflight — script succeeds ============================
-
-// TestDefaultFullDryRunPreflight_ScriptSucceeds: when the script exists,
-// is executable, and exits 0, defaultFullDryRunPreflight returns nil.
-func TestDefaultFullDryRunPreflight_ScriptSucceeds(t *testing.T) {
-	dir := t.TempDir()
-	scriptDir := filepath.Join(dir, "legacy", "scripts", "release")
-	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	script := filepath.Join(scriptDir, "full-dry-run.sh")
-	// Succeeding script: prints version arg and exits 0.
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho \"dry-run ok $2\"\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	err := defaultFullDryRunPreflight(dir, "1.2.3")
-	if err != nil {
-		t.Errorf("defaultFullDryRunPreflight with succeeding script: want nil, got %v", err)
-	}
-}
+// NOTE: the former TestDefaultFullDryRunPreflight_Script* tests were removed in
+// ADR-0062/T1.3 — defaultFullDryRunPreflight no longer shells out to the deleted
+// legacy/scripts/release/full-dry-run.sh. Its Go-native behavior is covered by
+// TestDefaultFullDryRunPreflight_NoDeadScript (preflight_no_deadscript_test.go).

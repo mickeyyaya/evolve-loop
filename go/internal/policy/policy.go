@@ -37,6 +37,21 @@ type Pin struct {
 	Model string `json:"model,omitempty"`
 }
 
+// FloorGate is one entry in the policy `floor` array (ADR-0055 D3): a named
+// closeout gate every completed cycle must satisfy before a batch is considered
+// clean. The canonical entry is "dossier-closeout" — every cycle must write a
+// dossier to knowledge-base/cycles/cycle-N.json, enforced by `evolve dossier
+// verify`. NOTE: this is the closeout-gate array (`floor`), distinct from
+// ShipFloor (`ship_floor`, the per-plan integrity floor of PHASES). Before the
+// 2026-06-22 doc↔impl audit the `floor` key was present in the checked-in
+// policy.json but had NO struct field, so json.Unmarshal silently dropped it and
+// the gate it declared enforced nothing.
+type FloorGate struct {
+	ID                 string `json:"id"`
+	Description        string `json:"description,omitempty"`
+	EnforcedSinceCycle int    `json:"enforced_since_cycle,omitempty"`
+}
+
 // Policy is the user-controlled rule set from .evolve/policy.json.
 type Policy struct {
 	// MandatoryPhases are phases the routing advisor may never drop from a
@@ -53,6 +68,12 @@ type Policy struct {
 	// it, so policy can never (even by typo) produce a floor without an
 	// evaluator. This is the ONLY hard product invariant in this layer.
 	ShipFloor []string `json:"ship_floor,omitempty"`
+	// Floor is the closeout-gate array (ADR-0055 D3): named gates every
+	// completed cycle must satisfy (e.g. "dossier-closeout"). Distinct from
+	// ShipFloor above (which lists PHASES). Absent ⇒ no closeout gates. Read by
+	// `evolve dossier verify` to decide whether a missing dossier fails the
+	// batch. (See FloorGate for the Potemkin-enforcement bug this field fixes.)
+	Floor []FloorGate `json:"floor,omitempty"`
 	// FailureFloor is the ONE user surface for failure-learning policy
 	// (failure floor Phase 4a). It tunes the LLM-learning layer only —
 	// the deterministic floor (FailedRecord + retrospective/lesson
@@ -172,6 +193,18 @@ func (p Policy) FloorPhases() (floor []string, overridden bool) {
 		out = append(out, evaluatorFloorPhase)
 	}
 	return out, true
+}
+
+// FloorEnrolls reports whether the policy `floor` array contains a closeout
+// gate with the given id (e.g. "dossier-closeout"). Pure; nil-safe — an empty
+// policy enrolls nothing.
+func (p Policy) FloorEnrolls(id string) bool {
+	for _, g := range p.Floor {
+		if g.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // MergeMandatory returns base plus any phase in MandatoryPhases not already

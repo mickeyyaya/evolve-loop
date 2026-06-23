@@ -1,34 +1,32 @@
 package consensusdispatch
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 )
 
-// resolveBashOrNative returns an exec.Cmd that prefers the native
-// `evolve <subcmd>` binary over the legacy bash script at
-// <dispatchDir>/<subcmd>.sh.
+// resolveNativeDispatch returns an exec.Cmd that runs `evolve <subcmd> <args...>`
+// via the native binary.
 //
 // Resolution order:
 //
 //  1. <EVOLVE_GO_BIN> if set + executable
 //  2. <repo>/go/bin/evolve relative to dispatchDir's ancestor
 //  3. `evolve` on PATH
-//  4. bash <dispatchDir>/<subcmd>.sh (legacy fallback; absent in v12.0.0)
 //
-// v11.9.x → v12.0.0 transition: the bash fallback exists only while
-// legacy/scripts/dispatch/ is present. In v12.0.0 the fallback is a no-op
-// (cmd.Run will fail), and consensus dispatch requires the native binary.
-func resolveBashOrNative(dispatchDir, subcmd string, subArgs []string) *exec.Cmd {
+// The legacy bash fallback (bash <dispatchDir>/<subcmd>.sh) was removed in
+// v12.0.0 together with legacy/scripts/dispatch/ (ADR-0062/T1.7): there is no
+// script to fall back to, so a missing native binary is a hard error rather than
+// a doomed `bash <deleted>.sh` invocation.
+func resolveNativeDispatch(dispatchDir, subcmd string, subArgs []string) (*exec.Cmd, error) {
 	binPath := resolveEvolveBin(dispatchDir)
-	if binPath != "" {
-		args := append([]string{subcmd}, subArgs...)
-		return exec.Command(binPath, args...)
+	if binPath == "" {
+		return nil, fmt.Errorf("consensusdispatch: native evolve binary not found (set EVOLVE_GO_BIN or build go/bin/evolve)")
 	}
-	script := filepath.Join(dispatchDir, subcmd+".sh")
-	bashArgs := append([]string{script}, subArgs...)
-	return exec.Command("bash", bashArgs...)
+	args := append([]string{subcmd}, subArgs...)
+	return exec.Command(binPath, args...), nil
 }
 
 // resolveEvolveBin walks up from dispatchDir looking for go/bin/evolve.
