@@ -21,8 +21,11 @@
 // read only here in an acs _test.go, which the flagreaders guard excludes, so it
 // needs no registry row of its own.
 //
-// Fail-OPEN when HEAD/git is unreachable (shallow/offline): CI and the per-cycle
-// worktree always have HEAD, so the teeth bite where it matters.
+// Fail-CLOSED during an active campaign (ADR-0064 M3): if HEAD's registry is
+// unreachable while EVOLVE_FLAG_CAMPAIGN=1, the cycle is QUARANTINED (failed),
+// not skipped — a campaign cycle runs in a full clone where HEAD is always
+// reachable, so an unreachable baseline is anomalous and must not silently pass.
+// Outside a campaign the gate is dormant regardless of git reachability.
 package flagprogress
 
 import (
@@ -88,10 +91,65 @@ func TestCountRowsInSource_StrictReduction(t *testing.T) {
 	}
 }
 
+// reductionVerdict is the strict-reduction gate's decision for one cycle.
+type reductionVerdict int
+
+const (
+	reductionDormant    reductionVerdict = iota // campaign inactive — skip
+	reductionQuarantine                         // campaign active, parent unreachable — fail-closed (M3)
+	reductionNoProgress                         // campaign active, no net row deletion — fail
+	reductionProgress                           // campaign active, strict reduction — pass
+)
+
+// classifyReduction decides the gate outcome. M3 (ADR-0064 Pillar 2): during an
+// active campaign an unreachable parent is QUARANTINE, not a skip — the prior
+// fail-open let a cycle bypass the strict-reduction check by making HEAD's
+// registry unreadable. Outside a campaign the gate is dormant regardless.
+func classifyReduction(campaignActive, parentReachable bool, current, parent int) reductionVerdict {
+	if !campaignActive {
+		return reductionDormant
+	}
+	if !parentReachable {
+		return reductionQuarantine
+	}
+	if current >= parent {
+		return reductionNoProgress
+	}
+	return reductionProgress
+}
+
+// TestClassifyReduction pins the gate's decision logic, including the M3
+// fail-closed case: an active campaign with an unreachable parent must QUARANTINE
+// (not skip), because a campaign cycle runs in a full clone where HEAD is always
+// reachable — an unreachable baseline means integrity cannot be verified.
+func TestClassifyReduction(t *testing.T) {
+	cases := []struct {
+		name                     string
+		campaignActive, parentOK bool
+		current, parent          int
+		want                     reductionVerdict
+	}{
+		{"dormant when no campaign", false, true, 35, 35, reductionDormant},
+		{"dormant even if parent unreachable", false, false, 0, 0, reductionDormant},
+		{"M3 fail-closed: active + parent unreachable", true, false, 0, 0, reductionQuarantine},
+		{"no progress: no change", true, true, 35, 35, reductionNoProgress},
+		{"no progress: rose", true, true, 36, 35, reductionNoProgress},
+		{"progress: one deleted", true, true, 34, 35, reductionProgress},
+		{"progress: multi deleted", true, true, 23, 35, reductionProgress},
+	}
+	for _, tc := range cases {
+		if got := classifyReduction(tc.campaignActive, tc.parentOK, tc.current, tc.parent); got != tc.want {
+			t.Errorf("%s: classifyReduction(%v,%v,%d,%d) = %v, want %v",
+				tc.name, tc.campaignActive, tc.parentOK, tc.current, tc.parent, got, tc.want)
+		}
+	}
+}
+
 // --- the acs guard ---
 
 // parentRowCount returns the registry row count at HEAD (the cycle's parent
-// commit). ok=false (fail-open) when HEAD or git is unavailable.
+// commit). ok=false when HEAD or git is unavailable — during an ACTIVE campaign
+// this triggers fail-closed quarantine (see classifyReduction), not a skip.
 func parentRowCount() (count int, ok bool) {
 	stdout, _, code, err := acsassert.SubprocessOutput("git", "show", "HEAD:"+registryTableRepoPath)
 	if err != nil || code != 0 {
@@ -102,23 +160,32 @@ func parentRowCount() (count int, ok bool) {
 
 // TestFlagCampaignCycle_StrictlyReducesRegistry is the missing-signal gate.
 func TestFlagCampaignCycle_StrictlyReducesRegistry(t *testing.T) {
-	if os.Getenv(campaignEnvKey) != "1" {
-		t.Skipf("%s != 1; strict-reduction gate dormant (not an active flag campaign)", campaignEnvKey)
+	campaignActive := os.Getenv(campaignEnvKey) == "1"
+	var parent int
+	var parentOK bool
+	if campaignActive {
+		parent, parentOK = parentRowCount()
 	}
 	current := len(flagregistry.All)
-	parent, ok := parentRowCount()
-	if !ok {
-		t.Skip("HEAD registry_table.go not reachable (shallow/offline); strict-reduction gate fail-open")
-	}
-	if current >= parent {
+
+	switch classifyReduction(campaignActive, parentOK, current, parent) {
+	case reductionDormant:
+		t.Skipf("%s != 1; strict-reduction gate dormant (not an active flag campaign)", campaignEnvKey)
+	case reductionQuarantine:
+		t.Fatalf("flag-campaign active but HEAD registry (%s) is unreachable — QUARANTINING the cycle "+
+			"(fail-closed, ADR-0064 M3). A campaign cycle runs in a full clone where HEAD is always "+
+			"reachable; an unreachable baseline means the strict-reduction check cannot run, so the cycle "+
+			"must not pass. (Outside a campaign this gate is dormant.)", registryTableRepoPath)
+	case reductionNoProgress:
 		// Fatalf (not Errorf): stop here so the success log below cannot also fire
 		// on the failure path and contradict the verdict in CI output.
 		t.Fatalf("flag-campaign cycle made NO net registry reduction: rows HEAD=%d -> worktree=%d "+
 			"(must strictly decrease). A conversion that does not DELETE the flag row is not progress — "+
 			"delete the row from %s, and the cycle's own predicate must assert flagregistry.Lookup returns false.",
 			parent, current, registryTableRepoPath)
+	case reductionProgress:
+		t.Logf("flag-campaign reduction OK: rows %d -> %d", parent, current)
 	}
-	t.Logf("flag-campaign reduction OK: rows %d -> %d", parent, current)
 }
 
 // TestRowCounter_AgreesWithStructOnHEAD pins countRowsInSource to
