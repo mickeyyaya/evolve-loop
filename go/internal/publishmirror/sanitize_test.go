@@ -15,7 +15,7 @@ func TestScan_CleanTree_NoViolations(t *testing.T) {
 }
 
 func TestScan_MacHomePath_Flagged(t *testing.T) {
-	files := map[string]string{"a.md": "see /Users/danleemh/ai/claude/evolve-loop for detail"}
+	files := map[string]string{"a.md": "see /Users/alice/ai/claude/evolve-loop for detail"}
 	v := Scan(files, nil)
 	if len(v) != 1 {
 		t.Fatalf("want 1 violation, got %d: %+v", len(v), v)
@@ -26,8 +26,8 @@ func TestScan_MacHomePath_Flagged(t *testing.T) {
 	if v[0].File != "a.md" || v[0].Line != 1 {
 		t.Errorf("loc = %s:%d, want a.md:1", v[0].File, v[0].Line)
 	}
-	if v[0].Match != "/Users/danleemh" {
-		t.Errorf("match = %q, want /Users/danleemh", v[0].Match)
+	if v[0].Match != "/Users/alice" {
+		t.Errorf("match = %q, want /Users/alice", v[0].Match)
 	}
 }
 
@@ -42,10 +42,10 @@ func TestScan_PlaceholderHomePath_NotFlagged(t *testing.T) {
 
 func TestScan_Denylist_CaseInsensitiveSubstring(t *testing.T) {
 	files := map[string]string{
-		"c.md": "author DanLeemh wrote this",
+		"c.md": "author Alice wrote this",
 		"d.md": "ping me at Me@Gmail.com please",
 	}
-	v := Scan(files, []string{"danleemh", "me@gmail.com"})
+	v := Scan(files, []string{"alice", "me@gmail.com"})
 	if len(v) != 2 {
 		t.Fatalf("want 2 denylist violations, got %d: %+v", len(v), v)
 	}
@@ -81,8 +81,8 @@ func TestScan_ScrubbedForms_NotFlagged(t *testing.T) {
 
 func TestScan_Deterministic_SortedByFileThenLine(t *testing.T) {
 	files := map[string]string{
-		"b.md": "line1\n/Users/danleemh/x\n/Users/danleemh/y",
-		"a.md": "/Users/danleemh/z",
+		"b.md": "line1\n/Users/alice/x\n/Users/alice/y",
+		"a.md": "/Users/alice/z",
 	}
 	v := Scan(files, nil)
 	if len(v) != 3 {

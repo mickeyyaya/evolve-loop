@@ -40,17 +40,39 @@ func removeBuildPrefix(jsonContent string) (string, error) {
 
 // readStagedFiles reads each listed path under dir into a map for the sanitizer.
 // Missing paths are skipped (the staged list is authoritative but a path may have
-// been removed by a transform). Files containing a NUL byte are treated as binary
-// and returned in skipped (NOT scanned — the deterministic scan is a text scan);
-// the caller surfaces them so a binary text-scan bypass is never silent.
+// been removed by a transform). Symlinks (the skill-projection links like
+// .agents/skills/* → skills/*) are NOT followed — their target PATH is scanned
+// instead, so a symlink pointing at /Users/<user>/... is still caught. Other
+// non-regular files (directories, devices) and NUL-byte binaries are returned in
+// skipped (NOT scanned — the deterministic scan is a text scan); the caller
+// surfaces them so a text-scan bypass is never silent.
 func readStagedFiles(dir string, paths []string) (files map[string]string, skipped []string, err error) {
 	files = make(map[string]string, len(paths))
 	for _, rel := range paths {
-		b, rerr := os.ReadFile(filepath.Join(dir, rel))
-		if rerr != nil {
-			if os.IsNotExist(rerr) {
+		full := filepath.Join(dir, rel)
+		info, lerr := os.Lstat(full)
+		if lerr != nil {
+			if os.IsNotExist(lerr) {
 				continue
 			}
+			return nil, nil, fmt.Errorf("lstat staged %s: %w", rel, lerr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Scan the link target (a path string), never read through the link.
+			if target, rerr := os.Readlink(full); rerr == nil {
+				files[rel] = target
+			} else {
+				// unreadable link → treat as skipped, not fatal
+				skipped = append(skipped, rel)
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			skipped = append(skipped, rel)
+			continue
+		}
+		b, rerr := os.ReadFile(full)
+		if rerr != nil {
 			return nil, nil, fmt.Errorf("read staged %s: %w", rel, rerr)
 		}
 		if bytes.IndexByte(b, 0) >= 0 {

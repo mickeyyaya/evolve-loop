@@ -76,6 +76,55 @@ func TestReadStagedFiles_ReadsListedSkipsMissing(t *testing.T) {
 	}
 }
 
+func TestReadStagedFiles_SymlinkScansTargetNotFollowed(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "skills", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Mimics .agents/skills/x -> skills/x (a symlink to a directory).
+	if err := os.Symlink("skills/x", filepath.Join(dir, "link")); err != nil {
+		t.Skip("symlinks unsupported on this platform")
+	}
+	files, _, err := readStagedFiles(dir, []string{"link"})
+	if err != nil {
+		t.Fatalf("readStagedFiles must not follow a symlink-to-dir: %v", err)
+	}
+	if files["link"] != "skills/x" {
+		t.Errorf("symlink content should be its target path, got %q", files["link"])
+	}
+}
+
+func TestReadStagedFiles_SymlinkToPIIPathIsScannable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Symlink("/Users/alice/secret", filepath.Join(dir, "bad")); err != nil {
+		t.Skip("symlinks unsupported on this platform")
+	}
+	files, _, err := readStagedFiles(dir, []string{"bad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := Scan(files, nil); len(v) == 0 {
+		t.Error("a symlink targeting a /Users path must be caught by the sanitizer")
+	}
+}
+
+func TestReadStagedFiles_SkipsNonRegular(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "adir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files, skipped, err := readStagedFiles(dir, []string{"adir"})
+	if err != nil {
+		t.Fatalf("readStagedFiles: %v", err)
+	}
+	if _, ok := files["adir"]; ok {
+		t.Error("a directory must not be scanned as text")
+	}
+	if len(skipped) != 1 || skipped[0] != "adir" {
+		t.Errorf("directory should be reported in skipped, got %v", skipped)
+	}
+}
+
 func TestReadStagedFiles_SkipsBinary(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "bin"), []byte{0x00, 0x01, 0x02}, 0o644); err != nil {

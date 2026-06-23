@@ -64,7 +64,7 @@ func setupPrivateRepo(t *testing.T, withLeak bool) string {
 	write("README.md", "# evolveloop\n\nThe full private README.\n")
 	write("docs/clean.md", "Clean: `~/ai/claude/evolve-loop/go`, user@example.com.\n")
 	if withLeak {
-		write("docs/leak.md", "oops /Users/danleemh/secret/path here\n")
+		write("docs/leak.md", "oops /Users/alice/secret/path here\n")
 	}
 	git(t, dir, "add", "-A")
 	git(t, dir, "commit", "-q", "-m", "initial")
