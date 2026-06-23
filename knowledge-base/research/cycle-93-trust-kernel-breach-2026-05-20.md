@@ -113,7 +113,7 @@ A revert of `838f8ac` would create a NEW defective commit (subject mismatch in t
 
 ## 6. References
 
-- **Plan:** `/Users/danleemh/.claude/plans/investigate-on-cycle-92-lucky-cookie.md` (this session's approved investigation plan)
+- **Plan:** `~/.claude/plans/investigate-on-cycle-92-lucky-cookie.md` (this session's approved investigation plan)
 - **Salvage branch:** `evolve/cycle-93@5afc482` (Cycle B deliverables — merged 2026-05-20)
 - **Existing retrospectives:**
   - `.evolve/instincts/lessons/cycle-92-gitignored-deliverable-survives-worktree-not-ship.yaml`

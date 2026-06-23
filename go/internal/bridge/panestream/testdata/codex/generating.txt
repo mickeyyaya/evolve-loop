@@ -34,22 +34,22 @@
   ## Cycle Context
   - cycle: 336
   - goal_hash: 501f3ab74de7713090b2f993160cfef4015e2381850fc48c8110c8c9eb690bf2
-  - project_root: /Users/danleemh/ai/claude/evolve-loop
-  - workspace: /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336
+  - project_root: ~/ai/claude/evolve-loop
+  - workspace: ~/ai/claude/evolve-loop/.evolve/runs/cycle-336
   - goal: Reduce code size and token usage across the evolve-loop Go codebase while preserving behavior, quality, and test/audit effectiveness. Prefer small, complete, behavior-preserving simplifications that fully pass
   the adversarial audit: DRY duplicated logic into a single source, collapse index-coupled parallel slices into one slice of a struct, remove dead code and no-op loop-variable shadowing (module is Go 1.23), hoist per-
   call regexp.MustCompile to package-level vars, simplify over-complex helpers, prune redundant comments, and add small defensive guards (e.g. empty-token) at chokepoints. Each cycle delivers ONE complete simplification
   with tests proving identical behavior (no regression) and a net reduction in lines/tokens.
 
 
-  DELIVERABLE PATH: /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336/mutation-gate-report.md
+  DELIVERABLE PATH: ~/ai/claude/evolve-loop/.evolve/runs/cycle-336/mutation-gate-report.md
 
 
 • I’ll run the mutation-gate workflow against the cycle workspace, starting from build-report.md to scope the changed Go packages, then I’ll write only the required report path and verify it with the native phase
   verifier.
 
-• Ran pwd && rg --files /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-336 | rg 'build-report\.md$|team-context\.md$|cycle-state\.json$'
-  └ /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-336
+• Ran pwd && rg --files ~/ai/claude/evolve-loop/.evolve/runs/cycle-336 | rg 'build-report\.md$|team-context\.md$|cycle-state\.json$'
+  └ ~/ai/claude/evolve-loop/.evolve/worktrees/cycle-336
 
 • Explored
   └ Read platform-compatibility.md

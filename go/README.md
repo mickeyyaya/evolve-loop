@@ -1,7 +1,7 @@
 # evolve-loop Go binary
 
 Single-binary Go rewrite of the evolve-loop orchestrator and trust kernel.
-See [plan](../scripts/) (parent plan at `/Users/danleemh/.claude/plans/this-is-a-big-parallel-locket.md`).
+See [plan](../scripts/) (parent plan at `~/.claude/plans/this-is-a-big-parallel-locket.md`).
 
 This module is intentionally separate from the repo root so the bash codebase
 (`scripts/`, `agents/`, `skills/`) continues to operate during the rewrite.

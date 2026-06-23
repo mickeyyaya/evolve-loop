@@ -1,4 +1,4 @@
-danleemh@host evolve-loop % claude --model sonnet --permission-mode acceptEdits
+user@host evolve-loop % claude --model sonnet --permission-mode acceptEdits
 ╭──────────────────────────────────────────────────────────╮
 │ Welcome to Claude Code                                     │
 ╰──────────────────────────────────────────────────────────╯

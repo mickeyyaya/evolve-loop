@@ -51,7 +51,7 @@ Cycle 97 fired a *different* detector (`subagent-run.sh` INTEGRITY-FAIL on stale
 
 ## Compounding factor: dual-root plugin pattern
 
-When the operator raised the watchdog default from 240 → 600s via `ad07d25`, the change took effect for the **project repo** (`/Users/danleemh/ai/claude/evolve-loop/`) but NOT for the **running plugin install** (`~/.claude/plugins/marketplaces/evolve-loop/`). The dispatcher's `find` expression in `skills/evolve-loop/SKILL.md` explicitly resolves to the plugin install, not the project repo. Cycles 96-98 required env-var override (`EVOLVE_INACTIVITY_THRESHOLD_S=600`) on the dispatcher invocation to apply the new default.
+When the operator raised the watchdog default from 240 → 600s via `ad07d25`, the change took effect for the **project repo** (`~/ai/claude/evolve-loop/`) but NOT for the **running plugin install** (`~/.claude/plugins/marketplaces/evolve-loop/`). The dispatcher's `find` expression in `skills/evolve-loop/SKILL.md` explicitly resolves to the plugin install, not the project repo. Cycles 96-98 required env-var override (`EVOLVE_INACTIVITY_THRESHOLD_S=600`) on the dispatcher invocation to apply the new default.
 
 This is **architectural**, not a defect — the plugin install is the runtime-vetted release; the project repo is the source of truth. Closure required publishing v10.17.0 via `release-pipeline.sh`, which propagates the change via marketplace sync. See [`dual-root-plugin-pattern-bite`](../../knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md) for the full path topology.
 

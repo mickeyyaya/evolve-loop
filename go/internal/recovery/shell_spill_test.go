@@ -8,9 +8,9 @@ func TestFatalPaneShellSpill(t *testing.T) {
 		name string
 		pane string
 	}{
-		{"zsh_command_not_found", "danleemh@host % Fix every violation\nzsh: command not found: Fix\n"},
-		{"bquote_continuation", "danleemh@host % knowledge-base/research/`\nbquote>\nbquote> # Evolve Architecture Designer\n"},
-		{"quote_continuation", "danleemh@host % 'unterminated\nquote>\nquote> still in shell\n"},
+		{"zsh_command_not_found", "user@host % Fix every violation\nzsh: command not found: Fix\n"},
+		{"bquote_continuation", "user@host % knowledge-base/research/`\nbquote>\nbquote> # Evolve Architecture Designer\n"},
+		{"quote_continuation", "user@host % 'unterminated\nquote>\nquote> still in shell\n"},
 	}
 	for _, tc := range cases {
 		tc := tc

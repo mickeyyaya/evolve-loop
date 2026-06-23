@@ -7,7 +7,7 @@
   },
   "homepage": "https://github.com/mickeyyaya/evolve-loop",
   "repository": "https://github.com/mickeyyaya/evolve-loop",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "compatibility": {
     "primary_cli": "claude-code",
     "tiers": {

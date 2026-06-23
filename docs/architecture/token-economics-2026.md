@@ -229,6 +229,6 @@ done
   including the v9.0.0 opt-in `EVOLVE_*` flags referenced here
 - [`docs/release-protocol.md`](../release-protocol.md) — publish
   vocabulary (push / tag / release / propagate / publish / ship)
-- [Memory: `reference_token_optimization_research.md`](file:///Users/danleemh/.claude/projects/-Users-danleemh-ai-claude-evolve-loop/memory/reference_token_optimization_research.md)
+- Memory: `reference_token_optimization_research.md` (internal operator memory — not in this repo)
   — 2026 production-state research (earlier campaign — pairs with this doc)
-- Plan file: [`~/.claude/plans/let-s-pause-all-task-snug-bentley.md`](file:///Users/danleemh/.claude/plans/let-s-pause-all-task-snug-bentley.md)
+- Plan file: `let-s-pause-all-task-snug-bentley.md` (internal plan — not in this repo)

@@ -42,13 +42,13 @@ func TestShellSpill_NewlinePrefixBoundary(t *testing.T) {
 		{
 			// "\nquote>" on its own line (newline present) — MUST match.
 			name:      "quote_newline_prefix_matches",
-			pane:      "danleemh@host evolve-loop % echo 'unterminated\nquote> continuation",
+			pane:      "user@host evolve-loop % echo 'unterminated\nquote> continuation",
 			wantFatal: true,
 		},
 		{
 			// "\nbquote>" on its own line — MUST match.
 			name:      "bquote_newline_prefix_matches",
-			pane:      "danleemh@host evolve-loop % echo `backtick\nbquote> continuation",
+			pane:      "user@host evolve-loop % echo `backtick\nbquote> continuation",
 			wantFatal: true,
 		},
 		{
@@ -91,9 +91,9 @@ func TestShellSpill_CaseInsensitiveBoundary(t *testing.T) {
 		name string
 		pane string
 	}{
-		{"QUOTE_upper", "danleemh@host % test\nQUOTE> should not match"},
-		{"BQUOTE_upper", "danleemh@host % test\nBQUOTE> should not match"},
-		{"Quote_mixed", "danleemh@host % test\nQuote> mixed-case should not match"},
+		{"QUOTE_upper", "user@host % test\nQUOTE> should not match"},
+		{"BQUOTE_upper", "user@host % test\nBQUOTE> should not match"},
+		{"Quote_mixed", "user@host % test\nQuote> mixed-case should not match"},
 	}
 	for _, tc := range nonMatching {
 		tc := tc
@@ -113,7 +113,7 @@ func TestShellSpill_CaseInsensitiveBoundary(t *testing.T) {
 func TestShellSpill_CommandNotFoundPrecedence(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
-	pane := "danleemh@host % codex-nudge\nzsh: command not found: codex-nudge\nbquote> "
+	pane := "user@host % codex-nudge\nzsh: command not found: codex-nudge\nbquote> "
 	cause, sig, ok := d.Detect(pane)
 	if !ok {
 		t.Fatal("pane with both command-not-found and bquote> must classify fatal")
@@ -134,7 +134,7 @@ func TestShellSpill_CommandNotFoundPrecedence(t *testing.T) {
 func TestShellSpill_MultilineWithHealthyLead(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
-	pane := "⏺ Reading go/internal/core/orchestrator.go…\n  ⎿ 120 lines\n✶ Deliberating… (esc to interrupt)\ndanleemh@host % echo '\nquote> still in shell"
+	pane := "⏺ Reading go/internal/core/orchestrator.go…\n  ⎿ 120 lines\n✶ Deliberating… (esc to interrupt)\nuser@host % echo '\nquote> still in shell"
 	cause, sig, ok := d.Detect(pane)
 	if !ok {
 		t.Fatal("pane with healthy header followed by quote> continuation must still classify fatal")
@@ -151,7 +151,7 @@ func TestShellSpill_MultilineWithHealthyLead(t *testing.T) {
 func TestDetect_NilDetector_SafeNoMatch(t *testing.T) {
 	t.Parallel()
 	var d *FatalPaneDetector
-	if _, _, ok := d.Detect("danleemh@host % foo\nbquote> "); ok {
+	if _, _, ok := d.Detect("user@host % foo\nbquote> "); ok {
 		t.Fatal("nil detector must return ok=false; it is nil-receiver safe")
 	}
 }

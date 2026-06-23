@@ -3,7 +3,7 @@
 > Research dossier — 2026-05-28
 > Host: macOS 14.x (arm64) · `codex --version` → `codex-cli 0.134.0` (Homebrew)
 > Cycle: `121` · Phase: `audit` · Driver: `codex-tmux` · Model tier: `opus` → `gpt-5.5`
-> Worktree: `/Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-121` (per-cycle)
+> Worktree: `~/ai/claude/evolve-loop/.evolve/worktrees/cycle-121` (per-cycle)
 
 ---
 
@@ -127,7 +127,7 @@ The `›` character (U+203A) is rendered as the bullet/selection indicator for t
 
 ### Critical observation 2: the bridge's manifest regex DOES match
 
-The codex-tmux manifest [interactive_prompts](file:///Users/danleemh/ai/claude/evolve-loop/go/internal/bridge/manifests/codex-tmux.json) has:
+The codex-tmux manifest [interactive_prompts](../../go/internal/bridge/manifests/codex-tmux.json) has:
 
 ```json
 {
@@ -271,11 +271,11 @@ tmux kill-session -t probe
 # 3. Pre-trust a worktree path manually and verify boot proceeds.
 cat >> ~/.codex/config.toml <<EOF
 
-[projects."/Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-122"]
+[projects."~/ai/claude/evolve-loop/.evolve/worktrees/cycle-122"]
 trust_level = "trusted"
 EOF
-mkdir -p /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-122
-tmux new-session -d -s probe2 -x 200 -y 50 'cd /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-122 && codex -m gpt-5.5'
+mkdir -p ~/ai/claude/evolve-loop/.evolve/worktrees/cycle-122
+tmux new-session -d -s probe2 -x 200 -y 50 'cd ~/ai/claude/evolve-loop/.evolve/worktrees/cycle-122 && codex -m gpt-5.5'
 sleep 5
 tmux capture-pane -t probe2 -p -S -200 | head -20
 #    Expected: NO trust modal; the real REPL `›` appears next to the
@@ -285,7 +285,7 @@ tmux kill-session -t probe2
 
 # 4. Confirm bridge's prompt-marker detection breaks on the trust modal.
 #    Run a quick Go test that feeds the trust-modal text to the boot loop:
-cd /Users/danleemh/ai/claude/evolve-loop
+cd ~/ai/claude/evolve-loop
 cat > /tmp/codex_boot_race_test.go <<'EOF'
 package bridge
 import "strings"; import "testing"
@@ -432,8 +432,8 @@ Defense in depth; safe to ship alongside Fix A.
 - [GitHub issue #4337 — Commands hang indefinitely on tool timeout](https://github.com/openai/codex/issues/4337)
 - [waskosky/codex-cli-farm — tmux session manager for codex](https://github.com/waskosky/codex-cli-farm)
 - [onesuper/tui-use — agent driver for TUI programs](https://github.com/onesuper/tui-use)
-- Local artifact: `/Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-121.reset-20260528T054334.325423000/cycle-state.snapshot.json`
-- Local source: `/Users/danleemh/ai/claude/evolve-loop/go/internal/bridge/driver_tmux_repl.go`, `driver_codextmux.go`, `autorespond.go`, `manifests/codex-tmux.json`
+- Local artifact: `~/ai/claude/evolve-loop/.evolve/runs/cycle-121.reset-20260528T054334.325423000/cycle-state.snapshot.json`
+- Local source: `~/ai/claude/evolve-loop/go/internal/bridge/driver_tmux_repl.go`, `driver_codextmux.go`, `autorespond.go`, `manifests/codex-tmux.json`
 - Local probes (run 2026-05-28 on the cycle-121 host):
   - `codex --version` → `codex-cli 0.134.0`
   - `codex doctor` → `auth ✓`, `model: gpt-5.5`, terminal 80×24, `~/.codex/config.toml` trusts only the main repo + two other projects (NOT the cycle worktree)

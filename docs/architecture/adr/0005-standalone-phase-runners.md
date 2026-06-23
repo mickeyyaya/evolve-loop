@@ -13,7 +13,7 @@ Each phase of the evolve-loop pipeline has a dedicated slash command (`/scout`, 
 
 The consequence: operators who want to run `/scout` or `/audit` in isolation must perform a brittle manual setup, and if prerequisites are missing, the phase agent may produce misleading output or fail with cryptic errors instead of a clear "input missing" message.
 
-This problem is documented in the architecture redesign plan (§ADR-5, `/Users/danleemh/.claude/plans/100-focus-on-only-smooth-kay.md`) as Debt B — phases not being truly independent components.
+This problem is documented in the architecture redesign plan (§ADR-5, `~/.claude/plans/100-focus-on-only-smooth-kay.md`) as Debt B — phases not being truly independent components.
 
 ---
 

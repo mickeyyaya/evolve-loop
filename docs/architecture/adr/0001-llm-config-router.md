@@ -3,7 +3,7 @@
 **Status**: Accepted  
 **Date**: 2026-05-14  
 **Cycle**: 52 (Slice A, Foundation)  
-**Plan**: `/Users/danleemh/.claude/plans/100-focus-on-only-smooth-kay.md` § ADR-1
+**Plan**: `~/.claude/plans/100-focus-on-only-smooth-kay.md` § ADR-1
 
 ---
 

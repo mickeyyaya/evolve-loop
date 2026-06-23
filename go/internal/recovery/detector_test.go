@@ -24,15 +24,15 @@ package recovery
 import "testing"
 
 const (
-	paneClaudeModelError = `danleemh@host evolve-loop % claude --model auto --dangerously-skip-permissions
+	paneClaudeModelError = `user@host evolve-loop % claude --model auto --dangerously-skip-permissions
 ⏺ There's an issue with the selected model (auto). It may not exist or you may not have access to it. Run /model to pick a different model.`
 
 	paneCodexSelfUpdate = `│ Update ran successfully! Please restart Codex to use the new version.
-danleemh@host evolve-loop %`
+user@host evolve-loop %`
 
-	paneDeadShell = `danleemh@host evolve-loop %
+	paneDeadShell = `user@host evolve-loop %
 zsh: command not found: Please
-danleemh@host evolve-loop %`
+user@host evolve-loop %`
 
 	paneHealthyClaude = `⏺ Reading go/internal/core/orchestrator.go…
   ⎿ 120 lines

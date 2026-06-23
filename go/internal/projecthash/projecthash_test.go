@@ -25,9 +25,9 @@ func TestCompute_GoldenVectors(t *testing.T) {
 		want  string
 	}{
 		{"empty_string", "", "e3b0c442"},
-		{"evolve_repo_root", "/Users/danleemh/ai/claude/evolve-loop", "21f9f7ae"},
+		{"evolve_repo_root", "~/ai/claude/evolve-loop", "e456edac"},
 		{"tmp_test_project", "/tmp/test-project", "b71e47fd"},
-		{"short_home", "/Users/danleemh", "200d7b19"},
+		{"short_home", "~", "7ace431c"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestCompute_MatchesBash(t *testing.T) {
 	}
 	for _, in := range []string{
 		"",
-		"/Users/danleemh/ai/claude/evolve-loop",
+		"~/ai/claude/evolve-loop",
 		"/tmp",
 		"path with unicode 日本語",
 		strings.Repeat("a/", 64),
@@ -101,8 +101,8 @@ func TestForProjectRoot_FallsBackOnEmpty(t *testing.T) {
 }
 
 func TestForProjectRoot_HappyPath(t *testing.T) {
-	got := ForProjectRoot("/Users/danleemh/ai/claude/evolve-loop")
-	if got != "21f9f7ae" {
-		t.Errorf("ForProjectRoot=%q, want 21f9f7ae", got)
+	got := ForProjectRoot("~/ai/claude/evolve-loop")
+	if got != "e456edac" {
+		t.Errorf("ForProjectRoot=%q, want e456edac", got)
 	}
 }

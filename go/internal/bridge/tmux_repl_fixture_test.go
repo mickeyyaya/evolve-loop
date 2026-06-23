@@ -18,7 +18,7 @@ const (
 
   Press enter to continue`
 
-	cycle274BquoteSpill = `danleemh@Danlee-mini-m4pro-1 evolve-loop % knowledge-base/research/
+	cycle274BquoteSpill = `user@host evolve-loop % knowledge-base/research/
 bquote>
 bquote> # Evolve Architecture Designer
 zsh: command not found: and`

@@ -7,7 +7,7 @@
 
 ## 1. What happened
 
-During cycle 95-96 of the v10.17.0 batch, the operator edited the watchdog default from 240s→600s via direct `Edit` calls on `/Users/danleemh/ai/claude/evolve-loop/scripts/dispatch/phase-watchdog.sh:32` (and sibling files). The edit was committed via `ship.sh --class manual` as `ad07d25` and pushed to origin/main. The next `/evolve-loop` dispatcher invocation, however, showed:
+During cycle 95-96 of the v10.17.0 batch, the operator edited the watchdog default from 240s→600s via direct `Edit` calls on `~/ai/claude/evolve-loop/scripts/dispatch/phase-watchdog.sh:32` (and sibling files). The edit was committed via `ship.sh --class manual` as `ad07d25` and pushed to origin/main. The next `/evolve-loop` dispatcher invocation, however, showed:
 
 ```
 [run-cycle] watchdog spawned (pid=92143 pgid=91530 threshold=240s)
@@ -28,7 +28,7 @@ Two parallel file trees:
 
 | Tree | Purpose | Path | Editable by operator? |
 |---|---|---|---|
-| **Project repo** | Source of truth; commits land here; pushed to origin | `/Users/danleemh/ai/claude/evolve-loop/` | Yes — direct edits via Edit/Write |
+| **Project repo** | Source of truth; commits land here; pushed to origin | `~/ai/claude/evolve-loop/` | Yes — direct edits via Edit/Write |
 | **Plugin install** | Runtime executable; dispatcher resolves to this | `~/.claude/plugins/marketplaces/evolve-loop/` | No — populated by marketplace sync |
 
 The dispatcher's `find` expression in `skills/evolve-loop/SKILL.md`:
@@ -75,7 +75,7 @@ The watchdog default change in v10.17.0 hit failure mode 1, recovered via env-va
 
 When making changes to dispatcher scripts that need to take effect IMMEDIATELY for the current dispatcher invocation:
 
-1. **Edit project repo** at `/Users/danleemh/ai/claude/evolve-loop/scripts/...`
+1. **Edit project repo** at `~/ai/claude/evolve-loop/scripts/...`
 2. **Commit + push** via `ship.sh --class manual` or `release-pipeline.sh`
 3. **For this dispatcher session only**, pass env-var override that matches the new behavior (e.g., `EVOLVE_INACTIVITY_THRESHOLD_S=600`)
 4. **For future sessions**, run `release-pipeline.sh X.Y.Z` to propagate to marketplace

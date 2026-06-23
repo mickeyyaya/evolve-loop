@@ -800,7 +800,7 @@ We treat framework-caught-its-own-bugs incidents (like cycle-61) as the most val
 
 ## License & Links
 
-- License: MIT — see [LICENSE](LICENSE)
+- License: Apache-2.0 — see [LICENSE](LICENSE)
 - GitHub: [github.com/mickeyyaya/evolve-loop](https://github.com/mickeyyaya/evolve-loop)
 - Marketplace: `/plugin marketplace add mickeyyaya/evolve-loop`
 - CLAUDE.md (runtime contract): [CLAUDE.md](CLAUDE.md)
