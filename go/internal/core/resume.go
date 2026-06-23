@@ -187,6 +187,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	for k, v := range req.Env {
 		envSnap[k] = v
 	}
+	// SSOT IPC-protocol-allowed: parent -> child resume-mode handoff (writer).
 	envSnap["EVOLVE_"+"RESUME_MODE"] = "1"
 	ctxSnap := make(map[string]string, len(req.Context))
 	for k, v := range req.Context {
