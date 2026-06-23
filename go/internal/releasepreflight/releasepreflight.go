@@ -75,7 +75,7 @@ type Result struct {
 	StepsTotal      int
 	CurrentVersion  string
 	AuditArtifact   string
-	AuditVerdict    string // "PASS" or "WARN"
+	AuditVerdict    string // "PASS", "WARN", or "NONE" (no on-disk audit available — advisory; CI-green is the authoritative gate)
 	AuditAge        time.Duration
 	PhantomEntries  int
 	GateTestsPassed int
@@ -334,13 +334,20 @@ func Run(opts Options) (Result, error) {
 		res.AuditVerdict = auditRes.verdict
 		res.AuditAge = auditRes.age
 		res.PhantomEntries = auditRes.phantomCount
-		if auditRes.phantomCount > 0 {
-			logf("WARN: skipped %d phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry.", auditRes.phantomCount)
+		if auditRes.verdict == auditVerdictNone {
+			// Determinism: no on-disk audit available in this worktree (clean
+			// checkout / CI / GC'd artifacts). The authoritative release gate is
+			// CI-green on the release commit (enforced by /publish) — advisory only.
+			logf("advisory: no on-disk audit in this worktree — CI-green on the release commit is the authoritative gate (/publish). Skipping the audit-PASS check.")
+		} else {
+			if auditRes.phantomCount > 0 {
+				logf("WARN: skipped %d phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry.", auditRes.phantomCount)
+			}
+			if auditRes.verdict == "WARN" {
+				logf("INFO: most recent audit is WARN (fluent posture; ships by default). Set EVOLVE_RELEASE_STRICT_PASS=1 for strict-PASS gate.")
+			}
+			logf("OK: latest audit %s, artifact=%s", auditRes.verdict, auditRes.artifact)
 		}
-		if auditRes.verdict == "WARN" {
-			logf("INFO: most recent audit is WARN (fluent posture; ships by default). Set EVOLVE_RELEASE_STRICT_PASS=1 for strict-PASS gate.")
-		}
-		logf("OK: latest audit %s, artifact=%s", auditRes.verdict, auditRes.artifact)
 	}
 	res.StepsPassed++
 
@@ -434,11 +441,24 @@ func makeInlineVerdictRE(strict bool) *regexp.Regexp {
 // awk-based fallback in bash. We scan up to 5 lines after the heading.
 var verdictHeadingRE = regexp.MustCompile(`(?i)^#+\s+(?:[0-9]+\.\s+)?Verdict\s*$`)
 
+// auditVerdictNone marks that no on-disk audit artifact was available to check
+// (absent ledger, no auditor entry, or all artifacts GC'd) — distinct from a
+// real PASS/WARN/FAIL. Determinism fix: a release MUST NOT be blocked by absent
+// transient runtime state (a clean checkout / CI / fresh worktree has no
+// ledger). The authoritative release gate is CI-green on the release commit,
+// enforced by the /publish skill. A present-but-failed audit still hard-blocks.
+const auditVerdictNone = "NONE"
+
 func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResult, error) {
 	var res auditResult
 	body, err := os.ReadFile(ledgerPath)
 	if err != nil {
-		return res, fmt.Errorf("no ledger at %s — no Auditor has ever run", ledgerPath)
+		if errors.Is(err, os.ErrNotExist) {
+			// Clean checkout / CI / fresh worktree: no ledger → advisory, not fatal.
+			res.verdict = auditVerdictNone
+			return res, nil
+		}
+		return res, fmt.Errorf("ledger read %s: %w", ledgerPath, err)
 	}
 	// Walk auditor entries in reverse (newest first).
 	var auditorEntries []string
@@ -454,7 +474,9 @@ func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResul
 		return res, fmt.Errorf("ledger read: %v", err)
 	}
 	if len(auditorEntries) == 0 {
-		return res, errors.New("no auditor entry in ledger")
+		// Ledger exists but no audit has run → audit signal unavailable, advisory.
+		res.verdict = auditVerdictNone
+		return res, nil
 	}
 
 	var candidate string
@@ -473,11 +495,10 @@ func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResul
 		res.phantomCount++
 	}
 	if candidate == "" {
-		if res.phantomCount > 0 {
-			return res, fmt.Errorf("all %d auditor entries point at missing artifacts (cleaned up?) — run a fresh cycle to produce a new audit-report.md",
-				res.phantomCount)
-		}
-		return res, errors.New("no auditor entry in ledger")
+		// Audit artifacts GC'd (all-phantom) or none usable → signal unavailable,
+		// advisory (not a failed audit). CI-green is the authoritative gate.
+		res.verdict = auditVerdictNone
+		return res, nil
 	}
 
 	// Verdict check.

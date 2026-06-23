@@ -161,17 +161,22 @@ func writeLedger(t *testing.T, lines ...string) string {
 }
 
 // TestCheckRecentAudit_AllPhantom covers the all-entries-phantom branch: every
-// auditor entry points at a missing artifact, so phantomCount>0 and no
-// candidate is found.
+// auditor entry points at a missing artifact (artifacts GC'd). The audit signal
+// is UNAVAILABLE, not failed — so this is ADVISORY (verdict NONE, no error), per
+// the deterministic-release fix: CI-green is the authoritative gate, a missing
+// on-disk audit must not block a clean/GC'd worktree's release.
 func TestCheckRecentAudit_AllPhantom(t *testing.T) {
 	t.Parallel()
 	ledger := writeLedger(t,
 		auditEntry("", "2026-05-27T00:00:00Z"),                             // empty path → phantom
 		auditEntry("/nonexistent/audit-report.md", "2026-05-27T00:00:00Z"), // missing → phantom
 	)
-	_, err := checkRecentAudit(ledger, false, time.Now())
-	if err == nil {
-		t.Error("expected all-phantom error")
+	got, err := checkRecentAudit(ledger, false, time.Now())
+	if err != nil {
+		t.Errorf("all-phantom must be advisory (no error), got: %v", err)
+	}
+	if got.verdict != auditVerdictNone {
+		t.Errorf("verdict = %q, want %q (advisory)", got.verdict, auditVerdictNone)
 	}
 }
 
@@ -337,13 +342,37 @@ func TestRun_GateTestsRunWithStubSeam(t *testing.T) {
 	}
 }
 
-// TestCheckRecentAudit_NoAuditorEntries covers the empty-ledger branch: a
-// ledger with no auditor entries returns "no auditor entry in ledger".
+// TestCheckRecentAudit_NoAuditorEntries covers the no-auditor-entry branch: a
+// ledger that exists but holds no auditor entry. The audit signal is
+// UNAVAILABLE (not failed) → ADVISORY (verdict NONE, no error). CI-green is the
+// authoritative gate.
 func TestCheckRecentAudit_NoAuditorEntries(t *testing.T) {
 	t.Parallel()
 	ledger := writeLedger(t, `{"role":"builder","ts":"2026-05-27T00:00:00Z"}`+"\n")
-	_, err := checkRecentAudit(ledger, false, time.Now())
-	fixtures.RequireErrContains(t, err, "no auditor entry")
+	got, err := checkRecentAudit(ledger, false, time.Now())
+	if err != nil {
+		t.Errorf("no-auditor-entry must be advisory (no error), got: %v", err)
+	}
+	if got.verdict != auditVerdictNone {
+		t.Errorf("verdict = %q, want %q (advisory)", got.verdict, auditVerdictNone)
+	}
+}
+
+// TestCheckRecentAudit_AbsentLedger is the core determinism case: a clean
+// checkout / CI / fresh worktree has no ledger at all. This MUST be advisory
+// (verdict NONE, no error) so a reproducible release from a clean tree is not
+// blocked by transient runtime state — the prior behavior ("no Auditor has ever
+// run") made releases worktree-dependent.
+func TestCheckRecentAudit_AbsentLedger(t *testing.T) {
+	t.Parallel()
+	absent := filepath.Join(t.TempDir(), "nonexistent", "ledger.jsonl")
+	got, err := checkRecentAudit(absent, false, time.Now())
+	if err != nil {
+		t.Errorf("absent ledger must be advisory (no error), got: %v", err)
+	}
+	if got.verdict != auditVerdictNone {
+		t.Errorf("verdict = %q, want %q (advisory)", got.verdict, auditVerdictNone)
+	}
 }
 
 // TestCheckRecentAudit_NoVerdictNonStrict covers the verdict-not-found branch
