@@ -38,6 +38,18 @@ description: Use after build has produced build-report.md. Validates the build v
 
 Default ON: each sub-auditor's prompt prepends "ADVERSARIAL AUDIT MODE — require positive evidence for PASS". Disable only via `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps. Auditor model defaults to Opus while Builder defaults to Sonnet — different family breaks same-model-judge sycophancy.
 
+## Goal-integrity (metric-affecting cycles)
+
+For any cycle that changes a scored metric — a flag-reduction cycle, a
+registry/gate/marker/allowlist edit, or any cycle claiming a count reduction —
+the auditor MUST apply the goal-integrity rubric in
+[`skills/adversarial-testing/SKILL.md` §10.1](../adversarial-testing/SKILL.md#101-goal-integrity-rubric-adr-0064--metric-affecting-cycles)
+as a mandatory BLOCK (co-equal with the deterministic gates, not a backstop). A
+claimed reduction must cite the **reader that was deleted** and confirm no
+surviving reader on any surface; "the row is gone" is not evidence. FAIL on
+writer-fabrication, off-namespace/reflection rename, contract under-delivery, or
+any `--class cycle` edit of a `guards.IsProtectedSurface` control-plane file.
+
 <!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/auditor.json -->
 ## Phase facts
 

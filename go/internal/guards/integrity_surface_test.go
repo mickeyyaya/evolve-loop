@@ -19,11 +19,11 @@ func TestIsProtectedSurface(t *testing.T) {
 		"/wt/go/internal/flagregistry/registry_ceiling_test.go",
 		"/wt/knowledge-base/research/flag-campaign-plan.json", // the contract
 		"/wt/skills/audit/SKILL.md",                           // grading rubric
-		"/wt/skills/adversarial-review/SKILL.md",
-		"/wt/.claude/settings.json",           // repo hook wiring
-		"/Users/runner/.claude/settings.json", // GLOBAL hook wiring (C1: must not be "always safe")
-		"/wt/.evolve/policy.json",             // M2: gate-default overrides
-		"/wt/Go/ACS/Regression/evil_test.go",  // M1: case-insensitive FS (Go/ACS == go/acs)
+		"/wt/skills/adversarial-testing/SKILL.md",             // the adversarial anti-gaming rubric (real dir)
+		"/wt/.claude/settings.json",                           // repo hook wiring
+		"/Users/runner/.claude/settings.json",                 // GLOBAL hook wiring (C1: must not be "always safe")
+		"/wt/.evolve/policy.json",                             // M2: gate-default overrides
+		"/wt/Go/ACS/Regression/evil_test.go",                  // M1: case-insensitive FS (Go/ACS == go/acs)
 	}
 	for _, p := range protected {
 		if !IsProtectedSurface(p) {
