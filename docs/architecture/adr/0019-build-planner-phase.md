@@ -77,7 +77,7 @@ Introduce a `build-planner` phase between TDD and Build:
 
 ## References
 
-- Operator spec: `/Users/danleemh/.claude/plans/opt-c-cycle-1-shadow-build-planner-wiring.md`
+- Operator spec: `~/.claude/plans/opt-c-cycle-1-shadow-build-planner-wiring.md`
 - Phase registry: `docs/architecture/phase-registry.json`
 - Cycle-40 instinct: `cycle-40-builder-context-crosscheck` (design drift without external artifact)
 - Sequential write discipline: `docs/architecture/sequential-write-discipline.md`

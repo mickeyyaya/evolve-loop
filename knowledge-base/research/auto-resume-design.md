@@ -189,7 +189,7 @@ capture is defense-in-depth.
 
 ## Departures from the original plan
 
-The plan (`/Users/danleemh/.claude/plans/investigate-when-the-pipeline-
+The plan (`~/.claude/plans/investigate-when-the-pipeline-
 jazzy-planet.md`) was iterated twice:
 
 1. **Initial proposal:** `--auto-resume` flag, default OFF, opt-in.

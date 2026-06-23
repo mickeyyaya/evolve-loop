@@ -6,7 +6,7 @@ recovery archive **outside the repo** so no cleanup can touch it.
 ## Where the safety net lives
 
 ```
-/Users/danleemh/ai/claude/evolve-loop-SAFETY-2026-05-30/
+~/ai/claude/evolve-loop-SAFETY-2026-05-30/
   RECOVERY.md                       # the canonical recovery instructions
   unmerged-refs.bundle              # 80M git bundle — 265 refs (all branches, remotes, tags, stashes)
   stash-patches/                    # 00-stash-list.txt + stash-0..4.patch
@@ -24,7 +24,7 @@ git reset --hard pre-consolidation-2026-05-30
 ## Recover one branch from the bundle
 
 ```
-SAFETY=/Users/danleemh/ai/claude/evolve-loop-SAFETY-2026-05-30
+SAFETY=~/ai/claude/evolve-loop-SAFETY-2026-05-30
 git bundle list-heads $SAFETY/unmerged-refs.bundle            # list all 265 captured refs
 git fetch $SAFETY/unmerged-refs.bundle refs/heads/<branch>:<local-name>
 # e.g. ship-recovery work:
@@ -43,7 +43,7 @@ git fetch $SAFETY/unmerged-refs.bundle refs/heads/stash-archive/1:recovered-stas
 ## Re-apply an uncommitted worktree patch
 
 ```
-git apply /Users/danleemh/ai/claude/evolve-loop-SAFETY-2026-05-30/worktree-uncommitted/egps-skip-fix.patch
+git apply ~/ai/claude/evolve-loop-SAFETY-2026-05-30/worktree-uncommitted/egps-skip-fix.patch
 ```
 
 ## Provenance

@@ -29,7 +29,7 @@ Per the V1-V3 verification plan, cycle-122 was sealed via `evolve cycle reset` �
 
 **Smoking-gun evidence from cycle-123 forensic state:**
 
-1. **`~/.codex/config.toml` (Fix 1 verification):** entries `[projects."/Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-123"]` and `[projects."/Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-123"]` BOTH present, mtime `2026-05-28 20:43:18` = exactly the tdd phase start. **Fix 1 fired correctly.**
+1. **`~/.codex/config.toml` (Fix 1 verification):** entries `[projects."~/ai/claude/evolve-loop/.evolve/worktrees/cycle-123"]` and `[projects."~/ai/claude/evolve-loop/.evolve/runs/cycle-123"]` BOTH present, mtime `2026-05-28 20:43:18` = exactly the tdd phase start. **Fix 1 fired correctly.**
 
 2. **`tdd-observer-events.ndjson` (Fix 3 verification):**
    ```ndjson
@@ -41,7 +41,7 @@ Per the V1-V3 verification plan, cycle-122 was sealed via `evolve cycle reset` �
 
 3. **Dispatch log line for tdd (Fix 2 (non-)verification):**
    ```
-   [runner] phase=tdd agent=tdd-engineer cli=codex-tmux (source=env(EVOLVE_TDD_ENGINEER_CLI)) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
+   [runner] phase=tdd agent=tdd-engineer cli=codex-tmux (source=env(EVOLVE_TDD_ENGINEER_CLI)) profile=~/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
    ```
    **NO `fallback=` or `triggers=` suffix.** The format-conditional only emits when `chain.candidates > 1`. The `tdd-engineer.json` profile has no `cli_fallback` key — chain resolved to `[codex-tmux]`, single-element. Even though Fix 2 extended the default trigger list to include exit=81, **there was no second CLI in the chain to fall back to.**
 
@@ -172,7 +172,7 @@ The honest scorecard for the cycle-122 plan: **1 of 3 fixes (Fix 3) was the unam
 > `~/.claude/session-data/2026-05-28-cycle122-123-redirect-session.tmp` and the
 > `[[project_cycle122_remediation_shipped]]` memory anchor.
 
-This incident must be resolved before the "any CLI × any phase × any model" invariant from [`feedback-any-cli-any-phase-any-model-invariant`](../../../../../.claude/projects/-Users-danleemh-ai-claude-evolve-loop/memory/feedback_any_cli_any_phase_any_model_invariant.md) can be claimed. Three concrete fixes (PRE-REDIRECT plan — preserved as historical context; see the AMENDMENT block above for the ACTUAL cycle-124 PR sequence):
+This incident must be resolved before the "any CLI × any phase × any model" invariant (`feedback-any-cli-any-phase-any-model-invariant`, internal operator memory) can be claimed. Three concrete fixes (PRE-REDIRECT plan — preserved as historical context; see the AMENDMENT block above for the ACTUAL cycle-124 PR sequence):
 
 ### Fix G1a — Launch codex with non-interactive approval flag
 

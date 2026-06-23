@@ -38,7 +38,7 @@ Three LLM families (Google scout/audit, OpenAI tdd/build, Anthropic triage/build
 ```
 • Ran go test ./internal/compactor ./internal/phases/build ./internal/phases/runner -run '...' -count=1
   └ FAIL    ./internal/compactor [setup failed]
-    open /Users/danleemh/Library/Caches/go-build/.../1abf73...d: operation not permitted
+    open ~/Library/Caches/go-build/.../1abf73...d: operation not permitted
 
 • The first RED run hit the sandboxed Go build cache, not the tests themselves.
   I'm rerunning with GOCACHE inside an allowed temp directory so the failure
@@ -49,7 +49,7 @@ Three LLM families (Google scout/audit, OpenAI tdd/build, Anthropic triage/build
     FAIL                                                  ← desired RED outcome
 
 • Running env GOCACHE=/private/tmp/evolve-cycle-122-go-cache go test ...
-  > /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-122/test-red-output.txt 2>&1
+  > ~/ai/claude/evolve-loop/.evolve/runs/cycle-122/test-red-output.txt 2>&1
 
   Would you like to run the following command?
 
@@ -57,7 +57,7 @@ Three LLM families (Google scout/audit, OpenAI tdd/build, Anthropic triage/build
           cycle workspace outside the writable worktree?
 
   $ env GOCACHE=/private/tmp/evolve-cycle-122-go-cache go test ... -count=1
-    > /Users/danleemh/ai/claude/evolve-loop/.evolve/runs/cycle-122/test-red-output.txt 2>&1
+    > ~/ai/claude/evolve-loop/.evolve/runs/cycle-122/test-red-output.txt 2>&1
 
 › 1. Yes, proceed (y)
   2. Yes, and don't ask again for commands that start with `env GOCACHE=...`
@@ -81,11 +81,11 @@ Three independent flaws stacked to produce the failure. Each is documented in th
 The codex 0.134.0 binary at `/opt/homebrew/Caskroom/codex/0.134.0/codex-aarch64-apple-darwin` has **its own permission system** (separate from the bridge's `sandbox-exec`/`bwrap` host sandbox) that prompts when a command writes outside its `cwd` boundary. The `~/.codex/config.toml` pre-trusts these paths:
 
 ```toml
-[projects."/Users/danleemh/ai/apps/kids-math"]
+[projects."~/ai/apps/other-project"]
 trust_level = "trusted"
-[projects."/Users/danleemh/ai/claude/evolve-loop"]
+[projects."~/ai/claude/evolve-loop"]
 trust_level = "trusted"
-[projects."/Users/danleemh/.claude/plugins/marketplaces/evolve-loop"]
+[projects."~/.claude/plugins/marketplaces/evolve-loop"]
 trust_level = "trusted"
 ```
 

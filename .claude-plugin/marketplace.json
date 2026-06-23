@@ -17,7 +17,7 @@
       },
       "homepage": "https://github.com/mickeyyaya/evolve-loop",
       "repository": "https://github.com/mickeyyaya/evolve-loop",
-      "license": "MIT",
+      "license": "Apache-2.0",
       "category": "workflow",
       "tags": [
         "agents",

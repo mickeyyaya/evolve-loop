@@ -68,7 +68,7 @@ and the scrollback capture (`capture-pane -p -S -200`) at the same tick — i.e.
 ### agy — representative boot pane
 ```
       ▄▀▀▄        Antigravity CLI 1.0.2
-     ▀▀▀▀▀▀       mickeyyaya@gmail.com (Google AI Pro)
+     ▀▀▀▀▀▀       user@example.com (Google AI Pro)
     ▀▀▀▀▀▀▀▀      Gemini 3.5 Flash (Medium)
    ▄▀▀    ▀▀▄     ~/ai/claude/evolve-loop-bridge-port
 ────────────────────────────────────────────────────────────────

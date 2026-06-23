@@ -101,7 +101,7 @@ No code fix in this dossier — this is a release retrospective. The fixes that 
 - Marketplace propagation: confirmed 1s after push (per release-pipeline.sh log)
 - Release journal: `.evolve/release-journal/10.17.0-20260520T105747Z.json`
 - All 12 commits visible via: `git log --oneline 8cff9c1..6505fd3`
-- Plan source: `/Users/danleemh/.claude/plans/innovate-think-of-what-fluffy-rose.md`
+- Plan source: `~/.claude/plans/innovate-think-of-what-fluffy-rose.md`
 - Cross-references (sibling dossiers):
   - [`watchdog-post-memo-sigterm-pattern-2026-05-20.md`](watchdog-post-memo-sigterm-pattern-2026-05-20.md)
   - [`dual-root-plugin-pattern-bite-2026-05-20.md`](dual-root-plugin-pattern-bite-2026-05-20.md)

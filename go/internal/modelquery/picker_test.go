@@ -24,7 +24,7 @@ const codexPickerPane = `╭─────────────────�
   Press enter to confirm or esc to go back`
 
 const agyPickerPane = `      ▄▀▀▄        Antigravity CLI 1.0.3
-     ▀▀▀▀▀▀       mickeyyaya@gmail.com (Google AI Pro)
+     ▀▀▀▀▀▀       user@example.com (Google AI Pro)
 >
 Switch Model
 > Gemini 3.5 Flash (Medium)    (current)

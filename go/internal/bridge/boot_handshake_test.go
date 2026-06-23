@@ -46,7 +46,7 @@ func (s *shellWedgeTmux) PasteBuffer(ctx context.Context, session string) error 
 // markerOverDeadShell renders the cycle-274 trap: a stale prompt marker in
 // scrollback above a wedged zsh continuation prompt.
 const markerOverDeadShell = `❯ previous output above
-danleemh@Danlee-mini-m4pro-1 evolve-loop % knowledge-base/research/
+user@host evolve-loop % knowledge-base/research/
 bquote>
 zsh: command not found: and`
 

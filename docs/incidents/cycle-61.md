@@ -138,7 +138,7 @@ Both fixes are Tier 1 (phase-gate hooks) and would close the gap between "Builde
 
 ## References
 
-- Plan: `/Users/danleemh/.claude/plans/let-s-follow-the-step-cozy-shannon.md`
+- Plan: `~/.claude/plans/let-s-follow-the-step-cozy-shannon.md`
 - Workspace: `.evolve/runs/cycle-61/` (orchestrator-stdout.log, audit-report.md, build-report.md, scout-report.md, memo-stdout.log)
 - Predicate 040 (mixed-CLI routing): `acs/regression-suite/cycle-60/040-e2e-mixed-cli-cycle.sh`
 - Related incident: `docs/incidents/gemini-forgery.md` (cycle 7.9.0+ defenses)

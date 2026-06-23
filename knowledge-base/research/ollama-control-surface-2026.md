@@ -808,7 +808,7 @@ The model receives the body between the `"""` markers as one prompt.
 
 ### 9.3 No streaming envelope to parse
 
-Unlike Claude Code's `--output-format=stream-json`, Ollama's REPL streams raw text to the pane — no JSON wrappers, no event types, no tool_use blocks. The scout/build/audit phases that consume `<phase>-stdout.log` already get human-readable text, so the v12.2 stdout filter (`/Users/danleemh/ai/claude/evolve-loop/go/internal/logfilter/`) has very little to clean for ollama-tmux. Plain text in, plain text out.
+Unlike Claude Code's `--output-format=stream-json`, Ollama's REPL streams raw text to the pane — no JSON wrappers, no event types, no tool_use blocks. The scout/build/audit phases that consume `<phase>-stdout.log` already get human-readable text, so the v12.2 stdout filter (`~/ai/claude/evolve-loop/go/internal/logfilter/`) has very little to clean for ollama-tmux. Plain text in, plain text out.
 
 ### 9.4 HTTP API completion detection (Tier 2)
 

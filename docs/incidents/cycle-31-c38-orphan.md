@@ -44,7 +44,7 @@
 
 ```
 commit 55d1dc52abfcdb3efbc613516da24325c1413f3b
-Author: Mickey Yaya <mickeyyaya@gmail.com>
+Author: Mickey Yaya <user@example.com>
 Date:   Wed May 13 11:31:41 2026 +0800
 
     feat: cycle 31 — c38-inbox-audit-and-collision: inbox-audit.sh NEW + ...
@@ -69,7 +69,7 @@ Date:   Wed May 13 11:31:41 2026 +0800
 
 ```
 commit 332ac9d89aee018de2eae76d25a2876514e821a9
-Author: Mickey Yaya <mickeyyaya@gmail.com>
+Author: Mickey Yaya <user@example.com>
 Date:   Wed May 13 11:25:52 2026 +0800
 
     feat: cycle 31 — c38-inbox-audit-and-collision: inbox-audit.sh NEW + ...
