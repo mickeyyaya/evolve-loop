@@ -1,0 +1,42 @@
+# publish-mirror sanitizer allowlist
+#
+# Staged paths exempt from the `evolve publish-mirror` deterministic sanitizer.
+# Read by `evolve publish-mirror` (override with --allow-from). Each line is a
+# repo-relative path; an allowlisted FILE exempts all its violations, and the
+# exempted count is logged (never silent). Real PII protection still applies to
+# every non-listed file, and the dev tree carries a zero-`danleemh` guard.
+#
+# Every entry here is a known-safe example/test fixture, NOT real PII:
+#   - the sanitizer's own positive-test fixtures must contain a /Users/<name>
+#     path and fake secret keys to test detection;
+#   - other tests use generic /Users/<placeholder> example paths;
+#   - redaction tests embed fake API keys to verify they get redacted;
+#   - two docs quote the public maintainer name / an example path.
+
+# --- sanitizer's own positive-test fixtures (must contain the patterns) ---
+go/internal/publishmirror/sanitize_test.go
+go/internal/publishmirror/transform_test.go
+go/internal/publishmirror/publishmirror_integration_test.go
+
+# --- tests using generic /Users/<placeholder> example paths ---
+go/internal/bridge/codex_pretrust_test.go
+go/internal/runscope/runscope_test.go
+go/internal/adapters/sandbox/sandbox_test.go
+go/internal/preflight/preflight_test.go
+go/internal/preflight/apicover_named_test.go
+go/cmd/apicover/cover_test.go
+go/internal/guards/integrity_surface_test.go
+go/internal/guards/ship_test.go
+go/internal/guards/role_test.go
+go/cmd/evolve/cmd_loop_env_test.go
+go/cmd/evolve/cmd_acs_adversarial_cycle230_test.go
+
+# --- redaction tests embedding fake API keys (test the secret scrubber) ---
+go/internal/panetrust/extract_test.go
+go/internal/panetrust/apicover_named_test.go
+go/internal/bridge/interaction_e2e_test.go
+go/internal/core/phase_advisor_capture_test.go
+
+# --- docs: public maintainer name in a quoted git log / an example path ---
+docs/incidents/cycle-31-c38-orphan.md
+docs/eval-grader-best-practices.md

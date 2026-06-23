@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
@@ -50,6 +52,8 @@ func runPublishMirrorCmd(args []string, stdin io.Reader, stdout, stderr io.Write
 	fs.StringVar(&opts.PublicReadme, "public-readme", "", "path to a README.md to swap into the public tree")
 	fs.StringVar(&opts.RepoDir, "repo", "", "private repo root (default: cwd)")
 	fs.StringVar(&opts.ScratchDir, "scratch-dir", "", "worktree dir (default: sibling evolveloop-mirror-scratch)")
+	var allowFrom string
+	fs.StringVar(&allowFrom, "allow-from", "docs/operations/mirror-sanitizer-allowlist.txt", "file listing staged paths exempt from the sanitizer (one per line; # comments)")
 	fs.BoolVar(&opts.Push, "push", false, "actually push to the mirror (without it, dry-run)")
 	if err := fs.Parse(args); err != nil {
 		return 1
@@ -57,6 +61,7 @@ func runPublishMirrorCmd(args []string, stdin io.Reader, stdout, stderr io.Write
 	opts.Exec = sysexec.DefaultRunner
 	opts.Stderr = stderr
 	opts.Denylist = operatorDenylist(opts.RepoDir)
+	opts.AllowFiles = loadAllowlist(opts.RepoDir, allowFrom, stderr)
 
 	res, err := publishmirror.Run(context.Background(), opts)
 	if res != nil && len(res.Violations) > 0 {
@@ -108,5 +113,39 @@ func operatorDenylist(repoDir string) []string {
 			}
 		}
 	}
+	return out
+}
+
+// loadAllowlist reads the sanitizer allowlist (one staged path per line; blank
+// lines and `#` comments ignored). A missing file is not an error — it just
+// means no exemptions. The file is tracked (auditable) so the public mirror's
+// exemptions are version-controlled.
+func loadAllowlist(repoDir, path string, stderr io.Writer) []string {
+	if path == "" {
+		return nil
+	}
+	full := path
+	if !filepath.IsAbs(path) {
+		dir := repoDir
+		if dir == "" {
+			dir = "."
+		}
+		full = filepath.Join(dir, path)
+	}
+	b, err := os.ReadFile(full)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(stderr, "publish-mirror: warning: cannot read allowlist %s: %v\n", full, err)
+		}
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			out = append(out, line)
+		}
+	}
+	// Audit trail: which allowlist (and how many entries) governed this run.
+	fmt.Fprintf(stderr, "publish-mirror: sanitizer allowlist: %d entries from %s\n", len(out), full)
 	return out
 }

@@ -30,6 +30,7 @@ type Options struct {
 	Message      string          // commit message (default: "Release <tag-or-short-sha>")
 	PublicReadme string          // optional path to a README.md to swap in (defers the B1c decision)
 	Denylist     []string        // PII substrings that must not appear (e.g. operator username, email)
+	AllowFiles   []string        // staged paths exempt from sanitizer violations (known-safe test/example fixtures); exemptions are logged, never silent
 	Push         bool            // false = dry-run (build + sanitize, never push)
 	ScratchDir   string          // worktree dir (default: sibling "evolveloop-mirror-scratch")
 	Exec         sysexec.RunFunc // git execution seam (default: sysexec.DefaultRunner)
@@ -42,7 +43,8 @@ type Result struct {
 	ScratchDir    string      // worktree the snapshot was built in (removed on success)
 	StagedFiles   int         // number of files staged into the mirror tree
 	Dropped       []string    // index paths removed (the tracked binary)
-	Violations    []Violation // sanitizer findings (non-empty ⇒ hard stop, no push)
+	Violations    []Violation // REAL sanitizer findings after allowlist filtering (non-empty ⇒ hard stop, no push)
+	Exempted      int         // count of violations suppressed by AllowFiles (logged, for transparency)
 	Pushed        bool        // whether the mirror was actually pushed
 	PublicRef     string      // the pushed branch ref on the mirror ("main")
 	Tag           string      // the tag created/pushed, if any
@@ -149,7 +151,12 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 	if len(skipped) > 0 {
 		logf("not text-scanned (binary): %d file(s): %v", len(skipped), skipped)
 	}
-	res.Violations = Scan(files, opts.Denylist)
+	real, exempted := partitionViolations(Scan(files, opts.Denylist), opts.AllowFiles)
+	res.Violations = real
+	res.Exempted = exempted
+	if exempted > 0 {
+		logf("allowlist: exempted %d violation(s) (allowlist: %d entries)", exempted, len(opts.AllowFiles))
+	}
 	if len(res.Violations) > 0 {
 		logf("SANITIZER FAIL: %d violation(s)", len(res.Violations))
 		return res, fmt.Errorf("sanitizer found %d violation(s) — refusing to publish", len(res.Violations))

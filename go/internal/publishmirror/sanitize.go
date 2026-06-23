@@ -85,3 +85,28 @@ func Scan(files map[string]string, denylist []string) []Violation {
 	})
 	return out
 }
+
+// partitionViolations splits Scan results into the REAL findings and the count
+// exempted by allow — staged paths known to contain example/test fixtures (a
+// macOS-home-path placeholder, fake test secrets, a public maintainer name). An
+// allowlisted FILE exempts all its violations; the count is returned so the
+// caller logs it. Exemptions are never silent.
+func partitionViolations(all []Violation, allow []string) (real []Violation, exempted int) {
+	if len(allow) == 0 {
+		return all, 0
+	}
+	allowed := make(map[string]bool, len(allow))
+	for _, f := range allow {
+		if f = strings.TrimSpace(f); f != "" {
+			allowed[f] = true
+		}
+	}
+	for _, v := range all {
+		if allowed[v.File] {
+			exempted++
+			continue
+		}
+		real = append(real, v)
+	}
+	return real, exempted
+}

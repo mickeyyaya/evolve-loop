@@ -93,3 +93,26 @@ func TestScan_Deterministic_SortedByFileThenLine(t *testing.T) {
 		t.Errorf("not sorted by file then line: %+v", v)
 	}
 }
+
+func TestPartitionViolations(t *testing.T) {
+	all := []Violation{
+		{File: "a_test.go", Line: 1, Rule: "macos-home-path", Match: "/Users/x"},
+		{File: "real.go", Line: 2, Rule: "macos-home-path", Match: "/Users/x"},
+		{File: "a_test.go", Line: 3, Rule: "openai-anthropic-key", Match: "sk-FAKE"},
+	}
+	real, exempted := partitionViolations(all, []string{"a_test.go", " ", ""})
+	if exempted != 2 {
+		t.Errorf("exempted=%d, want 2", exempted)
+	}
+	if len(real) != 1 || real[0].File != "real.go" {
+		t.Errorf("real findings = %+v, want only real.go", real)
+	}
+}
+
+func TestPartitionViolations_NoAllowlist_AllReal(t *testing.T) {
+	all := []Violation{{File: "x", Line: 1, Rule: "r", Match: "m"}}
+	real, exempted := partitionViolations(all, nil)
+	if exempted != 0 || len(real) != 1 {
+		t.Errorf("nil allowlist must exempt nothing: real=%d exempted=%d", len(real), exempted)
+	}
+}
