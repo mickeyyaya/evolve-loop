@@ -174,8 +174,26 @@ const registryTableSuffix = "internal/flagregistry/registry_table.go"
 // cross-file constants resolve. Unparseable files are skipped (the compiler
 // catches syntax errors elsewhere); the returned skipped list keeps that loud.
 func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
-	fset := token.NewFileSet()
 	set := map[string]bool{}
+	skipped, err = forEachProductionPackage(goRoot, func(fset *token.FileSet, pkgName string, files []*ast.File) {
+		collectEvolveConstKeys(fset, pkgName, files, set)
+	})
+	if err != nil {
+		return nil, skipped, err
+	}
+	return sortedKeys(set), skipped, nil
+}
+
+// forEachProductionPackage walks production Go under goRoot and invokes fn once
+// per package directory with that package's parsed non-test files, so a
+// collector can resolve same-package cross-file constants. It skips the
+// non-production subtrees (readSetSkipDirs), _test.go files, and the registry
+// CATALOG file (its {Name: "EVOLVE_..."} literals are the flag names by design —
+// scanning it would re-assert the registry against itself). Unparseable files
+// are returned in skipped, not failed (the compiler catches syntax errors
+// elsewhere, so the skip is never silent).
+func forEachProductionPackage(goRoot string, fn func(fset *token.FileSet, pkgName string, files []*ast.File)) (skipped []string, err error) {
+	fset := token.NewFileSet()
 	byDir := map[string][]*ast.File{}
 	var dirOrder []string
 
@@ -192,10 +210,6 @@ func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		// The registry data file is the flag CATALOG (its {Name: "EVOLVE_..."}
-		// literals are every flag name by design), not a reader — scanning it
-		// would re-assert the registry against itself, exactly as flagreaders
-		// excludes control-flags.md.
 		if strings.HasSuffix(filepath.ToSlash(path), registryTableSuffix) {
 			return nil
 		}
@@ -212,14 +226,14 @@ func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
 		return nil
 	})
 	if walkErr != nil {
-		return nil, skipped, fmt.Errorf("walk %s: %w", goRoot, walkErr)
+		return skipped, fmt.Errorf("walk %s: %w", goRoot, walkErr)
 	}
 
 	for _, dir := range dirOrder {
 		files := byDir[dir]
-		collectEvolveConstKeys(fset, files[0].Name.Name, files, set)
+		fn(fset, files[0].Name.Name, files)
 	}
-	return sortedKeys(set), skipped, nil
+	return skipped, nil
 }
 
 // markerCoveredLines returns the lines a marker comment annotates: every line of
