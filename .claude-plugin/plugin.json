@@ -67,6 +67,7 @@
     "./skills/minimalism/",
     "./skills/phase-create/",
     "./skills/publish/",
+    "./skills/publish-mirror/",
     "./skills/refactor/",
     "./skills/release/",
     "./skills/security-review-scored/",
