@@ -314,3 +314,10 @@ func injectOperatorDirectives(prompt, directives string) string {
 	}
 	return directives + "\n\n---\n\n" + prompt
 }
+
+// SetModelCatalogDirFn sets the model-catalog directory resolver in the inner bridge.
+// Called by cmd/evolve to inject the active cycle's evolve directory without
+// touching the process environment.
+func SetModelCatalogDirFn(fn func() string) {
+	gobridge.SetModelCatalogDirFn(fn)
+}

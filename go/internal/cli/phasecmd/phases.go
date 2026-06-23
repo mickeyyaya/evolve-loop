@@ -5,6 +5,7 @@
 package phasecmd
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -22,26 +23,34 @@ import (
 // runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
 // failure, 10 usage error, 1 I/O error.
 func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) == 0 {
+	fs := flag.NewFlagSet("evolve phases", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	profileDir := fs.String("profile-dir", "", "profiles directory (default: <project>/.evolve/profiles)")
+	personaOverride := fs.String("persona-override", "", "substitute persona file (<path>:<name>)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	remaining := fs.Args()
+	if len(remaining) == 0 {
 		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>|create --spec <file|->>")
 		return 10
 	}
 	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
-	switch args[0] {
+	switch remaining[0] {
 	case "list":
 		return phasesList(project, stdout, stderr)
 	case "validate":
-		return phasesValidate(project, args[1:], stdout, stderr)
+		return phasesValidate(project, *profileDir, remaining[1:], stdout, stderr)
 	case "check-coherence":
-		return phasesCheckCoherence(project, args[1:], stdout, stderr)
+		return phasesCheckCoherence(project, *profileDir, *personaOverride, remaining[1:], stdout, stderr)
 	case "check-artifact-coherence":
-		return phasesCheckArtifactCoherence(project, args[1:], stdout, stderr)
+		return phasesCheckArtifactCoherence(project, *profileDir, *personaOverride, remaining[1:], stdout, stderr)
 	case "add":
-		return phasesAdd(project, args[1:], stdout, stderr)
+		return phasesAdd(project, remaining[1:], stdout, stderr)
 	case "create":
-		return phasesCreate(project, args[1:], stdin, stdout, stderr)
+		return phasesCreate(project, remaining[1:], stdin, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add|create)\n", args[0])
+		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add|create)\n", remaining[0])
 		return 10
 	}
 }
@@ -82,7 +91,7 @@ func phasesList(project string, stdout, stderr io.Writer) int {
 // phasesValidate validates operator-authored phases. Discovery warnings go to
 // stderr; the per-phase OK/FAIL verdicts + violations go to stdout (the
 // machine-readable result). Exit 2 if any phase has violations.
-func phasesValidate(project string, args []string, stdout, stderr io.Writer) int {
+func phasesValidate(project, profileDir string, args []string, stdout, stderr io.Writer) int {
 	strictProvenance := false
 	var cleanArgs []string
 	for _, arg := range args {
@@ -95,7 +104,6 @@ func phasesValidate(project string, args []string, stdout, stderr io.Writer) int
 	args = cleanArgs
 
 	// Provenance check
-	profileDir := os.Getenv("EVOLVE_PROFILE_DIR")
 	if profileDir == "" {
 		profileDir = filepath.Join(project, ".evolve", "profiles")
 	}
@@ -154,7 +162,7 @@ func phasesValidate(project string, args []string, stdout, stderr io.Writer) int
 	return 0
 }
 
-func phasesCheckCoherence(project string, args []string, stdout, stderr io.Writer) int {
+func phasesCheckCoherence(project, profileDir, personaOverride string, args []string, stdout, stderr io.Writer) int {
 	strict := false
 	for _, arg := range args {
 		if arg == "--strict" {
@@ -162,14 +170,13 @@ func phasesCheckCoherence(project string, args []string, stdout, stderr io.Write
 		}
 	}
 
-	profileDir := os.Getenv("EVOLVE_PROFILE_DIR")
 	if profileDir == "" {
 		profileDir = filepath.Join(project, ".evolve", "profiles")
 	}
 
 	overrides := make(map[string]string)
-	if override := os.Getenv("EVOLVE_PERSONA_OVERRIDE"); override != "" {
-		parts := strings.SplitN(override, ":", 2)
+	if personaOverride != "" {
+		parts := strings.SplitN(personaOverride, ":", 2)
 		if len(parts) == 2 {
 			path := parts[0]
 			name := parts[1]
@@ -199,7 +206,7 @@ func phasesCheckCoherence(project string, args []string, stdout, stderr io.Write
 	return 0
 }
 
-func phasesCheckArtifactCoherence(project string, args []string, stdout, stderr io.Writer) int {
+func phasesCheckArtifactCoherence(project, profileDir, personaOverride string, args []string, stdout, stderr io.Writer) int {
 	strict := false
 	for _, arg := range args {
 		if arg == "--strict" {
@@ -207,14 +214,13 @@ func phasesCheckArtifactCoherence(project string, args []string, stdout, stderr 
 		}
 	}
 
-	profileDir := os.Getenv("EVOLVE_PROFILE_DIR")
 	if profileDir == "" {
 		profileDir = filepath.Join(project, ".evolve", "profiles")
 	}
 
 	overrides := make(map[string]string)
-	if override := os.Getenv("EVOLVE_PERSONA_OVERRIDE"); override != "" {
-		parts := strings.SplitN(override, ":", 2)
+	if personaOverride != "" {
+		parts := strings.SplitN(personaOverride, ":", 2)
 		if len(parts) == 2 {
 			path := parts[0]
 			name := parts[1]

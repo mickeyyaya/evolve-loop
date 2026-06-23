@@ -17,7 +17,6 @@ func TestPhaseInventory_BuildFromPhaseRoots(t *testing.T) {
   "classify": { "require_sections": ["Findings"], "verdict_on_pass": "PASS" }
 }`)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
-	t.Setenv("EVOLVE_PHASE_ROOTS", "")
 
 	var out, errb bytes.Buffer
 	code := RunPhaseInventory([]string{"build", "--force"}, nil, &out, &errb)

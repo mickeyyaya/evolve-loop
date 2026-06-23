@@ -33,10 +33,11 @@ import "testing"
 // (readers fully removed) → 48 -> 35.
 // cycle-15 (bypass-policy-flag): POLICY_BYPASS converted to --bypass-policy CLI flag,
 // row deleted → 35 -> 34. FlagCeiling stays at 35 (upper bound, not exact).
-// flag-campaign-10 wave-1 INTEGRATION (operator ratchet): cycles deleted 5 rows —
-// PHASE_RECOVERY (4-reader IPC+config), FLEET/FLEET_SCOPE/WORKTREE_ROOT (split-const
-// IPC via internal/ipcenv), POLICY_BYPASS (--bypass-policy CLI) → 35 -> 30.
-const FlagCeiling = 30
+// flag-campaign-10 wave-1 INTEGRATION: 5 rows (PHASE_RECOVERY, FLEET, FLEET_SCOPE,
+// WORKTREE_ROOT, POLICY_BYPASS) → 35 -> 30.
+// flag-campaign-10 wave-2 INTEGRATION: 6 rows (SYSTEM_PROMPT, ACS_GO_TIMEOUT_S,
+// CLI_MAX_CONCURRENT_CODEX, KB_SEARCH_PATHS, PHASE_ROOTS, MODEL_CATALOG_DIR) → 30 -> 24.
+const FlagCeiling = 24
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
@@ -74,10 +75,11 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // (PROMPT_MAX_TOKENS, REAP_ORPHANS, SANDBOX_FALLBACK_ON_EPERM); 21 -> 18.
 // cycle-15 (bypass-policy-flag): POLICY_BYPASS was already StatusDeprecated
 // (not a live feature flag), so LiveFeatureFlagCeiling unchanged at 18.
-// flag-campaign-10 wave-1 INTEGRATION: deleted 4 live Active dials
-// (PHASE_RECOVERY, FLEET, FLEET_SCOPE, WORKTREE_ROOT → IPC/policy); POLICY_BYPASS
-// was Deprecated (not live). 18 -> 14.
-const LiveFeatureFlagCeiling = 14
+// flag-campaign-10 wave-1 INTEGRATION: 4 live Active dials (PHASE_RECOVERY, FLEET,
+// FLEET_SCOPE, WORKTREE_ROOT) → 18 -> 14.
+// flag-campaign-10 wave-2 INTEGRATION: 1 live Active dial (CLI_MAX_CONCURRENT_CODEX,
+// a dead Active row); the other 5 wave-2 deletions were StatusInternal → 14 -> 13.
+const LiveFeatureFlagCeiling = 13
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is

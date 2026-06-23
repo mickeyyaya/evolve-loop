@@ -97,6 +97,6 @@ interview if the mint should become a first-class catalog citizen.
 
 A phase created here lands in `.evolve/phases/` (project-local). To ship
 phases as a plugin bundle: put the same `<name>/phase.json` dirs in any
-directory and add it to the colon-separated `EVOLVE_PHASE_ROOTS` env var.
-Left-most root wins on name collision; built-ins always win. Details:
-`docs/architecture/phase-plugin-system.md`.
+directory and add it to the colon-separated `paths.phase_roots` field in
+`.evolve/policy.json`. Left-most root wins on name collision; built-ins always
+win. Details: `docs/architecture/phase-plugin-system.md`.

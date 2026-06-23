@@ -39,6 +39,20 @@ func Resolve(key string, reqEnv map[string]string, profile, def string) string {
 	return def
 }
 
+// ResolveNoOS returns the first non-empty value from the three-tier chain
+// (reqEnv → profile → def), skipping the os.Getenv tier. Use this for keys
+// where the profile is the intended SSOT and process-env override is unwanted.
+// reqEnv may be nil (treated as empty); profile and def may be "".
+func ResolveNoOS(key string, reqEnv map[string]string, profile, def string) string {
+	if v, ok := reqEnv[key]; ok && v != "" {
+		return v
+	}
+	if profile != "" {
+		return profile
+	}
+	return def
+}
+
 // PhaseEnvKey builds the canonical per-phase env-var name:
 // "EVOLVE_<PHASE_UPPER>_<SUFFIX>". Hyphens in the phase name become
 // underscores so "tdd-engineer" maps to "EVOLVE_TDD_ENGINEER_*".

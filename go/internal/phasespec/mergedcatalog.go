@@ -1,9 +1,10 @@
 package phasespec
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // mergedcatalog.go — the ONE merged-catalog loader (built-in registry +
@@ -13,21 +14,17 @@ import (
 // the agent self-check, the host contract gate, the salvage rung, and the
 // runner default — now derives the catalog from here.
 
-// rootsEnv is the single seam for phase-plugin distribution (ADR-0038):
-// a colon-separated list of discovery roots overlaid in order.
-const rootsEnv = "EVOLVE_PHASE_ROOTS"
-
 // defaultRoot is the project-local drop-in root, conventionally first.
 const defaultRoot = ".evolve/phases"
 
 // registryRelPath locates the built-in phase registry inside a project.
 const registryRelPath = "docs/architecture/phase-registry.json"
 
-// Roots returns the phase-spec discovery roots for a project: EVOLVE_PHASE_ROOTS
-// (colon-separated; relative entries resolve against projectRoot) or the
-// default project-local .evolve/phases.
-func Roots(projectRoot string) []string {
-	raw := os.Getenv(rootsEnv)
+// RootsWithPolicy returns the phase-spec discovery roots using the given PathsConfig.
+// A colon-separated cfg.PhaseRoots overrides; relative entries resolve against
+// projectRoot; absolute entries are kept verbatim. Empty cfg ⇒ defaultRoot.
+func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string {
+	raw := cfg.PhaseRoots
 	if strings.TrimSpace(raw) == "" {
 		raw = defaultRoot
 	}
@@ -43,6 +40,15 @@ func Roots(projectRoot string) []string {
 		out = append(out, filepath.Join(projectRoot, p))
 	}
 	return out
+}
+
+// Roots returns the phase-spec discovery roots for a project, loading
+// phase roots from policy.json (PathsConfig.PhaseRoots) or falling back
+// to the default project-local .evolve/phases. Replaced EVOLVE_PHASE_ROOTS
+// env read (cycle-17).
+func Roots(projectRoot string) []string {
+	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	return RootsWithPolicy(projectRoot, pol.PathsConfig())
 }
 
 // MergedCatalog loads the built-in registry and overlays user phases from

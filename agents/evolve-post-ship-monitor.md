@@ -24,7 +24,7 @@ Catch integration failures introduced by the ship one cycle earlier than they wo
 ## Workflow
 
 1. **`evolve doctor`** — Run `./go/bin/evolve doctor` and capture all probe results. Flag any non-PASS lines.
-2. **`evolve phases list`** — Run with `EVOLVE_PHASE_ROOTS=.evolve/phases` and verify zero parse errors.
+2. **`evolve phases list`** — Run `./go/bin/evolve phases list` and verify zero parse errors.
 3. **Dry-run probe** — Run `./go/bin/evolve loop --dry-run 2>&1` and confirm pipeline wires without error.
 4. **Emit `post_ship.health`** — `true` only when all three probes exit 0 and report no FAIL.
 5. **Write report** with `## Health Probes`, `## Results`, `## Verdict`.

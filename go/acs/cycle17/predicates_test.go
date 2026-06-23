@@ -1,39 +1,64 @@
 //go:build acs
 
-// Package cycle17 materializes the cycle-17 acceptance criteria for three committed tasks:
+// Package cycle17 materializes the cycle-17 acceptance criteria for 4 flag-reduction
+// tasks, targeting 5 EVOLVE_* flags for elimination (registry 29 → 24 rows):
 //
-//   - campaign-verify-comma-rejection — add guard to campaign.Verify() rejecting cycle IDs
-//     that contain commas. EVOLVE_FLEET_SCOPE splits on ',' so a cycle ID "a,b" silently
-//     fans into two scope tokens, causing incorrect fan-out.
-//
-//   - fix-preliminary-study-metadata — create agents/evolve-preliminary-study.md persona
-//     file to pair with .evolve/profiles/preliminary-study.json, and add when_to_use /
-//     description fields to .evolve/phases/preliminary-study/phase.json.
-//
-//   - cmd-campaign-dispatch-coverage — add TestRunCampaign_NoArgs and
-//     TestRenderCampaignPlan_Valid to cmd_campaign_test.go to cover dispatch guards
-//     (0% coverage) and the renderCampaignPlan success path (currently 40%).
+//   - dead-flag-delete: delete EVOLVE_CLI_MAX_CONCURRENT_CODEX registry row (0 literal readers)
+//   - catalog-dir-di: convert EVOLVE_MODEL_CATALOG_DIR to fn-var DI via BridgePolicy.CatalogDir
+//   - policy-acs-kb: add ACSConfig+PathsConfig to policy.go; wire EVOLVE_ACS_GO_TIMEOUT_S
+//     and EVOLVE_KB_SEARCH_PATHS to these new policy structs
+//   - phase-roots-policy: convert EVOLVE_PHASE_ROOTS to PathsConfig.PhaseRoots in policy.json
 //
 // AC map (1:1 with scout-report.md ACs, all in triage top_n):
 //
-//	campaign-verify-comma-rejection:
-//	  AC1  Verify rejects "b,c" cycle ID (comma delimiter collision)      → C17_001
-//	  AC1- Valid plan without commas still passes Verify                  → C17_001neg (pre-existing GREEN)
+//	dead-flag-delete:
+//	  AC1  Lookup("EVOLVE_CLI_MAX_CONCURRENT_CODEX").found == false           → TestLookup_CliMaxConcurrentCodexAbsent
+//	  AC2  No literal in registry_table.go                                    → TestC17_101_CliMaxConcurrentCodexNoLiteralInRegistry
+//	  AC3- Driver prefix "EVOLVE_CLI_MAX_CONCURRENT_" still in driver source  → PRE-EXISTING GREEN (currently true; regression guard)
 //
-//	fix-preliminary-study-metadata:
-//	  AC2  agents/evolve-preliminary-study.md exists and is git-tracked   → C17_002
-//	  AC3  phasecoherence.TestRepoPersonaProfilePairing passes            → C17_003
-//	  AC4  phasespec.TestPhaseCatalog_OptionalPhasesHaveSelectMetadata passes → C17_004
+//	catalog-dir-di:
+//	  AC1  No os.Getenv("EVOLVE_MODEL_CATALOG_DIR") in catalog_overlay.go     → TestC17_110_CatalogDirNoOsGetenv
+//	  AC2  No os.Setenv("EVOLVE_MODEL_CATALOG_DIR") in cmd_cycle.go           → TestC17_111_CatalogDirNoOsSetenv
+//	  AC3  Lookup("EVOLVE_MODEL_CATALOG_DIR").found == false                  → TestLookup_ModelCatalogDirAbsent
+//	  AC4- modelCatalogDirFn fn-var seam present in catalog_overlay.go        → TestC17_113neg_CatalogDirFnVarInPlace
 //
-//	cmd-campaign-dispatch-coverage:
-//	  AC5  TestRunCampaign_NoArgs exists in cmd_campaign_test.go and passes  → C17_005
-//	  AC5- TestRunCampaign_UnknownSub exists and passes (semantic diversity) → C17_005neg
-//	  AC6  TestRenderCampaignPlan_Valid exists in cmd_campaign_test.go and passes → C17_006
+//	policy-acs-kb:
+//	  AC1  No env read for EVOLVE_ACS_GO_TIMEOUT_S in acssuite.go             → TestC17_120_AcsSuiteNoEnvGetenv
+//	  AC2  No env read for EVOLVE_KB_SEARCH_PATHS in kb.go                    → TestC17_121_KbNoEnvGetenv
+//	  AC3a Lookup("EVOLVE_ACS_GO_TIMEOUT_S").found == false                   → TestLookup_AcsGoTimeoutSAbsent
+//	  AC3b Lookup("EVOLVE_KB_SEARCH_PATHS").found == false                    → TestLookup_KbSearchPathsAbsent
+//	  AC5- Empty policy → ACSTimeoutConfig.GoTimeoutS==0 (uses DefaultTimeout) → TestC17_124neg_EmptyACSConfigZeroTimeout
+//	  AC6- Empty PathsConfig → KB fallback dirs non-empty                     → TestC17_125edge_EmptyPathsConfigKBFallback
 //
-// RED criteria: C17_001, C17_002, C17_003, C17_004, C17_005, C17_005neg, C17_006.
-// Pre-existing GREEN: C17_001neg.
+//	phase-roots-policy:
+//	  AC1  No os.Getenv(rootsEnv) in mergedcatalog.go                         → TestC17_130_PhaseRootsNoEnvRead
+//	  AC2  phasespec test suite green                                          → PRE-EXISTING GREEN (suite ok now; guard against regression)
+//	  AC4  Lookup("EVOLVE_PHASE_ROOTS").found == false                        → TestLookup_PhaseRootsAbsent
+//	  AC5- Absent PathsConfig.PhaseRoots → defaultRoot fallback               → TestC17_132neg_AbsentPathsConfigDefaultFallback
+//	  AC6- Absolute path in PhaseRoots passes through unchanged                → TestC17_133edge_AbsolutePathPassThrough
 //
-// Floor binding (R9.3): predicates only for tasks in triage top_n.
+//	ALL tasks:
+//	  count len(flagregistry.All) == 24 (29 − 5)                              → TestC17_999_RegistryCountIs24
+//
+// Adversarial diversity (SKILL §6):
+//
+//	Negative:  AC3-NEG (dynamic driver prefix preserved), AC4-NEG (fn-var seam),
+//	           AC5-NEG (nil-safe ACSConfig default), AC5-NEG (absent PathsConfig fallback)
+//	Edge/OOD:  AC6-EDGE (absent PathsConfig → KB fallback), AC6-EDGE (absolute path pass-through)
+//	Lexical:   Lookup, FileNotContains, FileContains, ACSTimeoutConfig, SearchPathsFromEnv,
+//	           RootsWithPolicy, len(All) — seven distinct verbs
+//	Semantic:  registry-deletion, env-read-removal, env-write-removal, fn-var-injection,
+//	           policy-struct-accessor, nil-safety, absolute-path-preservation
+//
+// RED state: Package fails to compile because policy.PathsConfig, policy.ACSConfig
+// (via ACSTimeoutConfig()), phasespec.RootsWithPolicy, and the new
+// research.SearchPathsFromEnv(policy.PathsConfig{}) signature do not exist yet.
+// Compile failure = RED (per ACS README: "RED = compile failure or t.Errorf/t.Fatalf").
+//
+// Pre-existing GREEN: AC3-NEG (driver prefix), AC2 phase-roots (phasespec suite currently passes).
+//
+// Floor binding (R9.3): predicates authored only for tasks in triage top_n.
+// No predicates for deferred or dropped tasks.
 package cycle17
 
 import (
@@ -41,274 +66,369 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/campaign"
-	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// goTestRun runs `go test` args from the go/ subdirectory of the repo root.
-// Returns combined stdout+stderr and exit code.
-func goTestRun(t *testing.T, args ...string) (combined string, code int) {
-	t.Helper()
+// ── dead-flag-delete ─────────────────────────────────────────────────────────
+
+// TestLookup_CliMaxConcurrentCodexAbsent verifies that the
+// EVOLVE_CLI_MAX_CONCURRENT_CODEX registry row has been deleted.
+// The flag has 0 literal readers in Go source; the driver constructs the name
+// dynamically at runtime ("EVOLVE_CLI_MAX_CONCURRENT_"+strings.ToUpper(lp.name)).
+//
+// BEHAVIORAL: calls flagregistry.Lookup directly.
+//
+// RED: row still in registry_table.go → Lookup returns found=true.
+// GREEN: Builder deletes the row → found=false.
+func TestLookup_CliMaxConcurrentCodexAbsent(t *testing.T) {
+	_, found := flagregistry.Lookup("EVOLVE_CLI_MAX_CONCURRENT_CODEX")
+	if found {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_CLI_MAX_CONCURRENT_CODEX\") returned found=true.\n" +
+			"Builder must delete the EVOLVE_CLI_MAX_CONCURRENT_CODEX row from\n" +
+			"go/internal/flagregistry/registry_table.go (0 literal readers).\n" +
+			"Do NOT remove the EVOLVE_CLI_MAX_CONCURRENT_ prefix in driver_tmux_repl.go\n" +
+			"(that is a runtime-constructed name, not a literal reader).")
+	}
+}
+
+// TestC17_101_CliMaxConcurrentCodexNoLiteralInRegistry verifies that the literal
+// string "EVOLVE_CLI_MAX_CONCURRENT_CODEX" is absent from registry_table.go after
+// the row deletion.
+//
+// // acs-predicate: config-check — registry literal absence is the structural contract.
+//
+// RED: literal present in registry_table.go (row still exists).
+// GREEN: Builder deletes the row.
+func TestC17_101_CliMaxConcurrentCodexNoLiteralInRegistry(t *testing.T) {
+	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	goDir := filepath.Join(root, "go")
-	quoted := make([]string, len(args))
-	for i, a := range args {
-		quoted[i] = "'" + strings.ReplaceAll(a, "'", "'\\''") + "'"
-	}
-	bashCmd := "cd '" + goDir + "' && go test " + strings.Join(quoted, " ")
-	out, errOut, c, _ := acsassert.SubprocessOutput("bash", "-c", bashCmd)
-	return strings.TrimSpace(out + "\n" + errOut), c
-}
-
-// ── campaign-verify-comma-rejection ─────────────────────────────────────────
-
-// TestC17_001_VerifyRejectsCommaInCycleID verifies that campaign.Verify()
-// returns a non-nil error when a cycle ID contains a comma.
-//
-// BEHAVIORAL: calls campaign.Verify() directly on a plan where cycle "b,c"
-// contains a comma. EVOLVE_FLEET_SCOPE splits scope tokens on ',' — if a
-// cycle ID contains a comma, it silently fans into two scope tokens, which
-// corrupts downstream fleet dispatch.
-//
-// RED: current Verify() only calls strings.TrimSpace — no comma check exists.
-//
-//	plan.Verify() returns nil for "b,c" today.
-//
-// GREEN: Builder adds strings.ContainsAny(c.ID, ",") guard in Verify().
-func TestC17_001_VerifyRejectsCommaInCycleID(t *testing.T) {
-	plan := &campaign.Plan{
-		Version: 1,
-		Goal:    "test-comma-rejection",
-		Cycles: []fleet.Todo{
-			{ID: "a", Files: []string{"fa"}},
-			{ID: "b,c", Files: []string{"fb"}}, // comma — fleet scope delimiter
-		},
-	}
-	if err := plan.Verify(); err == nil {
-		t.Errorf("RED: campaign.Verify() accepted cycle ID %q which contains a comma.\n"+
-			"EVOLVE_FLEET_SCOPE splits on ',' so \"b,c\" fans into two scope tokens.\n"+
-			"Builder must add in campaign.Verify(), inside the seen-loop after duplicate check:\n"+
-			"  if strings.ContainsAny(c.ID, \",\") {\n"+
-			"      return fmt.Errorf(\"campaign: cycle id %%q contains invalid char\", c.ID)\n"+
-			"  }\n"+
-			"File: go/internal/campaign/campaign.go", "b,c")
+	registryFile := filepath.Join(root, "go", "internal", "flagregistry", "registry_table.go")
+	if !acsassert.FileNotContains(t, registryFile, "EVOLVE_CLI_MAX_CONCURRENT_CODEX") {
+		t.Errorf("RED: registry_table.go still contains 'EVOLVE_CLI_MAX_CONCURRENT_CODEX'.\n" +
+			"Builder must delete the row (currently around line 15 of registry_table.go).")
 	}
 }
 
-// TestC17_001neg_ValidPlanPassesVerify verifies that a plan with clean (comma-free)
-// cycle IDs still passes Verify after the comma guard is added.
-//
-// PRE-EXISTING GREEN: Verify() returns nil for valid IDs today.
-// After Builder: the new guard only fires on commas; valid IDs continue to pass.
-func TestC17_001neg_ValidPlanPassesVerify(t *testing.T) {
-	plan := &campaign.Plan{
-		Version: 1,
-		Goal:    "test-valid-ids",
-		Cycles: []fleet.Todo{
-			{ID: "phase-1", Files: []string{"fa"}},
-			{ID: "phase-2", Files: []string{"fb"}, DependsOn: []string{"phase-1"}},
-		},
-	}
-	if err := plan.Verify(); err != nil {
-		t.Errorf("FAIL: campaign.Verify() rejected a valid plan (no commas in IDs): %v", err)
-	}
-}
+// ── catalog-dir-di ───────────────────────────────────────────────────────────
 
-// ── fix-preliminary-study-metadata ──────────────────────────────────────────
-
-// TestC17_002_PersonaFileExistsAndTracked verifies that
-// agents/evolve-preliminary-study.md exists on disk and is git-tracked.
+// TestC17_110_CatalogDirNoOsGetenv verifies that catalog_overlay.go no longer calls
+// os.Getenv("EVOLVE_MODEL_CATALOG_DIR") after the DI fn-var migration.
 //
-// BEHAVIORAL: disk presence check + git ls-files tracking check (cycle-93 pattern:
-// gitignored files are silently dropped at ship).
+// // acs-predicate: config-check — env-read absence is the structural contract.
 //
-// RED: agents/evolve-preliminary-study.md does not exist yet.
-//
-//	.evolve/profiles/preliminary-study.json exists but has no paired persona.
-//
-// GREEN: Builder creates agents/evolve-preliminary-study.md and `git add`s it.
-func TestC17_002_PersonaFileExistsAndTracked(t *testing.T) {
+// RED: os.Getenv("EVOLVE_MODEL_CATALOG_DIR") present at line 27 of catalog_overlay.go.
+// GREEN: Builder replaces with var modelCatalogDirFn reading BridgePolicy.CatalogDir.
+func TestC17_110_CatalogDirNoOsGetenv(t *testing.T) {
+	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	rel := filepath.Join("agents", "evolve-preliminary-study.md")
-	abs := filepath.Join(root, rel)
-
-	if !acsassert.FileExists(t, abs) {
-		t.Fatalf("RED: %s missing on disk.\n"+
-			".evolve/profiles/preliminary-study.json exists but has no paired persona.\n"+
-			"phasecoherence.TestRepoPersonaProfilePairing will fail at CI.\n"+
-			"Builder must create agents/evolve-preliminary-study.md with frontmatter\n"+
-			"(name, description, when_to_use) and a brief agent prompt body.", rel)
-	}
-	_, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel)
-	if code != 0 {
-		t.Errorf("RED: %s exists on disk but is not git-tracked — may be gitignored and dropped at ship.\n"+
-			"Builder must `git add agents/evolve-preliminary-study.md`.", rel)
+	overlay := filepath.Join(root, "go", "internal", "bridge", "catalog_overlay.go")
+	if !acsassert.FileNotContains(t, overlay, `os.Getenv("EVOLVE_MODEL_CATALOG_DIR")`) {
+		t.Errorf("RED: catalog_overlay.go still calls os.Getenv(\"EVOLVE_MODEL_CATALOG_DIR\").\n" +
+			"Builder must replace modelCatalogDir() func with:\n" +
+			"  var modelCatalogDirFn = func() string { return policy.Load(...).BridgeConfig().CatalogDir }\n" +
+			"matching capabilities.go's catalogDirFn pattern.\n" +
+			"File: go/internal/bridge/catalog_overlay.go")
 	}
 }
 
-// TestC17_003_PhaseCoherencePasses verifies that
-// phasecoherence.TestRepoPersonaProfilePairing passes (exit 0).
+// TestC17_111_CatalogDirNoOsSetenv verifies that cmd_cycle.go no longer calls
+// os.Setenv("EVOLVE_MODEL_CATALOG_DIR", ...) after the DI migration.
 //
-// BEHAVIORAL: subprocess `go test -run TestRepoPersonaProfilePairing` invokes
-// the real phasecoherence gate which reads the live agents/ and .evolve/profiles/
-// directories. A no-op (empty persona file) cannot satisfy the bijection gate.
+// // acs-predicate: config-check — env-write absence is the structural contract.
 //
-// RED: .evolve/profiles/preliminary-study.json exists with no paired persona →
-//
-//	TestRepoPersonaProfilePairing fails with "profile has no persona at agents/evolve-preliminary-study.md".
-//
-// GREEN: Builder creates agents/evolve-preliminary-study.md → bijection gate passes.
-func TestC17_003_PhaseCoherencePasses(t *testing.T) {
-	combined, code := goTestRun(t,
-		"-count=1",
-		"-run", "TestRepoPersonaProfilePairing",
-		"./internal/phasecoherence/...",
-	)
-	if code != 0 {
-		t.Errorf("RED: phasecoherence.TestRepoPersonaProfilePairing FAIL (exit %d).\n"+
-			"Builder must create agents/evolve-preliminary-study.md to pair with\n"+
-			".evolve/profiles/preliminary-study.json.\nOutput:\n%s", code, combined)
+// RED: os.Setenv("EVOLVE_MODEL_CATALOG_DIR", ...) present at line 245 of cmd_cycle.go.
+// GREEN: Builder replaces with bridge.SetModelCatalogDirFn(evolveDir) or equivalent.
+func TestC17_111_CatalogDirNoOsSetenv(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	cmdCycle := filepath.Join(root, "go", "cmd", "evolve", "cmd_cycle.go")
+	if !acsassert.FileNotContains(t, cmdCycle, `os.Setenv("EVOLVE_MODEL_CATALOG_DIR"`) {
+		t.Errorf("RED: cmd_cycle.go still calls os.Setenv(\"EVOLVE_MODEL_CATALOG_DIR\", ...).\n" +
+			"Builder must replace this os.Setenv with a call to an exported setter\n" +
+			"(e.g., bridge.SetModelCatalogDirFn(evolveDir)) that wires the fn-var\n" +
+			"without touching the process environment.\n" +
+			"File: go/cmd/evolve/cmd_cycle.go (currently line 245).")
 	}
 }
 
-// TestC17_004_PhaseSpecPasses verifies that
-// phasespec.TestPhaseCatalog_OptionalPhasesHaveSelectMetadata passes (exit 0).
+// TestLookup_ModelCatalogDirAbsent verifies that the EVOLVE_MODEL_CATALOG_DIR
+// registry row has been deleted after the DI fn-var migration.
 //
-// BEHAVIORAL: subprocess `go test -run TestPhaseCatalog_OptionalPhasesHaveSelectMetadata`
-// invokes the real phasespec gate which reads phase.json files from all phase roots.
+// BEHAVIORAL: calls flagregistry.Lookup directly.
 //
-// RED: .evolve/phases/preliminary-study/phase.json has no when_to_use or description →
-//
-//	test reports "[preliminary-study]" as a phase lacking SELECT metadata.
-//
-// GREEN: Builder adds when_to_use and description fields to phase.json.
-func TestC17_004_PhaseSpecPasses(t *testing.T) {
-	combined, code := goTestRun(t,
-		"-count=1",
-		"-run", "TestPhaseCatalog_OptionalPhasesHaveSelectMetadata",
-		"./internal/phasespec/...",
-	)
-	if code != 0 {
-		t.Errorf("RED: phasespec.TestPhaseCatalog_OptionalPhasesHaveSelectMetadata FAIL (exit %d).\n"+
-			"Builder must add when_to_use and description fields to\n"+
-			".evolve/phases/preliminary-study/phase.json.\nOutput:\n%s", code, combined)
+// RED: row still in registry_table.go → found=true.
+// GREEN: Builder deletes the row after wiring via BridgePolicy.CatalogDir.
+func TestLookup_ModelCatalogDirAbsent(t *testing.T) {
+	_, found := flagregistry.Lookup("EVOLVE_MODEL_CATALOG_DIR")
+	if found {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_MODEL_CATALOG_DIR\") returned found=true.\n" +
+			"Builder must delete the EVOLVE_MODEL_CATALOG_DIR row from registry_table.go\n" +
+			"after replacing the os.Getenv/os.Setenv pair with fn-var DI.")
 	}
 }
 
-// ── cmd-campaign-dispatch-coverage ──────────────────────────────────────────
-
-// TestC17_005_DispatchNoArgsTestExistsAndPasses verifies that
-// TestRunCampaign_NoArgs exists in cmd_campaign_test.go and passes.
+// TestC17_113neg_CatalogDirFnVarInPlace verifies that catalog_overlay.go declares
+// a "modelCatalogDirFn" fn-var (injection seam) rather than a plain func with
+// os.Getenv inside.
 //
-// BEHAVIORAL: subprocess `go test -v -run TestRunCampaign_NoArgs` — checks
-// for "--- PASS: TestRunCampaign_NoArgs" in the -v output. If the test
-// function does not exist, `go test -run` exits 0 but the PASS line is absent.
+// // acs-predicate: config-check — fn-var presence is the structural injection contract.
 //
-// RED: TestRunCampaign_NoArgs does not exist in cmd_campaign_test.go →
-//
-//	go test -v output does not contain "--- PASS: TestRunCampaign_NoArgs".
-//
-// GREEN: Builder adds TestRunCampaign_NoArgs which calls runCampaign([]string{}, ...)
-//
-//	and asserts exit=2 + stderr contains usage.
-func TestC17_005_DispatchNoArgsTestExistsAndPasses(t *testing.T) {
-	combined, code := goTestRun(t,
-		"-v", "-count=1",
-		"-run", "TestRunCampaign_NoArgs",
-		"./cmd/evolve/...",
-	)
-	if code != 0 {
-		t.Errorf("RED: go test -run TestRunCampaign_NoArgs failed (exit %d).\n"+
-			"Builder must add TestRunCampaign_NoArgs to go/cmd/evolve/cmd_campaign_test.go.\nOutput:\n%s",
-			code, combined)
-		return
-	}
-	if !strings.Contains(combined, "--- PASS: TestRunCampaign_NoArgs") {
-		t.Errorf("RED: TestRunCampaign_NoArgs was not found or not run.\n"+
-			"(go test -v output lacks '--- PASS: TestRunCampaign_NoArgs' — function not yet defined.)\n"+
-			"Builder must add:\n"+
-			"  func TestRunCampaign_NoArgs(t *testing.T) {\n"+
-			"      var stdout, stderr bytes.Buffer\n"+
-			"      if code := runCampaign([]string{}, nil, &stdout, &stderr); code != 2 {\n"+
-			"          t.Fatalf(...)\n"+
-			"      }\n"+
-			"  }\n"+
-			"File: go/cmd/evolve/cmd_campaign_test.go\nOutput:\n%s", combined)
+// RED: "modelCatalogDirFn" absent from catalog_overlay.go (currently: func modelCatalogDir()).
+// GREEN: Builder replaces the func with var modelCatalogDirFn and an exported setter.
+func TestC17_113neg_CatalogDirFnVarInPlace(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	overlay := filepath.Join(root, "go", "internal", "bridge", "catalog_overlay.go")
+	if !acsassert.FileContains(t, overlay, "modelCatalogDirFn") {
+		t.Errorf("RED: catalog_overlay.go does not contain 'modelCatalogDirFn'.\n" +
+			"Builder must replace the plain func modelCatalogDir() with a fn-var:\n" +
+			"  var modelCatalogDirFn = func() string { return policy.Load(...).BridgeConfig().CatalogDir }\n" +
+			"The existing capabilities.go file shows the same pattern (catalogDirFn).\n" +
+			"File: go/internal/bridge/catalog_overlay.go")
 	}
 }
 
-// TestC17_005neg_DispatchUnknownSubTestExistsAndPasses verifies that
-// TestRunCampaign_UnknownSub exists and passes (semantic diversity —
-// a distinct dispatch guard case from no-args).
+// ── policy-acs-kb ────────────────────────────────────────────────────────────
+
+// TestC17_120_AcsSuiteNoEnvGetenv verifies that acssuite.go no longer calls
+// envGet("EVOLVE_ACS_GO_TIMEOUT_S") after the ACSConfig policy migration.
 //
-// BEHAVIORAL: same subprocess -v approach as C17_005, for a different dispatch path.
-// RED: TestRunCampaign_UnknownSub does not exist yet.
-// GREEN: Builder adds TestRunCampaign_UnknownSub asserting runCampaign([]string{"unknown"}, ...) exits 2.
-func TestC17_005neg_DispatchUnknownSubTestExistsAndPasses(t *testing.T) {
-	combined, code := goTestRun(t,
-		"-v", "-count=1",
-		"-run", "TestRunCampaign_UnknownSub",
-		"./cmd/evolve/...",
-	)
-	if code != 0 {
-		t.Errorf("RED: go test -run TestRunCampaign_UnknownSub failed (exit %d).\n"+
-			"Builder must add TestRunCampaign_UnknownSub to cmd_campaign_test.go.\nOutput:\n%s",
-			code, combined)
-		return
-	}
-	if !strings.Contains(combined, "--- PASS: TestRunCampaign_UnknownSub") {
-		t.Errorf("RED: TestRunCampaign_UnknownSub was not found or not run.\n"+
-			"(go test -v output lacks '--- PASS: TestRunCampaign_UnknownSub')\n"+
-			"Builder must add:\n"+
-			"  func TestRunCampaign_UnknownSub(t *testing.T) {\n"+
-			"      var stdout, stderr bytes.Buffer\n"+
-			"      if code := runCampaign([]string{\"unknown\"}, nil, &stdout, &stderr); code != 2 {\n"+
-			"          t.Fatalf(...)\n"+
-			"      }\n"+
-			"  }\n"+
-			"File: go/cmd/evolve/cmd_campaign_test.go\nOutput:\n%s", combined)
+// // acs-predicate: config-check — env-read absence is the structural contract.
+//
+// RED: envGet("EVOLVE_ACS_GO_TIMEOUT_S") present at line 237 of acssuite.go.
+// GREEN: Builder reads ACSConfig.GoTimeoutS from policy instead; goLaneTimeout
+// uses it when non-zero, falls through to DefaultTimeout when zero.
+func TestC17_120_AcsSuiteNoEnvGetenv(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	suite := filepath.Join(root, "go", "internal", "acssuite", "acssuite.go")
+	if !acsassert.FileNotContains(t, suite, `envGet("EVOLVE_ACS_GO_TIMEOUT_S")`) {
+		t.Errorf("RED: acssuite.go still calls envGet(\"EVOLVE_ACS_GO_TIMEOUT_S\").\n" +
+			"Builder must add ACSConfig{GoTimeoutS int} to policy.go and wire\n" +
+			"goLaneTimeout to use ACSConfig.GoTimeoutS when non-zero.\n" +
+			"File: go/internal/acssuite/acssuite.go (currently line 237).")
 	}
 }
 
-// TestC17_006_RenderPlanValidTestExistsAndPasses verifies that
-// TestRenderCampaignPlan_Valid exists in cmd_campaign_test.go and passes.
+// TestC17_121_KbNoEnvGetenv verifies that research/kb.go no longer calls
+// os.Getenv("EVOLVE_KB_SEARCH_PATHS") after the PathsConfig policy migration.
 //
-// BEHAVIORAL: subprocess `go test -v -run TestRenderCampaignPlan_Valid` checks
-// for "--- PASS: TestRenderCampaignPlan_Valid" in the -v output. Existing
-// renderCampaignPlan tests only cover error paths (missing file, bad version);
-// the success path (valid plan → exit 0 + non-empty stdout) is at 40%.
+// // acs-predicate: config-check — env-read absence is the structural contract.
 //
-// RED: TestRenderCampaignPlan_Valid does not exist → PASS line absent.
-// GREEN: Builder writes a temp valid campaign-plan.json and calls renderCampaignPlan,
-//
-//	asserts exit=0 and non-empty stdout.
-func TestC17_006_RenderPlanValidTestExistsAndPasses(t *testing.T) {
-	combined, code := goTestRun(t,
-		"-v", "-count=1",
-		"-run", "TestRenderCampaignPlan_Valid",
-		"./cmd/evolve/...",
-	)
-	if code != 0 {
-		t.Errorf("RED: go test -run TestRenderCampaignPlan_Valid failed (exit %d).\n"+
-			"Builder must add TestRenderCampaignPlan_Valid to go/cmd/evolve/cmd_campaign_test.go.\nOutput:\n%s",
-			code, combined)
-		return
+// RED: os.Getenv("EVOLVE_KB_SEARCH_PATHS") present at line 67 of kb.go.
+// GREEN: Builder adds PathsConfig{KBSearchPaths string} to policy.go and changes
+// SearchPathsFromEnv to accept a PathsConfig parameter.
+func TestC17_121_KbNoEnvGetenv(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	kb := filepath.Join(root, "go", "internal", "research", "kb.go")
+	if !acsassert.FileNotContains(t, kb, `os.Getenv("EVOLVE_KB_SEARCH_PATHS")`) {
+		t.Errorf("RED: kb.go still calls os.Getenv(\"EVOLVE_KB_SEARCH_PATHS\").\n" +
+			"Builder must add PathsConfig.KBSearchPaths to policy.go and update\n" +
+			"SearchPathsFromEnv to accept a PathsConfig argument instead.\n" +
+			"File: go/internal/research/kb.go (currently line 67).")
 	}
-	if !strings.Contains(combined, "--- PASS: TestRenderCampaignPlan_Valid") {
-		t.Errorf("RED: TestRenderCampaignPlan_Valid was not found or not run.\n"+
-			"(go test -v output lacks '--- PASS: TestRenderCampaignPlan_Valid')\n"+
-			"Builder must add:\n"+
-			"  func TestRenderCampaignPlan_Valid(t *testing.T) {\n"+
-			"      path := writeCampaignTestPlan(t)\n"+
-			"      var stdout, stderr bytes.Buffer\n"+
-			"      if code := renderCampaignPlan(path, &stdout, &stderr); code != 0 {\n"+
-			"          t.Fatalf(\"want exit 0, got %%d; stderr=%%s\", code, stderr.String())\n"+
-			"      }\n"+
-			"      if stdout.Len() == 0 {\n"+
-			"          t.Fatal(\"renderCampaignPlan produced empty stdout on valid plan\")\n"+
-			"      }\n"+
-			"  }\n"+
-			"File: go/cmd/evolve/cmd_campaign_test.go\nOutput:\n%s", combined)
+}
+
+// TestLookup_AcsGoTimeoutSAbsent verifies that the EVOLVE_ACS_GO_TIMEOUT_S
+// registry row has been deleted after the ACSConfig migration.
+//
+// BEHAVIORAL: calls flagregistry.Lookup directly.
+//
+// RED: row still in registry_table.go → found=true.
+// GREEN: Builder deletes the row after wiring via ACSConfig.GoTimeoutS.
+func TestLookup_AcsGoTimeoutSAbsent(t *testing.T) {
+	_, found := flagregistry.Lookup("EVOLVE_ACS_GO_TIMEOUT_S")
+	if found {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_ACS_GO_TIMEOUT_S\") returned found=true.\n" +
+			"Builder must delete the row from registry_table.go after replacing\n" +
+			"envGet(\"EVOLVE_ACS_GO_TIMEOUT_S\") with ACSConfig.GoTimeoutS in acssuite.go.")
+	}
+}
+
+// TestLookup_KbSearchPathsAbsent verifies that the EVOLVE_KB_SEARCH_PATHS
+// registry row has been deleted after the PathsConfig migration.
+//
+// BEHAVIORAL: calls flagregistry.Lookup directly.
+//
+// RED: row still in registry_table.go → found=true.
+// GREEN: Builder deletes the row after wiring via PathsConfig.KBSearchPaths.
+func TestLookup_KbSearchPathsAbsent(t *testing.T) {
+	_, found := flagregistry.Lookup("EVOLVE_KB_SEARCH_PATHS")
+	if found {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_KB_SEARCH_PATHS\") returned found=true.\n" +
+			"Builder must delete the row from registry_table.go after replacing\n" +
+			"os.Getenv(\"EVOLVE_KB_SEARCH_PATHS\") with PathsConfig.KBSearchPaths in kb.go.")
+	}
+}
+
+// TestC17_124neg_EmptyACSConfigZeroTimeout verifies that policy.Policy{}.ACSTimeoutConfig()
+// returns an ACSConfig with GoTimeoutS==0 for an empty policy (nil ACS field).
+// A zero GoTimeoutS tells acssuite.goLaneTimeout to fall through to DefaultTimeout (60s),
+// so a missing policy block never causes a zero-timeout panic.
+//
+// BEHAVIORAL: calls policy.Policy{}.ACSTimeoutConfig() — fails to compile before
+// Builder adds ACSConfig and ACSTimeoutConfig() to policy.go.
+//
+// RED: policy.ACSTimeoutConfig / policy.ACSConfig undefined → compile failure.
+// GREEN: Builder adds the method; empty policy → GoTimeoutS==0.
+func TestC17_124neg_EmptyACSConfigZeroTimeout(t *testing.T) {
+	cfg := policy.Policy{}.ACSTimeoutConfig()
+	if cfg.GoTimeoutS != 0 {
+		t.Errorf("RED: policy.Policy{}.ACSTimeoutConfig().GoTimeoutS = %d; want 0.\n"+
+			"An absent ACS policy block must return ACSConfig{GoTimeoutS:0} so\n"+
+			"acssuite.goLaneTimeout falls through to DefaultTimeout (60s).\n"+
+			"A zero return from the policy accessor must NEVER be passed as a 0-second timeout.",
+			cfg.GoTimeoutS)
+	}
+}
+
+// TestC17_125edge_EmptyPathsConfigKBFallback verifies that research.SearchPathsFromEnv
+// with an empty PathsConfig returns the documented default KB search paths (non-empty).
+// This guards against a regression where a nil/absent config causes an empty path list
+// that silently breaks KB lookups.
+//
+// BEHAVIORAL: calls research.SearchPathsFromEnv(policy.PathsConfig{}) — fails to
+// compile before Builder changes SearchPathsFromEnv to accept a PathsConfig argument.
+//
+// RED: research.SearchPathsFromEnv currently takes 0 arguments → compile failure.
+// GREEN: Builder updates signature; empty PathsConfig.KBSearchPaths → fallback to
+//
+//	"knowledge-base/research/:.evolve/instincts/lessons/:docs/research/".
+func TestC17_125edge_EmptyPathsConfigKBFallback(t *testing.T) {
+	paths := research.SearchPathsFromEnv(policy.PathsConfig{})
+	if len(paths) == 0 {
+		t.Fatalf("RED: research.SearchPathsFromEnv(PathsConfig{}) returned empty paths.\n" +
+			"Empty PathsConfig.KBSearchPaths must fall back to the default:\n" +
+			"  knowledge-base/research/:.evolve/instincts/lessons/:docs/research/\n" +
+			"Builder must update SearchPathsFromEnv to accept PathsConfig and preserve fallback.")
+	}
+	for _, p := range paths {
+		if strings.Contains(p, "knowledge-base") {
+			return // found the expected default entry
+		}
+	}
+	t.Errorf("RED: fallback paths do not include a 'knowledge-base/' entry.\n"+
+		"Got: %v\nExpected at least one path containing 'knowledge-base'.", paths)
+}
+
+// ── phase-roots-policy ───────────────────────────────────────────────────────
+
+// TestC17_130_PhaseRootsNoEnvRead verifies that mergedcatalog.go no longer calls
+// os.Getenv(rootsEnv) (where rootsEnv = "EVOLVE_PHASE_ROOTS") after the policy migration.
+//
+// // acs-predicate: config-check — env-read absence is the structural contract.
+//
+// RED: os.Getenv(rootsEnv) present at line 30 of mergedcatalog.go.
+// GREEN: Builder adds RootsWithPolicy(root, cfg PathsConfig) and updates Roots()
+// to load policy and delegate, eliminating the os.Getenv call.
+func TestC17_130_PhaseRootsNoEnvRead(t *testing.T) {
+	// acs-predicate: config-check
+	root := acsassert.RepoRoot(t)
+	catalog := filepath.Join(root, "go", "internal", "phasespec", "mergedcatalog.go")
+	if !acsassert.FileNotContains(t, catalog, "os.Getenv(rootsEnv)") {
+		t.Errorf("RED: mergedcatalog.go still calls os.Getenv(rootsEnv).\n" +
+			"Builder must add:\n" +
+			"  func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string\n" +
+			"and have Roots(projectRoot string) load policy and delegate.\n" +
+			"File: go/internal/phasespec/mergedcatalog.go (currently line 30).")
+	}
+}
+
+// TestLookup_PhaseRootsAbsent verifies that the EVOLVE_PHASE_ROOTS registry row
+// has been deleted after the PathsConfig migration.
+//
+// BEHAVIORAL: calls flagregistry.Lookup directly.
+//
+// RED: row still in registry_table.go → found=true.
+// GREEN: Builder deletes the row after converting mergedcatalog.go:Roots() to
+// read policy.PathsConfig.PhaseRoots.
+func TestLookup_PhaseRootsAbsent(t *testing.T) {
+	_, found := flagregistry.Lookup("EVOLVE_PHASE_ROOTS")
+	if found {
+		t.Errorf("RED: flagregistry.Lookup(\"EVOLVE_PHASE_ROOTS\") returned found=true.\n" +
+			"Builder must delete the row from registry_table.go after removing\n" +
+			"os.Getenv(rootsEnv) from mergedcatalog.go and wiring PathsConfig.PhaseRoots.")
+	}
+}
+
+// TestC17_132neg_AbsentPathsConfigDefaultFallback verifies that RootsWithPolicy
+// returns the default ".evolve/phases" root when PathsConfig.PhaseRoots is empty.
+// This is the nil-safety contract: an absent policy block must never produce an
+// empty roots slice that silently breaks phase discovery.
+//
+// BEHAVIORAL: calls phasespec.RootsWithPolicy — fails to compile before Builder
+// adds the function to mergedcatalog.go.
+//
+// RED: phasespec.RootsWithPolicy undefined → compile failure.
+// GREEN: Builder adds RootsWithPolicy; empty PhaseRoots → ["<root>/.evolve/phases"].
+func TestC17_132neg_AbsentPathsConfigDefaultFallback(t *testing.T) {
+	testRoot := t.TempDir()
+	roots := phasespec.RootsWithPolicy(testRoot, policy.PathsConfig{})
+	if len(roots) == 0 {
+		t.Fatalf("RED: phasespec.RootsWithPolicy(root, PathsConfig{}) returned empty slice.\n" +
+			"Absent PhaseRoots must fall back to the defaultRoot (.evolve/phases).\n" +
+			"Builder must implement:\n" +
+			"  func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string\n" +
+			"in go/internal/phasespec/mergedcatalog.go.")
+	}
+	wantSuffix := filepath.Join(".evolve", "phases")
+	for _, r := range roots {
+		if strings.HasSuffix(r, wantSuffix) {
+			return // found the default root
+		}
+	}
+	t.Errorf("RED: RootsWithPolicy(root, PathsConfig{}) = %v;\n"+
+		"none of the returned paths ends with %q.\n"+
+		"Absent PhaseRoots must resolve to <projectRoot>/.evolve/phases.", roots, wantSuffix)
+}
+
+// TestC17_133edge_AbsolutePathPassThrough verifies that an absolute path in
+// PathsConfig.PhaseRoots is returned unchanged (not joined with projectRoot).
+// The existing Roots() function already handles absolute paths correctly; this
+// predicate ensures RootsWithPolicy preserves that behavior.
+//
+// BEHAVIORAL: calls phasespec.RootsWithPolicy — fails to compile before Builder
+// adds the function.
+//
+// RED: phasespec.RootsWithPolicy undefined → compile failure.
+// GREEN: absolute PhaseRoots → returned verbatim (not joined with projectRoot).
+func TestC17_133edge_AbsolutePathPassThrough(t *testing.T) {
+	const absPath = "/absolute/phase/root"
+	roots := phasespec.RootsWithPolicy("/some/project", policy.PathsConfig{PhaseRoots: absPath})
+	for _, r := range roots {
+		if r == absPath {
+			return // absolute path preserved
+		}
+	}
+	t.Errorf("RED: phasespec.RootsWithPolicy(\"/some/project\", PathsConfig{PhaseRoots: %q})\n"+
+		"returned %v; want the absolute path %q preserved verbatim (not joined with projectRoot).\n"+
+		"Builder must apply the same filepath.IsAbs check that current Roots() uses.", absPath, roots, absPath)
+}
+
+// ── ALL tasks ────────────────────────────────────────────────────────────────
+
+// TestC17_999_RegistryCountIs24 verifies that the flag registry has exactly 24
+// rows after all 5 deletions (29 baseline → 24 target).
+//
+// BEHAVIORAL: len(flagregistry.All) — direct in-process assertion.
+//
+// RED: len(All) == 29 (all 5 target rows still present).
+// GREEN: Builder deletes all 5 rows → len(All) == 24.
+func TestC17_999_RegistryCountIs24(t *testing.T) {
+	got := len(flagregistry.All)
+	if got != 24 {
+		t.Errorf("RED: len(flagregistry.All) = %d; want 24 (29 baseline − 5 deletions).\n"+
+			"Builder must delete ALL 5 target rows from go/internal/flagregistry/registry_table.go:\n"+
+			"  EVOLVE_CLI_MAX_CONCURRENT_CODEX  (dead — 0 literal readers)\n"+
+			"  EVOLVE_MODEL_CATALOG_DIR          (wired via BridgePolicy.CatalogDir fn-var)\n"+
+			"  EVOLVE_ACS_GO_TIMEOUT_S           (wired via policy.ACSConfig.GoTimeoutS)\n"+
+			"  EVOLVE_KB_SEARCH_PATHS            (wired via policy.PathsConfig.KBSearchPaths)\n"+
+			"  EVOLVE_PHASE_ROOTS                (wired via policy.PathsConfig.PhaseRoots)",
+			got)
 	}
 }

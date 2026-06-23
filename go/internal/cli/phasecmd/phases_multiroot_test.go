@@ -24,7 +24,13 @@ func TestPhasesList_MultiRootShowsProvenance(t *testing.T) {
 		[]byte(`{"name":"plugin-check","optional":true,"categories":["security"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_PHASE_ROOTS", ".evolve/phases:"+pluginRoot)
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	polJSON := `{"paths":{"phase_roots":".evolve/phases:` + pluginRoot + `"}}`
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(polJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	var out, errb bytes.Buffer
 	if code := RunPhases([]string{"list"}, nil, &out, &errb); code != 0 {

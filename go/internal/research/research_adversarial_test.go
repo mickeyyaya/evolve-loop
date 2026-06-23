@@ -7,36 +7,35 @@ package research
 import (
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // TestSearchPathsFromEnv_AllBranches — adversarial: the three branches of
-// SearchPathsFromEnv (env set/non-empty, env empty, env unset).
+// SearchPathsFromEnv (cfg set/non-empty, cfg empty, cfg whitespace-only).
 func TestSearchPathsFromEnv_AllBranches(t *testing.T) {
-	t.Run("env set to explicit paths returns those paths", func(t *testing.T) {
-		t.Setenv("EVOLVE_KB_SEARCH_PATHS", "/a/b:/c/d")
-		paths := SearchPathsFromEnv()
+	t.Run("cfg.KBSearchPaths set to explicit paths returns those paths", func(t *testing.T) {
+		cfg := policy.PathsConfig{KBSearchPaths: "/a/b:/c/d"}
+		paths := SearchPathsFromEnv(cfg)
 		if len(paths) != 2 || paths[0] != "/a/b" || paths[1] != "/c/d" {
 			t.Errorf("SearchPathsFromEnv with explicit value = %v, want [/a/b /c/d]", paths)
 		}
 	})
-	t.Run("env set to empty string falls back to default paths", func(t *testing.T) {
-		t.Setenv("EVOLVE_KB_SEARCH_PATHS", "")
-		paths := SearchPathsFromEnv()
+	t.Run("cfg.KBSearchPaths empty falls back to default paths", func(t *testing.T) {
+		paths := SearchPathsFromEnv(policy.PathsConfig{})
 		if len(paths) == 0 {
-			t.Error("empty env must fall back to default paths (not empty)")
+			t.Error("empty cfg must fall back to default paths (not empty)")
 		}
 	})
-	t.Run("env set to whitespace falls back to default paths", func(t *testing.T) {
-		t.Setenv("EVOLVE_KB_SEARCH_PATHS", "   ")
-		paths := SearchPathsFromEnv()
+	t.Run("cfg.KBSearchPaths whitespace-only falls back to default paths", func(t *testing.T) {
+		cfg := policy.PathsConfig{KBSearchPaths: "   "}
+		paths := SearchPathsFromEnv(cfg)
 		if len(paths) == 0 {
-			t.Error("whitespace-only env must fall back to default paths (not empty)")
+			t.Error("whitespace-only cfg must fall back to default paths (not empty)")
 		}
 	})
-	t.Run("env unset falls back to default paths", func(t *testing.T) {
-		t.Setenv("EVOLVE_KB_SEARCH_PATHS", "")
-		paths := SearchPathsFromEnv()
-		// Default includes knowledge-base/research/ and .evolve/instincts/lessons/.
+	t.Run("empty PathsConfig falls back to default paths with knowledge-base", func(t *testing.T) {
+		paths := SearchPathsFromEnv(policy.PathsConfig{})
 		found := false
 		for _, p := range paths {
 			if strings.Contains(p, "knowledge-base") || strings.Contains(p, "instincts") {

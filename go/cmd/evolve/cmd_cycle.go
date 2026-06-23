@@ -242,7 +242,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// regardless of EVOLVE_PROJECT_ROOT (which the loop resolves from a flag,
 	// not necessarily the env). Set unconditionally — evolveDir is authoritative.
 	if evolveDir != "" {
-		_ = os.Setenv("EVOLVE_MODEL_CATALOG_DIR", evolveDir)
+		d := evolveDir
+		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
 	// Ledger and storage are created first so the bridge adapter can wire its
 	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
@@ -523,11 +524,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	}
 }
 
-// kbRootsAbs resolves the EVOLVE_KB_SEARCH_PATHS roots (relative by default,
+// kbRootsAbs resolves the KB search roots (relative by default,
 // e.g. ".evolve/instincts/lessons/") against the project root so the KB reads
 // the right corpus regardless of the process cwd. Absolute roots pass through.
 func kbRootsAbs(projectRoot string) []string {
-	raw := research.SearchPathsFromEnv()
+	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	raw := research.SearchPathsFromEnv(pol.PathsConfig())
 	out := make([]string, 0, len(raw))
 	for _, p := range raw {
 		if filepath.IsAbs(p) {

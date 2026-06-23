@@ -120,10 +120,12 @@ func TestRunPhases_ProvenanceStrictPassesWhenAllStamped(t *testing.T) {
 	}
 }
 
-func TestRunPhases_ProvenanceHonorsProfileDirEnv(t *testing.T) {
-	// Eval C4 mechanism (R3): EVOLVE_PROFILE_DIR points validate at an
-	// alternate profiles dir; the unstamped profile there must be detected
-	// even though the project-root profiles dir is clean.
+func TestRunPhases_ProvenanceHonorsProfileDir(t *testing.T) {
+	// --profile-dir flag routes validate to the alternate profiles dir;
+	// the unstamped profile there must be detected even though the
+	// project-root profiles dir is clean.
+	// (Renamed from TestRunPhases_ProvenanceHonorsProfileDirEnv — cycle-16
+	// migrates EVOLVE_PROFILE_DIR to the --profile-dir CLI flag.)
 	root := newCoherenceProject(t)
 	writeCoherenceProfile(t, root, "stamped",
 		`{"name":"stamped","role":"stamped","cli":"claude-tmux","model_tier_default":"sonnet","generated_from":"hand-authored"}`)
@@ -132,15 +134,25 @@ func TestRunPhases_ProvenanceHonorsProfileDirEnv(t *testing.T) {
 		[]byte(`{"name":"scout","role":"scout","cli":"claude-tmux","model_tier_default":"sonnet"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_PROFILE_DIR", alt)
-
+	// Pass --profile-dir as a CLI flag before the subcommand verb (not env var).
 	var out, errb bytes.Buffer
-	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"--profile-dir", alt, "validate"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	combined := out.String() + errb.String()
 	if !strings.Contains(combined, "missing") || !strings.Contains(combined, "generated_from") || !strings.Contains(combined, "scout") {
-		t.Errorf("EVOLVE_PROFILE_DIR dir not scanned — want missing-generated_from WARN for scout, got:\n%s", combined)
+		t.Errorf("--profile-dir alt dir not scanned — want missing-generated_from WARN for scout, got:\n%s", combined)
+	}
+}
+
+func TestRunPhases_UnknownFlagReturnsNonZero(t *testing.T) {
+	// Passing an unknown flag must return exit != 0 (usage error).
+	// PRE-EXISTING GREEN: current default case already returns exit 10 for
+	// unrecognised args; after the flag.FlagSet migration it returns 10 via
+	// flag parse error. Both paths exit non-zero.
+	var out, errb bytes.Buffer
+	if rc := RunPhases([]string{"--unknown-flag-xyz"}, nil, &out, &errb); rc == 0 {
+		t.Errorf("RunPhases([--unknown-flag-xyz]) exit 0; want non-zero (usage error)")
 	}
 }
 
@@ -191,10 +203,11 @@ func TestRunPhases_CheckCoherenceStrictExitsTwoOnDrift(t *testing.T) {
 	}
 }
 
-func TestRunPhases_CheckCoherencePersonaOverrideEnv(t *testing.T) {
-	// Eval persona-tools-coherence-gate C4: EVOLVE_PERSONA_OVERRIDE=
-	// "<path>:<name>" substitutes the named persona's file. On-disk pair is
-	// clean; the override adds a contradicting tool → vocabulary WARN.
+func TestRunPhases_CheckCoherencePersonaOverride(t *testing.T) {
+	// --persona-override <path>:<name> substitutes the named persona's file.
+	// On-disk pair is clean; the override adds a contradicting tool → WARN.
+	// (Renamed from TestRunPhases_CheckCoherencePersonaOverrideEnv — cycle-16
+	// migrates EVOLVE_PERSONA_OVERRIDE to the --persona-override CLI flag.)
 	root := newCoherenceProject(t)
 	writeCoherencePersona(t, root, "widget", `tools: ["Read"]`)
 	writeCoherenceProfile(t, root, "widget",
@@ -204,10 +217,9 @@ func TestRunPhases_CheckCoherencePersonaOverrideEnv(t *testing.T) {
 		[]byte("---\nname: evolve-widget\ndescription: fixture\ntools: [\"Read\", \"git-commit\"]\n---\n\n# widget\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_PERSONA_OVERRIDE", override+":widget")
-
+	// Pass --persona-override as a CLI flag before the subcommand verb (not env var).
 	var out, errb bytes.Buffer
-	if rc := RunPhases([]string{"check-coherence"}, nil, &out, &errb); rc != 0 {
+	if rc := RunPhases([]string{"--persona-override", override + ":widget", "check-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
 	s := out.String()
