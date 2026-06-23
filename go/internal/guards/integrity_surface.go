@@ -34,7 +34,7 @@ var protectedSurfaceFragments = []string{
 	"/go/internal/flagregistry/registry_ceiling_test.go", // the ceiling ratchet gate
 	"/knowledge-base/research/flag-campaign-plan.json",   // the campaign contract
 	"/skills/audit/",                                     // the audit grading rubric
-	"/skills/adversarial-review/",                        // the adversarial grading rubric
+	"/skills/adversarial-testing/",                       // the adversarial anti-gaming rubric (M4 goal-integrity)
 	"/.claude/settings.json",                             // PreToolUse hook wiring (repo + global ~/.claude)
 	"/.evolve/policy.json",                               // gate-default overrides (eval/contract/swarm gates)
 }

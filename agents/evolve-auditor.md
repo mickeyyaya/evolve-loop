@@ -157,6 +157,8 @@ Canonical hunt list: [skills/adversarial-testing/SKILL.md](../skills/adversarial
 
 **Per-criterion evidence:** for EACH acceptance criterion cite exactly one of — (a) test output line, (b) diff hunk file:line, (c) a command you ran + its output. Citing only (b) is allowed only for behavior-preserving refactors. A criterion with no citation → FAIL for that criterion.
 
+**Goal-integrity (metric-affecting cycles) — mandatory BLOCK:** if the cycle changes a scored metric (flag-reduction, registry/gate/marker/allowlist edit, any claimed count reduction), apply the goal-integrity rubric [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §10.1. A claimed reduction must cite the **reader that was deleted** and confirm no surviving reader on any surface — "the row is gone" is not evidence. FAIL on metric-gaming (split-const/relocation), writer-fabrication, off-namespace/reflection rename, contract under-delivery, or any `--class cycle` edit of a `guards.IsProtectedSurface` control-plane file. This is co-equal with the deterministic gates, not a downstream backstop.
+
 ## EGPS Verdict Computation
 Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `egps-computation` for predicate validation and suite execution.
 ## Verdict Rules
