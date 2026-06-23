@@ -25,6 +25,17 @@ func git(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+// bareRemote creates a bare repo whose default branch is pinned to "main",
+// independent of the runner's init.defaultBranch (CI defaults to "master"). The
+// command publishes to main, so a clone must check out main to be verifiable.
+func bareRemote(t *testing.T) string {
+	t.Helper()
+	bare := t.TempDir()
+	git(t, bare, "init", "--bare", "-q")
+	git(t, bare, "symbolic-ref", "HEAD", "refs/heads/main")
+	return bare
+}
+
 // setupPrivateRepo builds a temp repo mimicking the private tree: a tracked
 // binary, a commit-prefix-scope with a chore(build) entry, a README, a clean
 // doc, and (optionally) a doc that leaks a macOS home path.
@@ -121,8 +132,7 @@ func TestRun_DryRun_DenylistCatchesUsername(t *testing.T) {
 
 func TestRun_Push_PublishesSquashedMirror(t *testing.T) {
 	repo := setupPrivateRepo(t, false)
-	bare := t.TempDir()
-	git(t, bare, "init", "--bare", "-q")
+	bare := bareRemote(t)
 
 	res, err := Run(context.Background(), Options{
 		RepoDir: repo, Remote: bare, Push: true, Tag: "v9.9.9", Message: "Release v9.9.9",
@@ -182,8 +192,7 @@ func TestRun_Push_BadRemote_Errors(t *testing.T) {
 
 func TestRun_Push_ReadmeSwap(t *testing.T) {
 	repo := setupPrivateRepo(t, false)
-	bare := t.TempDir()
-	git(t, bare, "init", "--bare", "-q")
+	bare := bareRemote(t)
 
 	pub := filepath.Join(t.TempDir(), "README.public.md")
 	if err := os.WriteFile(pub, []byte("# evolveloop (condensed public pitch)\n"), 0o644); err != nil {
