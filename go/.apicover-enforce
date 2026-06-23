@@ -360,3 +360,7 @@
 # leaf for EVOLVE_FLEET / EVOLVE_FLEET_SCOPE / EVOLVE_WORKTREE_ROOT — zero
 # intra-repo imports, no flagregistry row (protocol, not operator dial).
 ./internal/ipcenv
+
+# evolve publish-mirror: builds/pushes the public OSS mirror from the private tree
+# (deterministic transform + PII/secret sanitizer). See docs/operations/public-release.md.
+./internal/publishmirror

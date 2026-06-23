@@ -10,7 +10,7 @@ marketplace. This document is about the GitHub public repo.
 > `…/evolveloop/go` module rename (PR #229) have landed; see
 > [Convergence status](#convergence-status). The per-release transform is now
 > small (drop-binary, remove the `chore(build)` prefix, swap in the public README,
-> squash) and will be automated by `evolve publish-mirror`.
+> squash) and is automated by `evolve publish-mirror`.
 
 ---
 
@@ -119,9 +119,10 @@ Goal: shrink the per-release transform to drop-binary + remove-prefix (+ README)
 
 ## Manual procedure (current — residual transform set)
 
-Until `evolve publish-mirror` exists, this is the exact, reproducible procedure,
-run from a clean private `main` at the release commit. With B1/B2 converged, the
-transform step (2) is now small.
+`evolve publish-mirror` (above) automates this; the steps below are the exact,
+reproducible procedure it implements — kept as the reference/fallback, run from a
+clean private `main` at the release commit. With B1/B2 converged, the transform
+step (2) is now small.
 
 ```text
 # 1. Provision an ISOLATED worktree at the release commit. Do NOT run the orphan
@@ -175,12 +176,36 @@ git worktree remove --force ../evolveloop-release
 > a false-positive. `gh repo create` is **not** gated. The operator running the
 > snapshot's commit is the sanctioned path; never weaken the dev-repo gate itself.
 
-## Planned automation: `evolve publish-mirror`
+## Automation: `evolve publish-mirror`
 
-A Go subcommand (this project is all-Go, no scripts) that runs steps 1–5
-deterministically: resolve the release commit, snapshot the tracked tree, apply
-the residual transforms, invoke the sanitizer gate, squash, push-by-URL, tag,
-and verify. Tracked in the release-process work; see the engineering tasks.
+A Go subcommand (this project is all-Go, no scripts) that runs the release flow
+deterministically: resolve the release commit, snapshot the tracked tree into an
+isolated worktree, apply the residual transforms (remove the `chore(build)`
+prefix entry, optionally swap in a public README), stage on an orphan branch and
+drop the tracked binary, run a deterministic PII/secret **sanitizer gate**, then
+squash + push-by-URL + tag + verify.
+
+```text
+evolve publish-mirror                       # dry-run: build + sanitize, never push
+evolve publish-mirror --push --tag v1.2.3   # publish a tagged release to the mirror
+evolve publish-mirror --public-readme PATH  # swap in the condensed public README (B1c)
+```
+
+It is **dry-run by default** — without `--push` it builds and sanitizes the
+snapshot, reports what would publish, and tears it down. The sanitizer auto-adds
+the operator's username (`$USER`) and git email to the denylist, so the scrub
+regression net needs no configuration. A non-empty violation set is a hard stop
+(exit 2); the snapshot is never pushed.
+
+The sanitizer here is **deterministic** (structural macOS-home-path + secret-key
+patterns + the operator denylist). Running the judgment-based
+`ecc:opensource-sanitizer` agent on the snapshot remains an optional
+belt-and-suspenders for the first publish after a large change.
+
+> **Note:** publishing is the agent-runnable path (the ship-gate blocks an
+> agent's bare `git push`/`git commit` to the *dev* repo, but `evolve
+> publish-mirror` pushes a separate snapshot *by URL* to the public mirror — it
+> never touches the dev `origin`).
 
 ---
 
