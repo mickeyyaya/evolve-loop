@@ -140,17 +140,24 @@ func TestRun_Downgrade(t *testing.T) {
 	}
 }
 
-// === Test 7: missing ledger → ErrCheckFailed ================================
+// === Test 7: missing ledger → ADVISORY (deterministic release) ==============
+// Determinism fix: a release from a clean checkout / CI / fresh worktree (no
+// ledger) must NOT be blocked — the audit signal is unavailable, not failed, and
+// CI-green on the release commit is the authoritative gate (/publish). Preflight
+// passes with step 4 advisory.
 func TestRun_MissingLedger(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	os.Remove(filepath.Join(r, ".evolve", "ledger.jsonl"))
 	opts := stubOpts(r, "1.0.1")
-	_, err := Run(opts)
-	if !errors.Is(err, ErrCheckFailed) {
-		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	res, err := Run(opts)
+	if err != nil {
+		t.Fatalf("missing ledger must be advisory (no error), got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "no ledger") {
-		t.Errorf("err = %v, want contains 'no ledger'", err)
+	if res.AuditVerdict != auditVerdictNone {
+		t.Errorf("AuditVerdict = %q, want %q (advisory)", res.AuditVerdict, auditVerdictNone)
+	}
+	if res.StepsPassed != res.StepsTotal {
+		t.Errorf("StepsPassed=%d, want all %d (preflight passes with advisory audit)", res.StepsPassed, res.StepsTotal)
 	}
 }
 
