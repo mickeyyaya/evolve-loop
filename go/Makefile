@@ -27,7 +27,7 @@ DIST_TARGETS := \
     $(DIST_DIR)/evolve-linux-amd64 \
     $(DIST_DIR)/evolve-linux-arm64
 
-.PHONY: build test test-component test-integration test-e2e test-all \
+.PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64
 
@@ -74,8 +74,11 @@ test-component: ## Component tier: several internal packages wired against temp 
 test-integration: ## Integration tier: real FS/git/tmux subprocess tests (//go:build integration)
 	$(GO) test -race -count=1 -tags integration ./internal/... ./cmd/... ./test/integration/...
 
-test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e); live sub-tier self-skips without its opt-in
-	$(GO) test -count=1 -tags e2e ./cmd/... ./test/e2e/...
+test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in
+	$(GO) test -count=1 -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
+
+test-acs-durable: ## Durable ACS regression tier (//go:build acs); artifact-free predicates, mirrors the ci.yml acs-durable gate
+	$(GO) test -count=1 -tags acs ./acs/regression/...
 
 test-all: ## All tiers in one race run (local superset of CI; CI runs e2e WITHOUT -race in a separate step)
 	$(GO) test -race -count=1 -tags "integration e2e" $(FAST_PKGS)

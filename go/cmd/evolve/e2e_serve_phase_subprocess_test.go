@@ -1,4 +1,4 @@
-//go:build evolve_test_phases
+//go:build e2e && evolve_test_phases
 
 // End-to-end proof that phaseproto.SubprocessRunner can drive a real
 // `evolve serve-phase` subprocess. Closes the "cross-CLI parity

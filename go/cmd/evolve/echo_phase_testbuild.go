@@ -16,12 +16,18 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
 func init() {
-	phaseFactories["echo"] = func(req core.PhaseRequest) core.PhaseRunner {
+	// Register into the phases registry that `evolve serve-phase`
+	// (phasecmd.RunServePhase → registry.For) resolves against. The former
+	// package-local `phaseFactories` map was removed when serve-phase moved to
+	// internal/cli/phasecmd, which silently bit-rotted this test build
+	// (undefined: phaseFactories) — see ADR-0062/T1.7 follow-up.
+	registry.Register("echo", func(req core.PhaseRequest) core.PhaseRunner {
 		return &echoPhaseRunner{}
-	}
+	})
 }
 
 // echoPhaseRunner reflects the request's Cycle into ArtifactsDir so
