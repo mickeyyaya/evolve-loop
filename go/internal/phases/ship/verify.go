@@ -184,6 +184,11 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 	case ClassCycle:
 		res.Logs = append(res.Logs, "[ship] class: cycle (audit-bound)")
 		res.Provenance = "cycle (audit-verified)"
+		// Integrity boundary backstop (ADR-0064): a cycle may not commit changes
+		// to the pipeline control plane that grades it, by any channel.
+		if err := verifyNoControlPlaneEdits(ctx, opts, res); err != nil {
+			return err
+		}
 		if err := verifyAuditBinding(ctx, opts, res); err != nil {
 			return err
 		}

@@ -27,6 +27,7 @@ func TestVocabularyWireStrings(t *testing.T) {
 		{CodeAuditBindingAuditorExit, "AUDIT_BINDING_AUDITOR_EXIT"},
 		{CodeAuditBindingNoLedger, "AUDIT_BINDING_NO_LEDGER"},
 		{CodeEGPSRedCount, "EGPS_RED_COUNT"},
+		{CodeControlPlaneViolation, "CONTROL_PLANE_VIOLATION"},
 		{CodeInvalidClass, "INVALID_CLASS"},
 		{CodeManualNotTTY, "MANUAL_NOT_TTY"},
 		{CodeManualDeclined, "MANUAL_DECLINED"},

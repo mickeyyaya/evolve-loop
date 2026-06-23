@@ -316,7 +316,14 @@ type GuardInput struct {
 
 // GuardDecision is what a guard returns. Allow=true → exit 0; Allow=false → exit 2.
 // Reason is logged to .evolve/guards.log and written to stderr.
+//
+// Alarm marks a deny as an INTEGRITY VIOLATION (not a routine boundary deny) — a
+// phase agent attempted to modify the pipeline control plane that grades it. When
+// set, the guard runner additionally emits a CRITICAL record to
+// .evolve/integrity-alarm.jsonl so the violation is loud and auditable, not just
+// a silent exit-2.
 type GuardDecision struct {
 	Allow  bool
 	Reason string
+	Alarm  bool
 }
