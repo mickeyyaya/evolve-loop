@@ -4,7 +4,7 @@
 # Read by `evolve publish-mirror` (override with --allow-from). Each line is a
 # repo-relative path; an allowlisted FILE exempts all its violations, and the
 # exempted count is logged (never silent). Real PII protection still applies to
-# every non-listed file, and the dev tree carries a zero-`danleemh` guard.
+# every non-listed file, and the dev tree carries a zero-operator-username guard.
 #
 # Every entry here is a known-safe example/test fixture, NOT real PII:
 #   - the sanitizer's own positive-test fixtures must contain a /Users/<name>
