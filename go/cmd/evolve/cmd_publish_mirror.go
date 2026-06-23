@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
+	"os/user"
 	"strings"
 
 	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
@@ -84,13 +84,17 @@ func runPublishMirrorCmd(args []string, stdin io.Reader, stdout, stderr io.Write
 	return 0
 }
 
-// operatorDenylist auto-derives the PII terms most likely to leak: the username
-// of whoever runs the publish, and their configured git email. These are exactly
-// the strings the convergence scrub replaced, so they double as a regression net.
+// operatorDenylist auto-derives the PII terms most likely to leak: the login
+// name of whoever runs the publish, and their configured git email/name. These
+// are exactly the strings the convergence scrub replaced, so they double as a
+// regression net. The login name comes from os/user (not os.Getenv("USER")) so
+// it is not an operator-dial env read subject to the EVOLVE_ anti-rename gate.
 func operatorDenylist(repoDir string) []string {
 	var out []string
-	if u := strings.TrimSpace(os.Getenv("USER")); u != "" {
-		out = append(out, u)
+	if u, err := user.Current(); err == nil {
+		if name := strings.TrimSpace(u.Username); name != "" {
+			out = append(out, name)
+		}
 	}
 	dir := repoDir
 	if dir == "" {
