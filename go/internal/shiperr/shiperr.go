@@ -89,6 +89,13 @@ const (
 	// verify-class — EGPS gate
 	CodeEGPSRedCount ShipErrorCode = "EGPS_RED_COUNT"
 
+	// verify-class — pipeline control-plane integrity boundary (ADR-0064).
+	// A --class cycle commit whose diff touches the integrity surface (gates,
+	// metric SSOT, guards, contract, grading rubrics, hook wiring) — a cycle may
+	// not edit the gate that grades it. Precondition-class (not retryable); the
+	// fix is to ship the control-plane change via --class manual instead.
+	CodeControlPlaneViolation ShipErrorCode = "CONTROL_PLANE_VIOLATION"
+
 	// verify-class — manual / trivial / commit-gate
 	CodeInvalidClass         ShipErrorCode = "INVALID_CLASS"
 	CodeManualNotTTY         ShipErrorCode = "MANUAL_NOT_TTY"

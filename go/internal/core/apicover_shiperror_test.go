@@ -58,6 +58,9 @@ func allShipCodeCases() []shipCodeCase {
 		// verify-class — EGPS gate
 		{CodeEGPSRedCount, ShipClassPrecondition, StageVerifyClass},
 
+		// verify-class — pipeline control-plane integrity boundary (ADR-0064)
+		{CodeControlPlaneViolation, ShipClassPrecondition, StageVerifyClass},
+
 		// verify-class — manual / trivial / commit-gate (operator/config errors)
 		{CodeInvalidClass, ShipClassConfig, StageVerifyClass},
 		{CodeManualNotTTY, ShipClassConfig, StageVerifyClass},
@@ -158,8 +161,8 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 	t.Parallel()
 
 	cases := allShipCodeCases()
-	if len(cases) != 31 { // 32 target codes minus CodeUnknown (tested separately)
-		t.Fatalf("table drift: have %d code cases, want 31 (CodeUnknown is separate)", len(cases))
+	if len(cases) != 32 { // 33 target codes minus CodeUnknown (tested separately); +1 CodeControlPlaneViolation (ADR-0064)
+		t.Fatalf("table drift: have %d code cases, want 32 (CodeUnknown is separate)", len(cases))
 	}
 
 	seenWire := map[string]bool{}

@@ -55,6 +55,8 @@ const (
 
 	CodeEGPSRedCount = shiperr.CodeEGPSRedCount
 
+	CodeControlPlaneViolation = shiperr.CodeControlPlaneViolation
+
 	CodeInvalidClass         = shiperr.CodeInvalidClass
 	CodeManualNotTTY         = shiperr.CodeManualNotTTY
 	CodeManualDeclined       = shiperr.CodeManualDeclined

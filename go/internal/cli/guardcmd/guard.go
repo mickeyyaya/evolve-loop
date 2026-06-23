@@ -62,6 +62,38 @@ func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 	_, _ = f.Write([]byte(line))
 }
 
+// appendIntegrityAlarm writes a CRITICAL integrity-violation record to
+// .evolve/integrity-alarm.jsonl when a guard denies a control-plane modification
+// (GuardDecision.Alarm). Unlike the routine guards.log DENY line, this is a
+// dedicated, loud, append-only alarm channel the observer + audit surface to fail
+// the cycle: a phase agent tried to edit the gate/metric/guard/contract that
+// grades it. Best-effort: failures are silent so hook latency isn't impacted.
+func appendIntegrityAlarm(alarmPath, guardName string, in core.GuardInput, reason string) {
+	if err := os.MkdirAll(filepath.Dir(alarmPath), 0o755); err != nil {
+		return
+	}
+	path, _ := in.ToolInput["file_path"].(string)
+	rec := map[string]any{
+		"ts":       time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"severity": "CRITICAL",
+		"kind":     "integrity-violation",
+		"guard":    guardName,
+		"tool":     in.ToolName,
+		"path":     path,
+		"reason":   reason,
+	}
+	buf, err := json.Marshal(rec)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(alarmPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	_, _ = f.Write(append(buf, '\n'))
+}
+
 // runGuard implements `evolve guard <name>` — reads tool_input JSON from
 // stdin, dispatches to the named guard, and exits 0 on Allow or 2 on Deny.
 // Mirrors the bash hook contract (scripts/guards/*.sh).
@@ -116,6 +148,9 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	dec := g.Decide(context.Background(), in)
 	logPath := filepath.Join(evolveDir, "guards.log")
 	appendGuardsLog(logPath, name, dec.Allow, dec.Reason)
+	if dec.Alarm {
+		appendIntegrityAlarm(filepath.Join(evolveDir, "integrity-alarm.jsonl"), name, in, dec.Reason)
+	}
 	payload := map[string]any{"guard": name, "allow": dec.Allow, "reason": dec.Reason}
 	if buf, mErr := json.Marshal(payload); mErr == nil {
 		fmt.Fprintf(stdout, "%s\n", buf)
