@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
 )
 
 // tomlKeyEscaper escapes the characters TOML basic strings prohibit

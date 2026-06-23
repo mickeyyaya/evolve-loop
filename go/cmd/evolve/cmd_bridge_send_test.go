@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
 )
 
 // cmd_bridge_send_test.go — tests `evolve bridge send`, the deterministic

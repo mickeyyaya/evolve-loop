@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // reviewer.go — the R9.2 capacity clamp at the orchestrator's per-phase

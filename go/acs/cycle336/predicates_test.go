@@ -61,8 +61,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/aggregator"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/aggregator"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 const aggregatorSrcRel = "go/internal/aggregator/aggregator.go"

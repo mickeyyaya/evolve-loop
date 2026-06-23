@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
-	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/doctor"
+	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
 
 // fixedNow is a deterministic clock for tests.

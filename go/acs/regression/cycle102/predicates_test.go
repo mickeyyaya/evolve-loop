@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // TestC102_001_ProfileMaxTurnsCeilings ports cycle-102/001.

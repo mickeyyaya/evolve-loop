@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/log"
+	"github.com/mickeyyaya/evolveloop/go/internal/log"
 )
 
 // schemaVersion is the on-disk format version of .evolve/verdict-cache.json.

@@ -11,7 +11,7 @@ package bridge
 import (
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
 )
 
 // ControllerFactory mints isolated, per-family clicontrol.Controllers. Each

@@ -145,7 +145,7 @@ func tailFile(path string, off int64) ([]string, int64) {
 	if err != nil {
 		return nil, off
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
 		return nil, off
 	}

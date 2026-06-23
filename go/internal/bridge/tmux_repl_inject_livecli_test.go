@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
 )
 
 // tmux_repl_inject_livecli_test.go — end-to-end proof of LIVE COMMAND

@@ -11,7 +11,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // TestSuccessorStrategy_Debugger pins the debugger resolution: the control seam

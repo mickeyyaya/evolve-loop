@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
+	"github.com/mickeyyaya/evolveloop/go/internal/textutil"
 )
 
 const (

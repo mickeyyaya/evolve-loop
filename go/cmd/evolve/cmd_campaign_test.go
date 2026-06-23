@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
 )
 
 func TestCampaignCycleFromWorkspace(t *testing.T) {

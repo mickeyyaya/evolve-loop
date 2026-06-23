@@ -3,10 +3,10 @@ package opscmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
+	"github.com/mickeyyaya/evolveloop/go/internal/releasepreflight"
 )
 
 // runReleasePreflight is `evolve release-preflight <target> [--dry-run]

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestReadActiveWorktree_PrefersRunJSON_OverGlobal pins ADR-0049 S3 / gap G3:

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // pathExists is a small helper; acsassert.FileExists logs an error on

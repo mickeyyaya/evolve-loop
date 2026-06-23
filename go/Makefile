@@ -16,9 +16,9 @@ VERSION  ?= dev
 COMMIT   := $(shell git -C .. rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILT_AT := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LDFLAGS  := -X github.com/mickeyyaya/evolve-loop/go/pkg/version.version=$(VERSION) \
-            -X github.com/mickeyyaya/evolve-loop/go/pkg/version.commit=$(COMMIT) \
-            -X github.com/mickeyyaya/evolve-loop/go/pkg/version.builtAt=$(BUILT_AT)
+LDFLAGS  := -X github.com/mickeyyaya/evolveloop/go/pkg/version.version=$(VERSION) \
+            -X github.com/mickeyyaya/evolveloop/go/pkg/version.commit=$(COMMIT) \
+            -X github.com/mickeyyaya/evolveloop/go/pkg/version.builtAt=$(BUILT_AT)
 
 DIST_DIR := $(BIN_DIR)/dist
 DIST_TARGETS := \

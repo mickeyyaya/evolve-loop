@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
-	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/research"
 )
 
 type coverageKB struct{}

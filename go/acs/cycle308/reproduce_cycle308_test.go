@@ -14,9 +14,9 @@ package cycle308
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
-	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
-	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
+	"github.com/mickeyyaya/evolveloop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolveloop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolveloop/go/internal/triagecap"
 )
 
 // TestCycle308_InboxReleaseAPIExists verifies that ReleaseCycleProcessing

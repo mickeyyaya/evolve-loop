@@ -3,9 +3,9 @@ package core
 import (
 	"context"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // Phase, the phase/verdict/cycle-outcome vocabulary, and IsVerdict are defined

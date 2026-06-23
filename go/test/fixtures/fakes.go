@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // Compile-time proof the fakes satisfy the core ports. If a port gains a

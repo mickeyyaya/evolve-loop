@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 func TestWriteRoutingContext_CLIHealthSection(t *testing.T) {

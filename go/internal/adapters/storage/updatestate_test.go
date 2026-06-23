@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // updatestate_test.go — CA.3 (concurrency-factory plan, Track C-A):

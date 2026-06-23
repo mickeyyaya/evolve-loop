@@ -10,7 +10,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // TestSuccessorStrategy pins the config read + degrade that the retro gate keys

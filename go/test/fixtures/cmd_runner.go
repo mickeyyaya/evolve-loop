@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // Compile-time proof FakeExec.Run satisfies the one command-execution seam.

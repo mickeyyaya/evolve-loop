@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
+	"github.com/mickeyyaya/evolveloop/go/internal/directives"
 )
 
 // directives_provider_test.go — the cycle-start runtime operator-directives hook:

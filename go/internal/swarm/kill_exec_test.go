@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
 )
 
 // ExecTmuxKill is the production TmuxKiller. These tests pin the 2026-06-11

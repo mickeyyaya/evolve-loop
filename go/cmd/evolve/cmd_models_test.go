@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
 )
 
 func runModelsCLI(args ...string) (int, string, string) {

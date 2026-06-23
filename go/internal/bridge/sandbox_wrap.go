@@ -22,8 +22,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
 )
 
 // probeOnce caches the (process-lifetime) sandbox.Probe() result so each

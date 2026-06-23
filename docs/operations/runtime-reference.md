@@ -177,9 +177,9 @@ being gated puts it there, a chicken-and-egg the auto-repair can't resolve, so i
 ```bash
 cd go
 HEAD_SHORT=$(git -C .. rev-parse --short=12 HEAD)
-LDF="-X github.com/mickeyyaya/evolve-loop/go/pkg/version.version=<VERSION> \
-     -X github.com/mickeyyaya/evolve-loop/go/pkg/version.commit=${HEAD_SHORT} \
-     -X github.com/mickeyyaya/evolve-loop/go/pkg/version.builtAt=<FIXED-UTC-TIMESTAMP>"
+LDF="-X github.com/mickeyyaya/evolveloop/go/pkg/version.version=<VERSION> \
+     -X github.com/mickeyyaya/evolveloop/go/pkg/version.commit=${HEAD_SHORT} \
+     -X github.com/mickeyyaya/evolveloop/go/pkg/version.builtAt=<FIXED-UTC-TIMESTAMP>"
 go build -trimpath -buildvcs=false -ldflags="$LDF" -o evolve ./cmd/evolve   # run twice → byte-identical
 ```
 

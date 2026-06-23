@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
 )
 
 // ADR-0050 §3.10 Slice 4: ship reads commit_message from the typed envelope at

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
 )
 
 // TestLaunchFn_InvokedWithFleetEnvForced names the fleet.LaunchFn func type

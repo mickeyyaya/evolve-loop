@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/campaign"
+	"github.com/mickeyyaya/evolveloop/go/internal/campaign"
 )
 
 func TestAmplificationVerifyRejectsCycleOverflowWithSingleWidthWaves(t *testing.T) {

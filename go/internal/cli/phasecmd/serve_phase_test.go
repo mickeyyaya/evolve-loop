@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/pkg/phaseproto"
 )
 
 // envelopeStdin builds an envelope-framed request line ready to feed

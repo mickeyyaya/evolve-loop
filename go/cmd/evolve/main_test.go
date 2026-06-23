@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolveloop/go/internal/looppreflight"
 )
 
 // TestMain disables the workspace-pollution guard for every test in this

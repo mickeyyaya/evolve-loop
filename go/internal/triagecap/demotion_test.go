@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // demotion_test.go — ADR-0046 Layer 2: identical-rejection demotion for the

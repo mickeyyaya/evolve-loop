@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
 )
 
 // hooks is the spec-driven runner.Hooks implementation. It holds the spec by

@@ -32,7 +32,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
 )
 
 // Event kinds: the closed vocabulary of injections the loop can fire.

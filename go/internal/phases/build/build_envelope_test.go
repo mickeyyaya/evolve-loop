@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestComposePrompt_BuildPlanEnvelope pins ADR-0050 Phase 3.7: the build phase's

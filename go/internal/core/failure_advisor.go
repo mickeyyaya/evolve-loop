@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 // Advisor pane-digest caps: the StopEvent tail is ~40 lines; keep the framed

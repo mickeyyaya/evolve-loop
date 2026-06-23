@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // phaseIOMismatch records one field where the assembled typed Upstream view

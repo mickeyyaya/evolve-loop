@@ -11,7 +11,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolveloop/go/internal/kerneltest"
 )
 
 func TestRegistry_DeclaresWriteAxisForSourceWriters(t *testing.T) {

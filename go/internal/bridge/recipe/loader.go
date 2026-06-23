@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/paths"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // recipes/*.json are the embedded recipe definitions, making the engine

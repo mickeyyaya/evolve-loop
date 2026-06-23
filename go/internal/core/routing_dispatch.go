@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/research"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/research"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {

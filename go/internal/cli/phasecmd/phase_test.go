@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
 )
 
 // stubPhase is a minimal PhaseRunner used to drive cmd_phase tests

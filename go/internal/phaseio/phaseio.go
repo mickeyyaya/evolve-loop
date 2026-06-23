@@ -15,7 +15,7 @@
 // shadow-equivalence harness proves them equivalent to the legacy path.
 package phaseio
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+import "github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 
 // ErrorContext is the typed error channel piped to a recovery phase (e.g.
 // debugger), replacing the ad-hoc ship_error_code/class/stage/debug entries

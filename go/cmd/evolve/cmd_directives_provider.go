@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/directives"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
 )
 
 // makeDirectivesProvider builds the runtime operator-directives provider — the

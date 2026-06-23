@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 )
 
 // TestDigest_CapsStripsNeutralizes pins the three Digest duties in one table:

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // WS3-S2 (ADR-0052): recordPhasePlan must hash-bind the WS3-S1 capture

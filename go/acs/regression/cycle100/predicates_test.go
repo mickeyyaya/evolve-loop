@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // TestC100_001_ObserverEnforceDefaultOn ports cycle-100/001.

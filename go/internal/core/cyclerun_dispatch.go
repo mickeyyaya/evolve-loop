@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolveloop/go/internal/backfill"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/guards/treediff"
 )
 
 // dispatch runs the per-phase runner lookup, the pre-phase cycle-state write +

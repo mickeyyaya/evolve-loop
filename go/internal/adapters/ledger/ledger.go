@@ -18,8 +18,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // ZeroSeed is the prev_hash value used by the very first ledger entry.

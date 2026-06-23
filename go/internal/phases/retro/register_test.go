@@ -3,8 +3,8 @@ package retro
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
 )
 
 // TestRetroSelfRegisters asserts the retro phase publishes its own factory to

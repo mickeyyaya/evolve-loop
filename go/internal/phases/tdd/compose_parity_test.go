@@ -14,8 +14,8 @@ package tdd
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
 )
 
 func TestComposePromptParity_WithWorktree(t *testing.T) {

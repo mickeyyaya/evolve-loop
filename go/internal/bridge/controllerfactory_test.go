@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
 )
 
 // TestControllerFactory_PerFamilyIsolation verifies the factory mints a

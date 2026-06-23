@@ -13,9 +13,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
+	"github.com/mickeyyaya/evolveloop/go/internal/llmroute"
 )
 
 func cliHealthEnabled(env map[string]string) bool {

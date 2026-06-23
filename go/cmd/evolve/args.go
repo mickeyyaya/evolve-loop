@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+import "github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
 
 // reorderArgs forwards to cmdutil.ReorderArgs — the implementation now lives in
 // the cmd/evolve/cmdutil leaf so the decomposed internal/cli/* command groups

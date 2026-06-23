@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 func TestFakeStorage_RoundTripsStateAndCycleState(t *testing.T) {

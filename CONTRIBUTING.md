@@ -5,7 +5,7 @@ Thanks for your interest in contributing! This guide covers how to add agents, m
 ## Getting Started
 
 ```bash
-git clone https://github.com/mickeyyaya/evolve-loop.git
+git clone https://github.com/mickeyyaya/evolveloop.git
 cd evolve-loop
 evolve install
 ```

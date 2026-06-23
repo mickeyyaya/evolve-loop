@@ -25,8 +25,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/gc"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
 
 // Pin is a user-authored hard dispatch pin for a phase: an exact CLI and/or

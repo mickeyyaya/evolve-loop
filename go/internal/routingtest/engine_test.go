@@ -3,7 +3,7 @@ package routingtest
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 func TestEngine_RunAllExecutesPureAndCycleSpecs(t *testing.T) {

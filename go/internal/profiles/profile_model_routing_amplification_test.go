@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
 
 func TestAllProfileDefaultTiersResolveForSwappableDrivers(t *testing.T) {

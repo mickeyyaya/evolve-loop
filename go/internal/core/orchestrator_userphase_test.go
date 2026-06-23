@@ -3,8 +3,8 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // userPhaseOrchestrator builds an orchestrator whose catalog carries three user

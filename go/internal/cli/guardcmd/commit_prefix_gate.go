@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
+	"github.com/mickeyyaya/evolveloop/go/internal/commitprefixgate"
 )
 
 // runCommitPrefixGate is `evolve commit-prefix-gate --msg "<msg>" [flags]`.

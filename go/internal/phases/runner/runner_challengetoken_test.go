@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // promptRecordingBridge captures the exact prompt the runner dispatches.

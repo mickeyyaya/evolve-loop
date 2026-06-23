@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
 )
 
 // DefaultTTL is the cache freshness window. 1h matches the bash

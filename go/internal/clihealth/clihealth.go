@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolve-loop/go/internal/log"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolveloop/go/internal/log"
 )
 
 // Entry is one benched CLI family.

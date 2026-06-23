@@ -17,8 +17,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
 )
 
 // Owner identifies the process that holds a campaign's ownership lease. PID,

@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 func storyRun(t *testing.T, root string, bridge core.Bridge, now time.Time) {

@@ -24,7 +24,7 @@ import (
 	// sbx is the single source of truth for nested-Claude detection + the
 	// inner-sandbox wrap policy, shared with the bridge launch path. Aliased
 	// because a local variable in Probe() is named `sandbox`.
-	sbx "github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	sbx "github.com/mickeyyaya/evolveloop/go/internal/adapters/sandbox"
 )
 
 // Profile is the JSON shape emitted to stdout / .evolve/environment.json.

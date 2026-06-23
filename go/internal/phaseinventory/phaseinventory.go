@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // DefaultTTL matches skillinventory's cadence.

@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
 )
 
 // CheckArtifactNames verifies that each persona's declared output-artifact

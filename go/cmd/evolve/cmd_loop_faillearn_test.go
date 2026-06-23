@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // seedLoopStateFile writes a minimal on-disk state.json (the file

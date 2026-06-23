@@ -3,8 +3,8 @@ package ship
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
 )
 
 // TestShipSelfRegisters asserts the ship phase publishes its own factory to the

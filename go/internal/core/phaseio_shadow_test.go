@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // TestComparePhaseIOShadow_EquivalentNoMismatch: the typed Upstream assembled

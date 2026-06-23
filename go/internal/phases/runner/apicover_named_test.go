@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestBaseRunner_TypeNamedAndRuns names the BaseRunner type (every phase's

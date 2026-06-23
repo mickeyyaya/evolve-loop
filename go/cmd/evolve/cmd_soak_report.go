@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/soakreport"
+	"github.com/mickeyyaya/evolveloop/go/internal/soakreport"
 )
 
 func runSoakReport(args []string, _ io.Reader, stdout, stderr io.Writer) int {

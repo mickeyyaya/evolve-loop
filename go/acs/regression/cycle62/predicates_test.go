@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // TestC62_049_PostmortemCycle61Shipped ports cycle-62/049.

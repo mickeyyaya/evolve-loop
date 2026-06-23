@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/campaign"
-	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolveloop/go/internal/campaign"
+	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
 )
 
 // TestCampaignRun_AutoResumeSkipsCompletedWaves drives the full cmd wiring

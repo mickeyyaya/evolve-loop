@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // minDocWords rejects bare "// Package x." stubs while accepting a genuine

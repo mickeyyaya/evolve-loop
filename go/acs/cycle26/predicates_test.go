@@ -61,10 +61,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/quotareset"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // removedFlags is the canonical list of 3 flags that cycle-26 removes:

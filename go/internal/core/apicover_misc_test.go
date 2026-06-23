@@ -31,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 // --- FailureAdvisor + FailureAdvisorOption --------------------------------

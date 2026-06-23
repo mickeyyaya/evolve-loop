@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // Query is the taxonomy-shaped lookup key. It mirrors core.Taxonomy

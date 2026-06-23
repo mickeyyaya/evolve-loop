@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
+	"github.com/mickeyyaya/evolveloop/go/internal/core/evidence"
 )
 
 // completion.go — the phase-completion Strategy (ADR-0027). runTmuxREPL used

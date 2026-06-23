@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
 )
 
 // fakeLauncher records launches, tracks max in-flight (for the cap test), and

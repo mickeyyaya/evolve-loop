@@ -303,7 +303,7 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = f.Write(append(b, '\n'))
 }
 

@@ -20,9 +20,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/pkg/phaseproto"
 )
 
 func RunServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

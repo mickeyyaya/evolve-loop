@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // Orchestrator phase-1 test surface — uses fake adapters to verify the

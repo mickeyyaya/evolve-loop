@@ -4,7 +4,7 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // resolveTier computes a CLI's capability tier from its manifest and a

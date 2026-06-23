@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
+	"github.com/mickeyyaya/evolveloop/go/internal/textutil"
 )
 
 // failingWriter induces a synthetic write error to exercise filterStream's

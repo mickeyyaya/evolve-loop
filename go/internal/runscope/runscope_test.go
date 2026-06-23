@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/projecthash"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolveloop/go/internal/projecthash"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
 )
 
 // TestResolveLane_DistinctRootsDistinctLanes is the multi-stream-bug precondition:

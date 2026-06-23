@@ -490,7 +490,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasestream"
 )
 
 type ProducerConfig struct {
@@ -706,7 +706,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
 )
 
 var (

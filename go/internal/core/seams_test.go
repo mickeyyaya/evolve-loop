@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // TestArchitectureSeams_FoundationsExist is a standing guard for ADR-0052

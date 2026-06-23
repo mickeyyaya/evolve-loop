@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	_ "github.com/mickeyyaya/evolveloop/go/internal/checkpoint"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // seedCycleStateFile creates <root>/.evolve/cycle-state.json with a minimal

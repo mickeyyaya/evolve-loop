@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/dossier"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // ── D2: dossier-recorder-d2 ────────────────────────────────────────────────

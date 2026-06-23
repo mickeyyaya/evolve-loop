@@ -1,6 +1,6 @@
 package phasecontract
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+import "github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 
 // Resolver resolves a deliverable Contract for a phase/agent name. It is the
 // seam that lets the deliverable verifier and the bridge prompt-injection serve

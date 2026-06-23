@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 func runWithProcessAlive(t *testing.T, alive bool) (events string, killCalls int) {

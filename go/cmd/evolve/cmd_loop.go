@@ -20,19 +20,19 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolveloop/go/internal/cyclebudget"
+	"github.com/mickeyyaya/evolveloop/go/internal/inboxmover"
 
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
 	// so the orchestrator writes a resumable checkpoint at every phase boundary.
 	// Without this the hook stays nil and the feature silently no-ops in production.
-	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
-	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
+	_ "github.com/mickeyyaya/evolveloop/go/internal/checkpoint"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolveloop/go/internal/cyclecost"
+	"github.com/mickeyyaya/evolveloop/go/internal/dispatchevents"
+	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolveloop/go/internal/ledgerverify"
 )
 
 // validStrategies mirrors the bash whitelist at

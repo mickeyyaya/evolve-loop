@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 func TestDeleteRemoteTagWith_NotPresent_DeletesLocalReturnsNotPresent(t *testing.T) {

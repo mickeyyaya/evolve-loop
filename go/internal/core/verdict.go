@@ -1,6 +1,6 @@
 package core
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+import "github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
 
 // maxReasonSummaryLen bounds the short human summary attached to a verdict. Long
 // enough for a one-line "why" (an audit defect list, an EGPS red_count), short

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
+	"github.com/mickeyyaya/evolveloop/go/internal/detectcli"
 )
 
 // runDetectCLI is the `evolve detect-cli` subcommand: ports

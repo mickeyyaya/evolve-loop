@@ -15,15 +15,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/campaign"
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseregistrar"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/campaign"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseregistrar"
+	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
 )
 
 const campaignUsage = `Usage:

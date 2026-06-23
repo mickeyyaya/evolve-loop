@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // secondCallErrRunner PASSes every invocation except its 2nd one, which

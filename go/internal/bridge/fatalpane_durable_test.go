@@ -11,8 +11,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 func recordedFatalOutcomes(t *testing.T, stage string, busy bool) []interaction.Outcome {

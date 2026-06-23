@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
 )
 
 // Result is the JSON-compatible summary version-bump prints to stdout.

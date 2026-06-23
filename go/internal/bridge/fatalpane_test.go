@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 func fatalEv(tail string, busy bool) StopEvent {

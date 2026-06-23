@@ -77,9 +77,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // workflowFlags is the canonical list of 5 flags that cycle-29 removes by

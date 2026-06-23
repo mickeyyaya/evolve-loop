@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // TestLegalGraph_ConfigMatchesLiteral: the config-built legality graph from the

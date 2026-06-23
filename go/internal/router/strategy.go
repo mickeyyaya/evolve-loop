@@ -1,6 +1,6 @@
 package router
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/config"
+import "github.com/mickeyyaya/evolveloop/go/internal/config"
 
 // RoutingStrategy is the routing brain (GoF Strategy). Both implementations
 // converge on the same pure Route() clamp floor — the kernel is always the floor.

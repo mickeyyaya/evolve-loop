@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
 )
 
 // checkCLIHealth surfaces ACTIVE CLI-family benches (.evolve/cli-health.json,

@@ -56,8 +56,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/subagent"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // the three production files that own the dynamic-compile extractors.

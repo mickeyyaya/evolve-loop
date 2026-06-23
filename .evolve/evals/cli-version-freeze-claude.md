@@ -46,7 +46,7 @@ Expected output contains `--- PASS:` for both tests and no `--- FAIL:`.
 cd go && go test ./internal/looppreflight/... -count=1 2>&1 | tail -1
 ```
 
-Expected output begins with `ok` for `github.com/mickeyyaya/evolve-loop/go/internal/looppreflight`.
+Expected output begins with `ok` for `github.com/mickeyyaya/evolveloop/go/internal/looppreflight`.
 
 ## Anti-gaming check
 

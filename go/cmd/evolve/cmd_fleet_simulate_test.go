@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseorder"
 )
 
 // TestSimulatePhases_CoversCanonicalOrder guards the no-LLM `-simulate` harness:

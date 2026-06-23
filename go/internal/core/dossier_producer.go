@@ -19,7 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolveloop/go/internal/dossier"
 )
 
 // dossierVerdict maps a cycle's terminal CycleOutcome to the dossier verdict

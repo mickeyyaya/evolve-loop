@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 )
 
 const tokenFixture = "67dffdcb2fb3ab46"

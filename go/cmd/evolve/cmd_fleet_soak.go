@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionreaper"
+	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
 )
 
 // soakLaunchFn is the DI seam for the fleet.LaunchFn used by the soak.

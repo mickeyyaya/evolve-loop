@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionreaper"
+	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
 )
 
 // minFreeDiskBytes is the low-disk warning threshold (500 MiB). Below this the

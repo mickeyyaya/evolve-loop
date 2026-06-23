@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
 
 // Resolve returns the effective system prompt for agent. profileDir is the

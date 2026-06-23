@@ -3,8 +3,8 @@ package evalgate
 import (
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/evalqualitycheck"
 )
 
 // qualityGate (Gate B) enforces that the selected slugs' eval predicates are

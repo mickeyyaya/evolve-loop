@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionreaper"
+	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
 )
 
 func runSwarm(args []string, _ io.Reader, stdout, stderr io.Writer) int {

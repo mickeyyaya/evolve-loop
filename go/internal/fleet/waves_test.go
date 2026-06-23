@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
 )
 
 // scopesOf reduces waves to [wave][spec][todo-id] for assertion.

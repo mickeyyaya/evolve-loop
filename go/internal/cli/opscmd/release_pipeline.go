@@ -3,12 +3,12 @@ package opscmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/releasepipeline"
+	"github.com/mickeyyaya/evolveloop/go/internal/releasepipeline"
 )
 
 // runReleasePipeline is `evolve release <target> [flags]` (alias: release-pipeline).

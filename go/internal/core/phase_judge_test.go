@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // TestJudgeVerdict_Fields names the JudgeVerdict type directly (public-API

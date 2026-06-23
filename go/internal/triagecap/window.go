@@ -3,7 +3,7 @@ package triagecap
 import (
 	"slices"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // seedK is the throughput assumed before any observation: the cycle-281 PASS

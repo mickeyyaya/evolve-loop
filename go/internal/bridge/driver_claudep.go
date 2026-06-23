@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // claudePDriver is the headless `claude -p` driver — the Go port of

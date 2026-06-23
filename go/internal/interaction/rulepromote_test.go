@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 // healthyCorpus is a small stand-in for the immutable operator-reviewed

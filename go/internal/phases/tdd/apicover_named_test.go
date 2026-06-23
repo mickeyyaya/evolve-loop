@@ -3,7 +3,7 @@ package tdd
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestPhase_NamesTDDAndSatisfiesRunner names the concrete tdd.Phase type (New

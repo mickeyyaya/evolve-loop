@@ -20,7 +20,7 @@ awk '/^func parseHint/,/^}/' ~/ai/claude/evolve-loop/go/internal/quotareset/quot
 ### AC3: All existing tests still pass [code]
 ```bash
 cd ~/ai/claude/evolve-loop/go && go test ./internal/quotareset/... -count=1 -v 2>&1 | tail -5
-# Expected: "ok  github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
+# Expected: "ok  github.com/mickeyyaya/evolveloop/go/internal/quotareset"
 ```
 
 ### AC4: Negative — per-call usage is gone [code]

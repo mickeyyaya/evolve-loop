@@ -3,8 +3,8 @@ package audit
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestNewDefaultWithStage_NamedPhase names the concrete audit.Phase type

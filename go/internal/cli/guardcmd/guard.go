@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolveloop/go/internal/guards"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/triagecap"
 )
 
 // guardLogTag maps the Go guard subcommand name to the audit-trail tag

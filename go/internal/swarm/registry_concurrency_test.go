@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // registry_concurrency_test.go — Phase 2 / S2.5 (modularization campaign,

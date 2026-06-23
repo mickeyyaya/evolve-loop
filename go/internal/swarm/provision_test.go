@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
 )
 
 // integBranchFor / workerBranchFor / cycleBranchFor are the runscope-derived

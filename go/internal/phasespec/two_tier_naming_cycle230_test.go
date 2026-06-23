@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // Cycle-230 companion tests to TestBugRepro_Cycle229_TwoTierNamingMissing

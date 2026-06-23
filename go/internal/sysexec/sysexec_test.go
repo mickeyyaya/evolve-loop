@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // DefaultRunner is exercised against real, ubiquitous shell commands — it is

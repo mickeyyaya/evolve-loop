@@ -3,8 +3,8 @@ package router
 import (
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // PhasePolicy is the single enablement-decision object (Fowler's "decision point
