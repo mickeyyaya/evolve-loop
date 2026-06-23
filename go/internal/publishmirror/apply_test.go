@@ -26,6 +26,27 @@ func TestTagSuffix(t *testing.T) {
 	}
 }
 
+func TestIsValidTag(t *testing.T) {
+	for _, ok := range []string{"v1.2.3", "v20.4.0", "release/2026", "a_b-c.1"} {
+		if !isValidTag(ok) {
+			t.Errorf("isValidTag(%q) = false, want true", ok)
+		}
+	}
+	for _, bad := range []string{"", "v1 --force", "../../heads/main", "-v1", "/v1", "v1/", "a..b", "tag;rm"} {
+		if isValidTag(bad) {
+			t.Errorf("isValidTag(%q) = true, want false", bad)
+		}
+	}
+}
+
+func TestRun_RejectsBadTag(t *testing.T) {
+	// Validation happens before any git, so no real repo is needed.
+	_, err := Run(context.Background(), Options{RepoDir: t.TempDir(), Remote: "/tmp/x", Tag: "v1 --force"})
+	if err == nil {
+		t.Fatal("a malformed --tag must be rejected (refspec injection guard)")
+	}
+}
+
 func TestRun_RejectsBareRemoteName(t *testing.T) {
 	// "origin" would resolve against the scratch worktree's inherited private
 	// remotes. Run must reject it before touching git.

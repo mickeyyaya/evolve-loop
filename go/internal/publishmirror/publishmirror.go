@@ -49,6 +49,8 @@ type Result struct {
 	PublicRef     string      // the pushed branch ref on the mirror ("main")
 	Tag           string      // the tag created/pushed, if any
 	Message       string      // the commit message used
+	Parent        string      // the mirror-main commit the new commit was appended onto ("" = first publish, parentless)
+	Commit        string      // the new commit SHA pushed to the mirror
 }
 
 // Run builds the public mirror snapshot from the private tree and, when
@@ -86,6 +88,9 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 	// unambiguous and can never be origin.
 	if !strings.ContainsAny(opts.Remote, "/:@") {
 		return nil, fmt.Errorf("--remote %q looks like a bare remote name; pass a URL or path so the push never resolves against the private repo's remotes", opts.Remote)
+	}
+	if opts.Tag != "" && !isValidTag(opts.Tag) {
+		return nil, fmt.Errorf("--tag %q is not a valid git tag name", opts.Tag)
 	}
 
 	repo := gitexec.Git{Dir: absRepo, Exec: opts.Exec}
@@ -177,27 +182,92 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 	res.Message = msg
-	if err := scratch.Run(ctx, "commit", "-m", msg); err != nil {
-		return res, fmt.Errorf("commit: %w", err)
+
+	// Append model: parent the new commit on the mirror's CURRENT main — a clean
+	// PUBLIC commit — not on the orphan branch and not on the private HEAD. This
+	// preserves public release history (a fast-forward, no force-push) while the
+	// private history still never travels: the parent chain is public and the
+	// tree is the sanitized snapshot. An empty mirror yields a parentless commit
+	// (the first publish). The orphan checkout above gave a clean full index;
+	// write-tree captures it and commit-tree sets the explicit public parent.
+	parent, err := mirrorMainSHA(ctx, scratch, opts.Remote)
+	if err != nil {
+		return res, err
 	}
-	if opts.Tag != "" {
-		if err := scratch.Run(ctx, "tag", opts.Tag); err != nil {
-			return res, fmt.Errorf("tag %s: %w", opts.Tag, err)
-		}
+	res.Parent = parent
+	tree, err := scratch.Output(ctx, "write-tree")
+	if err != nil {
+		return res, fmt.Errorf("write-tree: %w", err)
 	}
-	if err := scratch.Run(ctx, "push", opts.Remote, orphanBranch+":main"); err != nil {
+	ctArgs := []string{"commit-tree", strings.TrimSpace(tree), "-m", msg}
+	if parent != "" {
+		ctArgs = []string{"commit-tree", strings.TrimSpace(tree), "-p", parent, "-m", msg}
+	}
+	newCommit, err := scratch.Output(ctx, ctArgs...)
+	if err != nil {
+		return res, fmt.Errorf("commit-tree: %w", err)
+	}
+	res.Commit = strings.TrimSpace(newCommit)
+
+	if err := scratch.Run(ctx, "push", opts.Remote, res.Commit+":refs/heads/main"); err != nil {
 		return res, fmt.Errorf("push to mirror: %w", err)
 	}
 	res.Pushed = true
 	res.PublicRef = "main"
 	if opts.Tag != "" {
-		if err := scratch.Run(ctx, "push", opts.Remote, opts.Tag); err != nil {
+		if err := scratch.Run(ctx, "push", opts.Remote, res.Commit+":refs/tags/"+opts.Tag); err != nil {
 			return res, fmt.Errorf("push tag %s: %w", opts.Tag, err)
 		}
 		res.Tag = opts.Tag
 	}
-	logf("pushed %s -> %s main%s", short(commit), opts.Remote, tagSuffix(opts.Tag))
+	logf("appended %s onto %s main (parent %s)%s", short(res.Commit), opts.Remote, short(parent), tagSuffix(opts.Tag))
 	return res, nil
+}
+
+// isValidTag accepts only safe git tag names, preventing refspec injection when
+// --tag is concatenated into "refs/tags/<tag>" (e.g. a space + extra flags, or
+// ".." path traversal into another ref namespace).
+func isValidTag(t string) bool {
+	if t == "" || strings.HasPrefix(t, "-") || strings.HasPrefix(t, "/") ||
+		strings.HasSuffix(t, "/") || strings.Contains(t, "..") {
+		return false
+	}
+	for _, r := range t {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '.' || r == '_' || r == '-' || r == '/':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// mirrorMainSHA returns the mirror's current main commit (the append parent),
+// fetching it into the local object store so commit-tree can reference it. An
+// empty return means the mirror has no main yet — the first publish, which
+// produces a parentless commit.
+func mirrorMainSHA(ctx context.Context, g gitexec.Git, remote string) (string, error) {
+	out, _, code, err := g.Capture(ctx, "ls-remote", remote, "refs/heads/main")
+	if err != nil {
+		return "", fmt.Errorf("ls-remote %s: %w", remote, err)
+	}
+	if code != 0 {
+		// A transport/auth failure — NOT "no main". Surface it rather than
+		// silently producing a parentless (first-publish) commit.
+		return "", fmt.Errorf("ls-remote %s: exit %d", remote, code)
+	}
+	if strings.TrimSpace(out) == "" {
+		return "", nil // mirror has no main yet → first publish (parentless)
+	}
+	if err := g.Run(ctx, "fetch", "--no-tags", remote, "main"); err != nil {
+		return "", fmt.Errorf("fetch mirror main: %w", err)
+	}
+	sha, err := g.Output(ctx, "rev-parse", "FETCH_HEAD")
+	if err != nil {
+		return "", fmt.Errorf("rev-parse FETCH_HEAD: %w", err)
+	}
+	return strings.TrimSpace(sha), nil
 }
 
 // applyTransforms mutates the scratch tree in place: removes the chore(build)

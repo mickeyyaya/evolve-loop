@@ -174,6 +174,52 @@ func TestRun_Push_PublishesSquashedMirror(t *testing.T) {
 	}
 }
 
+func TestRun_Push_AppendsOntoExistingMain(t *testing.T) {
+	repo := setupPrivateRepo(t, false)
+	bare := bareRemote(t)
+	// Seed the mirror with an existing commit on main (a prior release).
+	seed := t.TempDir()
+	git(t, filepath.Dir(seed), "clone", "-q", bare, seed)
+	if err := os.WriteFile(filepath.Join(seed, "PRIOR.md"), []byte("prior release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, seed, "add", "-A")
+	git(t, seed, "commit", "-q", "-m", "prior release")
+	git(t, seed, "push", "-q", "origin", "HEAD:main")
+	priorSHA := strings.TrimSpace(git(t, seed, "rev-parse", "HEAD"))
+
+	res, err := Run(context.Background(), Options{
+		RepoDir: repo, Remote: bare, Push: true, Tag: "v2.0.0", Message: "Release v2.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Run append: %v", err)
+	}
+	if res.Parent != priorSHA {
+		t.Errorf("Parent=%q, want prior %q (should append, not orphan)", res.Parent, priorSHA)
+	}
+
+	clone := t.TempDir()
+	git(t, filepath.Dir(clone), "clone", "-q", bare, clone)
+	// History preserved: main now has 2 commits, the new one parenting on prior.
+	if n := strings.TrimSpace(git(t, clone, "rev-list", "--count", "HEAD")); n != "2" {
+		t.Errorf("mirror should have 2 commits after append, got %s", n)
+	}
+	if p := strings.TrimSpace(git(t, clone, "rev-parse", "HEAD^")); p != priorSHA {
+		t.Errorf("HEAD^ = %q, want prior %q", p, priorSHA)
+	}
+	// HEAD's tree is the new snapshot (README present, binary dropped); the prior
+	// file is gone from the latest tree but still reachable via the parent.
+	if _, err := os.Stat(filepath.Join(clone, "README.md")); err != nil {
+		t.Errorf("snapshot README.md missing from appended commit: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(clone, "go", "evolve")); !os.IsNotExist(err) {
+		t.Error("go/evolve must not be in the appended mirror commit")
+	}
+	if out := git(t, clone, "cat-file", "-t", priorSHA); strings.TrimSpace(out) != "commit" {
+		t.Errorf("prior commit %s should remain reachable in history", priorSHA)
+	}
+}
+
 func TestRun_Push_BadRemote_Errors(t *testing.T) {
 	repo := setupPrivateRepo(t, false)
 	// A clean tree (sanitizer passes) but an unreachable remote: the commit
