@@ -622,6 +622,8 @@ func runCommitPrefixGate(ctx context.Context, opts *Options, msg, repoDir string
 // EVOLVE_SHIP_RELEASE_NOTES is set. Best-effort: a missing gh CLI or a
 // non-zero exit logs WARN and continues (release may already exist).
 func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) error {
+	// SSOT IPC-protocol-allowed: releasepipeline -> ship subprocess (reader side;
+	// writer is releasepipeline.go). Not an operator dial.
 	notes := opts.envStr("EVOLVE_" + "SHIP_RELEASE_NOTES")
 	if notes == "" {
 		return nil

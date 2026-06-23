@@ -37,7 +37,12 @@ import "testing"
 // WORKTREE_ROOT, POLICY_BYPASS) → 35 -> 30.
 // flag-campaign-10 wave-2 INTEGRATION: 6 rows (SYSTEM_PROMPT, ACS_GO_TIMEOUT_S,
 // CLI_MAX_CONCURRENT_CODEX, KB_SEARCH_PATHS, PHASE_ROOTS, MODEL_CATALOG_DIR) → 30 -> 24.
-const FlagCeiling = 24
+// 2026-06-23 ADR-0064 Pillar 2 (S4a, envtaint fold-aware read-set): +1 completeness
+// for EVOLVE_LANE — a pre-existing operator-set worktree dial read via split-const
+// (runscope.go), invisible to the go/ast flagreaders scan and so previously
+// unregistered. The new fold-aware gate (R_go ⊆ registry) surfaces it; a row is
+// required for completeness. StatusInternal, so LiveFeatureFlagCeiling is unchanged.
+const FlagCeiling = 25
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //

@@ -279,6 +279,7 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 	if cfg.Resume {
 		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
 		// does not classify this parent-to-child handoff as a configurable flag.
+		// SSOT IPC-protocol-allowed
 		out["EVOLVE_"+"RESUME"] = "1"
 	}
 	// WS-G2: per-agent --cli / --model launch flags translate to
