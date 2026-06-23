@@ -1,10 +1,11 @@
 package phasespec
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and
@@ -70,34 +71,32 @@ func TestApplyArchetypeDefaults_NonEvaluateNoOp(t *testing.T) {
 	}
 }
 
-// TestRoots_DefaultAndOverride exercises both Roots branches: the unset-env
-// default (project-local .evolve/phases joined to projectRoot) and the
-// EVOLVE_PHASE_ROOTS override (relative entries joined, absolute entries kept).
+// TestRoots_DefaultAndOverride exercises RootsWithPolicy branches: the empty-cfg
+// default (project-local .evolve/phases joined to projectRoot) and an override
+// (relative entries joined, absolute entries kept, empty segments dropped).
 func TestRoots_DefaultAndOverride(t *testing.T) {
 	root := t.TempDir()
 
-	// Default: env unset → single default root joined to projectRoot.
-	os.Unsetenv(rootsEnv)
-	got := Roots(root)
+	// Default: empty PathsConfig → single default root joined to projectRoot.
+	got := RootsWithPolicy(root, policy.PathsConfig{})
 	wantDefault := filepath.Join(root, defaultRoot)
 	if len(got) != 1 || got[0] != wantDefault {
-		t.Fatalf("Roots(default) = %v, want [%s]", got, wantDefault)
+		t.Fatalf("RootsWithPolicy(default) = %v, want [%s]", got, wantDefault)
 	}
 
 	// Override: a relative entry is joined to projectRoot, an absolute entry is
 	// kept verbatim. Empty segments are dropped.
 	abs := filepath.Join(root, "abs-phases")
-	t.Setenv(rootsEnv, "custom/phases::"+abs)
-	got = Roots(root)
+	got = RootsWithPolicy(root, policy.PathsConfig{PhaseRoots: "custom/phases::" + abs})
 	wantRel := filepath.Join(root, "custom/phases")
 	if len(got) != 2 {
-		t.Fatalf("Roots(override) = %v, want 2 entries", got)
+		t.Fatalf("RootsWithPolicy(override) = %v, want 2 entries", got)
 	}
 	if got[0] != wantRel {
-		t.Errorf("Roots(override)[0] = %q, want %q", got[0], wantRel)
+		t.Errorf("RootsWithPolicy(override)[0] = %q, want %q", got[0], wantRel)
 	}
 	if got[1] != abs {
-		t.Errorf("Roots(override)[1] = %q, want %q (absolute kept verbatim)", got[1], abs)
+		t.Errorf("RootsWithPolicy(override)[1] = %q, want %q (absolute kept verbatim)", got[1], abs)
 	}
 }
 

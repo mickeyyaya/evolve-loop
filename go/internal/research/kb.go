@@ -2,8 +2,9 @@ package research
 
 import (
 	"context"
-	"os"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // Query is the taxonomy-shaped lookup key. It mirrors core.Taxonomy
@@ -61,11 +62,12 @@ func SplitSearchPaths(raw string) []string {
 	return roots
 }
 
-// SearchPathsFromEnv reads EVOLVE_KB_SEARCH_PATHS, falling back to the documented
-// default when unset/empty.
-func SearchPathsFromEnv() []string {
-	if v := os.Getenv("EVOLVE_KB_SEARCH_PATHS"); strings.TrimSpace(v) != "" {
-		return SplitSearchPaths(v)
+// SearchPathsFromEnv returns KB search paths from the policy config,
+// falling back to the documented default when cfg.KBSearchPaths is empty.
+// Replaced EVOLVE_KB_SEARCH_PATHS env read (cycle-17).
+func SearchPathsFromEnv(cfg policy.PathsConfig) []string {
+	if strings.TrimSpace(cfg.KBSearchPaths) != "" {
+		return SplitSearchPaths(cfg.KBSearchPaths)
 	}
 	return SplitSearchPaths(defaultSearchPaths)
 }

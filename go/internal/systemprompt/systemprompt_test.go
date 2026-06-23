@@ -81,3 +81,22 @@ func TestResolve_NothingSet(t *testing.T) {
 		t.Errorf("missing profile: got %q, want empty", got)
 	}
 }
+
+func TestResolve_ProcessEnvDoesNotOverrideProfile(t *testing.T) {
+	// After the envchain.ResolveNoOS migration, EVOLVE_SYSTEM_PROMPT in the
+	// process environment must NOT win over a profile-set system_prompt when
+	// reqEnv is nil. The 4-tier chain drops tier-2 (os.Getenv) for this key,
+	// becoming: reqEnv → profile → def.
+	//
+	// RED: current Resolve calls envchain.Resolve which includes os.Getenv tier
+	// → returns "from-process-env". Builder must switch to envchain.ResolveNoOS.
+	dir := t.TempDir()
+	writeProfile(t, dir, "build", `{"name":"build","system_prompt":"from-profile"}`)
+
+	t.Setenv("EVOLVE_SYSTEM_PROMPT", "from-process-env")
+
+	if got := Resolve("build", dir, nil); got != "from-profile" {
+		t.Errorf("got %q; want %q (process env must not override profile after ResolveNoOS migration)",
+			got, "from-profile")
+	}
+}

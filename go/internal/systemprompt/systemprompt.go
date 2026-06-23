@@ -26,7 +26,7 @@ func Resolve(agent, profileDir string, reqEnv map[string]string) string {
 			return v
 		}
 	}
-	return envchain.Resolve("EVOLVE_SYSTEM_PROMPT", reqEnv, def, "")
+	return envchain.ResolveNoOS(envchain.SystemPromptReqEnvKey, reqEnv, def, "")
 }
 
 // profileDefault reads the profile's system_prompt (or system_prompt_file,

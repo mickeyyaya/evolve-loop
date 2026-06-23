@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // catalog_overlay.go wires the live model catalog (internal/modelcatalog) into
@@ -20,14 +22,25 @@ import (
 // and a missing/empty catalog returns the manifest unchanged — so this is
 // byte-identical to pre-catalog behavior until a live catalog is written.
 
-// modelCatalogDir resolves the directory holding model-catalog.json.
-// EVOLVE_MODEL_CATALOG_DIR overrides (test seam); otherwise
-// <EVOLVE_PROJECT_ROOT|.>/.evolve.
-func modelCatalogDir() string {
-	if d := os.Getenv("EVOLVE_MODEL_CATALOG_DIR"); d != "" {
-		return d
+// modelCatalogDirFn resolves the directory holding model-catalog.json.
+// Reads BridgePolicy.CatalogDir from policy.json; falls back to the project's
+// .evolve directory. Replaced EVOLVE_MODEL_CATALOG_DIR env read (cycle-17).
+var modelCatalogDirFn = func() string {
+	layout := paths.ResolveFromEnv()
+	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
+	if err == nil {
+		if dir := pol.BridgeConfig().CatalogDir; dir != "" {
+			return dir
+		}
 	}
-	return filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve")
+	return layout.EvolveDir
+}
+
+// SetModelCatalogDirFn replaces the model-catalog directory resolver.
+// Called by cmd/evolve to inject the active cycle's evolve directory without
+// touching the process environment.
+func SetModelCatalogDirFn(fn func() string) {
+	modelCatalogDirFn = fn
 }
 
 // overlayManifestCatalog merges live catalog tier models over m.ModelTierMap.
@@ -53,7 +66,7 @@ var (
 )
 
 func loadCatalogCached() modelcatalog.Catalog {
-	dir := modelCatalogDir()
+	dir := modelCatalogDirFn()
 	fi, err := os.Stat(filepath.Join(dir, modelcatalog.FileName))
 
 	catalogMu.Lock()

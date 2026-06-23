@@ -23,7 +23,6 @@ func createFixtureProject(t *testing.T) string {
 		t.Fatal(err)
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
-	t.Setenv("EVOLVE_PHASE_ROOTS", "")
 	return root
 }
 
@@ -264,7 +263,13 @@ func TestPhasesCreate_RejectsRootOutsideProjectAndRoots(t *testing.T) {
 	}
 	// But a configured plugin root IS a valid target.
 	pluginRoot := t.TempDir()
-	t.Setenv("EVOLVE_PHASE_ROOTS", ".evolve/phases:"+pluginRoot)
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	polJSON := `{"paths":{"phase_roots":".evolve/phases:` + pluginRoot + `"}}`
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(polJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	code, out, errb := runCreate(t, validCreateSpec, "--spec", "-", "--root", pluginRoot)
 	if code != 0 {
 		t.Fatalf("configured root must be accepted; got %d (stderr=%q stdout=%q)", code, errb, out)

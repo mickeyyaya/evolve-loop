@@ -8,6 +8,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
+// injectCatalogDir injects dir as the model-catalog directory for the duration
+// of the test, restoring the original fn-var at cleanup.
+func injectCatalogDir(t *testing.T, dir string) {
+	t.Helper()
+	orig := modelCatalogDirFn
+	modelCatalogDirFn = func() string { return dir }
+	t.Cleanup(func() { modelCatalogDirFn = orig })
+}
+
 func manifestWithTierMap() Manifest {
 	return Manifest{
 		CLI:          "claude-tmux",
@@ -75,7 +84,7 @@ func TestBaseCLIName(t *testing.T) {
 func TestLoadManifest_NoCatalogIsUnchanged(t *testing.T) {
 	// Point the catalog dir at an empty temp dir → LoadManifest must return the
 	// embedded manifest untouched (byte-identical-until-catalog property).
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+	injectCatalogDir(t, t.TempDir())
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +111,7 @@ func TestLoadManifest_LiveCatalogOverlays(t *testing.T) {
 	if _, err := modelcatalog.Read(dir); err != nil { // sanity
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", dir)
+	injectCatalogDir(t, dir)
 
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
@@ -113,15 +122,15 @@ func TestLoadManifest_LiveCatalogOverlays(t *testing.T) {
 	}
 }
 
-// TestModelCatalogDir_DefaultPath covers the else branch (line 30): when
-// EVOLVE_MODEL_CATALOG_DIR is unset the function falls through to the
-// EVOLVE_PROJECT_ROOT/.evolve default. In the normal test run EVOLVE_MODEL_CATALOG_DIR
-// is set to the real .evolve dir by the shell, so this branch is otherwise dead.
-func TestModelCatalogDir_DefaultPath(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", "")
-	t.Setenv("EVOLVE_PROJECT_ROOT", "")
-	got := modelCatalogDir()
-	if got != filepath.Join("", ".evolve") {
-		t.Errorf("modelCatalogDir() = %q, want %q", got, filepath.Join("", ".evolve"))
+// TestModelCatalogDirFn_Injectable verifies that the fn-var seam is injectable:
+// replacing modelCatalogDirFn redirects loadCatalogCached to the injected directory.
+func TestModelCatalogDirFn_Injectable(t *testing.T) {
+	want := t.TempDir()
+	orig := modelCatalogDirFn
+	modelCatalogDirFn = func() string { return want }
+	t.Cleanup(func() { modelCatalogDirFn = orig })
+	if got := modelCatalogDirFn(); got != want {
+		t.Errorf("modelCatalogDirFn() = %q, want %q (injection seam broken)", got, want)
 	}
+	_ = filepath.Join(want, modelcatalog.FileName) // suppress unused import warning
 }

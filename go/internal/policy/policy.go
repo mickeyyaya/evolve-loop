@@ -136,6 +136,12 @@ type Policy struct {
 	// Recovery configures the ADR-0044 Unified Phase Recovery rollout stage.
 	// Absent ⇒ built-in default applies (PhaseRecovery="shadow" — behavior-neutral).
 	Recovery *RecoveryPolicy `json:"recovery,omitempty"`
+	// ACS configures the ACS Go lane timeout. Absent ⇒ built-in defaults apply
+	// (DefaultTimeout=60s). Replaces EVOLVE_ACS_GO_TIMEOUT_S env read.
+	ACS *ACSConfig `json:"acs,omitempty"`
+	// Paths configures path-discovery overrides. Absent ⇒ built-in defaults apply.
+	// Replaces EVOLVE_KB_SEARCH_PATHS and EVOLVE_PHASE_ROOTS env reads.
+	Paths *PathsConfig `json:"paths,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -933,4 +939,44 @@ func (p Policy) CatalogConfig() CatalogPolicy {
 		out.AutoRefresh = p.Catalog.AutoRefresh
 	}
 	return out
+}
+
+// ACSConfig configures the ACS Go lane timeout.
+// Loaded from .evolve/policy.json "acs" block; absent block ⇒ built-in
+// defaults apply (DefaultTimeout=60s). Replaces EVOLVE_ACS_GO_TIMEOUT_S env read.
+type ACSConfig struct {
+	// GoTimeoutS overrides the whole-Go-lane timeout in seconds. 0 = use DefaultTimeout.
+	GoTimeoutS int `json:"go_timeout_s,omitempty"`
+}
+
+// ACSTimeoutConfig returns the ACS timeout configuration.
+// An absent block returns ACSConfig{GoTimeoutS:0} — callers must treat 0 as
+// "use DefaultTimeout" to avoid a zero-duration timeout.
+func (p Policy) ACSTimeoutConfig() ACSConfig {
+	if p.ACS == nil {
+		return ACSConfig{}
+	}
+	return *p.ACS
+}
+
+// PathsConfig configures path-discovery overrides.
+// Loaded from .evolve/policy.json "paths" block; absent block ⇒ built-in
+// defaults apply. Replaces EVOLVE_KB_SEARCH_PATHS and EVOLVE_PHASE_ROOTS reads.
+type PathsConfig struct {
+	// KBSearchPaths is a colon-separated list of KB search roots.
+	// Empty ⇒ built-in default (knowledge-base/research/:.evolve/instincts/lessons/:docs/research/).
+	// Replaces EVOLVE_KB_SEARCH_PATHS.
+	KBSearchPaths string `json:"kb_search_paths,omitempty"`
+	// PhaseRoots is a colon-separated list of phase discovery roots.
+	// Empty ⇒ built-in default (.evolve/phases). Replaces EVOLVE_PHASE_ROOTS.
+	PhaseRoots string `json:"phase_roots,omitempty"`
+}
+
+// PathsConfig returns the paths configuration.
+// An absent block returns PathsConfig{} — callers fall back to built-in defaults.
+func (p Policy) PathsConfig() PathsConfig {
+	if p.Paths == nil {
+		return PathsConfig{}
+	}
+	return *p.Paths
 }

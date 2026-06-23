@@ -33,10 +33,10 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
-// EVOLVE_ACS_GO_TIMEOUT_S overrides it when a scope legitimately needs longer.
 const DefaultTimeout = 60 * time.Second
 
 // evidenceMax caps the captured output excerpt per predicate.
@@ -222,22 +222,17 @@ func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []stri
 	return string(out), err
 }
 
-// goLaneTimeout returns the whole-lane timeout: opts.GoTimeout when > 0, else
-// EVOLVE_ACS_GO_TIMEOUT_S (seconds) when set, else DefaultTimeout. The Go lane
+// goLaneTimeout returns the whole-lane timeout: optsTimeout when > 0, else
+// cfg.GoTimeoutS (seconds) when > 0, else DefaultTimeout. The Go lane
 // is bounded as a whole (via context cancellation in runGoTest) because Go
 // compiles per package; the current-cycle scope runs a single package, so one
 // DefaultTimeout is the right ceiling.
-func goLaneTimeout(optsTimeout time.Duration, envGet func(string) string) time.Duration {
+func goLaneTimeout(optsTimeout time.Duration, cfg policy.ACSConfig) time.Duration {
 	if optsTimeout > 0 {
 		return optsTimeout
 	}
-	if envGet == nil {
-		envGet = os.Getenv
-	}
-	if raw := envGet("EVOLVE_ACS_GO_TIMEOUT_S"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
-			return time.Duration(n) * time.Second
-		}
+	if cfg.GoTimeoutS > 0 {
+		return time.Duration(cfg.GoTimeoutS) * time.Second
 	}
 	return DefaultTimeout
 }
@@ -336,7 +331,8 @@ func runGoTest(opts Options) ([]Result, error) {
 	// committed worktree artifact, not main's stale copy (cycle-355 fix).
 	env := predicateEnv(opts.ProjectRoot, opts.Root, changed)
 
-	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, nil))
+	pol, _ := policy.Load(filepath.Join(opts.ProjectRoot, ".evolve", "policy.json"))
+	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, pol.ACSTimeoutConfig()))
 	defer cancel()
 
 	var all []Result

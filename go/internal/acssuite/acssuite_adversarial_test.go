@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // TestCycleNumFromDir_BoundaryAndInvalid — adversarial: exhaustive boundary
@@ -47,63 +49,37 @@ func TestCycleNumFromDir_BoundaryAndInvalid(t *testing.T) {
 	}
 }
 
-// TestGoLaneTimeout_AllBranches — adversarial: exercises the four branches of
-// goLaneTimeout (opts>0 wins, env-valid wins, env-invalid falls back,
-// nil-envGet falls back).
+// TestGoLaneTimeout_AllBranches — adversarial: exercises the three branches of
+// goLaneTimeout (opts>0 wins, cfg.GoTimeoutS>0 wins, zero cfg falls back).
 func TestGoLaneTimeout_AllBranches(t *testing.T) {
-	t.Run("opts > 0 wins over env and default", func(t *testing.T) {
-		env := func(string) string { return "3600" }
-		got := goLaneTimeout(15*time.Second, env)
+	t.Run("opts > 0 wins over cfg and default", func(t *testing.T) {
+		got := goLaneTimeout(15*time.Second, policy.ACSConfig{GoTimeoutS: 3600})
 		if got != 15*time.Second {
 			t.Errorf("opts must win; got %v", got)
 		}
 	})
-	t.Run("opts=0 env valid integer yields that duration", func(t *testing.T) {
-		env := func(k string) string {
-			if k == "EVOLVE_ACS_GO_TIMEOUT_S" {
-				return "30"
-			}
-			return ""
-		}
-		got := goLaneTimeout(0, env)
+	t.Run("opts=0 cfg.GoTimeoutS=30 yields 30s", func(t *testing.T) {
+		got := goLaneTimeout(0, policy.ACSConfig{GoTimeoutS: 30})
 		if got != 30*time.Second {
-			t.Errorf("env=30 must produce 30s; got %v", got)
+			t.Errorf("cfg=30 must produce 30s; got %v", got)
 		}
 	})
-	t.Run("opts=0 env non-integer falls back to DefaultTimeout", func(t *testing.T) {
-		env := func(k string) string {
-			if k == "EVOLVE_ACS_GO_TIMEOUT_S" {
-				return "notanumber"
-			}
-			return ""
-		}
-		got := goLaneTimeout(0, env)
+	t.Run("opts=0 cfg.GoTimeoutS=0 falls back to DefaultTimeout", func(t *testing.T) {
+		got := goLaneTimeout(0, policy.ACSConfig{GoTimeoutS: 0})
 		if got != DefaultTimeout {
-			t.Errorf("invalid env must fall back to DefaultTimeout; got %v", got)
+			t.Errorf("zero cfg must fall back to DefaultTimeout; got %v", got)
 		}
 	})
-	t.Run("opts=0 env=0 (not positive) falls back to DefaultTimeout", func(t *testing.T) {
-		env := func(k string) string {
-			if k == "EVOLVE_ACS_GO_TIMEOUT_S" {
-				return "0"
-			}
-			return ""
-		}
-		got := goLaneTimeout(0, env)
+	t.Run("opts=0 empty ACSConfig falls back to DefaultTimeout", func(t *testing.T) {
+		got := goLaneTimeout(0, policy.ACSConfig{})
 		if got != DefaultTimeout {
-			t.Errorf("env=0 is not positive, must fall back; got %v", got)
+			t.Errorf("empty ACSConfig must fall back to DefaultTimeout; got %v", got)
 		}
 	})
-	t.Run("opts=0 env empty string falls back to DefaultTimeout", func(t *testing.T) {
-		got := goLaneTimeout(0, func(string) string { return "" })
-		if got != DefaultTimeout {
-			t.Errorf("empty env must fall back; got %v", got)
-		}
-	})
-	t.Run("nil envGet falls back gracefully without panic", func(t *testing.T) {
-		got := goLaneTimeout(0, nil)
+	t.Run("empty ACSConfig returns positive DefaultTimeout (not zero/panic)", func(t *testing.T) {
+		got := goLaneTimeout(0, policy.ACSConfig{})
 		if got <= 0 {
-			t.Errorf("nil envGet must return positive duration; got %v", got)
+			t.Errorf("empty cfg must return positive DefaultTimeout; got %v", got)
 		}
 	})
 }
