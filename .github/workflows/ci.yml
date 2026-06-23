@@ -30,8 +30,28 @@ jobs:
       - name: Validate plugin structure
         run: go/bin/evolve install --ci
 
-      # No-orphan invariant: the bash→Go migration removed every .sh/.py; this
-      # fails the build if any reappears. Also enforced per-cycle by the EGPS
-      # acs gate (go/acs/regression/noorphan) — this runs it on every push/PR.
-      - name: No orphaned scripts (zero .sh/.py)
-        run: cd go && go test -tags acs ./acs/regression/noorphan/...
+  # Durable ACS regression gate. The `//go:build acs` predicates enforce flag-
+  # registry ceilings/readers/progress, doc-comment coverage, no-orphan-scripts
+  # (subsumes the former standalone noorphan step), and per-cycle source
+  # invariants. They previously ran ONLY in the per-cycle EGPS gate
+  # (internal/acssuite); this makes the artifact-free tier a standing push/PR
+  # gate. The recursive run also sweeps the ~3 artifact-dependent predicates
+  # (buildselfcheck, cycle57/80/99) — they t.Skip cleanly without a live cycle's
+  # .evolve/runs artifacts, so they stay green no-ops here. acs/redteam is
+  # intentionally excluded (needs a live ledger).
+  #
+  # fetch-depth:0 is REQUIRED: flagceiling/flagprogress diff the registry against
+  # git history (git show origin/main:.../registry_table.go); both fail-open
+  # (t.Skip) if the ref is unavailable, so the gate stays green regardless.
+  acs-durable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - name: ACS durable regression suite
+        run: cd go && go test -count=1 -tags acs ./acs/regression/...

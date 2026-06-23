@@ -59,7 +59,12 @@ jobs:
           go test -race -count=1 -tags integration -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
           go tool cover -func=coverage.txt
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
-        run: go test -count=1 -tags e2e ./cmd/... ./test/e2e/...
+        # `evolve_test_phases` is added alongside `e2e` so the serve-phase
+        # subprocess round-trip test (cmd/evolve/e2e_serve_phase_subprocess_test.go
+        # + echo_phase_testbuild.go) compiles and runs — it was previously
+        # orphaned (no workflow passed its tag). It registers a test-only "echo"
+        # phase into the phases registry; production builds never set the tag.
+        run: go test -count=1 -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
       - name: coverage gate (>=85% per internal/* package)
         run: |
           fail=0

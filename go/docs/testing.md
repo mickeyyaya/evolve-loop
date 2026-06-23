@@ -26,8 +26,10 @@ cost is how it's *selected*.
 |---|---|---|---|
 | **fast** (default) | _(none)_ | All co-located tests NOT tagged integration/e2e + `test/component`. Sub-10s. | `make test` |
 | **integration** | `//go:build integration` | Real FS / git / tmux subprocess tests + `test/integration`. | `make test-integration` |
-| **e2e** | `//go:build e2e` | Full-cycle subprocess paths (`cmd/evolve/e2e_*`) + `test/e2e`. Live sub-tier self-skips without `EVOLVE_E2E_LIVE`. | `make test-e2e` |
-| **everything** | both | Fast + integration + e2e (what CI runs). | `make test-all` |
+| **e2e** | `//go:build e2e` (+ `evolve_test_phases`) | Full-cycle subprocess paths (`cmd/evolve/e2e_*`) + `test/e2e`. Live sub-tier self-skips without `EVOLVE_E2E_LIVE`. CI passes `evolve_test_phases` alongside `e2e` so the serve-phase subprocess round-trip test (which registers a test-only `echo` phase into the phases registry) compiles + runs — it was previously orphaned (no runner passed its tag). | `make test-e2e` |
+| **durable-acs** | `//go:build acs` | Artifact-free ACS regression predicates under `acs/regression/...` — flag ceilings/readers/progress, doc-comment coverage, no-orphan-scripts, per-cycle source invariants. A standing push/PR gate (ci.yml `acs-durable` job, **`fetch-depth:0`** for the git-diffing flag predicates) that complements the per-cycle EGPS run (`internal/acssuite`). Artifact-dependent predicates (`buildselfcheck`, `cycle57/80/99`) `t.Skip` cleanly; `acs/redteam` is excluded (needs a live ledger). | `make test-acs-durable` |
+| **everything** | both | Fast + integration + e2e (what the `go.yml` matrix runs; **durable-acs** is its own `ci.yml` job). | `make test-all` |
+| **spike** (manual diagnostic) | `//go:build spike` | Live-LLM diagnostics (e.g. `TestSpikeAdvisorLive` — the real advisor on Opus). **Not in CI**: expensive (real quota) and never asserts failure — a developer probe, run on demand. | `go test ./cmd/evolve/ -tags spike -run TestSpikeAdvisorLive -v -timeout 300s` |
 
 A file's build tag must sit at the very top, followed by a blank line:
 
