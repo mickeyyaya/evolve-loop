@@ -10,7 +10,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
 )
 
 // cliController is the production Controller. resolve and capture are seams

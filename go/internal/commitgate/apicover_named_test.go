@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // apicover_named_test.go names + exercises the exported symbols that the

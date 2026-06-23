@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
 )
 
 // runBridgeControl implements `evolve bridge control <family> <event>` — the

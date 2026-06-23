@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
 )
 
 // paneScriptTmux is a scriptable fake whose CapturePane returns whatever the

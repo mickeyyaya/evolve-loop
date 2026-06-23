@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
-	"github.com/mickeyyaya/evolve-loop/go/internal/verifyeval"
+	"github.com/mickeyyaya/evolveloop/go/internal/evalqualitycheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/verifyeval"
 )
 
 // runEval implements `evolve eval <subcommand>`. Subcommands:

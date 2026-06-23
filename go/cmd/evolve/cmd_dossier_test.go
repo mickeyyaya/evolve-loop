@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolveloop/go/internal/dossier"
 )
 
 func writeDossierFloorPolicy(t *testing.T, root string) {

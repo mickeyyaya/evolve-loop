@@ -1,4 +1,4 @@
-module github.com/mickeyyaya/evolve-loop/go
+module github.com/mickeyyaya/evolveloop/go
 
 go 1.23
 

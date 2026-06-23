@@ -7,8 +7,8 @@
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
     "license": "MIT",
-    "repo": "github.com/mickeyyaya/evolve-loop",
-    "repoUrl": "https://github.com/mickeyyaya/evolve-loop"
+    "repo": "github.com/mickeyyaya/evolveloop",
+    "repoUrl": "https://github.com/mickeyyaya/evolveloop"
   },
   "hero": {
     "headline": "Ship the code your agent wrote — without reading the diff.",
@@ -22,8 +22,8 @@
       "CI/CD for AI-written code."
     ],
     "subhead": "Evolve Loop wraps your AI coder in a structured, self-healing pipeline: it plans the work, an independent reviewer challenges it, only safe changes merge — and every run makes the next one smarter.",
-    "ctaPrimary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
-    "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
+    "ctaPrimary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolveloop" },
+    "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolveloop" },
     "verdictAnimation": {
       "file": "pre-merge review",
       "checks": ["Intent met", "Tests green", "Independently reviewed", "No regressions"],
@@ -141,7 +141,7 @@
     "kicker": "Quick start",
     "heading": "Your first cycle is one command away.",
     "install": [
-      { "step": "Add the marketplace", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
+      { "step": "Add the marketplace", "command": "/plugin marketplace add mickeyyaya/evolveloop" },
       { "step": "Install the plugin", "command": "/plugin install evolve-loop@evolve-loop" },
       { "step": "Run a cycle", "command": "/evolve-loop --cycles 3 \"add dark mode\"" }
     ],
@@ -154,15 +154,15 @@
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
     "subhead": "Open source. MIT. Works with Claude, Gemini, and Codex.",
-    "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
-    "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" }
+    "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolveloop" },
+    "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolveloop#readme" }
   },
   "footer": {
     "links": [
-      { "label": "GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
-      { "label": "Docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" },
-      { "label": "Changelog", "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/CHANGELOG.md" },
-      { "label": "License — MIT", "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/LICENSE" }
+      { "label": "GitHub", "href": "https://github.com/mickeyyaya/evolveloop" },
+      { "label": "Docs", "href": "https://github.com/mickeyyaya/evolveloop#readme" },
+      { "label": "Changelog", "href": "https://github.com/mickeyyaya/evolveloop/blob/main/CHANGELOG.md" },
+      { "label": "License — MIT", "href": "https://github.com/mickeyyaya/evolveloop/blob/main/LICENSE" }
     ],
     "tagline": "CI/CD for AI-written code.",
     "grounding": "Grounded in reflective self-improvement and double-loop learning."

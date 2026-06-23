@@ -10,7 +10,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolveloop/go/internal/kerneltest"
 )
 
 // TestSpineNext_WalksCanonicalSpine asserts spineNext returns each phase's

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 var osExec = osexec.Command

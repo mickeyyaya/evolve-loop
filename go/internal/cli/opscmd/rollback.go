@@ -3,10 +3,10 @@ package opscmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/rollback"
+	"github.com/mickeyyaya/evolveloop/go/internal/rollback"
 )
 
 // runRollback is `evolve rollback <journal.json> [--reason "..."] [--dry-run]`.

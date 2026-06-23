@@ -5,7 +5,7 @@ package interaction_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 func answererFixture() *interaction.KernelAnswerer {

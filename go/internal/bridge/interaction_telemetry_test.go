@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 // readInteractionLedger parses <ws>/<phase>-interactions.ndjson.

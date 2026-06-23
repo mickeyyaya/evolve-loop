@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
+	"github.com/mickeyyaya/evolveloop/go/internal/logfilter"
 )
 
 func main() {

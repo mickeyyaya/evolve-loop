@@ -36,9 +36,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.version={{.Version}}
-      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.commit={{.ShortCommit}}
-      - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.builtAt={{.Date}}
+      - -X github.com/mickeyyaya/evolveloop/go/pkg/version.version={{.Version}}
+      - -X github.com/mickeyyaya/evolveloop/go/pkg/version.commit={{.ShortCommit}}
+      - -X github.com/mickeyyaya/evolveloop/go/pkg/version.builtAt={{.Date}}
 
 archives:
   - id: evolve

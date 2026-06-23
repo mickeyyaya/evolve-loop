@@ -13,8 +13,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolveloop/go/internal/skillcheck"
 )
 
 const (

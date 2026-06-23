@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // Component tier example. This wires the REAL filesystem storage adapter

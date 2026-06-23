@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
 )
 
 // TestEmitControl_Outcomes verifies the control command maps each Controller

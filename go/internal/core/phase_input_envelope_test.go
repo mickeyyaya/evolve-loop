@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
 )
 
 // TestReadUpstreamBuildPlan pins the dispatch-seam population rule for ADR-0050

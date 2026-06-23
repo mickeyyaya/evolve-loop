@@ -1,6 +1,6 @@
 package router
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+import "github.com/mickeyyaya/evolveloop/go/internal/phaseio"
 
 // AssembleHandoffs reads the completed phases' handoff artifacts (via Digest)
 // and projects the resulting RoutingSignals into a dependency-free

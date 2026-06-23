@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // makeRepo creates a fixture repo with all 4 markers at the given version.

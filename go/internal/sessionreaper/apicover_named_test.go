@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
 )
 
 func TestExportedAPIContract(t *testing.T) {

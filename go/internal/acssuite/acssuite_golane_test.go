@@ -25,7 +25,7 @@ func goLine(pkg, test, action string) string {
 // goStream joins event lines into an NDJSON blob.
 func goStream(lines ...string) string { return strings.Join(lines, "\n") + "\n" }
 
-const acsPkgBase = "github.com/mickeyyaya/evolve-loop/go/acs/"
+const acsPkgBase = "github.com/mickeyyaya/evolveloop/go/acs/"
 
 // seamGo returns a GoExec seam that yields the canned NDJSON + err for the
 // CURRENT-cycle scope (`./acs/cycle<N>`) and empty output for the regression /

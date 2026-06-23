@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasestream"
 )
 
 // writeReport seeds a workspace with an orchestrator-report.md.

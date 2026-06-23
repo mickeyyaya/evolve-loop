@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
-	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
+	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
 )
 
 // runPreflight is the `evolve preflight-environment [--write|--summary|--json]` subcommand.

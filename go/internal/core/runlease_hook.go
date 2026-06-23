@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
 )
 
 // runlease_hook.go — ADR-0049 G16: the per-run .lease PRODUCER.

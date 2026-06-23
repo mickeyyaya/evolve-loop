@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // gitRec is a recording sysexec.RunFunc for core's white-box git tests. core

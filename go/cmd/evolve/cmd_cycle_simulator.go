@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclesimulator"
+	"github.com/mickeyyaya/evolveloop/go/internal/cyclesimulator"
 )
 
 // runCycleSimulator is the `evolve cycle-simulator <cycle> <workspace>` subcommand.

@@ -3,8 +3,8 @@ package swarmrunner
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
 )
 
 // TestDecorator_NamedConcreteType names the concrete swarmrunner.Decorator type

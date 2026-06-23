@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
+	"github.com/mickeyyaya/evolveloop/go/internal/cli/phasecmd"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
 )
 
 // runPlanAndExecute implements `evolve plan-and-execute <phase>`. It is

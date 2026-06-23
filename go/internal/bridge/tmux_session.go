@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
 )
 
 // resolveSession returns the tmux session name and whether it is a stable

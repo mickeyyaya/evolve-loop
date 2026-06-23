@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/panestream"
 )
 
 // TestDecideAutoRespond_IdleGatesEscalateWhileBusy pins the ADR-0047 state-gate

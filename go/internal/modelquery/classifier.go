@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
 )
 
 // CLIClassifier maps raw model ids to canonical tiers by asking a working LLM

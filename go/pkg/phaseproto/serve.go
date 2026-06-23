@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // Handler is the subprocess-side function that processes one request

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // Cycle-230 test-amplification adversarial tests for task phase-naming-lint.

@@ -57,4 +57,4 @@ The 9 cross-CLI invariants and 12 Core Agent Rules in [AGENTS.md](AGENTS.md) app
 - Security: [SECURITY.md](SECURITY.md)
 - Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Issues: https://github.com/mickeyyaya/evolve-loop/issues
+- Issues: https://github.com/mickeyyaya/evolveloop/issues

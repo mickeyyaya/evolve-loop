@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 func TestResolvedShipFloor(t *testing.T) {

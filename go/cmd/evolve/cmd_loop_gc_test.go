@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolveloop/go/internal/gc"
 )
 
 const gcManifestName = "gc-shadow-manifest.json"

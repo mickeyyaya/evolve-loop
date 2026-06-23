@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolveloop/go/internal/failuregrade"
+	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 type phaseTimingEntry struct {

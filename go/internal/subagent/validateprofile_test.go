@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
-	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolveloop/go/internal/capability"
+	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
 )
 
 // happyOpts builds a Options blob that lets every step succeed against the

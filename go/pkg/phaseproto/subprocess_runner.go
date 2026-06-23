@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // Stable error codes used across the wire. Subprocess agents written in

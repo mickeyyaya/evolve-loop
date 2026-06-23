@@ -3,8 +3,8 @@ package routingtest
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestBricks_VariadicSlicesAreDefensivelyCopied pins the cycle-263 audit

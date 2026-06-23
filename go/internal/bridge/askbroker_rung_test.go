@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 // escalatePrompt is a manifest rule that escalates (no response keys) — the

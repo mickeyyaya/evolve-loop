@@ -69,10 +69,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/retro"
+	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // removedFlags lists the 2 env flags removed in cycle 46.

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
 )
 
 // injectCatalogDir injects dir as the model-catalog directory for the duration

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
 )
 
 func resolvedWithBenches(t *testing.T, entries []clihealth.Entry) resolved {

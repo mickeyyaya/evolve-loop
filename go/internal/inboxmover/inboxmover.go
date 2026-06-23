@@ -493,7 +493,7 @@ func writeLedger(opts Options, entry LedgerEntry) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = f.Write(body)
 	_, _ = f.Write([]byte("\n"))
 }

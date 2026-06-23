@@ -424,7 +424,7 @@ Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The r
 **Option A: Plugin (recommended)**
 
 ```bash
-/plugin marketplace add mickeyyaya/evolve-loop
+/plugin marketplace add mickeyyaya/evolveloop
 /plugin install evolve-loop@evolve-loop
 ```
 
@@ -433,7 +433,7 @@ Forensic report: [docs/incidents/cycle-61.md](docs/incidents/cycle-61.md). The r
 The `evolve` Go binary is the sole runtime entrypoint, so build it after installing the plugin:
 
 ```bash
-/plugin marketplace add mickeyyaya/evolve-loop
+/plugin marketplace add mickeyyaya/evolveloop
 /plugin install evolve-loop@evolve-loop
 cd go && make build   # produces ./go/bin/evolve
 ```
@@ -443,7 +443,7 @@ Set `EVOLVE_GO_BIN=$(pwd)/go/bin/evolve` (or drop the binary on `PATH`). The Go 
 **Option C: Manual**
 
 ```bash
-git clone https://github.com/mickeyyaya/evolve-loop.git
+git clone https://github.com/mickeyyaya/evolveloop.git
 cd evolve-loop
 evolve install
 ```
@@ -801,8 +801,8 @@ We treat framework-caught-its-own-bugs incidents (like cycle-61) as the most val
 ## License & Links
 
 - License: Apache-2.0 — see [LICENSE](LICENSE)
-- GitHub: [github.com/mickeyyaya/evolve-loop](https://github.com/mickeyyaya/evolve-loop)
-- Marketplace: `/plugin marketplace add mickeyyaya/evolve-loop`
+- GitHub: [github.com/mickeyyaya/evolveloop](https://github.com/mickeyyaya/evolveloop)
+- Marketplace: `/plugin marketplace add mickeyyaya/evolveloop`
 - CLAUDE.md (runtime contract): [CLAUDE.md](CLAUDE.md)
 - CHANGELOG: [CHANGELOG.md](CHANGELOG.md)
 

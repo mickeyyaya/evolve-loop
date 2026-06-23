@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 )
 
 func jsonKeys(t *testing.T, v any) map[string]struct{} {

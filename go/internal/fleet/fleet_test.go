@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
 )
 
 // TestSupervisor_Validate: a misconfigured supervisor (nil LaunchFn) is caught

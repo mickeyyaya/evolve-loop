@@ -3,7 +3,7 @@ package phasespec
 import (
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
 )
 
 // ApplyUserRouting splices validated user phases into the routing config so the

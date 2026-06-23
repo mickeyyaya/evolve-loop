@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
 )
 
 // readCLIFrame loads a committed real capture-pane fixture for the channel e2e.

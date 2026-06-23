@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // TestCycleLoop_PostScoutHookFiresOncePreBuild pins the WS2-S0 hook call site

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and

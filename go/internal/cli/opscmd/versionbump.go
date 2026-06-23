@@ -2,11 +2,11 @@ package opscmd
 
 import (
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
+	"github.com/mickeyyaya/evolveloop/go/internal/versionbump"
 )
 
 // runVersionBump is `evolve version-bump <target> [--dry-run]`.

@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 // TestAdvisorDispatch_FallsBackWhenFamilyBenched pins WS6-S2 (ADR-0052): when the

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/panestream"
 )
 
 // stopreview.go — Stage-0 of the self-healing review layer (the "vertical

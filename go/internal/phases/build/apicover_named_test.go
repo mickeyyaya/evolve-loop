@@ -3,7 +3,7 @@ package build
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestPhase_NamedConcreteRunner names the concrete build.Phase type (New returns

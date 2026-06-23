@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // divergedWorktree sets up the concurrency case: a cycle worktree branch created

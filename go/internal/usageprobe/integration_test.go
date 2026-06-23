@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
+	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolveloop/go/internal/usageprobe"
 )
 
 // TestProbeToDispatchDemotion is the end-to-end proof that the probe removes the

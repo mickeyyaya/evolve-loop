@@ -3,8 +3,8 @@ package router
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // TestClampPlanToFloor_PreservesMintPhases proves the clamp carries minted

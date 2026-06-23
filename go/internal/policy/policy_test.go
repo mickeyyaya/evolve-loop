@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
 
 func writePolicy(t *testing.T, dir, body string) string {

@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // phaseIOCfg is shadowCfg with the EVOLVE_PHASE_IO dial set independently of the

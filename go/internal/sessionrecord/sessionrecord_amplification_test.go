@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
 )
 
 func TestReadAllSkipsMalformedLinesAndPreservesValidRecords(t *testing.T) {

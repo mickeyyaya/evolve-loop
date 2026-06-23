@@ -23,8 +23,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/commitgate"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {

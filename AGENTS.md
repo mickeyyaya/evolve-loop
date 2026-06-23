@@ -133,5 +133,5 @@ Every coding change takes the laziest solution that actually works — the ladde
 - Security vulnerabilities: see [SECURITY.md](SECURITY.md)
 - Code of conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md)
-- Pipeline issues: GitHub Issues at https://github.com/mickeyyaya/evolve-loop/issues
+- Pipeline issues: GitHub Issues at https://github.com/mickeyyaya/evolveloop/issues
 - Architecture / release protocol: [docs/guides/publishing-releases.md](docs/guides/publishing-releases.md), [docs/architecture/tri-layer.md](docs/architecture/tri-layer.md)

@@ -20,10 +20,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/treestate"
 )
 
 // auditEntry is the subset of LedgerEntry fields ship cares about.

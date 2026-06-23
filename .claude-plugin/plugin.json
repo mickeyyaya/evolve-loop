@@ -5,8 +5,8 @@
   "author": {
     "name": "Dan Lee"
   },
-  "homepage": "https://github.com/mickeyyaya/evolve-loop",
-  "repository": "https://github.com/mickeyyaya/evolve-loop",
+  "homepage": "https://github.com/mickeyyaya/evolveloop",
+  "repository": "https://github.com/mickeyyaya/evolveloop",
   "license": "Apache-2.0",
   "compatibility": {
     "primary_cli": "claude-code",

@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // gitRunner is core's git-execution seam: every git invocation in this package

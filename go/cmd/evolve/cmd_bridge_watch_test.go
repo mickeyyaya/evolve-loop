@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
 )
 
 // cmd_bridge_watch_test.go — TDD tests for `evolve bridge watch`,

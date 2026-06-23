@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
 )
 
 // checkBridgeBoot (Halt) is the check that catches the cycle-258 failure: it

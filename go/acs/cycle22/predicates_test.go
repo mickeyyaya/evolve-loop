@@ -46,8 +46,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
 )
 
 // deadFlags is the canonical list of 9 dead EVOLVE_* flags that cycle-22 removes.

@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
-	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
+	"github.com/mickeyyaya/evolveloop/go/internal/paths"
+	"github.com/mickeyyaya/evolveloop/go/internal/setup"
 )
 
 // runSetup implements `evolve setup <subcommand>` — the deterministic core

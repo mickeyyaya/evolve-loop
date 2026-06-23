@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/capabilities"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/capabilities"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/recipe"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/pkg/version"
 )
 
 const bridgeUsage = `evolve bridge — native-Go multi-CLI agent bridge

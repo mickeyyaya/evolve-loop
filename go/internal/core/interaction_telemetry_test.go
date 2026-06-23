@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 // TestCorrectionRedispatch_RecordsInteractionOutcome — one reject→approve

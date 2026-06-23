@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolveloop/go/internal/codequality"
 )
 
 // selfCheckFailure is one changed package whose unit tests failed, with the

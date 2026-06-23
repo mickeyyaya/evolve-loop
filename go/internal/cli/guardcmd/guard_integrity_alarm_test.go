@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 func writeBuildCycleState(t *testing.T, evolveDir, worktree string) {

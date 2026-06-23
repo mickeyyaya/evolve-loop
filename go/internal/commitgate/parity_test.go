@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
 )
 
 // goldenAttestation is the byte-exact layout the ship-gate reader

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
-	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 )
 
 // TestE2E_UnknownPrompt_KernelAnswered_PhaseCompletes — the I3 happy path

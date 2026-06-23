@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 )
 
 // TestValidatePlan_RejectsMalformedAndRegressive pins WS2-S1 (ADR-0052, research

@@ -3,7 +3,7 @@ package guards
 import (
 	"context"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // Phase blocks the Agent tool when a cycle is in progress (cycle-state.json

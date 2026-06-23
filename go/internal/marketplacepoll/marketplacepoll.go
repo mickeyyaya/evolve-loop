@@ -28,7 +28,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
 )
 
 // Sentinel errors. The cmd layer maps these to bash exit codes.

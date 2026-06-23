@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 )
 
 // Layer 3 CLI: `evolve phase verify` — the agent-callable self-check. Same

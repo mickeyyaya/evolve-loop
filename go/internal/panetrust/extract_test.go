@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
 )
 
 // TestExtract_AllowlistedPatternsOnly — the privileged path gets typed values

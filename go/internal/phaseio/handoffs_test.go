@@ -153,7 +153,6 @@ func TestHandoffs_Sealed_NoMutationViaInitOrAccessor(t *testing.T) {
 	gen["k"] = "MUTATED"
 	gen["new"] = "X"
 	deg[0] = "MUTATED"
-	deg = append(deg, "miss-2")
 	skip[0] = "MUTATED"
 	bySev["HIGH"] = 999
 

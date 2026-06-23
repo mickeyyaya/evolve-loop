@@ -28,7 +28,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // --- verifySelfSHA: sha256File error on unreadable binary (verify.go:65) ---

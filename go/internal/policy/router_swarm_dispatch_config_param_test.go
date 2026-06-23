@@ -11,7 +11,7 @@ package policy_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 func TestRouterConfig_Resolution(t *testing.T) {

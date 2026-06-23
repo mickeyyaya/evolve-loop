@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
 )
 
 // TestGitWorktree_CreateUsesNamedBranch validates the production provisioner

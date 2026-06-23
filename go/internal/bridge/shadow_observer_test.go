@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
 )
 
 func TestShadowRule_RecordsWouldFireOnceSendsNothing(t *testing.T) {

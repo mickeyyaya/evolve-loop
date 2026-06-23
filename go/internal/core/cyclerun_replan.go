@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 // cyclerun_replan.go — the ADR-0052 WS2 post-scout re-plan.

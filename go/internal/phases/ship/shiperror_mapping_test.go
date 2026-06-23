@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestShipError_AuditBindingHeadMoved proves a HEAD-moved audit binding flows

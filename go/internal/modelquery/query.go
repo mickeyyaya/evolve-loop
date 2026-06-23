@@ -20,7 +20,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
 )
 
 // Lister enumerates the concrete model ids one CLI currently offers. Strategies

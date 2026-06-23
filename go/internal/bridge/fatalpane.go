@@ -32,9 +32,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
-	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
 )
 
 // recoveryStageFromEnv resolves the bridge-side ADR-0044 phase recovery stage.

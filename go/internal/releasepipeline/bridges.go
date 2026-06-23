@@ -5,13 +5,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
-	"github.com/mickeyyaya/evolve-loop/go/internal/log"
-	"github.com/mickeyyaya/evolve-loop/go/internal/marketplacepoll"
-	"github.com/mickeyyaya/evolve-loop/go/internal/releaseconsistency"
-	"github.com/mickeyyaya/evolve-loop/go/internal/releasepreflight"
-	"github.com/mickeyyaya/evolve-loop/go/internal/rollback"
-	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
+	"github.com/mickeyyaya/evolveloop/go/internal/changeloggen"
+	"github.com/mickeyyaya/evolveloop/go/internal/log"
+	"github.com/mickeyyaya/evolveloop/go/internal/marketplacepoll"
+	"github.com/mickeyyaya/evolveloop/go/internal/releaseconsistency"
+	"github.com/mickeyyaya/evolveloop/go/internal/releasepreflight"
+	"github.com/mickeyyaya/evolveloop/go/internal/rollback"
+	"github.com/mickeyyaya/evolveloop/go/internal/versionbump"
 )
 
 // runPreflightLib invokes the releasepreflight library directly (no shell-out

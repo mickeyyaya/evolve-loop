@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/aggregator"
-	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
-	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
+	"github.com/mickeyyaya/evolveloop/go/internal/aggregator"
+	"github.com/mickeyyaya/evolveloop/go/internal/capability"
+	"github.com/mickeyyaya/evolveloop/go/internal/fanoutdispatch"
 )
 
 // DispatchParallelRequest captures every input cmd_dispatch_parallel reads.

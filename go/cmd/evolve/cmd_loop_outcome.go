@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolveloop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolveloop/go/internal/gc"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 )
 
 type loopResult struct {

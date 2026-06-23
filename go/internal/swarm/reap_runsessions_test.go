@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
 )
 
 func writeRegistry(t *testing.T, dir string, sessions ...string) string {

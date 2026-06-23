@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
 )
 
 func writeFile(t *testing.T, path, content string) {

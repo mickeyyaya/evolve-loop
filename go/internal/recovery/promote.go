@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
 )
 
 // promotedConfidence is recorded in every promoted-signature file: below the

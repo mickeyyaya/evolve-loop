@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
-	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolveloop/go/internal/acsrunner"
+	"github.com/mickeyyaya/evolveloop/go/internal/acssuite"
 )
 
 // resolveACSSuiteRoot reads <evolveDir>/runs/cycle-<cycle>/cycle-state.json and

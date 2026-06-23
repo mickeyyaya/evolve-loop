@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
+	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
 )
 
 // TestReadOnDirectoryPathErrors pins that a read error OTHER than "file does

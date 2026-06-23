@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
 func runRouting(args []string, _ io.Reader, stdout, stderr io.Writer) int {

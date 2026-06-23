@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolveloop/go/internal/checkpoint"
+	"github.com/mickeyyaya/evolveloop/go/internal/core"
 )
 
 // TestCycleState_ConcurrentWriters_BothUpdatesSurvive is the G7 (ADR-0049)

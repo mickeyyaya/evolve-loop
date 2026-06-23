@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bedrock"
+	"github.com/mickeyyaya/evolveloop/go/internal/bedrock"
 )
 
 // runBedrock is the `evolve build-invocation-context <role>` subcommand.

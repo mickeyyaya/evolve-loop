@@ -9,14 +9,14 @@ import (
 // A minimal hand-written test2json stream: two packages, a package-level
 // summary each, a subtest that must be excluded, and a skip.
 const sample = `
-{"Action":"run","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow"}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow","Elapsed":12.5}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow/sub","Elapsed":12.4}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestFast","Elapsed":0.1}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Elapsed":12.7}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
-{"Action":"skip","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestSkipped","Elapsed":0}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.4}
+{"Action":"run","Package":"github.com/mickeyyaya/evolveloop/go/internal/bridge","Test":"TestSlow"}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/bridge","Test":"TestSlow","Elapsed":12.5}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/bridge","Test":"TestSlow/sub","Elapsed":12.4}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/bridge","Test":"TestFast","Elapsed":0.1}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/bridge","Elapsed":12.7}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
+{"Action":"skip","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Test":"TestSkipped","Elapsed":0}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Elapsed":0.4}
 not-json build noise
 `
 
@@ -101,9 +101,9 @@ func TestMarkdown_FlagsSlowPackagesAndTests(t *testing.T) {
 func TestParse_ToleratesMalformedJSONLine(t *testing.T) {
 	// Arrange: a valid event, a '{'-prefixed but broken line, another valid event.
 	const stream = `
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestA","Elapsed":0.2}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Test":"TestA","Elapsed":0.2}
 {"Action":"pass","Package": not-valid-json
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.5}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Elapsed":0.5}
 `
 	// Act
 	rep, err := Parse(strings.NewReader(stream))
@@ -169,8 +169,8 @@ func TestParse_ScannerError_Propagates(t *testing.T) {
 func TestMarkdown_NoSlowPackages_RendersNonePlaceholder(t *testing.T) {
 	// Arrange: a fast suite (budget package only, 0.4s wall < 5s threshold).
 	const fastOnly = `
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
-{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.4}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
+{"Action":"pass","Package":"github.com/mickeyyaya/evolveloop/go/internal/budget","Elapsed":0.4}
 `
 	rep, err := Parse(strings.NewReader(fastOnly))
 	if err != nil {

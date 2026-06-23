@@ -8,7 +8,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolveloop/go/internal/adapters/ledger"
 )
 
 // runLedger implements `evolve ledger <subcommand>`. Subcommands:
