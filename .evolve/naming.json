@@ -1,0 +1,35 @@
+{
+  "_comment": "Single source of truth for naming invariants left behind by a plugin/skill/repo rename. The legacynames acs gate (go/acs/regression/legacynames) AND `evolve release` preflight scan every tracked file for each forbidden[].token and BLOCK on a match; `evolve names fix` rewrites forbidden->replacement. When a rename leaves a dead token behind, add a row here — do NOT hand-write a new one-off gate. canonical{} documents what the names ARE now (intent); forbidden[] is the enforced part. exclude[] entries are git pathspecs, applied as ':!<entry>'.",
+  "canonical": {
+    "pluginNamespace": "evo",
+    "repoSlug": "mickeyyaya/evolve-loop",
+    "commandPrefix": "/evo:"
+  },
+  "forbidden": [
+    {
+      "token": "evolveloop",
+      "replacement": "evolve-loop",
+      "reason": "pre-#235 GitHub repo slug; returns 404 after the repo was renamed to evolve-loop"
+    },
+    {
+      "token": "evolve-loop@evolve-loop",
+      "replacement": "evo@evo",
+      "reason": "dead plugin install handle; the plugin/command namespace was renamed to evo on 2026-06-24"
+    },
+    {
+      "token": "(^|[^A-Za-z0-9._/-])/evolve-loop:",
+      "replacement": "$1/evo:",
+      "match": "regex",
+      "reason": "pre-evo slash-command namespace, e.g. /evolve-loop:loop; boundary-anchored so it ignores <repo>/evolve-loop:<ref> URLs"
+    }
+  ],
+  "exclude": [
+    "CHANGELOG.md",
+    "*/testdata/*",
+    "go/evolve",
+    "docs/operations/release-notes",
+    "*archived-*",
+    "*.golden",
+    ".evolve/naming.json"
+  ]
+}

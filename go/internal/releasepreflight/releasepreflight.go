@@ -36,6 +36,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
 // Sentinel errors. ErrCheckFailed maps to exit 1.
@@ -63,10 +65,11 @@ type Options struct {
 
 	// Seams.
 	Now              func() time.Time
-	GitClean         func(repoRoot string) (bool, error)       // step 1
-	CurrentBranch    func(repoRoot string) (string, error)     // step 2
-	GateTestRunner   func(repoRoot string, suite string) error // step 5
-	SimulationRunner func(repoRoot string) error               // advisory step (post-step-5)
+	GitClean         func(repoRoot string) (bool, error)                   // step 1
+	CurrentBranch    func(repoRoot string) (string, error)                 // step 2
+	GateTestRunner   func(repoRoot string, suite string) error             // step 5
+	NameGuard        func(repoRoot string) ([]naminguard.Violation, error) // step 5 sub-check
+	SimulationRunner func(repoRoot string) error                           // advisory step (post-step-5)
 }
 
 // Result captures what happened; populated even on failure for diagnostics.
@@ -188,6 +191,21 @@ func defaultGateTestRunner(repoRoot string, suite string) error {
 		return fmt.Errorf("go test %s: %w\n%s", suite, err, out)
 	}
 	return nil
+}
+
+// defaultNameGuard scans tracked files for dead naming tokens using the SSOT
+// manifest. It no-ops (no manifest → nothing to guard) so the preflight stays
+// green on repos that have not adopted .evolve/naming.json.
+func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
+	manifestPath := filepath.Join(repoRoot, naminguard.DefaultManifestPath)
+	if _, err := os.Stat(manifestPath); err != nil {
+		return nil, nil
+	}
+	m, err := naminguard.Load(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	return naminguard.Scan(repoRoot, m)
 }
 
 // stripBypassEnv returns env without the EVOLVE_BYPASS_* gate-bypass vars, so a
@@ -369,6 +387,27 @@ func Run(opts Options) (Result, error) {
 			res.GateTestsPassed++
 		}
 		logf("OK: all %d gate-test suites green", len(DefaultGateTestSuites))
+
+		// Step 5 sub-check: no dead naming tokens survive in tracked files.
+		// Shares the legacynames acs gate's scanner + SSOT (.evolve/naming.json),
+		// so a release can't ship a rename that left a 404 slug / dead command
+		// behind. No-ops when the repo has no manifest.
+		nameGuard := opts.NameGuard
+		if nameGuard == nil {
+			nameGuard = defaultNameGuard
+		}
+		logf("  scanning for dead naming tokens (.evolve/naming.json)...")
+		vs, err := nameGuard(opts.RepoRoot)
+		if err != nil {
+			return res, fmt.Errorf("%w: naming guard error: %v", ErrCheckFailed, err)
+		}
+		if len(vs) > 0 {
+			return res, fmt.Errorf("%w: %d dead naming token(s) in tracked files — run `evolve names fix`: %s",
+				ErrCheckFailed, len(vs), vs[0])
+		}
+		logf("OK: no dead naming tokens")
+		// Step 5 counts as passed only here — after BOTH the gate-test suites
+		// (above) and this naming scan come back clean.
 		res.StepsPassed++
 	}
 

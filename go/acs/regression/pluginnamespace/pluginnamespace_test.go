@@ -106,29 +106,12 @@ func TestManifests_NamespaceConsistent(t *testing.T) {
 	}
 }
 
-// TestNoDeadInstallToken locks the regression class a reviewer caught during
-// the rename: operator-facing install/upgrade instructions that still printed
-// the dead "<old>@<old>" plugin handle (a copy-paste yields a "plugin not
-// found" error post-rename). It must survive in no tracked text source.
-// CHANGELOG keeps verbatim history; golden testdata and the prebuilt go/evolve
-// binary (rebuilt at release) are excluded; git grep -I skips binary. The
-// search handle is assembled at runtime so this guard never matches itself.
-func TestNoDeadInstallToken(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	deadHandle := "evolve-loop" + "@" + "evolve-loop" // assembled — avoids a self-match
-	stdout, _, code, _ := acsassert.SubprocessOutput(
-		"git", "-C", root, "grep", "-I", "-n", deadHandle, "--",
-		":!CHANGELOG.md", ":!*/testdata/*", ":!go/evolve",
-	)
-	switch code {
-	case 0:
-		t.Errorf("dead install handle still present (run: git grep %q):\n%s", deadHandle, stdout)
-	case 1:
-		// no matches — the invariant holds
-	default:
-		t.Fatalf("git grep failed (code=%d)", code)
-	}
-}
+// The dead-install-handle guard ("<old>@<old>" plugin handle) moved to the
+// config-driven legacynames gate (acs/regression/legacynames): the handle is
+// forbidden-token entry #2 in .evolve/naming.json, so one scanner enforces it
+// instead of a hand-written test per token. This package keeps only the two
+// invariants legacynames cannot express as a forbidden substring: the manifest
+// `name` IS the namespace, and the two manifests must agree.
 
 // TestLoopSkill_DescribesEvoCommand catches a half-done rename where the
 // manifests flipped to evo but the canonical loop skill prose still advertises
