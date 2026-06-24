@@ -120,7 +120,7 @@
   .pld-alabel{font-family:var(--pl-mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--pl-ink)}
   .pld-astate{font-family:var(--pl-mono);font-size:.54rem;letter-spacing:.04em;text-transform:uppercase;color:var(--pl-mut);height:10px;text-align:center;max-width:96px}
 
-  .pld-railwrap{position:relative;flex:1 1 auto;display:flex;align-items:center;gap:7px;overflow-x:auto;overflow-y:visible;padding:0 4px 0 8px;scrollbar-width:none}
+  .pld-railwrap{position:relative;flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:7px;overflow-x:auto;overflow-y:visible;padding:0 4px 0 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .pld-railwrap::-webkit-scrollbar{display:none}
   .pld-rail{position:absolute;left:8px;right:4px;top:50%;height:2px;transform:translateY(-1px);background:repeating-linear-gradient(90deg,var(--pl-line2) 0 5px,transparent 5px 11px)}
   .pld-railfill{position:absolute;left:8px;top:50%;height:2px;width:0;transform:translateY(-1px);background:linear-gradient(90deg,var(--pl-floor),var(--pl-acc));box-shadow:0 0 12px var(--pl-acc-soft);transition:width .3s ease}
@@ -178,6 +178,8 @@
 
   /* readout: model routing + reasoning log */
   .pld-readout{display:grid;grid-template-columns:.82fr 1.18fr;gap:20px;margin-top:24px;padding-top:20px;border-top:1px solid var(--pl-line)}
+  /* let grid/flex tracks shrink below their content so nowrap log lines can't blow out the page */
+  .pld-routing,.pld-logwrap{min-width:0}
   .pld-vlabel,.pld-loghead{font-family:var(--pl-mono);font-size:.58rem;letter-spacing:.22em;text-transform:uppercase;color:var(--pl-mut);margin:0 0 12px}
   .pld-modelbar{display:flex;height:11px;border-radius:999px;overflow:hidden;border:1px solid var(--pl-line);background:color-mix(in srgb,var(--pl-ink) 6%,transparent)}
   .pld-modelbar i{display:block;height:100%;transition:width .55s cubic-bezier(.4,0,.2,1)}
@@ -222,7 +224,23 @@
   .pld-note{margin-left:auto;font-family:var(--pl-mono);font-size:.58rem;color:var(--pl-mut)}
   .pld-note code{color:var(--pl-floor)}
 
-  @media(max-width:720px){.pld-readout{grid-template-columns:1fr}.pld-note{margin-left:0;width:100%}}
+  @media(max-width:720px){
+    .pld-readout{grid-template-columns:1fr}
+    .pld-note{margin-left:0;width:100%}
+  }
+  /* phones: tighten the advisor + nodes for the rail, and let the log wrap so reasoning stays readable */
+  @media(max-width:560px){
+    .pld-stage{padding:16px 14px}
+    .pld-advisor{width:60px}
+    .pld-orb{width:36px;height:36px}
+    .pld-node{width:74px}
+    .pld-scope{margin-left:0}
+    .pld-log{height:auto;max-height:260px;overflow-y:auto}
+    .pld-logline{white-space:normal;align-items:flex-start}
+    .pld-logline .pl-ph{flex:0 0 86px}
+    .pld-logline .pl-lm{display:none}
+    .pld-logline .pl-why{white-space:normal;text-overflow:clip}
+  }
 
   /* respect reduced-motion: the JS already collapses its timings; silence the looping CSS too */
   @media(prefers-reduced-motion:reduce){

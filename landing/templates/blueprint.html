@@ -75,6 +75,8 @@
   @media(max-width:880px){.hero__schema{display:none}}
   .hero .wrap{position:relative; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center}
   @media(max-width:880px){.hero .wrap{grid-template-columns:1fr; gap:36px}}
+  /* let the hero shrink to the viewport instead of its content's min size (no mobile overflow/clip) */
+  .hero .wrap,.hero .wrap>*{min-width:0}
   .hero h1{font-family:var(--mono); font-weight:700; font-size:clamp(1.65rem,4.6vw,3.35rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); overflow-wrap:break-word}
   .hero h1 em{font-style:normal; color:var(--accent)}
   .hero .sub{margin-top:22px; max-width:46ch; color:var(--muted); font-size:clamp(1rem,1.4vw,1.12rem); line-height:1.62}
@@ -166,8 +168,8 @@
   .pillar .pp{color:var(--muted); font-size:.93rem; margin-top:13px; line-height:1.6}
 
   /* comparison — styled like a diff */
-  .difftable{margin-top:42px; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; background:var(--surface)}
-  table{width:100%; border-collapse:collapse; font-size:.92rem}
+  .difftable{margin-top:42px; border:1px solid var(--line-strong); border-radius:10px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; background:var(--surface)}
+  table{width:100%; border-collapse:collapse; font-size:.92rem; min-width:540px}
   thead th{font-family:var(--mono); font-size:.74rem; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); text-align:left; padding:13px 18px; border-bottom:1px solid var(--line-strong); background:var(--raised)}
   thead th:nth-child(2)::before{content:"- "; color:#f85149; font-weight:700}
   thead th:last-child{color:var(--ok)}

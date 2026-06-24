@@ -61,7 +61,7 @@
   .navlinks .ghbtn:hover{border-color:var(--accent); color:var(--accent-ink)}
 
   /* hero */
-  .hero{min-height:92vh; display:flex; align-items:center; padding:90px 0 70px; overflow:hidden}
+  .hero{position:relative; min-height:92vh; display:flex; align-items:center; padding:90px 0 70px; overflow:hidden}
   .hero::before{ /* spotlight */
     content:""; position:absolute; top:-30%; left:50%; transform:translateX(-50%);
     width:120vw; height:120vh;
@@ -71,6 +71,8 @@
   .hero__img{position:absolute; inset:0; background:url("{{.Assets}}/hero.png") center 38%/cover no-repeat; opacity:.34; mask-image:radial-gradient(60% 60% at 50% 42%, #000 30%, transparent 78%)}
   .hero .wrap{position:relative; z-index:2; display:grid; grid-template-columns:1.05fr .95fr; gap:54px; align-items:center}
   @media(max-width:880px){.hero .wrap{grid-template-columns:1fr; gap:40px}}
+  /* let the hero shrink to the viewport instead of its content's min size (no mobile overflow) */
+  .hero .wrap,.hero .wrap>*{min-width:0}
   .hero h1{font-family:var(--serif); font-weight:400; font-size:clamp(2.2rem,6.4vw,5rem); line-height:1.02; letter-spacing:-.018em; overflow-wrap:break-word}
   .hero h1 em{font-style:italic; color:var(--accent-ink)}
   .hero .sub{margin-top:24px; max-width:34ch; color:var(--muted); font-size:clamp(1rem,1.5vw,1.16rem); line-height:1.62}
@@ -134,7 +136,8 @@
   .pillar .pp{color:var(--muted); font-size:.95rem; margin-top:14px; line-height:1.6}
 
   /* comparison */
-  table{width:100%; border-collapse:collapse; margin-top:46px; font-size:.96rem}
+  .tablewrap{margin-top:46px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+  table{width:100%; border-collapse:collapse; font-size:.96rem; min-width:540px}
   thead th{font-family:var(--mono); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); text-align:left; padding:14px 18px; border-bottom:1px solid var(--line-strong)}
   thead th:last-child{color:var(--accent-ink)}
   tbody th{font-weight:500; color:var(--ink); text-align:left; padding:16px 18px; border-bottom:1px solid var(--line); white-space:nowrap}
@@ -152,7 +155,7 @@
   .step{display:flex; align-items:center; gap:18px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
   .step .si{font-family:var(--mono); color:var(--accent-ink); font-size:.85rem; width:22px; flex:0 0 auto}
   .step .sl{color:var(--muted); font-size:.9rem; width:150px; flex:0 0 auto}
-  .step code{font-family:var(--mono); color:var(--ink); font-size:.9rem; flex:1}
+  .step code{font-family:var(--mono); color:var(--ink); font-size:.9rem; flex:1; min-width:0; overflow-x:auto}
   @media(max-width:640px){.step{flex-wrap:wrap; gap:8px} .step .sl{width:auto}}
   .presets{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px}
   .preset{font-family:var(--mono); font-size:.8rem; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:7px 14px}
@@ -261,12 +264,14 @@
   <div class="wrap">
     <p class="kicker" data-reveal>{{.Site.Comparison.Kicker}}</p>
     <h2 data-reveal data-d="1">{{.Site.Comparison.Heading}}</h2>
-    <table data-reveal data-d="2">
-      <thead><tr>{{range .Site.Comparison.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
-      <tbody>
-        {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
-      </tbody>
-    </table>
+    <div class="tablewrap" data-reveal data-d="2">
+      <table>
+        <thead><tr>{{range .Site.Comparison.Columns}}<th>{{.}}</th>{{end}}</tr></thead>
+        <tbody>
+          {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
+        </tbody>
+      </table>
+    </div>
     <p class="note" data-reveal data-d="2">{{.Site.Comparison.Note}}</p>
   </div>
 </section>

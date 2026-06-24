@@ -112,6 +112,8 @@
     -webkit-mask-image:radial-gradient(75% 90% at 100% 30%, #000 8%, transparent 70%)}
   .hero .grid{position:relative; z-index:1; display:grid; grid-template-columns:1.06fr .94fr; gap:48px; align-items:center}
   @media(max-width:880px){.hero .grid{grid-template-columns:1fr; gap:34px}}
+  /* let the hero shrink to the viewport instead of its content's min size (no mobile overflow/clip) */
+  .hero .grid,.hero .grid>*{min-width:0}
   .hero h1{font-family:var(--display); font-weight:600; font-size:clamp(2.1rem,5.6vw,4.3rem); line-height:1.02; letter-spacing:-.03em; overflow-wrap:break-word}
   .hero h1 em{font-style:normal; color:var(--accent)}
   .hero .sub{margin-top:22px; max-width:38ch; color:var(--muted); font-size:clamp(1.02rem,1.5vw,1.18rem); line-height:1.6}
@@ -195,8 +197,8 @@
   .pillar .pp{color:var(--muted); font-size:.95rem; margin-top:14px; line-height:1.6}
 
   /* ---- comparison ---- */
-  .tablewrap{margin-top:40px; border-radius:20px; overflow:hidden; border:1px solid var(--glass-line); box-shadow:var(--shadow-soft)}
-  table{width:100%; border-collapse:collapse; font-size:.96rem; background:rgba(255,255,255,.42); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px)}
+  .tablewrap{margin-top:40px; border-radius:20px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; border:1px solid var(--glass-line); box-shadow:var(--shadow-soft)}
+  table{width:100%; border-collapse:collapse; font-size:.96rem; min-width:540px; background:rgba(255,255,255,.42); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px)}
   thead th{font-family:var(--mono); font-size:.78rem; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); text-align:left; padding:16px 20px; border-bottom:1px solid var(--glass-line-strong); background:rgba(255,255,255,.4)}
   thead th:last-child{color:var(--accent)}
   tbody th{font-weight:500; color:var(--ink); text-align:left; padding:16px 20px; border-bottom:1px solid var(--glass-line); white-space:nowrap}
