@@ -276,7 +276,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	effectiveMax := cfg.MaxCycles
 	if budgetStage == cyclebudget.Enforce && !cfg.MaxCyclesExplicit {
 		effectiveMax = wc.MaxCyclesCap
-		fmt.Fprintf(stderr, "[loop] cycle-budget=enforce: completion-driven, safety cap=%d (no explicit --max-cycles)\n", effectiveMax)
+		fmt.Fprintf(stderr, "[loop] no --cycles: advisor-decided, completion-driven (stops when the backlog drains), safety cap=%d\n", effectiveMax)
 	}
 
 	for i := 0; i < effectiveMax; i++ {
@@ -513,12 +513,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				ranCycle, consecutiveFails, maxConsecutiveFails)
 		}
 
-		// Cycle-budget completion: on a non-FAIL cycle, if the backlog the
-		// planning phases produced is drained (or the advisor judged the goal
-		// done), stop instead of burning cycles to the cap. A FAIL cycle is left
-		// to the consecutive-fail breaker; an unreadable state.json skips the
-		// check (never falsely "complete").
-		if budgetStage != cyclebudget.Off && result.FinalVerdict != core.VerdictFAIL {
+		// Cycle-budget completion: when the operator gave no explicit --cycles,
+		// the advisor decides — on a non-FAIL cycle, if the backlog the planning
+		// phases produced is drained (or the advisor judged the goal done), stop
+		// instead of burning cycles to the cap. An explicit --cycles N is a
+		// contract to run exactly N, so it is never early-stopped here. A FAIL
+		// cycle is left to the consecutive-fail breaker; an unreadable state.json
+		// skips the check (never falsely "complete").
+		if budgetStage != cyclebudget.Off && !cfg.MaxCyclesExplicit && result.FinalVerdict != core.VerdictFAIL {
 			if backlog, ok := readCarryoverCount(filepath.Join(cfg.EvolveDir, "state.json")); ok {
 				d := cyclebudget.Next(budgetStage, i+1, effectiveMax, backlog, false)
 				if d.Advisory {

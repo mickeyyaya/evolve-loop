@@ -599,8 +599,13 @@ type WorkflowConfig struct {
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
 func (p Policy) WorkflowConfig() WorkflowConfig {
 	c := WorkflowConfig{
-		MaxConsecutiveFails:   1,
-		MaxCyclesCap:          25,
+		MaxConsecutiveFails: 1,
+		MaxCyclesCap:        25,
+		// Cycle count is optional: with no explicit --cycles the advisor decides
+		// how many cycles the goal needs — completion-driven (stop when the
+		// backlog drains), bounded by MaxCyclesCap. Override with
+		// workflow.cycle_budget="off" in policy.json to restore a fixed count.
+		CycleBudget:           "enforce",
 		AutoPrune:             true,
 		BackfillEnabled:       true,
 		ConsensusAuditEnabled: true,
@@ -620,7 +625,9 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	if p.Workflow.BackfillEnabled != nil {
 		c.BackfillEnabled = *p.Workflow.BackfillEnabled
 	}
-	c.CycleBudget = p.Workflow.CycleBudget
+	if p.Workflow.CycleBudget != "" {
+		c.CycleBudget = p.Workflow.CycleBudget
+	}
 	c.AllowDeepResearch = p.Workflow.AllowDeepResearch
 	c.AllowDocDelete = p.Workflow.AllowDocDelete
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable

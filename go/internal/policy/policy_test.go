@@ -267,6 +267,20 @@ func TestWorkflowConfig(t *testing.T) {
 	if defaults.MaxConsecutiveFails != 1 || defaults.MaxCyclesCap != 25 || !defaults.AutoPrune {
 		t.Fatalf("WorkflowConfig() defaults = %+v, want max fails=1 max cycles=25 auto prune=true", defaults)
 	}
+
+	// Cycle count is optional: the default cycle budget is "enforce" so that a
+	// loop with no explicit --cycles is advisor-decided (completion-driven up to
+	// MaxCyclesCap). This holds whether the workflow block is empty or absent.
+	if defaults.CycleBudget != "enforce" {
+		t.Errorf("default CycleBudget = %q, want enforce (advisor decides when --cycles omitted)", defaults.CycleBudget)
+	}
+	if nilWF := (Policy{}).WorkflowConfig(); nilWF.CycleBudget != "enforce" {
+		t.Errorf("nil-workflow CycleBudget = %q, want enforce", nilWF.CycleBudget)
+	}
+	// An explicit policy.json value still overrides the default.
+	if off := (Policy{Workflow: &WorkflowPolicy{CycleBudget: "off"}}).WorkflowConfig(); off.CycleBudget != "off" {
+		t.Errorf("explicit CycleBudget=off was not honored, got %q", off.CycleBudget)
+	}
 }
 
 func TestGatesConfig(t *testing.T) {

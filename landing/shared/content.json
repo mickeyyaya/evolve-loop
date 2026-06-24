@@ -237,12 +237,13 @@
     "heading": "Your first cycle is one command away.",
     "install": [
       { "step": "Install (one line)", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
-      { "step": "Run a cycle", "command": "/evo:loop --cycles 3 \"add dark mode\"" }
+      { "step": "Run a goal — the advisor decides how many cycles", "command": "/evo:loop \"add dark mode\"" }
     ],
     "presets": [
-      { "label": "innovate", "command": "/evo:loop --cycles 5 innovate \"explore concurrency\"", "blurb": "new features" },
-      { "label": "harden", "command": "/evo:loop --cycles 5 harden", "blurb": "stability + tests" },
-      { "label": "repair", "command": "/evo:loop --cycles 3 repair \"fix auth bug\"", "blurb": "smallest-change bug fix" }
+      { "label": "innovate", "command": "/evo:loop innovate \"explore concurrency\"", "blurb": "new features" },
+      { "label": "harden", "command": "/evo:loop harden", "blurb": "stability + tests" },
+      { "label": "repair", "command": "/evo:loop repair \"fix auth bug\"", "blurb": "smallest-change bug fix" },
+      { "label": "pin cycles", "command": "/evo:loop --cycles 3 \"add dark mode\"", "blurb": "optional hard bound" }
     ]
   },
   "finalCta": {
