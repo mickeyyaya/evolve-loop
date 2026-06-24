@@ -22,7 +22,7 @@
       "CI/CD for AI-written code."
     ],
     "subhead": "Evolve Loop wraps your AI coder in a structured, self-healing pipeline: it plans the work, an independent reviewer challenges it, only safe changes merge — and every run makes the next one smarter.",
-    "ctaPrimary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
+    "ctaPrimary": { "label": "Get started", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
     "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
     "verdictAnimation": {
       "file": "pre-merge review",
@@ -141,8 +141,7 @@
     "kicker": "Quick start",
     "heading": "Your first cycle is one command away.",
     "install": [
-      { "step": "Add the marketplace", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
-      { "step": "Install the plugin", "command": "/plugin install evo@evo" },
+      { "step": "Install (one line)", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
       { "step": "Run a cycle", "command": "/evo:loop --cycles 3 \"add dark mode\"" }
     ],
     "presets": [
@@ -154,7 +153,7 @@
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
     "subhead": "Open source. Apache-2.0. Works with Claude, Gemini, and Codex.",
-    "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolve-loop" },
+    "primary": { "label": "Get started", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
     "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" }
   },
   "footer": {

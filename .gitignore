@@ -150,3 +150,6 @@ routing-plan.json
 
 # campaign run logs (per-run runtime artifact)
 campaign.log
+
+# goreleaser local snapshot output (release runs in CI)
+/dist/

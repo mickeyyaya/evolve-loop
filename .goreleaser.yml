@@ -42,11 +42,23 @@ builds:
 
 archives:
   - id: evolve
-    name_template: 'evolve_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    # Version-LESS name so install.sh can fetch a stable URL:
+    #   .../releases/latest/download/evolve_<os>_<arch>.tar.gz
+    name_template: 'evolve_{{ .Os }}_{{ .Arch }}'
     files:
       - LICENSE
       - README.md
       - CHANGELOG.md
+      # Skill payload bundled beside the binary so a downloaded `evolve` is
+      # self-contained: installer.Install + runSkillsPublish read these from
+      # disk (there is no go:embed). Mirrors what `evolve install` consumes.
+      - .claude-plugin/plugin.json
+      - .claude-plugin/marketplace.json
+      - 'agents/evolve-*.md'
+      - 'skills/**'
+      - docs/reference/genes.md
+      - docs/reference/instincts.md
+      - docs/reference/configuration.md
     formats: [ 'tar.gz' ]
     format_overrides:
       - goos: windows

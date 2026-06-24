@@ -22,13 +22,21 @@ type Version struct {
 	Template string // name of the {{define}} block to execute
 }
 
+// RootFile is a static file copied verbatim into the dist root, e.g. the
+// install.sh installer served at https://<pages>/install.sh.
+type RootFile struct {
+	Src string // path relative to the build working dir (landing/)
+	Dst string // path relative to OutDir
+}
+
 // Config controls a build.
 type Config struct {
 	ContentPath  string
 	TemplateGlob string
 	AssetsDir    string
 	OutDir       string
-	Gallery      string // gallery template name (optional)
+	Gallery      string     // gallery template name (optional)
+	RootFiles    []RootFile // static files copied to the dist root (optional)
 	Versions     []Version
 }
 
@@ -89,6 +97,14 @@ func Build(cfg Config) ([]string, error) {
 		if err := copyDir(cfg.AssetsDir, filepath.Join(cfg.OutDir, "assets")); err != nil {
 			return nil, fmt.Errorf("copy assets: %w", err)
 		}
+	}
+
+	for _, rf := range cfg.RootFiles {
+		dst := filepath.Join(cfg.OutDir, rf.Dst)
+		if err := copyFile(rf.Src, dst); err != nil {
+			return nil, fmt.Errorf("copy root file %s: %w", rf.Src, err)
+		}
+		written = append(written, dst)
 	}
 	return written, nil
 }
@@ -157,5 +173,7 @@ func copyFile(src, dst string) error {
 	if _, err := io.Copy(out, in); err != nil {
 		return err
 	}
-	return nil
+	// Close explicitly so a write-back/flush error (ENOSPC, NFS) surfaces — a
+	// truncated install.sh must fail the build, not deploy silently.
+	return out.Close()
 }

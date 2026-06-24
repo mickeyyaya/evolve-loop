@@ -14,15 +14,15 @@ It works with Claude Code, Gemini CLI, and Codex CLI — and can route a differe
 
 ## Quick Start
 
-**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Codex CLI](https://github.com/openai/codex) — plus `git`, `bash`, and `jq`, and a repo you want to improve.
+**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Codex CLI](https://github.com/openai/codex) — and a repo you want to improve. The installer auto-installs the rest (`git`, `jq`, `tmux`).
 
-**Install:**
+**Install — one line.** Detects your OS/arch, downloads the prebuilt `evolve` binary (or builds from source as a fallback), and installs evolve for the CLI(s) you have:
 
 ```bash
-/plugin marketplace add mickeyyaya/evolve-loop
-/plugin install evo@evo
-cd go && make build   # builds the evolve runtime binary
+curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
 ```
+
+Wary of `curl | sh`? Inspect first: `curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh -o install.sh && less install.sh && sh install.sh`. Already in Claude Code? You can instead add the plugin directly — `/plugin marketplace add mickeyyaya/evolve-loop` then `/plugin install evo@evo`.
 
 **Set up (optional but recommended):** `/setup` is an interactive flow that detects your installed CLIs, explains the pipeline, and proposes which model should run each phase. Skip it and the loop runs with sensible all-Claude defaults.
 
@@ -263,7 +263,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 - **License:** Apache-2.0 — see [LICENSE](LICENSE) (third-party notices in [NOTICE](NOTICE))
 - **GitHub:** [github.com/mickeyyaya/evolve-loop](https://github.com/mickeyyaya/evolve-loop)
-- **Marketplace:** `/plugin marketplace add mickeyyaya/evolve-loop`
+- **Install:** `curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh` — or `/plugin marketplace add mickeyyaya/evolve-loop` in Claude Code
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 The design draws on Reflexion (Shinn et al., 2023), double-loop learning (Argyris & Schön, 1978), the reward-hacking literature (Skalse et al., 2022; Weng, 2024), and the LLM-as-judge bias research that motivates multi-annotator and adversarial evaluation. Full bibliography: [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).
