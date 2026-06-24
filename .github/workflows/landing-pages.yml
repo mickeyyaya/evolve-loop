@@ -8,6 +8,7 @@ on:
     paths:
       - 'landing/**'
       - '.github/workflows/landing-pages.yml'
+      - 'install.sh'
   workflow_dispatch:
 
 permissions:
