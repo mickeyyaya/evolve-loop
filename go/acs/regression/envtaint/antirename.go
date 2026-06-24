@@ -24,6 +24,9 @@ import (
 var externalEnvAllowlist = map[string]bool{
 	// Standard external environment.
 	"CI": true, "HOME": true, "CODEX_HOME": true, "XDG_RUNTIME_DIR": true,
+	// GitHub-provided token: read by release-verify-binaries to authenticate the
+	// release-asset query (CI / rate limits). Standard external var, not a dial.
+	"GITHUB_TOKEN": true,
 	// Legacy-named internal IPC / subprocess handoffs (not operator dials).
 	"CYCLE": true, "SHIP_CLASS": true, "WORKSPACE_PATH": true, "WORKTREE_PATH": true,
 	"PROFILE_PATH": true, "PROMPT_FILE": true, "PROMPT_FILE_OVERRIDE": true, "MODEL_TIER_HINT": true,

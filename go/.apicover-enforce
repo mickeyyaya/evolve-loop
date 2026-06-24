@@ -360,3 +360,7 @@
 # leaf for EVOLVE_FLEET / EVOLVE_FLEET_SCOPE / EVOLVE_WORKTREE_ROOT — zero
 # intra-repo imports, no flagregistry row (protocol, not operator dial).
 ./internal/ipcenv
+
+# release-flow hardening (2026-06-24): releasetargets parses .goreleaser.yml (the
+# SSOT for the release matrix) for the release-verify-binaries gate.
+./internal/releasetargets

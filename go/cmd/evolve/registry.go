@@ -98,6 +98,7 @@ var commands = []subcommand{
 	{Name: "commit-prefix-gate", Summary: "Conventional-commits prefix check", Run: guardcmd.RunCommitPrefixGate},
 	{Name: "release-consistency", Summary: "Verify version markers", Run: opscmd.RunReleaseConsistency},
 	{Name: "release-verify-clis", Summary: "Verify the release installs + performs for every LLM CLI", Run: runReleaseVerifyCLIs},
+	{Name: "release-verify-binaries", Summary: "Verify every prebuilt binary + checksums is published on a release tag", Run: runReleaseVerifyBinaries},
 
 	// v12.1 utilities + composition.
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
