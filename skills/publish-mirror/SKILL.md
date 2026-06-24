@@ -39,7 +39,7 @@ the go-native command. It runs the release flow deterministically (implementatio
 ```bash
 /publish-mirror                          # dry-run: build + sanitize, never push
 /publish-mirror --push --tag v1.2.3      # publish a tagged release to the mirror
-/publish-mirror --public-readme PATH     # swap in a condensed public README
+/publish-mirror --public-readme PATH     # OPTIONAL override (private README is already the condensed public one)
 /publish-mirror --ref <commit>           # snapshot a specific commit (default HEAD)
 /publish-mirror --remote URL             # override the mirror URL (must be a URL/path, never a bare remote name)
 ```

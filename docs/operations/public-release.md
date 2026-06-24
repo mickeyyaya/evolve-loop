@@ -9,8 +9,8 @@ marketplace. This document is about the GitHub public repo.
 > complete** — the Apache relicense + PII scrub (PR #228) and the
 > `…/evolveloop/go` module rename (PR #229) have landed; see
 > [Convergence status](#convergence-status). The per-release transform is now
-> small (drop-binary, remove the `chore(build)` prefix, swap in the public README,
-> squash) and is automated by `evolve publish-mirror`.
+> small (drop-binary, remove the `chore(build)` prefix, squash) and is automated
+> by `evolve publish-mirror`. **v20.4.0 is published** (mirror commit `176a1808`).
 
 ---
 
@@ -18,7 +18,7 @@ marketplace. This document is about the GitHub public repo.
 
 | Repo | Role | History | Identity |
 |---|---|---|---|
-| `mickeyyaya/evolve-loop` (private) | **Source of truth.** All development, campaigns, dogfooding. | Full (2,200+ commits) | Apache-2.0; module `…/evolveloop/go`; PII-scrubbed; keeps the tracked `go/evolve` binary + the full detailed README |
+| `mickeyyaya/evolve-loop` (private) | **Source of truth.** All development, campaigns, dogfooding. | Full (2,200+ commits) | Apache-2.0; module `…/evolveloop/go`; PII-scrubbed; keeps the tracked `go/evolve` binary; README == the public condensed pitch |
 | `mickeyyaya/evolveloop` (public) | **Derived release mirror.** Never hand-edited. | Clean-slate; one squashed commit per release | Apache-2.0; module `…/evolveloop/go`; PII-scrubbed; no tracked binary |
 
 The public repo is a **derived snapshot** of the source of truth. You don't edit
@@ -77,7 +77,7 @@ rows are the only per-release transform left for `evolve publish-mirror` to appl
 |---|---|---|
 | Drop `go/evolve` binary + `go/bin/**` | Embeds DWARF source paths w/ username; users build from source | **active** (private keeps the tracked binary for self-deploy) |
 | Remove the `chore(build)` commit-prefix entry | Its required paths (`go/evolve`, `go/bin/**`) are gitignored in public → an un-satisfiable "dead prefix" | **active** |
-| Swap in the condensed public README | Public gets the developer pitch; private keeps the full detailed README | **active** (B1c — README adoption into private is an open decision; see below) |
+| Swap in the condensed public README | Was: public got the pitch, private kept the full README | ✅ **converged** (B1c — private adopted the condensed README; `--public-readme` now optional) |
 | Apache LICENSE + NOTICE + manifest `license` fields | Public is Apache-2.0 | ✅ **converged** (PR #228) |
 | PII scrub (`/Users/<user>`, personal email, `user@host` fixtures, dasherized `-Users-<user>-` paths) + `projecthash` golden fix | No personal data in public | ✅ **converged** (PR #228) |
 | Module path `…/evolve-loop/go` → `…/evolveloop/go` (884 files) | Public must be `go install`-able at its own URL | ✅ **converged** (PR #229) |
@@ -92,7 +92,7 @@ rows are the only per-release transform left for `evolve publish-mirror` to appl
 
 ## Convergence status
 
-Goal: shrink the per-release transform to drop-binary + remove-prefix (+ README)
+Goal (achieved): shrink the per-release transform to drop-binary + remove-prefix
 + squash, which `evolve publish-mirror` automates.
 
 - **B1 — Apache relicense + PII scrub:** ✅ **DONE** (PR #228, merge `02f3c0f4`).
@@ -107,13 +107,13 @@ Goal: shrink the per-release transform to drop-binary + remove-prefix (+ README)
   to the literal private repo (this file's topology row + the
   `publishing-releases.md` origin line). Done after the campaign branches landed,
   on a quiet `main`.
-- **B1c — public README adoption (OPEN decision):** NOT done. The private README
-  is the full detailed version; the public mirror uses a condensed pitch
-  (refined directly on the mirror, commit `a0614494`). Two paths: (a) adopt the
-  condensed README into private — one README, no transform, but the dev repo
-  loses its detailed front page; or (b) keep the private full README and have
-  `publish-mirror` swap in a stored public README. Until decided, the README
-  remains a per-release transform.
+- **B1c — public README adoption:** ✅ **DONE.** Private adopted the condensed
+  pitch README (was 7832 words → 3141), with a compact `## Version` section
+  grafted in (`Current (vX.Y)` + a one-row history table) so `versionbump` /
+  `release-consistency` keep working; full release detail lives in `CHANGELOG.md`
+  and `docs/`. Private README now == the public README, so the swap is gone:
+  `publish-mirror --push` ships private's README directly, and `--public-readme`
+  is only an optional override.
 
 ---
 
@@ -130,10 +130,10 @@ step (2) is now small.
 git worktree add --detach ../evolveloop-release <release-commit>
 cd ../evolveloop-release
 
-# 2. Apply the RESIDUAL transforms in this worktree. Relicense + PII scrub + the
-#    module rename are already in private `main` (converged), so only these
-#    remain: remove the chore(build) commit-prefix entry, and swap in the
-#    condensed public README. The binary drop happens in step 3 (git rm --cached).
+# 2. Apply the RESIDUAL transforms in this worktree. Relicense + PII scrub +
+#    module rename + README are all converged in private `main`, so only this
+#    remains: remove the chore(build) commit-prefix entry. The binary drop
+#    happens in step 3 (git rm --cached).
 
 # 3. Stage on an orphan branch, then EXPLICITLY drop the tracked binary.
 #    `git checkout --orphan` gives the branch no PARENT (history severed) but its
@@ -188,7 +188,7 @@ squash + push-by-URL + tag + verify.
 ```text
 evolve publish-mirror                       # dry-run: build + sanitize, never push
 evolve publish-mirror --push --tag v1.2.3   # publish a tagged release to the mirror
-evolve publish-mirror --public-readme PATH  # swap in the condensed public README (B1c)
+evolve publish-mirror --public-readme PATH  # OPTIONAL override (private README is already the condensed one)
 ```
 
 It is **dry-run by default** — without `--push` it builds and sanitizes the
@@ -209,11 +209,10 @@ belt-and-suspenders for the first publish after a large change.
 
 ---
 
-## First-release reconciliation note
+## First-release reconciliation note (resolved)
 
-The public repo already contains the initial release + a README refinement made
-directly on the mirror (2026-06-23, commit `a0614494`). With B1 (relicense + PII
-scrub) and B2 (rename) converged, the first formalized re-publish reproduces that
-state from private **except the README**: until the B1c decision lands,
-`publish-mirror` must swap in the condensed public README so the run does not
-clobber the refined mirror copy with the private full README.
+The first formalized re-publish (v20.4.0, mirror commit `176a1808`) **appended**
+onto the mirror's prior history (`a0614494`) — see the append model in
+[Automation](#automation-evolve-publish-mirror). B1c is resolved: private adopted
+the condensed README, so the published README now comes straight from private and
+no longer needs `--public-readme`.
