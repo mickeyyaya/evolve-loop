@@ -22,8 +22,11 @@ package pluginnamespace
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -142,5 +145,89 @@ func TestLoopSkill_DescribesEvoCommand(t *testing.T) {
 	want := "/" + wantNamespace + ":loop"
 	if !strings.Contains(string(raw), want) {
 		t.Errorf("skills/loop/SKILL.md does not advertise %q — half-done rename?", want)
+	}
+}
+
+// bareEvoSkillRefs returns every "bare" evo-command reference in skills/ docs: a
+// /<skill> slash-command token NOT namespaced as /evo:<skill>. The skill universe
+// is the skills/<name>/ directory names. Boundary chars are matched (RE2 has no
+// lookahead) so link paths (../release/), fs paths (docs/release-protocol), and
+// already-prefixed /evo:<skill> refs are NOT flagged. root is the repo root.
+func bareEvoSkillRefs(root string) ([]string, error) {
+	skillsDir := filepath.Join(root, "skills")
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return nil, fmt.Errorf("read skills/: %w", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, regexp.QuoteMeta(e.Name()))
+		}
+	}
+	if len(names) == 0 {
+		return nil, fmt.Errorf("no skills found under %s", skillsDir)
+	}
+	// Longest-first so a multi-word name matches before any shorter substring.
+	sort.Slice(names, func(i, j int) bool { return len(names[i]) > len(names[j]) })
+	re := regexp.MustCompile(`(^|[^:a-zA-Z0-9/._-])/(` + strings.Join(names, "|") + `)([^-/a-zA-Z0-9]|$)`)
+
+	var offenders []string
+	walkErr := filepath.WalkDir(skillsDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		for i, line := range strings.Split(string(raw), "\n") {
+			if re.MatchString(line) {
+				offenders = append(offenders, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+			}
+		}
+		return nil
+	})
+	return offenders, walkErr
+}
+
+// TestSkillRefsAreEvoNamespaced enforces that every evo-skill slash-command
+// reference in skills/ docs is /evo:<skill>, never bare /<skill> — the plugin's
+// command namespace is evo, so a bare /<skill> would not resolve at install.
+func TestSkillRefsAreEvoNamespaced(t *testing.T) {
+	offenders, err := bareEvoSkillRefs(acsassert.RepoRoot(t))
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Errorf("%d bare evo-command ref(s) — use /%s:<skill>, not bare /<skill>:\n  %s",
+			len(offenders), wantNamespace, strings.Join(offenders, "\n  "))
+	}
+}
+
+// TestBareEvoSkillRefDetection is the red-proof: against a fixture with a
+// namespaced /evo:demo, a bare /demo, and a path ../demo/, only the bare ref is
+// flagged. Proves the gate catches violations and is path-safe.
+func TestBareEvoSkillRefDetection(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "skills", "demo")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "ok: /evo:demo\nbad: /demo here\npath: see [x](../demo/SKILL.md)\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	offenders, err := bareEvoSkillRefs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(offenders) != 1 || !strings.Contains(offenders[0], "/demo here") {
+		t.Errorf("want exactly the bare /demo line flagged (not /evo:demo or the ../demo/ path), got: %v", offenders)
 	}
 }

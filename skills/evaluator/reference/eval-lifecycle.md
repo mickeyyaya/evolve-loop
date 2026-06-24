@@ -1,6 +1,6 @@
 # Evaluation Lifecycle — Self-Improving Evaluation
 
-> Reference for the `/evaluator` skill's self-improvement mechanisms. Based on EDDOps (arXiv:2411.13768) and metacognitive learning research.
+> Reference for the `/evo:evaluator` skill's self-improvement mechanisms. Based on EDDOps (arXiv:2411.13768) and metacognitive learning research.
 
 ## Contents
 - [4-Stage Lifecycle](#4-stage-lifecycle)

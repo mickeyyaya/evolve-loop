@@ -5,7 +5,7 @@ description: Reference doc.
 
 # Refactor Workflow — Detailed Phases
 
-> Read this file when executing the full /refactor pipeline. Covers Phases 1-5 with subagent prompts, isolation rules, and merge protocol.
+> Read this file when executing the full /evo:refactor pipeline. Covers Phases 1-5 with subagent prompts, isolation rules, and merge protocol.
 
 ## Phase Overview
 
@@ -211,7 +211,7 @@ Refactoring can create emergent work — extracting a method may reveal a new sm
 | Pass 2 | Fix emergent smells from Pass 1 | Re-scan detects new issues in changed files |
 | Pass 3 | Final cleanup pass | Re-scan still detects issues (rare) |
 
-After each pass, re-scan ONLY the files modified in that pass. If no new issues are detected, stop early. Never exceed 3 passes — remaining issues carry to next `/refactor` invocation.
+After each pass, re-scan ONLY the files modified in that pass. If no new issues are detected, stop early. Never exceed 3 passes — remaining issues carry to next `/evo:refactor` invocation.
 
 ### Subagent Execution Prompt Template
 

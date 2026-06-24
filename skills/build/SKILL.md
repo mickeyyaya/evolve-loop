@@ -58,7 +58,7 @@ This is **why Builder cannot fan-out** even though Scout and Auditor can.
 
 Invoked by:
 - `/evo:build`
-- `loop` macro after `/tdd`
+- `loop` macro after `/evo:tdd`
 
 ## Reference
 

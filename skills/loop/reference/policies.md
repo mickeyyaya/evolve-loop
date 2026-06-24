@@ -157,7 +157,7 @@ When rate limit detected:
 | Priority | Method | When | Command |
 |----------|--------|------|---------|
 | 1 | `/schedule` (remote trigger) | Reset window >= 1 hour | One-time trigger at next hour mark |
-| 2 | `/loop` (local retry) | Short limits, user present | `/loop 5m /evo:loop <remaining> <strategy> <goal>` |
+| 2 | `/evo:loop` (local retry) | Short limits, user present | `/evo:loop 5m /evo:loop <remaining> <strategy> <goal>` |
 | 3 | Manual resume (fallback) | Scheduling unavailable | Output resume command for user |
 
 ### Rate Limit vs Context Budget
@@ -166,7 +166,7 @@ When rate limit detected:
 |---------|---------------|------------|
 | Type | Internal quality | External hard wall |
 | Detection | Proactive (estimated) | Reactive (error-based) |
-| Recovery | User runs `/evo:loop` | **Auto-scheduled** via `/schedule` or `/loop` |
+| Recovery | User runs `/evo:loop` | **Auto-scheduled** via `/schedule` or `/evo:loop` |
 | Reset time | Immediate (new session) | Provider-dependent (minutes to hours) |
 
 ## Context Management

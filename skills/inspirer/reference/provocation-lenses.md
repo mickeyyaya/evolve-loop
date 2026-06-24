@@ -1,6 +1,6 @@
 # Provocation Lenses — Full Reference
 
-> Detailed descriptions, usage guidance, and domain affinity matrix for all 12 provocation lenses used by the `/inspirer` skill.
+> Detailed descriptions, usage guidance, and domain affinity matrix for all 12 provocation lenses used by the `/evo:inspirer` skill.
 
 ## Contents
 - [Lens Catalog](#lens-catalog)

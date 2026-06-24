@@ -3,7 +3,7 @@ name: golang-test-review
 description: Use when reviewing Go test code (new or changed *_test.go files, test harnesses, fixtures, or test tooling) for a Go-test-expert pass — behavior-over-surface, determinism, parallel-safety, build-tag correctness, and harness reuse. Complements the general code-reviewer with test-specific rigor.
 ---
 
-# /golang-test-review
+# /evo:golang-test-review
 
 A focused Go-test-engineering review. Run it over the changed `*_test.go` files
 (and any test harness / fixtures / test tooling) **after** writing tests and

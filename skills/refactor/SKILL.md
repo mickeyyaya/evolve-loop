@@ -4,7 +4,7 @@ description: Use when the user asks to refactor code, review code quality, or fi
 argument-hint: "[scan|fix|security|performance|review|auto|arch|complexity|health|diff|hotspots]"
 ---
 
-# /refactor — Full Refactoring Pipeline
+# /evo:refactor — Full Refactoring Pipeline
 
 > Orchestrate the complete refactoring workflow: detect smells, prioritize by weighted scoring, partition into independent groups, execute in parallel worktrees via subagents, merge and verify. Enhanced with cognitive complexity scoring, architecture analysis, and speed-optimized parallel scan pipelines.
 
@@ -76,18 +76,18 @@ The user can scope the refactoring with arguments:
 
 | Command | Behavior |
 |---------|----------|
-| `/refactor` | Full pipeline on current file or user-specified files |
-| `/refactor scan` | Phase 1 only — detect and report, no changes |
-| `/refactor fix <smell>` | Skip to Phase 3-4 for a specific known smell |
-| `/refactor security` | Security-focused scan using `security-patterns-code-review` |
-| `/refactor performance` | Performance-focused scan using `performance-anti-patterns` |
-| `/refactor review` | Full code review using `review-cheat-sheet` as guide |
-| `/refactor auto` | Force auto mode — plan, partition, execute in parallel, merge without confirmation |
-| `/refactor arch` | Architecture-only analysis — circular deps, boundaries, centrality |
-| `/refactor complexity` | Cognitive complexity report only — no fixes |
-| `/refactor health` | Composite health score per function — multi-metric scoring |
-| `/refactor diff` | Scan only files changed since last commit |
-| `/refactor hotspots` | Git-history analysis — find high-churn, high-smell files |
+| `/evo:refactor` | Full pipeline on current file or user-specified files |
+| `/evo:refactor scan` | Phase 1 only — detect and report, no changes |
+| `/evo:refactor fix <smell>` | Skip to Phase 3-4 for a specific known smell |
+| `/evo:refactor security` | Security-focused scan using `security-patterns-code-review` |
+| `/evo:refactor performance` | Performance-focused scan using `performance-anti-patterns` |
+| `/evo:refactor review` | Full code review using `review-cheat-sheet` as guide |
+| `/evo:refactor auto` | Force auto mode — plan, partition, execute in parallel, merge without confirmation |
+| `/evo:refactor arch` | Architecture-only analysis — circular deps, boundaries, centrality |
+| `/evo:refactor complexity` | Cognitive complexity report only — no fixes |
+| `/evo:refactor health` | Composite health score per function — multi-metric scoring |
+| `/evo:refactor diff` | Scan only files changed since last commit |
+| `/evo:refactor hotspots` | Git-history analysis — find high-churn, high-smell files |
 
 ## Cross-Reference Map
 

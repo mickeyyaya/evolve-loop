@@ -1,6 +1,6 @@
 # Scoring Dimensions — 6-Dimension Quality Rubric
 
-> Detailed scoring criteria for the `/evaluator` skill's 6 quality dimensions. Each dimension scored 0.0-1.0 with 5-point granularity.
+> Detailed scoring criteria for the `/evo:evaluator` skill's 6 quality dimensions. Each dimension scored 0.0-1.0 with 5-point granularity.
 
 ## Contents
 - [Dimension Definitions](#dimension-definitions)
