@@ -358,8 +358,7 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 			"EVOLVE_ROUTER_MODEL=opus",        // advisor at its deep production tier
 			"EVOLVE_MANDATORY_PHASES=scout",   // keep the cycle tiny; planner runs regardless
 		},
-		Timeout:   envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
-		BudgetUSD: 2.0,
+		Timeout: envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
 	})
 	if res.TransientExhausted {
 		t.Skipf("activation transient (quarantined):\n%s", lastN(res.Out, 600))
@@ -444,8 +443,7 @@ func TestE2ELiveAdvisorSelectsDesignPhase(t *testing.T) {
 			"EVOLVE_ROUTER_MODEL=opus",
 			"EVOLVE_MANDATORY_PHASES=scout",
 		},
-		Timeout:   envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
-		BudgetUSD: 2.0,
+		Timeout: envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
 	})
 	if res.TransientExhausted {
 		t.Skipf("design-selection transient (quarantined):\n%s", lastN(res.Out, 600))

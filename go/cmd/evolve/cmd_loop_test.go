@@ -188,29 +188,35 @@ func TestParseLoopArgs_DryRun(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_BudgetFlagsAreNoOps verifies the deprecated --budget-usd
-// flag is accepted but no longer drives behavior: it parses without error and
-// does NOT bump the cycle count (the former budget-mode 50-cycle default is
-// gone — cost is display-only telemetry now).
+// TestParseLoopArgs_BudgetFlagsAreNoOps verifies the removed --budget-usd flag
+// no longer drives behavior: a legacy invocation is stripped (not rejected), so
+// it parses without error and does NOT bump the cycle count (the former
+// budget-mode 50-cycle default is gone — cost is display-only telemetry now).
 func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &stderr)
 	if rc != 0 {
-		t.Fatalf("rc=%d, want 0 (--budget-usd must still be accepted)", rc)
+		t.Fatalf("rc=%d, want 0 (legacy --budget-usd must be stripped, not rejected)", rc)
 	}
 	if cfg.MaxCycles != 1 {
 		t.Errorf("MaxCycles=%d, want 1 (--budget-usd must not drive cycle count)", cfg.MaxCycles)
 	}
+	// The goal positional must survive the strip intact.
+	if cfg.GoalText != "fix bug" {
+		t.Errorf("GoalText=%q, want \"fix bug\" (strip must not eat the positional goal)", cfg.GoalText)
+	}
 }
 
-// TestParseLoopArgs_BudgetFlagWarnsDisabled verifies that --budget-usd emits a
-// visible disabled notice on stderr and that the flag's absence produces none.
-func TestParseLoopArgs_BudgetFlagWarnsDisabled(t *testing.T) {
+// TestParseLoopArgs_BudgetFlagWarnsRemoved verifies that a legacy --budget-usd
+// emits a visible "removed" notice on stderr pointing operators at --cycles, and
+// that the flag's absence produces no budget noise.
+func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
 	var withFlag bytes.Buffer
 	parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &withFlag)
 	got := withFlag.String()
-	if !strings.Contains(got, "--budget-usd") || !strings.Contains(strings.ToLower(got), "disabled") {
-		t.Errorf("expected a disabled/deprecation notice mentioning --budget-usd; stderr=%q", got)
+	low := strings.ToLower(got)
+	if !strings.Contains(got, "--budget-usd") || !strings.Contains(low, "removed") || !strings.Contains(got, "--cycles") {
+		t.Errorf("expected a removal notice mentioning --budget-usd and --cycles; stderr=%q", got)
 	}
 	// And no budget noise when the flag is absent.
 	var noFlag bytes.Buffer
