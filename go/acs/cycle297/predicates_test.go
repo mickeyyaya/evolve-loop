@@ -129,7 +129,7 @@ func runFreezeClaude(t *testing.T) string {
 // RED baseline: worktreeBase(".") returns (".evolve/worktrees", nil) — the
 // white-box test FAILs (no PASS line). GREEN requires the IsAbs(projectRoot)
 // guard in the default branch. The no-FAIL check is the anti-regression axis:
-// the existing TestWorktreeBase_EnvOverride/_DefaultPath/_RelativeEnvReturnsError
+// the existing TestWorktreeBase_AbsoluteOverride/_DefaultPath/_RelativeOverrideReturnsError
 // callers must stay green through the change.
 func TestC297_001_WorktreeBaseRefusesRelativeDefaultRoot(t *testing.T) {
 	out := runSwarmWorktreeBase(t)

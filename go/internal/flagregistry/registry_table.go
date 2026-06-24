@@ -32,5 +32,4 @@ var All = []Flag{
 	{Name: "EVOLVE_SANDBOX", Status: StatusActive, Cluster: "Sandbox Cluster", Doc: "Enable outer sandbox-exec/bwrap wrapper"},
 	{Name: "EVOLVE_STRICT_AUDIT", Status: StatusActive, Cluster: "Workflow Defaults", Doc: "WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate"},
 	{Name: "EVOLVE_USE_PHASE_REGISTRY", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "Set `0` to skip reading `phase-registry.json` (built-in defaults only)"},
-	{Name: "EVOLVE_WORKTREE_BASE", Status: StatusActive, Cluster: "Worktree / Workspace", Doc: "Per-cycle worktree base path"},
 }

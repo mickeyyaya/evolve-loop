@@ -401,11 +401,9 @@ func TestGitAndFileHelperCoverage(t *testing.T) {
 	}
 
 	base := t.TempDir()
-	t.Setenv("EVOLVE_WORKTREE_BASE", base)
-	if got := (gitWorktree{}).base("/tmp/project"); got != base {
-		t.Fatalf("worktree env base=%q want %q", got, base)
+	if got := (gitWorktree{baseOverride: base}).base("/tmp/project"); got != base {
+		t.Fatalf("worktree base override=%q want %q", got, base)
 	}
-	t.Setenv("EVOLVE_WORKTREE_BASE", "")
 	if got := (gitWorktree{}).base("/tmp/project"); !strings.HasSuffix(got, filepath.Join(".evolve", "worktrees")) {
 		t.Fatalf("worktree default base=%q", got)
 	}

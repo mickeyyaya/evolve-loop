@@ -403,6 +403,20 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 	}
 }
 
+// WithWorktreeBase injects the operator worktree-base override, resolved once
+// from policy.json (worktree.base) at the composition root. Empty ⇒ no override
+// (the gitWorktree default <root>/.evolve/worktrees stands). Replaces the former
+// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064). Mutually exclusive
+// with WithWorktreeProvisioner (both set o.worktree); production uses only this
+// one, tests use only the fake — never both.
+func WithWorktreeBase(base string) Option {
+	return func(o *Orchestrator) {
+		if base != "" {
+			o.worktree = gitWorktree{baseOverride: base}
+		}
+	}
+}
+
 // WithObserver injects a per-phase stall detector (cycle-122 Fix 3 / ADR-0030).
 // The orchestrator calls observer.Start(...) before each phase's runner.Run
 // and the returned cancel after — running a background watcher that emits

@@ -208,14 +208,13 @@ func TestProbe_OperatorWorktreeBaseOverride(t *testing.T) {
 	root := t.TempDir()
 	override := t.TempDir()
 	p := Probe(Options{
-		ProjectRoot: root,
-		OSType:      "darwin",
-		Env: stubEnv(map[string]string{
-			"HOME": root, "EVOLVE_WORKTREE_BASE": override,
-		}),
-		LookPath: stubLookPath(nil),
-		Now:      fixedNow(),
-		IsNested: func() bool { return false },
+		ProjectRoot:  root,
+		OSType:       "darwin",
+		WorktreeBase: override,
+		Env:          stubEnv(map[string]string{"HOME": root}),
+		LookPath:     stubLookPath(nil),
+		Now:          fixedNow(),
+		IsNested:     func() bool { return false },
 	})
 	if p.AutoConfig.WorktreeBase != override {
 		t.Errorf("operator override should win; got %q", p.AutoConfig.WorktreeBase)

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
 )
 
@@ -40,8 +41,9 @@ func RunPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		pluginRoot = root
 	}
 	profile := preflight.Probe(preflight.Options{
-		ProjectRoot: root,
-		PluginRoot:  pluginRoot,
+		ProjectRoot:  root,
+		PluginRoot:   pluginRoot,
+		WorktreeBase: policy.WorktreeBaseFor(root),
 	})
 	if write {
 		if err := profile.WriteToFile(root); err != nil {

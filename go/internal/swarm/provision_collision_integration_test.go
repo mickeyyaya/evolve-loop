@@ -41,9 +41,8 @@ func TestGitWorkerProvisioner_ConcurrentSiblingsNoCollision(t *testing.T) {
 	git(mainRoot, "worktree", "add", "-q", "-b", "stream-sibling", sibling, "HEAD")
 
 	sharedBase := t.TempDir()
-	t.Setenv("EVOLVE_WORKTREE_BASE", sharedBase)
 	ctx := context.Background()
-	p := NewGitWorkerProvisioner(nil)
+	p := NewGitWorkerProvisioner(nil, sharedBase)
 
 	iMain, err := p.CreateIntegration(ctx, mainRoot, 1)
 	if err != nil {

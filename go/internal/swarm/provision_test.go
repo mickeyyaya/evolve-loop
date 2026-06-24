@@ -57,10 +57,9 @@ func branchOf(t *testing.T, wt string) string {
 
 func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 	root := gitInit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
 	var linked []string
-	p := NewGitWorkerProvisioner(func(wt, _ string) { linked = append(linked, wt) })
+	p := NewGitWorkerProvisioner(func(wt, _ string) { linked = append(linked, wt) }, "")
 
 	integBranch := integBranchFor(root, 5)
 	integ, err := p.CreateIntegration(ctx, root, 5)
@@ -95,9 +94,8 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 
 func TestGitWorkerProvisioner_CreateWorkerIdempotent(t *testing.T) {
 	root := gitInit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
-	p := NewGitWorkerProvisioner(nil)
+	p := NewGitWorkerProvisioner(nil, "")
 	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
 	a, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
@@ -115,9 +113,8 @@ func TestGitWorkerProvisioner_CreateWorkerIdempotent(t *testing.T) {
 
 func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	root := gitInit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
-	p := NewGitWorkerProvisioner(nil)
+	p := NewGitWorkerProvisioner(nil, "")
 	integBranch := integBranchFor(root, 1)
 	_, _ = p.CreateIntegration(ctx, root, 1)
 	w0, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
@@ -136,12 +133,11 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase covers the EVOLVE_WORKTREE_BASE env-override path. An
-// absolute override is honored verbatim with no error.
-func TestWorktreeBase_EnvOverride(t *testing.T) {
+// TestWorktreeBase_AbsoluteOverride covers the policy.json worktree.base override
+// path. An absolute override is honored verbatim with no error.
+func TestWorktreeBase_AbsoluteOverride(t *testing.T) {
 	custom := filepath.Join(t.TempDir(), "custom-base") // t.TempDir is absolute
-	t.Setenv("EVOLVE_WORKTREE_BASE", custom)
-	got, err := worktreeBase("/some/project")
+	got, err := worktreeBase(custom, "/some/project")
 	if err != nil {
 		t.Fatalf("absolute override must not error, got %v", err)
 	}
@@ -153,8 +149,7 @@ func TestWorktreeBase_EnvOverride(t *testing.T) {
 // TestWorktreeBase_DefaultPath covers the default (no env) path. The default is
 // rooted at the absolute projectRoot, so it returns no error.
 func TestWorktreeBase_DefaultPath(t *testing.T) {
-	t.Setenv("EVOLVE_WORKTREE_BASE", "")
-	got, err := worktreeBase("/proj")
+	got, err := worktreeBase("", "/proj")
 	if err != nil {
 		t.Fatalf("absolute default must not error, got %v", err)
 	}
@@ -163,18 +158,17 @@ func TestWorktreeBase_DefaultPath(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase_RelativeEnvReturnsError pins the inbox-defect closure
+// TestWorktreeBase_RelativeOverrideReturnsError pins the inbox-defect closure
 // (swarm-tests-relative-worktree-base): the guard refusing a non-absolute base
 // must live in worktreeBase ITSELF — not only one call-site deeper in
-// addWorktree. A relative EVOLVE_WORKTREE_BASE must make worktreeBase return a
+// addWorktree. A relative worktree.base override must make worktreeBase return a
 // ("", error) whose message identifies the base must be absolute, BEFORE any
 // caller touches git/MkdirAll. This is the negative (anti-no-op) axis: a build
 // that leaves worktreeBase returning the relative string verbatim fails here.
-func TestWorktreeBase_RelativeEnvReturnsError(t *testing.T) {
-	t.Setenv("EVOLVE_WORKTREE_BASE", "relative-worktrees")
-	got, err := worktreeBase("/some/project")
+func TestWorktreeBase_RelativeOverrideReturnsError(t *testing.T) {
+	got, err := worktreeBase("relative-worktrees", "/some/project")
 	if err == nil {
-		t.Fatalf("worktreeBase with a relative EVOLVE_WORKTREE_BASE must return an error, got path %q", got)
+		t.Fatalf("worktreeBase with a relative override must return an error, got path %q", got)
 	}
 	if got != "" {
 		t.Errorf("on a relative base worktreeBase must return an empty path, got %q", got)
@@ -186,19 +180,18 @@ func TestWorktreeBase_RelativeEnvReturnsError(t *testing.T) {
 
 // TestWorktreeBase_RelativeProjectRootRefused pins the LAST gap of the
 // swarm-tests-relative-worktree-base inbox defect (cycle-297). Cycle 296 moved
-// the IsAbs guard into worktreeBase, but only on the EVOLVE_WORKTREE_BASE
-// (env-override) branch. The DEFAULT branch still returned
+// the IsAbs guard into worktreeBase, but only on the override branch. The
+// DEFAULT branch still returned
 // filepath.Join(projectRoot, ".evolve", "worktrees") verbatim — which is
 // RELATIVE when projectRoot is relative (e.g. "."). A relative worktree base
 // breaks `git worktree add` (resolved against an unintended cwd) and the
-// tree-diff guard. With EVOLVE_WORKTREE_BASE unset, worktreeBase(".") must
-// return ("", error) whose message identifies that the base/root must be
-// absolute, BEFORE any caller touches git/MkdirAll. This is the negative
-// (anti-no-op) axis: the RED baseline returned ".evolve/worktrees" with a nil
-// error, so this test fails until the default branch also guards IsAbs.
+// tree-diff guard. With no override, worktreeBase("", ".") must return
+// ("", error) whose message identifies that the base/root must be absolute,
+// BEFORE any caller touches git/MkdirAll. This is the negative (anti-no-op)
+// axis: the RED baseline returned ".evolve/worktrees" with a nil error, so this
+// test fails until the default branch also guards IsAbs.
 func TestWorktreeBase_RelativeProjectRootRefused(t *testing.T) {
-	t.Setenv("EVOLVE_WORKTREE_BASE", "") // force the default-path branch
-	got, err := worktreeBase(".")
+	got, err := worktreeBase("", ".")
 	if err == nil {
 		t.Fatalf("worktreeBase(\".\") with the default branch must return an error for a relative project root, got path %q", got)
 	}
@@ -212,11 +205,10 @@ func TestWorktreeBase_RelativeProjectRootRefused(t *testing.T) {
 
 func TestAddWorktree_RelativeBaseRefused(t *testing.T) {
 	root := gitInit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", "relative-worktrees")
 
-	_, err := NewGitWorkerProvisioner(nil).CreateIntegration(context.Background(), root, 294)
+	_, err := NewGitWorkerProvisioner(nil, "relative-worktrees").CreateIntegration(context.Background(), root, 294)
 	if err == nil {
-		t.Fatal("CreateIntegration with relative EVOLVE_WORKTREE_BASE must fail")
+		t.Fatal("CreateIntegration with a relative worktree.base override must fail")
 	}
 	if !strings.Contains(err.Error(), "absolute") {
 		t.Fatalf("relative base error = %q, want message mentioning absolute", err)
@@ -229,9 +221,8 @@ func TestAddWorktree_RelativeBaseRefused(t *testing.T) {
 // TestCreateWorker_EmptyIntegrationBranch covers the empty-integrationBranch fallback.
 func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	root := gitInit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
 	ctx := context.Background()
-	p := NewGitWorkerProvisioner(nil)
+	p := NewGitWorkerProvisioner(nil, "")
 	// Empty integrationBranch → falls back to "HEAD"
 	wt, err := p.CreateWorker(ctx, root, 9, "w0", "")
 	if err != nil {
@@ -248,7 +239,6 @@ func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	root := gitInit(t)
 	base := filepath.Join(root, ".evolve", "worktrees")
-	t.Setenv("EVOLVE_WORKTREE_BASE", base)
 	ctx := context.Background()
 
 	// Pre-create a stale stub at the EXACT path CreateWorker will target, so the
@@ -262,7 +252,7 @@ func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := NewGitWorkerProvisioner(nil)
+	p := NewGitWorkerProvisioner(nil, base)
 	wt, err := p.CreateWorker(ctx, root, 7, "w0", "")
 	if err != nil {
 		t.Fatalf("CreateWorker with stale stub: %v", err)

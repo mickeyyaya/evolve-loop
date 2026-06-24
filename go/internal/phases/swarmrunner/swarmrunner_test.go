@@ -532,9 +532,10 @@ func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 // Enforce writer path: when all workers fail → FAIL verdict + non-nil error.
 func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
 	inner := &fakeInner{name: "build"}
-	d := New(inner, &errBridge{}, swarm.ModeWriter, Config{Stage: "enforce"})
 	root := gitInitForTest(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
+	// Exercise the Config.WorktreeBase DI seam (replaces the former
+	// EVOLVE_WORKTREE_BASE env read; flag-reduction, ADR-0064).
+	d := New(inner, &errBridge{}, swarm.ModeWriter, Config{Stage: "enforce", WorktreeBase: filepath.Join(root, ".evolve", "worktrees")})
 	ws := t.TempDir()
 	writeWriterPlan(t, ws)
 

@@ -57,9 +57,9 @@ func chdirTempNonGit(t *testing.T) string {
 func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
 	chdirTempNonGit(t)
 	const relBase = "relative-base-probe" // relative → the bug class
-	t.Setenv("EVOLVE_WORKTREE_BASE", relBase)
-
-	g := gitWorktree{}
+	// base override (policy.json worktree.base) injected via the struct field —
+	// the EVOLVE_WORKTREE_BASE env read was removed (flag-reduction, ADR-0064).
+	g := gitWorktree{baseOverride: relBase}
 	wt, err := g.Create(".", 1)
 	if err == nil {
 		t.Fatalf("RED: relative EVOLVE_WORKTREE_BASE %q must be refused; got worktree %q, nil error", relBase, wt)
@@ -83,8 +83,7 @@ func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
 // lacking "absolute".
 func TestGitWorktree_RelativeProjectRootRefused(t *testing.T) {
 	chdirTempNonGit(t)
-	t.Setenv("EVOLVE_WORKTREE_BASE", "") // empty → base() falls back to <root>/.evolve/worktrees
-
+	// No base override → base() falls back to <root>/.evolve/worktrees.
 	g := gitWorktree{}
 	wt, err := g.Create(".", 1)
 	if err == nil {

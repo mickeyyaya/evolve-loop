@@ -168,8 +168,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 		if err := os.WriteFile(baseFile, []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(baseFile, "child"))
-		p := NewGitWorkerProvisioner(nil)
+		p := NewGitWorkerProvisioner(nil, filepath.Join(baseFile, "child"))
 		if _, err := p.CreateIntegration(context.Background(), root, 282); err == nil || !strings.Contains(err.Error(), "worktree base") {
 			t.Fatalf("CreateIntegration mkdir error = %v", err)
 		}
@@ -177,8 +176,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 
 	t.Run("default worktree base and empty integration branch base", func(t *testing.T) {
 		root := gitInit(t)
-		t.Setenv("EVOLVE_WORKTREE_BASE", "")
-		p := NewGitWorkerProvisioner(nil)
+		p := NewGitWorkerProvisioner(nil, "")
 		wt, err := p.CreateWorker(context.Background(), root, 282, "wbase", "")
 		if err != nil {
 			t.Fatal(err)
@@ -191,8 +189,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 
 	t.Run("addWorktree reports invalid base", func(t *testing.T) {
 		root := gitInit(t)
-		t.Setenv("EVOLVE_WORKTREE_BASE", filepath.Join(root, ".evolve", "worktrees"))
-		p := NewGitWorkerProvisioner(nil)
+		p := NewGitWorkerProvisioner(nil, "")
 		_, err := p.CreateWorker(context.Background(), root, 282, "wbadbase", "missing-base")
 		if err == nil || !strings.Contains(err.Error(), "git worktree add") {
 			t.Fatalf("CreateWorker invalid base error = %v", err)
@@ -202,7 +199,6 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 	t.Run("stale directory is removed before add", func(t *testing.T) {
 		root := gitInit(t)
 		base := filepath.Join(root, ".evolve", "worktrees")
-		t.Setenv("EVOLVE_WORKTREE_BASE", base)
 		stale := filepath.Join(base, integBranchFor(root, 282))
 		if err := os.MkdirAll(stale, 0o755); err != nil {
 			t.Fatal(err)
@@ -210,7 +206,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(stale, "junk"), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		p := NewGitWorkerProvisioner(nil)
+		p := NewGitWorkerProvisioner(nil, base)
 		wt, err := p.CreateIntegration(context.Background(), root, 282)
 		if err != nil {
 			t.Fatal(err)
@@ -228,7 +224,7 @@ func TestSwarm_CoverageGitProvisionerEdges(t *testing.T) {
 		if err := os.MkdirAll(wt, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		p := NewGitWorkerProvisioner(nil)
+		p := NewGitWorkerProvisioner(nil, "")
 		if err := p.Cleanup(context.Background(), t.TempDir(), wt); err != nil {
 			t.Fatalf("Cleanup should remain best-effort, got %v", err)
 		}

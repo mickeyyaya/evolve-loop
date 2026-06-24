@@ -42,7 +42,10 @@ import "testing"
 // (runscope.go), invisible to the go/ast flagreaders scan and so previously
 // unregistered. The new fold-aware gate (R_go ⊆ registry) surfaces it; a row is
 // required for completeness. StatusInternal, so LiveFeatureFlagCeiling is unchanged.
-const FlagCeiling = 25
+// 2026-06-24: -1 — EVOLVE_WORKTREE_BASE legitimately removed (policy.json
+// worktree.base + WithWorktreeBase DI to all 3 readers; ADR-0064). StatusActive,
+// so LiveFeatureFlagCeiling also drops by 1.
+const FlagCeiling = 24
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
@@ -84,7 +87,9 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // FLEET_SCOPE, WORKTREE_ROOT) → 18 -> 14.
 // flag-campaign-10 wave-2 INTEGRATION: 1 live Active dial (CLI_MAX_CONCURRENT_CODEX,
 // a dead Active row); the other 5 wave-2 deletions were StatusInternal → 14 -> 13.
-const LiveFeatureFlagCeiling = 13
+// 2026-06-24: EVOLVE_WORKTREE_BASE (StatusActive operator dial) legitimately
+// removed → policy.json worktree.base + WithWorktreeBase DI; 13 -> 12 (ADR-0064).
+const LiveFeatureFlagCeiling = 12
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is
