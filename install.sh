@@ -47,21 +47,38 @@ windows_help() {
 }
 
 # ---- 1. OS / arch ----------------------------------------------------------
+# Sets PLATFORM (= goreleaser <os>_<arch>) for the prebuilt download. An OS/arch
+# with no prebuilt asset falls through to building from source (FORCE_BUILD), so
+# the installer always works even on platforms outside the release matrix.
 detect_platform() {
 	uname_s="$(uname -s)"
 	uname_m="$(uname -m)"
 	case "$uname_s" in
-		Darwin) OS=darwin ;;
-		Linux)  OS=linux ;; # WSL2 reports Linux — works unchanged
+		Darwin)  OS=darwin ;;
+		Linux)   OS=linux ;; # WSL2 reports Linux — works unchanged
+		FreeBSD) OS=freebsd ;;
+		OpenBSD) OS=openbsd ;;
+		NetBSD)  OS=netbsd ;;
 		MINGW*|MSYS*|CYGWIN*|Windows_NT) windows_help ;;
-		*) die "unsupported OS '$uname_s' (prebuilt binaries: darwin/linux). On Windows, use WSL2." ;;
+		*) OS="" ;; # unknown OS — build from source
 	esac
 	case "$uname_m" in
-		x86_64|amd64)  ARCH=amd64 ;;
-		aarch64|arm64) ARCH=arm64 ;;
-		*) die "unsupported arch '$uname_m' (prebuilt binaries: amd64/arm64)." ;;
+		x86_64|amd64)            ARCH=amd64 ;;
+		aarch64|arm64)           ARCH=arm64 ;;
+		armv7l|armv6l|armhf|arm) ARCH=arm ;;
+		i386|i486|i586|i686)     ARCH=386 ;;
+		riscv64)                 ARCH=riscv64 ;;
+		ppc64le)                 ARCH=ppc64le ;;
+		s390x)                   ARCH=s390x ;;
+		*) ARCH="" ;; # unknown arch — build from source
 	esac
-	PLATFORM="${OS}_${ARCH}"   # matches goreleaser {{.Os}}_{{.Arch}} (lowercase)
+	if [ -z "$OS" ] || [ -z "$ARCH" ]; then
+		warn "no prebuilt binary for $uname_s/$uname_m — building from source"
+		FORCE_BUILD=1
+		PLATFORM="unsupported"
+	else
+		PLATFORM="${OS}_${ARCH}" # matches goreleaser <os>_<arch> (lowercase)
+	fi
 }
 
 # ---- 2. Package manager + dependency tools ---------------------------------
@@ -158,7 +175,7 @@ verify_checksum() {  # verify_checksum <file> <name-in-sums> <checksums.txt>
 }
 
 try_prebuilt() {
-	if [ "$FORCE_BUILD" = 1 ]; then log "EVO_FORCE_BUILD=1 — skipping prebuilt"; return 1; fi
+	if [ "$FORCE_BUILD" = 1 ]; then log "skipping prebuilt — building from source"; return 1; fi
 	asset="evolve_${PLATFORM}.tar.gz"
 	url="${ASSET_BASE}/${asset}"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/evolve.XXXXXX")"
