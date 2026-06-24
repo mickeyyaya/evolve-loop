@@ -24,6 +24,7 @@ type Site struct {
 	Comparison   Comparison   `json:"comparison"`
 	Quickstart   Quickstart   `json:"quickstart"`
 	Examples     Examples     `json:"examples"`
+	Concurrency  Concurrency  `json:"concurrency"`
 	FinalCTA     FinalCTA     `json:"finalCta"`
 	Footer       Footer       `json:"footer"`
 }
@@ -184,6 +185,34 @@ type SetupInfo struct {
 	Presets []string `json:"presets"`
 }
 
+// Concurrency powers the animated "run several loops at once" section: a set of
+// parallel lanes (one loop per feature, each on its own LLM and branch) plus a
+// few support scenarios. It conveys the concept — isolated, parallel, serialized
+// merge — not the internals.
+type Concurrency struct {
+	Kicker    string     `json:"kicker"`
+	Heading   string     `json:"heading"`
+	Sub       string     `json:"sub"`
+	Lanes     []Lane     `json:"lanes"`
+	Scenarios []Scenario `json:"scenarios"`
+}
+
+// Lane is one concurrent loop: a goal, the LLM it runs on, its branch, and the
+// pipeline the advisor composed for it — each lane runs its OWN phases, so the
+// lanes deliberately differ.
+type Lane struct {
+	Goal   string   `json:"goal"`
+	CLI    string   `json:"cli"`
+	Branch string   `json:"branch"`
+	Phases []string `json:"phases"`
+}
+
+// Scenario is one short "here's when you'd use it" card.
+type Scenario struct {
+	Title string `json:"title"`
+	Note  string `json:"note"`
+}
+
 type FinalCTA struct {
 	Heading   string `json:"heading"`
 	Subhead   string `json:"subhead"`
@@ -238,6 +267,8 @@ func (s *Site) Validate() error {
 		{"pipelineDemo.cases (>=2)", len(s.PipelineDemo.Cases) < 2},
 		{"examples.heading", s.Examples.Heading == ""},
 		{"examples.items (>=5)", len(s.Examples.Items) < 5},
+		{"concurrency.heading", s.Concurrency.Heading == ""},
+		{"concurrency.lanes (>=2)", len(s.Concurrency.Lanes) < 2},
 		{"pillars (>=3)", len(s.Pillars) < 3},
 		{"comparison.rows", len(s.Comparison.Rows) == 0},
 		{"footer.links", len(s.Footer.Links) == 0},
@@ -262,6 +293,12 @@ func (s *Site) Validate() error {
 			if ph.Use && !providers[ph.CLI] {
 				return fmt.Errorf("invalid content: pipelineDemo.cases[%d] phase %q routes to %q, not in providers", i, ph.Phase, ph.CLI)
 			}
+		}
+	}
+	// Each concurrency lane composes its own pipeline.
+	for i, l := range s.Concurrency.Lanes {
+		if len(l.Phases) < 2 {
+			return fmt.Errorf("invalid content: concurrency.lanes[%d] (%q) needs its own phases (>=2)", i, l.Goal)
 		}
 	}
 	return nil

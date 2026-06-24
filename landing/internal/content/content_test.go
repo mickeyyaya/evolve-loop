@@ -249,3 +249,49 @@ func TestQuickstartStepLabelsStayShort(t *testing.T) {
 		}
 	}
 }
+
+// The "run several loops at once" section must load with parallel lanes (each a
+// loop on its own LLM + branch) and support scenarios — the concurrency story.
+func TestConcurrency_LoadsAndComplete(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := site.Concurrency
+	if c.Heading == "" {
+		t.Error("concurrency.heading must be set")
+	}
+	if len(c.Lanes) < 2 {
+		t.Fatalf("concurrency.lanes = %d, want >= 2 (loops running in parallel)", len(c.Lanes))
+	}
+	// Each loop composes its OWN pipeline — the lanes must NOT share one phase
+	// lineup. Require per-lane phases and assert they actually differ.
+	seen := map[string]int{}
+	for i, l := range c.Lanes {
+		if l.Goal == "" || l.CLI == "" || l.Branch == "" {
+			t.Errorf("concurrency.lanes[%d] needs goal, cli (the LLM), and branch (isolation)", i)
+		}
+		if len(l.Phases) < 2 {
+			t.Errorf("concurrency.lanes[%d] (%q) needs its own phases (>=2)", i, l.Goal)
+		}
+		seen[strings.Join(l.Phases, ">")]++
+	}
+	if len(seen) < 2 {
+		t.Error("concurrency lanes all share one phase lineup; each loop should compose a different pipeline")
+	}
+	if len(c.Scenarios) == 0 {
+		t.Error("concurrency.scenarios should give at least one usage scenario")
+	}
+}
+
+// Validate must fail loudly if the concurrency block is missing.
+func TestValidate_RequiresConcurrency(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site.Concurrency = Concurrency{}
+	if err := site.Validate(); err == nil {
+		t.Error("Validate() accepted an empty concurrency block; want a loud failure")
+	}
+}

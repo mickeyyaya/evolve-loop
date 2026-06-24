@@ -656,3 +656,258 @@
   </div>
 </section>
 {{end}}
+
+{{define "concurrency"}}
+<style>
+  .cl{
+    --cl-acc:var(--accent,#0071e3);
+    --cl-acc-soft:var(--accent-soft,color-mix(in srgb,var(--cl-acc) 13%,transparent));
+    --cl-ink:var(--ink,#161616);
+    --cl-mut:var(--muted,#7a7a7a);
+    --cl-bg:var(--surface,var(--bg,#fff));
+    --cl-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);
+    --cl-disp:var(--serif,var(--display,inherit));
+    --cl-line:color-mix(in srgb,var(--cl-ink) 14%,transparent);
+    --cl-line2:color-mix(in srgb,var(--cl-ink) 26%,transparent);
+    --cl-surf:color-mix(in srgb,var(--cl-ink) 3%,transparent);
+    --cl-ok:var(--ok,#16996a);
+    --cl-claude:#cc7a4d;
+    --cl-codex:#10a37f;
+    --cl-gemini:#5e8bf0;
+    max-width:1080px;margin:0 auto;padding:clamp(48px,8vw,104px) 28px}
+  .cl-kicker{font-family:var(--cl-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cl-acc);margin:0}
+  .cl-h{font-family:var(--cl-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.08;margin:14px 0 0;color:var(--cl-ink)}
+  .cl-sub{color:var(--cl-mut);margin:13px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:64ch}
+
+  .cl-stage{margin-top:30px;border:1px solid var(--cl-line);border-radius:16px;background:var(--cl-surf);padding:clamp(16px,2.4vw,24px);position:relative;overflow:hidden}
+  .cl-stage::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(color-mix(in srgb,var(--cl-ink) 4%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--cl-ink) 4%,transparent) 1px,transparent 1px);background-size:34px 34px;mask:radial-gradient(120% 80% at 30% 20%,#000 40%,transparent 100%);opacity:.6}
+
+  .cl-grid{position:relative;display:grid;grid-template-columns:1fr auto;gap:clamp(14px,2.2vw,30px);align-items:stretch}
+
+  /* lanes */
+  .cl-lanes{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .cl-lane{display:flex;align-items:center;gap:12px;min-width:0;border:1px solid var(--cl-line);border-radius:12px;background:color-mix(in srgb,var(--cl-ink) 2%,var(--cl-bg));padding:11px 13px;opacity:.6;transition:opacity .4s,border-color .4s,box-shadow .4s}
+  .cl-lane.live{opacity:1}
+  .cl-lane.merged{border-color:color-mix(in srgb,var(--cl-ok) 45%,transparent)}
+  .cl-orb{flex:0 0 auto;width:30px;height:30px;border-radius:50%;position:relative;display:grid;place-items:center;font-family:var(--cl-mono);font-size:.6rem;font-weight:700;color:#fff}
+  .cl-orb.p-claude{background:var(--cl-claude);--rc:var(--cl-claude)} .cl-orb.p-codex{background:var(--cl-codex);--rc:var(--cl-codex)} .cl-orb.p-gemini{background:var(--cl-gemini);--rc:var(--cl-gemini)}
+  .cl-lane.live .cl-orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1.5px solid var(--rc);opacity:.5;animation:cl-ripple 1.5s ease-out infinite}
+  @keyframes cl-ripple{0%{transform:scale(.8);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+
+  .cl-meta{flex:0 0 auto;width:128px;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .cl-goal{font-size:.8rem;font-weight:600;color:var(--cl-ink);line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cl-branch{font-family:var(--cl-mono);font-size:.58rem;color:var(--cl-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cl-branch b{color:var(--cl-mut)}
+  .cl-branch.p-claude{color:var(--cl-claude)} .cl-branch.p-codex{color:var(--cl-codex)} .cl-branch.p-gemini{color:var(--cl-gemini)}
+
+  .cl-rail{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:6px}
+  .cl-tick{flex:1 1 0;min-width:0;height:24px;border:1px solid var(--cl-line2);border-radius:6px;display:grid;place-items:center;font-family:var(--cl-mono);font-size:.5rem;letter-spacing:.04em;text-transform:uppercase;color:var(--cl-mut);background:transparent;transition:.3s;white-space:nowrap;overflow:hidden}
+  .cl-tick.done{color:var(--cl-ink);border-color:var(--cl-line2);background:color-mix(in srgb,var(--cl-ink) 6%,transparent)}
+  .cl-tick.active{color:#fff;border-color:transparent;animation:cl-pulse 1s ease-in-out infinite}
+  .cl-lane[data-p=claude] .cl-tick.active{background:var(--cl-claude)} .cl-lane[data-p=codex] .cl-tick.active{background:var(--cl-codex)} .cl-lane[data-p=gemini] .cl-tick.active{background:var(--cl-gemini)}
+  .cl-tick.ship.done{background:var(--cl-ok);border-color:transparent;color:#fff}
+  @keyframes cl-pulse{50%{filter:brightness(1.15)}}
+  .cl-state{flex:0 0 auto;width:74px;text-align:right;font-family:var(--cl-mono);font-size:.56rem;letter-spacing:.04em;text-transform:uppercase;color:var(--cl-mut)}
+  .cl-state.queued{color:var(--cl-acc)} .cl-state.merged{color:var(--cl-ok);font-weight:700}
+
+  /* merge gate → main */
+  .cl-merge{flex:0 0 auto;width:clamp(120px,16vw,168px);border:1px dashed var(--cl-line2);border-radius:12px;background:color-mix(in srgb,var(--cl-ink) 2%,var(--cl-bg));padding:14px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+  .cl-gatelabel{font-family:var(--cl-mono);font-size:.54rem;letter-spacing:.14em;text-transform:uppercase;color:var(--cl-mut)}
+  .cl-gate{width:100%;min-height:30px;border:1px solid var(--cl-line2);border-radius:8px;display:grid;place-items:center;font-family:var(--cl-mono);font-size:.6rem;color:var(--cl-mut);padding:5px 6px;transition:.25s;white-space:nowrap;overflow:hidden}
+  .cl-gate.busy{border-color:var(--cl-acc);color:var(--cl-acc);background:var(--cl-acc-soft)}
+  .cl-trunk{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:2px}
+  .cl-mainlabel{font-family:var(--cl-mono);font-size:.6rem;letter-spacing:.06em;color:var(--cl-ink)}
+  .cl-maincount{font-family:var(--cl-disp);font-size:1.9rem;line-height:1;color:var(--cl-ok);transition:transform .25s}
+  .cl-maincount.bump{transform:scale(1.18)}
+  .cl-maindesc{font-family:var(--cl-mono);font-size:.5rem;letter-spacing:.06em;text-transform:uppercase;color:var(--cl-mut)}
+
+  /* scenarios + note */
+  .cl-scen{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+  .cl-card{border:1px solid var(--cl-line);border-radius:12px;background:var(--cl-surf);padding:14px 15px;min-width:0}
+  .cl-card h3{font-family:var(--cl-disp);font-weight:inherit;font-size:1rem;margin:0 0 6px;color:var(--cl-ink)}
+  .cl-card p{margin:0;font-size:.84rem;line-height:1.5;color:var(--cl-mut)}
+  .cl-note{margin-top:16px;font-family:var(--cl-mono);font-size:.66rem;color:var(--cl-mut);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .cl-note b{color:var(--cl-ink)}
+  .cl-note .cl-key{color:var(--cl-ok)}
+
+  @media(max-width:760px){
+    .cl-grid{grid-template-columns:1fr}
+    .cl-merge{width:auto;flex-direction:row;justify-content:space-between}
+    .cl-scen{grid-template-columns:1fr}
+  }
+  @media(max-width:560px){
+    .cl-meta{width:96px}
+    .cl-state{display:none}
+    .cl-tick{font-size:0;padding:0}
+    .cl-tick::after{content:attr(data-i);font-size:.5rem}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .cl-lane.live .cl-orb::after,.cl-tick.active{animation:none}
+  }
+</style>
+<section class="cl" id="concurrency" data-reveal>
+  <p class="cl-kicker">{{.Site.Concurrency.Kicker}}</p>
+  <h2 class="cl-h">{{.Site.Concurrency.Heading}}</h2>
+  <p class="cl-sub">{{.Site.Concurrency.Sub}}</p>
+  <div class="cl-stage">
+    <div class="cl-grid">
+      <div class="cl-lanes"></div>
+      <div class="cl-merge">
+        <span class="cl-gatelabel">merge gate · one at a time</span>
+        <span class="cl-gate">idle</span>
+        <div class="cl-trunk">
+          <span class="cl-mainlabel">main</span>
+          <span class="cl-maincount">0</span>
+          <span class="cl-maindesc">shipped</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cl-scen">
+    {{range .Site.Concurrency.Scenarios}}
+    <div class="cl-card"><h3>{{.Title}}</h3><p>{{.Note}}</p></div>
+    {{end}}
+  </div>
+  <p class="cl-note"><span class="cl-key">All you need is an LLM CLI subscription.</span> Each lane runs on a CLI you're already signed into — Claude, Codex, or Gemini.</p>
+  <script type="application/json" class="cl-data">{{json .Site.Concurrency}}</script>
+</section>
+{{end}}
+
+{{define "concurrencyjs"}}
+<script>
+(function () {
+  var root = document.getElementById('concurrency');
+  if (!root) { return; }
+  var demo = JSON.parse(root.querySelector('.cl-data').textContent);
+  var lanes = (demo.lanes || []).filter(function (l) { return l.phases && l.phases.length; });
+  if (!lanes.length) { return; }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var lanesEl = root.querySelector('.cl-lanes'),
+      gateEl = root.querySelector('.cl-gate'),
+      countEl = root.querySelector('.cl-maincount');
+
+  function provKey(cli) {
+    var m = String(cli || '').toLowerCase();
+    if (m.indexOf('codex') >= 0 || m.indexOf('gpt') >= 0) { return 'codex'; }
+    if (m.indexOf('gemini') >= 0) { return 'gemini'; }
+    return 'claude';
+  }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var gen = 0;
+  function stale(g) { return g !== gen; }
+
+  // Build the lane DOM once. Each lane runs on a different provider and a
+  // slightly different cadence, so they're visibly independent (concurrent).
+  var SPEED = [820, 980, 700, 900, 760];
+  lanesEl.innerHTML = '';
+  var laneEls = lanes.map(function (l, i) {
+    var pk = provKey(l.cli);
+    var el = document.createElement('div');
+    el.className = 'cl-lane';
+    el.setAttribute('data-p', pk);
+    var lp = l.phases || [];
+    var ticks = lp.map(function (ph, j) {
+      var cls = 'cl-tick' + (j === lp.length - 1 ? ' ship' : '');
+      return '<span class="' + cls + '" data-i="' + esc(ph.charAt(0)) + '">' + esc(ph) + '</span>';
+    }).join('');
+    el.innerHTML =
+      '<span class="cl-orb p-' + pk + '">' + esc((l.cli || '?').charAt(0)) + '</span>' +
+      '<span class="cl-meta"><span class="cl-goal">' + esc(l.goal) + '</span>' +
+      '<span class="cl-branch p-' + pk + '">' + esc(l.cli) + ' · ' + esc(l.branch) + '</span></span>' +
+      '<span class="cl-rail">' + ticks + '</span>' +
+      '<span class="cl-state">idle</span>';
+    lanesEl.appendChild(el);
+    return el;
+  });
+
+  function resetVisuals() {
+    countEl.textContent = '0';
+    gateEl.textContent = 'idle';
+    gateEl.classList.remove('busy');
+    laneEls.forEach(function (el) {
+      el.classList.remove('live', 'merged');
+      var st = el.querySelector('.cl-state');
+      st.textContent = 'idle';
+      st.className = 'cl-state';
+      el.querySelectorAll('.cl-tick').forEach(function (t) { t.classList.remove('done', 'active'); });
+    });
+  }
+
+  async function runOnce() {
+    var g = ++gen;
+    resetVisuals();
+    var queue = [], mergedCount = 0;
+
+    // Each lane advances its phases on its own cadence — true parallelism.
+    var laneRun = lanes.map(function (_l, i) {
+      return (async function () {
+        var el = laneEls[i], ticks = el.querySelectorAll('.cl-tick'), st = el.querySelector('.cl-state');
+        await sleep(reduce ? 0 : i * 280); // staggered start
+        if (stale(g)) { return; }
+        el.classList.add('live');
+        st.textContent = 'running';
+        for (var p = 0; p < ticks.length; p++) {
+          if (stale(g)) { return; }
+          ticks.forEach(function (t, j) { t.classList.toggle('active', j === p); });
+          await sleep(reduce ? 40 : SPEED[i % SPEED.length]);
+          if (stale(g)) { return; }
+          ticks[p].classList.remove('active');
+          ticks[p].classList.add('done');
+        }
+        st.textContent = 'queued';
+        st.className = 'cl-state queued';
+        queue.push(i);
+      })();
+    });
+
+    // The merge gate is the only serialized section: one branch reaches main
+    // at a time, no matter how many lanes finished together.
+    var mergeProc = (async function () {
+      while (!stale(g) && mergedCount < lanes.length) {
+        if (queue.length) {
+          var i = queue.shift();
+          var l = lanes[i], el = laneEls[i];
+          gateEl.textContent = '⤳ ' + l.branch;
+          gateEl.classList.add('busy');
+          await sleep(reduce ? 60 : 620);
+          if (stale(g)) { return; }
+          mergedCount++;
+          countEl.textContent = String(mergedCount);
+          countEl.classList.add('bump');
+          setTimeout(function () { countEl.classList.remove('bump'); }, 240);
+          gateEl.classList.remove('busy');
+          gateEl.textContent = 'idle';
+          el.classList.add('merged');
+          var st = el.querySelector('.cl-state');
+          st.textContent = 'merged ✓';
+          st.className = 'cl-state merged';
+        } else {
+          await sleep(80);
+        }
+      }
+    })();
+
+    await Promise.all(laneRun.concat([mergeProc]));
+    if (stale(g)) { return; }
+    var t0 = Date.now();
+    while (Date.now() - t0 < (reduce ? 800 : 2600)) { if (stale(g)) { return; } await sleep(80); }
+  }
+
+  async function loop() {
+    if (reduce) { await runOnce(); return; }
+    while (true) { await runOnce(); }
+  }
+
+  if ('IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { io.disconnect(); loop(); } });
+    }, { threshold: 0.25 });
+    io.observe(root);
+  } else {
+    loop();
+  }
+})();
+</script>
+{{end}}

@@ -264,6 +264,21 @@
       "presets": ["Recommended", "Economy", "Max-quality"]
     }
   },
+  "concurrency": {
+    "kicker": "Built for parallelism",
+    "heading": "Run several loops at once.",
+    "sub": "Give each feature its own loop and they run side by side — each in its own git worktree and branch, each on its own LLM, each composing the pipeline its goal needs. They never step on each other, and only green changes merge to main, one at a time.",
+    "lanes": [
+      { "goal": "add dark mode", "cli": "Claude", "branch": "cycle-darkmode", "phases": ["Intent", "Scout", "TDD", "Build", "Audit", "Ship"] },
+      { "goal": "harden the auth flow", "cli": "Codex", "branch": "cycle-auth", "phases": ["Plan", "Build", "Audit", "Security", "Ship"] },
+      { "goal": "speed up the dashboard", "cli": "Gemini", "branch": "cycle-perf", "phases": ["Scout", "Build", "Benchmark", "Ship"] }
+    ],
+    "scenarios": [
+      { "title": "Many features at once", "note": "Point a loop at each goal; they advance in parallel, not in a queue." },
+      { "title": "Isolated by design", "note": "Each loop owns a worktree + branch — no crossed wires, no half-merges." },
+      { "title": "Safe, serialized merges", "note": "Only green work reaches main, one merge at a time." }
+    ]
+  },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
     "subhead": "Open source. Apache-2.0. Works with Claude, Gemini, and Codex.",
