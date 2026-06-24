@@ -16,7 +16,7 @@
      Single nouns are acceptable when no action applies (`commit`, `setup`, `inspirer`,
      `evaluator`, `publish`, `release`, `refactor`).
 2. **No namespace stutter.** The CLI renders skills as `/<plugin>:<dir>`; a directory name must
-   not repeat the plugin name. `skills/build` → `/evolve-loop:build`. Never `skills/evolve-build`.
+   not repeat the plugin name. `skills/build` → `/evo:build`. Never `skills/evolve-build`.
 3. **Frontmatter `name:` MUST equal the directory name.** A mismatch makes the skill fail to
    load. Enforced by `evolve skills check` / `cmd_skills_drift_test.go`.
 4. **Every skill on disk is listed in `.claude-plugin/plugin.json:skills[]`** — filesystem

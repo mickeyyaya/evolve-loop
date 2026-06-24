@@ -28,7 +28,7 @@
 | bash | 3.2+ (default macOS) | Many scripts target the macOS-default bash; no bash-4-isms required |
 | git | 2.5+ | Per-cycle worktrees need `git worktree add` |
 | `jq` | 1.6+ | Every state.json + ledger operation |
-| Anthropic auth | Subscription via `~/.claude.json` OR `ANTHROPIC_API_KEY` | Subscription auth is first-class for `/evolve-loop`; API key is also supported |
+| Anthropic auth | Subscription via `~/.claude.json` OR `ANTHROPIC_API_KEY` | Subscription auth is first-class for `/evo:loop`; API key is also supported |
 | (optional) Gemini CLI | v0.42+ | Only if you want Gemini-routed phases |
 | (optional) Codex CLI | any | Only if you want Codex-routed phases (hybrid mode) |
 | Free disk | ~200 MB | Per-cycle worktrees + workspace artifacts |
@@ -51,7 +51,7 @@ In your Claude Code session:
 
 ```
 /plugin marketplace add mickeyyaya/evolve-loop
-/plugin install evolve-loop
+/plugin install evo
 ```
 
 Or for a project-local install (recommended for trying it out):
@@ -148,7 +148,7 @@ bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget
 Or, if you're inside Claude Code:
 
 ```
-/evolve-loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to legacy/scripts/foo.sh..."
+/evo:loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to legacy/scripts/foo.sh..."
 ```
 
 The dispatcher launches the orchestrator subprocess. You'll see streaming output for ~10-20 minutes.
@@ -330,7 +330,7 @@ For deeper understanding of cross-cycle learning, see [self-evolution.md](../con
 |---|---|---|
 | `ship-gate DENY` on a manual git command | Hook is enforcing — direct git commit forbidden | Use `bash legacy/scripts/lifecycle/ship.sh --class manual "<msg>"` |
 | `claude binary not found` | Claude Code CLI not in PATH | `which claude` to verify; install per claude.com/code |
-| `sandbox-exec: Operation not permitted` | Nested-Claude environment (running `/evolve-loop` from inside Claude Code) | Auto-detected; check `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
+| `sandbox-exec: Operation not permitted` | Nested-Claude environment (running `/evo:loop` from inside Claude Code) | Auto-detected; check `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
 | `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a ship.sh update | Delete `.evolve/state.json:expected_ship_sha` and re-run; v8.32+ auto-rotates |
 | Cycle stuck in `calibrate` for >2 min | Orchestrator subprocess slow to start | Check `pgrep -fl claude` to confirm subprocess running; wait or kill + retry |
 | `state.json:lastCycleNumber` not advancing | Worktree-state-not-syncing (B7) | Fixed in v10.7.0+; if older, run `jq '.lastCycleNumber += 1 \| .' state.json > tmp && mv tmp state.json` |

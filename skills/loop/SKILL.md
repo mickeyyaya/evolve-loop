@@ -1,12 +1,12 @@
 ---
 name: loop
-description: Use when the user invokes /evolve-loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
+description: Use when the user invokes /evo:loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
 argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
 ---
 
 # Evolve Loop v20.4
 
-> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evolve-loop` or asks to run improvement cycles.
+> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evo:loop` or asks to run improvement cycles.
 
 ## Platform overlay (v8.15.0+)
 
@@ -14,11 +14,11 @@ Tool and command names in this file use **Claude Code conventions** (`Read`, `Ba
 
 > **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher is archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — not for general use.
 
-> **What this does in one paragraph:** Each `/evolve-loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
+> **What this does in one paragraph:** Each `/evo:loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `ship.sh` commits only what passes. A trust kernel of three shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) enforces phase order and artifact integrity at the OS layer, not the prompt layer — so the pipeline's safety properties hold even in autonomous / bypass-permissions mode. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
 
 ## STRICT MODE — Read this first (v11.5.0+)
 
-When invoked via `/evolve-loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
+When invoked via `/evo:loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
 
 ```bash
 "${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
@@ -55,7 +55,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 
 …and then read the binary's summary. Nothing else. The dispatcher loops one cycle per iteration and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
-**Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable via `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evolve-loop` and intent capture happens automatically as the first phase.
+**Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable via `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evo:loop` and intent capture happens automatically as the first phase.
 
 **Sandbox EPERM fallback** (v8.20.1+, auto-managed since cycle-10): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. The preflight auto-detects nested-Claude and enables the EPERM fallback automatically — no env flag needed. The adapter retries without sandbox-exec on EPERM, preserving sandbox where the kernel allows it.
 
@@ -79,7 +79,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 
 **Dispatch policy:** Configured in `.evolve/policy.json` under `dispatch.policy` (`off` / `verify` / `stop`; default: `verify`). Controls per-cycle ledger verification.
 
-The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `evolve cycle run` spawns. You, the slash-command handler, do not consult it during a `/evolve-loop` invocation.
+The rest of this file (architecture, model routing, phase docs) is reference material for the **orchestrator subagent** that `evolve cycle run` spawns. You, the slash-command handler, do not consult it during a `/evo:loop` invocation.
 
 ---
 
@@ -158,7 +158,7 @@ The following JSON block is the canonical state initialization for the evolve-lo
 }
 ```
 
-**Usage:** `/evolve-loop [--budget-usd N | --cycles N] [strategy] [goal]`
+**Usage:** `/evo:loop [--budget-usd N | --cycles N] [strategy] [goal]`
 (legacy bare positional integer = cycles; deprecation WARN emitted —
 prefer `--budget-usd N` or `--cycles N` explicitly)
 
@@ -176,7 +176,7 @@ Parse `$ARGUMENTS` (v9.0.5+ — budget-first guidance, both modes supported):
   `harden` | `repair` | `ultrathink` | `autoresearch`.
 - **Goal** (positional, after strategy): free-form text; quote it when it
   contains apostrophes or shell metacharacters.
-- **Legacy bare integer** (`/evolve-loop 3 balanced "goal"`) still parses
+- **Legacy bare integer** (`/evo:loop 3 balanced "goal"`) still parses
   as cycles in v9.0.x with a deprecation WARN. The v10.0.0 candidate
   will consider flipping bare-positional to dollars; until then, use
   the explicit flag to be flip-safe.
@@ -212,10 +212,10 @@ quota-likely signature). `subagent-run.sh` wrote a checkpoint and
    - Floor at 60s so a near-zero remaining window doesn't busy-loop.
    - Cap at 3600s because `ScheduleWakeup` clamps to [60, 3600]; if the
      window is longer, call ScheduleWakeup again on the next wake.
-3. **Call `ScheduleWakeup`** with that delay and `prompt="/evolve-loop --resume"`.
+3. **Call `ScheduleWakeup`** with that delay and `prompt="/evo:loop --resume"`.
    Provide a `reason` like `"waiting for quota reset at <wake-at>"`.
 4. On each wake, if `now < wake_at`, repeat steps 2–3 (chained wake-ups).
-5. When `now >= wake_at`, the prompt fires `/evolve-loop --resume` which
+5. When `now >= wake_at`, the prompt fires `/evo:loop --resume` which
    in turn invokes the native `evolve loop --resume` path → it bumps the
    `autoResumeAttempts` counter and re-runs the paused cycle from its
    last clean phase boundary.
@@ -242,7 +242,7 @@ contract and env-var reference.
 ```
 Phase 0:   CALIBRATE ─ benchmark (once per invocation) → phase0-calibrate.md
 Phase 0b: INTENT ─── [Intent] structure user goal     → docs/architecture/intent-phase.md
-                     (always-on for /evolve-loop slash command path; v8.19.1+)
+                     (always-on for /evo:loop slash command path; v8.19.1+)
 Phase 1: RESEARCH ── proactive research loop          → online-researcher.md
 Utility:   SEARCH ─── intent-aware web search engine    → smart-web-search.md
 Phase 2:   DISCOVER ── [Scout] scan + task selection    → phases.md
@@ -260,7 +260,7 @@ Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-
 For each cycle:
 1. Claim cycle number (OCC protocol)
 2. **Phase transitions are enforced by `evolve guard phase`** (PreToolUse hook in `.claude/settings.json`) plus the in-process Go orchestrator's state machine. Operators do not invoke a separate phase-gate command; the kernel layer enforces it automatically.
-3. Intent (v8.19.1+, always for /evolve-loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
+3. Intent (v8.19.1+, always for /evo:loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
 4. **Subagents are dispatched by the Go orchestrator** (`go/internal/core/orchestrator.go`) via the `bridge` adapter, which spawns the configured CLI (`claude -p`, `gemini`, or the agy/codex adapter) and feeds the per-phase agent prompt from `agents/<name>.md`. The kernel still enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes tamper-evident ledger entries. The `evolve subagent run <agent> <cycle> <workspace>` CLI is available for manual single-phase dispatch (used by `evolve serve-phase` and the cross-CLI consensus harness). The bash `subagent-run.sh` path was removed in v12.0.0.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately

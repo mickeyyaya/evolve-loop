@@ -60,7 +60,7 @@ First line `Verdict: <X>`, second `Average Score: <N.N>`, then per-lens reports.
 ## Composition
 
 Invoked by:
-- `/evolve-loop:plan-review`
+- `/evo:plan-review`
 - `loop` macro (between Scout and TDD when `workflow.phase_enables.plan-review=on`)
 
 The `plan-reviewer` persona uses `parallel_subtasks` (see `.evolve/profiles/plan-reviewer.json`) — the lens sub-personas (count projected into Phase facts above) run concurrently and merge via `aggregator.sh phase=plan-review`.

@@ -153,7 +153,7 @@ func Decide(entries []Entry, opts Options) Decision {
 	if ev.ByClass[string(IntentRejected)] > 0 {
 		reason := fmt.Sprintf("%d prior intent-rejected (out-of-scope IBTC)",
 			ev.ByClass[string(IntentRejected)])
-		remediation := "Refine the goal description to be in-scope, then re-run /evolve-loop."
+		remediation := "Refine the goal description to be in-scope, then re-run /evo:loop."
 		if opts.Strict {
 			return Decision{
 				Action: ActionBlockCode, Reason: reason, Remediation: remediation,
@@ -210,7 +210,7 @@ func Decide(entries []Entry, opts Options) Decision {
 	if ev.ConsecutiveInfraTransientStreak >= 3 {
 		reason := fmt.Sprintf("%d consecutive infrastructure-transient failures despite EPERM-fallback.",
 			ev.ConsecutiveInfraTransientStreak)
-		remediation := "Either: (1) run /evolve-loop from a non-sandboxed terminal, OR (2) run scripts/failure/state-prune.sh --classification infrastructure-transient after confirming the underlying issue is resolved, OR (3) file an issue with cycle ledger entry."
+		remediation := "Either: (1) run /evo:loop from a non-sandboxed terminal, OR (2) run scripts/failure/state-prune.sh --classification infrastructure-transient after confirming the underlying issue is resolved, OR (3) file an issue with cycle ledger entry."
 		if opts.Strict {
 			return Decision{
 				Action: ActionBlockOperatorAction, Reason: reason, Remediation: remediation,

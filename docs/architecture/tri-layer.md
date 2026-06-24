@@ -17,7 +17,7 @@
 |---|---|---|---|
 | **Skill** | Workflow + steps + exit criteria — *the how* | `skills/<name>/SKILL.md` | `tdd`, `audit` |
 | **Persona** | One role, one perspective, one output format — *the who* | `agents/<role>.md` | `evolve-scout`, `plan-reviewer` |
-| **Command** | User-facing entry point — *the when* (the orchestration layer) | the skill itself, invoked as `/evolve-loop:<name>` (separate `.claude-plugin/commands/` layer removed in ADR-0040) | `/evolve-loop:scout`, `/evolve-loop:audit`, `/evolve-loop:loop` |
+| **Command** | User-facing entry point — *the when* (the orchestration layer) | the skill itself, invoked as `/evo:<name>` (separate `.claude-plugin/commands/` layer removed in ADR-0040) | `/evo:scout`, `/evo:audit`, `/evo:loop` |
 
 **The governing rule** (inherited from `addyosmani/agent-skills`): the user (or a slash command) is the orchestrator. **Personas do not invoke other personas.** Skills are mandatory hops inside a persona's workflow.
 
@@ -32,8 +32,8 @@ This is not just a convention — Claude Code enforces it at runtime: *"subagent
 | 1 | **Direct invocation** | One persona, one perspective, one artifact | `/audit` runs auditor |
 | 2 | **Single-persona slash command** | Repeating direct invocation with saved setup | `/scout`, `/build` |
 | 3 | **Parallel fan-out + merge** | Independent sub-tasks that share an input but produce different perspectives | `/scout` fans out to scout-codebase + scout-research + scout-evals (Sprint 1.1) |
-| 4 | **Sequential pipeline as user-driven skill invocations** | Lifecycle with dependencies + human checkpoints | `/evolve-loop:scout → :plan-review → :tdd → :build → :audit → :ship → :retro` |
-| 5 | **Auto-orchestrated macro** (the `/evolve-loop:loop` exception) | Autonomous mode: full lifecycle without human checkpoints | `/evolve-loop:loop` runs the entire sequence; trust kernel enforces phase ordering at script layer |
+| 4 | **Sequential pipeline as user-driven skill invocations** | Lifecycle with dependencies + human checkpoints | `/evo:scout → :plan-review → :tdd → :build → :audit → :ship → :retro` |
+| 5 | **Auto-orchestrated macro** (the `/evo:loop` exception) | Autonomous mode: full lifecycle without human checkpoints | `/evo:loop` runs the entire sequence; trust kernel enforces phase ordering at script layer |
 
 Pattern 5 is **specific to evolve-loop** because the trust kernel (sandbox, ledger SHA, phase-gate) substitutes for the human checkpoints addyosmani's framework relies on. Without our kernel, auto-orchestration would be Anti-pattern C below.
 
@@ -58,7 +58,7 @@ The trust kernel operates at **script layer**, *below* skills/personas/commands:
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  Commands (/evolve-loop:<skill> — namespaced)      │  USER-FACING
+│  Commands (/evo:<skill> — namespaced)      │  USER-FACING
 ├────────────────────────────────────────────────────┤
 │  Personas (agents/*.md)                            │  ROLES
 ├────────────────────────────────────────────────────┤
@@ -108,7 +108,7 @@ This means Sprint 3's tri-layer refactor only touches the user-facing API; the k
 
 ### A new Command must:
 
-- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evolve-loop:<name>` — there is no separate command file layer (removed in ADR-0040; it duplicated skill prose)
+- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evo:<name>` — there is no separate command file layer (removed in ADR-0040; it duplicated skill prose)
 - Compose personas and skills (the orchestration layer) inside the skill's Composition section
 - For Pattern 3 (fan-out): issue multiple `Agent` tool calls in **one** assistant turn (sequential turns serialize)
 

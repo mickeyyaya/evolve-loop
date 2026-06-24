@@ -10,14 +10,14 @@ description: Pre-Scout intent capture phase. Structures vague user goals into in
 ## When to invoke
 
 - **Autonomous**: orchestrator advances to phase=intent when `cycle-state.intent_required==true` (set at cycle init from `workflow.phase_enables.intent=1`)
-- **User-driven**: `/evolve-loop:intent`, before `/evolve-loop:loop`, to lock in structured intent
+- **User-driven**: `/evo:intent`, before `/evo:loop`, to lock in structured intent
 - **Re-run**: re-invoke to replace prior intent.md within the same cycle (kernel accepts latest ledger entry)
 
 ## When NOT to invoke
 
 - After Scout has already run for this cycle (intent must precede research)
 - For pure-execution cycles where the goal is fully specified (e.g., "fix typo at file.md:42") — but in practice, even those benefit from the explicit `non_goals` and `acceptance_checks`
-- When `workflow.phase_enables.intent` is unset and the user has not explicitly invoked `/evolve-loop:intent` — default flow skips this phase
+- When `workflow.phase_enables.intent` is unset and the user has not explicitly invoked `/evo:intent` — default flow skips this phase
 
 ## Workflow
 
@@ -61,7 +61,7 @@ Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, gi
 ## Composition
 
 Invoked by:
-- `/evolve-loop:intent` (user-driven)
+- `/evo:intent` (user-driven)
 - `evolve-orchestrator` macro when `cycle-state.intent_required==true`
 
 Cannot be:

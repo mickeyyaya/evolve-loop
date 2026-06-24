@@ -1,4 +1,4 @@
-// Package goalhash computes a stable hash of a /evolve-loop goal string.
+// Package goalhash computes a stable hash of a /evo:loop goal string.
 //
 // Byte-exact port of the bash pipeline at
 // legacy/scripts/lifecycle/intent-batch-resolve.sh:

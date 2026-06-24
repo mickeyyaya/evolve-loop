@@ -30,7 +30,7 @@ func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) in
 	)
 	marketplaceDir := ""
 	if home, err := os.UserHomeDir(); err == nil {
-		marketplaceDir = home + "/.claude/plugins/marketplaces/evolve-loop"
+		marketplaceDir = home + "/.claude/plugins/marketplaces/evo"
 	}
 
 	i := 0
@@ -41,7 +41,7 @@ func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) in
 			fmt.Fprintln(stdout, "Usage: evolve marketplace-poll <target-version> [flags]")
 			fmt.Fprintln(stdout, "  --max-wait-s N           (default 300)")
 			fmt.Fprintln(stdout, "  --poll-interval-s N      (default 15)")
-			fmt.Fprintln(stdout, "  --marketplace-dir DIR    (default ~/.claude/plugins/marketplaces/evolve-loop)")
+			fmt.Fprintln(stdout, "  --marketplace-dir DIR    (default ~/.claude/plugins/marketplaces/evo)")
 			fmt.Fprintln(stdout, "  --dry-run")
 			return 0
 		case a == "--dry-run":

@@ -1,11 +1,11 @@
 # Gemini CLI Runtime (Hybrid Driver)
 
-> How `/evolve-loop` reaches the dispatcher under Gemini CLI. **The Claude binary is required at runtime even though Gemini drives the conversation.** This is intentional — see [Why hybrid](#why-hybrid) below.
+> How `/evo:loop` reaches the dispatcher under Gemini CLI. **The Claude binary is required at runtime even though Gemini drives the conversation.** This is intentional — see [Why hybrid](#why-hybrid) below.
 
 ## Invocation chain
 
 ```
-User: /evolve-loop 5 polish improve dispatcher
+User: /evo:loop 5 polish improve dispatcher
   (typed into Gemini CLI)
 
   ↓ Gemini resolves the skill via ~/.gemini/extensions/<install-path>

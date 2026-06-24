@@ -124,9 +124,9 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 
 | Need | How |
 |---|---|
-| Enable PSMAS for a session | `EVOLVE_PSMAS_SKIP=1 /evolve-loop ...` |
+| Enable PSMAS for a session | `EVOLVE_PSMAS_SKIP=1 /evo:loop ...` |
 | Check what was skipped | `grep '"kind":"phase_skipped"' .evolve/ledger.jsonl \| tail` |
-| Disable for one cycle only | `EVOLVE_PSMAS_SKIP=0 /evolve-loop ...` for that invocation |
+| Disable for one cycle only | `EVOLVE_PSMAS_SKIP=0 /evo:loop ...` for that invocation |
 | Force a phase to run despite skip recommendation | Triage emits the recommendation, but operator can edit `triage-report.md` to clear `phase_skip[]` before Build phase starts (interactive use only) |
 
 ## A/B Verification Results (cycle 99)

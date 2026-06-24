@@ -9,7 +9,7 @@
 
 ## Context
 
-Operators needed a channel to inject tasks into a running `/evolve-loop` dispatcher. Direct `state.json` writes failed silently: the reconcile pass drops entries that don't match the canonical 8-field schema, and direct writes race the orchestrator's read-modify-write pass.
+Operators needed a channel to inject tasks into a running `/evo:loop` dispatcher. Direct `state.json` writes failed silently: the reconcile pass drops entries that don't match the canonical 8-field schema, and direct writes race the orchestrator's read-modify-write pass.
 
 Three constraints shaped the design:
 

@@ -81,10 +81,10 @@ var referenceDocs = []string{
 // update-install-sh-version-string eval asserts on this exact substring.
 const Version = "v6"
 
-// UsageLine is the one-line /evolve-loop usage string the installer prints on
+// UsageLine is the one-line /evo:loop usage string the installer prints on
 // success. It mirrors install.sh line 146; the fix-install-usage-and-ci-docs-check
 // eval asserts it is the three-argument [cycles] [strategy] [goal] form.
-const UsageLine = "Usage: /evolve-loop [cycles] [strategy] [goal]"
+const UsageLine = "Usage: /evo:loop [cycles] [strategy] [goal]"
 
 // ValidateResult is the machine-readable summary CI mode prints (the
 // EVOLVE_LOOP_* key=value lines install.sh emitted). A non-zero Errors means the
@@ -403,11 +403,11 @@ func UninstallDryRun(homeDir string, out io.Writer) UninstallResult {
 
 // PluginAlreadyInstalled reports whether evolve-loop is already present as an AI
 // CLI plugin under homeDir (a cache or marketplace dir). The manual installer
-// uses this to warn about creating duplicate /evolve-loop entries, exactly as
+// uses this to warn about creating duplicate /evo:loop entries, exactly as
 // install.sh lines 84-99 did.
 func PluginAlreadyInstalled(homeDir string) bool {
-	cache := filepath.Join(homeDir, ".claude", "plugins", "cache", "evolve-loop")
-	marketplace := filepath.Join(homeDir, ".claude", "plugins", "marketplaces", "evolve-loop")
+	cache := filepath.Join(homeDir, ".claude", "plugins", "cache", "evo")
+	marketplace := filepath.Join(homeDir, ".claude", "plugins", "marketplaces", "evo")
 	return dirExists(cache) || dirExists(marketplace)
 }
 

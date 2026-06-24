@@ -9,7 +9,7 @@
 
 ## Trigger event
 
-Operator ran `/evolve-loop --budget-usd 100 autoresearch run` and observed:
+Operator ran `/evo:loop --budget-usd 100 autoresearch run` and observed:
 
 ```
 ⏺ Monitor event: "evolve-loop dispatcher per-cycle events ($100 autoresearch run)"

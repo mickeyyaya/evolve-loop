@@ -7,10 +7,10 @@
 ## Why this exists
 
 Pre-v10.6.0, hitting a Claude Code subscription rate-limit (`You've hit your
-limit · resets HH:MMam`) during an `/evolve-loop $N autoresearch run` left
+limit · resets HH:MMam`) during an `/evo:loop $N autoresearch run` left
 the pipeline halted indefinitely. The v9.1.0 checkpoint mechanism correctly
 preserved the worktree + `cycle-state.json`, but **nothing scheduled a wake-up
-to call `/evolve-loop --resume` after the quota window reset**. The operator
+to call `/evo:loop --resume` after the quota window reset**. The operator
 had to notice manually, wait, and re-invoke.
 
 Five concrete gaps drove the halt:
@@ -43,7 +43,7 @@ v10.6.0 closes all five with a three-layer design.
     ▼
   Layer 3: dispatcher emits QUOTA-PAUSE marker + DISPATCH_RC=5
     └─ SKILL.md handles DISPATCH_RC=5 → calls ScheduleWakeup until wake-at →
-       re-invokes /evolve-loop --resume → resume-cycle.sh bumps attempts,
+       re-invokes /evo:loop --resume → resume-cycle.sh bumps attempts,
        runs the paused cycle from its last clean phase boundary
 ```
 
@@ -107,7 +107,7 @@ QUOTA-PAUSE: cycle=N wake-at=2026-05-15T05:20:00+0800 source=parsed attempts=0/3
 `.agents/skills/loop/SKILL.md` carries a "Quota Handling &
 Auto-Resume" section that instructs the model: when `DISPATCH_RC=5` appears
 in dispatcher output, parse the `wake-at=ISO8601` value, compute a clamped
-`delaySeconds`, call `ScheduleWakeup` with `prompt="/evolve-loop --resume"`,
+`delaySeconds`, call `ScheduleWakeup` with `prompt="/evo:loop --resume"`,
 and chain wake-ups until the reset time. The clamp is `[60, 3600]` to
 match `ScheduleWakeup`'s own range; for waits longer than 3600s the SKILL
 schedules a fresh wake on each cycle.
@@ -138,13 +138,13 @@ schedules a fresh wake on each cycle.
 Default behavior (always-on auto-resume):
 
 ```bash
-/evolve-loop --budget-usd 100 autoresearch run
+/evo:loop --budget-usd 100 autoresearch run
 # ... cycles run normally ...
 # ... quota hit at, say, midnight ...
 # QUOTA-PAUSE: cycle=27 wake-at=2026-05-15T05:20:00+0800 source=parsed attempts=0/3
-# SKILL.md calls ScheduleWakeup(delay=18900s, prompt="/evolve-loop --resume")
+# SKILL.md calls ScheduleWakeup(delay=18900s, prompt="/evo:loop --resume")
 # ... 5h15m of sleep ...
-# Claude wakes, fires /evolve-loop --resume
+# Claude wakes, fires /evo:loop --resume
 # resume-cycle.sh bumps attempts to 1, runs cycle 27 from its paused phase
 # Cycle 27 completes; dispatcher continues with cycle 28
 ```
@@ -227,7 +227,7 @@ bash legacy/scripts/tests/auto-resume-test.sh         # 26 assertions, Layers 1+
 bash legacy/scripts/tests/checkpoint-roundtrip-test.sh # 19 assertions, no regression
 
 # Manual end-to-end (requires triggering a quota hit)
-EVOLVE_QUOTA_RESET_HOURS=0.05 /evolve-loop --budget-usd 5 "smoke test"
+EVOLVE_QUOTA_RESET_HOURS=0.05 /evo:loop --budget-usd 5 "smoke test"
 #   - run a short cycle that hits the cost ceiling
 #   - observe QUOTA-PAUSE marker
 #   - observe ScheduleWakeup invocation in transcript

@@ -58,7 +58,7 @@ description: Use after ship completes. Three sub-reflectors (instinct, gene, fai
 ## Composition
 
 Invoked by:
-- `/evolve-loop:retro`
+- `/evo:retro`
 - `loop` macro after `/ship`
 
 Fan-out prompts live in `.evolve/profiles/retrospective.json:parallel_subtasks` (count projected into Phase facts above).

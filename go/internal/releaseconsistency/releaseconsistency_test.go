@@ -17,8 +17,8 @@ func makeRepo(t *testing.T, version string) string {
 	t.Helper()
 	mm := majorMinor(version)
 	return fixtures.NewWorkspace(t).WithFiles(map[string]string{
-		".claude-plugin/plugin.json":      fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version),
-		".claude-plugin/marketplace.json": fmt.Sprintf(`{"plugins":[{"name":"evolve-loop","version":"%s"}]}`, version),
+		".claude-plugin/plugin.json":      fmt.Sprintf(`{"name":"evo","version":"%s"}`, version),
+		".claude-plugin/marketplace.json": fmt.Sprintf(`{"plugins":[{"name":"evo","version":"%s"}]}`, version),
 		"skills/loop/SKILL.md":            fmt.Sprintf("---\nname: x\n---\n\n# Evolve Loop v%s\n\nbody\n", mm),
 		"README.md":                       fmt.Sprintf("# Evolve Loop\n\n**Current (v%s)** description\n\n| v%s | 2026 |\n", mm, mm),
 		"CHANGELOG.md":                    fmt.Sprintf("# Changelog\n\n## [%s] - 2026-05-24\n\nEntries.\n", version),
@@ -167,7 +167,7 @@ func TestCheck_MarkerFileMissing(t *testing.T) {
 func TestCheck_MarkerNoVersionField(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
 	// marketplace.json present but lacks a version field.
-	fixtures.MustWrite(t, filepath.Join(d, ".claude-plugin/marketplace.json"), `{"plugins":[{"name":"evolve-loop"}]}`)
+	fixtures.MustWrite(t, filepath.Join(d, ".claude-plugin/marketplace.json"), `{"plugins":[{"name":"evo"}]}`)
 	var buf bytes.Buffer
 	res, err := Run(Options{ProjectRoot: d, Target: "11.8.2", Stderr: &buf})
 	if !errors.Is(err, ErrInconsistent) {

@@ -33,7 +33,7 @@ Which agent was involved?
 ## Command Used
 
 ```
-/evolve-loop <arguments>
+/evo:loop <arguments>
 ```
 
 ## Expected Behavior

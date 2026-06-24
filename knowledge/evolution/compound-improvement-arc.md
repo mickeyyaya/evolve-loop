@@ -102,7 +102,7 @@ role-gate denied it.
 
 ### The meta-loop bring-up (cycles 109–116) — the seven-layer onion
 
-The defining event of the Go era. A `/evolve-loop --budget-usd 150 ultrathink` run
+The defining event of the Go era. A `/evo:loop --budget-usd 150 ultrathink` run
 pointed the v13 Go binary at the repo itself, to research and implement
 long-running/self-healing/progress-tracking. It had **never completed a full build
 cycle on the Go orchestrator** — every prior attempt died before writing code. This

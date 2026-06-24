@@ -73,7 +73,7 @@ Verdict tokens: `PASS` | `FAIL` | `WARN` | `SKIPPED`.
 ## Composition
 
 Invoked by:
-- `/evolve-loop:audit`
+- `/evo:audit`
 - `loop` macro after `/build`
 
 Fan-out prompts live in `.evolve/profiles/auditor.json:parallel_subtasks` (count projected into Phase facts above).

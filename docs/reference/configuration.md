@@ -110,9 +110,9 @@ See [domain-adapters.md](docs/domain-adapters.md) for the full adapter interface
 Strategies steer the cycle's intent without requiring a full goal string:
 
 ```
-/evolve-loop innovate         # feature-first mode
-/evolve-loop 3 harden         # stability-first for 3 cycles
-/evolve-loop repair fix auth   # fix-only with directed goal
+/evo:loop innovate         # feature-first mode
+/evo:loop 3 harden         # stability-first for 3 cycles
+/evo:loop repair fix auth   # fix-only with directed goal
 ```
 
 | Strategy | Scout | Builder | Auditor |
@@ -130,8 +130,8 @@ The strategy is stored in `state.json` and passed to all agents via the context 
 ### Autonomous (no goal)
 
 ```
-/evolve-loop
-/evolve-loop 3
+/evo:loop
+/evo:loop 3
 ```
 
 Scout performs broad discovery and picks highest-impact work.
@@ -139,8 +139,8 @@ Scout performs broad discovery and picks highest-impact work.
 ### Directed (with goal)
 
 ```
-/evolve-loop 1 add dark mode support
-/evolve-loop add user authentication
+/evo:loop 1 add dark mode support
+/evo:loop add user authentication
 ```
 
 Scout focuses discovery and task selection on the goal.

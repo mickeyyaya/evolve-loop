@@ -57,7 +57,7 @@ This is **why Builder cannot fan-out** even though Scout and Auditor can.
 ## Composition
 
 Invoked by:
-- `/evolve-loop:build`
+- `/evo:build`
 - `loop` macro after `/tdd`
 
 ## Reference

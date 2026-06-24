@@ -7,7 +7,7 @@
 
 ## 1. What happened
 
-During cycle 95-96 of the v10.17.0 batch, the operator edited the watchdog default from 240s→600s via direct `Edit` calls on `~/ai/claude/evolve-loop/scripts/dispatch/phase-watchdog.sh:32` (and sibling files). The edit was committed via `ship.sh --class manual` as `ad07d25` and pushed to origin/main. The next `/evolve-loop` dispatcher invocation, however, showed:
+During cycle 95-96 of the v10.17.0 batch, the operator edited the watchdog default from 240s→600s via direct `Edit` calls on `~/ai/claude/evolve-loop/scripts/dispatch/phase-watchdog.sh:32` (and sibling files). The edit was committed via `ship.sh --class manual` as `ad07d25` and pushed to origin/main. The next `/evo:loop` dispatcher invocation, however, showed:
 
 ```
 [run-cycle] watchdog spawned (pid=92143 pgid=91530 threshold=240s)

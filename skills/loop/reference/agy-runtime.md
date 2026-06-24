@@ -1,13 +1,13 @@
 # Antigravity CLI (agy) Runtime
 
-> How `/evolve-loop` reaches the dispatcher under Antigravity CLI (agy). Unlike Gemini, `agy` supports native non-interactive prompt mode (`agy -p`), so NATIVE execution is the preferred path — no hybrid shim required when `agy` is on PATH.
+> How `/evo:loop` reaches the dispatcher under Antigravity CLI (agy). Unlike Gemini, `agy` supports native non-interactive prompt mode (`agy -p`), so NATIVE execution is the preferred path — no hybrid shim required when `agy` is on PATH.
 >
 > **Note (script→Go migration, 2026-06):** the bash CLI adapters (`legacy/scripts/cli_adapters/*.sh`) referenced below were removed; dispatch is now native Go via the bridge drivers (`agy` / `agy-tmux`). The invocation-chain and example-command sections below describe the former bash path and are retained as historical context.
 
 ## Invocation chain
 
 ```
-User: /evolve-loop 5 polish improve dispatcher
+User: /evo:loop 5 polish improve dispatcher
   (typed into agy CLI)
 
   ↓ agy resolves the skill via ~/.antigravity/extensions/<install-path>

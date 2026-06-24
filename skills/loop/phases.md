@@ -43,7 +43,7 @@ v8.13.1 kernel hooks: **role-gate.sh** (denies writes outside phase allowlist), 
 
 ## Phase 0: CALIBRATE (once per invocation)
 
-Runs **once per `/evolve-loop` invocation**, not per cycle. Establishes a project-level benchmark baseline.
+Runs **once per `/evo:loop` invocation**, not per cycle. Establishes a project-level benchmark baseline.
 
 ### Session Resume Check (before calibration)
 

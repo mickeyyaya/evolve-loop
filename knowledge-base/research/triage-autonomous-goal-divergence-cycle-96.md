@@ -21,7 +21,7 @@ The operator's expectation gap: assumed `--cycles N` + goal text = exact executi
 2. **state.json:failedApproaches[]** — adapter signals from prior cycles (forces avoidance of repeated failure modes)
 3. **scout-report.md backlog** — discovery findings from the current cycle's scout
 4. **state.json:abnormalEvents[]** — recent warning events that should be addressed
-5. **operator goal text** — the `<goal>` arg passed to `/evolve-loop`
+5. **operator goal text** — the `<goal>` arg passed to `/evo:loop`
 
 The operator goal text is INPUT #5, not #1. When carryoverTodos contains "builder turn-overrun fix" (carried over from cycle 89's abnormal-events), and scout-report independently surfaces "mastery field plumbing needed" (downstream of cycle-95 P2), the triage agent's `cycle_size_estimate` calculation may rank these higher than the operator's stated work.
 
@@ -36,7 +36,7 @@ In cycle-96 specifically, the triage decision was VALIDATED in retrospect: P4 tu
 Three modes of operator interaction:
 1. **"Suggest" mode (default):** Operator goal text is input #5. Triage may or may not pick it up. Best for self-evolving long-term improvement.
 2. **"Insist" mode (not implemented):** Operator wants strict goal adherence. Would require `EVOLVE_GOAL_STRICT=1` env var that forces triage to weight goal text as #1. Not currently available.
-3. **"Manual" mode (existing):** Operator skips `/evolve-loop` and does the work themselves via standard Claude Code. Bypasses the cycle pipeline entirely.
+3. **"Manual" mode (existing):** Operator skips `/evo:loop` and does the work themselves via standard Claude Code. Bypasses the cycle pipeline entirely.
 
 For the v10.17.0 batch, the operator was in mode 1. The autonomous behavior was correct but unexpected.
 
@@ -57,7 +57,7 @@ No code fix needed. Documentation fix: this dossier + README.md "How Evolve Loop
 
 If operators want strict adherence, the workaround is to phrase the goal text minimally with carryover-style framing:
 ```
-/evolve-loop --cycles 1 balanced "ONLY work on P4 triage Layer-3 extraction. Do not pick up carryover items."
+/evo:loop --cycles 1 balanced "ONLY work on P4 triage Layer-3 extraction. Do not pick up carryover items."
 ```
 This explicit instruction tends to bias triage toward the stated work, though it's not enforced.
 

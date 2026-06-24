@@ -1,7 +1,7 @@
 // Package cyclesimulator ports legacy/scripts/dispatch/cycle-simulator.sh.
 //
 // No-LLM cycle plumbing simulator (v8.50.0+). Walks every phase of an
-// /evolve-loop cycle writing deterministic artifacts and appending
+// /evo:loop cycle writing deterministic artifacts and appending
 // tamper-evident ledger entries WITHOUT making any LLM API calls.
 //
 // What this validates:

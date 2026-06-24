@@ -97,7 +97,7 @@ The pipeline emits each step's proposed output without writing or committing.
 |---|---|---|
 | `preflight: target X not greater than current Y` | Version already bumped, OR you typo'd the arg | Run `cat .claude-plugin/plugin.json` and confirm; pick a higher target |
 | `preflight: most recent audit-report.md does not declare 'Verdict: PASS'` | Last audit was WARN/FAIL or stale | Run a fresh audit cycle (`evolve loop`) or `evolve subagent run auditor` |
-| `marketplace-poll: TIMEOUT` after `git push` | Marketplace checkout didn't pull within deadline | Pipeline auto-rolls-back. Investigate: `git -C ~/.claude/plugins/marketplaces/evolve-loop log --oneline \| head` |
+| `marketplace-poll: TIMEOUT` after `git push` | Marketplace checkout didn't pull within deadline | Pipeline auto-rolls-back. Investigate: `git -C ~/.claude/plugins/marketplaces/evo log --oneline \| head` |
 | `SELF_SHA_TAMPERED` on the next ship | Rebuilt binary pinned but not committed in the release | Known structural residue — see runtime-reference.md binary-rebuild procedure; fix tracked in the release-rebuild-binary-not-committed work package |
 | Hand-curated CHANGELOG entry overwritten | (Won't happen) | Changelog step is idempotent — if `## [<version>]` exists it skips |
 
