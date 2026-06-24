@@ -26,28 +26,76 @@ Wary of `curl | sh`? Inspect first: `curl -fsSL https://mickeyyaya.github.io/evo
 
 **Windows:** the autonomous loop's runtime is Unix-based (tmux, bash), so run it under **[WSL2](https://learn.microsoft.com/windows/wsl/install)** — install WSL, open your WSL (e.g. Ubuntu) shell, then run the same one-liner there (inside WSL, it installs exactly as on Linux). The `/evo:*` skills *also* install natively in Claude Code on Windows via the `/plugin` commands above; only the loop runtime needs WSL.
 
-**Set up (optional but recommended):** `/setup` is an interactive flow that detects your installed CLIs, explains the pipeline, and proposes which model should run each phase. Skip it and the loop runs with sensible all-Claude defaults.
+### Run — from one command to full control
 
-**Run:**
+Start with just a goal. Reach for a flag only when you want more control — each step below adds one, and explains what happens behind the scenes.
+
+**1 · Just a goal** — the advisor decides everything:
 
 ```bash
-# Just give it a goal — the advisor decides how many cycles the work needs
-# (completion-driven: it stops when the backlog is drained, capped for safety)
 /evo:loop "add dark mode"
+```
+> *Behind the scenes:* Scout reads your repo and the goal, then the advisor **composes the pipeline itself** — which phases to run, which LLM + model runs each, and how many cycles. It keeps going until the work backlog is drained, bounded by a safety cap. You configure nothing.
 
-# Strategy presets tune scope and strictness (cycle count still optional)
-/evo:loop harden                            # stability + tests
-/evo:loop repair "fix auth bug"             # fix-only, smallest diff
-/evo:loop innovate "explore concurrency primitives"
+**2 · Steer the approach** with a strategy:
 
-# Pin an exact number of cycles when you want a hard bound
+```bash
+/evo:loop harden                              # stability + tests
+/evo:loop repair "fix the auth bug"           # smallest-diff bug fix
+/evo:loop innovate "explore concurrency"      # new capabilities
+```
+> *Behind the scenes:* a strategy (`balanced` default · `harden` · `repair` · `innovate` · `ultrathink` · `autoresearch`) shifts **what Scout looks for and how strict Audit is** — same phase spine, different posture.
+
+**3 · Bound the cycles** when you want a hard limit:
+
+```bash
 /evo:loop --cycles 3 "add dark mode"
+```
+> *Behind the scenes:* `--cycles N` is a **contract** — exactly N cycles, never early-stopped. Omit it (step 1) and the advisor decides the count instead.
 
-# Resume a cycle that was checkpointed (e.g. quota wall)
+**4 · Bound the cost** instead of the count:
+
+```bash
+/evo:loop --budget-usd 5 "improve test coverage"
+```
+> *Behind the scenes:* runs cycle after cycle until cumulative spend reaches **$5**, then stops cleanly (`stop_reason=budget`). Combine `--budget-usd N --cycles M` to stop at whichever limit comes first.
+
+**5 · Control the models** with a one-time setup:
+
+```bash
+/evo:setup                          # pick a preset once
+/evo:loop "harden the auth flow"
+```
+> *Behind the scenes:* setup writes **per-phase model routing** to `.evolve/policy.json` — e.g. Build on Codex/GPT-5.5 and Audit on Claude/Opus, deliberately **different model families so the reviewer can't rubber-stamp the builder**. Every later run uses it.
+
+**6 · Resume** a run that was interrupted:
+
+```bash
 /evo:loop --resume
 ```
+> *Behind the scenes:* a checkpoint (e.g. a quota wall mid-cycle) is picked up **exactly where it stopped** — the worktree and cycle state are restored, no work lost.
 
 A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
+
+### Setup & configuration (optional)
+
+You can run the loop with **zero configuration** — it defaults to all-Claude models and sensible behavior. When you want control, it's one command:
+
+```bash
+/evo:setup
+```
+
+It detects which LLM CLIs you have, explains the pipeline, and offers **three presets** — **Recommended**, **Economy** (cheaper/faster models), and **Max-quality** (strongest models). You make **one choice**, and it writes the per-phase model routing for you. Re-run it anytime — it's idempotent.
+
+Everything else has sane defaults; the only knobs live in `.evolve/policy.json` and are all optional:
+
+| Setting | Default | What it does |
+|---|---|---|
+| per-phase model pins | all-Claude | which LLM + model runs each phase (written by `/evo:setup`) |
+| `workflow.cycle_budget` | `enforce` | `enforce` = advisor decides the cycle count; `off` = omitting `--cycles` runs a single cycle |
+| `workflow.max_cycles_cap` | `25` | safety ceiling for how many cycles the advisor may run |
+
+Most people run `/evo:setup` once and never open the file.
 
 ---
 
