@@ -216,7 +216,7 @@
 <body>
 <nav>
   <div class="wrap">
-    <a class="brand" href="#top"><span class="glyph">$_</span>{{.Site.Product.Name}}<span class="ver">{{.Site.Product.Version}}</span></a>
+    <a class="brand" href="#top"><span class="glyph">$_</span>{{.Site.Product.Name}}</a>
     <div class="navlinks">
       <a href="{{(index .Site.Footer.Links 1).Href}}">docs</a>
       <a class="ghbtn" href="{{.Site.Product.RepoURL}}">★ GitHub</a>
@@ -297,8 +297,8 @@
 </section>
 
 {{template "pipelinedemo" .}}
-{{template "examples" .}}
 {{template "concurrency" .}}
+{{template "examples" .}}
 
 <section class="band">
   <div class="wrap">
