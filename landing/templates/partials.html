@@ -127,7 +127,9 @@
   .pld-railfill{position:absolute;left:8px;top:50%;height:2px;width:0;transform:translateY(-1px);background:linear-gradient(90deg,var(--pl-floor),var(--pl-acc));box-shadow:0 0 12px var(--pl-acc-soft);transition:width .3s ease}
   .pld-railfill::after{content:"";position:absolute;right:-3px;top:50%;width:8px;height:8px;border-radius:50%;transform:translateY(-50%);background:var(--pl-acc);box-shadow:0 0 12px 2px var(--pl-acc)}
 
-  .pld-node{position:relative;z-index:2;flex:0 0 auto;width:84px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--pl-line2);border-radius:10px;background:var(--pl-node-base);text-align:center;opacity:.7;transform:translateY(0);transition:transform .5s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .4s,box-shadow .4s,background .4s}
+  .pld-node{position:relative;z-index:2;flex:0 0 auto;width:84px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--pl-line2);border-radius:10px;background:var(--pl-node-base);text-align:center;opacity:1;transform:translateY(0);transition:transform .5s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .4s,box-shadow .4s,background .4s}
+  /* dim/recessed look for not-yet-active phases — muted color, NOT element opacity, so the rail line stays hidden behind the opaque card */
+  .pld-node:not(.pick):not(.floor.on):not(.mint):not(.skip) .pl-nm{color:var(--pl-mut)}
   .pld-node .pl-idx{position:absolute;top:5px;left:7px;font-family:var(--pl-mono);font-size:.5rem;color:var(--pl-mut);opacity:.7}
   .pld-node .pl-nm{font-weight:600;font-size:.66rem;line-height:1.12;color:var(--pl-ink);padding:0 3px;letter-spacing:.01em;margin-bottom:2px}
   .pld-node .pl-cli{font-family:var(--pl-mono);font-size:.5rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--pl-mut);height:8px;white-space:nowrap}
@@ -169,7 +171,7 @@
   .pld-node.skip .pl-stub{opacity:.6}
 
   /* open-ended tail — the catalog is not a fixed list */
-  .pld-node.ghost{justify-content:center;border-style:dashed;border-color:var(--pl-line2);background:transparent;opacity:.6}
+  .pld-node.ghost{justify-content:center;border-style:dashed;border-color:var(--pl-line2);background:var(--pl-node-base);opacity:1}
   .pld-node.ghost .pl-plus{font-size:1.1rem;line-height:1;color:var(--pl-acc)}
   .pld-node.ghost .pl-nm{color:var(--pl-mut);font-weight:600;white-space:normal;font-size:.6rem;line-height:1.15}
   .pld-node.ghost::after{content:"unlimited";position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);font-family:var(--pl-mono);font-size:.46rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);background:var(--pl-bg);padding:0 4px}
