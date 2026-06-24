@@ -74,15 +74,20 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	return rc, nil
 }
 
-// mapCodexModel maps Claude tier aliases to codex model names (researched
-// 2026-05-21 per drivers/codex.sh). Unknown values pass through unchanged.
+// mapCodexModel maps a tier to a codex model name (researched 2026-05-21 per
+// drivers/codex.sh). It accepts BOTH the canonical tier vocabulary
+// (fast/balanced/deep — what policy pins and `evolve setup apply` store) and
+// the legacy Claude aliases (haiku/sonnet/opus); each tier resolves to the same
+// native id. Native ids and genuinely unknown values pass through unchanged.
+// (cycle-378: a pinned canonical tier "deep" was previously unrecognized here,
+// so -m was omitted and codex exited rc=1.)
 func mapCodexModel(m string) string {
 	switch m {
-	case "haiku":
+	case "fast", "haiku":
 		return "gpt-5.4-mini"
-	case "sonnet":
+	case "balanced", "sonnet":
 		return "gpt-5.4"
-	case "opus":
+	case "deep", "opus":
 		return "gpt-5.5"
 	}
 	return m

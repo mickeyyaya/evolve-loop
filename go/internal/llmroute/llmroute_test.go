@@ -327,3 +327,35 @@ func TestResolve_PinCLIOnlyLeavesModelNormal(t *testing.T) {
 		t.Errorf("Model=%q, want sonnet (CLI-only pin leaves model to normal chain)", got.Model)
 	}
 }
+
+// TestResolve_PinBaseFamilyNormalizesToDefaultDriver guards the cycle-378
+// incident: a policy pin written with a BARE family ("codex", which is exactly
+// what `evolve setup apply` emits — Assignment.CLI is the base family) selected
+// the headless `codex` driver instead of the default tmux driver `codex-tmux`.
+// The headless driver has neither the manifest model_tier_map nor the
+// ChatGPT-account model clamp, so codex exited rc=1 every cycle and the loop
+// spun. A base family that has a registered "<family>-tmux" driver MUST
+// normalize to that default driver; an already-qualified or explicit-headless
+// (e.g. "claude-p") name is left untouched.
+func TestResolve_PinBaseFamilyNormalizesToDefaultDriver(t *testing.T) {
+	for _, tc := range []struct{ pinCLI, want string }{
+		{"codex", "codex-tmux"},
+		{"claude", "claude-tmux"},
+		{"agy", "agy-tmux"},
+		{"ollama", "ollama-tmux"},
+		// already driver-qualified → untouched
+		{"codex-tmux", "codex-tmux"},
+		{"claude-tmux", "claude-tmux"},
+		// explicit headless variant preserved (no *-tmux equivalent registered)
+		{"claude-p", "claude-p"},
+	} {
+		pin := &policy.Pin{CLI: tc.pinCLI}
+		got := Resolve("scout", "scout", "auto", nil, nil, nil, pin)
+		if got.Candidates[0] != tc.want {
+			t.Errorf("pin cli=%q: primary=%q, want %q", tc.pinCLI, got.Candidates[0], tc.want)
+		}
+		if got.PrimarySource != "policy.pin" {
+			t.Errorf("pin cli=%q: source=%q, want policy.pin", tc.pinCLI, got.PrimarySource)
+		}
+	}
+}
