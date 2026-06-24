@@ -100,8 +100,8 @@ A profile written with `context_mode: "digest"` is **forward-compatible**: it ac
 
 | Need | How |
 |---|---|
-| Disable digest for one invocation | `EVOLVE_CONTEXT_DIGEST=0 /evolve-loop ...` |
-| Enable digest for an agent without profile field | `EVOLVE_CONTEXT_DIGEST=1 /evolve-loop ...` |
+| Disable digest for one invocation | `EVOLVE_CONTEXT_DIGEST=0 /evo:loop ...` |
+| Enable digest for an agent without profile field | `EVOLVE_CONTEXT_DIGEST=1 /evo:loop ...` |
 | Permanently flip an agent | Edit `.evolve/profiles/<agent>.json`, add `"context_mode": "digest"` |
 | Check what mode was emitted | Look for `EVOLVE_CONTEXT_DIGEST_FROM_PROFILE=1` in role-context-builder stderr / ledger |
 | Force full mode after a non-recorded failure | `EVOLVE_CONTEXT_DIGEST=0` until the next PASS |

@@ -1,7 +1,7 @@
 # AI-Factory Pipeline Resilience & Self-Testing — Research + Repo Grounding
 
 **Date:** 2026-06-02
-**Trigger:** `/evolve-loop` goal — "improve test design & coverage so the pipeline proceeds even when it encounters issues; research how other AI factory pipelines work."
+**Trigger:** `/evo:loop` goal — "improve test design & coverage so the pipeline proceeds even when it encounters issues; research how other AI factory pipelines work."
 **Method:** Parallel research (external pattern survey) + repo grounding (current test state). This doc seeds a `harden`-strategy run.
 
 ---

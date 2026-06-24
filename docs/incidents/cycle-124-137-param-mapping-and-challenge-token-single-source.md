@@ -22,7 +22,7 @@
 |---|---|
 | **Trigger** | Operator directive: store each LLM CLI's parameter mapping in external text/JSON, separated from code (clean-code/design-pattern). |
 | **Actual ask** | Delivered by **PR 1 + PR 2** — fully complete. |
-| **Cascade** | A standing goal ("two clean `/evolve-loop` cycles") drove **PRs 3–7**, each fixing a *procedural/architectural* gap that blocked audit PASS — not a code defect in the operator's feature. |
+| **Cascade** | A standing goal ("two clean `/evo:loop` cycles") drove **PRs 3–7**, each fixing a *procedural/architectural* gap that blocked audit PASS — not a code defect in the operator's feature. |
 | **Root architectural fault** | The cycle's **challenge token had no single source of truth.** Two code paths minted it independently (orchestrator at cycle start, bridge at every phase launch), so phase reports diverged → every cycle 134–136 failed audit C1. |
 | **Resolution** | PR 6 made the orchestrator the **primary writer**; PR 7 made the bridge a **read-first consumer** (mint only as standalone fallback). The on-disk `challenge-token.txt` is now the single source of truth. |
 | **Proof** | cycle-137 scout-report line 2 carried the exact orchestrator-seeded token `f73314437229c5fa` — the divergence that killed 3 prior cycles is closed. |
@@ -51,7 +51,7 @@ The realizer became a **Strategy pattern driven by declarative config**: it read
 
 ## 3. The cascade: how chasing one goal surfaced six gaps
 
-The operator's feature was done at PR 2. A **standing-goal hook** ("two complete successful `/evolve-loop` cycles, resolve issues from an architecture perspective") then drove repeated cycle attempts. Each attempt ran the full 7-phase pipeline and failed audit — never on a code defect, always on a **procedural artifact** the pipeline itself failed to produce or verify. Each failure exposed the next layer:
+The operator's feature was done at PR 2. A **standing-goal hook** ("two complete successful `/evo:loop` cycles, resolve issues from an architecture perspective") then drove repeated cycle attempts. Each attempt ran the full 7-phase pipeline and failed audit — never on a code defect, always on a **procedural artifact** the pipeline itself failed to produce or verify. Each failure exposed the next layer:
 
 ```
 PR1/PR2 ship ──> run cycle ──> audit FAIL: missing eval file ──────────> PR3

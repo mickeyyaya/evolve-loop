@@ -31,7 +31,7 @@ per-CLI artifacts:
 | Target | Names | Transform | Install step (`--install`) |
 |---|---|---|---|
 | codex | `evolve-<name>` | rewrite the single frontmatter `name:` line in-place (line splice — never YAML re-serialization, which is lossy) | copy staged mirror → `$CODEX_HOME/skills/` + prune |
-| agy | unprefixed | verbatim + provenance marker | `agy plugin install .evolve/publish/agy/evolve-loop` |
+| agy | unprefixed | verbatim + provenance marker | `agy plugin install .evolve/publish/agy/evo` |
 | ollama | model `evolve-<name>` | Modelfile: `FROM <base>` + skill body as `SYSTEM """…"""` (literal `"""` downgraded to `'''`) | `ollama create evolve-<name> -f Modelfile` per skill |
 
 ### Flat-namespace prefixing

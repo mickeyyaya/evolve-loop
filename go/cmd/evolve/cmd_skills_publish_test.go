@@ -33,7 +33,7 @@ func publishTestProject(t *testing.T, skills map[string]string) string {
 		list = append(list, "./skills/"+name+"/")
 	}
 	sort.Strings(list)
-	manifest, err := json.Marshal(map[string]any{"name": "evolve-loop", "version": "0.0.0-test", "skills": list})
+	manifest, err := json.Marshal(map[string]any{"name": "evo", "version": "0.0.0-test", "skills": list})
 	if err != nil {
 		t.Fatalf("marshal plugin.json: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestPublishAgy_StagingLayoutAndValidate(t *testing.T) {
 		t.Fatalf("exit %d\nstderr:\n%s", code, errBuf.String())
 	}
 
-	stagingPlugin := filepath.Join(project, ".evolve", "publish", "agy", "evolve-loop")
+	stagingPlugin := filepath.Join(project, ".evolve", "publish", "agy", "evo")
 	manifest, err := os.ReadFile(filepath.Join(stagingPlugin, "plugin.json"))
 	if err != nil {
 		t.Fatalf("plugin.json missing: %v", err)
@@ -316,7 +316,7 @@ func TestPublishAgy_StagingLayoutAndValidate(t *testing.T) {
 	var pj struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(manifest, &pj); err != nil || pj.Name != "evolve-loop" {
+	if err := json.Unmarshal(manifest, &pj); err != nil || pj.Name != "evo" {
 		t.Errorf("plugin.json wrong: %s (err %v)", manifest, err)
 	}
 

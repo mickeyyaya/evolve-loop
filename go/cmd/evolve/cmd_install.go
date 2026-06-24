@@ -16,8 +16,8 @@ import (
 // valid JSON, four core agents with YAML frontmatter, five loop skill files)
 // and exits 1 if any hard check failed — copying nothing. Without --ci, it
 // copies evolve-*.md agents and skills/loop/*.md into $HOME/.claude, warning
-// first (and prompting on stdin) if evolve-loop is already installed as a
-// plugin to avoid duplicate /evolve-loop entries.
+// first (and prompting on stdin) if evo is already installed as a
+// plugin to avoid duplicate /evo:loop entries.
 func runInstall(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ci := installModeCI(args)
 	for _, a := range args {
@@ -50,12 +50,12 @@ func runInstall(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if installer.PluginAlreadyInstalled(homeDir) {
-		fmt.Fprintln(stdout, "WARNING: evolve-loop is already installed as a plugin.")
-		fmt.Fprintln(stdout, "Manual install will create DUPLICATES (/evolve-loop will appear twice).")
+		fmt.Fprintln(stdout, "WARNING: evo is already installed as a plugin.")
+		fmt.Fprintln(stdout, "Manual install will create DUPLICATES (/evo:loop will appear twice).")
 		fmt.Fprintln(stdout, "")
 		fmt.Fprintln(stdout, "To upgrade the plugin version instead, run in your AI CLI:")
-		fmt.Fprintln(stdout, "  /plugin marketplace update evolve-loop")
-		fmt.Fprintln(stdout, "  /plugin update evolve-loop@evolve-loop")
+		fmt.Fprintln(stdout, "  /plugin marketplace update evo")
+		fmt.Fprintln(stdout, "  /plugin update evo@evo")
 		fmt.Fprintln(stdout, "  /plugin reload")
 		fmt.Fprintln(stdout, "")
 		fmt.Fprint(stdout, "Continue with manual install anyway? [y/N] ")
@@ -69,7 +69,7 @@ func runInstall(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "NOTE: Preferred method is plugin install:")
 	fmt.Fprintln(stdout, "  /plugin marketplace add mickeyyaya/evolve-loop")
-	fmt.Fprintln(stdout, "  /plugin install evolve-loop@evolve-loop")
+	fmt.Fprintln(stdout, "  /plugin install evo@evo")
 	fmt.Fprintln(stdout, "")
 
 	res, err := installer.Install(srcDir, homeDir, stdout)

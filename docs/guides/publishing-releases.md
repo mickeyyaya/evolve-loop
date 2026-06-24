@@ -13,7 +13,7 @@ The /insights audit (cycle 8200 onward) flagged "publish" as ambiguous: sometime
 | **push** | `git push origin <branch>` — fast-forwards a remote ref. Pure git. | Hard (force-push only). |
 | **tag** | `git tag vX.Y.Z <sha>` — annotated tag at a commit. | Yes (`git tag -d` + `git push origin :refs/tags/vX.Y.Z`). |
 | **release** | `gh release create vX.Y.Z` — creates a GitHub Release object with notes, tied to a tag. | Yes (`gh release delete vX.Y.Z`). |
-| **propagate** | Marketplace checkouts (`~/.claude/plugins/marketplaces/evolve-loop/`) `git pull` the new tag, then Claude Code's `installed_plugins.json` registry refreshes. | N/A (eventually consistent; verifiable). |
+| **propagate** | Marketplace checkouts (`~/.claude/plugins/marketplaces/evo/`) `git pull` the new tag, then Claude Code's `installed_plugins.json` registry refreshes. | N/A (eventually consistent; verifiable). |
 | **publish** | Composite atomic operation: pre-flight → bump → changelog → audit-bound ship → propagate-verify → rollback-on-fail. | Yes (auto-rollback if propagation fails or post-push gh-release fails). |
 | **ship** | DEPRECATED informal alias for "push." Use **publish** for new releases. `bash legacy/scripts/lifecycle/ship.sh` remains the gate-allowlisted atomic primitive that publish calls internally. | — |
 
@@ -150,7 +150,7 @@ Scope syntax (optional): `feat(auth): add OAuth flow`. The scope is stripped in 
 ## Marketplace topology
 
 ```
-   /Users/<user>/.claude/plugins/marketplaces/evolve-loop/   ← marketplace checkout (git clone)
+   /Users/<user>/.claude/plugins/marketplaces/evo/   ← marketplace checkout (git clone)
       .claude-plugin/plugin.json:.version  ← THIS is what marketplace-poll watches
                           │
                           │ git pull (manual or via Claude Code session start)
@@ -191,7 +191,7 @@ Routinely setting any of these is a CLAUDE.md violation. The pipeline never sets
 |---------|-----------|----------|
 | `preflight: target X not greater than current Y` | You forgot to update `--cycle` arg, or the version bump was already applied. | Run `cat .claude-plugin/plugin.json` to check current; pick a higher target. |
 | `preflight: most recent audit-report.md does not declare 'Verdict: PASS'` | Last audit was WARN/FAIL, or you haven't run an audit recently. | Spawn an audit: `bash legacy/scripts/dispatch/subagent-run.sh auditor <cycle> <workspace>`. |
-| `marketplace-poll: TIMEOUT` | Marketplace checkout didn't pull within --max-wait-s. Possible causes: network lag, marketplace dir corrupted, push didn't actually land. | Check `git -C ~/.claude/plugins/marketplaces/evolve-loop log --oneline | head -3`. If origin/main has the new commit but checkout doesn't, `git -C <dir> pull --ff-only`. |
+| `marketplace-poll: TIMEOUT` | Marketplace checkout didn't pull within --max-wait-s. Possible causes: network lag, marketplace dir corrupted, push didn't actually land. | Check `git -C ~/.claude/plugins/marketplaces/evo log --oneline | head -3`. If origin/main has the new commit but checkout doesn't, `git -C <dir> pull --ff-only`. |
 | `rollback: PARTIAL` | Some rollback step (release-delete, tag-delete, revert) failed. | `cat .evolve/release-rollbacks.jsonl` shows which step. Manually finish (e.g., `gh release delete vX.Y.Z` if release-delete failed). |
 
 ## Out of scope (deferred to v8.13.3+)

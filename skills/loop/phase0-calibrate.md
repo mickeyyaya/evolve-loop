@@ -7,7 +7,7 @@ description: Phase 0 Calibration logic.
 
 # Evolve Loop — Phase 0: CALIBRATE
 
-Runs **once per `/evolve-loop` invocation**, not per cycle. Executes before the first Scout. Establishes a project-level benchmark baseline so tasks are measured against project quality, not just process quality.
+Runs **once per `/evo:loop` invocation**, not per cycle. Executes before the first Scout. Establishes a project-level benchmark baseline so tasks are measured against project quality, not just process quality.
 
 ## Calibration Deduplication
 

@@ -72,7 +72,7 @@ loop runs). The remaining steps, each gated on the prior:
 2. **Shadow-parity — tier 2 (live cycle, real LLM): operator-run.** Run one real cycle through the
    Go path and confirm a clean Scout→Build→Audit→Ship with a committed cycle:
    ```bash
-   EVOLVE_BRIDGE_GO=1 evolve cycle run   # or a 1-cycle /evolve-loop batch
+   EVOLVE_BRIDGE_GO=1 evolve cycle run   # or a 1-cycle /evo:loop batch
    ```
 3. **Flip default:** make `EVOLVE_BRIDGE_GO=1` the default in `adapters/bridge` (and update the
    778-line `bridge_test.go` that currently assumes the bash default).

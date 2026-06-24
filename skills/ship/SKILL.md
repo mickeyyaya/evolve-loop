@@ -49,7 +49,7 @@ Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is
 ## Composition
 
 Invoked by:
-- `/evolve-loop:ship` (user-driven)
+- `/evo:ship` (user-driven)
 - `loop` macro after `/audit`
 
 ## Reference

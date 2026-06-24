@@ -36,7 +36,7 @@ Recovery is now part of the framework's contract: **work-in-flight survives comm
 | **1. failedApproaches[]** | Audit FAIL/WARN OR run-cycle rc=1 | ~free (single state.json append) | Raw failure record (cycle, verdict, errorCategory) | 30 days default (`expiresAt`) |
 | **2. Retrospective YAML lessons** | Audit FAIL/WARN (auto-on v8.45.0+) | $0.30–0.50 per cycle (Sonnet retrospective subagent) | Structured root-cause + prevention rule | Permanent (tracked YAML files + state.json:instinctSummary[]) |
 | **3. Checkpoint-resume** | Cumulative cost ≥95% of cap, OR rc=1 with quota-exhaustion signature | Heavy (entire worktree + cycle-state preserved) | Full mid-cycle state — Builder's uncommitted edits, completed phases, cost-so-far | Until `--resume` or manual cleanup |
-| **4. Worktree preservation** | Any rc≠0 if no checkpoint fired | None (passive — the worktree just doesn't get deleted) | Worktree edits surviving cleanup-skip | Until next `/evolve-loop --reset` or manual cleanup |
+| **4. Worktree preservation** | Any rc≠0 if no checkpoint fired | None (passive — the worktree just doesn't get deleted) | Worktree edits surviving cleanup-skip | Until next `/evo:loop --reset` or manual cleanup |
 
 These are independent. A single failure may trigger 1, 2, 3, or 4 of them depending on its kind.
 
@@ -224,7 +224,7 @@ The `--reset` does NOT touch Tier 1 hooks — they remain enforcing. Only Tier 3
 The motivating incident for v9.1.0. Detailed timeline:
 
 ```
-T+0:00   /evolve-loop --cycles 3 invoked
+T+0:00   /evo:loop --cycles 3 invoked
 T+0:02   Cycle 11 starts, Calibrate → Research → Build phases run
 T+0:08   Cycle 11 audit phase begins
 T+0:12   `claude -p` subprocess dies silently (rc=1, empty stderr)
@@ -254,7 +254,7 @@ T+35:00  Cycle 11 completes; ships normally
 
 Net work loss: ~5 minutes (the partial audit phase). The ~$2-4 of Builder work survives.
 
-This is the canonical test of Layer 3. Subscription users (the dominant case for `/evolve-loop`) should NEVER lose >1 phase of work to quota.
+This is the canonical test of Layer 3. Subscription users (the dominant case for `/evo:loop`) should NEVER lose >1 phase of work to quota.
 
 ---
 

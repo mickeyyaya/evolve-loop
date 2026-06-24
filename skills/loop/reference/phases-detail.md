@@ -142,7 +142,7 @@ REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *
 
 **On RED (first occurrence):** Write enriched `handoff.md` as a safety checkpoint. Then **continue immediately** — auto-compaction should free context.
 
-**On RED (second consecutive):** STOP. Output resume command: `/evolve-loop <remaining> <strategy> <goal>`.
+**On RED (second consecutive):** STOP. Output resume command: `/evo:loop <remaining> <strategy> <goal>`.
 
 Increment after each cycle: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
 

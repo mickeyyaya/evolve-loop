@@ -34,7 +34,7 @@ Maximum velocity, zero shortcuts. Worktrees are provisioned natively — agents 
 
 bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date -d`. Required: `set -uo pipefail` (not `set -e`), atomic writes via `mv "${f}.tmp.$$"`, `git diff HEAD` for tree-state SHA. `skills/<name>/` is canonical; `.agents/skills/` are symlinks. Full table with reasons/portable alternatives → [runtime-reference.md](docs/operations/runtime-reference.md).
 
-## /evolve-loop task priority
+## /evo:loop task priority
 
 1. New features 2. Bug fixes 3. Security issues
 

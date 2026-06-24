@@ -344,7 +344,7 @@ The cycle-scope Triage phase (Layer C, agents/evolve-triage.md) now runs on **ev
 
 `--budget-usd N` / `--budget N` flags use dollar spend as primary stop condition. Dispatcher runs cycles until cumulative cost ≥ $N, then exits with `stop_reason=budget`. `EVOLVE_BATCH_BUDGET_CAP` remains hard ceiling.
 
-Bare-positional-integer (`/evolve-loop 3 ...`) still parses as **cycles** with deprecation WARN. v10+ candidate considers flipping to dollars — prefer the explicit flag (`--cycles N` or `--budget-usd N`) to be flip-safe.
+Bare-positional-integer (`/evo:loop 3 ...`) still parses as **cycles** with deprecation WARN. v10+ candidate considers flipping to dollars — prefer the explicit flag (`--cycles N` or `--budget-usd N`) to be flip-safe.
 
 Builder cost-overrun guard: `phase-gate.sh gate_build_to_audit` reads `builder-usage.json` against `EVOLVE_MAX_BUDGET_USD` (or `EVOLVE_BUILDER_COST_THRESHOLD`, default `$2.00`) and appends audit-visible defect on overrun. Strict mode: `EVOLVE_BUILDER_COST_GUARD_STRICT=1`.
 
@@ -354,7 +354,7 @@ Builder cost-overrun guard: `phase-gate.sh gate_build_to_audit` reads `builder-u
 
 Reactive (Cycle 3): `_quota_likely` heuristic in `subagent-run.sh` writes a checkpoint when phase rc=1 + stderr empty + cost ≥80% of `BATCH_CAP`. Pre-emptive (Cycle 2): dispatcher exports `EVOLVE_CHECKPOINT_REQUEST=1` when cumulative cost crosses 95%. Operator-requested: `cycle-state.sh checkpoint operator-requested`.
 
-When checkpoint fires: `run-cycle.sh`'s EXIT trap preserves worktree + cycle-state + workspace artifacts. Resume via `/evolve-loop --resume`. Trust kernel unchanged — resume goes through same enforcement.
+When checkpoint fires: `run-cycle.sh`'s EXIT trap preserves worktree + cycle-state + workspace artifacts. Resume via `/evo:loop --resume`. Trust kernel unchanged — resume goes through same enforcement.
 
 Full env-var reference and protocol: `docs/architecture/checkpoint-resume.md`, `docs/architecture/context-window-control.md`.
 

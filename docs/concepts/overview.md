@@ -47,7 +47,7 @@ The 8 phases are mandatory in order. Every phase change is recorded in `cycle-st
 
 ## Who Does What — The Agents
 
-An "agent" in evolve-loop is **one persona, one perspective, one output format** — see [tri-layer.md](../architecture/tri-layer.md). Personas are markdown files in `agents/`. They don't invoke each other; the slash command (or `/evolve-loop`'s orchestrator) sequences them.
+An "agent" in evolve-loop is **one persona, one perspective, one output format** — see [tri-layer.md](../architecture/tri-layer.md). Personas are markdown files in `agents/`. They don't invoke each other; the slash command (or `/evo:loop`'s orchestrator) sequences them.
 
 | Agent | Persona file | Role | Read what | Write what |
 |---|---|---|---|---|

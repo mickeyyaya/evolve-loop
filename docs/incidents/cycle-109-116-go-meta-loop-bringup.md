@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-27 | **Severity:** HIGH (the v13 Go meta-loop could not complete a single cycle) | **Status:** all 7 layers remediated + shipped to main; cycle 116 (the end-to-end validation) sealed unfinished via `evolve cycle reset` (dispatcher died mid-audit)
 
-> A `/evolve-loop --budget-usd 150 ultrathink` run against the repo itself surfaced **seven distinct pipeline-failure layers** in a row. Each was a cycle-runtime integration behavior the v11 bash→Go port dropped or changed, that the Phase-1 unit suite (fakes only) never exercised. Each fix advanced the loop exactly one phase deeper, revealing the next. By cycle 116 the loop ran intent → scout → triage → tdd → build-planner → **build** (writing the goal's own code via TDD) — the first Go-era cycle to write production code.
+> A `/evo:loop --budget-usd 150 ultrathink` run against the repo itself surfaced **seven distinct pipeline-failure layers** in a row. Each was a cycle-runtime integration behavior the v11 bash→Go port dropped or changed, that the Phase-1 unit suite (fakes only) never exercised. Each fix advanced the loop exactly one phase deeper, revealing the next. By cycle 116 the loop ran intent → scout → triage → tdd → build-planner → **build** (writing the goal's own code via TDD) — the first Go-era cycle to write production code.
 
 ## Part 1: What Happened
 

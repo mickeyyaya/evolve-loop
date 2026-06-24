@@ -127,7 +127,7 @@ The two systems integrate at the threshold layer:
 3. **Implicit checkpoint** — when context is in the danger zone, the
    same `EVOLVE_CHECKPOINT_REQUEST=1` signal is set as for cost.
 
-This means an operator running `/evolve-loop --budget-usd 5 "<goal>"` who
+This means an operator running `/evo:loop --budget-usd 5 "<goal>"` who
 hits the context wall before the cost wall sees the same graceful pause
 behavior as if cost had hit first.
 

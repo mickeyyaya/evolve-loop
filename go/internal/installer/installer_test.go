@@ -32,9 +32,9 @@ func fakePluginLayout(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	writeFile(t, root, ".claude-plugin/plugin.json",
-		`{"name":"evolve-loop","version":"6.0.0","description":"d","agents":[],"skills":[]}`)
+		`{"name":"evo","version":"6.0.0","description":"d","agents":[],"skills":[]}`)
 	writeFile(t, root, ".claude-plugin/marketplace.json",
-		`{"plugins":[{"name":"evolve-loop"}]}`)
+		`{"plugins":[{"name":"evo"}]}`)
 	for _, a := range coreAgents {
 		writeFile(t, root, "agents/"+a+".md", "---\nname: "+a+"\ndescription: d\n---\nbody\n")
 	}
@@ -157,7 +157,7 @@ func TestValidate_FlagsMissingPluginField(t *testing.T) {
 	root := fakePluginLayout(t)
 	// Drop the description field from an otherwise-valid manifest.
 	writeFile(t, root, ".claude-plugin/plugin.json",
-		`{"name":"evolve-loop","version":"6.0.0","agents":[],"skills":[]}`)
+		`{"name":"evo","version":"6.0.0","agents":[],"skills":[]}`)
 	var out bytes.Buffer
 	res := Validate(root, &out)
 
@@ -422,7 +422,7 @@ func TestPluginAlreadyInstalled(t *testing.T) {
 	if PluginAlreadyInstalled(home) {
 		t.Error("clean home reported as already-installed")
 	}
-	if err := os.MkdirAll(filepath.Join(home, ".claude", "plugins", "cache", "evolve-loop"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, ".claude", "plugins", "cache", "evo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if !PluginAlreadyInstalled(home) {
@@ -430,7 +430,7 @@ func TestPluginAlreadyInstalled(t *testing.T) {
 	}
 
 	home2 := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(home2, ".claude", "plugins", "marketplaces", "evolve-loop"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home2, ".claude", "plugins", "marketplaces", "evo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if !PluginAlreadyInstalled(home2) {
@@ -455,5 +455,10 @@ func TestExportedResultTypes(t *testing.T) {
 	}
 	if !strings.Contains(UsageLine, "[cycles] [strategy] [goal]") {
 		t.Errorf("UsageLine drifted from the 3-arg form: %q", UsageLine)
+	}
+	// Post-rename (2026-06-24): the installer prints the live /evo:loop command,
+	// never the dead /evolve-loop one. Locks the user-facing display string.
+	if !strings.Contains(UsageLine, "/evo:loop") {
+		t.Errorf("UsageLine must use the /evo:loop command form, got: %q", UsageLine)
 	}
 }

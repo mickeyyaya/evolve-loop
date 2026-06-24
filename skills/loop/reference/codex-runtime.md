@@ -1,11 +1,11 @@
 # Codex CLI Runtime (Hybrid Driver, v8.51.0+)
 
-> How `/evolve-loop` reaches the dispatcher under OpenAI Codex CLI. **The Claude binary is recommended at runtime for full caps, but no longer required** — v8.51.0 added graceful degradation. See [v8.51 capability model](#v851-capability-model) below.
+> How `/evo:loop` reaches the dispatcher under OpenAI Codex CLI. **The Claude binary is recommended at runtime for full caps, but no longer required** — v8.51.0 added graceful degradation. See [v8.51 capability model](#v851-capability-model) below.
 
 ## Invocation chain
 
 ```
-User: /evolve-loop 5 polish improve dispatcher
+User: /evo:loop 5 polish improve dispatcher
   (typed into Codex CLI)
 
   ↓ Codex resolves the skill

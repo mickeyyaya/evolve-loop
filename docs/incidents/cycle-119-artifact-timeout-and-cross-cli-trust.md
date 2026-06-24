@@ -1,6 +1,6 @@
 # Incident Report & Remediation: Relative-Path ExitArtifactTimeout + Cross-CLI Trust Bypass — Cycle 119
 
-**Date:** 2026-05-28 | **Severity:** CRITICAL (a `/evolve-loop` launched via the documented slash-command path could not clear *any* worktree phase → no cycle could build or ship) | **Status:** Issue 1 FIXED + shipped `80f4206` (main, CI green); the **Issue-1 fix validated on cycle 120** — the tdd worktree phase (where 119 died) cleared cleanly, no `exit=81` — though that cycle then hit a *separate* failure at build-planner (Issue 4). Issues 2–4 OPEN with fix designs below.
+**Date:** 2026-05-28 | **Severity:** CRITICAL (a `/evo:loop` launched via the documented slash-command path could not clear *any* worktree phase → no cycle could build or ship) | **Status:** Issue 1 FIXED + shipped `80f4206` (main, CI green); the **Issue-1 fix validated on cycle 120** — the tdd worktree phase (where 119 died) cleared cleanly, no `exit=81` — though that cycle then hit a *separate* failure at build-planner (Issue 4). Issues 2–4 OPEN with fix designs below.
 
 **Validation result (cycle 120, full-phase, fixed binary):** intent→scout→triage→**tdd ALL completed** (tdd = the worktree phase where 119 died; it wrote `test-report.md` to the now-absolute workspace, the bridge detected it at the matching absolute path, `bridge.Launch` returned cleanly). Per-phase: all `claude-tmux`; intent/tdd/build-planner=opus, scout/triage=sonnet. The cycle then FAILED at **build-planner** with a *new* `exit=81` (see Issue 4) — unrelated to the relative-path root cause.
 
@@ -8,7 +8,7 @@
 
 ## Part 1: What Happened
 
-**Context.** An all-phases verification run (`/evolve-loop`, every optional phase enabled, goal = "optimize token usage") was launched as **cycle 119** to (a) exercise the full pipeline and (b) do real token-optimization work. Intent → Scout → Triage ran; the cycle then **aborted at the TDD phase**:
+**Context.** An all-phases verification run (`/evo:loop`, every optional phase enabled, goal = "optimize token usage") was launched as **cycle 119** to (a) exercise the full pipeline and (b) do real token-optimization work. Intent → Scout → Triage ran; the cycle then **aborted at the TDD phase**:
 
 ```
 evolve loop: cycle 119: phase tdd: tdd: bridge: bridge: launch exit=81

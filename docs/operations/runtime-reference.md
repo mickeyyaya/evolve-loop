@@ -135,13 +135,13 @@ Migration note: `EVOLVE_ALLOW_DEEP_RESEARCH` is retired; use
 >
 > - `evolve acs suite --cycle N [--root .] [--evolve-dir .evolve]` — runs the bash EGPS predicate suite (cycle-N predicates + regression-suite + red-team) and writes `<evolve-dir>/runs/cycle-N/acs-verdict.json`; exit `2` when any predicate is RED, `0` when all green. Host-side deterministic replacement for the deleted `run-acs-suite.sh` (ADR-0025). `evolve acs run --cycle N <pkg>` runs `go test -json` on a package into the same verdict file.
 
-> **Session cost isolation (v10.8.0+):** `claude -p` subagent invocations bill to the OAuth session that launched the dispatcher (the parent Claude Code session), not the batch budget meter. To isolate `/evolve-loop` costs from your prior session context, run `/clear` before starting a new evolve-loop batch. The batch meter (`state.json:currentBatch.cycleAccruedCostUSD`) tracks per-cycle accumulation but cannot capture OAuth session charges.
+> **Session cost isolation (v10.8.0+):** `claude -p` subagent invocations bill to the OAuth session that launched the dispatcher (the parent Claude Code session), not the batch budget meter. To isolate `/evo:loop` costs from your prior session context, run `/clear` before starting a new evolve-loop batch. The batch meter (`state.json:currentBatch.cycleAccruedCostUSD`) tracks per-cycle accumulation but cannot capture OAuth session charges.
 
 ## Ship classes (`evolve ship --class <X>`, native)
 
 | Class | Use case | Verification |
 |---|---|---|
-| `cycle` (default) | `/evolve-loop` cycle commits | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 |
+| `cycle` (default) | `/evo:loop` cycle commits | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 |
 | `manual` | Operator-driven manual commits | Skips audit-binding, but requires a fresh commit-gate review attestation (`.commit-gate/attestation.json`; bypass with `EVOLVE_BYPASS_COMMIT_GATE=1`); interactive y/N. CI mode: `EVOLVE_SHIP_AUTO_CONFIRM=1`. |
 | `release` | `evolve release` pipeline only | Skips audit (version-bump mutates files post-audit); logs RELEASE class loudly |
 

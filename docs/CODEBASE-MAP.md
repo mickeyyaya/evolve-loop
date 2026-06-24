@@ -105,7 +105,7 @@ and project-scoped slash commands. Not evolve-loop runtime state.
 ### `.claude-plugin/`
 
 Claude Code plugin manifest (`plugin.json`, `marketplace.json`).
-Defines the `/evolve-loop` skill entry point, permissions, and plugin metadata.
+Defines the `/evo:loop` skill entry point, permissions, and plugin metadata.
 
 ### `bin/`
 
