@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // TestPhaseVerify_UserPhaseParity proves the agent self-check resolves a

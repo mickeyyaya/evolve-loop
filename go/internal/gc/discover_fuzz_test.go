@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"pgregory.net/rapid"
 )
 

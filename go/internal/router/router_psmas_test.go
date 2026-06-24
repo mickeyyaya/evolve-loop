@@ -22,7 +22,7 @@ package router
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // psmasBase mirrors base() but with the PSMAS gate open and a present

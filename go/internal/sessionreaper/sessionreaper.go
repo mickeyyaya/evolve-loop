@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
-	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // Options configures an orphan sweep.

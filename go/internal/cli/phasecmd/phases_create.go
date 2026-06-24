@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseinventory"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseinventory"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // createEnvelopeOut is the stdout contract for `phases create`. Stable JSON so

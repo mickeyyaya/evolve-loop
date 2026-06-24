@@ -19,11 +19,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // Version is the onboarding schema version stamped by Complete.

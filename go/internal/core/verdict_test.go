@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 )
 
 func TestReasonFromDiagnostics(t *testing.T) {

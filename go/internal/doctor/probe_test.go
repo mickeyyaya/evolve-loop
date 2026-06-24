@@ -216,7 +216,7 @@ func TestRealProbe_Go(t *testing.T) {
 // Found=false without error.
 func TestRealProbe_Missing(t *testing.T) {
 	// Construct an arbitrary 64-char name unlikely to exist as a binary.
-	name := "evolveloop_doctor_probe_must_not_exist_anywhere_xyzzy_qux_42"
+	name := "evolve-loop_doctor_probe_must_not_exist_anywhere_xyzzy_qux_42"
 	if runtime.GOOS == "windows" {
 		t.Skip("not validated on windows")
 	}

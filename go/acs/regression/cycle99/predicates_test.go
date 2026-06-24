@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC99_001_PsmasABVerificationDocumented ports cycle-99/001.

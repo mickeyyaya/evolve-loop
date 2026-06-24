@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // profileCLIs returns the non-empty CLI driver names a profile can run against:

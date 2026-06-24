@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/dossier"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {

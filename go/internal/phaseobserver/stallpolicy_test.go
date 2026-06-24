@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // scriptedStallPolicy returns a fixed action for every stall incident and

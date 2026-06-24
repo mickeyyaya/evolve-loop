@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
 // ADR-0050 §3.10 Slice 2: intent reads the goal from the typed envelope at enforce

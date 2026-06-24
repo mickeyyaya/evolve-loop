@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 func TestSwarmRunner_CoverageHelpers(t *testing.T) {

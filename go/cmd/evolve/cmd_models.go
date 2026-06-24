@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolveloop/go/internal/setup"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
 // runModels implements `evolve models <subcommand>` — the live tier→model

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // Cycle-230 test-amplification adversarial tests for task ledger-skip-source.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/detectnested"
+	"github.com/mickeyyaya/evolve-loop/go/internal/detectnested"
 )
 
 // runDetectNested is the `evolve detect-nested-claude` subcommand.

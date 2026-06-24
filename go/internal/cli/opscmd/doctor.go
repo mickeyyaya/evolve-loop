@@ -3,10 +3,10 @@ package opscmd
 import (
 	"flag"
 	"fmt"
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/doctor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 )
 
 // runDoctor implements `evolve doctor <subcommand>`: `probe <tool>` (CLI

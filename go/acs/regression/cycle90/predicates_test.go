@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // TestC90_001_ExpectedShipShaRefreshed ports cycle-90/001.

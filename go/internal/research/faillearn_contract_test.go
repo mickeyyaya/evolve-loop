@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 )
 
 // If this count drifts, a field was added to research.lessonYAML that

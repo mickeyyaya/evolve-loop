@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
 // verifyNoControlPlaneEdits is the post-hoc backstop of the pipeline integrity

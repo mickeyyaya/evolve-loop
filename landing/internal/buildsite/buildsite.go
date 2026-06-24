@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"evolveloop-landing/internal/content"
-	"evolveloop-landing/internal/render"
+	"evolve-loop-landing/internal/content"
+	"evolve-loop-landing/internal/render"
 )
 
 // Version is one style of the landing page.
@@ -148,12 +148,12 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // metadataAllowlist is the SHRINKING set of OPTIONAL catalog phases that still

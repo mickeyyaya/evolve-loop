@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/panestream"
-	"github.com/mickeyyaya/evolveloop/go/internal/cliadmit"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliadmit"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // errWorktreeRequired is the CB.2 typed refusal: under a fleet supervisor

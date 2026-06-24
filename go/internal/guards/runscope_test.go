@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {

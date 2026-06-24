@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasewatchdog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasewatchdog"
 )
 
 // runPhaseWatchdog is the `evolve phase-watchdog <workspace> <pgid> <cycle> <cycle-state>` subcommand.

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // TestIntegration_BridgeBoot_ClaudeTmux is the one test that reproduces the

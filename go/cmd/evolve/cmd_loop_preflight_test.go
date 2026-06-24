@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/looppreflight"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // forcedHalt is a looppreflight.Result that always halts — the seam value tests

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestWithStateLock_SerializesWithUpdateState pins ADR-0049 S2 / gap G2: ship's

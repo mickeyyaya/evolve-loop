@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // compact_prompts_test.go — contract for prompt-ondemand-section-strip (runner half).

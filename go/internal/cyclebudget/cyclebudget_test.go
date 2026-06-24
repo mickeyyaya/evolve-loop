@@ -3,7 +3,7 @@ package cyclebudget_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cyclebudget"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 )
 
 func TestNext_OffStageNeverDecides(t *testing.T) {

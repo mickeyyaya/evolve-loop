@@ -17,7 +17,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
 // readStateMap parses path as JSON into a map. Missing/empty → empty map.

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
 // TestDossierVerdict_MapsCycleOutcomes pins the CycleOutcome → dossier verdict

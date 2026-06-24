@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // runDoctorBoot implements `evolve doctor boot <driver> [--sandbox] [--json]`:

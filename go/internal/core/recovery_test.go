@@ -8,7 +8,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
 )
 
 func TestRecoveryTarget_ConfigDriven(t *testing.T) {

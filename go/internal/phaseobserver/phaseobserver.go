@@ -26,8 +26,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
-	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 const (

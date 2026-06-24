@@ -97,7 +97,7 @@ No code fix in this dossier — this is a release retrospective. The fixes that 
 ## 6. References
 
 - Release commit: `6505fd3 release: v10.17.0` — 5 files (plugin.json, marketplace.json, SKILL.md, README.md, CHANGELOG.md)
-- GitHub release: https://github.com/mickeyyaya/evolveloop/releases/tag/v10.17.0
+- GitHub release: https://github.com/mickeyyaya/evolve-loop/releases/tag/v10.17.0
 - Marketplace propagation: confirmed 1s after push (per release-pipeline.sh log)
 - Release journal: `.evolve/release-journal/10.17.0-20260520T105747Z.json`
 - All 12 commits visible via: `git log --oneline 8cff9c1..6505fd3`

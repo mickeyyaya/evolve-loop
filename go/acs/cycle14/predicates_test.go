@@ -38,8 +38,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // goBashCmd runs a bash command string from the go/ directory and returns
@@ -156,7 +156,7 @@ func TestC14_004_IPCEnvLeafHasNoInternalImports(t *testing.T) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &info); err != nil {
 		t.Fatalf("RED: failed to parse go list -json output: %v\nRaw stdout:\n%s", err, out)
 	}
-	const modulePrefix = "github.com/mickeyyaya/evolveloop/go"
+	const modulePrefix = "github.com/mickeyyaya/evolve-loop/go"
 	for _, imp := range info.Imports {
 		if strings.HasPrefix(imp, modulePrefix) {
 			t.Errorf("RED: ipcenv imports intra-repo package %q.\n"+

@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
 // cmdBridgeWatch implements `evolve bridge watch --workspace=DIR --agent=NAME [--follow]`.

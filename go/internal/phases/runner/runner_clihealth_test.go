@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // cycle283WallTail is the verbatim wall line from the real cycle-283

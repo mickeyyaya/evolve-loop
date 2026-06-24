@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // topNHeadingRE locates the committed-selection heading. The canonical

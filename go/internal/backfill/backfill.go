@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // phaseHeaders maps each phase name to its canonical markdown header.

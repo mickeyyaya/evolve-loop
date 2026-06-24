@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC77_001_AuditorColdMoveStage8 ports cycle-77/001.

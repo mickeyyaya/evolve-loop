@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 // WaveRunner runs one wave's file-disjoint specs concurrently and returns the

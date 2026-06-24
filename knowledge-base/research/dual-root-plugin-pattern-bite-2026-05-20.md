@@ -95,7 +95,7 @@ Add a `--watch-project-repo=$PWD` mode to the dispatcher that prefers project-re
 
 - Source commit: `ad07d25 perf(watchdog): raise default stall threshold 240s → 600s`
 - Release commit: `6505fd3 release: v10.17.0`
-- GitHub release: https://github.com/mickeyyaya/evolveloop/releases/tag/v10.17.0
+- GitHub release: https://github.com/mickeyyaya/evolve-loop/releases/tag/v10.17.0
 - Skill file: `skills/evolve-loop/SKILL.md` STRICT MODE section (the `find` expression)
 - Memory: `feedback_dual_root_pattern.md`
 - Cross-references:

@@ -65,8 +65,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/quotareset"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // the single production file the committed top_n task targets.

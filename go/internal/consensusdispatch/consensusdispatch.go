@@ -20,8 +20,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
 // Exit code contract (matches consensus-dispatch.sh):

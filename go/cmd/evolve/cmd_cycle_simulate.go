@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/ledger"
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/storage"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // simulatePhase satisfies core.PhaseRunner with a deterministic PASS

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // PlanCycles partitions a backlog into at most `count` concurrent cycle specs,

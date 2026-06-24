@@ -19,7 +19,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 )
 
 // CycleRow is one cycle's R6 outcome classification.

@@ -3,8 +3,8 @@ package deliverable
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Phase 3.8 (ADR-0050): the structured-failure-block requirement — enforced

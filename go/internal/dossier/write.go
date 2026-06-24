@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // Write persists d to dir as cycle-N.json and cycle-N.md using atomic

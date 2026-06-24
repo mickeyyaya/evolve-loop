@@ -3,8 +3,8 @@ package fleet
 import (
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/dag"
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dag"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // PlanWaves turns a dependency-annotated backlog into an ordered list of waves.

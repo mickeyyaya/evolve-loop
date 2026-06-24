@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // artifactTimeoutErr mimics exactly what bridge.Engine.Launch returns on exit

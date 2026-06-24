@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
 // Sentinel errors returned by Supervisor.Ask.

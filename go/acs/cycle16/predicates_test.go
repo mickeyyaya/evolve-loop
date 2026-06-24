@@ -50,9 +50,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cli/phasecmd"
-	"github.com/mickeyyaya/evolveloop/go/internal/systemprompt"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/systemprompt"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // cycle16TempProject creates a minimal project skeleton for phasecmd tests.

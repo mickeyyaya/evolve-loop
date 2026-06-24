@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 var t0 = time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC)

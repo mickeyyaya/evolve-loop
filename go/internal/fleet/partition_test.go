@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func bucketIDs(b []Todo) []string {

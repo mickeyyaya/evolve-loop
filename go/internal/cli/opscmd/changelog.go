@@ -3,12 +3,12 @@ package opscmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/changeloggen"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
 )
 
 // runChangelogGen is `evolve changelog-gen <from-ref> <to-ref> <version> [--dry-run]`.

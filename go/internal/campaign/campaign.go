@@ -19,7 +19,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 const (

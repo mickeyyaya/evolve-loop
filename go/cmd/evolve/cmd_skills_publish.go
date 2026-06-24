@@ -33,8 +33,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 //go:embed templates/modelfile.tmpl

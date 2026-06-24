@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 func TestHealthyCorpus_EmbeddedAndParsed(t *testing.T) {

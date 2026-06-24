@@ -41,7 +41,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Sentinel errors. The cmd layer maps these to exit codes.
@@ -591,7 +591,7 @@ func defaultRebuildBinary(repoRoot, target string, dryRun bool) error {
 	if _, err := exec.LookPath("go"); err != nil {
 		return fmt.Errorf("go toolchain not on PATH: %w", err)
 	}
-	const versionPkg = "github.com/mickeyyaya/evolveloop/go/pkg/version"
+	const versionPkg = "github.com/mickeyyaya/evolve-loop/go/pkg/version"
 	commit := "unknown"
 	if out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--short=12", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(string(out))

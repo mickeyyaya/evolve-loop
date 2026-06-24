@@ -1,6 +1,6 @@
 package fixtures
 
-import "github.com/mickeyyaya/evolveloop/go/internal/core"
+import "github.com/mickeyyaya/evolve-loop/go/internal/core"
 
 // Test-data builders (the Object Mother pattern): factories that return a
 // valid default value so a test only states the fields it actually cares

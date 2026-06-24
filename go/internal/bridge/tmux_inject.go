@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/keyspec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
 
 // emitChannelBreadcrumb writes one structured channel marker to w. The producer's

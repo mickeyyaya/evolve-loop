@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // makeRepo sets up an inbox/-style repo with optional inbox/ files,

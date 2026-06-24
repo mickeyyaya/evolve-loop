@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/installer"
+	"github.com/mickeyyaya/evolve-loop/go/internal/installer"
 )
 
 // runInstall is `evolve install [--ci]` — the native port of install.sh.
@@ -68,7 +68,7 @@ func runInstall(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "Installing Evolve Loop %s...\n", installer.Version)
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "NOTE: Preferred method is plugin install:")
-	fmt.Fprintln(stdout, "  /plugin marketplace add mickeyyaya/evolveloop")
+	fmt.Fprintln(stdout, "  /plugin marketplace add mickeyyaya/evolve-loop")
 	fmt.Fprintln(stdout, "  /plugin install evolve-loop@evolve-loop")
 	fmt.Fprintln(stdout, "")
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 func TestReapOrphans_FreshLeaseSkipped(t *testing.T) {

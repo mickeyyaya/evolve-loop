@@ -37,7 +37,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // binPath returns the absolute path to the built evolve binary in the worktree.

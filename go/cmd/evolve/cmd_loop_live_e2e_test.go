@@ -38,12 +38,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/ledger"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/cycleclassify"
-	"github.com/mickeyyaya/evolveloop/go/internal/dispatchevents"
-	"github.com/mickeyyaya/evolveloop/go/internal/ledgerverify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 )
 
 // minimalProfileJSON produces a one-shot profile satisfying the bridge's

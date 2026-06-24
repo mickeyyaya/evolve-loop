@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // RunRequest captures every input cmd_run reads from argv + environment.

@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // updatestate.go — CA.3 (concurrency-factory plan, Track C-A): the

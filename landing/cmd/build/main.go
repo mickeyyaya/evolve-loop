@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 
-	"evolveloop-landing/internal/buildsite"
+	"evolve-loop-landing/internal/buildsite"
 )
 
 // config returns the build configuration: the five landing-page versions plus
@@ -42,9 +42,9 @@ func run(stdout io.Writer) int {
 		fmt.Fprintln(os.Stderr, "build error:", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "built %d files into %s/\n", len(written), cfg.OutDir)
+	_, _ = fmt.Fprintf(stdout, "built %d files into %s/\n", len(written), cfg.OutDir)
 	for _, w := range written {
-		fmt.Fprintln(stdout, "  ", w)
+		_, _ = fmt.Fprintln(stdout, "  ", w)
 	}
 	return 0
 }

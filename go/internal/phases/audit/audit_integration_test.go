@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // writeGoPredFixture writes a minimal Go ACS predicate module under <root>/go so

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cyclehealth"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // runCycleHealth implements `evolve cycle-health <N> <workspace>`.

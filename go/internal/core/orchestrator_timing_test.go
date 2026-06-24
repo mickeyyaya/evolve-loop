@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // cycleWorkspaceDir mirrors RunCycle's WorkspacePath formula

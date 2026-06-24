@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // TestGitWorktree_ConcurrentSiblingsNoBranchCollision reproduces the multi-stream

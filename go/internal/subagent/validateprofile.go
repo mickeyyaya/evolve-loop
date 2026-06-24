@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	gobridge "github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // ValidateProfileRequest captures every input cmd_validate_profile reads

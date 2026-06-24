@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/skillinventory"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillinventory"
 )
 
 // runSkillInventory implements `evolve skill-inventory <subcommand>`.

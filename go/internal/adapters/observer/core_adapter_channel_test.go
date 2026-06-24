@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/channel"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func TestCoreAdapter_SpawnsProducer_WhenChannelOn(t *testing.T) {

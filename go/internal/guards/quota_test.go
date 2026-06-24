@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Quota is the port of scripts/hooks/research-quota-gate.sh. Phase-1

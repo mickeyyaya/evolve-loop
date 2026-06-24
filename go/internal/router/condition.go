@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // evalCondition is the Specification evaluator: does a single declarative

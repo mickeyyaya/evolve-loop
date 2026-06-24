@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
 // diffAbs returns |a-b| for float epsilon comparisons.

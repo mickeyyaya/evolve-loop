@@ -44,8 +44,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // goDir returns the module dir; `go test -C <goDir>` / `git -C <goDir>` make every

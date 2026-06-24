@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func TestRun_BridgeBoot_Skipped_Warns(t *testing.T) {

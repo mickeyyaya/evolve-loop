@@ -9,8 +9,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // writeDecision stages a debug-decision.json under dir. An empty body

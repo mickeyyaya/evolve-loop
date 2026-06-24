@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // engine_launch_test.go — tests for the core.Bridge entry Engine.Launch

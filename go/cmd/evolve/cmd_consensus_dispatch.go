@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/consensusdispatch"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/consensusdispatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // runConsensusDispatch is the `evolve consensus-dispatch` subcommand. Ports

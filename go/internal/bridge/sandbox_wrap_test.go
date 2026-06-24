@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/sandbox"
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // Workstream B unit tests for the bridge-side sandbox seam.

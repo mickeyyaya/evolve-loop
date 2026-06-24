@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 // runInboxMover is `evolve inbox-mover <subcmd> [args]`. Mirrors

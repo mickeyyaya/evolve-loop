@@ -7,8 +7,8 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/kerneltest"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // TestCanTerminateEarly_ConfigOverridesLiteral proves the config path WINS over

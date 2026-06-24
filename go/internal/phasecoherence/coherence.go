@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // Violation is one persona/profile coherence drift finding, carrying the

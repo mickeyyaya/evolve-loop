@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- verifySelfSHA: clean pass (SHA and version both match) ----------------

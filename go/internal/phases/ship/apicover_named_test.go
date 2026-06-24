@@ -12,8 +12,8 @@ package ship
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestClassIsValid pins the documented closed set: the four declared Class

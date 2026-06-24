@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func TestAmplifyRun_HostCapabilitiesMultipleWarningsStayNonHalting(t *testing.T) {

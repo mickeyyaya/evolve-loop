@@ -3,7 +3,7 @@ package deliverable
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // ADR-0050 §3.10 Slice 5: verdictPresent's prose substring scan is the legacy

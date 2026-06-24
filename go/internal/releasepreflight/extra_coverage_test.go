@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestExtractJSONVersion_Errors covers the two error branches: unreadable file

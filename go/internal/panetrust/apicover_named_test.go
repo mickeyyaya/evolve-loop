@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 )
 
 // TestRedactSecrets_NamesExportedWrapper exercises the WS3-S1 exported redaction

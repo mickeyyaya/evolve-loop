@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // WriteArtifacts persists the deterministic learning artifacts for a

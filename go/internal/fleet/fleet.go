@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // errNoLaunch surfaces a misconfigured supervisor instead of a silent no-op.

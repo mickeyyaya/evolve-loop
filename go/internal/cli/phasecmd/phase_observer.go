@@ -10,9 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseobserver"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // runPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.

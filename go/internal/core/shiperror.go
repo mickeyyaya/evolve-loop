@@ -1,6 +1,6 @@
 package core
 
-import "github.com/mickeyyaya/evolveloop/go/internal/shiperr"
+import "github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 
 // The structured ship→orchestrator error protocol now lives in the
 // zero-dependency leaf internal/shiperr (so both the ship phase that CONSTRUCTS

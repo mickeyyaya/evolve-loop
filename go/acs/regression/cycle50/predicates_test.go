@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC50_001_ScoutStep45Exists ports cycle-50/001.

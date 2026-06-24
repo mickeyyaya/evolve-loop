@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // NOTE: these are white-box tests in `package phasespec`. They CANNOT import

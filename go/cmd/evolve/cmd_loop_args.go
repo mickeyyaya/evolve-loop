@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/goalhash"
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {

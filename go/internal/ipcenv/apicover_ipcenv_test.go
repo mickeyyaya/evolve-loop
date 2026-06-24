@@ -3,7 +3,7 @@ package ipcenv_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // TestIpcenv_ConstValues names all three exported types in ipcenv for apicover

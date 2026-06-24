@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"sort"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // SessionKiller tears down one worker session. Injected so the reaper/dispatcher

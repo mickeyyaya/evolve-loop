@@ -30,8 +30,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/projecthash"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/projecthash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // EnvLane is the environment variable an operator sets to pin a human-readable

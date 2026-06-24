@@ -200,7 +200,7 @@ The value proposition was never "cycles never fail." It's that failures **produc
 **Install:**
 
 ```bash
-/plugin marketplace add mickeyyaya/evolveloop
+/plugin marketplace add mickeyyaya/evolve-loop
 /plugin install evolve-loop@evolve-loop
 cd go && make build   # builds the evolve runtime binary
 ```
@@ -258,8 +258,8 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 ## License & Links
 
 - **License:** Apache-2.0 — see [LICENSE](LICENSE) (third-party notices in [NOTICE](NOTICE))
-- **GitHub:** [github.com/mickeyyaya/evolveloop](https://github.com/mickeyyaya/evolveloop)
-- **Marketplace:** `/plugin marketplace add mickeyyaya/evolveloop`
+- **GitHub:** [github.com/mickeyyaya/evolve-loop](https://github.com/mickeyyaya/evolve-loop)
+- **Marketplace:** `/plugin marketplace add mickeyyaya/evolve-loop`
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 The design draws on Reflexion (Shinn et al., 2023), double-loop learning (Argyris & Schön, 1978), the reward-hacking literature (Skalse et al., 2022; Weng, 2024), and the LLM-as-judge bias research that motivates multi-annotator and adversarial evaluation. Full bibliography: [docs/architecture/phase-architecture-citations.md](docs/architecture/phase-architecture-citations.md).

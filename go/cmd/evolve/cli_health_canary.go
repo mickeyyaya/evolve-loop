@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 // defaultLiveProbe is the production canary probe: a bounded LiveSmokeTest of the

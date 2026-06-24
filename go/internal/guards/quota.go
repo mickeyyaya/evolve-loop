@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Quota enforces per-agent web-research caps. Phase-1: in-memory

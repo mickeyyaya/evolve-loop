@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseorder"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
 )
 
 // runPhaseOrder is the `evolve phase-order` subcommand. Ports

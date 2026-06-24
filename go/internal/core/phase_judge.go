@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // JudgeVerdict is the LLM-as-judge route-quality grade (ADR-0052 WS4-S3). It is

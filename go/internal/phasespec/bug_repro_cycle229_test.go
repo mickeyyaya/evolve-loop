@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // TestBugRepro_Cycle229_TwoTierNamingMissing reproduces the bug described in

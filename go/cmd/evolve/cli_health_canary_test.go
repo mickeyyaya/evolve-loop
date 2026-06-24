@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
 func benchExpired(t *testing.T, root, family string, strikes int) {

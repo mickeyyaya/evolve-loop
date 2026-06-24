@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // TestPhaseAdvisor_RePlanThreadsSignalsAndDepth pins the WS1-S3 re-invokable

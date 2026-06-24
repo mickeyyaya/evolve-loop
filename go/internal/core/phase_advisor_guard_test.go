@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // TestMintConfigsFrom_RejectsAdvisorRoleMint pins the WS1-S2 recursion guard

@@ -38,7 +38,7 @@ Expected output contains `--- PASS: TestWorktreeBase_DefaultPath`.
 cd go && go test ./internal/swarm/... -count=1 2>&1 | tail -1
 ```
 
-Expected output begins with `ok` for `github.com/mickeyyaya/evolveloop/go/internal/swarm`.
+Expected output begins with `ok` for `github.com/mickeyyaya/evolve-loop/go/internal/swarm`.
 
 ## Anti-gaming check
 

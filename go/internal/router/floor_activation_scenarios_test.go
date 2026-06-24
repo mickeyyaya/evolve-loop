@@ -10,8 +10,8 @@ package router_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	. "github.com/mickeyyaya/evolveloop/go/internal/routingtest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	. "github.com/mickeyyaya/evolve-loop/go/internal/routingtest"
 )
 
 // TestFloorActivationKernel runs the explicit single-decision floor catalog.

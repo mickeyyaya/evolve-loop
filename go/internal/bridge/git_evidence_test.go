@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core/evidence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
 // git_evidence_test.go — the ADR-0027 git-evidence completion contract:
