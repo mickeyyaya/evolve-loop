@@ -79,6 +79,10 @@ node_modules/
 # (e.g. dossier-closeout) that must pass before a cycle can ship. Operator-
 # extensible; must be tracked so the gate applies consistently across clones.
 !.evolve/policy.json
+# ... and except the naming-guard manifest (SSOT for the legacynames acs gate,
+# `evolve release` preflight, and `evolve names`). Lists the dead naming tokens a
+# rename leaves behind; must be tracked so the guard applies across all clones.
+!.evolve/naming.json
 # ... and except user-defined phase specs. Operators drop a phase.json under
 # .evolve/phases/<name>/phase.json to extend the pipeline declaratively.
 # Analogous to .evolve/profiles/ — must be tracked so new phases ship with the

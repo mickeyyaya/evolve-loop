@@ -29,6 +29,8 @@ Commands:
   dossier    Read and verify cycle dossiers
               ( dossier verify [--project-root P] )
   acs        Run ACS predicates    ( acs run --cycle N <pkg> | acs suite --cycle N )
+  names      Guard naming after a rename; scans tracked files for dead tokens
+              from .evolve/naming.json ( names check [--project-root P] | names fix )
   phase        Run a single phase in-process; PhaseRequest on stdin,
                 PhaseResponse on stdout ( phase <intent|scout|triage|tdd|build|audit|ship|retro> )
   serve-phase  Envelope-framed phase subprocess (phaseproto wire); the binary

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -73,6 +74,60 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 	if res.CurrentVersion != "1.0.0" {
 		t.Errorf("CurrentVersion = %q, want 1.0.0", res.CurrentVersion)
+	}
+}
+
+// === Naming guard (step-5 sub-check) ========================================
+
+// stepFiveOpts wires past steps 1-4 and the gate suites so a test can exercise
+// the step-5 naming sub-check in isolation.
+func stepFiveOpts(repo, target string) Options {
+	o := stubOpts(repo, target)
+	o.SkipTests = false
+	o.GateTestRunner = func(string, string) error { return nil }
+	o.SimulationRunner = func(string) error { return nil }
+	return o
+}
+
+func TestRun_NamingGuardBlocks(t *testing.T) {
+	opts := stepFiveOpts(makeRepo(t, "1.0.0"), "1.0.1")
+	opts.NameGuard = func(string) ([]naminguard.Violation, error) {
+		return []naminguard.Violation{{File: "README.md", Line: 1, Token: "evolve" + "loop"}}, nil
+	}
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "naming token") {
+		t.Errorf("err = %v, want a dead-naming-token message", err)
+	}
+}
+
+func TestRun_NamingGuardCleanPasses(t *testing.T) {
+	opts := stepFiveOpts(makeRepo(t, "1.0.0"), "1.0.1")
+	opts.NameGuard = func(string) ([]naminguard.Violation, error) { return nil, nil }
+	res, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run err = %v", err)
+	}
+	if res.StepsPassed != 5 {
+		t.Errorf("StepsPassed = %d, want 5", res.StepsPassed)
+	}
+}
+
+// A scanner error (e.g. a malformed manifest) must fail the preflight, not be
+// swallowed — this covers the err != nil branch of the step-5 naming sub-check.
+func TestRun_NamingGuardErrorFails(t *testing.T) {
+	opts := stepFiveOpts(makeRepo(t, "1.0.0"), "1.0.1")
+	opts.NameGuard = func(string) ([]naminguard.Violation, error) {
+		return nil, errors.New("naminguard: manifest has no forbidden[] tokens")
+	}
+	_, err := Run(opts)
+	if !errors.Is(err, ErrCheckFailed) {
+		t.Fatalf("err = %v, want ErrCheckFailed", err)
+	}
+	if !strings.Contains(err.Error(), "naming guard error") {
+		t.Errorf("err = %v, want a naming-guard-error message", err)
 	}
 }
 
