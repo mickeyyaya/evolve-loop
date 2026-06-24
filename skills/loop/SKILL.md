@@ -1,7 +1,7 @@
 ---
 name: loop
 description: Use when the user invokes /evo:loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
-argument-hint: "[--budget-usd N | --cycles N | --resume] [strategy] [goal]"
+argument-hint: "[--cycles N | --resume] [strategy] [goal]"
 ---
 
 # Evolve Loop v21.1
@@ -41,7 +41,7 @@ The `find` expression locates the Go binary in either install layout (marketplac
 
 Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args.
 
-**Budget-driven dispatch:** Pass `--budget-usd N` (or `--budget N`) to run cycles until cumulative cost ≥ $N, rather than a fixed count. Example: `... loop --budget-usd 5 "improve test coverage"`. The cycle count becomes a safety upper bound (default 50). Passing both `--budget-usd N --cycles M` stops at whichever comes first.
+**Cycle count is optional:** omit `--cycles` and the advisor decides how many cycles the goal needs — completion-driven, stopping when the backlog drains, bounded by a safety cap. Pass `--cycles N` for a hard bound of exactly N cycles.
 
 **Resume after pause:** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
 ```bash
@@ -106,7 +106,6 @@ The following JSON block is the canonical state initialization for the evolve-lo
   "operatorWarnings": [],
   "stagnation": {"nothingToDoCount": 0, "recentPatterns": []},
   "warnAfterCycles": 5,
-  "tokenBudget": {"perTask": 80000, "perCycle": 200000, "researchPhase": 25000},
   "mastery": {"level": "novice", "consecutiveSuccesses": 0},
   "ledgerSummary": {"totalEntries": 0, "cycleRange": [0, 0], "scoutRuns": 0, "builderRuns": 0, "totalTasksShipped": 0, "totalTasksFailed": 0, "avgTasksPerCycle": 0},
   "instinctSummary": [],
@@ -158,28 +157,22 @@ The following JSON block is the canonical state initialization for the evolve-lo
 }
 ```
 
-**Usage:** `/evo:loop [--budget-usd N | --cycles N] [strategy] [goal]`
+**Usage:** `/evo:loop [--cycles N] [strategy] [goal]`
 (legacy bare positional integer = cycles; deprecation WARN emitted —
-prefer `--budget-usd N` or `--cycles N` explicitly)
+prefer explicit `--cycles N`)
 
 ## Quick Start
 
-Parse `$ARGUMENTS` (v9.0.5+ — budget-first guidance, both modes supported):
+Parse `$ARGUMENTS`:
 
-- **`--budget-usd N`** (alias `--budget N`) → cost-driven mode: run cycles
-  until cumulative spend ≥ \$N, then stop with `stop_reason=budget`.
-  CYCLES becomes a safety upper bound (default 50). This is the
-  recommended mode — costs are predictable; cycle counts are not.
-- **`--cycles N`** → cycle-driven mode: run exactly N cycles regardless
-  of cost.
+- **`--cycles N`** → run exactly N cycles. Omit it and the advisor decides
+  the cycle count (completion-driven, bounded by a safety cap).
 - **Strategy** (positional, after flags): `balanced` (default) | `innovate` |
   `harden` | `repair` | `ultrathink` | `autoresearch`.
 - **Goal** (positional, after strategy): free-form text; quote it when it
   contains apostrophes or shell metacharacters.
 - **Legacy bare integer** (`/evo:loop 3 balanced "goal"`) still parses
-  as cycles in v9.0.x with a deprecation WARN. The v10.0.0 candidate
-  will consider flipping bare-positional to dollars; until then, use
-  the explicit flag to be flip-safe.
+  as cycles with a deprecation WARN. Prefer the explicit `--cycles N` flag.
 
 | Strategy | Focus | Approach | Strictness |
 |----------|-------|----------|------------|
