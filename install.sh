@@ -16,12 +16,12 @@ set -eu
 
 # ---- Config (env-overridable so CI/tests can redirect) ---------------------
 REPO="mickeyyaya/evolve-loop"
-RELEASE_BASE="${EVOLVE_RELEASE_BASE:-https://github.com/${REPO}/releases/latest/download}"
-ASSET_BASE="${EVOLVE_ASSET_BASE:-$RELEASE_BASE}"            # point at a 404 to force the build path
-SOURCE_TARBALL="${EVOLVE_SOURCE_TARBALL:-https://github.com/${REPO}/archive/refs/heads/main.tar.gz}"
-INSTALL_LIB="${EVOLVE_INSTALL_LIB:-$HOME/.evolve-loop}"     # binary + skill payload live here
+RELEASE_BASE="${EVO_RELEASE_BASE:-https://github.com/${REPO}/releases/latest/download}"
+ASSET_BASE="${EVO_ASSET_BASE:-$RELEASE_BASE}"            # point at a 404 to force the build path
+SOURCE_TARBALL="${EVO_SOURCE_TARBALL:-https://github.com/${REPO}/archive/refs/heads/main.tar.gz}"
+INSTALL_LIB="${EVO_INSTALL_LIB:-$HOME/.evolve-loop}"     # binary + skill payload live here
 BIN_DIR_DEFAULT="$HOME/.local/bin"
-FORCE_BUILD="${EVOLVE_FORCE_BUILD:-0}"                      # test seam
+FORCE_BUILD="${EVO_FORCE_BUILD:-0}"                      # test seam
 
 log()  { printf '%s\n' "evolve-install: $*"; }
 warn() { printf '%s\n' "evolve-install: WARNING: $*" >&2; }
@@ -143,7 +143,7 @@ verify_checksum() {  # verify_checksum <file> <name-in-sums> <checksums.txt>
 }
 
 try_prebuilt() {
-	if [ "$FORCE_BUILD" = 1 ]; then log "EVOLVE_FORCE_BUILD=1 — skipping prebuilt"; return 1; fi
+	if [ "$FORCE_BUILD" = 1 ]; then log "EVO_FORCE_BUILD=1 — skipping prebuilt"; return 1; fi
 	asset="evolve_${PLATFORM}.tar.gz"
 	url="${ASSET_BASE}/${asset}"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/evolve.XXXXXX")"
@@ -213,13 +213,13 @@ place_on_path() {
 		LN="ln -sf"
 	fi
 	$LN "$INSTALLED_BIN" "$bindir/evolve"
-	EVOLVE_BIN="$bindir/evolve"
+	EVO_BIN="$bindir/evolve"
 	case ":$PATH:" in
 		*":$bindir:"*) : ;;
 		*) warn "$bindir is not on your PATH. Add to your shell profile:"
 		   warn "  export PATH=\"$bindir:\$PATH\"" ;;
 	esac
-	log "linked evolve → $EVOLVE_BIN"
+	log "linked evolve → $EVO_BIN"
 }
 
 # ---- 7. Install skills + verify --------------------------------------------
@@ -231,8 +231,8 @@ run_evolve_install() {
 }
 
 final_checks() {
-	"$EVOLVE_BIN" version >/dev/null 2>&1 || warn "evolve did not report a version"
-	"$EVOLVE_BIN" doctor probe tmux >/dev/null 2>&1 || warn "tmux probe failed (run 'evolve doctor' to diagnose)"
+	"$EVO_BIN" version >/dev/null 2>&1 || warn "evolve did not report a version"
+	"$EVO_BIN" doctor probe tmux >/dev/null 2>&1 || warn "tmux probe failed (run 'evolve doctor' to diagnose)"
 	log "done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
 	log "uninstall: evolve uninstall   (and: rm -rf $INSTALL_LIB)"
 }
