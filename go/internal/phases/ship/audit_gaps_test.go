@@ -56,13 +56,13 @@ func TestVerifyAuditBinding_FailVerdict_IntegrityError(t *testing.T) {
 }
 
 // TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError: a WARN verdict
-// with EVOLVE_STRICT_AUDIT=1 must block ship. Without the flag it ships.
+// with policy.json workflow.strict_audit must block ship. Without it, WARN ships.
 func TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError(t *testing.T) {
 	repo := makeRepo(t)
 	// No git changes needed — just need a WARN verdict + matching HEAD/tree.
 	seedAudit(t, repo, "WARN")
+	writeStrictAuditPolicy(t, repo)
 	opts := auditOpts(t, repo)
-	opts.Env = map[string]string{"EVOLVE_STRICT_AUDIT": "1"}
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
 	wantShipErr(t, err, core.CodeAuditBindingVerdictWarn, core.ShipClassPrecondition, "WARN")
 }

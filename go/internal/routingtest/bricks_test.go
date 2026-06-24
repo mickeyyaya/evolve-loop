@@ -130,8 +130,8 @@ func TestBrick_EnableEnvAndTriggerBricks(t *testing.T) {
 	if s.Enable["intent"] != config.EnableOn {
 		t.Fatalf("IntentRequired() must set Enable[intent]=on; got enable=%+v", s.Enable)
 	}
-	if s.Env["EVOLVE_STRICT_AUDIT"] != "1" {
-		t.Fatalf("env map = %+v", s.Env)
+	if !s.Strict {
+		t.Fatalf("StrictAudit() must set Strict=true; got %+v", s)
 	}
 	trigger := s.Triggers["tester"]
 	if len(trigger.InsertWhen) != 1 || trigger.InsertWhen[0].Field != "build.severity_max" {

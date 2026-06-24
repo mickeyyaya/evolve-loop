@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
 	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
@@ -82,7 +81,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 			branch, extraEnv, reason = cr.o.decideAfterRetroRouted(cr.ctx, cr.cycle, cr.cs, cr.routingSeq, dr.resp.Verdict, cr.state.FailedAt, router.RouteInput{
 				Cfg:            cr.o.cfg,
 				Completed:      cr.cs.CompletedPhases,
-				Strict:         envchain.BoolValue(cr.envSnap["EVOLVE_STRICT_AUDIT"], false),
+				Strict:         cr.workflowConfig.StrictAudit,
 				Workspace:      cr.cs.WorkspacePath,
 				ProjectRoot:    cr.req.ProjectRoot,
 				Cycle:          cr.cycle,

@@ -145,7 +145,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1",
 		"EVOLVE_TRIAGE_DISABLE=1",
 		"EVOLVE_BUILD_PLANNER=1",
-		"EVOLVE_STRICT_AUDIT=1",
 	}
 	got := buildCycleEnv(cfg, osEnv)
 	for k, want := range map[string]string{
@@ -153,7 +152,6 @@ func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": "1",
 		"EVOLVE_TRIAGE_DISABLE":            "1",
 		"EVOLVE_BUILD_PLANNER":             "1",
-		"EVOLVE_STRICT_AUDIT":              "1",
 	} {
 		if got[k] != want {
 			t.Errorf("%s = %q, want %q", k, got[k], want)

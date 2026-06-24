@@ -163,7 +163,7 @@ the most recent `role=auditor kind=agent_subprocess` entry, then asserts:
 2. `audit-report.md` exists and its SHA matches the ledger (artifact not mutated
    post-audit);
 3. the report declares a recognizable verdict — `FAIL` refuses, dual `FAIL∧PASS`
-   refuses, `WARN` ships unless `EVOLVE_STRICT_AUDIT=1`;
+   refuses, `WARN` ships unless `.evolve/policy.json` sets `workflow.strict_audit`;
 4. **EGPS gate**: `acs-verdict.json:red_count == 0` (`checkEGPSGate`);
 5. **cycle binding**: current `git rev-parse HEAD` == ledger `git_head` AND
    `sha256(git diff HEAD)` == ledger `tree_state_sha`;

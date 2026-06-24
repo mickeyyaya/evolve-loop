@@ -323,7 +323,7 @@ Frontend tasks require Playwright screenshots / DOM snapshots, not just "I teste
 | Verdict | Meaning | Downstream effect |
 |---|---|---|
 | **PASS** | All checks passed. Ship without reservation. | ship.sh commits + pushes; lastCycleNumber advances |
-| **WARN** | Findings present, not blocking. | **Ships by default** (v8.28.0 ship.sh, v8.35.0 orchestrator). Recorded as `code-audit-warn` (low severity, 1d age-out). `EVOLVE_STRICT_AUDIT=1` reverts to legacy block-on-WARN. |
+| **WARN** | Findings present, not blocking. | **Ships by default** (v8.28.0 ship.sh, v8.35.0 orchestrator). Recorded as `code-audit-warn` (low severity, 1d age-out). `.evolve/policy.json` `workflow.strict_audit: true` reverts to legacy block-on-WARN. |
 | **FAIL** | Real defect, refuse to ship. | Orchestrator skips ship; `record-failure-to-state.sh` appends `code-audit-fail` (high severity, 30d age-out). Triggers Retrospective. |
 
 ship.sh parses verdict via regex: accepts `Verdict: PASS|WARN|FAIL` (case-insensitive) OR markdown-bold heading form `## Verdict\n**PASS**`. v8.30.0 added dual-verdict detection — if BOTH PASS and FAIL appear, ship refuses ("auditor produced inconsistent artifact").
@@ -414,7 +414,7 @@ $0.40-2.50/cycle. v8.35.0 adaptive tiering brings trivial-diff audits to ~$0.50;
 
 | Env var | Effect |
 |---|---|
-| `EVOLVE_STRICT_AUDIT=1` | Block ship on WARN (revert to pre-v8.28.0) |
+| `.evolve/policy.json` `workflow.strict_audit: true` | Block ship on WARN (revert to pre-v8.28.0) |
 | `EVOLVE_BYPASS_SHIP_VERIFY=1` | Skip self-SHA pin (legacy compat; deprecated -> use `--class manual`) |
 | `EVOLVE_BYPASS_SHIP_GATE=1` | Bypass the kernel hook entirely (emergency only; logged WARN) |
 | `EVOLVE_SHIP_AUTO_CONFIRM=1` | Skip interactive y/N for `--class manual` (CI mode) |

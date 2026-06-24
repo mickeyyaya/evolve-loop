@@ -89,7 +89,10 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 // a dead Active row); the other 5 wave-2 deletions were StatusInternal → 14 -> 13.
 // 2026-06-24: EVOLVE_WORKTREE_BASE (StatusActive operator dial) legitimately
 // removed → policy.json worktree.base + WithWorktreeBase DI; 13 -> 12 (ADR-0064).
-const LiveFeatureFlagCeiling = 12
+// 2026-06-24: EVOLVE_STRICT_AUDIT (StatusActive operator dial) legitimately removed
+// → policy.json workflow.strict_audit + DI (cyclerun via WorkflowConfig; audit &
+// ship phases via StrictAuditFor); 12 -> 11 (ADR-0064).
+const LiveFeatureFlagCeiling = 11
 
 // TestRegistry_LiveFeatureFlagCeiling enforces the live-feature-flag ratchet.
 // Lowering LiveFeatureFlagCeiling is progress; raising it is a regression and is

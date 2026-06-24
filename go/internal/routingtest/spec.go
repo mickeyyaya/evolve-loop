@@ -51,6 +51,10 @@ type ScenarioSpec struct {
 	// --- world fixtures ---
 	Signals SignalSpec
 	Env     map[string]string
+	// Strict mirrors the resolved policy.json workflow.strict_audit posture
+	// (replaces the EVOLVE_STRICT_AUDIT env scenario knob, flag-reduction
+	// ADR-0064). engine.go threads it straight into router.RouteInput.Strict.
+	Strict bool
 
 	// --- PureKernel-only ---
 	Current   string

@@ -71,22 +71,38 @@ func TestNative_C_WARN_ShipsFluent(t *testing.T) {
 	}
 }
 
-// --- Test C2: EVOLVE_STRICT_AUDIT=1 → WARN refused ------------------
+// --- Test C2: workflow.strict_audit → WARN refused -----------------
 
 func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change strict\n")
 	seedAudit(t, repo, "WARN")
+	// Strict mode now comes from .evolve/policy.json (workflow.strict_audit), not
+	// the retired EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
+	writeStrictAuditPolicy(t, repo)
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
 		CommitMessage: "should not ship",
-		Env:           map[string]string{"EVOLVE_STRICT_AUDIT": "1"},
 	})
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure (WARN+strict is a re-auditable precondition), got %d", res.ExitCode)
 	}
-	if !containsLog(res, "EVOLVE_STRICT_AUDIT=1") {
+	if !containsLog(res, "workflow.strict_audit") {
 		t.Errorf("missing strict-audit message in: %v", res.Logs)
+	}
+}
+
+// writeStrictAuditPolicy drops a .evolve/policy.json into root that turns on the
+// strict (legacy-blocking) audit posture — the policy.json replacement for the
+// retired EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
+func writeStrictAuditPolicy(t *testing.T, root string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"),
+		[]byte(`{"workflow":{"strict_audit":true}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

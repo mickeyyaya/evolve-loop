@@ -43,7 +43,7 @@ func TestFinalizeOutcome_SkippedWithHeadMoved_ShippedViaBuild(t *testing.T) {
 func TestFinalizeOutcome_SkippedWithRetroAdvisory_SkippedAuditAdvisory(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{}
-	decision := "proceed: fluent mode (set EVOLVE_STRICT_AUDIT=1 for legacy blocking): would-have-blocked: BLOCK-CODE — 16 non-expired code-audit-fail entries (within 30d retention)"
+	decision := "proceed: fluent mode (set workflow.strict_audit in policy.json for legacy blocking): would-have-blocked: BLOCK-CODE — 16 non-expired code-audit-fail entries (within 30d retention)"
 	if got := o.finalizeOutcome(VerdictSKIPPED, decision, "abc", "abc"); got != CycleOutcomeSkippedAuditAdvisory {
 		t.Errorf("SKIPPED + would-have-blocked must be SKIPPED_AUDIT_ADVISORY, got %q", got)
 	}

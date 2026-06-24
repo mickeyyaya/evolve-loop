@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
 	"github.com/mickeyyaya/evolveloop/go/internal/router"
 )
 
@@ -72,7 +71,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 			History:   entriesFromRecords(cr.state.FailedAt),
 			Cfg:       cr.o.cfg,
 			Completed: cr.cs.CompletedPhases,
-			Strict:    envchain.BoolValue(cr.envSnap["EVOLVE_STRICT_AUDIT"], false),
+			Strict:    cr.workflowConfig.StrictAudit,
 			Now:       cr.o.now(),
 			// Proposer context (DynamicLLM only; ignored by pure Route).
 			Workspace:   cr.cs.WorkspacePath,

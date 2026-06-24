@@ -107,9 +107,10 @@ type Options struct {
 	ShipBinaryPath string
 
 	// Env overrides for the operator-facing env vars. Empty values fall
-	// through to os.Getenv. Keys: EVOLVE_SHIP_AUTO_CONFIRM,
-	// EVOLVE_STRICT_AUDIT. EVOLVE_SHIP_RELEASE_NOTES is IPC-only
-	// (releasepipeline → evolve-ship subprocess; split-const form).
+	// through to os.Getenv. Key: EVOLVE_SHIP_AUTO_CONFIRM. Strict-audit is
+	// sourced from .evolve/policy.json (workflow.strict_audit), not here.
+	// EVOLVE_SHIP_RELEASE_NOTES is IPC-only (releasepipeline → evolve-ship
+	// subprocess; split-const form).
 	Env map[string]string
 
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict

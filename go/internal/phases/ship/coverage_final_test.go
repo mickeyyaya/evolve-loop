@@ -317,12 +317,12 @@ func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
 // --- verifyAuditBinding: WARN fluent-pass logs ---------------------------
 
 // TestVerifyAuditBinding_WarnFluent_LogsAndPasses: WARN verdict without
-// EVOLVE_STRICT_AUDIT ships with a log line (fluent-by-default policy).
+// workflow.strict_audit ships with a log line (fluent-by-default policy).
 func TestVerifyAuditBinding_WarnFluent_LogsAndPasses(t *testing.T) {
 	repo := makeRepo(t)
 	seedAudit(t, repo, "WARN")
 	opts := auditOpts(t, repo)
-	// No EVOLVE_STRICT_AUDIT set → fluent pass.
+	// No workflow.strict_audit policy → fluent pass.
 	res := &RunResult{}
 	if err := verifyAuditBinding(context.Background(), opts, res); err != nil {
 		t.Fatalf("WARN fluent must pass; got %v", err)

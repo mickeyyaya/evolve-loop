@@ -4,13 +4,13 @@
 //
 // Audit is the EGPS gate: PASS requires BOTH a parseable PASS verdict
 // in audit-report.md AND red_count == 0 in acs-verdict.json.
-// EVOLVE_STRICT_AUDIT=1 additionally promotes WARN to FAIL.
+// policy.json workflow.strict_audit additionally promotes WARN to FAIL.
 //
 // Verdict mapping:
 //   - empty artifact / no parseable verdict declaration → FAIL
 //   - acs-verdict.json missing or unparseable → FAIL + error diag
 //   - acs-verdict.json red_count > 0 → FAIL + EGPS diag
-//   - WARN + EVOLVE_STRICT_AUDIT=1 → FAIL
+//   - WARN + workflow.strict_audit → FAIL
 //   - otherwise → whatever verdict the audit-report.md declares (PASS/WARN/FAIL/SKIPPED)
 //
 // The verdict declaration is recognized in several agent-produced shapes —
@@ -42,6 +42,7 @@ import (
 	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
 	"github.com/mickeyyaya/evolveloop/go/internal/skillcheck"
 )
@@ -184,11 +185,11 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}
 	}
 
-	if verdict == core.VerdictWARN && req.Env["EVOLVE_STRICT_AUDIT"] == "1" {
+	if verdict == core.VerdictWARN && policy.StrictAuditFor(req.ProjectRoot) {
 		verdict = core.VerdictFAIL
 		diags = append(diags, core.Diagnostic{
 			Severity: "error",
-			Message:  "EVOLVE_STRICT_AUDIT=1 promoted WARN to FAIL",
+			Message:  "policy.json workflow.strict_audit promoted WARN to FAIL",
 		})
 	}
 

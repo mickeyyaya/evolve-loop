@@ -88,8 +88,8 @@ func TestCoverageAdditionalBricksAndPhaseSeq(t *testing.T) {
 	if s.Signals.CycleSize != "large" || s.Signals.ScoutBacklog != 7 || len(s.FailedAt) != 2 {
 		t.Fatalf("brick state mismatch: %+v", s)
 	}
-	if s.Enable["intent"] != config.EnableOn || s.Env["EVOLVE_STRICT_AUDIT"] != "1" {
-		t.Fatalf("env/enable bricks mismatch: enable=%+v env=%+v", s.Enable, s.Env)
+	if s.Enable["intent"] != config.EnableOn || !s.Strict {
+		t.Fatalf("strict/enable bricks mismatch: enable=%+v strict=%v", s.Enable, s.Strict)
 	}
 	if s.Enable["memo"] != config.EnableOn || s.Verdicts[string(core.PhaseBuild)] != "WARN" {
 		t.Fatalf("enable/verdict bricks mismatch: enable=%+v verdicts=%+v", s.Enable, s.Verdicts)

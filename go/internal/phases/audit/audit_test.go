@@ -245,12 +245,21 @@ func TestRun_AuditWARN_WARN(t *testing.T) {
 func TestRun_StrictAuditMode_WARNBecomesFAIL(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
+	// Strict mode is now sourced from .evolve/policy.json (workflow.strict_audit),
+	// not an env dial — replaces the EVOLVE_STRICT_AUDIT read (flag-reduction, ADR-0064).
+	proj := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(proj, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, ".evolve", "policy.json"),
+		[]byte(`{"workflow":{"strict_audit":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	body := "# Audit Report\n\n## Verdict\n**WARN**\n"
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
-		Env: map[string]string{"EVOLVE_STRICT_AUDIT": "1"},
+		Cycle: 1, ProjectRoot: proj, Workspace: ws,
 	})
 	if resp.Verdict != core.VerdictFAIL {
 		t.Errorf("Verdict=%q, want FAIL (strict-audit promotes WARN→FAIL)", resp.Verdict)
