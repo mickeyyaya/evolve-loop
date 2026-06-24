@@ -67,55 +67,216 @@
 
 {{define "pipelinedemo"}}
 <style>
-  .pld{--pl-ink:var(--ink,#161616);--pl-mut:var(--muted,#7a7a7a);--pl-acc:var(--accent,#0071e3);
-    --pl-bg:color-mix(in srgb,var(--ink,#000) 4%,transparent);
-    --pl-line:color-mix(in srgb,var(--ink,#000) 16%,transparent);
-    --pl-acc-soft:color-mix(in srgb,var(--accent,#0071e3) 11%,transparent);
+  .pld{
+    --pl-acc:var(--accent,#0071e3);
+    --pl-acc-soft:var(--accent-soft,color-mix(in srgb,var(--pl-acc) 14%,transparent));
+    --pl-ink:var(--ink,#161616);
+    --pl-mut:var(--muted,#7a7a7a);
+    --pl-bg:var(--surface,var(--bg,#fff));
     --pl-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);
+    --pl-disp:var(--serif,var(--display,inherit));
+    --pl-line:color-mix(in srgb,var(--pl-ink) 14%,transparent);
+    --pl-line2:color-mix(in srgb,var(--pl-ink) 26%,transparent);
+    --pl-surf:color-mix(in srgb,var(--pl-ink) 3%,transparent);
+    --pl-floor:var(--ok,#16996a);
+    --pl-floor-soft:var(--ok-soft,color-mix(in srgb,var(--pl-floor) 13%,transparent));
+    --pl-claude:#cc7a4d;
+    --pl-codex:#10a37f;
+    --pl-gemini:#5e8bf0;
     max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
   .pld-kicker{font-family:var(--pl-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pl-acc);margin:0}
-  .pld-h{font-family:var(--serif,inherit);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--pl-ink)}
-  .pld-sub{color:var(--pl-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:64ch}
-  .pld-stage{margin-top:30px;border:1px solid var(--pl-line);border-radius:16px;background:var(--pl-bg);padding:22px;min-height:250px}
-  .pld-prompt{font-family:var(--pl-mono);font-size:.9rem;color:var(--pl-ink);display:flex;align-items:center;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--pl-line)}
-  .pld-goal{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);border:1px solid var(--pl-line);border-radius:5px;padding:3px 7px}
-  .pld-status{display:flex;align-items:center;gap:10px;margin-top:16px;font-family:var(--pl-mono);font-size:.82rem;color:var(--pl-mut);min-height:22px}
-  .pld-status.done{color:var(--pl-acc)}
-  .pld-spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--pl-line);border-top-color:var(--pl-acc);animation:pld-spin .7s linear infinite;flex:0 0 auto}
-  .pld-status.done .pld-spin{display:none}
-  @keyframes pld-spin{to{transform:rotate(360deg)}}
-  .pld-track{display:flex;flex-wrap:wrap;gap:10px;padding:22px 0 4px}
-  .pld-node{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--pl-line);border-radius:10px;padding:10px 14px 10px 11px;background:color-mix(in srgb,var(--pl-ink) 3%,transparent);opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s,border-color .4s,background .4s}
-  .pld-node.in{opacity:.5;transform:none}
-  .pld-node.sel{opacity:1;border-color:color-mix(in srgb,var(--pl-acc) 50%,transparent);background:var(--pl-acc-soft)}
-  .pld-node.skip{opacity:.6}
-  .pld-node.skip .pld-name{text-decoration:line-through;color:var(--pl-mut)}
-  .pld-num{font-family:var(--pl-mono);font-size:.72rem;font-weight:600;color:var(--pl-mut);background:color-mix(in srgb,var(--pl-ink) 8%,transparent);border-radius:6px;min-width:24px;height:24px;padding:0 5px;display:grid;place-items:center;flex:0 0 auto;transition:.3s}
-  .pld-node.sel .pld-num{color:var(--pl-acc);background:color-mix(in srgb,var(--pl-acc) 16%,transparent)}
-  .pld-name{font-weight:600;font-size:.9rem;color:var(--pl-ink)}
-  .pld-tag{font-size:.74rem;color:var(--pl-mut);white-space:nowrap}
-  .pld-foot{display:flex;align-items:center;gap:16px;margin-top:18px;min-height:34px}
-  .pld-result{display:flex;align-items:center;gap:14px;flex-wrap:wrap;opacity:0;transform:translateY(6px);transition:.4s}
-  .pld-result.show{opacity:1;transform:none}
-  .pld-done-badge{font-family:var(--pl-mono);font-weight:600;letter-spacing:.05em;font-size:.78rem;color:var(--pl-acc);border:1px solid color-mix(in srgb,var(--pl-acc) 45%,transparent);background:var(--pl-acc-soft);padding:6px 12px;border-radius:8px;white-space:nowrap}
-  .pld-out{color:var(--pl-mut);font-size:.92rem}
-  .pld-replay{font:inherit;font-size:.85rem;color:var(--pl-mut);background:transparent;border:1px solid var(--pl-line);border-radius:999px;padding:7px 14px;cursor:pointer;margin-left:auto}
-  .pld-replay:hover{color:var(--pl-acc);border-color:var(--pl-acc)}
-  .pld-replay:focus-visible{outline:2px solid var(--pl-acc);outline-offset:2px}
-  @media(max-width:560px){.pld-node{flex:1 1 100%}}
+  .pld-h{font-family:var(--pl-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--pl-ink)}
+  .pld-sub{color:var(--pl-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
+
+  .pld-stage{margin-top:30px;border:1px solid var(--pl-line);border-radius:16px;background:var(--pl-surf);padding:clamp(16px,2.4vw,24px)}
+
+  /* goal bar */
+  .pld-bar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;font-family:var(--pl-mono);padding-bottom:16px;border-bottom:1px solid var(--pl-line)}
+  .pld-glabel{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pl-acc);border:1px solid var(--pl-line2);border-radius:5px;padding:4px 8px;flex:0 0 auto}
+  .pld-goal{font-size:clamp(.95rem,1.6vw,1.15rem);color:var(--pl-ink)}
+  .pld-goal code{font-family:var(--pl-mono);color:var(--pl-acc);background:var(--pl-acc-soft);border-radius:5px;padding:1px 6px}
+  .pld-cursor{display:inline-block;width:8px;height:1.05em;background:var(--pl-acc);transform:translateY(2px);margin-left:1px;animation:pld-blink 1s steps(2) infinite}
+  @keyframes pld-blink{50%{opacity:0}}
+  .pld-scope{margin-left:auto;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--pl-mut);border:1px dashed var(--pl-line2);border-radius:999px;padding:5px 11px;flex:0 0 auto;opacity:0;transition:opacity .4s}
+  .pld-scope.show{opacity:1}
+
+  /* legend explaining the four kinds of node */
+  .pld-legend2{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-family:var(--pl-mono);font-size:.6rem;color:var(--pl-mut);padding-top:15px}
+  .pld-legend2 span{display:inline-flex;align-items:center;gap:7px}
+  .pld-legend2 .k{width:13px;height:13px;border-radius:4px;flex:0 0 auto}
+  .pld-legend2 .k-floor{border:1.5px solid var(--pl-floor);background:var(--pl-floor-soft)}
+  .pld-legend2 .k-common{border:1.5px solid var(--pl-acc);background:var(--pl-acc-soft)}
+  .pld-legend2 .k-mint{border:1.5px solid var(--pl-acc);background:var(--pl-acc)}
+  .pld-legend2 .k-open{border:1.5px dashed var(--pl-line2)}
+
+  /* board: advisor + rail */
+  .pld-board{display:flex;align-items:stretch;gap:0;padding:26px 0 62px;position:relative}
+  .pld-advisor{flex:0 0 auto;width:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;z-index:3}
+  .pld-orb{width:44px;height:44px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,color-mix(in srgb,var(--pl-acc) 55%,#fff),var(--pl-acc) 60%,color-mix(in srgb,var(--pl-acc) 75%,#000));box-shadow:0 0 0 1px var(--pl-acc-soft),0 0 26px -4px var(--pl-acc)}
+  .pld-orb::before{content:"";position:absolute;inset:-7px;border-radius:50%;border:1px solid var(--pl-acc-soft);animation:pld-ripple 3s ease-out infinite}
+  @keyframes pld-ripple{0%{transform:scale(.7);opacity:.8}100%{transform:scale(1.7);opacity:0}}
+  .pld-advisor.busy .pld-orb{animation:pld-pulse .7s ease-in-out infinite}
+  @keyframes pld-pulse{50%{box-shadow:0 0 0 2px var(--pl-acc),0 0 40px 2px var(--pl-acc)}}
+  .pld-alabel{font-family:var(--pl-mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--pl-ink)}
+  .pld-astate{font-family:var(--pl-mono);font-size:.54rem;letter-spacing:.04em;text-transform:uppercase;color:var(--pl-mut);height:10px;text-align:center;max-width:96px}
+
+  .pld-railwrap{position:relative;flex:1 1 auto;display:flex;align-items:center;gap:7px;overflow-x:auto;overflow-y:visible;padding:0 4px 0 8px;scrollbar-width:none}
+  .pld-railwrap::-webkit-scrollbar{display:none}
+  .pld-rail{position:absolute;left:8px;right:4px;top:50%;height:2px;transform:translateY(-1px);background:repeating-linear-gradient(90deg,var(--pl-line2) 0 5px,transparent 5px 11px)}
+  .pld-railfill{position:absolute;left:8px;top:50%;height:2px;width:0;transform:translateY(-1px);background:linear-gradient(90deg,var(--pl-floor),var(--pl-acc));box-shadow:0 0 12px var(--pl-acc-soft);transition:width .3s ease}
+  .pld-railfill::after{content:"";position:absolute;right:-3px;top:50%;width:8px;height:8px;border-radius:50%;transform:translateY(-50%);background:var(--pl-acc);box-shadow:0 0 12px 2px var(--pl-acc)}
+
+  .pld-node{position:relative;z-index:2;flex:0 0 auto;width:84px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--pl-line2);border-radius:10px;background:color-mix(in srgb,var(--pl-ink) 4%,var(--pl-bg));text-align:center;opacity:.7;transform:translateY(0);transition:transform .5s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .4s,box-shadow .4s,background .4s}
+  .pld-node .pl-idx{position:absolute;top:5px;left:7px;font-family:var(--pl-mono);font-size:.5rem;color:var(--pl-mut);opacity:.7}
+  .pld-node .pl-nm{font-weight:600;font-size:.66rem;line-height:1.12;color:var(--pl-ink);padding:0 3px;letter-spacing:.01em;margin-bottom:2px}
+  .pld-node .pl-cli{font-family:var(--pl-mono);font-size:.5rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--pl-mut);height:8px;white-space:nowrap}
+  .pld-node .pl-cli.p-claude{color:var(--pl-claude)}
+  .pld-node .pl-cli.p-codex{color:var(--pl-codex)}
+  .pld-node .pl-cli.p-gemini{color:var(--pl-gemini)}
+  .pld-node .pl-model{font-family:var(--pl-mono);font-size:.45rem;letter-spacing:.02em;text-transform:uppercase;color:var(--pl-mut);height:7px;white-space:nowrap;opacity:.9}
+  .pld-node .pl-badge{position:absolute;top:-8px;right:-8px;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-family:var(--pl-mono);font-size:.56rem;font-weight:700;background:var(--pl-bg);border:1px solid var(--pl-line2);color:var(--pl-mut);transform:scale(0);transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+  .pld-node .pl-lock{position:absolute;top:5px;right:6px;width:10px;height:11px;color:var(--pl-floor);opacity:0;transition:opacity .4s}
+  .pld-node .pl-spark{position:absolute;top:4px;right:6px;font-size:.62rem;line-height:1;color:var(--pl-acc);opacity:0}
+
+  .pld-node.considering{animation:pld-cons 1.1s ease-in-out infinite}
+  @keyframes pld-cons{50%{border-color:var(--pl-line)}}
+  .pld-node.premint{opacity:0;transform:scale(.55);pointer-events:none}
+
+  /* floor — mandated fundamentals, lit in the "ok/guaranteed" colour + locked */
+  .pld-node.floor .pl-lock{opacity:.85}
+  .pld-node.floor.on{opacity:1;border-color:var(--pl-floor);background:var(--pl-floor-soft);box-shadow:0 0 0 1px var(--pl-floor) inset,0 0 24px -5px var(--pl-floor)}
+  .pld-node.floor.on .pl-lock{opacity:1}
+  .pld-node.floor.on .pl-badge{transform:scale(1);border-color:var(--pl-floor);background:var(--pl-floor);color:#fff}
+
+  /* common picked — accent outline */
+  .pld-node.pick{opacity:1;border-color:var(--pl-acc);background:var(--pl-acc-soft);box-shadow:0 0 22px -6px var(--pl-acc)}
+  .pld-node.pick .pl-badge{transform:scale(1);border-color:var(--pl-acc);color:#fff;background:var(--pl-acc)}
+
+  /* minted — accent fill + sparkle + "minted" tag (the advisor wrote it) */
+  .pld-node.mint{opacity:1;border-color:var(--pl-acc);background:linear-gradient(180deg,color-mix(in srgb,var(--pl-acc) 26%,var(--pl-bg)),var(--pl-acc-soft));box-shadow:0 0 26px -4px var(--pl-acc);animation:pld-pop .45s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes pld-pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+  .pld-node.mint .pl-spark{opacity:1;animation:pld-spark 1.4s ease-in-out infinite}
+  @keyframes pld-spark{50%{opacity:.4;transform:scale(.8)}}
+  .pld-node.mint .pl-badge{transform:scale(1);border-color:var(--pl-acc);background:var(--pl-acc);color:#fff}
+  .pld-node.mint::after{content:"minted";position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);font-family:var(--pl-mono);font-size:.46rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);background:var(--pl-bg);padding:0 4px;white-space:nowrap}
+
+  /* skipped — drops well clear of the rail and fades into a parked row */
+  .pld-node.skip{transform:translateY(48px) scale(.84);opacity:.24;border-style:dashed;border-color:var(--pl-line)}
+  .pld-node.skip .pl-nm{color:var(--pl-mut);text-decoration:line-through;text-decoration-color:var(--pl-line2)}
+  .pld-node.skip .pl-cli{color:var(--pl-mut)}
+  .pld-node .pl-stub{position:absolute;left:50%;top:-44px;width:1px;height:44px;background:linear-gradient(var(--pl-line2),transparent);opacity:0;transition:opacity .4s}
+  .pld-node.skip .pl-stub{opacity:.6}
+
+  /* open-ended tail — the catalog is not a fixed list */
+  .pld-node.ghost{justify-content:center;border-style:dashed;border-color:var(--pl-line2);background:transparent;opacity:.6}
+  .pld-node.ghost .pl-plus{font-size:1.1rem;line-height:1;color:var(--pl-acc)}
+  .pld-node.ghost .pl-nm{color:var(--pl-mut);font-weight:600;white-space:normal;font-size:.6rem;line-height:1.15}
+  .pld-node.ghost::after{content:"unlimited";position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);font-family:var(--pl-mono);font-size:.46rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pl-acc);background:var(--pl-bg);padding:0 4px}
+
+  .pld-node.spot{animation:pld-spot 1.1s ease-out}
+  @keyframes pld-spot{0%{box-shadow:0 0 0 1px var(--pl-floor),0 0 0 12px color-mix(in srgb,var(--pl-floor) 32%,transparent)}100%{box-shadow:0 0 0 1px transparent,0 0 0 0 transparent}}
+
+  /* readout: model routing + reasoning log */
+  .pld-readout{display:grid;grid-template-columns:.82fr 1.18fr;gap:20px;margin-top:24px;padding-top:20px;border-top:1px solid var(--pl-line)}
+  .pld-vlabel,.pld-loghead{font-family:var(--pl-mono);font-size:.58rem;letter-spacing:.22em;text-transform:uppercase;color:var(--pl-mut);margin:0 0 12px}
+  .pld-modelbar{display:flex;height:11px;border-radius:999px;overflow:hidden;border:1px solid var(--pl-line);background:color-mix(in srgb,var(--pl-ink) 6%,transparent)}
+  .pld-modelbar i{display:block;height:100%;transition:width .55s cubic-bezier(.4,0,.2,1)}
+  .pld-seg-claude{background:var(--pl-claude)}
+  .pld-seg-codex{background:var(--pl-codex)}
+  .pld-seg-gemini{background:var(--pl-gemini)}
+  .pld-modellegend{display:flex;flex-wrap:wrap;gap:7px 14px;margin-top:11px;font-family:var(--pl-mono);font-size:.6rem;color:var(--pl-mut);min-height:14px}
+  .pld-modellegend span{display:inline-flex;align-items:center;gap:6px}
+  .pld-modellegend i{display:inline-block;width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+  .pld-modellegend b{color:var(--pl-ink);font-weight:700}
+  .pld-routenote{font-size:.74rem;line-height:1.5;color:var(--pl-mut);margin:15px 0 0}
+  .pld-counts{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+  .pld-chip{font-family:var(--pl-mono);font-size:.6rem;letter-spacing:.03em;padding:5px 9px;border-radius:999px;border:1px solid var(--pl-line2);color:var(--pl-mut)}
+  .pld-chip b{color:var(--pl-ink)}
+  .pld-chip.c-pick b,.pld-chip.c-mint b{color:var(--pl-acc)}
+  .pld-chip.c-floor b{color:var(--pl-floor)}
+  .pld-compose{font-family:var(--pl-mono);font-size:.64rem;color:var(--pl-mut);margin:13px 0 0;min-height:14px}
+  .pld-compose b{color:var(--pl-ink)}
+
+  .pld-log{font-family:var(--pl-mono);height:236px;overflow:hidden;display:flex;flex-direction:column;gap:2px}
+  .pld-logline{font-size:.7rem;line-height:1.4;display:flex;gap:8px;align-items:baseline;white-space:nowrap;opacity:0;transform:translateX(-5px);animation:pld-linein .25s ease forwards}
+  @keyframes pld-linein{to{opacity:1;transform:translateX(0)}}
+  .pld-logline .pl-mk{flex:0 0 14px;text-align:center;font-weight:700;color:var(--pl-mut)}
+  .pld-logline .pl-ph{flex:0 0 104px;text-transform:uppercase;font-size:.58rem;letter-spacing:.05em;color:var(--pl-mut)}
+  .pld-logline .pl-lm{flex:0 0 126px;font-size:.55rem;letter-spacing:.02em;color:var(--pl-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pld-logline .pl-lm.p-claude{color:var(--pl-claude)}
+  .pld-logline .pl-lm.p-codex{color:var(--pl-codex)}
+  .pld-logline .pl-lm.p-gemini{color:var(--pl-gemini)}
+  .pld-logline .pl-why{color:var(--pl-ink);overflow:hidden;text-overflow:ellipsis}
+  .pld-logline.l-pick .pl-mk,.pld-logline.l-pick .pl-ph{color:var(--pl-acc)}
+  .pld-logline.l-mint .pl-mk,.pld-logline.l-mint .pl-ph{color:var(--pl-acc)}
+  .pld-logline.l-floor .pl-mk,.pld-logline.l-floor .pl-ph{color:var(--pl-floor)}
+  .pld-logline.l-skip{opacity:.58}
+
+  /* case tabs */
+  .pld-tabs{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px;align-items:center}
+  .pld-tab{font-family:var(--pl-mono);font-size:.6rem;letter-spacing:.03em;text-transform:uppercase;color:var(--pl-mut);background:transparent;border:1px solid var(--pl-line2);border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:color .25s,border-color .25s,background .25s}
+  .pld-tab .pl-pip{width:5px;height:5px;border-radius:50%;background:var(--pl-line2);transition:.25s}
+  .pld-tab:hover{color:var(--pl-ink)}
+  .pld-tab.active{color:var(--pl-ink);border-color:var(--pl-acc);background:var(--pl-acc-soft)}
+  .pld-tab.active .pl-pip{background:var(--pl-acc);box-shadow:0 0 8px var(--pl-acc)}
+  .pld-note{margin-left:auto;font-family:var(--pl-mono);font-size:.58rem;color:var(--pl-mut)}
+  .pld-note code{color:var(--pl-floor)}
+
+  @media(max-width:720px){.pld-readout{grid-template-columns:1fr}.pld-note{margin-left:0;width:100%}}
+
+  /* respect reduced-motion: the JS already collapses its timings; silence the looping CSS too */
+  @media(prefers-reduced-motion:reduce){
+    .pld-cursor,.pld-orb::before,.pld-advisor.busy .pld-orb,.pld-node.considering,
+    .pld-node.mint,.pld-node.mint .pl-spark,.pld-node.spot{animation:none}
+  }
 </style>
 <section class="pld" id="pipeline" data-reveal>
   <p class="pld-kicker">{{.Site.PipelineDemo.Kicker}}</p>
   <h2 class="pld-h">{{.Site.PipelineDemo.Heading}}</h2>
   <p class="pld-sub">{{.Site.PipelineDemo.Sub}}</p>
   <div class="pld-stage">
-    <div class="pld-prompt"><span class="pld-goal">goal</span><span class="pld-tasktext"></span></div>
-    <div class="pld-status"><span class="pld-spin" aria-hidden="true"></span><span class="pld-statustext"></span></div>
-    <div class="pld-track" aria-live="polite"></div>
-    <div class="pld-foot">
-      <div class="pld-result"></div>
-      <button class="pld-replay" type="button" hidden>↻ Compose again</button>
+    <div class="pld-bar">
+      <span class="pld-glabel">goal</span>
+      <span class="pld-goal"></span><span class="pld-cursor" aria-hidden="true"></span>
+      <span class="pld-scope"></span>
     </div>
+    <div class="pld-legend2">
+      <span><span class="k k-floor"></span> mandated floor</span>
+      <span><span class="k k-common"></span> common phase</span>
+      <span><span class="k k-mint"></span> written for this goal</span>
+      <span><span class="k k-open"></span> + unlimited</span>
+    </div>
+    <div class="pld-board">
+      <div class="pld-advisor">
+        <span class="pld-orb" aria-hidden="true"></span>
+        <span class="pld-alabel">Advisor</span>
+        <span class="pld-astate"></span>
+      </div>
+      <div class="pld-railwrap">
+        <span class="pld-rail" aria-hidden="true"></span>
+        <span class="pld-railfill" aria-hidden="true"></span>
+      </div>
+    </div>
+    <div class="pld-readout">
+      <div class="pld-routing">
+        <p class="pld-vlabel">Per-phase LLM routing</p>
+        <div class="pld-modelbar"></div>
+        <div class="pld-modellegend"></div>
+        <p class="pld-routenote">The advisor gives each phase to an LLM and model per policy — balancing ownership across Claude Code, Codex, and Gemini, and keeping the builder and auditor on different families so the review stays honest.</p>
+        <div class="pld-counts">
+          <span class="pld-chip c-pick"><b class="pld-n-pick">0</b> common</span>
+          <span class="pld-chip c-mint"><b class="pld-n-mint">0</b> minted</span>
+          <span class="pld-chip c-floor"><b class="pld-n-floor">0</b> floor</span>
+          <span class="pld-chip c-skip"><b class="pld-n-skip">0</b> skipped</span>
+        </div>
+        <div class="pld-compose"></div>
+      </div>
+      <div class="pld-logwrap">
+        <p class="pld-loghead">Advisor ▸ reasoning</p>
+        <div class="pld-log"></div>
+      </div>
+    </div>
+    <div class="pld-tabs"></div>
   </div>
   <script type="application/json" class="pld-demo">{{json .Site.PipelineDemo}}</script>
 </section>
@@ -127,73 +288,289 @@
   var root = document.getElementById('pipeline');
   if (!root) { return; }
   var demo = JSON.parse(root.querySelector('.pld-demo').textContent);
-  var track = root.querySelector('.pld-track');
-  var result = root.querySelector('.pld-result');
-  var taskText = root.querySelector('.pld-tasktext');
-  var status = root.querySelector('.pld-status');
-  var statusText = root.querySelector('.pld-statustext');
-  var replay = root.querySelector('.pld-replay');
+  var cases = demo.cases || [];
+  if (!cases.length) { return; }
+  var floor = {};
+  (demo.floor || []).forEach(function (f) { floor[f] = true; });
+  var providerOrder = demo.providers && demo.providers.length ? demo.providers : ['Claude', 'Codex', 'Gemini'];
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var timers = [];
-  function clearAll() { timers.forEach(clearTimeout); timers = []; }
-  function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+
+  var goalEl = root.querySelector('.pld-goal'),
+      cursor = root.querySelector('.pld-cursor'),
+      scopeEl = root.querySelector('.pld-scope'),
+      advisor = root.querySelector('.pld-advisor'),
+      astate = root.querySelector('.pld-astate'),
+      railwrap = root.querySelector('.pld-railwrap'),
+      railfill = root.querySelector('.pld-railfill'),
+      modelbar = root.querySelector('.pld-modelbar'),
+      modellegend = root.querySelector('.pld-modellegend'),
+      composeEl = root.querySelector('.pld-compose'),
+      logEl = root.querySelector('.pld-log'),
+      tabsEl = root.querySelector('.pld-tabs'),
+      nPick = root.querySelector('.pld-n-pick'),
+      nMint = root.querySelector('.pld-n-mint'),
+      nFloor = root.querySelector('.pld-n-floor'),
+      nSkip = root.querySelector('.pld-n-skip');
+
+  var T = { goal: reduce ? 0 : 26, why: reduce ? 0 : 8, think: reduce ? 80 : 760, step: reduce ? 16 : 118, hold: reduce ? 500 : 3200 };
+  var LOCK = '<svg viewBox="0 0 12 13" width="10" height="11" fill="none" aria-hidden="true">' +
+    '<rect x="1" y="5.4" width="10" height="6.6" rx="1.3" stroke="currentColor" stroke-width="1.2"/>' +
+    '<path d="M3 5.4V3.6a3 3 0 0 1 6 0v1.8" stroke="currentColor" stroke-width="1.2"/></svg>';
+
+  var gen = 0, pending = null, started = false, introShown = false;
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function stale(g) { return g !== gen; }
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
-  function nodeHTML(c) {
-    return '<div class="pld-node"><span class="pld-num">·</span>' +
-      '<span class="pld-name">' + esc(c.phase) + '</span>' +
-      '<span class="pld-tag"></span></div>';
+  function provKey(cli) {
+    var m = String(cli || '').toLowerCase();
+    if (m.indexOf('codex') >= 0 || m.indexOf('gpt') >= 0) { return 'codex'; }
+    if (m.indexOf('gemini') >= 0) { return 'gemini'; }
+    return 'claude';
   }
-  function decide(node, c, order) {
-    if (c.use) {
-      node.classList.add('sel');
-      node.querySelector('.pld-num').textContent = (order < 10 ? '0' : '') + order;
-    } else {
-      node.classList.add('skip');
-      node.querySelector('.pld-num').textContent = '–';
-      node.querySelector('.pld-tag').textContent = '· skipped — ' + (c.skip || 'not needed');
+  // Drop a redundant provider prefix from the model name ("Gemini-3.5-Flash" → "3.5-Flash").
+  function shortModel(cli, model) {
+    var c = String(cli || ''), m = String(model || '');
+    if (c && m.toLowerCase().indexOf(c.toLowerCase()) === 0) {
+      return m.slice(c.length).replace(/^[-\s·]+/, '');
+    }
+    return m;
+  }
+
+  cases.forEach(function (c, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pld-tab';
+    b.innerHTML = '<span class="pl-pip"></span>' + esc(c.scope || ('case ' + (i + 1)));
+    b.addEventListener('click', function () { pending = i; });
+    tabsEl.appendChild(b);
+  });
+  var note = document.createElement('span');
+  note.className = 'pld-note';
+  note.innerHTML = 'floor <code>' + esc((demo.floor || []).join(' · ')) + '</code> always runs';
+  tabsEl.appendChild(note);
+  var tabs = tabsEl.querySelectorAll('.pld-tab');
+
+  // Type the goal char-by-char; backtick-wrapped spans render as <code>.
+  // textContent only — never innerHTML — so content can't inject markup.
+  async function typeGoal(text, g) {
+    goalEl.textContent = '';
+    cursor.style.display = 'inline-block';
+    var segs = String(text).split('`');
+    for (var i = 0; i < segs.length; i++) {
+      var code = (i % 2 === 1);
+      var node = code ? document.createElement('code') : document.createTextNode('');
+      goalEl.appendChild(node);
+      var seg = segs[i];
+      for (var j = 0; j < seg.length; j++) {
+        if (stale(g)) { return; }
+        var ch = seg.charAt(j);
+        if (code) { node.textContent += ch; } else { node.nodeValue += ch; }
+        if (T.goal) { await sleep(T.goal); }
+      }
     }
   }
-  function run() {
-    clearAll();
-    var cs = demo.candidates || [];
-    taskText.textContent = ' ' + demo.task;
-    track.innerHTML = '';
-    result.className = 'pld-result'; result.innerHTML = '';
-    replay.hidden = true;
-    status.className = 'pld-status';
-    cs.forEach(function (c) { track.insertAdjacentHTML('beforeend', nodeHTML(c)); });
-    var nodes = track.querySelectorAll('.pld-node');
-    function finish(used) {
-      status.className = 'pld-status done';
-      statusText.textContent = '✓ composed by the model · ' + used + ' of ' + cs.length + ' phases';
-      result.innerHTML = '<span class="pld-done-badge">✓ MODEL-COMPOSED</span>' +
-        '<span class="pld-out">' + esc(demo.outcome) + '</span>';
-      result.classList.add('show');
-      replay.hidden = false;
+  async function typeWhy(el, text, g) {
+    el.textContent = '';
+    var s = String(text);
+    for (var i = 0; i < s.length; i++) {
+      if (stale(g)) { return; }
+      el.textContent += s.charAt(i);
+      if (T.why) { await sleep(T.why); }
     }
-    if (reduce) {
-      var o = 0;
-      cs.forEach(function (c, i) { nodes[i].classList.add('in'); decide(nodes[i], c, c.use ? (++o) : 0); });
-      finish(o);
-      return;
+  }
+
+  function makeNode(p, idx) {
+    var n = document.createElement('div');
+    var isFloor = !!floor[p.phase];
+    n.className = 'pld-node ' + (p.mint ? 'premint' : (isFloor ? 'floor' : 'considering'));
+    n.innerHTML =
+      '<span class="pl-idx">' + (idx < 9 ? '0' : '') + (idx + 1) + '</span>' +
+      (isFloor ? '<span class="pl-lock">' + LOCK + '</span>' : '') +
+      (p.mint ? '<span class="pl-spark">✦</span>' : '') +
+      '<span class="pl-badge"></span>' +
+      '<span class="pl-nm">' + esc(p.phase) + '</span>' +
+      '<span class="pl-cli"></span><span class="pl-model"></span>';
+    return n;
+  }
+
+  function railTo(node) {
+    var x = node.offsetLeft + node.offsetWidth / 2;
+    railfill.style.width = Math.max(0, x - 8) + 'px';
+    var right = node.offsetLeft + node.offsetWidth;
+    if (right > railwrap.scrollLeft + railwrap.clientWidth) {
+      railwrap.scrollLeft = right - railwrap.clientWidth + 14;
     }
-    nodes.forEach(function (nd, i) { after(45 * i, function () { nd.classList.add('in'); }); });
-    statusText.textContent = 'the model is composing a pipeline…';
-    var start = 45 * cs.length + 520, order = 0;
-    cs.forEach(function (c, i) {
-      after(start + 360 * i, function () { decide(nodes[i], c, c.use ? (++order) : 0); });
+  }
+
+  function renderProviders(counts) {
+    modelbar.innerHTML = '';
+    modellegend.innerHTML = '';
+    var total = 0;
+    providerOrder.forEach(function (m) { total += counts[m] || 0; });
+    if (!total) { return; }
+    providerOrder.forEach(function (m) {
+      var c = counts[m] || 0;
+      if (!c) { return; }
+      var seg = document.createElement('i');
+      seg.className = 'pld-seg-' + provKey(m);
+      seg.style.width = (c / total * 100) + '%';
+      modelbar.appendChild(seg);
+      var lg = document.createElement('span');
+      lg.innerHTML = '<i class="pld-seg-' + provKey(m) + '"></i><b>' + esc(m) + '</b> &times;' + c;
+      modellegend.appendChild(lg);
     });
-    after(start + 360 * cs.length + 320, function () { finish(order); });
   }
-  replay.addEventListener('click', run);
+
+  async function addLog(p, isFloor, g) {
+    var kind, mk;
+    if (isFloor)      { kind = 'floor'; mk = '▣'; }
+    else if (p.mint)  { kind = 'mint';  mk = '✦'; }
+    else if (p.use)   { kind = 'pick';  mk = '✓'; }
+    else              { kind = 'skip';  mk = '✕'; }
+    var line = document.createElement('div');
+    line.className = 'pld-logline l-' + kind;
+    var lm = p.use ? (esc(p.cli || '') + ' · ' + esc(shortModel(p.cli, p.model))) : '';
+    line.innerHTML = '<span class="pl-mk">' + mk + '</span>' +
+      '<span class="pl-ph">' + esc(p.phase) + '</span>' +
+      '<span class="pl-lm ' + (p.use ? 'p-' + provKey(p.cli) : '') + '">' + lm + '</span>' +
+      '<span class="pl-why"></span><span class="pld-cursor pl-lcur"></span>';
+    logEl.appendChild(line);
+    while (logEl.scrollHeight > logEl.clientHeight && logEl.firstChild !== line) {
+      logEl.removeChild(logEl.firstChild);
+    }
+    await typeWhy(line.querySelector('.pl-why'), p.why || '', g);
+    var lc = line.querySelector('.pl-lcur');
+    if (lc) { lc.remove(); }
+  }
+
+  async function runCase(idx) {
+    var g = ++gen;
+    var c = cases[idx];
+    for (var t = 0; t < tabs.length; t++) { tabs[t].classList.toggle('active', t === idx); }
+
+    railfill.style.width = '0px';
+    railwrap.scrollLeft = 0;
+    logEl.innerHTML = '';
+    modelbar.innerHTML = '';
+    modellegend.innerHTML = '';
+    composeEl.textContent = '';
+    nPick.textContent = '0'; nMint.textContent = '0'; nFloor.textContent = '0'; nSkip.textContent = '0';
+    scopeEl.classList.remove('show');
+
+    var old = railwrap.querySelectorAll('.pld-node');
+    for (var k = 0; k < old.length; k++) { old[k].remove(); }
+    var nodes = c.phases.map(function (p, i) { var n = makeNode(p, i); railwrap.appendChild(n); return n; });
+    // open-ended tail: the catalog is never a fixed list
+    var ghost = document.createElement('div');
+    ghost.className = 'pld-node ghost';
+    ghost.innerHTML = '<span class="pl-plus">＋</span><span class="pl-nm">any phase<br>the goal needs</span>';
+    railwrap.appendChild(ghost);
+
+    // First time only: spotlight the mandated floor so the principle reads up front.
+    if (!introShown && !reduce) {
+      introShown = true;
+      astate.textContent = 'mandated floor';
+      for (var f = 0; f < nodes.length; f++) {
+        if (!nodes[f].classList.contains('floor')) { continue; }
+        nodes[f].classList.add('on', 'spot');
+        nodes[f].querySelector('.pl-cli').textContent = 'floor';
+        await sleep(360);
+        if (stale(g)) { return; }
+      }
+      await sleep(640);
+      nodes.forEach(function (n) {
+        if (n.classList.contains('floor')) {
+          n.classList.remove('on', 'spot');
+          n.querySelector('.pl-cli').textContent = '';
+        }
+      });
+    }
+
+    await typeGoal(c.goal, g);
+    if (stale(g)) { return; }
+    scopeEl.textContent = c.scope || '';
+    scopeEl.classList.add('show');
+
+    advisor.classList.add('busy');
+    astate.textContent = 'analyzing…';
+    await sleep(T.think);
+    if (stale(g)) { return; }
+    advisor.classList.remove('busy');
+    astate.textContent = 'composing';
+    cursor.style.display = 'none';
+
+    var order = 0, pick = 0, mint = 0, fl = 0, skip = 0, provCounts = {};
+    for (var i = 0; i < c.phases.length; i++) {
+      if (stale(g)) { return; }
+      var p = c.phases[i], n = nodes[i], isFloor = !!floor[p.phase];
+      var cliEl = n.querySelector('.pl-cli'), modelEl = n.querySelector('.pl-model');
+      if (p.use) {
+        order++;
+        n.querySelector('.pl-badge').textContent = order;
+        if (p.cli) { provCounts[p.cli] = (provCounts[p.cli] || 0) + 1; }
+        cliEl.textContent = p.cli || 'run';
+        cliEl.className = 'pl-cli p-' + provKey(p.cli);
+        modelEl.textContent = shortModel(p.cli, p.model);
+        if (isFloor) {
+          n.classList.remove('considering'); n.classList.add('on'); fl++; nFloor.textContent = fl;
+        } else if (p.mint) {
+          n.classList.remove('premint'); n.classList.add('mint'); mint++; nMint.textContent = mint;
+          astate.textContent = '✦ writing ' + p.phase + '…';
+        } else {
+          n.classList.remove('considering'); n.classList.add('pick'); pick++; nPick.textContent = pick;
+        }
+        railTo(n);
+      } else {
+        n.classList.remove('considering'); n.classList.add('skip');
+        cliEl.textContent = 'skip'; cliEl.className = 'pl-cli'; modelEl.textContent = '';
+        var stub = document.createElement('span'); stub.className = 'pl-stub'; n.appendChild(stub);
+        skip++; nSkip.textContent = skip;
+      }
+      await addLog(p, isFloor, g);
+      if (stale(g)) { return; }
+      if (p.mint) { astate.textContent = 'composing'; }
+      await sleep(T.step);
+    }
+    if (stale(g)) { return; }
+
+    astate.textContent = 'done';
+    renderProviders(provCounts);
+    composeEl.innerHTML = '<b>' + (pick + mint + fl) + '</b> phases composed · <b>' + mint +
+      '</b> written for this goal · <b>' + fl + '</b> mandated';
+
+    var t0 = Date.now();
+    while (Date.now() - t0 < T.hold) {
+      if (stale(g) || pending !== null) { break; }
+      await sleep(80);
+    }
+  }
+
+  async function loop() {
+    if (started) { return; }
+    started = true;
+    var i = 0;
+    if (reduce) { await runCase(0); return; }
+    while (true) {
+      if (pending !== null) { i = pending; pending = null; }
+      await runCase(i);
+      if (pending !== null) { i = pending; pending = null; }
+      else { i = (i + 1) % cases.length; }
+    }
+  }
+
   if ('IntersectionObserver' in window && !reduce) {
     var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) { io.disconnect(); run(); } });
-    }, { threshold: 0.3 });
+      entries.forEach(function (e) { if (e.isIntersecting) { io.disconnect(); loop(); } });
+    }, { threshold: 0.25 });
     io.observe(root);
   } else {
-    run();
+    loop();
   }
+
+  window.addEventListener('resize', function () {
+    var on = railwrap.querySelectorAll('.pld-node.on, .pld-node.pick, .pld-node.mint');
+    if (on.length) { railTo(on[on.length - 1]); }
+  });
 })();
 </script>
 {{end}}
