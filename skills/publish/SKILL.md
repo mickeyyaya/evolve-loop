@@ -1,16 +1,16 @@
 ---
 name: publish
-description: Use when the user invokes /publish or asks to release a new version, ship a release, or publish a tag. Wraps the go-native self-healing release pipeline (`evolve release`) — pre-flight checks, auto-changelog, atomic ship, marketplace propagation poll, auto-rollback on failure.
+description: Use when the user invokes /evo:publish or asks to release a new version, ship a release, or publish a tag. Wraps the go-native self-healing release pipeline (`evolve release`) — pre-flight checks, auto-changelog, atomic ship, marketplace propagation poll, auto-rollback on failure.
 argument-hint: "<target-version> [--dry-run] [--no-rollback] [--skip-tests] [--max-poll-wait-s 300]"
 ---
 
-# /publish
+# /evo:publish
 
 > Canonical release entry point. Owns the full publish lifecycle: pre-flight → bump → changelog → ship → propagate → rollback-on-failure. NOT a synonym for "git push" — see [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary.
 
 ## What this skill does
 
-When the user types `/publish 18.5.0` (or similar), invoke the go-native release pipeline with the target version. The pipeline owns every step (implementation: `go/internal/releasepipeline/`, journal under `.evolve/release-journal/`):
+When the user types `/evo:publish 18.5.0` (or similar), invoke the go-native release pipeline with the target version. The pipeline owns every step (implementation: `go/internal/releasepipeline/`, journal under `.evolve/release-journal/`):
 
 | Step | Operation | Failure → action |
 |---|---|---|
@@ -38,7 +38,7 @@ gh run list --branch main --limit 1 --json headSha,status,conclusion,url
 Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `conclusion == "success"`. Anything else → **STOP** with the run URL:
 - *in-progress* → wait for it.
 - *failure* → fix `main` green first.
-- *stale SHA / local `main` ahead of `origin`* → you'd publish commits CI has never seen; **push `main` and let CI run first**, then release. (This is the same gate [`/release`](../release/SKILL.md) runs; it is hoisted here so `/publish`-direct callers are protected too.)
+- *stale SHA / local `main` ahead of `origin`* → you'd publish commits CI has never seen; **push `main` and let CI run first**, then release. (This is the same gate [`/evo:release`](../release/SKILL.md) runs; it is hoisted here so `/evo:publish`-direct callers are protected too.)
 
 **After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch all three workflows, then confirm the binaries actually landed:
 
@@ -55,17 +55,17 @@ gh release view --json assets -q '.assets[].name' | grep -q '\.tar\.gz$' \
 ```
 
 - **All green + binaries present → done.** Report the run URLs + the published asset count (`gh release view --json assets -q '.assets | length'`).
-- **`go`/`CI` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
+- **`go`/`CI` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/evo:publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
 - **`release` red or binaries MISSING → the release shipped without prebuilt binaries** (the one-line installer keeps working via build-from-source, just slower). Fix forward: fix `.goreleaser.yml`/`release.yml`, then `gh run rerun <release-run-id>` if the tag is intact, else cut the next patch.
 
 ## Invocation
 
 ```bash
-/publish 18.5.0                       # full publish, default 5-min poll, auto-rollback on
-/publish 18.5.0 --dry-run             # simulate every step, mutate nothing
-/publish 18.5.0 --skip-tests          # hot-fix path: skip preflight gate-test execution
-/publish 18.5.0 --no-rollback         # post-push failure → exit 3, no auto-revert
-/publish 18.5.0 --max-poll-wait-s 600 # tolerate slower marketplace propagation
+/evo:publish 18.5.0                       # full publish, default 5-min poll, auto-rollback on
+/evo:publish 18.5.0 --dry-run             # simulate every step, mutate nothing
+/evo:publish 18.5.0 --skip-tests          # hot-fix path: skip preflight gate-test execution
+/evo:publish 18.5.0 --no-rollback         # post-push failure → exit 3, no auto-revert
+/evo:publish 18.5.0 --max-poll-wait-s 600 # tolerate slower marketplace propagation
 ```
 
 The slash command translates to:
@@ -79,19 +79,19 @@ Optional hardening: `--require-preflight` runs the full-dry-run harness before a
 ## When to use this skill
 
 - **Always for any version bump** (patch, minor, major). The pipeline guarantees consistency, propagation, and rollback.
-- Gate readiness first with [`/release`](../release/SKILL.md) (read-only checks: preflight, consistency, CI-green-on-main, no-WIP-commits) — it delegates here when green.
+- Gate readiness first with [`/evo:release`](../release/SKILL.md) (read-only checks: preflight, consistency, CI-green-on-main, no-WIP-commits) — it delegates here when green.
 
 ## When NOT to use this skill
 
-- **Not for non-release commits.** If you're committing a feature without bumping the version, use [`/commit`](../commit/SKILL.md) (gated attestation → `evolve ship --class manual`). The release pipeline assumes a version bump and will fail-fast in preflight if `<target>` equals current.
+- **Not for non-release commits.** If you're committing a feature without bumping the version, use [`/evo:commit`](../commit/SKILL.md) (gated attestation → `evolve ship --class manual`). The release pipeline assumes a version bump and will fail-fast in preflight if `<target>` equals current.
 - **Not as a substitute for testing.** `--skip-tests` is for hot-fix scenarios where CI already verified. Routine releases must run the full preflight test suite.
 
-## Checking what `/publish` would do (dry-run)
+## Checking what `/evo:publish` would do (dry-run)
 
 Operators new to the pipeline: always start with `--dry-run` to see the proposed changelog block, version bump diff, and lifecycle plan before mutating:
 
 ```bash
-/publish 18.5.0 --dry-run
+/evo:publish 18.5.0 --dry-run
 ```
 
 The pipeline emits each step's proposed output without writing or committing.
