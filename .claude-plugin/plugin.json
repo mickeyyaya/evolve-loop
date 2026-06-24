@@ -81,12 +81,7 @@
       "package": "./cmd/evolve",
       "source_build": "cd go && make build",
       "cross_compile": "cd go && make dist",
-      "artifacts": {
-        "darwin-amd64": "go/bin/dist/evolve-darwin-amd64",
-        "darwin-arm64": "go/bin/dist/evolve-darwin-arm64",
-        "linux-amd64": "go/bin/dist/evolve-linux-amd64",
-        "linux-arm64": "go/bin/dist/evolve-linux-arm64"
-      },
+      "release_matrix_source": ".goreleaser.yml (builds[].targets) is the single source of truth for the published prebuilt binaries. `make dist` cross-compiles the local-dev subset (go/Makefile dist-* targets); the release workflow verifies every target archive + checksums.txt is published via `evolve release-verify-binaries <tag>`. Do not re-list the matrix here.",
       "tier": "tier-1-primary",
       "tier_note": "Canonical runtime as of v12.0.0. The legacy bash pipeline was removed in the v12 flag day; only the archived dispatcher at archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh remains as an emergency rollback hatch (EVOLVE_USE_LEGACY_BASH=1).",
       "fallback": {

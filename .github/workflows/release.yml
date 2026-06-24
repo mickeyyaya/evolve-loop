@@ -1,10 +1,16 @@
 name: release
 
-# Publishes prebuilt `evolve` binaries (darwin/linux × amd64/arm64, with the
+# Publishes prebuilt `evolve` binaries (the matrix in .goreleaser.yml, with the
 # skill payload bundled) to the GitHub release when a v* tag is pushed. The
 # install.sh one-line installer downloads these from
-# .../releases/latest/download/evolve_<os>_<arch>.tar.gz. Build matrix +
-# archive layout live in .goreleaser.yml; this is only the trigger + auth.
+# .../releases/latest/download/evolve_<os>_<arch>.tar.gz.
+#
+# The job graph enforces the three release invariants deterministically:
+#   test       — the full Go suite must pass on the TAGGED commit (check #3)
+#   goreleaser — needs:test, so a red suite never publishes (builds the binaries)
+#   verify     — needs:goreleaser, asserts every prebuilt binary + checksums is
+#                actually published (check #2) and the release installs + performs
+#                for every LLM CLI (check #1)
 on:
   push:
     tags:
@@ -15,8 +21,37 @@ permissions:
   contents: write
 
 jobs:
+  # check #3 — "all tests performed": gate publishing on the full suite passing
+  # on the exact tagged commit. Calls the project's own Makefile targets (no
+  # re-listed `go test` commands) and mirrors go.yml's structure (integration
+  # tier with race; e2e tier without race).
+  test:
+    name: full suite (tagged commit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - name: lint (vet + gofmt)
+        run: make lint
+      - name: build
+        run: make build
+      - name: test (race + integration tier)
+        run: make test-integration
+      - name: e2e tier (no race)
+        run: make test-e2e
+
   goreleaser:
     name: build + publish binaries
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,3 +66,27 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # check #2 — "all binaries prebuilt ready" + check #1 — "every CLI installs and
+  # performs": run AFTER publish, against the actual GitHub release. Either gate
+  # failing fails the workflow, surfacing an incomplete publish loudly.
+  verify:
+    name: verify published release
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - name: build evolve binary
+        run: go -C go build -o "$GITHUB_WORKSPACE/evolve" ./cmd/evolve
+      - name: verify all prebuilt binaries + checksums published (check #2)
+        run: ./evolve release-verify-binaries "$GITHUB_REF_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: verify release installs + performs for every LLM CLI (check #1)
+        run: ./evolve release-verify-clis
