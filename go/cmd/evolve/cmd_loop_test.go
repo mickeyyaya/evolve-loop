@@ -203,6 +203,23 @@ func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 	}
 }
 
+// TestParseLoopArgs_BudgetFlagWarnsDisabled verifies that --budget-usd emits a
+// visible disabled notice on stderr and that the flag's absence produces none.
+func TestParseLoopArgs_BudgetFlagWarnsDisabled(t *testing.T) {
+	var withFlag bytes.Buffer
+	parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &withFlag)
+	got := withFlag.String()
+	if !strings.Contains(got, "--budget-usd") || !strings.Contains(strings.ToLower(got), "disabled") {
+		t.Errorf("expected a disabled/deprecation notice mentioning --budget-usd; stderr=%q", got)
+	}
+	// And no budget noise when the flag is absent.
+	var noFlag bytes.Buffer
+	parseLoopArgs([]string{"fix bug"}, &noFlag)
+	if strings.Contains(strings.ToLower(noFlag.String()), "budget") {
+		t.Errorf("no budget notice expected when --budget-usd is absent; stderr=%q", noFlag.String())
+	}
+}
+
 // TestParsePositional unit-tests the heuristic in isolation.
 func TestParsePositional(t *testing.T) {
 	cases := []struct {

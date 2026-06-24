@@ -53,14 +53,7 @@ Start with just a goal. Reach for a flag only when you want more control — eac
 ```
 > *Behind the scenes:* `--cycles N` is a **contract** — exactly N cycles, never early-stopped. Omit it (step 1) and the advisor decides the count instead.
 
-**4 · Bound the cost** instead of the count:
-
-```bash
-/evo:loop --budget-usd 5 "improve test coverage"
-```
-> *Behind the scenes:* runs cycle after cycle until cumulative spend reaches **$5**, then stops cleanly (`stop_reason=budget`). Combine `--budget-usd N --cycles M` to stop at whichever limit comes first.
-
-**5 · Control the models** with a one-time setup:
+**4 · Control the models** with a one-time setup:
 
 ```bash
 /evo:setup                          # pick a preset once
@@ -68,7 +61,7 @@ Start with just a goal. Reach for a flag only when you want more control — eac
 ```
 > *Behind the scenes:* setup writes **per-phase model routing** to `.evolve/policy.json` — e.g. Build on Codex/GPT-5.5 and Audit on Claude/Opus, deliberately **different model families so the reviewer can't rubber-stamp the builder**. Every later run uses it.
 
-**6 · Resume** a run that was interrupted:
+**5 · Resume** a run that was interrupted:
 
 ```bash
 /evo:loop --resume

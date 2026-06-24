@@ -89,6 +89,13 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
+	// The cost-budget feature is disabled: dollar-cost calculation was
+	// unreliable across LLM models. Flag still accepted so old scripts parse,
+	// but we warn rather than silently ignore it.
+	if budgetUSD != 0 {
+		fmt.Fprintln(stderr, "evolve loop: WARN: --budget-usd / --budget is disabled and ignored; use --cycles N to bound the run, or omit it and let the advisor decide")
+	}
+
 	// Enforce the flag's "absolute path" contract for the project root AND the
 	// evolve dir. Downstream, WorkspacePath (= <root>/.evolve/runs/cycle-N) and
 	// every per-phase artifact path are derived by joining these; worktree phases
