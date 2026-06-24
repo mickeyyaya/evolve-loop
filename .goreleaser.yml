@@ -15,9 +15,14 @@ version: 2
 project_name: evolve
 
 before:
+  # goreleaser execs hooks directly (no shell), so `cd go && …` fails with
+  # "cd: not found"; the module is under go/, so use `go -C go …`. The release
+  # tag is cut on main, which CI (go.yml) already fully tests (make build +
+  # race + e2e), so this only re-tidies modules — it does NOT re-run the suite
+  # here (that also needs build artifacts the --clean checkout lacks, e.g.
+  # commit-prefix-scope.json's go/bin/** path).
   hooks:
-    - cd go && go mod tidy
-    - cd go && go test -race -count=1 ./...
+    - go -C go mod tidy
 
 builds:
   - id: evolve
