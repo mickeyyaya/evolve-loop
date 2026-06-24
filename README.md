@@ -12,6 +12,39 @@ It works with Claude Code, Gemini CLI, and Codex CLI — and can route a differe
 
 ---
 
+## Quick Start
+
+**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Codex CLI](https://github.com/openai/codex) — plus `git`, `bash`, and `jq`, and a repo you want to improve.
+
+**Install:**
+
+```bash
+/plugin marketplace add mickeyyaya/evolve-loop
+/plugin install evo@evo
+cd go && make build   # builds the evolve runtime binary
+```
+
+**Set up (optional but recommended):** `/setup` is an interactive flow that detects your installed CLIs, explains the pipeline, and proposes which model should run each phase. Skip it and the loop runs with sensible all-Claude defaults.
+
+**Run:**
+
+```bash
+# Run exactly N cycles toward a goal
+/evo:loop --cycles 3 "add dark mode"
+
+# Strategy presets tune scope and strictness
+/evo:loop --cycles 5 harden                 # stability + tests
+/evo:loop --cycles 3 repair "fix auth bug"  # fix-only, smallest diff
+/evo:loop --cycles 5 innovate "explore concurrency primitives"
+
+# Resume a cycle that was checkpointed (e.g. quota wall)
+/evo:loop --resume
+```
+
+A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
+
+---
+
 ## The problem it solves
 
 Autonomous agents are now good enough to write a feature, fix a bug, or refactor a module unattended. So the bottleneck moved. It's no longer *can the agent write the code?* — it's *can you merge what it wrote without re-reading every diff?*
@@ -192,39 +225,6 @@ The strongest evidence that the anti-gaming is real is that it has repeatedly ca
 - **An autonomous goal divergence.** Triage chose to ship something other than the operator's stated plan — and was right: the stated item was already done, so the deviation saved a wasted cycle. (Operator goal text is *input*, not an unquestionable directive — by design.)
 
 The value proposition was never "cycles never fail." It's that failures **produce durable lessons and structural fixes** — which is the most valuable kind of bug report. Case studies: [docs/incidents/](docs/incidents/).
-
----
-
-## Quick Start
-
-**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Codex CLI](https://github.com/openai/codex) — plus `git`, `bash`, and `jq`, and a repo you want to improve.
-
-**Install:**
-
-```bash
-/plugin marketplace add mickeyyaya/evolve-loop
-/plugin install evo@evo
-cd go && make build   # builds the evolve runtime binary
-```
-
-**Set up (optional but recommended):** `/setup` is an interactive flow that detects your installed CLIs, explains the pipeline, and proposes which model should run each phase. Skip it and the loop runs with sensible all-Claude defaults.
-
-**Run:**
-
-```bash
-# Run exactly N cycles toward a goal
-/evo:loop --cycles 3 "add dark mode"
-
-# Strategy presets tune scope and strictness
-/evo:loop --cycles 5 harden                 # stability + tests
-/evo:loop --cycles 3 repair "fix auth bug"  # fix-only, smallest diff
-/evo:loop --cycles 5 innovate "explore concurrency primitives"
-
-# Resume a cycle that was checkpointed (e.g. quota wall)
-/evo:loop --resume
-```
-
-A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
 
 ---
 
