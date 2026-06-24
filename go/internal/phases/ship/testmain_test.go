@@ -14,7 +14,6 @@ import (
 // on cleanup), so this composes cleanly with them.
 var shipControlFlowEnvVars = []string{
 	"EVOLVE_SHIP_AUTO_CONFIRM",
-	"EVOLVE_STRICT_AUDIT",
 	"EVOLVE_SHIP_RELEASE_NOTES",
 	"EVOLVE_BYPASS_PREFIX_GATE",
 }

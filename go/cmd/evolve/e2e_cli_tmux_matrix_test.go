@@ -120,7 +120,6 @@ func runOneTmuxCycle(t *testing.T, cfg tmuxCycleConfig) {
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
 		"EVOLVE_NATIVE_SHIP=0",
-		"EVOLVE_STRICT_AUDIT=0",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		// Redirect codex's pre-trust write away from the real ~/.codex.
 		"EVOLVE_CODEX_CONFIG_PATH="+filepath.Join(fakeHome, ".codex", "config.toml"),

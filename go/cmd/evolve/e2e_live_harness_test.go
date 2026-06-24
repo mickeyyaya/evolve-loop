@@ -286,7 +286,6 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 		// Native-only ship: the legacy EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT
 		// fake-ship hatch was removed in the Go-only consolidation, so a live
 		// cycle runs the native shipper. Shipped (below) is OBSERVED, not asserted.
-		"EVOLVE_STRICT_AUDIT=0",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		// Redirect codex/agy preflight writes away from the operator's real home.
 		"EVOLVE_CODEX_CONFIG_PATH="+filepath.Join(fakeHome, ".codex", "config.toml"),

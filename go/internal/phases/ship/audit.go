@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
@@ -99,13 +100,13 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	case pass:
 		// clean ship
 	case warn:
-		if opts.envBool("EVOLVE_STRICT_AUDIT") {
+		if policy.StrictAuditFor(opts.ProjectRoot) {
 			return shipErr(core.CodeAuditBindingVerdictWarn, core.ShipClassPrecondition, core.StageVerifyClass,
-				"audit-report.md declares 'Verdict: WARN' and EVOLVE_STRICT_AUDIT=1 — strict mode rejects WARN",
+				"audit-report.md declares 'Verdict: WARN' and policy.json workflow.strict_audit is set — strict mode rejects WARN",
 				"artifact_path", entry.ArtifactPath)
 		}
 		res.Logs = append(res.Logs,
-			"[ship] audit verdict: WARN — shipping per fluent-by-default policy (set EVOLVE_STRICT_AUDIT=1 to block on WARN)",
+			"[ship] audit verdict: WARN — shipping per fluent-by-default policy (set workflow.strict_audit in .evolve/policy.json to block on WARN)",
 		)
 	default:
 		return shipErr(core.CodeAuditBindingMalformed, core.ShipClassPrecondition, core.StageVerifyClass,

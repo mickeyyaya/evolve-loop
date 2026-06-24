@@ -32,7 +32,7 @@ type RouteInput struct {
 	History        []failureadapter.Entry // converted state.failedApproaches
 	Cfg            config.RoutingConfig
 	Completed      []string // phases already done this cycle
-	Strict         bool     // EVOLVE_STRICT_AUDIT — threaded to failureadapter for retro
+	Strict         bool     // policy.json workflow.strict_audit — threaded to failureadapter for retro
 	Now            time.Time
 	IntentRequired bool
 	PSMASEnabled   bool // EVOLVE_PSMAS_SKIP — consume triage phase_skip[] when enabled.
