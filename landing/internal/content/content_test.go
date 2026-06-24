@@ -87,28 +87,80 @@ func TestContent_PipelineDemoLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := site.PipelineDemo
-	if d.Heading == "" || d.Task == "" || d.Outcome == "" {
-		t.Error("PipelineDemo Heading/Task/Outcome must all be set")
+	if d.Heading == "" {
+		t.Error("PipelineDemo.Heading must be set")
 	}
-	if len(d.Candidates) < 5 {
-		t.Fatalf("PipelineDemo.Candidates = %d, want >= 5 (the palette the model picks from)", len(d.Candidates))
+	if len(d.Floor) == 0 {
+		t.Fatal("PipelineDemo.Floor must name the always-run phases")
 	}
-	var used, skipped int
-	for i, c := range d.Candidates {
-		if c.Phase == "" {
-			t.Errorf("candidate %d has no phase name", i)
+	if len(d.Cases) < 5 {
+		t.Fatalf("PipelineDemo.Cases = %d, want >= 5 looping goals", len(d.Cases))
+	}
+
+	floor := make(map[string]bool, len(d.Floor))
+	for _, f := range d.Floor {
+		floor[f] = true
+	}
+
+	var mintedAnywhere int
+	usedPerCase := make([]int, len(d.Cases))
+	for ci, c := range d.Cases {
+		if c.Goal == "" {
+			t.Errorf("case %d must set a goal", ci)
 		}
-		if c.Use {
-			used++
-		} else {
-			skipped++
-			if c.Skip == "" {
-				t.Errorf("skipped candidate %q must give a reason", c.Phase)
+		if len(c.Phases) < 5 {
+			t.Errorf("case %q has %d phases, want >= 5", c.Goal, len(c.Phases))
+		}
+		runFloor := make(map[string]bool)
+		for _, p := range c.Phases {
+			if p.Phase == "" {
+				t.Errorf("case %q has a phase with no name", c.Goal)
+			}
+			if p.Use {
+				usedPerCase[ci]++
+				if p.CLI == "" || p.Model == "" {
+					t.Errorf("case %q: run phase %q must name the LLM (cli) and model the advisor routed it to", c.Goal, p.Phase)
+				}
+				if floor[p.Phase] {
+					runFloor[p.Phase] = true
+				}
+			} else if p.Why == "" {
+				t.Errorf("case %q: skipped phase %q must give a reason", c.Goal, p.Phase)
+			}
+			if p.Mint {
+				mintedAnywhere++
+				if !p.Use {
+					t.Errorf("case %q: minted phase %q should also run (use=true)", c.Goal, p.Phase)
+				}
+			}
+		}
+		// The integrity floor must run in every case — that is the whole point
+		// of marking it a floor (ship ⇒ build ∧ audit).
+		for _, f := range d.Floor {
+			if !runFloor[f] {
+				t.Errorf("case %q must run floor phase %q (the floor always runs)", c.Goal, f)
 			}
 		}
 	}
-	if used < 3 || skipped < 1 {
-		t.Errorf("want the model to use >=3 and skip >=1 phases (got used=%d skipped=%d)", used, skipped)
+
+	if mintedAnywhere == 0 {
+		t.Error("at least one case should mint a custom phase (the advisor writes its own)")
+	}
+	// The demo earns its name only if the pipelines actually differ in weight.
+	if len(usedPerCase) == 0 {
+		t.Fatal("no cases to compare weights")
+	}
+	min, max := usedPerCase[0], usedPerCase[0]
+	for _, n := range usedPerCase {
+		if n < min {
+			min = n
+		}
+		if n > max {
+			max = n
+		}
+	}
+	if min == max {
+		t.Errorf("cases should vary light↔heavy, but all run %d phases", min)
 	}
 }
 

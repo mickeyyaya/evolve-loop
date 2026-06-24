@@ -63,24 +63,119 @@
     { "phase": "Learn", "artifact": "a lesson kept", "blurb": "Turns the outcome into a durable lesson the next cycle starts with." }
   ],
   "pipelineDemo": {
-    "kicker": "AI-generated pipeline",
+    "kicker": "AI-composed pipeline",
     "heading": "The model composes its own pipeline.",
-    "sub": "Give it a goal. From every phase it could run, the model picks the ones this change actually needs — and skips the rest, with reasons. Nothing here is pre-scripted.",
-    "task": "add a dark-mode toggle",
-    "candidates": [
-      { "phase": "Intent", "use": true },
-      { "phase": "Scout", "use": true },
-      { "phase": "Triage", "use": true },
-      { "phase": "Plan-Review", "use": false, "skip": "low-risk UI change" },
-      { "phase": "TDD", "use": true },
-      { "phase": "Build", "use": true },
-      { "phase": "Audit", "use": true },
-      { "phase": "Benchmark", "use": false, "skip": "no perf-sensitive path" },
-      { "phase": "Security review", "use": false, "skip": "no auth or input surface" },
-      { "phase": "Ship", "use": true },
-      { "phase": "Learn", "use": true }
-    ],
-    "outcome": "Eight phases chosen from eleven — the model skipped what this goal didn't need."
+    "sub": "Give it a goal. The advisor runs the mandated fundamentals, picks from the common phases, and writes brand-new ones when the goal needs them — then routes each phase to the right LLM and model: Claude Code, Codex, or Gemini, per policy. The combinations are unlimited; nothing here is pre-scripted.",
+    "floor": ["Build", "Audit", "Ship"],
+    "providers": ["Claude", "Codex", "Gemini"],
+    "cases": [
+      {
+        "goal": "Build a `<canvas>` Snake game web page",
+        "scope": "greenfield feature",
+        "phases": [
+          { "phase": "Intent", "use": true, "cli": "Claude", "model": "Opus", "why": "a vague one-liner — pin scope before any code" },
+          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "no game code yet — fast survey of the stack, pick canvas" },
+          { "phase": "Triage", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "split board · snake · food · loop · score" },
+          { "phase": "Plan-Review", "use": true, "cli": "Claude", "model": "Opus", "why": "a new UI surface — Design + Eng lenses weigh in" },
+          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "encode the rules: growth, collision, wrap, lose" },
+          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — implement loop + input + render" },
+          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family than the builder, so the review stays honest" },
+          { "phase": "Playtest", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "no phase judges whether the controls feel right — so the advisor writes one" },
+          { "phase": "Benchmark", "use": false, "why": "60fps is trivial here — perf isn't the goal" },
+          { "phase": "Security", "use": false, "why": "no auth, no input, no data — zero surface" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit once the evals are green" },
+          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the canvas game-loop pattern" }
+        ]
+      },
+      {
+        "goal": "Rename `usr` → `currentUser` in the auth module",
+        "scope": "mechanical rename",
+        "phases": [
+          { "phase": "Intent", "use": false, "why": "the goal is exact — nothing to clarify" },
+          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "find every reference so the rename is total" },
+          { "phase": "Triage", "use": false, "why": "one mechanical change — nothing to defer" },
+          { "phase": "Plan-Review", "use": false, "why": "a pure rename — no design surface" },
+          { "phase": "TDD", "use": false, "why": "behavior is unchanged — existing tests pin it" },
+          { "phase": "Build", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — apply it; the compiler finds stragglers" },
+          { "phase": "Audit", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — a second family runs the suite, proving nothing moved" },
+          { "phase": "Benchmark", "use": false, "why": "identical runtime behavior" },
+          { "phase": "Security", "use": false, "why": "no security surface touched" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
+          { "phase": "Learn", "use": false, "why": "trivial — no lesson worth keeping" }
+        ]
+      },
+      {
+        "goal": "Fix the off-by-one crashing the last page of results",
+        "scope": "bug fix",
+        "phases": [
+          { "phase": "Intent", "use": false, "why": "the bug report is concrete — the goal is clear" },
+          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "find where the page boundary is computed" },
+          { "phase": "Fault-Localize", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "the advisor writes a phase to pin the exact off-by-one before any fix" },
+          { "phase": "Triage", "use": false, "why": "a single defect — nothing to split" },
+          { "phase": "Plan-Review", "use": false, "why": "no new design — behavior already specified" },
+          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "write a test that crashes on the last page first" },
+          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — fix the index math → GREEN" },
+          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family replays the repro + full regression" },
+          { "phase": "Benchmark", "use": false, "why": "the fix is O(1) — no perf impact" },
+          { "phase": "Security", "use": false, "why": "no security surface in pagination math" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
+          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the boundary-test pattern" }
+        ]
+      },
+      {
+        "goal": "Add email + password login with Stripe checkout",
+        "scope": "auth + payments",
+        "phases": [
+          { "phase": "Intent", "use": true, "cli": "Claude", "model": "Opus", "why": "auth + payments — pin the flows + failure modes" },
+          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "survey session + DB layer; check the Stripe SDK" },
+          { "phase": "Triage", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "sequence: auth → checkout → webhooks" },
+          { "phase": "Plan-Review", "use": true, "cli": "Claude", "model": "Opus", "why": "all four lenses — the Security lens is mandatory" },
+          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "encode success + every rejection path as RED" },
+          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — implement auth + checkout → GREEN" },
+          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family than the builder audits the code" },
+          { "phase": "Security", "use": true, "cli": "Claude", "model": "Opus", "why": "scored: hashing, authz, secrets, webhook sigs" },
+          { "phase": "Webhook-Replay-Guard", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "payments need an idempotency/replay guard no common phase covers — minted" },
+          { "phase": "Benchmark", "use": false, "why": "correctness over latency at this stage" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Sonnet", "why": "fundamental — gated commit once the security score clears" },
+          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the auth + webhook pattern" }
+        ]
+      },
+      {
+        "goal": "Update the README install section for the new installer",
+        "scope": "docs",
+        "phases": [
+          { "phase": "Intent", "use": false, "why": "a doc change — the scope is obvious" },
+          { "phase": "Scout", "use": false, "why": "the change is the prose itself — no code to map" },
+          { "phase": "Triage", "use": false, "why": "a single doc edit" },
+          { "phase": "Plan-Review", "use": false, "why": "prose, not architecture" },
+          { "phase": "TDD", "use": false, "why": "no code — nothing to test" },
+          { "phase": "Build", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "fundamental — rewrite the section; verify the command runs" },
+          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — doc-lint + link-check" },
+          { "phase": "Benchmark", "use": false, "why": "no runtime path" },
+          { "phase": "Security", "use": false, "why": "no security surface" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
+          { "phase": "Learn", "use": false, "why": "no engineering lesson" }
+        ]
+      },
+      {
+        "goal": "Speed up the dashboard query that times out on big tenants",
+        "scope": "performance",
+        "phases": [
+          { "phase": "Intent", "use": false, "why": "the target is measurable — make it fast" },
+          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "profile the slow path — find the N+1 / missing index" },
+          { "phase": "Triage", "use": false, "why": "a single hotspot" },
+          { "phase": "Plan-Review", "use": false, "why": "no behavior change — just faster" },
+          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Sonnet", "why": "characterization tests — the output must not change" },
+          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — add the index / batch the query" },
+          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family checks outputs are identical" },
+          { "phase": "Query-Plan-Diff", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "the advisor writes a phase to diff the SQL plan before vs after" },
+          { "phase": "Benchmark", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "measure before/after — prove + guard the speedup" },
+          { "phase": "Security", "use": false, "why": "query shape unchanged — no new exposure" },
+          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit once the benchmark clears" },
+          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the indexing fix" }
+        ]
+      }
+    ]
   },
   "pillarsIntro": {
     "kicker": "What makes it work",

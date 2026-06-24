@@ -82,22 +82,39 @@ type Phase struct {
 }
 
 // PipelineDemo powers the interactive "the model composes its own pipeline"
-// section: one example goal, and the phases the model generates for it.
+// section. Floor is the small set of phases policy always runs (the integrity
+// invariant ship ⇒ build ∧ audit); Cases are the goals the demo loops through,
+// each showing the pipeline the advisor composes for it.
 type PipelineDemo struct {
-	Kicker     string        `json:"kicker"`
-	Heading    string        `json:"heading"`
-	Sub        string        `json:"sub"`
-	Task       string        `json:"task"`
-	Candidates []PhaseChoice `json:"candidates"`
-	Outcome    string        `json:"outcome"`
+	Kicker    string     `json:"kicker"`
+	Heading   string     `json:"heading"`
+	Sub       string     `json:"sub"`
+	Floor     []string   `json:"floor"`
+	Providers []string   `json:"providers"`
+	Cases     []DemoCase `json:"cases"`
 }
 
-// PhaseChoice is one phase the model could run. Use marks the phases it selects
-// for this goal; Skip gives the reason it leaves a phase out.
+// DemoCase is one goal the advisor composes a pipeline for. Phases is the
+// ordered list of every node shown for this case, in display order — common
+// phases, mandated floor phases, and any the advisor mints for the goal.
+type DemoCase struct {
+	Goal   string        `json:"goal"`
+	Scope  string        `json:"scope"`
+	Phases []PhaseChoice `json:"phases"`
+}
+
+// PhaseChoice is one node in a case. Use marks the phases the advisor runs; Why
+// gives the reason (a skip reason when Use is false). CLI is the LLM provider the
+// advisor gave the phase to (Claude Code, Codex, Gemini) and Model the specific
+// model — the advisor balances ownership across providers per policy. Mint marks
+// a phase the advisor wrote on the spot because no common phase fit the goal.
 type PhaseChoice struct {
 	Phase string `json:"phase"`
 	Use   bool   `json:"use"`
-	Skip  string `json:"skip,omitempty"`
+	Why   string `json:"why,omitempty"`
+	CLI   string `json:"cli,omitempty"`
+	Model string `json:"model,omitempty"`
+	Mint  bool   `json:"mint,omitempty"`
 }
 
 type Pillar struct {
@@ -186,6 +203,10 @@ func (s *Site) Validate() error {
 		{"hero.ctaPrimary.command", s.Hero.CTAPrimary.Command == ""},
 		{"proofBar", len(s.ProofBar) == 0},
 		{"phaseSpine (>=5)", len(s.PhaseSpine) < 5},
+		{"pipelineDemo.heading", s.PipelineDemo.Heading == ""},
+		{"pipelineDemo.floor (>=1)", len(s.PipelineDemo.Floor) == 0},
+		{"pipelineDemo.providers (>=1)", len(s.PipelineDemo.Providers) == 0},
+		{"pipelineDemo.cases (>=2)", len(s.PipelineDemo.Cases) < 2},
 		{"pillars (>=3)", len(s.Pillars) < 3},
 		{"comparison.rows", len(s.Comparison.Rows) == 0},
 		{"footer.links", len(s.Footer.Links) == 0},
@@ -193,6 +214,23 @@ func (s *Site) Validate() error {
 	for _, c := range checks {
 		if c.missing {
 			return fmt.Errorf("missing required content field: %s", c.name)
+		}
+	}
+	// Cross-field coherence for the pipeline demo: a bad content.json should fail
+	// the build here, not render a broken card. Every case needs phases, and every
+	// phase the advisor runs must route to a declared provider.
+	providers := make(map[string]bool, len(s.PipelineDemo.Providers))
+	for _, p := range s.PipelineDemo.Providers {
+		providers[p] = true
+	}
+	for i, c := range s.PipelineDemo.Cases {
+		if len(c.Phases) == 0 {
+			return fmt.Errorf("invalid content: pipelineDemo.cases[%d] (%q) has no phases", i, c.Goal)
+		}
+		for _, ph := range c.Phases {
+			if ph.Use && !providers[ph.CLI] {
+				return fmt.Errorf("invalid content: pipelineDemo.cases[%d] phase %q routes to %q, not in providers", i, ph.Phase, ph.CLI)
+			}
 		}
 	}
 	return nil
