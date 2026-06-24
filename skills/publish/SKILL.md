@@ -40,6 +40,14 @@ Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `con
 - *failure* → fix `main` green first.
 - *stale SHA / local `main` ahead of `origin`* → you'd publish commits CI has never seen; **push `main` and let CI run first**, then release. (This is the same gate [`/evo:release`](../release/SKILL.md) runs; it is hoisted here so `/evo:publish`-direct callers are protected too.)
 
+**Also before** invoking the pipeline — every LLM CLI must install AND the release binary must answer every core subcommand the installed skills shell out to. This is a deterministic, `gh`-free local gate (no network, no live LLM): it installs the Claude payload into a throwaway home, renders the Codex/agy projections, checks the Gemini in-repo layout, then smoke-runs each core subcommand on the running binary.
+
+```bash
+evolve release-verify-clis
+```
+
+Require **exit 0** — every CLI row plus the `binary:core-subcommands` row reports `OK`. Anything else → **STOP**; the printed table names the failing target: a CLI whose install/projection broke, or a subcommand the binary no longer answers (the *"installed skills silently break"* regression). Fix forward before publishing. CI enforces the same matrix via the `TestReleaseVerifyCLIMatrix_RealPayload` e2e test (`go` workflow), so a red here predicts a red CI on the release commit.
+
 **After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch all three workflows, then confirm the binaries actually landed:
 
 ```bash
