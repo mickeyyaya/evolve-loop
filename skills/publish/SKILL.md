@@ -40,18 +40,23 @@ Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `con
 - *failure* → fix `main` green first.
 - *stale SHA / local `main` ahead of `origin`* → you'd publish commits CI has never seen; **push `main` and let CI run first**, then release. (This is the same gate [`/release`](../release/SKILL.md) runs; it is hoisted here so `/publish`-direct callers are protected too.)
 
-**After** the pipeline reports success — the *released commit's* CI must go green (catches the version-bump + freshly-pushed commits; this is what actually let v20.1.0 ship red):
+**After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch all three workflows, then confirm the binaries actually landed:
 
 ```bash
 sha=$(git rev-parse origin/main)
-for wf in go CI; do
+for wf in go CI release; do
   rid=$(gh run list --commit "$sha" --workflow "$wf" --json databaseId -q '.[0].databaseId')
   gh run watch "$rid" --exit-status || echo "RED: $wf on $sha"
 done
+# A green `release` run can still upload nothing on a config slip — confirm the
+# prebuilt binaries (evolve_<os>_<arch>.tar.gz) actually landed on the release:
+gh release view --json assets -q '.assets[].name' | grep -q '\.tar\.gz$' \
+  || echo "MISSING: no prebuilt binaries on the latest release — re-run: gh run rerun <release-run-id>"
 ```
 
-- **Both green → done.** Report the run URLs.
-- **Red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
+- **All green + binaries present → done.** Report the run URLs + the published asset count (`gh release view --json assets -q '.assets | length'`).
+- **`go`/`CI` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
+- **`release` red or binaries MISSING → the release shipped without prebuilt binaries** (the one-line installer keeps working via build-from-source, just slower). Fix forward: fix `.goreleaser.yml`/`release.yml`, then `gh run rerun <release-run-id>` if the tag is intact, else cut the next patch.
 
 ## Invocation
 
