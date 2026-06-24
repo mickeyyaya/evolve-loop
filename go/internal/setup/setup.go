@@ -131,10 +131,17 @@ type CLIStatus struct {
 // (cli ∉ allowed_clis, or model tier outside the envelope) — surfaced so the
 // /setup onboarding loop can fix the offending pin before it hard-fails dispatch.
 type PhaseStatus struct {
-	Role            string   `json:"role"`
-	CurrentCLI      string   `json:"current_cli,omitempty"`
-	CurrentTier     string   `json:"current_tier,omitempty"`
-	Source          string   `json:"source"`
+	Role        string `json:"role"`
+	CurrentCLI  string `json:"current_cli,omitempty"`
+	CurrentTier string `json:"current_tier,omitempty"`
+	Source      string `json:"source"`
+	// DefaultCLI/DefaultTier are the PROFILE defaults (profile cli +
+	// model_tier_default), carried independently of any policy-pin overlay so the
+	// deterministic recommender (Recommend) can compute "differs from default"
+	// without re-loading the profile. Unpinned phases have these == Current*;
+	// pinned phases keep the profile default here while Current* shows the pin.
+	DefaultCLI      string   `json:"default_cli,omitempty"`
+	DefaultTier     string   `json:"default_tier,omitempty"`
 	Envelope        Envelope `json:"envelope"`
 	CrossFamilyWith string   `json:"cross_family_with,omitempty"`
 	AllowedCLIs     []string `json:"allowed_clis,omitempty"`
@@ -236,8 +243,9 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 			// Step 9: resolvellm emits a tier, never an exact model.
 			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
-		if envlp, fam, allowed, ok := readProfileConstraints(profilesDir, role); ok {
-			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = envlp, fam, allowed
+		if pc, ok := readProfileConstraints(profilesDir, role); ok {
+			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = pc.Envelope, pc.CrossFamilyWith, pc.AllowedCLIs
+			ps.DefaultCLI, ps.DefaultTier = pc.DefaultCLI, pc.DefaultTier
 		}
 		// Overlay the policy pin (the dispatch resolver honors it absolutely) and
 		// validate it against the same floor dispatch enforces, so onboarding can
@@ -308,20 +316,39 @@ func capTierFromManifest(adaptersDir, base string) string {
 	return "delegated"
 }
 
-func readProfileConstraints(profilesDir, role string) (Envelope, string, []string, bool) {
+// profileConstraints is the per-phase onboarding view read from a <role>.json
+// profile: the kernel-clamp guardrails (envelope/cross-family/allowed_clis) plus
+// the profile DEFAULTS (cli + model_tier_default) the recommender baselines on.
+type profileConstraints struct {
+	Envelope        Envelope
+	CrossFamilyWith string
+	AllowedCLIs     []string
+	DefaultCLI      string // profile.cli (raw driver name, e.g. "agy-tmux")
+	DefaultTier     string // profile.model_tier_default
+}
+
+func readProfileConstraints(profilesDir, role string) (profileConstraints, bool) {
 	b, err := os.ReadFile(filepath.Join(profilesDir, role+".json"))
 	if err != nil {
-		return Envelope{}, "", nil, false
+		return profileConstraints{}, false
 	}
 	var doc struct {
 		Envelope        Envelope `json:"model_tier_envelope"`
 		CrossFamilyWith string   `json:"cross_family_with"`
 		AllowedCLIs     []string `json:"allowed_clis"`
+		CLI             string   `json:"cli"`
+		DefaultTier     string   `json:"model_tier_default"`
 	}
 	if json.Unmarshal(b, &doc) != nil {
-		return Envelope{}, "", nil, false
+		return profileConstraints{}, false
 	}
-	return doc.Envelope, doc.CrossFamilyWith, doc.AllowedCLIs, true
+	return profileConstraints{
+		Envelope:        doc.Envelope,
+		CrossFamilyWith: doc.CrossFamilyWith,
+		AllowedCLIs:     doc.AllowedCLIs,
+		DefaultCLI:      doc.CLI,
+		DefaultTier:     doc.DefaultTier,
+	}, true
 }
 
 func readStateMarker(evolveDir string) (string, int) {

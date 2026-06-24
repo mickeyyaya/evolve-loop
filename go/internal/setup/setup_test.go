@@ -229,6 +229,31 @@ func TestDetect_PolicyPinOverlay(t *testing.T) {
 	}
 }
 
+// TestDetect_PhaseDefaultsFromProfile: PhaseStatus carries the PROFILE default
+// CLI + tier (profile.cli + model_tier_default), independent of any policy-pin
+// overlay — so the recommender can compute "differs from default" without a
+// profile loader. The pin overrides Current*, but Default* stays the profile's.
+func TestDetect_PhaseDefaultsFromProfile(t *testing.T) {
+	// builder profile: cli agy-tmux, model_tier_default sonnet. Pin it to claude/deep.
+	rep := detectWithPolicy(t, `{"pins":{"builder":{"cli":"claude","model":"deep"}}}`)
+	b := phaseByRole(rep, "builder")
+	if b.DefaultCLI != "agy-tmux" || b.DefaultTier != "sonnet" {
+		t.Errorf("profile defaults: got cli=%q tier=%q, want agy-tmux/sonnet", b.DefaultCLI, b.DefaultTier)
+	}
+	// The pin still overlays Current* (proves Default* is NOT just a copy of the pin).
+	if b.CurrentCLI != "claude" || b.CurrentTier != "deep" {
+		t.Errorf("pin overlay broken: %+v", b)
+	}
+	// An unpinned phase: Default* equals Current* (both from the profile).
+	s := phaseByRole(rep, "scout")
+	if s.DefaultCLI != s.CurrentCLI || s.DefaultTier != s.CurrentTier {
+		t.Errorf("unpinned scout Default*/Current* should match: %+v", s)
+	}
+	if s.DefaultCLI != "claude-tmux" || s.DefaultTier != "sonnet" {
+		t.Errorf("scout profile defaults: got cli=%q tier=%q, want claude-tmux/sonnet", s.DefaultCLI, s.DefaultTier)
+	}
+}
+
 // TestDetect_PolicyPinCLIViolation: a pin whose CLI is outside allowed_clis is
 // surfaced as a violation (still overlaid so the user sees what they wrote).
 func TestDetect_PolicyPinCLIViolation(t *testing.T) {
@@ -333,12 +358,12 @@ func TestCapTierFromManifest(t *testing.T) {
 func TestReadProfileConstraints_MalformedJSON(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "scout.json"), `{not valid json`)
-	_, _, _, ok := readProfileConstraints(dir, "scout")
+	_, ok := readProfileConstraints(dir, "scout")
 	if ok {
 		t.Error("malformed profile JSON should report ok=false")
 	}
 	// Missing file is also ok=false (the ReadFile-error branch).
-	if _, _, _, ok := readProfileConstraints(dir, "absent"); ok {
+	if _, ok := readProfileConstraints(dir, "absent"); ok {
 		t.Error("missing profile should report ok=false")
 	}
 }
