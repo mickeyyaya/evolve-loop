@@ -315,6 +315,33 @@ func TestRecommend_Deterministic(t *testing.T) {
 	}
 }
 
+// A custom PresetConfig exercises the "up" and "min" tier-bias strategies (the
+// shipped default only uses default/down/max) and constructs PresetConfig +
+// PresetSpec directly — proving the config-driven interpreter handles the full
+// bias vocabulary.
+func TestRecommend_CustomPresetConfig_UpAndMin(t *testing.T) {
+	cfg := PresetConfig{
+		Default: "rich",
+		Presets: []PresetSpec{
+			{Name: "rich", Description: "one tier richer", TierBias: "up"},
+			{Name: "floor", Description: "envelope floor", TierBias: "min"},
+		},
+	}
+	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
+		ph("scout", "claude-tmux", "fast", "fast", "fast", "deep", []string{"all"}, ""),
+	)
+	rr := Recommend(rep, cfg)
+	if rr.Default != "rich" || len(rr.Presets) != 2 {
+		t.Fatalf("custom config: default=%q presets=%d", rr.Default, len(rr.Presets))
+	}
+	if got := asg(t, presetByName(t, rr, "rich"), "scout").Tier; got != "balanced" {
+		t.Errorf("up bias: fast → %q, want balanced (one rank richer)", got)
+	}
+	if got := asg(t, presetByName(t, rr, "floor"), "scout").Tier; got != "fast" {
+		t.Errorf("min bias: scout tier = %q, want fast (envelope floor)", got)
+	}
+}
+
 // 18b. A profile that omits model_tier_default (empty DefaultTier) must NOT
 // spuriously report DiffersFromDefault in the recommended preset — else apply
 // would emit a redundant pin. The effective default (envelope.default/balanced)
