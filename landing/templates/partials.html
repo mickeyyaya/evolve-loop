@@ -78,6 +78,7 @@
     --pl-line:color-mix(in srgb,var(--pl-ink) 14%,transparent);
     --pl-line2:color-mix(in srgb,var(--pl-ink) 26%,transparent);
     --pl-surf:color-mix(in srgb,var(--pl-ink) 3%,transparent);
+    --pl-node-base:color-mix(in srgb,var(--pl-ink) 4%,var(--pl-bg));
     --pl-floor:var(--ok,#16996a);
     --pl-floor-soft:var(--ok-soft,color-mix(in srgb,var(--pl-floor) 13%,transparent));
     --pl-claude:#cc7a4d;
@@ -126,7 +127,7 @@
   .pld-railfill{position:absolute;left:8px;top:50%;height:2px;width:0;transform:translateY(-1px);background:linear-gradient(90deg,var(--pl-floor),var(--pl-acc));box-shadow:0 0 12px var(--pl-acc-soft);transition:width .3s ease}
   .pld-railfill::after{content:"";position:absolute;right:-3px;top:50%;width:8px;height:8px;border-radius:50%;transform:translateY(-50%);background:var(--pl-acc);box-shadow:0 0 12px 2px var(--pl-acc)}
 
-  .pld-node{position:relative;z-index:2;flex:0 0 auto;width:84px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--pl-line2);border-radius:10px;background:color-mix(in srgb,var(--pl-ink) 4%,var(--pl-bg));text-align:center;opacity:.7;transform:translateY(0);transition:transform .5s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .4s,box-shadow .4s,background .4s}
+  .pld-node{position:relative;z-index:2;flex:0 0 auto;width:84px;min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--pl-line2);border-radius:10px;background:var(--pl-node-base);text-align:center;opacity:.7;transform:translateY(0);transition:transform .5s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .4s,box-shadow .4s,background .4s}
   .pld-node .pl-idx{position:absolute;top:5px;left:7px;font-family:var(--pl-mono);font-size:.5rem;color:var(--pl-mut);opacity:.7}
   .pld-node .pl-nm{font-weight:600;font-size:.66rem;line-height:1.12;color:var(--pl-ink);padding:0 3px;letter-spacing:.01em;margin-bottom:2px}
   .pld-node .pl-cli{font-family:var(--pl-mono);font-size:.5rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--pl-mut);height:8px;white-space:nowrap}
@@ -144,16 +145,16 @@
 
   /* floor — mandated fundamentals, lit in the "ok/guaranteed" colour + locked */
   .pld-node.floor .pl-lock{opacity:.85}
-  .pld-node.floor.on{opacity:1;border-color:var(--pl-floor);background:var(--pl-floor-soft);box-shadow:0 0 0 1px var(--pl-floor) inset,0 0 24px -5px var(--pl-floor)}
+  .pld-node.floor.on{opacity:1;border-color:var(--pl-floor);background:var(--pl-floor-soft),var(--pl-node-base);box-shadow:0 0 0 1px var(--pl-floor) inset,0 0 24px -5px var(--pl-floor)}
   .pld-node.floor.on .pl-lock{opacity:1}
   .pld-node.floor.on .pl-badge{transform:scale(1);border-color:var(--pl-floor);background:var(--pl-floor);color:#fff}
 
   /* common picked — accent outline */
-  .pld-node.pick{opacity:1;border-color:var(--pl-acc);background:var(--pl-acc-soft);box-shadow:0 0 22px -6px var(--pl-acc)}
+  .pld-node.pick{opacity:1;border-color:var(--pl-acc);background:var(--pl-acc-soft),var(--pl-node-base);box-shadow:0 0 22px -6px var(--pl-acc)}
   .pld-node.pick .pl-badge{transform:scale(1);border-color:var(--pl-acc);color:#fff;background:var(--pl-acc)}
 
   /* minted — accent fill + sparkle + "minted" tag (the advisor wrote it) */
-  .pld-node.mint{opacity:1;border-color:var(--pl-acc);background:linear-gradient(180deg,color-mix(in srgb,var(--pl-acc) 26%,var(--pl-bg)),var(--pl-acc-soft));box-shadow:0 0 26px -4px var(--pl-acc);animation:pld-pop .45s cubic-bezier(.3,1.4,.5,1)}
+  .pld-node.mint{opacity:1;border-color:var(--pl-acc);background:linear-gradient(180deg,color-mix(in srgb,var(--pl-acc) 26%,var(--pl-bg)),var(--pl-acc-soft)),var(--pl-node-base);box-shadow:0 0 26px -4px var(--pl-acc);animation:pld-pop .45s cubic-bezier(.3,1.4,.5,1)}
   @keyframes pld-pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
   .pld-node.mint .pl-spark{opacity:1;animation:pld-spark 1.4s ease-in-out infinite}
   @keyframes pld-spark{50%{opacity:.4;transform:scale(.8)}}
