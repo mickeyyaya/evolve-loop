@@ -4,7 +4,7 @@
 
 > **The pitch, in one sentence:** Any agent can write a feature overnight. Evolve Loop is the layer that decides whether that code is *safe to merge* — adversarially, structurally, and with memory that compounds across runs.
 
-The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and a number of cycles. It runs unattended: it finds the work, plans it, writes it, has a *different* model adversarially review it, ships only what passes deterministic checks, and turns every failure into a durable lesson the next cycle reads automatically.
+The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and, optionally, a number of cycles; leave the count off and the advisor decides how many the work needs. It runs unattended: it finds the work, plans it, writes it, has a *different* model adversarially review it, ships only what passes deterministic checks, and turns every failure into a durable lesson the next cycle reads automatically.
 
 It works with Claude Code, Gemini CLI, and Codex CLI — and can route a different LLM to each stage of the work.
 
@@ -31,13 +31,17 @@ Wary of `curl | sh`? Inspect first: `curl -fsSL https://mickeyyaya.github.io/evo
 **Run:**
 
 ```bash
-# Run exactly N cycles toward a goal
-/evo:loop --cycles 3 "add dark mode"
+# Just give it a goal — the advisor decides how many cycles the work needs
+# (completion-driven: it stops when the backlog is drained, capped for safety)
+/evo:loop "add dark mode"
 
-# Strategy presets tune scope and strictness
-/evo:loop --cycles 5 harden                 # stability + tests
-/evo:loop --cycles 3 repair "fix auth bug"  # fix-only, smallest diff
-/evo:loop --cycles 5 innovate "explore concurrency primitives"
+# Strategy presets tune scope and strictness (cycle count still optional)
+/evo:loop harden                            # stability + tests
+/evo:loop repair "fix auth bug"             # fix-only, smallest diff
+/evo:loop innovate "explore concurrency primitives"
+
+# Pin an exact number of cycles when you want a hard bound
+/evo:loop --cycles 3 "add dark mode"
 
 # Resume a cycle that was checkpointed (e.g. quota wall)
 /evo:loop --resume
