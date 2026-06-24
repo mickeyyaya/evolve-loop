@@ -110,6 +110,145 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 	}
 }
 
+// TestRunSetup_RecommendJSON: `setup recommend --json` exits 0 and emits the
+// configured presets (3 from the shipped default) regardless of host CLIs —
+// presets come from the public config, not from detection.
+func TestRunSetup_RecommendJSON(t *testing.T) {
+	project := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"recommend", "--json"}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("recommend: rc=%d (%s)", rc, errb.String())
+	}
+	var rr struct {
+		Presets []struct {
+			Name string `json:"name"`
+		} `json:"presets"`
+		Default string `json:"default"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &rr); err != nil {
+		t.Fatalf("recommend emitted non-JSON: %v\n%s", err, out.String())
+	}
+	if len(rr.Presets) != 3 || rr.Default != "recommended" {
+		t.Errorf("want 3 presets + default recommended, got %d / %q", len(rr.Presets), rr.Default)
+	}
+}
+
+// TestRunSetup_RecommendHuman: human mode exits 0 and prints something.
+func TestRunSetup_RecommendHuman(t *testing.T) {
+	project := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"recommend"}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("recommend human: rc=%d (%s)", rc, errb.String())
+	}
+	if out.Len() == 0 {
+		t.Error("recommend human mode should print a table")
+	}
+}
+
+// TestRunSetup_ApplyMissingPreset: --preset is required → bad-args exit 10.
+func TestRunSetup_ApplyMissingPreset(t *testing.T) {
+	project := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"apply"}, nil, &out, &errb); rc != 10 {
+		t.Errorf("missing --preset: rc=%d want 10 (%s)", rc, errb.String())
+	}
+}
+
+// TestRunSetup_ApplyUnknownPreset: an unknown preset is a runtime refusal (exit
+// 1) naming the valid set — host-independent (rejected before any pin write).
+func TestRunSetup_ApplyUnknownPreset(t *testing.T) {
+	project := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	var out, errb bytes.Buffer
+	if rc := runSetup([]string{"apply", "--preset", "turbo"}, nil, &out, &errb); rc != 1 {
+		t.Errorf("unknown preset: rc=%d want 1 (%s)", rc, errb.String())
+	}
+	if !strings.Contains(errb.String(), "recommended") {
+		t.Errorf("unknown-preset diagnostic should name valid presets, got %q", errb.String())
+	}
+}
+
+// TestRunSetup_ApplyWritesPolicy is host-robust: foreign keys survive whether
+// apply writes (host has an authed CLI → rc 0, pins added) or refuses a degraded
+// preset (no authed CLI → rc 1, policy.json untouched, never clobbered).
+func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
+	project := t.TempDir()
+	evolveDir := filepath.Join(project, ".evolve")
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	setupWrite(t, filepath.Join(evolveDir, "profiles", "builder.json"), `{
+	  "cli":"agy-tmux","model_tier_default":"sonnet",
+	  "model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"},
+	  "cross_family_with":"auditor","allowed_clis":["claude","agy"]
+	}`)
+	setupWrite(t, filepath.Join(evolveDir, "profiles", "auditor.json"), `{
+	  "cli":"codex-tmux","model_tier_default":"sonnet",
+	  "model_tier_envelope":{"min":"deep","default":"deep","max":"deep"},
+	  "cross_family_with":"builder","allowed_clis":["all"]
+	}`)
+	policyPath := filepath.Join(evolveDir, "policy.json")
+	setupWrite(t, policyPath, `{"version":1,"floor":[{"id":"dossier-closeout"}]}`)
+
+	var out, errb bytes.Buffer
+	rc := runSetup([]string{"apply", "--preset", "recommended"}, nil, &out, &errb)
+
+	raw, _ := os.ReadFile(policyPath)
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		t.Fatalf("policy.json unreadable after apply: %v", err)
+	}
+	// Foreign keys must survive in BOTH outcomes (write preserves; refuse leaves untouched).
+	for _, k := range []string{"version", "floor"} {
+		if _, ok := obj[k]; !ok {
+			t.Errorf("apply (rc=%d) dropped foreign key %q", rc, k)
+		}
+	}
+	switch rc {
+	case 0:
+		if _, ok := obj["pins"]; !ok {
+			t.Error("apply rc=0 should have added pins")
+		}
+	case 1:
+		// Degraded refusal (no authed CLI on this host): policy.json untouched.
+		if _, ok := obj["pins"]; ok {
+			t.Error("refused apply must NOT write pins")
+		}
+	default:
+		t.Fatalf("unexpected rc=%d (%s)", rc, errb.String())
+	}
+}
+
+// TestRunSetup_ApplyUnreadablePolicy_FailsLoud: a present-but-unreadable
+// policy.json (here a directory) must fail loudly (exit 1), never be silently
+// treated as absent and overwritten.
+func TestRunSetup_ApplyUnreadablePolicy_FailsLoud(t *testing.T) {
+	project := t.TempDir()
+	evolveDir := filepath.Join(project, ".evolve")
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
+	// policy.json as a directory → os.ReadFile returns a non-ENOENT error.
+	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	rc := runSetup([]string{"apply", "--preset", "recommended"}, nil, &out, &errb)
+	if rc != 1 {
+		t.Fatalf("unreadable policy.json should fail loud: rc=%d want 1 (%s)", rc, errb.String())
+	}
+	// The failure must come from the READ step (fired before Apply), not from a
+	// later write — proving the non-ENOENT read error is surfaced, not swallowed.
+	if !strings.Contains(errb.String(), "reading") {
+		t.Errorf("error should name the policy read failure, got %q", errb.String())
+	}
+}
+
 func TestMaybePrintSetupNudge(t *testing.T) {
 	// No state.json → nudge prints.
 	evolveDir := t.TempDir()

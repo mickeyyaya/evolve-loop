@@ -10,24 +10,31 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
 // runSetup implements `evolve setup <subcommand>` — the deterministic core
 // behind the in-session /setup skill. Subcommands:
 //
-//	detect   [--json]                         onboarding digest (CLIs + per-phase)
-//	complete                                  stamp the first-run marker
+//	detect    [--json]                      onboarding digest (CLIs + per-phase)
+//	recommend [--json]                      the configured presets (Recommended/Economy/Max-quality)
+//	apply     --preset <name> [--dry-run]   write the chosen preset's pins to policy.json
+//	complete                                stamp the first-run marker
 //
 // Exit codes: 0 OK, 10 bad args, 1 runtime error.
 func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|complete)")
+		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|recommend|apply|complete)")
 		return 10
 	}
 	switch args[0] {
 	case "detect":
 		return runSetupDetect(args[1:], stdout, stderr)
+	case "recommend":
+		return runSetupRecommend(args[1:], stdout, stderr)
+	case "apply":
+		return runSetupApply(args[1:], stdout, stderr)
 	case "complete":
 		return runSetupComplete(args[1:], stdout, stderr)
 	default:
@@ -101,6 +108,132 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	printDetectHuman(stdout, rep)
+	return 0
+}
+
+// runSetupRecommend emits the configured presets (deterministic over detection +
+// the public preset config) — the "pick ONE" choice the /setup skill presents.
+func runSetupRecommend(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve setup recommend", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var asJSON bool
+	var evolveDirFlag, projectRootFlag string
+	fs.BoolVar(&asJSON, "json", false, "emit presets as JSON (default human table)")
+	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
+	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag, stderr)
+	rep := setup.Detect(context.Background(), setup.DetectOptions{
+		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
+	})
+	cfg, err := setup.LoadPresets(evolveDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve setup recommend: %v\n", err)
+		return 1
+	}
+	rr := setup.Recommend(rep, cfg)
+	if asJSON {
+		buf, err := json.MarshalIndent(rr, "", "  ")
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve setup recommend: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "%s\n", buf)
+		return 0
+	}
+	printRecommendHuman(stdout, rr)
+	return 0
+}
+
+func printRecommendHuman(w io.Writer, rr setup.RecommendReport) {
+	fmt.Fprintf(w, "Available families: %v  (cross-family OK: %v)\n", rr.AvailableFamilies, rr.CrossFamilyOK)
+	for _, p := range rr.Presets {
+		tag := ""
+		if p.Name == rr.Default {
+			tag = "  ← recommended"
+		}
+		if p.Degraded {
+			tag += "  [DEGRADED — not all phases satisfiable]"
+		}
+		fmt.Fprintf(w, "\n• %s%s\n  %s\n", p.Name, tag, p.Description)
+		for _, a := range p.Assignments {
+			line := fmt.Sprintf("    %-14s %-7s %-9s", a.Role, a.CLI, a.Tier)
+			if a.Model != "" {
+				line += " " + a.Model
+			}
+			if a.Warning != "" {
+				line += "  ⚠ " + a.Warning
+			}
+			fmt.Fprintln(w, line)
+		}
+	}
+	fmt.Fprintf(w, "\nApply with:  evolve setup apply --preset %s\n", rr.Default)
+}
+
+// runSetupApply writes the chosen preset's per-phase pins into the public
+// .evolve/policy.json (lossless merge in setup.Apply). --dry-run prints the
+// merged policy without writing. Exit: 0 OK, 10 bad args, 1 runtime refusal.
+func runSetupApply(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve setup apply", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var preset, evolveDirFlag, projectRootFlag string
+	var dryRun bool
+	fs.StringVar(&preset, "preset", "", "preset name to apply (required): see `evolve setup recommend`")
+	fs.BoolVar(&dryRun, "dry-run", false, "print the merged policy.json to stdout, write nothing")
+	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
+	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if preset == "" {
+		fmt.Fprintln(stderr, "evolve setup apply: --preset is required (see `evolve setup recommend`)")
+		return 10
+	}
+	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag, stderr)
+	rep := setup.Detect(context.Background(), setup.DetectOptions{
+		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
+	})
+	cfg, err := setup.LoadPresets(evolveDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: %v\n", err)
+		return 1
+	}
+	policyPath := filepath.Join(evolveDir, "policy.json")
+	existing, rerr := os.ReadFile(policyPath)
+	if rerr != nil && !os.IsNotExist(rerr) {
+		// Absent → start fresh; but a present-but-unreadable policy must fail
+		// loudly rather than be silently treated as empty and overwritten.
+		fmt.Fprintf(stderr, "evolve setup apply: reading %s: %v\n", policyPath, rerr)
+		return 1
+	}
+	profLoader := profiles.NewFromDir(filepath.Join(evolveDir, "profiles"))
+	out, err := setup.Apply(rep, cfg, preset, existing, profLoader)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: %v\n", err)
+		return 1
+	}
+	if dryRun {
+		fmt.Fprintf(stdout, "%s", out)
+		return 0
+	}
+	// Atomic write (temp + rename), mirroring setup.Complete.
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: mkdir: %v\n", err)
+		return 1
+	}
+	tmp := fmt.Sprintf("%s.tmp.%d", policyPath, os.Getpid())
+	if err := os.WriteFile(tmp, out, 0o644); err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: write temp: %v\n", err)
+		return 1
+	}
+	defer func() { _ = os.Remove(tmp) }()
+	if err := os.Rename(tmp, policyPath); err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: atomic rename: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "[setup apply] wrote preset %q to %s\n", preset, policyPath)
 	return 0
 }
 

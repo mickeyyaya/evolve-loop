@@ -1,0 +1,21 @@
+{
+  "//": "Public, exposed setup-preset definitions. This shipped default is overridable per-repo by .evolve/setup-presets.json. The Go recommender is a generic interpreter: it reads these presets + the public .evolve/profiles/*.json defaults + live detection, and writes per-phase pins to the public .evolve/policy.json. No preset behavior is hardcoded in code.",
+  "default": "recommended",
+  "presets": [
+    {
+      "name": "recommended",
+      "description": "Profile defaults, subscription-aware. Builder and Auditor run on different model families when you have two (adversarial integrity).",
+      "tier_bias": "default"
+    },
+    {
+      "name": "economy",
+      "description": "One tier cheaper per phase wherever the envelope allows — lighter on quota and cost.",
+      "tier_bias": "down"
+    },
+    {
+      "name": "max-quality",
+      "description": "Top of each phase's envelope — best quality, highest cost.",
+      "tier_bias": "max"
+    }
+  ]
+}

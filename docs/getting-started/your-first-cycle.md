@@ -95,28 +95,31 @@ If any of those fail, see [Common First-Time Issues](#common-first-time-issues).
 
 ## Step 3 — (Optional) Choose Your LLM Routing
 
-By default, evolve-loop runs every phase on Claude Sonnet. You can override per-phase via `.evolve/llm_config.json` (gitignored — operator-local).
+By default, evolve-loop runs each phase on the model its **profile** declares. The simplest way to change that is the one-question setup flow:
 
-Skip this step on your first cycle. Try the default first.
-
-If you want to try a mixed setup later:
-
-```bash
-mkdir -p .evolve
-cat > .evolve/llm_config.json << 'EOF'
-{
-  "schema_version": 1,
-  "phases": {
-    "scout":   {"provider": "google",    "cli": "gemini", "model": "gemini-3.1-pro-preview"},
-    "builder": {"provider": "anthropic", "cli": "claude", "model_tier": "sonnet"},
-    "auditor": {"provider": "anthropic", "cli": "claude", "model": "claude-opus-4-7"}
-  },
-  "_fallback": {"cli": "claude", "model_tier": "sonnet"}
-}
-EOF
+```
+/evo:setup
 ```
 
-This routes Scout to Gemini 3.1 Pro Preview, Builder to Claude Sonnet, Auditor to Claude Opus (different family from Builder — adversarial-mode default). See [pluggability.md](../concepts/pluggability.md) for more configs.
+It auto-detects which CLIs/subscriptions you have, explains the pipeline, then offers **three ready-made presets** — each a complete per-phase model plan the binary computes from your profiles:
+
+| Preset | What it does |
+|---|---|
+| **Recommended** | Profile defaults, subscription-aware. Builder and Auditor run on different model families when you have two (adversarial integrity). |
+| **Economy** | One tier cheaper per phase where the envelope allows — lighter on quota/cost. |
+| **Max-quality** | Top of each phase's envelope — best quality, highest cost. |
+
+You pick **one**; the binary writes per-phase pins to `.evolve/policy.json` (only where they differ from the profile default). Skip this on your first cycle — the defaults work.
+
+Prefer the command line, or want to script it?
+
+```bash
+evolve setup recommend                 # show the three presets for your machine
+evolve setup apply --preset economy    # write the chosen preset's pins to .evolve/policy.json
+evolve setup apply --preset recommended --dry-run   # preview the merged policy, write nothing
+```
+
+Presets themselves are public config (`go/internal/setup/presets.json`), overridable per-repo via `.evolve/setup-presets.json`. For the full mechanism see [setup-onboarding.md](../architecture/setup-onboarding.md); for more routing configs see [pluggability.md](../concepts/pluggability.md).
 
 ---
 
