@@ -24,6 +24,8 @@ curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
 
 Wary of `curl | sh`? Inspect first: `curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh -o install.sh && less install.sh && sh install.sh`. Already in Claude Code? You can instead add the plugin directly — `/plugin marketplace add mickeyyaya/evolve-loop` then `/plugin install evo@evo`.
 
+**Windows:** the autonomous loop's runtime is Unix-based (tmux, bash), so run it under **[WSL2](https://learn.microsoft.com/windows/wsl/install)** — install WSL, open your WSL (e.g. Ubuntu) shell, then run the same one-liner there (inside WSL, it installs exactly as on Linux). The `/evo:*` skills *also* install natively in Claude Code on Windows via the `/plugin` commands above; only the loop runtime needs WSL.
+
 **Set up (optional but recommended):** `/setup` is an interactive flow that detects your installed CLIs, explains the pipeline, and proposes which model should run each phase. Skip it and the loop runs with sensible all-Claude defaults.
 
 **Run:**

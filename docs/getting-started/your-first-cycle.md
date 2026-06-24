@@ -62,6 +62,12 @@ Or, inside Claude Code, add the plugin directly:
 /plugin install evo
 ```
 
+**On Windows:** the loop runtime is Unix-based (tmux, bash), so run it under
+[WSL2](https://learn.microsoft.com/windows/wsl/install) — install WSL, open your
+WSL (e.g. Ubuntu) shell, then run the one-liner above there (inside WSL it
+installs exactly as on Linux). The `/evo:*` skills install natively in Claude
+Code on Windows via the `/plugin` commands above; only the loop runtime needs WSL.
+
 Or for a project-local install (recommended for trying it out):
 
 ```bash
