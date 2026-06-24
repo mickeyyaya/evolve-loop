@@ -114,7 +114,7 @@ func runResumeGuard(t *testing.T) string {
 
 // --- C296_001 (T1.guard): worktreeBase() ITSELF refuses a relative base -------
 //
-// Behavioral: gates on a real `--- PASS: TestWorktreeBase_RelativeEnvReturnsError`
+// Behavioral: gates on a real `--- PASS: TestWorktreeBase_RelativeOverrideReturnsError`
 // line. That white-box test calls the unexported worktreeBase directly with a
 // relative EVOLVE_WORKTREE_BASE and asserts it returns ("", error mentioning
 // "absolute"). A magic string cannot produce a named PASS line for a function
@@ -128,8 +128,8 @@ func TestC296_001_WorktreeBaseRefusesRelativeBase(t *testing.T) {
 	if anyFailRe.MatchString(out) {
 		t.Errorf("RED/REGRESSION: a TestWorktreeBase* test FAILs:\n%s", tail(out, 40))
 	}
-	if !topLevelPassed(out, "TestWorktreeBase_RelativeEnvReturnsError") {
-		t.Errorf("RED: TestWorktreeBase_RelativeEnvReturnsError did not PASS — worktreeBase " +
+	if !topLevelPassed(out, "TestWorktreeBase_RelativeOverrideReturnsError") {
+		t.Errorf("RED: TestWorktreeBase_RelativeOverrideReturnsError did not PASS — worktreeBase " +
 			"does not yet refuse a relative EVOLVE_WORKTREE_BASE itself (guard still only in addWorktree)")
 	}
 	// Auxiliary anti-duplication check (not RED-discriminating), FUNCTION-SCOPED
@@ -150,7 +150,7 @@ func TestC296_001_WorktreeBaseRefusesRelativeBase(t *testing.T) {
 // --- C296_002 (T1.green): the whole internal/swarm suite stays green ----------
 //
 // Anti-no-op regression gate: the signature change touches addWorktree and the
-// existing TestWorktreeBase_EnvOverride / _DefaultPath callers. Running the full
+// existing TestWorktreeBase_AbsoluteOverride / _DefaultPath callers. Running the full
 // swarm suite (real provisioner, isolated temp repos) and asserting no `--- FAIL:`
 // line ensures the refactor did not break the env-override / default / idempotent
 // / cleanup behaviors. A FAIL line is a real test failure no source string fakes.

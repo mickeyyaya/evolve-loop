@@ -14,8 +14,8 @@ import (
 // gitexec seam (the newGit factory lets each call pick its own -C dir). The
 // real-git reuse/teardown/error paths stay covered by provision_test.go.
 
-func fakeProvisioner(fake *fixtures.FakeExec) gitWorkerProvisioner {
-	return gitWorkerProvisioner{newGit: func(dir string) gitexec.Git {
+func fakeProvisioner(fake *fixtures.FakeExec, baseOverride string) gitWorkerProvisioner {
+	return gitWorkerProvisioner{baseOverride: baseOverride, newGit: func(dir string) gitexec.Git {
 		return gitexec.Git{Dir: dir, Exec: fake.Run}
 	}}
 }
@@ -23,7 +23,7 @@ func fakeProvisioner(fake *fixtures.FakeExec) gitWorkerProvisioner {
 func TestCleanup_RoutesGitWorktreeRemoveThroughSeam(t *testing.T) {
 	t.Parallel()
 	fake := &fixtures.FakeExec{}
-	p := fakeProvisioner(fake)
+	p := fakeProvisioner(fake, "")
 
 	if err := p.Cleanup(context.Background(), "/repo", t.TempDir()); err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -39,9 +39,8 @@ func TestCleanup_RoutesGitWorktreeRemoveThroughSeam(t *testing.T) {
 
 func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("EVOLVE_WORKTREE_BASE", base)
 	fake := &fixtures.FakeExec{}
-	p := fakeProvisioner(fake)
+	p := fakeProvisioner(fake, base)
 
 	wt, err := p.CreateIntegration(context.Background(), "/repo", 5)
 	if err != nil {

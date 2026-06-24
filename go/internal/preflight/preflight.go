@@ -102,6 +102,11 @@ type Options struct {
 	IsNested func() bool
 	// OSType overrides runtime detection ("darwin", "linux", "other").
 	OSType string
+	// WorktreeBase is the operator override for the per-cycle worktree base,
+	// resolved from policy.json (worktree.base) at the composition root. Empty ⇒
+	// preflight selects a default writable base. Replaces the former
+	// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+	WorktreeBase string
 }
 
 // Probe runs the discover+decide pipeline and returns the populated Profile.
@@ -179,7 +184,7 @@ func Probe(opts Options) Profile {
 	}
 
 	// Worktree base selection
-	wtBase, wtReason := selectWorktreeBase(opts, getEnv, nested, fs, filepath.Join(stateDir, "worktrees"), probeTmpDir, probeCache)
+	wtBase, wtReason := selectWorktreeBase(opts, nested, fs, filepath.Join(stateDir, "worktrees"), probeTmpDir, probeCache)
 
 	// CLI binaries
 	bins := CLIBins{
@@ -230,7 +235,7 @@ func Probe(opts Options) Profile {
 		}
 	} else {
 		autoReasoning = fmt.Sprintf(
-			"ERROR: no writable worktree base. Tried in-project (%v), TMPDIR (%v), cache dir (%v). OPERATOR ACTION: set EVOLVE_WORKTREE_BASE to a writable directory, or run from a different shell with broader permissions. Last-resort: use the explicit no-worktree operator mode (loses per-cycle isolation, NOT recommended).",
+			"ERROR: no writable worktree base. Tried in-project (%v), TMPDIR (%v), cache dir (%v). OPERATOR ACTION: set worktree.base in .evolve/policy.json to a writable directory, or run from a different shell with broader permissions. Last-resort: use the explicit no-worktree operator mode (loses per-cycle isolation, NOT recommended).",
 			fs.InProjectWorktreesWritable, fs.TmpdirWritable, fs.CacheDirWritable)
 	}
 
@@ -283,11 +288,11 @@ func decideSandbox(osType string, nested, sbExec, bwrap bool) Sandbox {
 	return s
 }
 
-func selectWorktreeBase(opts Options, getEnv func(string) string, nested bool, fs Filesystem, inProject, tmpdir, cacheDir string) (string, string) {
-	// 1. Operator override
-	if v := getEnv("EVOLVE_WORKTREE_BASE"); v != "" {
+func selectWorktreeBase(opts Options, nested bool, fs Filesystem, inProject, tmpdir, cacheDir string) (string, string) {
+	// 1. Operator override (policy.json worktree.base)
+	if v := opts.WorktreeBase; v != "" {
 		if probeWritable(v) {
-			return v, "operator-provided EVOLVE_WORKTREE_BASE (writable)"
+			return v, "operator-provided worktree.base (writable)"
 		}
 		// fall-through with WARN attached to reason field
 		// (mirrors bash setting WORKTREE_BASE_REASON but proceeding)

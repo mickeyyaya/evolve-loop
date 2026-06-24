@@ -38,7 +38,7 @@ type WorkerProvisioner interface {
 //   - integration: branch cycle-<N>-integration, worktree <base>/cycle-<N>-integration
 //   - worker:      branch cycle-<N>-<workerID>,  worktree <base>/cycle-<N>-<workerID>
 //
-// base = EVOLVE_WORKTREE_BASE or <root>/.evolve/worktrees (same as core).
+// base = baseOverride (policy.json worktree.base) or <root>/.evolve/worktrees (same as core).
 type gitWorkerProvisioner struct {
 	// LinkGuardDeps is an optional hook to make a fresh worktree self-sufficient
 	// for the trust-kernel hooks (symlink binary + .evolve state). Injected so
@@ -51,6 +51,12 @@ type gitWorkerProvisioner struct {
 	// single Git) because one provision op spans two dirs: the worktree's own dir
 	// for the reuse rev-parse probe, the project root for worktree add/remove.
 	newGit func(dir string) gitexec.Git
+
+	// baseOverride is the operator override for the worktree base, resolved once
+	// from policy.json (worktree.base) and injected via NewGitWorkerProvisioner.
+	// Empty ⇒ the built-in <root>/.evolve/worktrees default. Replaces the former
+	// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+	baseOverride string
 }
 
 // git returns the gitexec.Git rooted at dir, defaulting to the production
@@ -74,16 +80,20 @@ func gitFailReason(code int, err error) string {
 
 // NewGitWorkerProvisioner returns the production provisioner. linkGuardDeps may
 // be nil (skipped) — supply core.LinkGuardDeps at the composition root.
-func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string)) WorkerProvisioner {
-	return gitWorkerProvisioner{LinkGuardDeps: linkGuardDeps}
+// baseOverride is the resolved policy.json worktree.base ("" ⇒ default location).
+func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string), baseOverride string) WorkerProvisioner {
+	return gitWorkerProvisioner{LinkGuardDeps: linkGuardDeps, baseOverride: baseOverride}
 }
 
-func worktreeBase(projectRoot string) (string, error) {
-	if b := os.Getenv("EVOLVE_WORKTREE_BASE"); b != "" {
-		if !filepath.IsAbs(b) {
-			return "", fmt.Errorf("worktree base must be absolute: %s", b)
+// worktreeBase resolves the worker worktree base. An absolute baseOverride
+// (policy.json worktree.base) wins; a relative override is refused. Empty ⇒
+// <root>/.evolve/worktrees. Replaces the former EVOLVE_WORKTREE_BASE env read.
+func worktreeBase(baseOverride, projectRoot string) (string, error) {
+	if baseOverride != "" {
+		if !filepath.IsAbs(baseOverride) {
+			return "", fmt.Errorf("worktree base must be absolute: %s", baseOverride)
 		}
-		return b, nil
+		return baseOverride, nil
 	}
 	if !filepath.IsAbs(projectRoot) {
 		return "", fmt.Errorf("worktree base: project root must be absolute: %s", projectRoot)
@@ -110,7 +120,7 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 // addWorktree runs the idempotent `git worktree add -B <branch> <wt> <base>`,
 // reusing an existing valid worktree (and tearing down a stale stub first).
 func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, branch, base string) (string, error) {
-	root, err := worktreeBase(projectRoot)
+	root, err := worktreeBase(g.baseOverride, projectRoot)
 	if err != nil {
 		return "", err
 	}

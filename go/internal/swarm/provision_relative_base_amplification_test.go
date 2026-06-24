@@ -17,11 +17,10 @@ func TestGitProvisioner_RelativeWorktreeBaseHasNoFilesystemSideEffects(t *testin
 	chdirForAmplification(t, cwd)
 
 	relativeBase := filepath.Join("relative-base", "nested")
-	t.Setenv("EVOLVE_WORKTREE_BASE", relativeBase)
 
-	got, err := swarm.NewGitWorkerProvisioner(nil).CreateIntegration(context.Background(), repo, 294)
+	got, err := swarm.NewGitWorkerProvisioner(nil, relativeBase).CreateIntegration(context.Background(), repo, 294)
 	if err == nil {
-		t.Fatalf("CreateIntegration succeeded with relative EVOLVE_WORKTREE_BASE; path=%q", got)
+		t.Fatalf("CreateIntegration succeeded with a relative worktree.base override; path=%q", got)
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
 		t.Fatalf("CreateIntegration error = %q, want mention of absolute worktree base", err)

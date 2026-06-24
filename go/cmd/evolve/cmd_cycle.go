@@ -303,7 +303,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// router.PolicyForProject so per-phase consumers see the same route.
 		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
-	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase}
+	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()
 	recoveryCfg := pol.RecoveryConfig()
@@ -516,6 +516,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	opts = append(opts, core.WithWorkflowConfig(pol.WorkflowConfig()))
+	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	return orchDeps{
 		Storage:      st,

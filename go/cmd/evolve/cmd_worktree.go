@@ -1,6 +1,7 @@
-// `evolve worktree` manages per-cycle git worktrees provisioned under
-// EVOLVE_WORKTREE_BASE (default .evolve/worktrees/). This is the v1 port
-// of the worktree-management surface from scripts/lifecycle/run-cycle.sh.
+// `evolve worktree` manages per-cycle git worktrees provisioned under the
+// --base flag (default .evolve/worktrees/; the loop resolves it from policy.json
+// worktree.base). This is the v1 port of the worktree-management surface from
+// scripts/lifecycle/run-cycle.sh.
 package main
 
 import (

@@ -193,7 +193,7 @@ func TestReapRunReport_ProducedByReapRunSessions(t *testing.T) {
 // exercises a no-op method through it: Cleanup of an empty worktree path is the
 // documented best-effort no-op (returns nil without shelling out to git).
 func TestWorkerProvisioner_SatisfiedByGitProvisioner(t *testing.T) {
-	var prov WorkerProvisioner = NewGitWorkerProvisioner(nil)
+	var prov WorkerProvisioner = NewGitWorkerProvisioner(nil, "")
 	if err := prov.Cleanup(context.Background(), t.TempDir(), ""); err != nil {
 		t.Errorf("WorkerProvisioner.Cleanup of an empty worktree must be a nil no-op, got %v", err)
 	}

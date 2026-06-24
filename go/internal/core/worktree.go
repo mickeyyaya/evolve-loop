@@ -32,13 +32,20 @@ type WorktreeProvisioner interface {
 }
 
 // gitWorktree is the production provisioner: `git worktree add --detach
-// <base>/cycle-N HEAD`, base = EVOLVE_WORKTREE_BASE or <root>/.evolve/worktrees.
-// Mirrors `evolve worktree create|cleanup` (cmd_worktree.go).
-type gitWorktree struct{}
+// <base>/cycle-N HEAD`, base = baseOverride (policy.json worktree.base) or
+// <root>/.evolve/worktrees. Mirrors `evolve worktree create|cleanup`
+// (cmd_worktree.go).
+type gitWorktree struct {
+	// baseOverride is the operator override for the per-cycle worktree base,
+	// resolved once from policy.json (worktree.base) and injected via
+	// WithWorktreeBase. Empty ⇒ the built-in <root>/.evolve/worktrees default.
+	// Replaces the former EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+	baseOverride string
+}
 
-func (gitWorktree) base(projectRoot string) string {
-	if b := os.Getenv("EVOLVE_WORKTREE_BASE"); b != "" {
-		return b
+func (g gitWorktree) base(projectRoot string) string {
+	if g.baseOverride != "" {
+		return g.baseOverride
 	}
 	return filepath.Join(projectRoot, ".evolve", "worktrees")
 }

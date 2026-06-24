@@ -47,6 +47,10 @@ const (
 type Config struct {
 	Stage    string
 	PortBase int
+	// WorktreeBase is the resolved policy.json worktree.base ("" ⇒ default
+	// <root>/.evolve/worktrees), threaded to the worker provisioner. Replaces
+	// the former EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+	WorktreeBase string
 }
 
 // Decorator wraps a phase runner with swarm dispatch. Construct via New.
@@ -122,7 +126,7 @@ func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 		Concurrency: d.concurrency,
 	}
 	if d.mode == swarm.ModeWriter {
-		deps.Provisioner = swarm.NewGitWorkerProvisioner(nil)
+		deps.Provisioner = swarm.NewGitWorkerProvisioner(nil, d.cfg.WorktreeBase)
 		deps.PortBase = d.cfg.PortBase // 0 → swarm.DefaultPortBase
 	}
 	return deps

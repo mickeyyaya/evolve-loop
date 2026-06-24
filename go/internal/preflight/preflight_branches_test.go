@@ -106,8 +106,8 @@ func TestProbe_DefaultIsNested_HostTypeNotNested(t *testing.T) {
 }
 
 // TestSelectWorktreeBase_OverrideNotWritableFallsThrough pins the branch where
-// EVOLVE_WORKTREE_BASE is set but unwritable: the override is ignored and the
-// standalone in-project base is chosen instead.
+// the worktree.base override is set but unwritable: the override is ignored and
+// the standalone in-project base is chosen instead.
 func TestSelectWorktreeBase_OverrideNotWritableFallsThrough(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -117,12 +117,13 @@ func TestSelectWorktreeBase_OverrideNotWritableFallsThrough(t *testing.T) {
 		t.Fatalf("write blocker: %v", err)
 	}
 	p := Probe(Options{
-		ProjectRoot: root,
-		OSType:      "darwin",
-		Env:         stubEnv(map[string]string{"HOME": root, "EVOLVE_WORKTREE_BASE": blocker}),
-		LookPath:    stubLookPath(nil),
-		Now:         fixedNow(),
-		IsNested:    func() bool { return false },
+		ProjectRoot:  root,
+		OSType:       "darwin",
+		WorktreeBase: blocker,
+		Env:          stubEnv(map[string]string{"HOME": root}),
+		LookPath:     stubLookPath(nil),
+		Now:          fixedNow(),
+		IsNested:     func() bool { return false },
 	})
 	if strings.Contains(p.AutoConfig.WorktreeBaseReason, "operator-provided") {
 		t.Errorf("unwritable override must NOT win; reason was %q", p.AutoConfig.WorktreeBaseReason)

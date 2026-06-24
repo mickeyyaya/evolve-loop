@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolveloop/go/internal/gc"
@@ -142,6 +143,11 @@ type Policy struct {
 	// Paths configures path-discovery overrides. Absent ⇒ built-in defaults apply.
 	// Replaces EVOLVE_KB_SEARCH_PATHS and EVOLVE_PHASE_ROOTS env reads.
 	Paths *PathsConfig `json:"paths,omitempty"`
+	// Worktree configures the per-cycle worktree base path. Absent ⇒ built-in
+	// default (<root>/.evolve/worktrees). Replaces the EVOLVE_WORKTREE_BASE env
+	// read (flag-reduction, ADR-0064): the operator override now flows from this
+	// config block, loaded once, rather than a process env dial.
+	Worktree *WorktreePolicy `json:"worktree,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -681,6 +687,41 @@ type SwarmPolicy struct {
 type SwarmConfig struct {
 	Stage    string
 	PortBase int
+}
+
+// WorktreePolicy is the .evolve/policy.json "worktree" block. Replaces the
+// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+type WorktreePolicy struct {
+	// Base is the operator override for the per-cycle worktree base directory
+	// (e.g. a writable mount when the in-project .evolve/worktrees location is
+	// not writable). Empty/absent ⇒ the caller's built-in default applies.
+	Base string `json:"base,omitempty"`
+}
+
+// WorktreeBase returns the operator override for the per-cycle worktree base
+// (policy.json worktree.base), or "" if absent — in which case every reader keeps
+// its built-in <root>/.evolve/worktrees default. Unlike SwarmConfig there is no
+// resolved-config struct: this is a single scalar with no default to apply (the
+// readers own the default), so a bare accessor is the whole surface.
+func (p Policy) WorktreeBase() string {
+	if p.Worktree == nil {
+		return ""
+	}
+	return p.Worktree.Base
+}
+
+// WorktreeBaseFor loads the policy at projectRoot's .evolve/policy.json and
+// returns the resolved worktree.base override. Fail-open: a missing OR malformed
+// policy yields "" so the pre-batch readiness probe simply selects a default
+// writable base; the loud malformed-policy failure still surfaces at the cycle's
+// own policy.Load. Lets preflight agree with the orchestrator on the operator
+// worktree base without each caller re-implementing the load.
+func WorktreeBaseFor(projectRoot string) string {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return ""
+	}
+	return pol.WorktreeBase()
 }
 
 // SwarmConfig returns swarm configuration with built-in defaults resolved.

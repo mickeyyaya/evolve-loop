@@ -52,9 +52,7 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	// without the lane, both runs target the same dir (<shared>/cycle-1) AND the
 	// same global branch (cycle-1), exercising both collision axes at once.
 	sharedBase := t.TempDir()
-	t.Setenv("EVOLVE_WORKTREE_BASE", sharedBase)
-
-	g := gitWorktree{}
+	g := gitWorktree{baseOverride: sharedBase}
 	wtMain, err := g.Create(mainRoot, 1)
 	if err != nil {
 		t.Fatalf("Create(mainRoot, 1): %v", err)

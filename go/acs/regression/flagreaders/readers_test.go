@@ -105,6 +105,12 @@ var retiredFlagsByFile = map[string]map[string]bool{
 	// by the cycle-50/C50_009 regression invariant. EVOLVE_WORKTREE_PATH was retired
 	// in cycle-10; the snippet documents the backward-compat form for reference.
 	"agents/evolve-tester.md": {"EVOLVE_WORKTREE_PATH": true},
+	// skills/adversarial-testing/SKILL.md uses EVOLVE_WORKTREE_BASE as the WORKED
+	// EXAMPLE of the cycle-20 split-const dodge (the dodge it teaches reviewers to
+	// catch). The dial was legitimately removed in 2026-06 (policy.json worktree.base
+	// + WithWorktreeBase DI, ADR-0064); the name survives only as documentation of
+	// the historical dodge, not a live reader.
+	"skills/adversarial-testing/SKILL.md": {"EVOLVE_WORKTREE_BASE": true},
 }
 
 // TestEveryProductionReaderHasRegistryRow fails if any standalone EVOLVE_*

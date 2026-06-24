@@ -152,13 +152,12 @@ func funcCoverage(t *testing.T, pkg, fn string) (float64, string) {
 // dir an un-guarded build creates under cwd, keeping the RED run side-effect-free.
 func TestC294_001_GuardRefusesRelativeWorktreeBase(t *testing.T) {
 	const relBase = "c294-relbase-probe" // relative → the bug class
-	t.Setenv("EVOLVE_WORKTREE_BASE", relBase)
-	defer os.RemoveAll(relBase) // sweep what an un-guarded (RED) impl MkdirAll's under cwd
+	defer os.RemoveAll(relBase)          // sweep what an un-guarded (RED) impl MkdirAll's under cwd
 
 	projectRoot := t.TempDir() // intentionally NOT a git repo
-	_, err := swarm.NewGitWorkerProvisioner(nil).CreateIntegration(context.Background(), projectRoot, 294)
+	_, err := swarm.NewGitWorkerProvisioner(nil, relBase).CreateIntegration(context.Background(), projectRoot, 294)
 	if err == nil {
-		t.Fatalf("RED: a relative EVOLVE_WORKTREE_BASE %q must be refused, got nil error", relBase)
+		t.Fatalf("RED: a relative worktree.base override %q must be refused, got nil error", relBase)
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
 		t.Errorf("RED: guard absent — provisioner error %q does not indicate the worktree base must be absolute", err.Error())

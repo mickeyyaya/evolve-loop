@@ -30,6 +30,7 @@ import (
 	"github.com/mickeyyaya/evolveloop/go/internal/doctor"
 	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolveloop/go/internal/policy"
 	"github.com/mickeyyaya/evolveloop/go/internal/preflight"
 	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
 )
@@ -249,7 +250,9 @@ func resolve(opts Options) (resolved, error) {
 		o.probeCLI = doctor.Probe
 	}
 	if o.hostProbe == nil {
-		o.hostProbe = func() preflight.Profile { return preflight.Probe(preflight.Options{ProjectRoot: o.projectRoot}) }
+		o.hostProbe = func() preflight.Profile {
+			return preflight.Probe(preflight.Options{ProjectRoot: o.projectRoot, WorktreeBase: policy.WorktreeBaseFor(o.projectRoot)})
+		}
 	}
 	if o.dirWritable == nil {
 		o.dirWritable = defaultDirWritable
