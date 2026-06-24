@@ -32,7 +32,6 @@
     }
   },
   "proofBar": [
-    { "value": "v20.4", "label": "shipping" },
     { "value": "367+", "label": "cycles run" },
     { "value": "61", "label": "lessons learned" },
     { "value": "Apache-2.0", "label": "open source" }
@@ -254,7 +253,7 @@
       { "n": "1", "label": "Just a goal", "command": "/evo:loop \"add dark mode\"", "note": "The advisor composes the whole pipeline — which phases run, which LLM runs each, and how many cycles. It stops when the work is done." },
       { "n": "2", "label": "Steer the approach", "command": "/evo:loop harden", "note": "A strategy (harden · repair · innovate · balanced) shifts scope and strictness — same phase spine, different posture." },
       { "n": "3", "label": "Bound the cycles", "command": "/evo:loop --cycles 3 \"add dark mode\"", "note": "--cycles N is a hard contract: exactly N cycles, never early-stopped." },
-      { "n": "4", "label": "Control the models", "command": "/evo:setup", "note": "Pick a preset once; it routes each phase to an LLM (e.g. Build on Codex, Audit on Claude) in .evolve/policy.json." },
+      { "n": "4", "label": "Stack the levers", "command": "/evo:loop --cycles 3 harden \"tighten input validation\"", "note": "Compose them — a strategy, a hard cycle bound, and a goal in one command. This is the full-control end of the spectrum." },
       { "n": "5", "label": "Resume", "command": "/evo:loop --resume", "note": "Picks a checkpointed run up exactly where it stopped — worktree and state intact, no work lost." }
     ],
     "setup": {
