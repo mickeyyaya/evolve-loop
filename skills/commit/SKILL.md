@@ -4,7 +4,7 @@ description: Use when the user asks to commit changes (interactively, not inside
 argument-hint: "<commit message>"
 ---
 
-# /commit
+# /evo:commit
 
 > Gated interactive commit. A commit only lands if simplify → review → lint → targeted-test all pass; the gate writes `.commit-gate/attestation.json` bound to `sha256(git diff HEAD)`. The commit goes through `evolve ship --class manual`, which **hard-verifies that attestation at this repo's real commit chokepoint** — ship-gate forbids bare `git commit`, and ship commits internally, so this Go-side check (`go/internal/phases/ship/commitgate.go`) is the single enforcement point. This skill is the intelligent driver — the gate itself is `evolve commit-gate run` (Go; `go/internal/commitgate/`).
 
@@ -50,7 +50,7 @@ Namespace prefixes are stripped, so `ecc:go-reviewer` counts as `go-reviewer`. P
 ## When NOT to use this skill
 
 - **Inside an autonomous evolve-loop cycle.** Cycle commits use `evolve ship --class cycle` (audit-binding); only `--class manual` requires the commit-gate attestation, so cycles are exempt by construction. Use the cycle pipeline there.
-- **Releases / version bumps.** Use `/publish` (or `/release` to gate readiness first).
+- **Releases / version bumps.** Use `/evo:publish` (or `/evo:release` to gate readiness first).
 
 ## Emergency bypass
 

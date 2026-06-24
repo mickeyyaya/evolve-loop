@@ -153,5 +153,5 @@ Builder → Skill("security-review-scored") → parse "Composite Score: X.XX"
 ### Standalone Invocation
 
 ```bash
-/security-review-scored [--tier lightweight|standard|full]
+/evo:security-review-scored [--tier lightweight|standard|full]
 ```

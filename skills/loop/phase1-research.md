@@ -46,7 +46,7 @@ Apply the Beyond-the-Ask Divergence Trigger from `online-researcher.md`:
 2. Generate 1 provocation research query per lens
 3. Pass selected lenses to Scout context for hypothesis generation
 
-**Enhanced divergence via `/inspirer` (optional):** When `strategy == "innovate"` OR `discoveryVelocity.rolling3 < 0.5`, delegate to `/inspirer [goal] --depth QUICK --format evolve --lenses 3` for broader creative exploration with web-grounded research. Merge returned concept cards with standard gap-analysis cards (same +2 priority boost). Skip when `strategy == "repair"|"harden"`, lean mode active, or budget YELLOW/RED.
+**Enhanced divergence via `/evo:inspirer` (optional):** When `strategy == "innovate"` OR `discoveryVelocity.rolling3 < 0.5`, delegate to `/evo:inspirer [goal] --depth QUICK --format evolve --lenses 3` for broader creative exploration with web-grounded research. Merge returned concept cards with standard gap-analysis cards (same +2 priority boost). Skip when `strategy == "repair"|"harden"`, lean mode active, or budget YELLOW/RED.
 
 **Skip conditions:** lean mode active OR budget YELLOW → skip trigger (both standard and enhanced), use standard queries only.
 

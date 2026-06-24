@@ -1,6 +1,6 @@
 ---
 name: inspirer
-description: Use when the user invokes /inspirer or asks to brainstorm creatively, think outside the box, explore unconventional approaches, break out of stagnation, or generate research-backed ideas with provocation lenses
+description: Use when the user invokes /evo:inspirer or asks to brainstorm creatively, think outside the box, explore unconventional approaches, break out of stagnation, or generate research-backed ideas with provocation lenses
 argument-hint: "[topic/question] [--depth QUICK|STANDARD|DEEP] [--lenses N] [--format full|brief|evolve]"
 ---
 
@@ -24,16 +24,16 @@ argument-hint: "[topic/question] [--depth QUICK|STANDARD|DEEP] [--lenses N] [--f
 
 ```bash
 # Basic — think creatively about a topic
-/inspirer "How should we handle real-time sync in a serverless app?"
+/evo:inspirer "How should we handle real-time sync in a serverless app?"
 
 # Control depth (QUICK = fast ideation, DEEP = thorough exploration)
-/inspirer "What features increase user retention?" --depth DEEP
+/evo:inspirer "What features increase user retention?" --depth DEEP
 
 # Specify number of lenses (default: 4 for STANDARD)
-/inspirer "Multi-agent coordination patterns" --lenses 5
+/evo:inspirer "Multi-agent coordination patterns" --lenses 5
 
 # Output for evolve-loop consumption
-/inspirer "Improve eval infrastructure" --format evolve --depth QUICK
+/evo:inspirer "Improve eval infrastructure" --format evolve --depth QUICK
 ```
 
 **Parse arguments:**
@@ -319,12 +319,12 @@ The orchestrator can delegate to inspirer at Step 2.5 (DIVERGENCE TRIGGER):
 - Lean mode is NOT active
 - Strategy is NOT `repair` or `harden`
 
-**Invocation (in-process):** `/inspirer [goal] --depth QUICK --format evolve --lenses 3`
+**Invocation (in-process):** `/evo:inspirer [goal] --depth QUICK --format evolve --lenses 3`
 
 **Invocation (subprocess-isolated, REQUIRED in production cycles):**
 
 ```bash
-echo "/inspirer $GOAL --depth QUICK --format evolve --lenses 3" | \
+echo "/evo:inspirer $GOAL --depth QUICK --format evolve --lenses 3" | \
     bash legacy/scripts/dispatch/subagent-run.sh inspirer "$CYCLE" "$WORKSPACE_PATH"
 ```
 

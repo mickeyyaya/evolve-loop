@@ -9,7 +9,7 @@ description: Reference doc.
 
 ## PR Review Integration
 
-Run `/refactor scan` automatically on PR diffs to catch smells before merge:
+Run `/evo:refactor scan` automatically on PR diffs to catch smells before merge:
 
 | Trigger | Scope | Action |
 |---------|-------|--------|

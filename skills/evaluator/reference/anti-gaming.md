@@ -1,6 +1,6 @@
 # Anti-Gaming Defenses — Evaluator Stress Test Protocol
 
-> Detailed reference for the `/evaluator` skill's Layer 2 (DETECT). Based on the Evaluator Stress Test (arXiv:2507.05619) and METR reward hacking research.
+> Detailed reference for the `/evo:evaluator` skill's Layer 2 (DETECT). Based on the Evaluator Stress Test (arXiv:2507.05619) and METR reward hacking research.
 
 ## Contents
 - [Why Gaming Matters](#why-gaming-matters)

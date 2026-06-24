@@ -6,7 +6,7 @@
 
 ## Example 1: Code Architecture
 
-**Input:** `/inspirer "How should we handle real-time sync in a serverless app?" --depth STANDARD`
+**Input:** `/evo:inspirer "How should we handle real-time sync in a serverless app?" --depth STANDARD`
 
 ### Stage 1: FRAME
 ```json
@@ -57,7 +57,7 @@ All 4 cards kept. Ranked: insp-002 (0.73), insp-001 (0.67), insp-003 (0.67), ins
 
 ## Example 2: Product Strategy
 
-**Input:** `/inspirer "What features should we add to increase user retention?" --depth DEEP`
+**Input:** `/evo:inspirer "What features should we add to increase user retention?" --depth DEEP`
 
 ### Stage 1: FRAME
 ```json
@@ -89,7 +89,7 @@ All 4 cards kept. Ranked: insp-002 (0.73), insp-001 (0.67), insp-003 (0.67), ins
 
 ## Example 3: Technical Research (evolve format)
 
-**Input:** `/inspirer "Multi-agent coordination patterns" --depth QUICK --format evolve`
+**Input:** `/evo:inspirer "Multi-agent coordination patterns" --depth QUICK --format evolve`
 
 ### Stage 1: FRAME
 ```json

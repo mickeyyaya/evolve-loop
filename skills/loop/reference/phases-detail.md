@@ -50,7 +50,7 @@ IDE-specific mirror dirs (`.cursor/skills/`, `.kiro/skills/`, `.agents/skills/`)
 
 | Category | Matches | Example Skills |
 |----------|---------|---------------|
-| `code-review` | code review, quality, patterns | `/code-review-simplify` (built-in), `code-review:code-review`, `pr-review-workflow` |
+| `code-review` | code review, quality, patterns | `/evo:code-review-simplify` (built-in), `code-review:code-review`, `pr-review-workflow` |
 | `testing` | TDD, test generation, coverage | `everything-claude-code:tdd`, `testing-patterns` |
 | `security` | security audit, vulnerability | `everything-claude-code:security-review`, `security-patterns-code-review` |
 | `language:<lang>` | language-specific patterns | `python-review-patterns`, `go-review-patterns`, `typescript-review-patterns` |
@@ -63,7 +63,7 @@ IDE-specific mirror dirs (`.cursor/skills/`, `.kiro/skills/`, `.agents/skills/`)
 | `agent-design` | agent patterns, orchestration | `agent-orchestration-patterns`, `agent-memory-patterns` |
 | `docs` | documentation, API docs | `code-documentation-patterns`, `review-api-contract` |
 | `infra` | CI/CD, containers, deployment | `cicd-pipeline-patterns`, `container-kubernetes-patterns` |
-| `refactoring` | refactor, code smells | `/refactor` (built-in), `detect-code-smells`, `refactoring-decision-matrix` |
+| `refactoring` | refactor, code smells | `/evo:refactor` (built-in), `detect-code-smells`, `refactoring-decision-matrix` |
 
 For skill precedence, conflict resolution, phase eligibility, and budget-aware depth routing, see [reference/skill-routing.md](skill-routing.md).
 
@@ -123,7 +123,7 @@ check_rate_limit(agent_result):
 **On rate limit detection (4-step protocol):**
 1. Complete current phase (never break mid-phase)
 2. Write handoff using Session Break Handoff Template (cause: "API rate limit")
-3. Auto-schedule resume: try `/schedule` first (remote trigger at next hour), fall back to `/loop 5m`, fall back to manual resume instructions
+3. Auto-schedule resume: try `/schedule` first (remote trigger at next hour), fall back to `/evo:loop 5m`, fall back to manual resume instructions
 4. **STOP** — do not start next phase
 
 ---
