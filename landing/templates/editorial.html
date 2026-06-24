@@ -65,6 +65,8 @@
   /* hero — two-column magazine split */
   .hero{padding:72px 0 60px; border-bottom:1px solid var(--rule)}
   .hero .wrap{display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center}
+  /* let the hero shrink to the viewport instead of its content's min size (no mobile overflow) */
+  .hero .wrap,.hero .wrap>*{min-width:0}
   .hero__copy{max-width:38ch}
   .hero h1{font-family:var(--serif); font-weight:500; font-size:clamp(2.1rem,5.4vw,4.4rem);
     line-height:1.04; letter-spacing:-.02em; margin-top:18px; overflow-wrap:break-word}
@@ -178,7 +180,8 @@
   .pillar .pp{color:var(--muted); font-size:1rem; line-height:1.62; max-width:58ch}
 
   /* comparison table */
-  table{width:100%; border-collapse:collapse; margin-top:40px; font-size:.96rem}
+  .tablewrap{margin-top:40px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+  table{width:100%; border-collapse:collapse; font-size:.96rem; min-width:540px}
   caption{text-align:left; font-family:var(--sans); font-size:.72rem; font-weight:600;
     letter-spacing:.16em; text-transform:uppercase; color:var(--muted); padding-bottom:14px}
   thead th{font-family:var(--sans); font-size:.72rem; font-weight:600; text-transform:uppercase;
@@ -374,13 +377,15 @@
         <h2 data-reveal>{{.Site.Comparison.Heading}}</h2>
       </div>
     </div>
-    <table data-reveal>
-      <caption>{{.Site.Comparison.Heading}}</caption>
-      <thead><tr>{{range .Site.Comparison.Columns}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
-      <tbody>
-        {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
-      </tbody>
-    </table>
+    <div class="tablewrap" data-reveal>
+      <table>
+        <caption>{{.Site.Comparison.Heading}}</caption>
+        <thead><tr>{{range .Site.Comparison.Columns}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+        <tbody>
+          {{range .Site.Comparison.Rows}}<tr>{{range $i,$c := .}}{{if eq $i 0}}<th scope="row">{{$c}}</th>{{else}}<td>{{$c}}</td>{{end}}{{end}}</tr>{{end}}
+        </tbody>
+      </table>
+    </div>
     <p class="note" data-reveal>{{.Site.Comparison.Note}}</p>
   </div>
 </section>
