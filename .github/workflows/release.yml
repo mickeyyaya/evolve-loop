@@ -1,0 +1,33 @@
+name: release
+
+# Publishes prebuilt `evolve` binaries (darwin/linux × amd64/arm64, with the
+# skill payload bundled) to the GitHub release when a v* tag is pushed. The
+# install.sh one-line installer downloads these from
+# .../releases/latest/download/evolve_<os>_<arch>.tar.gz. Build matrix +
+# archive layout live in .goreleaser.yml; this is only the trigger + auth.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    name: build + publish binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # goreleaser needs full history + tags
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

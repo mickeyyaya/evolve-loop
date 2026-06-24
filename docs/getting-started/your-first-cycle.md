@@ -45,9 +45,17 @@ echo $ANTHROPIC_API_KEY  # Either set, or use subscription auth via ~/.claude.js
 
 ---
 
-## Step 1 — Install the Plugin
+## Step 1 — Install
 
-In your Claude Code session:
+The fastest path — one line that detects your platform, gets the `evolve` binary
+(prebuilt, or built from source as a fallback), auto-installs missing deps, and
+installs evolve for the CLI(s) you have:
+
+```bash
+curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
+```
+
+Or, inside Claude Code, add the plugin directly:
 
 ```
 /plugin marketplace add mickeyyaya/evolve-loop

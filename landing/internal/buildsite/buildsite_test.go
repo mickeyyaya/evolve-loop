@@ -54,6 +54,38 @@ func TestBuild_RendersPagesAndCopiesAssets(t *testing.T) {
 	}
 }
 
+// Build copies RootFiles verbatim into the dist root — how install.sh reaches
+// /install.sh on GitHub Pages.
+func TestBuild_CopiesRootFiles(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "page.html"), `{{define "mini"}}x{{end}}`)
+	mustWrite(t, filepath.Join(dir, "install.sh"), "#!/bin/sh\necho hi\n")
+
+	out := filepath.Join(dir, "dist")
+	written, err := Build(Config{
+		ContentPath:  "../../shared/content.json",
+		TemplateGlob: filepath.Join(dir, "*.html"),
+		OutDir:       out,
+		RootFiles:    []RootFile{{Src: filepath.Join(dir, "install.sh"), Dst: "install.sh"}},
+		Versions:     []Version{{Slug: "mini", Title: "Mini", Template: "mini"}},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if got := readFile(t, filepath.Join(out, "install.sh")); got != "#!/bin/sh\necho hi\n" {
+		t.Errorf("install.sh not copied verbatim, got: %q", got)
+	}
+	found := false
+	for _, w := range written {
+		if strings.HasSuffix(w, "install.sh") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("install.sh missing from written list: %v", written)
+	}
+}
+
 func TestBuild_UnknownTemplateFailsLoudly(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "page.html"), `{{define "real"}}x{{end}}`)

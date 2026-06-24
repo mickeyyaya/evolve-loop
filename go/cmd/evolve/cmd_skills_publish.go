@@ -163,14 +163,22 @@ func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 		cfg.OllamaBase = "llama3.1:8b"
 	}
 	if cfg.CodexHome == "" {
-		cfg.CodexHome = os.Getenv("CODEX_HOME")
-	}
-	if cfg.CodexHome == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			cfg.CodexHome = filepath.Join(home, ".codex")
-		}
+		cfg.CodexHome = defaultCodexHome()
 	}
 	return cfg, true
+}
+
+// defaultCodexHome resolves the Codex skills root: CODEX_HOME, else ~/.codex
+// (empty only if the home dir is unknown). Shared by parsePublishFlags and the
+// directly-built publishConfig in `evolve install`.
+func defaultCodexHome() string {
+	if h := os.Getenv("CODEX_HOME"); h != "" {
+		return h
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".codex")
+	}
+	return ""
 }
 
 // runSkillsPublish stages (and optionally installs) every requested target.

@@ -57,14 +57,16 @@ var textFlagRE = regexp.MustCompile(`\bEVOLVE(_[A-Z0-9]+)+\b`)
 
 // skipDirs are subtrees whose EVOLVE_* references are not production surfaces:
 // vendor/testdata are fixtures; .git is VCS metadata; node_modules is deps;
-// .evolve is gitignored runtime state (worktrees/runs), not committed source.
+// .evolve is gitignored runtime state (worktrees/runs), not committed source;
+// dist is build output (goreleaser dist/, landing/dist/ — gitignored, generated,
+// e.g. landing/dist/install.sh is a copy of the source install.sh).
 // ipcenv is the SSOT for IPC protocol constants — its literals ARE the protocol
 // values, not readers; it has no flagregistry row by design (cycle-14).
 // Matched by basename (a future production dir named "acs" is pruned by PATH in
 // the Go walk, not here). _test.go files are skipped per-file.
 var skipDirs = map[string]bool{
 	"vendor": true, "testdata": true, ".git": true, "node_modules": true, ".evolve": true,
-	"ipcenv": true,
+	"ipcenv": true, "dist": true,
 }
 
 // textExts are the text-file surfaces scanned in textSurfaceRoots. *.sh is NOT
