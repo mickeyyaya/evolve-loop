@@ -80,6 +80,8 @@ You can run the loop with **zero configuration** — it defaults to all-Claude m
 
 It detects which LLM CLIs you have, explains the pipeline, and offers **three presets** — **Recommended**, **Economy** (cheaper/faster models), and **Max-quality** (strongest models). You make **one choice**, and it writes the per-phase model routing for you. Re-run it anytime — it's idempotent.
 
+**All you need is an LLM CLI subscription.** Evolve drives the CLIs you're already signed into — your Claude, Codex, or Gemini subscription is enough to run the loop.
+
 Everything else has sane defaults; the only knobs live in `.evolve/policy.json` and are all optional:
 
 | Setting | Default | What it does |
@@ -89,6 +91,17 @@ Everything else has sane defaults; the only knobs live in `.evolve/policy.json` 
 | `workflow.max_cycles_cap` | `25` | safety ceiling for how many cycles the advisor may run |
 
 Most people run `/evo:setup` once and never open the file.
+
+### Run several features at once
+
+Give each feature its own loop and run them **in parallel** — each in its own git worktree and branch, each on its own LLM. They don't step on each other, and only green changes merge to `main`, one at a time.
+
+```bash
+# Fan a backlog into N concurrent, file-disjoint cycles (CLI-native):
+evolve fleet --count 3 --goal-hash <hash> --plan backlog.json
+```
+
+Or run a separate `/evo:loop` in each of several git worktrees — one per feature, each on the CLI you prefer (Claude · Codex · Gemini). Either way, isolation is by **worktree + branch**, so concurrent loops can't corrupt each other; the merge to `main` is **serialized** for safety. It's safe parallelism across **independent** work — bounded by your machine and your LLM rate limits, not magic infinite scale.
 
 ---
 
