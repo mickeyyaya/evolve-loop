@@ -250,11 +250,12 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v20.4)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v21.0)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
 | v20.4 | Jun 24 | see [CHANGELOG.md](CHANGELOG.md) |
+| v21.0 | Jun 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
