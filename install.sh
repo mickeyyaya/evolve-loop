@@ -32,14 +32,29 @@ need_sudo() {
 	if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; else SUDO=""; fi
 }
 
+# windows_help fires under native Windows (Git Bash / MSYS / Cygwin). The loop
+# runtime needs a Unix shell (tmux, bash, OS sandbox), so WSL2 is the path —
+# inside WSL, uname reports Linux and this same one-liner just works.
+windows_help() {
+	warn "Windows detected ($uname_s)."
+	warn "evolve-loop's runtime needs a Unix shell (tmux, bash), so install it under WSL2:"
+	warn "  1. Install WSL2:  https://learn.microsoft.com/windows/wsl/install"
+	warn "  2. Open your WSL (e.g. Ubuntu) shell, then run this same one-liner there:"
+	warn "       curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
+	warn "Tip: the /evo:* skills also work in native Claude Code on Windows —"
+	warn "     /plugin marketplace add mickeyyaya/evolve-loop  then  /plugin install evo@evo"
+	die "use WSL2 for the runtime (steps above)."
+}
+
 # ---- 1. OS / arch ----------------------------------------------------------
 detect_platform() {
 	uname_s="$(uname -s)"
 	uname_m="$(uname -m)"
 	case "$uname_s" in
 		Darwin) OS=darwin ;;
-		Linux)  OS=linux ;;
-		*) die "unsupported OS '$uname_s' (prebuilt binaries: darwin/linux). Build manually: clone the repo, then 'cd go && go build ./cmd/evolve'." ;;
+		Linux)  OS=linux ;; # WSL2 reports Linux — works unchanged
+		MINGW*|MSYS*|CYGWIN*|Windows_NT) windows_help ;;
+		*) die "unsupported OS '$uname_s' (prebuilt binaries: darwin/linux). On Windows, use WSL2." ;;
 	esac
 	case "$uname_m" in
 		x86_64|amd64)  ARCH=amd64 ;;
