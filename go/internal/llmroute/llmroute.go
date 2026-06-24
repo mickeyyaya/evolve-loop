@@ -111,8 +111,10 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 //   - prof may be nil (no profile on disk).
 //   - autoExpand may be nil (then "auto" is left as-is).
 //   - pin may be nil (no policy pin). A non-nil pin is ABSOLUTE: pin.CLI
-//     replaces the resolved primary CLI (source="policy.pin"), and pin.Model
-//     replaces the resolved model outright — bypassing the env/profile/default
+//     replaces the resolved primary CLI (source="policy.pin"), normalized from a
+//     bare family to its default tmux driver (defaultDriverForFamily: "codex" →
+//     "codex-tmux"), and pin.Model replaces the resolved model outright —
+//     bypassing the env/profile/default
 //     chain AND the "auto" expansion (so a pinned model never triggers a
 //     resolvellm/catalog lookup). The caller is responsible for the
 //     --bypass-policy escape hatch (pass nil to bypass) and for validating
@@ -123,7 +125,7 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 func Resolve(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel, pin *policy.Pin) Plan {
 	primary, source := resolvePrimary(agent, env, prof)
 	if pin != nil && pin.CLI != "" {
-		primary, source = pin.CLI, "policy.pin"
+		primary, source = defaultDriverForFamily(pin.CLI), "policy.pin"
 	}
 	var model string
 	if pin != nil && pin.Model != "" {
@@ -159,6 +161,23 @@ func resolveModel(agent, phase, defaultModel string, env map[string]string, prof
 		}
 	}
 	return model
+}
+
+// defaultDriverForFamily normalizes a bare CLI family (e.g. "codex") to its
+// default interactive driver ("codex-tmux") when one is registered. Policy pins
+// and `evolve setup apply` emit bare base families (Assignment.CLI is the base
+// family), but the dispatch default is the tmux driver (CLAUDE.md: "Default
+// execution = tmux-LLM drivers"). The headless "<family>" driver lacks the
+// manifest model_tier_map and the codex ChatGPT model clamp, so a bare-family
+// pin previously selected it and codex exited rc=1 every cycle (cycle-378). A
+// name that is already driver-qualified, or whose "<family>-tmux" form is not a
+// registered driver (e.g. the explicit headless "claude-p"), is returned
+// unchanged. cliBinaryFor is the single source of registered driver names.
+func defaultDriverForFamily(cli string) string {
+	if _, ok := cliBinaryFor[cli+"-tmux"]; ok {
+		return cli + "-tmux"
+	}
+	return cli
 }
 
 // resolvePrimary returns the primary CLI and its provenance label.
