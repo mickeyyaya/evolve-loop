@@ -24,8 +24,6 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		strategy          string
 		maxCyclesFlag     int
 		cyclesFlag        int
-		budgetUSD         float64
-		batchCapUSD       float64
 		resume            bool
 		dryRun            bool
 		reset             bool
@@ -42,14 +40,6 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.StringVar(&strategy, "strategy", "", "balanced|innovate|harden|repair|ultrathink|autoresearch (default: balanced)")
 	fs.IntVar(&maxCyclesFlag, "max-cycles", 0, "maximum cycles to run (default 1; aliased by --cycles)")
 	fs.IntVar(&cyclesFlag, "cycles", 0, "alias for --max-cycles")
-	// --budget-usd / --budget / --batch-cap-usd are DEPRECATED no-ops: cost is
-	// display-only telemetry now (the token-budget cost gates were removed because
-	// the cost calculation was unreliable across LLM models). The flags are still
-	// accepted so existing scripts/CI don't error; they have no effect. Use
-	// --cycles N to bound a run.
-	fs.Float64Var(&budgetUSD, "budget-usd", 0, "(DEPRECATED, ignored) former budget-driven dollar cap")
-	fs.Float64Var(&budgetUSD, "budget", 0, "(DEPRECATED, ignored) alias for --budget-usd")
-	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "(DEPRECATED, ignored) former cumulative batch USD cap")
 	fs.BoolVar(&resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
@@ -85,15 +75,14 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return nil
 	})
 
+	// The cost-budget flags (--budget-usd/--budget/--batch-cap-usd) are removed
+	// from the parameter surface; strip any legacy occurrence (with a WARN) before
+	// parse so old scripts don't trip flag.Parse's "not defined" error.
+	args = stripRemovedBudgetFlags(args, func(m string) {
+		fmt.Fprintf(stderr, "evolve loop: WARN: %s\n", m)
+	})
 	if err := fs.Parse(args); err != nil {
 		return loopConfig{}, 10
-	}
-
-	// The cost-budget feature is disabled: dollar-cost calculation was
-	// unreliable across LLM models. Flag still accepted so old scripts parse,
-	// but we warn rather than silently ignore it.
-	if budgetUSD != 0 {
-		fmt.Fprintln(stderr, "evolve loop: WARN: --budget-usd / --budget is disabled and ignored; use --cycles N to bound the run, or omit it and let the advisor decide")
 	}
 
 	// Enforce the flag's "absolute path" contract for the project root AND the

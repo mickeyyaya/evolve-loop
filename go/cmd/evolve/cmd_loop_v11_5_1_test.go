@@ -16,10 +16,10 @@ import (
 // Deprecated cost flags are accepted no-ops
 // ============================================================================
 
-// TestParseLoopArgs_BudgetAliasAccepted verifies --budget-usd and its --budget
-// alias still parse without error (so existing scripts/CI don't break) but no
-// longer drive any behavior — cost is display-only telemetry now, and the flag
-// must NOT bump the cycle count (the former budget-mode 50-cycle default is gone).
+// TestParseLoopArgs_BudgetAliasAccepted verifies a legacy --budget-usd and its
+// --budget alias are stripped (not rejected) so existing scripts/CI don't break,
+// and drive no behavior — cost is display-only telemetry now, and the flag must
+// NOT bump the cycle count (the former budget-mode 50-cycle default is gone).
 func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"--budget-usd", "--budget"} {
@@ -42,9 +42,9 @@ func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 // Deprecation WARN
 // ============================================================================
 
-// TestParseLoopArgs_NegativeBudgetAccepted — --budget-usd is a deprecated no-op,
-// so ANY value (incl. negative) is accepted and ignored. Previously a negative
-// value was a hard rc=10 error; that validation was removed for consistency.
+// TestParseLoopArgs_NegativeBudgetAccepted — --budget-usd is removed and stripped
+// before parse, so ANY value (incl. a negative like "-1", which the strip must
+// consume as the value rather than leave for flag.Parse) is accepted and ignored.
 func TestParseLoopArgs_NegativeBudgetAccepted(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer

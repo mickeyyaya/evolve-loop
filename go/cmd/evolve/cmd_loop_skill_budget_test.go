@@ -1,8 +1,9 @@
 // cmd_loop_skill_budget_test.go guards a product decision: the cost-budget
-// feature (--budget-usd / --budget) is unsupported — a reliable dollar cost
-// can't be derived across different LLMs — so no user-facing surface may
-// advertise it. This pins the loop skill doc; the CLI flag itself is a warned
-// no-op covered by cmd_loop_test.go.
+// feature (--budget-usd / --budget / --batch-cap-usd) is removed — per-cycle
+// token cost is tracked accurately across LLM CLIs as display-only telemetry,
+// not exposed as a cap parameter — so no user-facing surface may advertise it.
+// This pins the loop skill doc; the removed CLI flags are stripped-with-WARN,
+// covered by cmd_loop_test.go and budget_flags_test.go.
 package main
 
 import (

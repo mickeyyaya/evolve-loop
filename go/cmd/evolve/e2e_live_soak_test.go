@@ -52,7 +52,6 @@ func TestE2ELiveCrossFamilySoak(t *testing.T) {
 				GoalHash:  "soak-" + name,
 				ExtraEnv:  []string{"EVOLVE_AUDITOR_CLI=" + auditor.Driver},
 				Timeout:   envDurationSeconds("EVOLVE_E2E_LIVE_TMUX_TIMEOUT_S", 15*time.Minute),
-				BudgetUSD: 2.00,
 			})
 
 			if res.TransientExhausted {

@@ -146,8 +146,6 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		goalHash     string
 		goalText     string
 		evolveDir    string
-		budgetUSD    float64
-		batchCapUSD  float64
 		simulate     bool
 		bypassPolicy bool
 	)
@@ -155,10 +153,14 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
 	fs.StringVar(&goalText, "goal", "", "human-readable goal text (threaded to Scout + the routing advisor as Context[\"goal\"]); optional")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
-	fs.Float64Var(&budgetUSD, "budget-usd", 999999, "(DEPRECATED, ignored) former per-cycle USD budget cap")
-	fs.Float64Var(&batchCapUSD, "batch-cap-usd", 20.0, "(DEPRECATED, ignored) former cumulative batch USD cap")
 	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
+	// The cost-budget flags (--budget-usd/--budget/--batch-cap-usd) are removed
+	// from the parameter surface; strip any legacy occurrence (with a WARN) before
+	// parse so old scripts don't trip flag.Parse's "not defined" error.
+	args = stripRemovedBudgetFlags(args, func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
+	})
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}

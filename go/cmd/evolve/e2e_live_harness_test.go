@@ -217,7 +217,6 @@ type liveCycleCfg struct {
 	Goal      string   // human-readable goal text (--goal); threaded to Scout + advisor. Optional.
 	ExtraEnv  []string // e.g. EVOLVE_<AGENT>_CLI for cross-family
 	Timeout   time.Duration
-	BudgetUSD float64 // per-cycle --budget-usd cap
 }
 
 // liveResult is the observable outcome of a live cycle.
@@ -299,7 +298,6 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 		"--project-root", projRoot,
 		"--goal-hash", cfg.GoalHash,
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
-		"--budget-usd", strconv.FormatFloat(cfg.BudgetUSD, 'f', 2, 64),
 	}
 	if cfg.Goal != "" {
 		args = append(args, "--goal", cfg.Goal)

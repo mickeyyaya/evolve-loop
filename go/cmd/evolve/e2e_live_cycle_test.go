@@ -57,7 +57,6 @@ func runLiveCycleTier1(t *testing.T, repoRoot, evolveBin string, cli liveCLI, ti
 		Tier:      cli.CheapTier,
 		GoalHash:  "live-" + cli.Driver,
 		Timeout:   timeout,
-		BudgetUSD: 1.00,
 	})
 	t.Logf("[live-cycle] %s shipped=%v cost=$%.4f roles=%v", cli.Driver, res.Shipped, res.Cost, ledgerRoles(res.Entries))
 
