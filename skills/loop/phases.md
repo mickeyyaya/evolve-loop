@@ -86,7 +86,7 @@ if CONSECUTIVE_FAILURES >= 3:
   → execute Rate Limit Recovery Protocol
 ```
 
-On detection: complete current phase, write handoff, auto-schedule resume (`/schedule` → `/loop 5m` → manual), then **STOP**. For full detection code block and 4-step protocol see [reference/phases-detail.md](reference/phases-detail.md#rate-limit-recovery).
+On detection: complete current phase, write handoff, auto-schedule resume (`/schedule` → `/evo:loop 5m` → manual), then **STOP**. For full detection code block and 4-step protocol see [reference/phases-detail.md](reference/phases-detail.md#rate-limit-recovery).
 
 ### Context Window Budget Gate (MANDATORY — runs before anything else)
 
@@ -236,7 +236,7 @@ The Auditor reviews Builder changes **in the worktree**. Worktree tasks built in
 
 **Launch Auditor Agent** via `evolve subagent run --role auditor --cycle "$CYCLE" --workspace "$WORKSPACE_PATH"` (the Go orchestrator does this automatically inside `evolve cycle run`; the explicit form is for manual one-off runs). For full context JSON and model-tier selection logic see [reference/phases-detail.md](reference/phases-detail.md#phase-4-audit).
 
-**Enhanced evaluation via `/evaluator`** (optional, `strategy == "harden"` or `forceFullAudit == true`): merge scores into `## Evaluator Scores`. Skip when lean mode or budget YELLOW/RED.
+**Enhanced evaluation via `/evo:evaluator`** (optional, `strategy == "harden"` or `forceFullAudit == true`): merge scores into `## Evaluator Scores`. Skip when lean mode or budget YELLOW/RED.
 
 After Auditor completes: PASS → Phase 5 Ship; WARN/FAIL/SHIP_GATE_DENIED → drop work, record failure, discard worktree.
 

@@ -1,6 +1,6 @@
 ---
 name: evaluator
-description: Use when the user invokes /evaluator or asks to evaluate, assess, score, or independently audit code quality, project health, or improvement priorities with multi-dimensional scoring and anti-gaming defenses
+description: Use when the user invokes /evo:evaluator or asks to evaluate, assess, score, or independently audit code quality, project health, or improvement priorities with multi-dimensional scoring and anti-gaming defenses
 argument-hint: "[target] [--scope task|project|strategic] [--depth quick|standard|deep]"
 ---
 
@@ -24,16 +24,16 @@ argument-hint: "[target] [--scope task|project|strategic] [--depth quick|standar
 
 ```bash
 # Evaluate recent changes (task scope)
-/evaluator --scope task
+/evo:evaluator --scope task
 
 # Full project health assessment
-/evaluator --scope project --depth deep
+/evo:evaluator --scope project --depth deep
 
 # Strategic direction guidance — what should improve next?
-/evaluator --scope strategic
+/evo:evaluator --scope strategic
 
 # Evaluate specific files
-/evaluator src/auth/ --scope task --depth standard
+/evo:evaluator src/auth/ --scope task --depth standard
 ```
 
 **Parse arguments:**
@@ -241,11 +241,11 @@ Default: **standard**
 
 When invoked from evolve-loop's Auditor phase:
 - **Trigger:** `strategy == "harden"` OR `forceFullAudit == true`
-- **Invocation (in-process):** `/evaluator --scope task --depth standard`
+- **Invocation (in-process):** `/evo:evaluator --scope task --depth standard`
 - **Invocation (subprocess-isolated, REQUIRED in production cycles):**
 
   ```bash
-  echo "/evaluator --scope task --depth standard" | \
+  echo "/evo:evaluator --scope task --depth standard" | \
       bash legacy/scripts/dispatch/subagent-run.sh evaluator "$CYCLE" "$WORKSPACE_PATH"
   ```
 

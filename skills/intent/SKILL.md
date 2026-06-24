@@ -33,7 +33,7 @@ description: Pre-Scout intent capture phase. Structures vague user goals into in
 
 ## Autonomy invariant
 
-This skill MUST NOT block on human approval. The intent persona produces intent.md; `gate_intent_to_research` verifies structure (≥1 challenged_premise, valid awn_class, SHA matches ledger); cycle proceeds. There is no `accept-intent` operator command — re-running `/intent` replaces the prior file, and the kernel uses the latest ledger entry. This is the difference between an autonomy-preserving filter and a checkpoint.
+This skill MUST NOT block on human approval. The intent persona produces intent.md; `gate_intent_to_research` verifies structure (≥1 challenged_premise, valid awn_class, SHA matches ledger); cycle proceeds. There is no `accept-intent` operator command — re-running `/evo:intent` replaces the prior file, and the kernel uses the latest ledger entry. This is the difference between an autonomy-preserving filter and a checkpoint.
 
 ## Cycle-binding
 

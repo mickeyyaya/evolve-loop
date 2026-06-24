@@ -200,7 +200,7 @@ The skill can be invoked directly outside the evolve-loop:
 
 ```bash
 # Review + simplify changed files
-/code-review-simplify [--tier lightweight|standard|full] [--files <paths>]
+/evo:code-review-simplify [--tier lightweight|standard|full] [--files <paths>]
 ```
 
 ## Simplification Catalog

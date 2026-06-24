@@ -50,7 +50,7 @@ Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is
 
 Invoked by:
 - `/evo:ship` (user-driven)
-- `loop` macro after `/audit`
+- `loop` macro after `/evo:audit`
 
 ## Reference
 

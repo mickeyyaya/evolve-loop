@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use when the user runs /evo:setup (or /setup), asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. Runs once on first launch (the loop nudges) and is re-runnable anytime.
+description: Use when the user runs /evo:setup (or /evo:setup), asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. Runs once on first launch (the loop nudges) and is re-runnable anytime.
 argument-hint: ""
 ---
 
@@ -8,11 +8,11 @@ argument-hint: ""
 
 > Interactive onboarding. Everything deterministic — detection, the per-phase model **recommendation**, the policy write, and verification — runs in the Go binary (`evolve setup detect|recommend|apply`). The only judgment left HERE, in your session (zero extra API cost), is **teaching the pipeline** and **relaying the user's one preset choice**. You no longer hand-author pins; `evolve setup apply` writes them. Presets are defined in a public config file (`go/internal/setup/presets.json`, overridable per-repo via `.evolve/setup-presets.json`) — never hardcoded. See [docs/architecture/setup-onboarding.md](../../docs/architecture/setup-onboarding.md).
 >
-> Invoked as `/evo:setup` (the `evo` plugin namespace); `/setup` is the same skill.
+> Invoked as `/evo:setup` (the `evo` plugin namespace); `/evo:setup` is the same skill.
 
 ## When to use
 
-- The loop printed `[setup] First run …`, or the user typed `/evo:setup` / `/setup`, or asked to configure models / learn the pipeline.
+- The loop printed `[setup] First run …`, or the user typed `/evo:setup` / `/evo:setup`, or asked to configure models / learn the pipeline.
 - Re-running is always safe — it re-detects and re-applies the chosen preset (idempotent; lossless-merges into `.evolve/policy.json`).
 
 ## Binary
