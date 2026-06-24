@@ -192,6 +192,6 @@ func (rep *Report) Markdown(o MarkdownOptions) string {
 
 // shortPkg trims the module prefix for readability.
 func shortPkg(pkg string) string {
-	const prefix = "github.com/mickeyyaya/evolveloop/go/"
+	const prefix = "github.com/mickeyyaya/evolve-loop/go/"
 	return strings.TrimPrefix(pkg, prefix)
 }

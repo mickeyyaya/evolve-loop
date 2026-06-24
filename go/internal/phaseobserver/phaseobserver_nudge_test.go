@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
 // phaseobserver_nudge_test.go — the soft-stall nudge hook: before the hard

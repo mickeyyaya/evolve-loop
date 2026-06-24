@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // TestC65_001_OrchestratorTrim ports cycle-65/001 (orchestrator.md size ≤ 28483 bytes).

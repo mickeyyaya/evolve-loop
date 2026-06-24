@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/ledger"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestDispatch_NoArgs prints usage and returns 2.

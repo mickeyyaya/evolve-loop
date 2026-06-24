@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/directives"
+	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 )
 
 // writeTempFile writes body to a temp file and returns its path.

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // lockHooks holds injectable seams for syscall.Flock + file close so

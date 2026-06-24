@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // ResumePoint describes a checkpointed cycle that can be resumed.

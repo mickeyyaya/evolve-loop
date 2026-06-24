@@ -17,7 +17,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
 // CampaignProgress is the persisted record of how far a campaign run got.

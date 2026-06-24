@@ -66,11 +66,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/research"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // ── dead-flag-delete ─────────────────────────────────────────────────────────

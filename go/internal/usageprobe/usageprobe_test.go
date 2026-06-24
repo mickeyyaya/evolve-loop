@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/clicontrol"
-	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
 func newStore(t *testing.T) *clihealth.Store {

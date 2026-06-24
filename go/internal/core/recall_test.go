@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/research"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // fakeKB is a test double for research.KB capturing the query it received.

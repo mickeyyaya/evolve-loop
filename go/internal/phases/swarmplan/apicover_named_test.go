@@ -3,8 +3,8 @@ package swarmplan
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 )
 
 // TestPhase_NamedSatisfiesSkipperContract names the swarmplan.Phase type (New

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/skillcheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 func runSkills(args []string, _ io.Reader, stdout, stderr io.Writer) int {

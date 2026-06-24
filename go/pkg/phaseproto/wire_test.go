@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Wire-protocol version pin. The wire format is the load-bearing contract

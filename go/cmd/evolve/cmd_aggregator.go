@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/aggregator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/aggregator"
 )
 
 // runAggregator is the `evolve aggregator <phase> <output> <worker>...` subcommand.

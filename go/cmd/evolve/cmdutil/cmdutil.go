@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // HasHelp reports whether args contains the conventional help flags

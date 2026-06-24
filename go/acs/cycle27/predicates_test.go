@@ -60,8 +60,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // deadFlags is the canonical list of 3 flags that cycle-27 removes:

@@ -50,7 +50,7 @@ echo $ANTHROPIC_API_KEY  # Either set, or use subscription auth via ~/.claude.js
 In your Claude Code session:
 
 ```
-/plugin marketplace add mickeyyaya/evolveloop
+/plugin marketplace add mickeyyaya/evolve-loop
 /plugin install evolve-loop
 ```
 
@@ -58,7 +58,7 @@ Or for a project-local install (recommended for trying it out):
 
 ```bash
 cd /your/project
-git clone https://github.com/mickeyyaya/evolveloop.git .evolve/plugin
+git clone https://github.com/mickeyyaya/evolve-loop.git .evolve/plugin
 ```
 
 Then in Claude Code: `/plugin reload`.

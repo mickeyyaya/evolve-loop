@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // fixedClock returns a deterministic Now for reproducible `ts` fields.

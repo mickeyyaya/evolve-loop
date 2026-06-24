@@ -66,10 +66,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // removedFlags is the canonical list of 3 INTERACTIVE_POLICY cluster flags

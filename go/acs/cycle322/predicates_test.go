@@ -60,8 +60,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // goDir returns the module dir; `go test -C <goDir>` makes every invocation

@@ -3,10 +3,10 @@ package core
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // fakeMinter is a core.PhaseMinter: it normalizes the spec (forces Optional,

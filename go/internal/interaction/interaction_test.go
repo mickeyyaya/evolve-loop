@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // readLedger parses <ws>/<phase>-interactions.ndjson into outcomes.

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // publishSkillDoc builds a minimal canonical SKILL.md.

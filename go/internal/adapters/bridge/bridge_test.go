@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // fakeEngine is the injected core.Bridge. It records the request it

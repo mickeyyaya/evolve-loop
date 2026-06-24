@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // TestRegistryActivatingFields_AgreeWithLiteralKernel loads the shipped registry

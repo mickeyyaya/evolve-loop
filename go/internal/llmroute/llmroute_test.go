@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // TestMain clears EVOLVE_CLI from the process env so tests that exercise the

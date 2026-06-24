@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // runHappyOpts returns a RunOptions blob where every seam is configured

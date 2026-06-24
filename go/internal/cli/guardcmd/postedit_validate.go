@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
-	"github.com/mickeyyaya/evolveloop/go/internal/posteditvalidate"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/posteditvalidate"
 )
 
 // runPostEditValidate is `evolve postedit-validate` — reads a PostToolUse

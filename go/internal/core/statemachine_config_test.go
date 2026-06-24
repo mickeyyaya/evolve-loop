@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // specForCatalog adapts a test catalog to the StateMachine.specFor accessor,

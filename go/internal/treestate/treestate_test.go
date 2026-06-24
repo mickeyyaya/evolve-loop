@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // fakeRunner returns a sysexec.RunFunc that writes diffOut to stdout and returns

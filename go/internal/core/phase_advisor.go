@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // PhaseAdvisor is the bridge-backed DynamicLLM brain. It satisfies two router

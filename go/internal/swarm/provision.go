@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // WorkerProvisioner creates and removes the per-worker git worktrees + the

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
 // TestRun_WorkspaceMkdirFails covers Run's workspace-create error branch: the

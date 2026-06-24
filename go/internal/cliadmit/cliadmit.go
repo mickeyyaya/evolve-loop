@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // DefaultTTL is the maximum age of a holder's heartbeat before it is

@@ -1,9 +1,9 @@
 package routingtest
 
 import (
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // Brick is a composable mutation of a ScenarioSpec (functional-options style).

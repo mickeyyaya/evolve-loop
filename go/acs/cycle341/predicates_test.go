@@ -35,7 +35,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // TestC341_001_AllProfilesSubstitutabilityAtParityTestPasses verifies that

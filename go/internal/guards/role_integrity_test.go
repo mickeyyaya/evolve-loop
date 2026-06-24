@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestRole_DeniesControlPlaneEditInBuildPhase is the cycle-20 regression: a build

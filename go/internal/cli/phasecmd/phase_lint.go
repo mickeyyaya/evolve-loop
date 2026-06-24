@@ -5,10 +5,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // runPhaseLint implements `evolve phase lint <name>` — a developer aid that

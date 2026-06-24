@@ -28,9 +28,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // hangClassifierFn reports whether the exit-transport-hang reclassifier is

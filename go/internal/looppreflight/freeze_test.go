@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // freezeOptions returns goodPipelineOptions with a codex-tmux profile in use

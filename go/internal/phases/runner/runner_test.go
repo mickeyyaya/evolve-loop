@@ -10,10 +10,10 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestMain clears EVOLVE_CLI from the process env so runner tests that exercise

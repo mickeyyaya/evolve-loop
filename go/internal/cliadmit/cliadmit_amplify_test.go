@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cliadmit"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliadmit"
 )
 
 // setAmpXDG isolates slot files to a per-test temp dir so amplification tests

@@ -3,8 +3,8 @@ package audit
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // ADR-0050 §3.10 Slice 5: at enforce the machine-readable evolve-verdict sentinel

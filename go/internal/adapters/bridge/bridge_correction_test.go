@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // bridge_correction_test.go — contract-correction retry: the "## Correction"

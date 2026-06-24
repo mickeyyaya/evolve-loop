@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Commit is one commit subject line passed to Classify.

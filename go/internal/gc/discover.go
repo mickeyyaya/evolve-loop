@@ -30,7 +30,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // runMarkers are the files whose presence identifies a directory as a run

@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // tddRuleCfg is the default TDD-pin (EVOLVE_CONDITIONAL_MANDATORY): tdd is

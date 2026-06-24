@@ -16,7 +16,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 //go:embed interaction/healthy-corpus.txt

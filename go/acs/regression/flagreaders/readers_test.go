@@ -41,8 +41,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // flagNameRE matches a complete, well-formed flag name. Anchored, so it never

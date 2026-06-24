@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/pkg/phaseproto"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
 // buildEvolveBinaryWithTestPhases compiles the evolve binary into a

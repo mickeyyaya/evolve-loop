@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // contract.go is the single source of truth for "is this dispatched-agent

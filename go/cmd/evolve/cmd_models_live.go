@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolveloop/go/internal/modelquery"
-	"github.com/mickeyyaya/evolveloop/go/internal/setup"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
 // shouldRefreshCatalog is the pure cycle-start gate: refresh only when enabled

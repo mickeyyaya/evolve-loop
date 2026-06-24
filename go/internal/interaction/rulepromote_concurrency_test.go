@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 // TestPromoteRule_ConcurrentSameID_NoLostWrite is the N14 (ADR-0049) regression

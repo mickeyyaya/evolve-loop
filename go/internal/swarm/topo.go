@@ -1,6 +1,6 @@
 package swarm
 
-import "github.com/mickeyyaya/evolveloop/go/internal/dag"
+import "github.com/mickeyyaya/evolve-loop/go/internal/dag"
 
 // TopoOrder returns the serialized merge-train order for a writer swarm: the
 // flattened topological order over the inter-worker depends_on DAG, so a worker

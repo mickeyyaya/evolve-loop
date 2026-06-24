@@ -8,8 +8,8 @@ package policy_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseobserver"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type observerWant struct {

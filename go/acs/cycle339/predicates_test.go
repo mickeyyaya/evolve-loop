@@ -29,9 +29,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // vendorTiers is the set of legacy vendor model names that must not appear in

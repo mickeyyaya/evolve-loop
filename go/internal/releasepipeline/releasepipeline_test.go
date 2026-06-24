@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // allOkSteps returns Steps where every step succeeds. The defaults that

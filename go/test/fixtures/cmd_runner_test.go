@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 func TestFakeExec_ZeroValue_SucceedsWithEmptyOutput(t *testing.T) {

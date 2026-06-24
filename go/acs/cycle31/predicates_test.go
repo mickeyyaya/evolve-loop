@@ -74,9 +74,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/internal/guards"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // bypassFlags is the canonical list of 7 flags that cycle-31 removes:

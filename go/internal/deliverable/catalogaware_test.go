@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // catalogaware_test.go — RED contract for VerifyCatalogAware: ONE verify

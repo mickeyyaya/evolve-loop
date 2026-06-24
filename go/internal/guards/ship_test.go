@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Ship is the port of scripts/guards/ship-gate.sh.

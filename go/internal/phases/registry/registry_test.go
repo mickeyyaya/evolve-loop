@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // fakeRunner implements core.PhaseRunner with deterministic behavior

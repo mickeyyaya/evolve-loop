@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // writeScoutReport writes a scout-report.md selecting the given slugs (prose form).

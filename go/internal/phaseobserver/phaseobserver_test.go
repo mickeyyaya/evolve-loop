@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 func tempWorkspace(t *testing.T) string {

@@ -13,7 +13,7 @@ package mergegate_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/mergegate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mergegate"
 )
 
 // clear is the all-green safety baseline: every floor predicate satisfied, so the

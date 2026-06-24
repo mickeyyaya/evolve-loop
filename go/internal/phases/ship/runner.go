@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 func defaultNow() Now {

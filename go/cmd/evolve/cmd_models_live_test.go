@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
 func TestShouldRefreshCatalog(t *testing.T) {

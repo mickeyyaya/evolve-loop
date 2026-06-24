@@ -3,7 +3,7 @@ package observer
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // TestSocketTmuxRunner_PrependsIsolatedSocket: the observer's liveness probe must

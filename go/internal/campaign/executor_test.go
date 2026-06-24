@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 func mkOptionalWave(ids ...string) []fleet.CycleSpec {

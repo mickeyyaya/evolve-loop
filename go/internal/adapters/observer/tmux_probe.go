@@ -14,8 +14,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // anyProbe composes liveness probes: the agent is alive if ANY sub-probe says

@@ -3,8 +3,8 @@ package ship
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // ADR-0050 §3.10 Slice 6: at enforce the ship gate's verdict parse is sentinel-first

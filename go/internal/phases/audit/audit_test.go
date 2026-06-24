@@ -14,12 +14,12 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolveloop/go/internal/phases/registry"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestExtractHonorsPhaseContract pins audit's verdict extractor to the canonical

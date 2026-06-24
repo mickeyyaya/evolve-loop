@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/triagecap"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // floorbinding.go — Gate C (R9.3, triage capacity): EGPS floor predicates

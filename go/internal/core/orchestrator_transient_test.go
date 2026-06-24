@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func wrapTransient(code int) error {

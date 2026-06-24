@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestRunnerMissingProfile_NoProfilesDir verifies the critical backward-compat

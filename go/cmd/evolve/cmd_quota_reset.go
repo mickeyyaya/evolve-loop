@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/quotareset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 // runQuotaReset is the `evolve estimate-quota-reset [WORKSPACE]` subcommand.

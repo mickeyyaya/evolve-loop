@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
 func appendFeed(t *testing.T, ws, agent string, lines ...string) {

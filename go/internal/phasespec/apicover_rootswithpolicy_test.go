@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // TestRootsWithPolicy pins the EVOLVE_PHASE_ROOTS → policy.PathsConfig conversion:

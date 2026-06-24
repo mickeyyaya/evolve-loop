@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 // MaxEntries caps state.json:failedApproaches at this many entries.

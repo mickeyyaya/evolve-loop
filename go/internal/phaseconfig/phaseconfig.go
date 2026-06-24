@@ -24,8 +24,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // Dispatch is the launch-time configuration for a phase's agent — the subset of

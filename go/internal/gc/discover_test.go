@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 func writeFile(t *testing.T, path, content string) {

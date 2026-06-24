@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // catalogaware.go — VerifyCatalogAware: VerifyWith behind the SAME merged-

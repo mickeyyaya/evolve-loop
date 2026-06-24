@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Layer 3 of the deliverable-contract feature (ADR-0034): the shared verifier

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // TestRun_InlinePrompt_NoDiskFile proves a minted phase can ship its prompt

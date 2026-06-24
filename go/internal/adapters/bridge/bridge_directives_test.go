@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // bridge_directives_test.go — runtime operator-directives block: the pre-rendered

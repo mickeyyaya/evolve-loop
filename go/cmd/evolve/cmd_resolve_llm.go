@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 // runResolveLLM is the `evolve resolve-llm <role>` subcommand. Resolves the

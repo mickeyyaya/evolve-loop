@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // WireVersion is the on-wire protocol version. Bumping this is a

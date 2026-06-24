@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // TestStartRunLease_WritesInitialLeaseBeforeReturn pins the WRITE-ORDERING

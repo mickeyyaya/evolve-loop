@@ -15,7 +15,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/mergegate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mergegate"
 )
 
 // fakeExecutor stands in for the git/ship-backed Executor. The assertion below

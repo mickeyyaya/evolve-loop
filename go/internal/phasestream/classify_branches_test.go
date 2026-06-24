@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/textutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
 )
 
 // TestClassifier_NewClassifier_DefaultsClockToNow pins the NewClassifier

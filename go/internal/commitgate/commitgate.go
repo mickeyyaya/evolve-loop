@@ -37,9 +37,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolveloop/go/internal/sysexec"
-	"github.com/mickeyyaya/evolveloop/go/internal/treestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
 // Exit codes — the load-bearing contract the ship-gate reader and the /commit

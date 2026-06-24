@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // --- minimal test harness for core_test package ---

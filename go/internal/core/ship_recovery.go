@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError, depth int) (Phase, bool) {

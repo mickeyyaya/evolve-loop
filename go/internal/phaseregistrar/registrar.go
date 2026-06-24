@@ -19,14 +19,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolveloop/go/internal/phases/specrunner"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // Registrar builds phase runners from unified configs. Bridge + Prompts are

@@ -58,10 +58,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/changeloggen"
-	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
-	"github.com/mickeyyaya/evolveloop/go/internal/textutil"
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/textutil"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // production files the two committed top_n tasks target.

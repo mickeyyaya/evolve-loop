@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 // plantFires writes an interaction ledger with n would-fire lines (+ one

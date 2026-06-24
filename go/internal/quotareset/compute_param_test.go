@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/quotareset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 // builtInHours mirrors quotareset's internal fallback (5.4167h ≈ 5h25min). It is

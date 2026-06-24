@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/cycleclassify"
-	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
-	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 var wireOrchestratorDepsFn = wireOrchestratorDeps

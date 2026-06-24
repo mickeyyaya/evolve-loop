@@ -21,8 +21,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // TestDefaultGitState_RealRepo exercises defaultGitState + runGit against a

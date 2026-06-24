@@ -3,13 +3,13 @@ package opscmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/marketplacepoll"
+	"github.com/mickeyyaya/evolve-loop/go/internal/marketplacepoll"
 )
 
 // runMarketplacePoll is `evolve marketplace-poll <target> [--max-wait-s N]

@@ -32,7 +32,7 @@ These are NOT vulnerabilities in evolve-loop:
 
 ## How to Report
 
-**Preferred**: [Open a Private Vulnerability Report on GitHub](https://github.com/mickeyyaya/evolveloop/security/advisories/new). This routes the report directly to maintainers via GitHub's built-in security flow.
+**Preferred**: [Open a Private Vulnerability Report on GitHub](https://github.com/mickeyyaya/evolve-loop/security/advisories/new). This routes the report directly to maintainers via GitHub's built-in security flow.
 
 **Alternative**: email the maintainer at the contact listed in `.claude-plugin/plugin.json:author`. Include:
 1. A description of the vulnerability and its impact

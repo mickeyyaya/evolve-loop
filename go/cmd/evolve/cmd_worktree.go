@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
-	"github.com/mickeyyaya/evolveloop/go/internal/runscope"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
 // absWorktreeRoot absolutizes a worktree subcommand's --project-root (default

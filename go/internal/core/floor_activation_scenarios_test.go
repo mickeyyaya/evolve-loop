@@ -11,8 +11,8 @@ package core_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	. "github.com/mickeyyaya/evolveloop/go/internal/routingtest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	. "github.com/mickeyyaya/evolve-loop/go/internal/routingtest"
 )
 
 func TestFloorActivationCycle(t *testing.T) {

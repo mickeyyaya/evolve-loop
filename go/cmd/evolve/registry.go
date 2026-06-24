@@ -14,10 +14,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cli/guardcmd"
-	"github.com/mickeyyaya/evolveloop/go/internal/cli/opscmd"
-	"github.com/mickeyyaya/evolveloop/go/internal/cli/phasecmd"
-	"github.com/mickeyyaya/evolveloop/go/pkg/version"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
 // subcommand is one row in the dispatcher table.

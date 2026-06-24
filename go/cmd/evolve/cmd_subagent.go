@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/subagent"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
 const subagentUsage = `Usage: evolve subagent <subcommand> [arguments]

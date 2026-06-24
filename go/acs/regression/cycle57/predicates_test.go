@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC57_022_OrchestratorUsesRegistry ports cycle-57/022 (wiring-only).

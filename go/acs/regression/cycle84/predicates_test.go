@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // TestC84_001_LintBaselineExists ports cycle-84/001.

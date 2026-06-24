@@ -18,10 +18,10 @@ package swarmplan
 import (
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/phases/runner"
-	"github.com/mickeyyaya/evolveloop/go/internal/prompts"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // Config is the swarm-plan phase configuration. Bridge and Prompts may be nil in

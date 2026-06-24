@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Reason mirrors the four bash-canonical checkpoint reasons.

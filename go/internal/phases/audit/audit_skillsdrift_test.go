@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // A cycle whose worktree drifted a SKILL.md (e.g. edited .evolve/profiles/*.json

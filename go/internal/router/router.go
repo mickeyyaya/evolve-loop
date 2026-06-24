@@ -4,9 +4,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 )
 
 // canonicalOrder is the linear phase sequence the walk advances through. The

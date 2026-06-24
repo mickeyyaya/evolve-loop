@@ -23,7 +23,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Factory builds a core.PhaseRunner from a phase request. The closure

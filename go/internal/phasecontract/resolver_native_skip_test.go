@@ -17,7 +17,7 @@ package phasecontract
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 func lookupFor(specs ...phasespec.PhaseSpec) func(string) (phasespec.PhaseSpec, bool) {

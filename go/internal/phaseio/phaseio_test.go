@@ -3,7 +3,7 @@ package phaseio
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // TestPhaseInput_SealedContext_NoMutation is the named RED anchor for 3.1: the

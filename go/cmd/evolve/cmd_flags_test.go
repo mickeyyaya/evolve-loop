@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/flagregistry"
-	"github.com/mickeyyaya/evolveloop/go/internal/skillcheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 // anyRenderedFlagToken returns the backticked name of the first registered flag,

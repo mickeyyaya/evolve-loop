@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // makeMarketplace creates a fake marketplace directory at the given version.

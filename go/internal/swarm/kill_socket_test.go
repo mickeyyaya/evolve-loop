@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // TestExecTmuxKill_TargetsIsolatedBridgeSocket: teardown must kill sessions on

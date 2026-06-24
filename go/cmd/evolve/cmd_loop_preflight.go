@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/looppreflight"
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 // runLoopPreflightFn is the test seam for the pre-batch readiness gate; tests

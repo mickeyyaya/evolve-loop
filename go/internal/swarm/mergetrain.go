@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // ErrMergeConflict is returned by a GitMerger when a merge could not be applied

@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 // loadPlanSpecs parses an `evolve fleet --plan` backlog ([{"id","files"}]) and

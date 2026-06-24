@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/recipe"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // recipe_adapter.go wires the recipe.Engine (pure, in internal/bridge/recipe)

@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // TestPlanMismatch_TriggersOnlyOnMaterialDivergence pins WS2-S4 (ADR-0052) with a

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/panestream"
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
-	"github.com/mickeyyaya/evolveloop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 )
 
 // autorespond.go — the fallback prompt-detection engine for interactive

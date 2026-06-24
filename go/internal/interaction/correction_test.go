@@ -5,7 +5,7 @@ package interaction_test
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 func fullBudget(redispatch int) map[string]int {

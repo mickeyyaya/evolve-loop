@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/test/fixtures"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // makeRepo writes a manifest at .evolve/commit-prefix-scope.json with the

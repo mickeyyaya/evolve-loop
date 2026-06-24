@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 func validPlan() *Plan {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
 // realProfilesDir resolves the on-disk .evolve/profiles directory relative to

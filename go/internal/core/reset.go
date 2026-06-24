@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/faillearn"
-	"github.com/mickeyyaya/evolveloop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
 // reset.go — the complement of resume.go. Where resume CONTINUES a

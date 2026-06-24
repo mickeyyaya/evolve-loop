@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // Sentinel errors.

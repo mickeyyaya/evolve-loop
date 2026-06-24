@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/failureadapter"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // decideAfterRetro consults the failure-adapter over cycle history

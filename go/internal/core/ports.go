@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // Storage reads and writes the .evolve/ filesystem state surface:

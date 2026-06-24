@@ -6,8 +6,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // WS4-S1 (ADR-0052): the corpus loads + validates. A malformed case file is a

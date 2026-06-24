@@ -6,10 +6,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/cmd/evolve/cmdutil"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseinventory"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseinventory"
 )
 
 // runPhaseInventory implements `evolve phase-inventory <subcommand>` — the

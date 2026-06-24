@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
 // ProducerConfig wires a Producer to a single phase's raw logs.

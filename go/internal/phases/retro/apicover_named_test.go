@@ -3,7 +3,7 @@ package retro
 import (
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // TestPhase_NamedConcreteRunner names the concrete retro.Phase type (New returns

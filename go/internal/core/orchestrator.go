@@ -9,17 +9,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
-	"github.com/mickeyyaya/evolveloop/go/internal/directives"
-	"github.com/mickeyyaya/evolveloop/go/internal/envchain"
-	"github.com/mickeyyaya/evolveloop/go/internal/interaction"
-	"github.com/mickeyyaya/evolveloop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolveloop/go/internal/phaseconfig"
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
-	"github.com/mickeyyaya/evolveloop/go/internal/research"
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
-	"github.com/mickeyyaya/evolveloop/go/internal/verdictcache"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
 // PhaseBoundaryCheckpointer is a package-level hook to write a checkpoint block

@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // IO is the typed input/output contract of a phase: the artifact files it

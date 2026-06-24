@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 func TestGitProvisioner_RelativeWorktreeBaseHasNoFilesystemSideEffects(t *testing.T) {

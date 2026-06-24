@@ -4,7 +4,7 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Ship denies ship-class commands unless the canonical scripts/lifecycle/

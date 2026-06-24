@@ -3,7 +3,7 @@ package routingtest
 import (
 	"fmt"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // scriptedProposer is the deterministic stand-in for the LLM router brain. Keyed

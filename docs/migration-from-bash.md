@@ -100,7 +100,7 @@ exec's to `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`
 (archived in v11.5.0 M6 via `git mv`; full history preserved). The
 native Go dispatch path is not consulted.
 
-Report the issue at <https://github.com/mickeyyaya/evolveloop/issues>
+Report the issue at <https://github.com/mickeyyaya/evolve-loop/issues>
 with `cycle-state.json` and the failing log line attached.
 
 ## Deprecation schedule

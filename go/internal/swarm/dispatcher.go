@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // DefaultPortBase is the first port handed to swarm writer workers when

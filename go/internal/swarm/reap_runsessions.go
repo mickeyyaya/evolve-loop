@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
 // reap_runsessions.go — CB.5 run-teardown reaper (concurrency campaign W4).

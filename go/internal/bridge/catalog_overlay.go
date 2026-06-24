@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/modelcatalog"
-	"github.com/mickeyyaya/evolveloop/go/internal/paths"
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // catalog_overlay.go wires the live model catalog (internal/modelcatalog) into

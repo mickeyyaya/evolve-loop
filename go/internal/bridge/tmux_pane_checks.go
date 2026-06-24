@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 // paneProfileFor resolves the panestream PaneProfile for a tmux driver by

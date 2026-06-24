@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/pruneephemeral"
+	"github.com/mickeyyaya/evolve-loop/go/internal/pruneephemeral"
 )
 
 // runPruneEphemeral is `evolve prune-ephemeral [--dry-run] [--quiet]

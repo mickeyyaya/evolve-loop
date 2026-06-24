@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/inboxmover"
-	"github.com/mickeyyaya/evolveloop/go/internal/triagecap"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 // postShip runs the side-effects that follow a successful commit+push.

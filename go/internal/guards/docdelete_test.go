@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // DocDelete is the port of scripts/hooks/doc-deletion-guard.sh.

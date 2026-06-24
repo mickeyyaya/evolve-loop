@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Digest is the observe→digest boundary: the ONLY code that knows the on-disk

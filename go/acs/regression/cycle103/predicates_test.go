@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolveloop/go/pkg/acsassert"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 // TestC103_001_BuildPlannerPersonaExists ports cycle-103/001.

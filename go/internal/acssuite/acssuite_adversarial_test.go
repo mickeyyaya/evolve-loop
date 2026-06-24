@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // TestCycleNumFromDir_BoundaryAndInvalid — adversarial: exhaustive boundary

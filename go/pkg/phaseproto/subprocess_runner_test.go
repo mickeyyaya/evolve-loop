@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolveloop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // SubprocessRunner must satisfy core.PhaseRunner — compile-time assert.

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/mickeyyaya/evolveloop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // phaseRoots delegates to phasespec.Roots — the single home for the
