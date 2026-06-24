@@ -1,11 +1,11 @@
 # Claude Code Runtime
 
-> How `/evolve-loop` reaches the dispatcher under Claude Code. This is the reference runtime — every gate and adapter assumes Claude semantics first.
+> How `/evo:loop` reaches the dispatcher under Claude Code. This is the reference runtime — every gate and adapter assumes Claude semantics first.
 
 ## Invocation chain
 
 ```
-User: /evolve-loop 5 polish improve dispatcher
+User: /evo:loop 5 polish improve dispatcher
 
   ↓ Claude Code resolves the slash command
   ↓ via .claude-plugin/plugin.json → skills/loop/SKILL.md
@@ -70,7 +70,7 @@ These hooks are configured in `.claude-plugin/plugin.json`. They are the structu
 
 ## When to NOT use the strict dispatcher
 
-The dispatcher is mandatory for `/evolve-loop` invocations. The only documented exception is `dispatch.policy: "off"` in `.evolve/policy.json`, which skips per-cycle ledger verification — used solely for debugging the dispatcher itself. Setting it for real cycles disables the only structural enforcement of pipeline completeness; do not.
+The dispatcher is mandatory for `/evo:loop` invocations. The only documented exception is `dispatch.policy: "off"` in `.evolve/policy.json`, which skips per-cycle ledger verification — used solely for debugging the dispatcher itself. Setting it for real cycles disables the only structural enforcement of pipeline completeness; do not.
 
 ## Failure modes
 

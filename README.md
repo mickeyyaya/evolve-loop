@@ -67,7 +67,7 @@ That last point is the whole design philosophy in one line: **LLMs do the qualit
 
 ### A cycle, end to end
 
-Say you run `/evolve-loop --cycles 1 "make the export endpoint resilient to large payloads."` Each step below reads only the artifact the step before it produced:
+Say you run `/evo:loop --cycles 1 "make the export endpoint resilient to large payloads."` Each step below reads only the artifact the step before it produced:
 
 - **Intent** restates the goal as a spec — and pushes back: *is "large" 10 MB or 10 GB? Is streaming acceptable, or must the response stay synchronous?* It records the assumptions it's proceeding on.
 - **Scout** reads the spec, traces the endpoint through the codebase, notices the current in-memory buffering, and proposes a fix.
@@ -201,7 +201,7 @@ The value proposition was never "cycles never fail." It's that failures **produc
 
 ```bash
 /plugin marketplace add mickeyyaya/evolveloop
-/plugin install evolve-loop@evolve-loop
+/plugin install evo@evo
 cd go && make build   # builds the evolve runtime binary
 ```
 
@@ -211,15 +211,15 @@ cd go && make build   # builds the evolve runtime binary
 
 ```bash
 # Run exactly N cycles toward a goal
-/evolve-loop --cycles 3 "add dark mode"
+/evo:loop --cycles 3 "add dark mode"
 
 # Strategy presets tune scope and strictness
-/evolve-loop --cycles 5 harden                 # stability + tests
-/evolve-loop --cycles 3 repair "fix auth bug"  # fix-only, smallest diff
-/evolve-loop --cycles 5 innovate "explore concurrency primitives"
+/evo:loop --cycles 5 harden                 # stability + tests
+/evo:loop --cycles 3 repair "fix auth bug"  # fix-only, smallest diff
+/evo:loop --cycles 5 innovate "explore concurrency primitives"
 
 # Resume a cycle that was checkpointed (e.g. quota wall)
-/evolve-loop --resume
+/evo:loop --resume
 ```
 
 A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).

@@ -61,7 +61,7 @@ Tests MUST fail when run against the current codebase. A test that passes immedi
 ## Composition
 
 Invoked by:
-- `/evolve-loop:tdd`
+- `/evo:tdd`
 - `loop` macro after plan-review (or after discover when plan-review off)
 
 ## Reference

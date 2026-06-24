@@ -5,7 +5,7 @@ description: Use when starting a new evolve-loop cycle and the cycle goal is amb
 
 # scout
 
-> Sprint 3 composable skill (v8.16+). Inspired by `addyosmani/agent-skills/spec-driven-development`. Invoked as `/evolve-loop:scout` and called by the `loop` macro.
+> Sprint 3 composable skill (v8.16+). Inspired by `addyosmani/agent-skills/spec-driven-development`. Invoked as `/evo:scout` and called by the `loop` macro.
 
 ## When to invoke
 
@@ -60,7 +60,7 @@ Spec at `<workspace>/spec.md` with sections:
 ## Composition
 
 Invoked by:
-- `/evolve-loop:scout` (when scout-codebase sub-scout runs)
+- `/evo:scout` (when scout-codebase sub-scout runs)
 - `loop` macro skill at calibrate→research transition
 
 This skill **does not invoke other personas**. It is a workflow used by Scout-class personas.

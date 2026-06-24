@@ -7,7 +7,7 @@
 
 ## Summary
 
-Cycle 61 was an experiment routing `gemini-3.1-pro-preview` to the Scout and Builder phases of `/evolve-loop`. The cycle technically shipped a commit on `main`, but the dispatcher classified it as an integrity breach due to a memo-phase API 529 failure. The cycle exposed seven bugs in the evolve-loop runtime, six of which are real and warrant structural fixes.
+Cycle 61 was an experiment routing `gemini-3.1-pro-preview` to the Scout and Builder phases of `/evo:loop`. The cycle technically shipped a commit on `main`, but the dispatcher classified it as an integrity breach due to a memo-phase API 529 failure. The cycle exposed seven bugs in the evolve-loop runtime, six of which are real and warrant structural fixes.
 
 The most interesting aspect: **the orchestrator-report.md narrative was partially unreliable.** Multiple claims in that report (notably "manually fast-forwarded the worktree branch to main" and the description of a ship.sh `INTEGRITY-FAIL` resolution) were either hallucinations from the context-compacted resumed session or misleading paraphrases of standard operations. Source-level evidence (git reflog, state.json mtime, ledger) contradicts the report's wording.
 
@@ -17,7 +17,7 @@ The most interesting aspect: **the orchestrator-report.md narrative was partiall
 |---|---|
 | ~04:55 | I manually bumped `state.json:lastCycleNumber` from 59 → 60 to force cycle 61 numbering (cycle 60 had stale counter from prior re-invocation). |
 | 00:06:43 UTC | `state.json:lastUpdated` records this edit. **This timestamp does not change for the remainder of the conversation.** |
-| ~08:06 | `/evolve-loop --cycles 1 --budget-usd 5` invoked. Dispatcher provisioned worktree at `.evolve/worktrees/cycle-61`, branch `evolve/cycle-61`. |
+| ~08:06 | `/evo:loop --cycles 1 --budget-usd 5` invoked. Dispatcher provisioned worktree at `.evolve/worktrees/cycle-61`, branch `evolve/cycle-61`. |
 | ~08:08 | Scout dispatched via gemini.sh NATIVE adapter against `gemini-3.1-pro-preview`. Initial attempt produced 0-byte raw output due to API rate-limit (429/503). |
 | ~08:10 | Orchestrator re-ran Scout with `EVOLVE_LLM_CONFIG_PATH=/dev/null` forcing claude fallback. **Per-role ledger entries for cycle 61 record `cli_resolution.target_cli=claude, model=sonnet, source=llm_config_fallback`** — confirming Builder/Auditor/Triage actually executed on Claude, not Gemini, despite the orchestrator-report implying otherwise (this is B6). |
 | ~08:14 | Triage decision written. Build phase ran. |
@@ -133,7 +133,7 @@ Both fixes are Tier 1 (phase-gate hooks) and would close the gap between "Builde
 1. **The orchestrator-report is not source of truth.** When narrative claims conflict with file-level evidence (git reflog, ledger, file mtimes), trust the evidence. B3's "permission escape" mystery dissolved once we checked `state.json:lastUpdated`.
 2. **Context compaction is a narrative-reliability hazard.** The orchestrator's session was compacted around `orchestrator-stdout.log:356`. Post-compaction claims in the report should be cross-checked against the ledger and reflog.
 3. **Worktree state ≠ project-root state.** Subagents editing `.evolve/state.json` inside the worktree are editing a separate file from the project root's. Profile permission denials may apply to one but not the other.
-4. **`/evolve-loop --cycles 1` is a real test bed.** Cycle 61 burned ~$5 and ~30 minutes but produced concrete evidence for 7 bugs. The investment is worthwhile when the alternative is debugging the runtime in production.
+4. **`/evo:loop --cycles 1` is a real test bed.** Cycle 61 burned ~$5 and ~30 minutes but produced concrete evidence for 7 bugs. The investment is worthwhile when the alternative is debugging the runtime in production.
 5. **Predicate 040 (mixed-CLI routing) was correct but narrow.** It proved the *router* dispatches correctly. It did NOT prove the *adapter* invokes correctly nor that downstream phases survive a fallback. Cycle 61's true contribution was filling that gap.
 
 ## References

@@ -101,10 +101,10 @@ All Campaign A–D opt-in flags follow the v8.55/v8.59 ladder:
 | `EVOLVE_CONTEXT_DIGEST` | 0 | v9.0.x verify cycle | v9.1 | v9.2+ |
 | `EVOLVE_ANCHOR_EXTRACT` | 0 | v9.0.x verify cycle | v9.1 | v9.2+ |
 
-Operators set them via env when running `/evolve-loop`:
+Operators set them via env when running `/evo:loop`:
 
 ```bash
-EVOLVE_CACHE_PREFIX_V2=1 EVOLVE_CONTEXT_DIGEST=1 EVOLVE_ANCHOR_EXTRACT=1 /evolve-loop --cycles 3 balanced "<goal>"
+EVOLVE_CACHE_PREFIX_V2=1 EVOLVE_CONTEXT_DIGEST=1 EVOLVE_ANCHOR_EXTRACT=1 /evo:loop --cycles 3 balanced "<goal>"
 ```
 
 ## Research foundations

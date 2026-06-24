@@ -377,7 +377,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
 			fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d\n",
 				qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
-			fmt.Fprintln(stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evolve-loop --resume")
+			fmt.Fprintln(stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evo:loop --resume")
 			fmt.Fprintln(stderr, "[loop]   to resume manually: evolve loop --resume")
 			lr.StopReason = "quota-pause"
 			lr.emit(stdout)

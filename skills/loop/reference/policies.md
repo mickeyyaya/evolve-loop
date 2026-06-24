@@ -58,7 +58,7 @@ When RED is signaled:
 1. **Complete current phase** (never break mid-phase)
 2. **Write state.json** with current version (OCC protocol)
 3. **Write handoff** to `$WORKSPACE_PATH/handoff.md` AND `.evolve/workspace/handoff.md` (see template below)
-4. **Output resume instructions:** `Resume: /evolve-loop <N> [strategy] [goal]`
+4. **Output resume instructions:** `Resume: /evo:loop <N> [strategy] [goal]`
 5. **STOP** — do not start the next cycle
 
 ### Session Break Handoff Template
@@ -69,7 +69,7 @@ Required sections (all mandatory):
 # Session Break Handoff — Cycle <N>
 
 ## Resume Command
-`/evolve-loop <remaining_cycles> <strategy> <goal or "autonomous">`
+`/evo:loop <remaining_cycles> <strategy> <goal or "autonomous">`
 
 ## Why Session Broke
 - Context budget status / API rate limit / cause
@@ -157,7 +157,7 @@ When rate limit detected:
 | Priority | Method | When | Command |
 |----------|--------|------|---------|
 | 1 | `/schedule` (remote trigger) | Reset window >= 1 hour | One-time trigger at next hour mark |
-| 2 | `/loop` (local retry) | Short limits, user present | `/loop 5m /evolve-loop <remaining> <strategy> <goal>` |
+| 2 | `/loop` (local retry) | Short limits, user present | `/loop 5m /evo:loop <remaining> <strategy> <goal>` |
 | 3 | Manual resume (fallback) | Scheduling unavailable | Output resume command for user |
 
 ### Rate Limit vs Context Budget
@@ -166,7 +166,7 @@ When rate limit detected:
 |---------|---------------|------------|
 | Type | Internal quality | External hard wall |
 | Detection | Proactive (estimated) | Reactive (error-based) |
-| Recovery | User runs `/evolve-loop` | **Auto-scheduled** via `/schedule` or `/loop` |
+| Recovery | User runs `/evo:loop` | **Auto-scheduled** via `/schedule` or `/loop` |
 | Reset time | Immediate (new session) | Provider-dependent (minutes to hours) |
 
 ## Context Management

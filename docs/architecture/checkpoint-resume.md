@@ -6,7 +6,7 @@
 
 ## Why this exists
 
-Three consecutive `/evolve-loop` dispatcher runs in the 2026-05-11 session
+Three consecutive `/evo:loop` dispatcher runs in the 2026-05-11 session
 aborted at `rc=1` with the same signature: orchestrator subagent exits
 non-zero, empty stderr tail, no `orchestrator-report.md` produced. Each
 failure happened **after substantial cycle work** (cycle 11 reached audit
@@ -97,7 +97,7 @@ EXIT trap to preserve state.
 ### 4. `--resume` flag (Cycle 4)
 
 ```bash
-/evolve-loop --resume
+/evo:loop --resume
 # or
 bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
 ```
@@ -163,7 +163,7 @@ to pre-v9.1.0 when there is no checkpoint.
 [run-cycle] CHECKPOINT: worktree + state preserved at /var/folders/.../cycle-14; resume with --resume
 
 # Wait for quota window to roll forward, then:
-$ /evolve-loop --resume
+$ /evo:loop --resume
 [resume-cycle] RESUME: cycle 14
 [resume-cycle]   paused phase    : build
 [resume-cycle]   pause reason    : quota-likely
@@ -174,7 +174,7 @@ $ /evolve-loop --resume
 ### Scenario B: Quota wall, git HEAD moved (hot-fix)
 
 ```bash
-$ /evolve-loop --resume
+$ /evo:loop --resume
 [resume-cycle] STALE: git HEAD moved since checkpoint
 [resume-cycle]   paused at: abc123...
 [resume-cycle]   current  : def456...
@@ -189,9 +189,9 @@ to Builder's work.
 ### Scenario C: Worktree manually deleted
 
 ```bash
-$ /evolve-loop --resume
+$ /evo:loop --resume
 [resume-cycle] STALE: worktree no longer exists at /var/folders/.../cycle-14
-[resume-cycle]   recovery: cannot resume this cycle. Run /evolve-loop fresh.
+[resume-cycle]   recovery: cannot resume this cycle. Run /evo:loop fresh.
 ```
 
 Without the worktree, Builder's edits are unrecoverable. Start a new cycle.
@@ -199,12 +199,12 @@ Without the worktree, Builder's edits are unrecoverable. Start a new cycle.
 ### Scenario D: Crash during resume
 
 ```bash
-$ /evolve-loop --resume
+$ /evo:loop --resume
 # ... orchestrator subprocess dies again
 [resume-cycle] orchestrator subagent exited rc=3 during resume
 
 # The checkpoint block survives (EXIT trap honored it). Retry:
-$ /evolve-loop --resume
+$ /evo:loop --resume
 # ... picks up from the SAME phase boundary
 ```
 

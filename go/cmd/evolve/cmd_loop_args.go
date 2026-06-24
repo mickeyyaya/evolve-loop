@@ -112,7 +112,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	posCycles, posStrategy, posGoal := parsePositional(fs.Args())
 
 	// Legacy positional-integer deprecation WARN — operators relying on bare
-	// `/evolve-loop 3 ...` get nudged toward `--cycles 3`.
+	// `/evo:loop 3 ...` get nudged toward `--cycles 3`.
 	if posCycles > 0 && cyclesFlag == 0 && maxCyclesFlag == 0 {
 		fmt.Fprintf(stderr, "evolve loop: WARN: bare positional integer (%d) parsed as --cycles is deprecated; prefer explicit --cycles N\n", posCycles)
 	}
@@ -197,7 +197,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 //	Remaining tokens are joined by space → GOAL.
 //
 // Order matters; this matches the bash heuristic verbatim so operators
-// who paste their `/evolve-loop 3 balanced "fix bug"` invocations into
+// who paste their `/evo:loop 3 balanced "fix bug"` invocations into
 // the Go binary keep the same parsing semantics.
 func parsePositional(args []string) (cycles int, strategy string, goal string) {
 	i := 0

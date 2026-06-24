@@ -8,7 +8,7 @@
 
 Skills are auto-discovered at `.agents/skills/<name>/SKILL.md` (the cross-CLI open standard). The `.agents/skills/` directory contains symlinks to the canonical `skills/<name>/` location. Both paths resolve to the same SKILL.md content.
 
-To invoke the primary skill: `/evolve-loop` (registered via the plugin's slash-command set).
+To invoke the primary skill: `/evo:loop` (registered via the plugin's slash-command set).
 
 ## Runtime adapter (tier-1-hybrid)
 

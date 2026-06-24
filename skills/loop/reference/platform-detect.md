@@ -33,7 +33,7 @@ evolve-loop has two surfaces:
 The skill content references tools by their **Claude Code names** (`Skill`, `Bash`, `TaskCreate`, etc.) because that's the project's primary platform. When you're on a different CLI, you need a translation layer:
 
 - `reference/<platform>-tools.md` translates tool names (e.g. CC `Bash` → Gemini `run_shell_command`).
-- `reference/<platform>-runtime.md` translates invocation patterns (e.g. how `/evolve-loop` is reached on this CLI).
+- `reference/<platform>-runtime.md` translates invocation patterns (e.g. how `/evo:loop` is reached on this CLI).
 
 Without reading these overlays first, you may try to invoke a tool that doesn't exist on your platform.
 

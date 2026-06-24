@@ -67,7 +67,7 @@ func TestDefaultPaths(t *testing.T) {
 func TestCurrentJSONVersion(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "plugin.json")
-	writeFile(t, p, `{"name":"evolve-loop","version":"11.6.6","extra":"x"}`)
+	writeFile(t, p, `{"name":"evo","version":"11.6.6","extra":"x"}`)
 	got, err := CurrentJSONVersion(p)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -97,7 +97,7 @@ func TestCurrentJSONVersion_MissingFile(t *testing.T) {
 func TestBumpJSONVersion_TopLevel(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "plugin.json")
-	writeFile(t, p, `{"name":"evolve-loop","version":"11.6.6"}`)
+	writeFile(t, p, `{"name":"evo","version":"11.6.6"}`)
 	changed, err := BumpJSONVersion(p, "11.7.0", false)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -157,7 +157,7 @@ func TestBumpJSONVersion_MarketplaceShape(t *testing.T) {
 	// marketplace.json has plugins[].version + a top-level version stub.
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "marketplace.json")
-	writeFile(t, p, `{"plugins":[{"name":"evolve-loop","version":"11.6.6"},{"name":"other","version":"11.6.6"}]}`)
+	writeFile(t, p, `{"plugins":[{"name":"evo","version":"11.6.6"},{"name":"other","version":"11.6.6"}]}`)
 	changed, err := BumpJSONVersion(p, "11.7.0", false)
 	if err != nil {
 		t.Fatalf("%v", err)

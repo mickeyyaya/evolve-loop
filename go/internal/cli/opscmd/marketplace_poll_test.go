@@ -17,7 +17,7 @@ func cmdMakeMarketplace(t *testing.T, version string) string {
 	if err := os.MkdirAll(filepath.Join(d, ".claude-plugin"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	body := fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version)
+	body := fmt.Sprintf(`{"name":"evo","version":"%s"}`, version)
 	if err := os.WriteFile(filepath.Join(d, ".claude-plugin", "plugin.json"),
 		[]byte(body), 0o644); err != nil {
 		t.Fatalf("write: %v", err)

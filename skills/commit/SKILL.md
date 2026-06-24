@@ -20,7 +20,7 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
    | a | **simplify**: `code-simplifier` (or `ecc:code-simplifier`) | clarity, dead code, simplification |
    | b | **one review**: the matching language reviewer (`go-reviewer` / `python-reviewer` / `typescript-reviewer` / `rust-reviewer`) **OR** the general `code-reviewer` / `/code-review` — pick **one** | correctness, security, semantics |
 
-   Prefer the language reviewer when there's a clear primary language (richer); use the general `code-reviewer` for mixed/other languages. The combined `evolve-loop:code-review-simplify` skill satisfies **both a and b** in a single pass.
+   Prefer the language reviewer when there's a clear primary language (richer); use the general `code-reviewer` for mixed/other languages. The combined `evo:code-review-simplify` skill satisfies **both a and b** in a single pass.
 4. **Run the gate**: `"$CLAUDE_PROJECT_DIR/go/bin/evolve" commit-gate run --reviewers "<comma-list of what you ran>"`.
    - This is the gate (Go; `go/internal/commitgate/`): lang-detect, the `--reviewers` precondition, the lint lanes, and the tree-SHA-bound attestation. (The original bash runner was deleted once a differential-parity test proved the two byte-identical; a Go-only golden test now pins the attestation byte layout.)
    - **exit 0** → attestation written; proceed immediately to step 5 (no edits in between).

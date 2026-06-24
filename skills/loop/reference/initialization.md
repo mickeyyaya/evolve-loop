@@ -5,7 +5,7 @@ description: Reference doc.
 
 # Session Initialization
 
-> Read this file once at the start of each `/evolve-loop` invocation.
+> Read this file once at the start of each `/evo:loop` invocation.
 
 ## 1. Create Directories and Run ID
 

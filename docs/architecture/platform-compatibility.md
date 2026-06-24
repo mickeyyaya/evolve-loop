@@ -122,7 +122,7 @@ skill surfaces via `evolve skills publish` (single-source projection; see
 | Target | Surface | What lands there |
 |---|---|---|
 | Codex CLI | `$CODEX_HOME/skills/evolve-<name>/` | all 22 skills, `evolve-` prefixed (flat namespace) |
-| Antigravity (agy) | `agy plugin install` → `~/.gemini/config/plugins/evolve-loop/` | all 22 skills, unprefixed under the `evolve-loop` plugin |
+| Antigravity (agy) | `agy plugin install` → `~/.gemini/config/plugins/evo/` | all 22 skills, unprefixed under the `evo` plugin |
 | Ollama | `ollama create evolve-<name>` Modelfiles | read-only reasoning/review subset only (no tool use in `ollama run`) |
 
 ```bash

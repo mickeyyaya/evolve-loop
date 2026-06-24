@@ -9,11 +9,11 @@
 The plugin (≤ v16.9.0) exposed **two parallel surfaces** for the same pipeline phases:
 
 1. `.claude-plugin/commands/*.md` (9 files: scout, plan-review, tdd, build, audit, ship, retro,
-   loop, intent) → `/evolve-loop:scout`, `/evolve-loop:build`, … These duplicated prose from the
+   loop, intent) → `/evo:scout`, `/evo:build`, … These duplicated prose from the
    skills and still referenced the legacy bash dispatcher
    (`legacy/scripts/dispatch/subagent-run.sh`) removed at the v12 flag day.
-2. `skills/evolve-*/SKILL.md` (9 phase skills) → stuttering names `/evolve-loop:evolve-build`,
-   `/evolve-loop:evolve-loop` — the directory name repeated the plugin namespace.
+2. `skills/evolve-*/SKILL.md` (9 phase skills) → stuttering names `/evo:evolve-build`,
+   `/evo:evolve-loop` — the directory name repeated the plugin namespace.
 
 Concrete duplication: the single-writer-invariant paragraph appeared nearly verbatim in
 `commands/build.md` AND `skills/evolve-build/SKILL.md`; output-contract section headings were
@@ -31,19 +31,19 @@ codified.
   array). Skills are the only invocation surface; they carry `argument-hint` and slash
   invocation natively.
 - Phase skill directories drop the `evolve-` prefix. The namespace already supplies it:
-  `/evolve-loop:build`, not `/evolve-loop:evolve-build`.
+  `/evo:build`, not `/evo:evolve-build`.
 
 | Old dir | New dir | Surface |
 |---|---|---|
-| skills/evolve-spec | skills/scout | /evolve-loop:scout |
-| skills/evolve-plan-review | skills/plan-review | /evolve-loop:plan-review |
-| skills/evolve-tdd | skills/tdd | /evolve-loop:tdd |
-| skills/evolve-build | skills/build | /evolve-loop:build |
-| skills/evolve-audit | skills/audit | /evolve-loop:audit |
-| skills/evolve-ship | skills/ship | /evolve-loop:ship |
-| skills/evolve-retro | skills/retro | /evolve-loop:retro |
-| skills/evolve-intent | skills/intent | /evolve-loop:intent |
-| skills/evolve-loop | skills/loop | /evolve-loop:loop (macro) |
+| skills/evolve-spec | skills/scout | /evo:scout |
+| skills/evolve-plan-review | skills/plan-review | /evo:plan-review |
+| skills/evolve-tdd | skills/tdd | /evo:tdd |
+| skills/evolve-build | skills/build | /evo:build |
+| skills/evolve-audit | skills/audit | /evo:audit |
+| skills/evolve-ship | skills/ship | /evo:ship |
+| skills/evolve-retro | skills/retro | /evo:retro |
+| skills/evolve-intent | skills/intent | /evo:intent |
+| skills/evolve-loop | skills/loop | /evo:loop (macro) |
 
 `evolve-spec → scout` also fixes the dir-name/phase mismatch. Utility skills (13) were already
 compliant and keep their names. All on-disk skills are now explicitly listed in
@@ -93,7 +93,7 @@ A hand edit inside a generated region fails CI; the fix is to edit the SSOT and 
 ## Consequences
 
 - Breaking surface rename → **v17.0.0**. Installed users pick up the new skill set via
-  marketplace propagation; stale plugin-cache slash entries (`/evolve-loop:evolve-*`) may linger
+  marketplace propagation; stale plugin-cache slash entries (`/evo:evolve-*`) may linger
   for one session until the cache refreshes.
 - User-minted phases under `.evolve/phases/` are unaffected (no SKILL.md projection; invoked via
   `evolve phase <name>`); they follow `<object>-<action>` naming per the convention doc.

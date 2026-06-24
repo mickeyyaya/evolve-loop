@@ -20,7 +20,7 @@
 ## Test Plan
 
 - [ ] Ran `evolve install` successfully
-- [ ] Ran `/evolve-loop 1` on a test project
+- [ ] Ran `/evo:loop 1` on a test project
 - [ ] Verified affected workspace files are generated correctly
 - [ ] Verified ledger entries have correct format
 - [ ] No regressions in other phases

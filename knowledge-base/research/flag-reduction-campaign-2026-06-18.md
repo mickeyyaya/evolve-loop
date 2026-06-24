@@ -69,8 +69,13 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
   (now dual-root-correct after ADR-0053).
 - **Integrity floor untouched.** Gate flags (`EVOLVE_EVAL_GATE`, `EVOLVE_CONTRACT_GATE`,
   EGPS, bypass hatches) are `active` and stay; consolidation must not weaken a gate.
-- **One well-scoped, test-backed reduction per cycle** with a regression guard; ship via
-  the cycle pipeline.
+- **Batch low-risk reductions; isolate risky ones.** Dead-flag removal and internal
+  classification are pure registry/doc edits with no behavior change → BATCH many per cycle
+  (they share the single registry file, so batching is the throughput lever; concurrency
+  can't help — `fleet`'s `Partition` clusters same-file work into one cycle, partition.go:46).
+  Behavior-changing or architectural reductions (deprecated-bridge retirement, test-seam
+  relocation, cluster consolidation) stay ONE per cycle for isolated audit/rollback. Every
+  removal/promotion ships with a regression guard; ship via the cycle pipeline.
 
 ## Loop goal-text (verbatim, for `evolve loop --goal-text`)
 
@@ -78,17 +83,29 @@ predicate/doc/gate can read from the wrong root (cycle-355) or drift against.
 > (`go/internal/flagregistry/registry_table.go`, projected to
 > `docs/architecture/control-flags.md`) has 282 flags but only 82 are active production;
 > 111 are unclassified `internal`, 65 are test-only `test-seam`, 18 are `dead`, 6 are
-> `deprecated` (2 past-due). Each cycle, pick ONE highest-value, lowest-risk reduction:
-> (a) remove confirmed-dead flags (verify ZERO readers across ALL surfaces — go/, .github/,
-> skills/, agents/, *.sh — and paste the grep as evidence; the "no reader (2026-06-11
-> inventory)" note is a hint, re-verify) plus any vestigial reader and the doc index;
-> (b) retire a past-due deprecated WARN-bridge
-> with its reader; (c) classify `internal` flags (dead→remove, real→promote+document);
-> (d) consolidate a cluster of single-decision flags into a config-object/Strategy per
-> the no-flag-sprawl rule. NEVER change behavior of active flags or weaken an integrity
-> gate; every removal/consolidation ships with a regression guard proving the flag is
-> gone and behavior is unchanged. Regenerate control-flags.md from the registry. Justify
-> with Clean Code + GoF patterns. Ship one reconciliation per cycle.
+> `deprecated` (2 past-due). All reductions edit the single shared registry_table.go and the
+> generated control-flags.md, so they cannot be parallelized across cycles — BATCH low-risk
+> reductions into ONE cycle for throughput instead. Each cycle, do ONE of:
+> (a) DEAD-FLAG SWEEP — in one cycle remove EVERY flag you can confirm dead this cycle:
+> verify ZERO readers across ALL surfaces (go/, .github/, skills/, agents/, *.sh, go/Makefile,
+> root instruction .md) and paste the grep per flag; the "no reader (2026-06-11 inventory)"
+> note is a hint, re-verify. Give each removed flag its own regression guard. If a flag fails
+> cross-surface verification, EXCLUDE it from the batch and proceed with the rest — never let
+> one bad flag sink the cycle.
+> (b) INTERNAL-CLASSIFICATION SWEEP — in one cycle classify a batch of ~15-25 `internal` flags:
+> zero-reader → remove (with guard); real reader → promote `active` with a one-line Doc +
+> Cluster. Batch freely; all low-risk.
+> (c) DEPRECATED-BRIDGE RETIREMENT — ONE per cycle (removes a live WARN bridge + its reader
+> code = behavior-adjacent; isolated audit/rollback).
+> (d) TEST-SEAM RELOCATION or CLUSTER CONSOLIDATION — ONE architectural change per cycle,
+> isolated (ultrathink + strong review).
+> Prefer (a) then (b) for bulk throughput; choose (c)/(d) when (a)/(b) are exhausted or a
+> past-due bridge / architectural win is higher-value. NEVER change behavior of active flags
+> or weaken an integrity gate (EVOLVE_EVAL_GATE, EVOLVE_CONTRACT_GATE, EGPS, bypass hatches);
+> every removal/promotion ships with a regression guard proving the flag is gone (or correctly
+> reclassified) and behavior is unchanged. Regenerate control-flags.md from the registry.
+> Justify with Clean Code + GoF patterns. Ship ONE batch (one coherent reconciliation,
+> possibly many flags) per cycle.
 
 ## Status
 

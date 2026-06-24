@@ -22,7 +22,7 @@ func makeMarketplace(t *testing.T, version string) string {
 	if err := os.MkdirAll(filepath.Join(d, ".claude-plugin"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	body := fmt.Sprintf(`{"name":"evolve-loop","version":"%s"}`, version)
+	body := fmt.Sprintf(`{"name":"evo","version":"%s"}`, version)
 	if err := os.WriteFile(filepath.Join(d, ".claude-plugin", "plugin.json"),
 		[]byte(body), 0o644); err != nil {
 		t.Fatalf("write plugin.json: %v", err)
@@ -106,7 +106,7 @@ func TestRun_MatchAfterDelay(t *testing.T) {
 		Pull: func(dir string) error {
 			pullCalls++
 			if pullCalls == 3 {
-				body := []byte(`{"name":"evolve-loop","version":"1.2.3"}`)
+				body := []byte(`{"name":"evo","version":"1.2.3"}`)
 				if err := os.WriteFile(filepath.Join(dir, ".claude-plugin", "plugin.json"),
 					body, 0o644); err != nil {
 					return err

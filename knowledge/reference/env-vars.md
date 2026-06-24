@@ -137,7 +137,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 | Item | Value / contract | Notes |
 |---|---|---|
 | Runtime location | `go/internal/...` (Go-only) | The runtime is the Go binary; the bash `legacy/scripts/` tree was removed in the Go-only consolidation. A few shell helpers remain only as test fixtures + the commit-gate runner. |
-| Ship class `cycle` (default) | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 | `/evolve-loop` cycle commits. |
+| Ship class `cycle` (default) | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 | `/evo:loop` cycle commits. |
 | Ship class `manual` | Skips audit-binding; requires fresh commit-gate attestation (bypass `EVOLVE_BYPASS_COMMIT_GATE=1`); interactive y/N (CI: `EVOLVE_SHIP_AUTO_CONFIRM=1`) | Operator-driven manual commits. |
 | Ship class `release` | Skips audit (version-bump mutates files post-audit); logs RELEASE class loudly | `evolve release` pipeline only. |
 

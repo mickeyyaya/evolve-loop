@@ -5,7 +5,7 @@
 ## Pipeline diagram
 
 ```
-/evolve-loop CLI argv: [cycles] [strategy] [goal]
+/evo:loop CLI argv: [cycles] [strategy] [goal]
        │
        ▼
 evolve-loop-dispatch.sh  (privileged shell, NOT a subagent)
@@ -49,7 +49,7 @@ Each transition between phases passes through `legacy/scripts/guards/phase-gate-
 ## Phase 0 — Calibrate
 
 **Persona**: orchestrator (no separate Calibrate agent; the orchestrator's first action).
-**When**: ONCE per `/evolve-loop` invocation (not per cycle), at the start of cycle 1.
+**When**: ONCE per `/evo:loop` invocation (not per cycle), at the start of cycle 1.
 **Purpose**: Compute the project's `projectBenchmark` across 8 dimensions so Scout has objective signal for task selection.
 
 ### What Calibrate measures
@@ -81,14 +81,14 @@ Each dimension gets a `composite` score (0-1) blending automated and LLM probes.
 
 ### Cost
 
-Typically ~$0.30-0.80 for a fresh calibration. Skipped on cycles 2+ within the same `/evolve-loop` invocation (cached).
+Typically ~$0.30-0.80 for a fresh calibration. Skipped on cycles 2+ within the same `/evo:loop` invocation (cached).
 
 ---
 
 ## Phase 0b — Intent (v8.19.1+)
 
 **Persona**: `agents/evolve-intent.md` — "Intent Architect" (model: tier-1 / Opus default).
-**When**: Always-on for the `/evolve-loop` slash command path. Before Scout. Skipped only on legacy `bash run-cycle.sh` invocations without `EVOLVE_REQUIRE_INTENT=1`.
+**When**: Always-on for the `/evo:loop` slash command path. Before Scout. Skipped only on legacy `bash run-cycle.sh` invocations without `EVOLVE_REQUIRE_INTENT=1`.
 **Purpose**: Convert the user's vague goal into a structured `intent.md` so Scout doesn't have to infer.
 
 ### Why Intent exists

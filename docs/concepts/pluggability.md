@@ -67,7 +67,7 @@ evolve-loop ships these skills:
 | `evolve-ship` | Pre-flight + ship.sh invocation | orchestrator persona |
 | `evolve-retro` | Retrospective lesson extraction | retrospective persona |
 | `evolve-memo` | Carryover capture | memo persona |
-| `evolve-loop` | The macro: full lifecycle orchestration | `/evolve-loop` command |
+| `evolve-loop` | The macro: full lifecycle orchestration | `/evo:loop` command |
 
 To swap a skill:
 

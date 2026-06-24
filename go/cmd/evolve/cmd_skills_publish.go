@@ -45,7 +45,7 @@ var modelfileTmpl string
 const publishProvenanceSentinel = "EVOLVE-PUBLISH:projection"
 
 // publishPluginName is the plugin/namespace identity used for the agy target.
-const publishPluginName = "evolve-loop"
+const publishPluginName = "evo"
 
 // Exec seams — overridable in tests so no real agy/ollama binaries run.
 var (
@@ -306,7 +306,7 @@ func renderCodex(skills []canonicalSkill) (map[string][]byte, error) {
 }
 
 // renderAgy projects skills into agy's native plugin layout. Skill names stay
-// unprefixed — the evolve-loop plugin name supplies the namespace.
+// unprefixed — the evo plugin name supplies the namespace.
 func renderAgy(skills []canonicalSkill) map[string][]byte {
 	manifest, _ := json.MarshalIndent(struct {
 		Name string `json:"name"`

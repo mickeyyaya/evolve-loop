@@ -10,7 +10,7 @@ argument-hint: "<target-version> [--max-wait-s 60] [--marketplace-dir <path>]"
 
 ## What this skill does
 
-Polls `~/.claude/plugins/marketplaces/evolve-loop/.claude-plugin/plugin.json` against the target version. On match, runs `legacy/scripts/utility/release.sh <target>` to refresh the installed-plugins registry — closing the cache-refresh ordering bug structurally (release.sh only runs after convergence is confirmed).
+Polls `~/.claude/plugins/marketplaces/evo/.claude-plugin/plugin.json` against the target version. On match, runs `legacy/scripts/utility/release.sh <target>` to refresh the installed-plugins registry — closing the cache-refresh ordering bug structurally (release.sh only runs after convergence is confirmed).
 
 The slash command translates to:
 
@@ -36,7 +36,7 @@ bash legacy/scripts/release/marketplace-poll.sh <args>
 ## When NOT to use this skill
 
 - **During an in-flight `/publish` run.** The pipeline already polls internally. Running this concurrently could race against the pipeline's poll loop.
-- **For non-evolve-loop marketplaces.** This skill targets the evolve-loop marketplace specifically. Override the default path with `--marketplace-dir <path>` if you need to point elsewhere.
+- **For non-evo marketplaces.** This skill targets the evo marketplace specifically. Override the default path with `--marketplace-dir <path>` if you need to point elsewhere.
 
 ## Exit codes
 

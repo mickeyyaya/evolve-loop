@@ -1,6 +1,6 @@
 # Incident Report & Remediation: Codex REPL Boot Timeout + Multi-CLI Pipeline Robustness — Cycle 121
 
-**Date:** 2026-05-28 | **Severity:** HIGH (a verified-hardened `/evolve-loop` cycle ran 5/8 phases cleanly then died at audit on a single-CLI integration bug → no cycle could complete the full Scout→Ship path when the auditor profile pinned to codex-tmux) | **Status:** Root cause identified + multi-CLI fallback fix shipped + codex 0.134 manifest/driver fixes shipped. Validated end-to-end on **cycle 122** which ran 7 phases including the `--cli auditor=claude-tmux` hot-swap path. Builds on cycle-119's incident report ([cycle-119-artifact-timeout-and-cross-cli-trust.md](./cycle-119-artifact-timeout-and-cross-cli-trust.md)).
+**Date:** 2026-05-28 | **Severity:** HIGH (a verified-hardened `/evo:loop` cycle ran 5/8 phases cleanly then died at audit on a single-CLI integration bug → no cycle could complete the full Scout→Ship path when the auditor profile pinned to codex-tmux) | **Status:** Root cause identified + multi-CLI fallback fix shipped + codex 0.134 manifest/driver fixes shipped. Validated end-to-end on **cycle 122** which ran 7 phases including the `--cli auditor=claude-tmux` hot-swap path. Builds on cycle-119's incident report ([cycle-119-artifact-timeout-and-cross-cli-trust.md](./cycle-119-artifact-timeout-and-cross-cli-trust.md)).
 
 **Validation result (cycle 122, multi-CLI hot-swap).** scout → triage → tdd → build-planner → build → **audit (claude-tmux via `--cli auditor=claude-tmux source=env(EVOLVE_AUDITOR_CLI)`)** → retro all completed end-to-end. Audit produced a real FAIL verdict on the prompt; state machine correctly routed audit→retro (no ship). The PIPELINE never aborted on a CLI-level failure — exactly what WS-G targeted.
 
@@ -8,7 +8,7 @@
 
 ## Part 1: What Happened
 
-**Context.** After all 6 cycle-119/120 hardening workstreams (A/D/C/B/F/E) had merged to main, an end-to-end verification cycle (`/evolve-loop --cycles 1 --goal-text "optimize the pipeline"` on the rebuilt binary at `/tmp/evolve-hardened`) was launched as **cycle 121**. Five phases passed cleanly — including the cycle-120 build-planner repro path under `EVOLVE_BUILD_PLANNER=1`, validating WS-A (absolute paths), WS-B (CLI-agnostic sandbox + tree-diff guard), WS-D (optional soft-fail), and WS-F (ollama driver registration). The cycle then **aborted at the audit phase**:
+**Context.** After all 6 cycle-119/120 hardening workstreams (A/D/C/B/F/E) had merged to main, an end-to-end verification cycle (`/evo:loop --cycles 1 --goal-text "optimize the pipeline"` on the rebuilt binary at `/tmp/evolve-hardened`) was launched as **cycle 121**. Five phases passed cleanly — including the cycle-120 build-planner repro path under `EVOLVE_BUILD_PLANNER=1`, validating WS-A (absolute paths), WS-B (CLI-agnostic sandbox + tree-diff guard), WS-D (optional soft-fail), and WS-F (ollama driver registration). The cycle then **aborted at the audit phase**:
 
 ```
 evolve loop: cycle 121: phase audit: audit: bridge: bridge: launch exit=80

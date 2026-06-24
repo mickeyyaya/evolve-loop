@@ -208,7 +208,7 @@ func TestPluginVersion_Valid(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.json"),
-		[]byte(`{"name":"evolve-loop","version":"11.5.5"}`), 0o644); err != nil {
+		[]byte(`{"name":"evo","version":"11.5.5"}`), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	if got := pluginVersion(dir); got != "11.5.5" {

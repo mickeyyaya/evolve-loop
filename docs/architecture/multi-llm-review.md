@@ -376,7 +376,7 @@ Three opt-in surfaces:
 
 ```bash
 # Flag form (preferred — explicit per-invocation)
-/evolve-loop --consensus-audit 1 polish "audit hardening"
+/evo:loop --consensus-audit 1 polish "audit hardening"
 
 # Env var form (CI-friendly, persistent across multiple dispatches)
 EVOLVE_CONSENSUS_AUDIT=1 bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 1 polish "..."

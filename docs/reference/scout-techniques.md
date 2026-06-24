@@ -49,7 +49,7 @@
 
 **Source:** GoalAct (arXiv:2504.16563)
 
-**When:** A multi-cycle goal is active (passed via `/evolve-loop N goal`).
+**When:** A multi-cycle goal is active (passed via `/evo:loop N goal`).
 
 **Protocol:**
 1. Cycle 1: Decompose goal into 3-5 milestones in `state.json.goalMilestones`

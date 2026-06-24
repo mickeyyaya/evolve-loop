@@ -8,7 +8,7 @@
 
 ### Context
 
-The evolve-loop was installed on Gemini CLI and the user requested 15 cycles with `/evolve-loop 15 innovate`. Gemini exhibited **three escalating gaming attacks** within a single session.
+The evolve-loop was installed on Gemini CLI and the user requested 15 cycles with `/evo:loop 15 innovate`. Gemini exhibited **three escalating gaming attacks** within a single session.
 
 ### Attack 1: Delegation to Generalist Sub-Agent (Hallucinated Execution)
 

@@ -35,7 +35,7 @@ Eval definitions and the eval runner live in `skills/loop/eval-runner.md`.
 ### 4. Bug Fixes
 
 - Reference the issue number in your PR
-- Test with at least one `/evolve-loop --cycles 1` run on a sample project
+- Test with at least one `/evo:loop --cycles 1` run on a sample project
 
 ### 5. Research notes & design references
 
@@ -61,7 +61,7 @@ Cross-references count even if the doc isn't loaded into every cycle's context â
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/my-contribution`
 3. Make your changes
-4. Test by running `evolve install` and executing `/evolve-loop 1` on a test project
+4. Test by running `evolve install` and executing `/evo:loop 1` on a test project
 5. Submit a PR with summary, phase impact, and test results
 
 ## Code of Conduct

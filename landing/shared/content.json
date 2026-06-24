@@ -2,11 +2,11 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v20.2",
+    "version": "v20.4",
     "mentalModel": "CI/CD for AI-written code",
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
-    "license": "MIT",
+    "license": "Apache-2.0",
     "repo": "github.com/mickeyyaya/evolveloop",
     "repoUrl": "https://github.com/mickeyyaya/evolveloop"
   },
@@ -32,10 +32,10 @@
     }
   },
   "proofBar": [
-    { "value": "v20.2", "label": "shipping" },
+    { "value": "v20.4", "label": "shipping" },
     { "value": "367+", "label": "cycles run" },
     { "value": "61", "label": "lessons learned" },
-    { "value": "MIT", "label": "open source" }
+    { "value": "Apache-2.0", "label": "open source" }
   ],
   "problem": {
     "kicker": "The bottleneck moved",
@@ -142,18 +142,18 @@
     "heading": "Your first cycle is one command away.",
     "install": [
       { "step": "Add the marketplace", "command": "/plugin marketplace add mickeyyaya/evolveloop" },
-      { "step": "Install the plugin", "command": "/plugin install evolve-loop@evolve-loop" },
-      { "step": "Run a cycle", "command": "/evolve-loop --cycles 3 \"add dark mode\"" }
+      { "step": "Install the plugin", "command": "/plugin install evo@evo" },
+      { "step": "Run a cycle", "command": "/evo:loop --cycles 3 \"add dark mode\"" }
     ],
     "presets": [
-      { "label": "innovate", "command": "/evolve-loop --cycles 5 innovate \"explore concurrency\"", "blurb": "new features" },
-      { "label": "harden", "command": "/evolve-loop --cycles 5 harden", "blurb": "stability + tests" },
-      { "label": "repair", "command": "/evolve-loop --cycles 3 repair \"fix auth bug\"", "blurb": "smallest-change bug fix" }
+      { "label": "innovate", "command": "/evo:loop --cycles 5 innovate \"explore concurrency\"", "blurb": "new features" },
+      { "label": "harden", "command": "/evo:loop --cycles 5 harden", "blurb": "stability + tests" },
+      { "label": "repair", "command": "/evo:loop --cycles 3 repair \"fix auth bug\"", "blurb": "smallest-change bug fix" }
     ]
   },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
-    "subhead": "Open source. MIT. Works with Claude, Gemini, and Codex.",
+    "subhead": "Open source. Apache-2.0. Works with Claude, Gemini, and Codex.",
     "primary": { "label": "Get started", "command": "/plugin marketplace add mickeyyaya/evolveloop" },
     "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolveloop#readme" }
   },
@@ -162,7 +162,7 @@
       { "label": "GitHub", "href": "https://github.com/mickeyyaya/evolveloop" },
       { "label": "Docs", "href": "https://github.com/mickeyyaya/evolveloop#readme" },
       { "label": "Changelog", "href": "https://github.com/mickeyyaya/evolveloop/blob/main/CHANGELOG.md" },
-      { "label": "License — MIT", "href": "https://github.com/mickeyyaya/evolveloop/blob/main/LICENSE" }
+      { "label": "License — Apache-2.0", "href": "https://github.com/mickeyyaya/evolveloop/blob/main/LICENSE" }
     ],
     "tagline": "CI/CD for AI-written code.",
     "grounding": "Grounded in reflective self-improvement and double-loop learning."
