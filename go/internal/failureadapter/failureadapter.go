@@ -96,7 +96,7 @@ type Evidence struct {
 
 // Options controls Decide's behaviour. Now=zero defaults to time.Now().
 type Options struct {
-	Strict bool      // EVOLVE_STRICT_AUDIT=1 → first matching BLOCK wins.
+	Strict bool      // policy.json workflow.strict_audit → first matching BLOCK wins.
 	Now    time.Time // override clock for tests.
 }
 
@@ -235,11 +235,11 @@ func Decide(entries []Entry, opts Options) Decision {
 
 	// Default / fluent terminus.
 	if len(awareness) > 0 {
-		reason := "fluent mode (set EVOLVE_STRICT_AUDIT=1 for legacy blocking): " + strings.Join(awareness, "; ")
+		reason := "fluent mode (set workflow.strict_audit in policy.json for legacy blocking): " + strings.Join(awareness, "; ")
 		return Decision{
 			Action:      ActionProceed,
 			Reason:      reason,
-			Remediation: "Awareness only — orchestrator should consider the prior failures when planning. Set EVOLVE_STRICT_AUDIT=1 to restore legacy block-on-recurring-failure behavior.",
+			Remediation: "Awareness only — orchestrator should consider the prior failures when planning. Set workflow.strict_audit in .evolve/policy.json to restore legacy block-on-recurring-failure behavior.",
 			Evidence:    ev,
 		}
 	}

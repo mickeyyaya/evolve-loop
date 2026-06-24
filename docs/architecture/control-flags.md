@@ -42,7 +42,6 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_REFLECTION_JOURNAL` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 | `EVOLVE_ROUTING_MODE` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Routing brain: `llm`/`dynamic`/`dynamic-llm` (LLM proposes, kernel clamps) / `static`/`static-preset`/`preset` (triggers + spine only, no LLM). Unknown → `llm` + WARN |
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
-| `EVOLVE_STRICT_AUDIT` | active | — | — | Workflow Defaults | WARN→FAIL promotion in ship.sh + failure-adapter blocking (v8.35+); single severity gate |
 | `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 
 <!-- GENERATED:flag-index END -->

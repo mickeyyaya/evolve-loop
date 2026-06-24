@@ -121,7 +121,7 @@ func IntentRequired() Brick {
 	return func(s *ScenarioSpec) { ensureEnable(s); s.Enable["intent"] = config.EnableOn }
 }
 func StrictAudit() Brick {
-	return func(s *ScenarioSpec) { ensureEnv(s); s.Env["EVOLVE_STRICT_AUDIT"] = "1" }
+	return func(s *ScenarioSpec) { s.Strict = true }
 }
 
 // SeedFailure appends n non-expired failedApproaches records (retro arc input).
@@ -248,11 +248,6 @@ func ensureEnable(s *ScenarioSpec) {
 func ensureTriggers(s *ScenarioSpec) {
 	if s.Triggers == nil {
 		s.Triggers = map[string]config.RoutingBlock{}
-	}
-}
-func ensureEnv(s *ScenarioSpec) {
-	if s.Env == nil {
-		s.Env = map[string]string{}
 	}
 }
 func orPASS(v string) string {

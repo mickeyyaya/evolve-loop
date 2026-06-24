@@ -122,7 +122,7 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 	}
 
 	tmp := fmt.Sprintf("%s.tmp.%d", in.Output, os.Getpid())
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 
 	now := in.Now().UTC().Format("2006-01-02T15:04:05Z")
 	var rc int
@@ -156,7 +156,7 @@ func defaultReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return io.ReadAll(f)
 }
 
@@ -187,7 +187,7 @@ func scanFirstCapture(path string, re *regexp.Regexp) string {
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
@@ -382,7 +382,7 @@ func writeCrossCLIVote(out string, workers []string, now string, readFile func(s
 
 	quorum := (total + 1) / 2
 	verdict := "WARN"
-	reason := fmt.Sprintf("cross-cli-vote: %d of %d PASS (below quorum=%d); ships per fluent default unless EVOLVE_STRICT_AUDIT=1",
+	reason := fmt.Sprintf("cross-cli-vote: %d of %d PASS (below quorum=%d); ships per fluent default unless workflow.strict_audit",
 		passCount, total, quorum)
 	if anyFail {
 		verdict = "FAIL"

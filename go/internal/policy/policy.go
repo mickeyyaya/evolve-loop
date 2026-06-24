@@ -569,6 +569,14 @@ type WorkflowPolicy struct {
 	// PSMASEnabled enables the Phase Scheduling and Management Advisor
 	// Subsystem. Absent/false = disabled (opt-in). Replaces EVOLVE_PSMAS_SKIP.
 	PSMASEnabled *bool `json:"psmas_enabled,omitempty"`
+	// StrictAudit selects the strict (legacy-blocking) audit posture. Absent/false
+	// = fluent-by-default (ship on a WARN audit verdict; the failure-adapter is
+	// awareness-only on recurring failures). True restores legacy blocking: WARN is
+	// promoted to FAIL in both the audit phase and the ship audit-binding, and the
+	// failure-adapter's first matching rule BLOCKs. Replaces the EVOLVE_STRICT_AUDIT
+	// env read (flag-reduction, ADR-0064). A plain bool (not *bool): false is the
+	// product default, so an absent block and an explicit false are the same posture.
+	StrictAudit bool `json:"strict_audit,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -585,6 +593,7 @@ type WorkflowConfig struct {
 	PhaseEnables          map[string]string
 	ConsensusAuditEnabled bool
 	PSMASEnabled          bool
+	StrictAudit           bool
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -623,7 +632,23 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	if p.Workflow.PSMASEnabled != nil {
 		c.PSMASEnabled = *p.Workflow.PSMASEnabled
 	}
+	c.StrictAudit = p.Workflow.StrictAudit
 	return c
+}
+
+// StrictAuditFor loads the policy at projectRoot's .evolve/policy.json and returns
+// the resolved workflow.strict_audit posture. Fail-open: a missing OR malformed
+// policy yields false (fluent default) so a typo can never silently ARM the opt-in
+// strict tightening — the loud malformed-policy failure still surfaces at the
+// cycle's own policy.Load. The audit phase and the ship audit-binding both read
+// strict mode from here (they have projectRoot but not the orchestrator's
+// once-resolved WorkflowConfig), mirroring WorktreeBaseFor's loader pattern.
+func StrictAuditFor(projectRoot string) bool {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return false
+	}
+	return pol.WorkflowConfig().StrictAudit
 }
 
 // RetryPolicy is the .evolve/policy.json "retry" block.

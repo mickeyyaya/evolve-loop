@@ -128,9 +128,6 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		// takes effect when the dispatcher routes to bash; the fake-cli
 		// e2e harness depends on the script substitution.
 		"EVOLVE_NATIVE_SHIP=0",
-		// Disable the strict audit promotion so the WARN→FAIL bump doesn't
-		// surprise us; the fake emits a clean PASS verdict anyway.
-		"EVOLVE_STRICT_AUDIT=0",
 		// Skip the deep-research quota for this test.
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 	)

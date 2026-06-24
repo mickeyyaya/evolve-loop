@@ -83,7 +83,7 @@ func runPure(t *testing.T, s ScenarioSpec) {
 		Signals:   s.Signals.Signals(),
 		Cfg:       buildConfig(s),
 		Completed: s.Completed,
-		Strict:    s.Env["EVOLVE_STRICT_AUDIT"] == "1",
+		Strict:    s.Strict,
 		Now:       fixedNow,
 	}
 	// Thread the advisor's CLAMPED whole-cycle plan exactly as the orchestrator

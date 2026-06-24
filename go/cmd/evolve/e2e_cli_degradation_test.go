@@ -89,7 +89,6 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 
 	env := append(os.Environ(),
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
-		"EVOLVE_STRICT_AUDIT=0",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		// No EVOLVE_CLI: the per-agent profile (cli + cli_fallback) drives the
 		// chain. claude-p is primary; codex is the fallback.

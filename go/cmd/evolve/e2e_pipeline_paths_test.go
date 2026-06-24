@@ -30,6 +30,13 @@ import (
 // a blocked cycle (and, post Stage-5.1, a native ship that cannot ff-merge in
 // the fixture) legitimately returns non-zero — so callers assert on the
 // ledger-observable routing (which phases the pipeline reached) via ledgerHasRole.
+// strictPolicyMarker is a TEST-ONLY sentinel (not a production flag, so it never
+// reaches the cycle subprocess). When present in a pipelineCycle extraEnv list it
+// makes the harness drop a .evolve/policy.json with workflow.strict_audit:true into
+// the cycle's project root — the policy.json replacement for the retired
+// EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
+const strictPolicyMarker = "TEST_WRITE_STRICT_POLICY=1"
+
 func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) []ledgerEntry {
 	t.Helper()
 	projRoot := setupTempProject(t, repoRoot)
@@ -41,7 +48,16 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"BRIDGE_TESTING=1",
 		"BRIDGE_CLAUDE_BINARY="+fakeBin,
 	)
-	env = append(env, extraEnv...)
+	for _, e := range extraEnv {
+		if e == strictPolicyMarker {
+			policyPath := filepath.Join(projRoot, ".evolve", "policy.json")
+			if err := os.WriteFile(policyPath, []byte(`{"workflow":{"strict_audit":true}}`), 0o644); err != nil {
+				t.Fatalf("write strict policy: %v", err)
+			}
+			continue // marker is harness-only; never forward it to the subprocess
+		}
+		env = append(env, e)
+	}
 
 	cmd := exec.Command(evolveBin, "cycle", "run",
 		"--project-root", projRoot,
@@ -97,24 +113,24 @@ func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 	}
 }
 
-// Audit WARN ships by default (fluent), but EVOLVE_STRICT_AUDIT=1 promotes it
+// Audit WARN ships by default (fluent), but workflow.strict_audit promotes it
 // to FAIL → block + retro.
 func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 
 	t.Run("fluent_ships", func(t *testing.T) {
 		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnfluent",
-			"FAKE_CLI_AUDIT_VERDICT=WARN", "EVOLVE_STRICT_AUDIT=0")
+			"FAKE_CLI_AUDIT_VERDICT=WARN")
 		if !ledgerHasRole(entries, "ship") {
-			t.Errorf("audit WARN with EVOLVE_STRICT_AUDIT=0 should proceed to the ship phase (fluent); ledger roles=%v", ledgerRoles(entries))
+			t.Errorf("audit WARN with no strict policy should proceed to the ship phase (fluent); ledger roles=%v", ledgerRoles(entries))
 		}
 	})
 
 	t.Run("strict_blocks", func(t *testing.T) {
 		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnstrict",
-			"FAKE_CLI_AUDIT_VERDICT=WARN", "EVOLVE_STRICT_AUDIT=1")
+			"FAKE_CLI_AUDIT_VERDICT=WARN", strictPolicyMarker)
 		if ledgerHasRole(entries, "ship") {
-			t.Errorf("audit WARN with EVOLVE_STRICT_AUDIT=1 must be promoted to FAIL and NOT reach the ship phase; ledger roles=%v", ledgerRoles(entries))
+			t.Errorf("audit WARN with workflow.strict_audit must be promoted to FAIL and NOT reach the ship phase; ledger roles=%v", ledgerRoles(entries))
 		}
 		if !ledgerHasRole(entries, "retro") {
 			t.Errorf("strict WARN→FAIL must route to retro; ledger roles=%v", ledgerRoles(entries))

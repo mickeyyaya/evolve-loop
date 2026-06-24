@@ -180,7 +180,7 @@ pipeline paths, layered on the `evolve-fake-cli` seam (`BRIDGE_TESTING=1` +
 | `e2e_cycle_cli_matrix_test.go` (pre-existing) | Happy-path full cycle scout→ship | headless: claude-p, codex, agy |
 | `e2e_cli_tmux_matrix_test.go` | Happy-path full cycle through a **real tmux server** | interactive: claude-tmux, codex-tmux, agy-tmux. Fake serves a REPL printing every driver's boot marker; `HOME`/`EVOLVE_CODEX_CONFIG_PATH` redirected so preflights never touch the operator's real `~/.codex`. ~45s/CLI; timeout tunable via `EVOLVE_E2E_TMUX_TIMEOUT_S`. |
 | `e2e_cli_degradation_test.go` | CLI fallback chain (ADR-0029) | Primary claude-p fails with each trigger code {80,81,124,127} → runner retries codex → ships. Non-trigger 99 → no fallback → no ship. Per-CLI exit injection via `FAKE_CLI_CLAUDE_EXIT`. |
-| `e2e_pipeline_paths_test.go` | Audit FAIL→retro→no-ship; WARN fluent-ships vs strict-blocks; intent phase | headless; `FAKE_CLI_AUDIT_VERDICT`, `EVOLVE_STRICT_AUDIT`, `EVOLVE_REQUIRE_INTENT`. |
+| `e2e_pipeline_paths_test.go` | Audit FAIL→retro→no-ship; WARN fluent-ships vs strict-blocks; intent phase | headless; `FAKE_CLI_AUDIT_VERDICT`, `.evolve/policy.json` `workflow.strict_audit`, `EVOLVE_REQUIRE_INTENT`. |
 | `e2e_setup_validation_test.go` | `evolve setup detect/validate` floor | in-process `runSetup`: envelope (ERROR), allowed_clis (ERROR), cross-family (WARN / `--strict` ERROR), detect JSON shape. |
 
 `evolve-fake-cli` gained a persistent REPL mode (auto-detected from a tmux launch:

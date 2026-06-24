@@ -24,7 +24,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 | `acs-verdict.json` (gate, not env) | enforced | Cycle ships only if `red_count == 0`. WARN level removed in v10.0.0. | No rollback — hard gate. See [egps-v10](../../docs/architecture/egps-v10.md). |
 | `EVOLVE_TEST_PHASE_ENABLED` | `1` (default-on) | `1`: TDD-Engineer writes behavioral predicates before Builder; Tester validates after. `0`: Builder writes own predicates (v10.1 fallback, degrades quality). | `=0` reverts to v10.1 self-predicate fallback. Default flipped cycle-86 (predicate-quality Layer 4). |
 | `EVOLVE_TRIAGE_DISABLE` | `0` (Triage on) | Runs Layer C Triage on every cycle. | `=1` skips Triage; soft WARN if skipped without override. |
-| `EVOLVE_STRICT_AUDIT` | `0` (fluent) | WARN ships by default (v8.28.0+). | `=1` blocks on WARN. Note: WARN removed in v10.0.0 — applies to pre-EGPS bootstrap cycles only. |
+| `workflow.strict_audit` (`.evolve/policy.json`) | `false` (fluent) | WARN ships by default (v8.28.0+). | `true` blocks on WARN. Migrated from the `EVOLVE_STRICT_AUDIT` env dial (flag-reduction, ADR-0064). Note: WARN removed in v10.0.0 — applies to pre-EGPS bootstrap cycles only. |
 | `ADVERSARIAL_AUDIT` | `1` (default-on) | Runner prepends "ADVERSARIAL AUDIT MODE" framing requiring positive evidence for PASS; Auditor defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy. | `=0` disables adversarial framing. |
 
 ## Phase routing & lifecycle

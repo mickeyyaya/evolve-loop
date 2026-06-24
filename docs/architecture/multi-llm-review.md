@@ -345,7 +345,7 @@ The aggregator's `cross-cli-vote` merge mode applies these rules:
 | All N return PASS | PASS | 0 | Unanimous; ship |
 | ≥ ceil(N/2) PASS, no FAIL | PASS | 0 | Quorum met without veto |
 | Any FAIL | **FAIL** | **1** | Veto rule: any one CLI smelled blood |
-| < ceil(N/2) PASS, no FAIL | WARN | 0 | Below quorum; ships per fluent default unless `EVOLVE_STRICT_AUDIT=1` |
+| < ceil(N/2) PASS, no FAIL | WARN | 0 | Below quorum; ships per fluent default unless `workflow.strict_audit` |
 
 The veto rule is the central insight: a single dissenting CLI is more informative than M agreeing CLIs, because agreement could be sycophancy. The protocol biases toward false negatives (block ship when uncertain) over false positives (ship when divergence exists).
 
