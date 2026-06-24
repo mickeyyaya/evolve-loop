@@ -196,3 +196,56 @@ func TestLoad_MissingFileFailsLoudly(t *testing.T) {
 		t.Fatal("Load(missing) returned nil error, want a file error")
 	}
 }
+
+// The "from one command to full control" usage ladder must load with a full set
+// of progressive examples and a setup explainer — the new landing section.
+func TestExamples_LoadsAndComplete(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := site.Examples
+	if e.Heading == "" {
+		t.Error("examples.heading must be set")
+	}
+	if len(e.Items) < 5 {
+		t.Fatalf("examples.items = %d, want >= 5 (simplest → most control)", len(e.Items))
+	}
+	for i, it := range e.Items {
+		if it.Label == "" || it.Command == "" || it.Note == "" {
+			t.Errorf("examples.items[%d] must set label, command, and a behind-the-scenes note", i)
+		}
+	}
+	if e.Setup.Command == "" || e.Setup.Note == "" || len(e.Setup.Presets) == 0 {
+		t.Error("examples.setup must give a command, a note, and the preset names")
+	}
+}
+
+// Validate must fail loudly if the examples block is missing — it powers a whole
+// landing section, so a bad edit should break the build, not render an empty gap.
+func TestValidate_RequiresExamples(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site.Examples = Examples{}
+	if err := site.Validate(); err == nil {
+		t.Error("Validate() accepted an empty examples block; want a loud failure")
+	}
+}
+
+// Quickstart install-step LABELS must stay short. A long label is a sentence,
+// and a flex step label that won't shrink overflows narrow (≤360px) screens —
+// the descriptive detail belongs in the examples ladder, not the step label.
+func TestQuickstartStepLabelsStayShort(t *testing.T) {
+	site, err := Load("../../shared/content.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const maxLabel = 24
+	for _, s := range site.Quickstart.Install {
+		if len(s.Step) > maxLabel {
+			t.Errorf("quickstart install step label %q is %d chars (> %d); keep step labels short so they don't overflow on mobile", s.Step, len(s.Step), maxLabel)
+		}
+	}
+}

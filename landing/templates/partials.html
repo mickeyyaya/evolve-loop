@@ -592,3 +592,67 @@
 })();
 </script>
 {{end}}
+
+{{define "examples"}}
+<style>
+  .ex{
+    --ex-acc:var(--accent,#0071e3);
+    --ex-acc-soft:var(--accent-soft,color-mix(in srgb,var(--ex-acc) 13%,transparent));
+    --ex-ink:var(--ink,#161616);
+    --ex-mut:var(--muted,#7a7a7a);
+    --ex-bg:var(--surface,var(--bg,#fff));
+    --ex-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);
+    --ex-disp:var(--serif,var(--display,inherit));
+    --ex-line:color-mix(in srgb,var(--ex-ink) 14%,transparent);
+    --ex-line2:color-mix(in srgb,var(--ex-ink) 24%,transparent);
+    --ex-surf:color-mix(in srgb,var(--ex-ink) 3%,transparent);
+    max-width:1080px;margin:0 auto;padding:clamp(48px,8vw,104px) 28px}
+  .ex-kicker{font-family:var(--ex-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ex-acc);margin:0}
+  .ex-h{font-family:var(--ex-disp);font-weight:inherit;font-size:clamp(1.7rem,3.6vw,2.6rem);line-height:1.1;margin:14px 0 0;color:var(--ex-ink)}
+  .ex-sub{color:var(--ex-mut);margin:12px 0 0;font-size:clamp(1rem,1.4vw,1.12rem);max-width:62ch}
+  .ex-list{list-style:none;margin:30px 0 0;padding:0;display:flex;flex-direction:column;gap:14px}
+  .ex-item{display:flex;gap:16px;align-items:flex-start;border:1px solid var(--ex-line);border-radius:14px;background:var(--ex-surf);padding:16px 18px;min-width:0}
+  .ex-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--ex-mono);font-size:.8rem;font-weight:700;color:var(--ex-acc);border:1px solid color-mix(in srgb,var(--ex-acc) 40%,transparent);background:var(--ex-acc-soft)}
+  .ex-body{min-width:0;flex:1 1 auto}
+  .ex-cmdrow{display:flex;align-items:center;gap:10px;min-width:0}
+  .ex-cmd{font-family:var(--ex-mono);font-size:.9rem;color:var(--ex-ink);background:color-mix(in srgb,var(--ex-ink) 6%,transparent);border:1px solid var(--ex-line);border-radius:8px;padding:7px 11px;white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%;flex:1 1 0}
+  .ex-copy{flex:0 0 auto;font-family:var(--ex-mono);font-size:.72rem;color:var(--ex-mut);background:transparent;border:1px solid var(--ex-line2);border-radius:7px;padding:6px 11px;cursor:pointer;transition:color .2s,border-color .2s}
+  .ex-copy:hover{color:var(--ex-acc);border-color:var(--ex-acc)}
+  .ex-copy.is-copied{color:var(--ex-acc);border-color:var(--ex-acc)}
+  .ex-note{margin:9px 0 0;color:var(--ex-mut);font-size:.92rem;line-height:1.55}
+  .ex-note b{color:var(--ex-ink)}
+  .ex-setup{margin-top:22px;border:1px dashed var(--ex-line2);border-radius:14px;background:color-mix(in srgb,var(--ex-acc) 4%,transparent);padding:18px 20px}
+  .ex-setup-h{font-family:var(--ex-disp);font-weight:inherit;font-size:1.18rem;margin:0 0 12px;color:var(--ex-ink)}
+  .ex-presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+  .ex-preset{font-family:var(--ex-mono);font-size:.72rem;letter-spacing:.03em;color:var(--ex-ink);border:1px solid var(--ex-line2);border-radius:999px;padding:5px 12px;background:var(--ex-bg)}
+  @media(max-width:560px){.ex-item{gap:12px;padding:14px}}
+</style>
+<section class="ex" id="examples" data-reveal>
+  <p class="ex-kicker">{{.Site.Examples.Kicker}}</p>
+  <h2 class="ex-h">{{.Site.Examples.Heading}}</h2>
+  <p class="ex-sub">{{.Site.Examples.Sub}}</p>
+  <ol class="ex-list">
+    {{range .Site.Examples.Items}}
+    <li class="ex-item">
+      <span class="ex-n" aria-hidden="true">{{.N}}</span>
+      <div class="ex-body">
+        <div class="ex-cmdrow">
+          <code class="ex-cmd">{{.Command}}</code>
+          <button class="ex-copy" type="button" data-copy="{{.Command}}" aria-label="Copy command: {{.Command}}">Copy</button>
+        </div>
+        <p class="ex-note"><b>{{.Label}}.</b> {{.Note}}</p>
+      </div>
+    </li>
+    {{end}}
+  </ol>
+  <div class="ex-setup">
+    <h3 class="ex-setup-h">{{.Site.Examples.Setup.Heading}}</h3>
+    <div class="ex-cmdrow">
+      <code class="ex-cmd">{{.Site.Examples.Setup.Command}}</code>
+      <button class="ex-copy" type="button" data-copy="{{.Site.Examples.Setup.Command}}" aria-label="Copy command: {{.Site.Examples.Setup.Command}}">Copy</button>
+    </div>
+    <p class="ex-note">{{.Site.Examples.Setup.Note}}</p>
+    <div class="ex-presets">{{range .Site.Examples.Setup.Presets}}<span class="ex-preset">{{.}}</span>{{end}}</div>
+  </div>
+</section>
+{{end}}

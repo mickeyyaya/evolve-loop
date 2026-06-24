@@ -23,6 +23,7 @@ type Site struct {
 	Incident     Incident     `json:"incident"`
 	Comparison   Comparison   `json:"comparison"`
 	Quickstart   Quickstart   `json:"quickstart"`
+	Examples     Examples     `json:"examples"`
 	FinalCTA     FinalCTA     `json:"finalCta"`
 	Footer       Footer       `json:"footer"`
 }
@@ -155,6 +156,34 @@ type Quickstart struct {
 	Presets []Preset      `json:"presets"`
 }
 
+// Examples powers the "from one command to full control" usage ladder: a
+// progressive list of commands, each with a behind-the-scenes note, plus a
+// simple setup/configuration explainer.
+type Examples struct {
+	Kicker  string        `json:"kicker"`
+	Heading string        `json:"heading"`
+	Sub     string        `json:"sub"`
+	Items   []ExampleItem `json:"items"`
+	Setup   SetupInfo     `json:"setup"`
+}
+
+// ExampleItem is one rung of the usage ladder: a numbered command and what it
+// does behind the scenes.
+type ExampleItem struct {
+	N       string `json:"n"`
+	Label   string `json:"label"`
+	Command string `json:"command"`
+	Note    string `json:"note"`
+}
+
+// SetupInfo is the one-command setup explainer + the named presets it offers.
+type SetupInfo struct {
+	Heading string   `json:"heading"`
+	Command string   `json:"command"`
+	Note    string   `json:"note"`
+	Presets []string `json:"presets"`
+}
+
 type FinalCTA struct {
 	Heading   string `json:"heading"`
 	Subhead   string `json:"subhead"`
@@ -207,6 +236,8 @@ func (s *Site) Validate() error {
 		{"pipelineDemo.floor (>=1)", len(s.PipelineDemo.Floor) == 0},
 		{"pipelineDemo.providers (>=1)", len(s.PipelineDemo.Providers) == 0},
 		{"pipelineDemo.cases (>=2)", len(s.PipelineDemo.Cases) < 2},
+		{"examples.heading", s.Examples.Heading == ""},
+		{"examples.items (>=5)", len(s.Examples.Items) < 5},
 		{"pillars (>=3)", len(s.Pillars) < 3},
 		{"comparison.rows", len(s.Comparison.Rows) == 0},
 		{"footer.links", len(s.Footer.Links) == 0},
