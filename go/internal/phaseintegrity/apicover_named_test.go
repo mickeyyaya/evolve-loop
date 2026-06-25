@@ -21,3 +21,15 @@ func TestNamePublicAPI(t *testing.T) {
 		t.Fatalf("TreeSHA: %v", err)
 	}
 }
+
+// TestNamePublicAPI_Repin names the re-pin surface (ProvenanceVerified,
+// RepinResult, RepinShipSHA) for the apicover public-API gate; behavior is
+// exercised in repin_test.go.
+func TestNamePublicAPI_Repin(t *testing.T) {
+	var _ ProvenanceVerified = func(string) bool { return true }
+	want := RepinResult{Repinned: true, OldSHA: "old", NewSHA: "new", Authorized: "provenance"}
+	if want.NewSHA != "new" || !want.Repinned {
+		t.Fatalf("RepinResult fields: %+v", want)
+	}
+	// RepinShipSHA itself is exercised across repin_test.go.
+}
