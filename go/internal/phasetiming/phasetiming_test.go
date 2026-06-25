@@ -71,3 +71,70 @@ func TestRead_MissingFileIsNotExist(t *testing.T) {
 		t.Errorf("missing file must return an os.IsNotExist error; got %v", err)
 	}
 }
+
+// ProjectParallelSaving is the shadow evidence for PR2: it projects how much
+// wall-clock the independent post-build evaluate phases (archetype "evaluate",
+// excluding the audit brancher) would save if run concurrently. Pure projection
+// from recorded durations — no execution change.
+func TestProjectParallelSaving(t *testing.T) {
+	t.Parallel()
+	entries := []Entry{
+		{Phase: "scout", DurationMS: 400_000, Archetype: "plan"},  // not evaluate — excluded
+		{Phase: "build", DurationMS: 700_000, Archetype: "build"}, // not evaluate — excluded
+		{Phase: "coverage-gate", DurationMS: 240_000, Archetype: "evaluate"},
+		{Phase: "behavior-compare", DurationMS: 120_000, Archetype: "evaluate"},
+		{Phase: "adversarial-review", DurationMS: 300_000, Archetype: "evaluate"},
+		{Phase: "audit", DurationMS: 290_000, Archetype: "evaluate"}, // the brancher — excluded
+	}
+	// Group = the 3 non-audit evaluate phases: 240+120+300 = 660s sequential.
+	// At concurrency 2, makespan lower bound = max(maxDur 300, ceil(660/2)=330) = 330s.
+	p := ProjectParallelSaving(entries, 2)
+	if p.Concurrency != 2 {
+		t.Errorf("Concurrency=%d, want 2", p.Concurrency)
+	}
+	if len(p.GroupPhases) != 3 {
+		t.Errorf("GroupPhases=%v, want 3 non-audit evaluate phases", p.GroupPhases)
+	}
+	if p.SequentialMS != 660_000 {
+		t.Errorf("SequentialMS=%d, want 660000", p.SequentialMS)
+	}
+	if p.ProjectedParallelMS != 330_000 {
+		t.Errorf("ProjectedParallelMS=%d, want 330000 (makespan lower bound)", p.ProjectedParallelMS)
+	}
+	if p.SavingMS != 330_000 {
+		t.Errorf("SavingMS=%d, want 330000", p.SavingMS)
+	}
+}
+
+// Concurrency >= group size ⇒ makespan = the single longest phase.
+func TestProjectParallelSaving_UnboundedConcurrency(t *testing.T) {
+	t.Parallel()
+	entries := []Entry{
+		{Phase: "a", DurationMS: 100, Archetype: "evaluate"},
+		{Phase: "b", DurationMS: 500, Archetype: "evaluate"},
+		{Phase: "c", DurationMS: 200, Archetype: "evaluate"},
+	}
+	p := ProjectParallelSaving(entries, 8)
+	if p.ProjectedParallelMS != 500 {
+		t.Errorf("ProjectedParallelMS=%d, want 500 (the longest phase)", p.ProjectedParallelMS)
+	}
+	if p.SavingMS != 300 { // 800 sequential - 500 makespan
+		t.Errorf("SavingMS=%d, want 300", p.SavingMS)
+	}
+}
+
+// Degenerate cases: <2 parallelizable phases, or concurrency<=1, ⇒ zero saving.
+func TestProjectParallelSaving_NoParallelism(t *testing.T) {
+	t.Parallel()
+	one := []Entry{{Phase: "audit", DurationMS: 300, Archetype: "evaluate"}} // only audit
+	if p := ProjectParallelSaving(one, 4); p.SavingMS != 0 || len(p.GroupPhases) != 0 {
+		t.Errorf("single audit phase: want zero saving / empty group, got %+v", p)
+	}
+	two := []Entry{
+		{Phase: "a", DurationMS: 100, Archetype: "evaluate"},
+		{Phase: "b", DurationMS: 200, Archetype: "evaluate"},
+	}
+	if p := ProjectParallelSaving(two, 1); p.SavingMS != 0 {
+		t.Errorf("concurrency 1: want zero saving, got %+v", p)
+	}
+}

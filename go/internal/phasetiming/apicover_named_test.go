@@ -9,6 +9,20 @@ import (
 	"testing"
 )
 
+// TestParallelProjection_Named names the ParallelProjection type by identifier
+// (apicover counts field access as "uses", not "names") and pins the shadow
+// projection contract: 2 evaluate phases at concurrency 2 yield a real saving.
+func TestParallelProjection_Named(t *testing.T) {
+	t.Parallel()
+	var p ParallelProjection = ProjectParallelSaving([]Entry{
+		{Phase: "coverage-gate", DurationMS: 400, Archetype: "evaluate"},
+		{Phase: "behavior-compare", DurationMS: 200, Archetype: "evaluate"},
+	}, 2)
+	if p.SavingMS == 0 || len(p.GroupPhases) != 2 {
+		t.Errorf("expected a positive saving over 2 evaluate phases at C=2; got %+v", p)
+	}
+}
+
 // TestSummary_RollupNamed names the Summary type and Rollup, pinning the roll-up
 // contract that the latency evidence turns on: total = sum of durations, longest
 // = max, retried = dispatches past attempt 1.

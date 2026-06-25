@@ -27,10 +27,12 @@ func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 		projectRoot string
 		evolveDir   string
 		jsonOut     bool
+		concurrency int
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.BoolVar(&jsonOut, "json", false, "emit the cycle timing Summary as JSON")
+	fs.IntVar(&concurrency, "concurrency", 2, "concurrency for the shadow parallel-evaluate projection")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -64,7 +66,20 @@ func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	renderTiming(stdout, cycleLabel, entries, summary)
+	renderParallelProjection(stdout, phasetiming.ProjectParallelSaving(entries, concurrency))
 	return 0
+}
+
+// renderParallelProjection prints the SHADOW estimate of parallelizing the
+// independent checking phases (PR2 shadow stage) — operator evidence only when
+// there is a measurable saving.
+func renderParallelProjection(w io.Writer, p phasetiming.ParallelProjection) {
+	if p.SavingMS == 0 {
+		return
+	}
+	fmt.Fprintf(w, "Parallel-evaluate projection (shadow, C=%d): %s — %s → %s, would save %s\n",
+		p.Concurrency, strings.Join(p.GroupPhases, ", "),
+		phasetiming.HumanMS(p.SequentialMS), phasetiming.HumanMS(p.ProjectedParallelMS), phasetiming.HumanMS(p.SavingMS))
 }
 
 // resolveCycleWorkspace returns the workspace dir and a display label for the
