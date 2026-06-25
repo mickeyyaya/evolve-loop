@@ -310,13 +310,14 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v21.1)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v21.2)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
 | v20.4 | Jun 24 | see [CHANGELOG.md](CHANGELOG.md) |
 | v21.0 | Jun 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v21.1 | Jun 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v21.2 | Jun 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
