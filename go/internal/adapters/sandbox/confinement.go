@@ -70,5 +70,20 @@ func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 	if nested {
 		return false, "nested-Claude: outer Claude Code OS sandbox + Tier-1 hooks already confine; inner sandbox redundant (and on macOS sandbox_apply() returns EPERM, hanging REPL boot)"
 	}
+	// Subtractive capability gate: a MEASURED-incapable sandbox (binary present
+	// but sandbox_apply fails — e.g. a broken/SIP-weird standalone host) must NOT
+	// be wrapped, because wrapping it hangs the REPL boot (exit 80). This is the
+	// only behavioral delta vs the legacy guess, and it is strictly subtractive:
+	// it can only demote a would-be wrap to skip (the nested skip above already
+	// guarantees capability never PROMOTES a nested skip to a wrap), so
+	// new_wrap ⟹ old_wrap. An UNCHECKED probe (CapabilityChecked=false) keeps
+	// the legacy behavior byte-identical.
+	if probe.CapabilityChecked && !probe.Capable {
+		reason := probe.Reason
+		if reason == "" {
+			reason = "sandbox binary present but sandbox_apply failed"
+		}
+		return false, "measured: " + reason + " — inner sandbox not applicable here"
+	}
 	return true, "standalone host with available sandbox binary: inner confinement enabled"
 }

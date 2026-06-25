@@ -153,6 +153,10 @@ type Policy struct {
 	// byte-neutral with the legacy single-pin ship check. Mode="phase" verifies
 	// the per-phase agent-block chain; Stage="enforce" blocks (shadow logs only).
 	Integrity *IntegrityPolicy `json:"integrity,omitempty"`
+	// Sandbox configures the OS-sandbox subsystem. Absent ⇒ built-in default
+	// applies (NestedFallback="off" — the verified-fallback write-canary is
+	// opt-in; a fresh policy.json never halts a nested run).
+	Sandbox *SandboxPolicy `json:"sandbox,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -884,6 +888,30 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ReviewGate != "" {
 		c.ReviewGate = p.Gates.ReviewGate
+	}
+	return c
+}
+
+// SandboxPolicy is the .evolve/policy.json "sandbox" block. NestedFallback
+// selects the verified-fallback rollout stage for nested runs where the inner
+// OS sandbox can't apply: "off" (default — no canary), "shadow" (run the
+// write-canary and WARN if the outer environment is unverified), or "enforce"
+// (HALT the batch if unverified). Resolved to a config.Stage via parseGateStage
+// at the composition root; unknown values map to off (canary disabled).
+type SandboxPolicy struct {
+	NestedFallback string `json:"nested_fallback,omitempty"`
+}
+
+// SandboxConfig returns sandbox configuration with built-in defaults resolved.
+// Empty/absent NestedFallback ⇒ "off" (canary opt-in; a fresh policy.json never
+// runs the write-canary nor halts a nested run).
+func (p Policy) SandboxConfig() SandboxPolicy {
+	c := SandboxPolicy{NestedFallback: "off"}
+	if p.Sandbox == nil {
+		return c
+	}
+	if p.Sandbox.NestedFallback != "" {
+		c.NestedFallback = p.Sandbox.NestedFallback
 	}
 	return c
 }

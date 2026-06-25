@@ -150,6 +150,15 @@ func TestRun_HostCapabilities_SandboxWantedButUnavailable_Warns(t *testing.T) {
 	if !strings.Contains(strings.ToLower(c.Detail), "sandbox") {
 		t.Fatalf("detail should mention sandbox; got %q", c.Detail)
 	}
+	// The WARN must be HONEST (P2 fix): it states phases run UNCONFINED at the
+	// inner layer, not the reassuring "degrades gracefully" that hid the loss of
+	// inner write-confinement.
+	if !strings.Contains(c.Detail, "UNCONFINED at the inner layer") {
+		t.Errorf("WARN must honestly state phases run UNCONFINED at the inner layer; got %q", c.Detail)
+	}
+	if strings.Contains(c.Detail, "degrades gracefully") {
+		t.Errorf("WARN must drop the reassuring 'degrades gracefully' phrasing; got %q", c.Detail)
+	}
 }
 
 func TestRun_HostCapabilities_NoSandboxProfiles_Passes(t *testing.T) {

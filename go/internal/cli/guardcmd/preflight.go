@@ -41,9 +41,10 @@ func RunPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		pluginRoot = root
 	}
 	profile := preflight.Probe(preflight.Options{
-		ProjectRoot:  root,
-		PluginRoot:   pluginRoot,
-		WorktreeBase: policy.WorktreeBaseFor(root),
+		ProjectRoot:    root,
+		PluginRoot:     pluginRoot,
+		WorktreeBase:   policy.WorktreeBaseFor(root),
+		SandboxCapable: preflight.MeasuredSandboxCapability,
 	})
 	if write {
 		if err := profile.WriteToFile(root); err != nil {

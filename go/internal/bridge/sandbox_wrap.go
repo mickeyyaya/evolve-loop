@@ -20,31 +20,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// probeOnce caches the (process-lifetime) sandbox.Probe() result so each
-// driver call doesn't re-exec LookPath. Tests using a custom SandboxWrap
-// bypass this entirely.
-var (
-	probeOnce sync.Once
-	probedRes sandbox.ProbeResult
-)
-
-func cachedProbe() sandbox.ProbeResult {
-	probeOnce.Do(func() { probedRes = sandbox.Probe() })
-	return probedRes
-}
-
-// defaultSandboxWrap returns the production SandboxWrapper closure with the
-// real cached probe. Production callers use this; tests should call
-// defaultSandboxWrapWithProbe with an injected probe func to avoid coupling
-// to the package-level sync.Once.
+// defaultSandboxWrap returns the production SandboxWrapper closure. The probe —
+// including the capability measurement — is cached process-wide inside
+// sandbox.Probe itself, so production passes it directly; tests should call
+// defaultSandboxWrapWithProbe with an injected probe func to bypass the cache.
 func defaultSandboxWrap(deps Deps) SandboxWrapper {
-	return defaultSandboxWrapWithProbe(deps, cachedProbe)
+	return defaultSandboxWrapWithProbe(deps, sandbox.Probe)
 }
 
 // defaultSandboxWrapWithProbe is the test seam: the probeFunc lets tests

@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Config carries the sandbox parameters extracted from a profile.
@@ -35,7 +37,18 @@ type ProbeResult struct {
 	OS         string // runtime.GOOS
 	Available  bool   // sandbox-exec / bwrap present on PATH
 	BinaryPath string // resolved path when Available
-	Reason     string // diagnostic when !Available
+	Reason     string // diagnostic when !Available or when sandbox_apply fails
+
+	// Capable reports whether the sandbox binary actually APPLIES on this host —
+	// a measured fact, not the env-var nested guess. Under nested-Claude on
+	// macOS, sandbox_apply() returns EPERM, so the binary is Available but not
+	// Capable. Only meaningful when CapabilityChecked is true.
+	Capable bool
+	// CapabilityChecked distinguishes "Capable=false because measured-incapable"
+	// from "Capable=false because never measured" (no binary, or no probe). A
+	// consumer treats !CapabilityChecked as "unknown — fall back to the legacy
+	// heuristic" so unmeasured callers are byte-identical to pre-measurement.
+	CapabilityChecked bool
 }
 
 // LookPathFunc is the seam for injecting `exec.LookPath` behavior in
@@ -43,9 +56,74 @@ type ProbeResult struct {
 // tests; Probe is the production entry point.
 type LookPathFunc func(string) (string, error)
 
-// Probe inspects the host for an available sandbox binary.
+// capabilityProbe is the seam for MEASURING whether the sandbox binary applies:
+// it execs a trivial no-op confined command and returns the exec error (nil ⇒
+// the sandbox applied). Injected in tests; defaultCapabilityProbe is production.
+type capabilityProbe func(ctx context.Context, binaryPath string) error
+
+// capabilityTimeout bounds the measurement exec. A trivial confined /usr/bin/true
+// returns near-instantly when the sandbox applies and EPERM-fast when it can't;
+// the timeout is the guarantee that a pathological host can never reintroduce the
+// 80s REPL-boot hang this measurement exists to prevent. Timeout ⇒ not capable.
+const capabilityTimeout = 3 * time.Second
+
+// probeOnce caches the process-lifetime probe (including the capability exec) so
+// every consumer — bridge ShouldWrap, preflight — shares ONE measured value and
+// the exec runs at most once.
+var (
+	probeOnce   sync.Once
+	probedValue ProbeResult
+)
+
+// Probe inspects the host for an available sandbox binary AND measures whether
+// it actually applies. Cached once per process.
 func Probe() ProbeResult {
-	return probeFor(runtime.GOOS, exec.LookPath)
+	probeOnce.Do(func() {
+		probedValue = measureCapability(probeFor(runtime.GOOS, exec.LookPath), defaultCapabilityProbe)
+	})
+	return probedValue
+}
+
+// measureCapability augments a PATH-presence probe with a measured "does it
+// actually apply?" signal. !Available or a nil probe leaves CapabilityChecked
+// false (unknown); otherwise it execs the probe under a bounded timeout and
+// records Capable + (on failure) the diagnostic in Reason.
+func measureCapability(pr ProbeResult, probe capabilityProbe) ProbeResult {
+	if !pr.Available || probe == nil {
+		return pr
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), capabilityTimeout)
+	defer cancel()
+	pr.CapabilityChecked = true
+	if err := probe(ctx, pr.BinaryPath); err != nil {
+		pr.Capable = false
+		pr.Reason = fmt.Sprintf("sandbox binary present but sandbox_apply failed (%v)", err)
+	} else {
+		pr.Capable = true
+	}
+	return pr
+}
+
+// defaultCapabilityProbe runs the smallest possible confined no-op (/usr/bin/true
+// has no REPL, so it cannot hang) to measure whether sandbox_apply succeeds.
+func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.CommandContext(ctx, binaryPath, "-p", "(version 1)(allow default)", "/usr/bin/true")
+	case "linux":
+		cmd = exec.CommandContext(ctx, binaryPath, "--ro-bind", "/", "/", "/bin/true")
+	default:
+		// Unreachable in production: measureCapability only probes when Available,
+		// which probeFor sets solely for darwin/linux.
+		return fmt.Errorf("no capability probe for GOOS=%s", runtime.GOOS)
+	}
+	// WaitDelay bounds the post-kill drain: after the context timeout fires and
+	// the child is signalled, Run() is still guaranteed to return promptly even
+	// if a pathological host (the exact case this probe detects) wedges a
+	// grandchild holding the pipes — it can never reintroduce the boot-hang.
+	cmd.WaitDelay = capabilityTimeout
+	return cmd.Run()
 }
 
 func probeFor(goos string, look LookPathFunc) ProbeResult {

@@ -139,7 +139,7 @@ func checkHostCapabilities(o resolved) CheckResult {
 	if sandboxWanted(o.profileLister, o.profileGetter) {
 		if host := o.hostProbe(); !host.Sandbox.ExpectedToWork {
 			warns = append(warns, fmt.Sprintf(
-				"profiles request sandboxing but host sandbox is not expected to work (%s) — the bridge degrades gracefully",
+				"inner OS sandbox unavailable (%s); source-writing phases run UNCONFINED at the inner layer — the outer Claude Code session + Tier-1 hooks (phase-gate, role-gate, ledger SHA) are the only confinement",
 				host.Sandbox.Reason))
 		}
 	}

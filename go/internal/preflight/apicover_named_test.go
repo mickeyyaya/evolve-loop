@@ -44,6 +44,17 @@ func TestProfile_MarshalJSON_NamedDirectCall(t *testing.T) {
 	}
 }
 
+// TestMeasuredSandboxCapability_Named names and invokes the production
+// SandboxCapable seam. The measured values are host-dependent (capable hinges on
+// whether sandbox_apply works here), so it pins only the structural invariant
+// capable ⇒ checked (a capable verdict is impossible without a measurement).
+func TestMeasuredSandboxCapability_Named(t *testing.T) {
+	capable, checked := MeasuredSandboxCapability()
+	if capable && !checked {
+		t.Error("MeasuredSandboxCapability: capable=true with checked=false violates capable ⇒ checked")
+	}
+}
+
 // TestCLIBins_NamedFullStructEquality names the CLIBins type (constructed in
 // Probe but never named in a test) and pins its JSON contract: a CLIBins with a
 // resolved claude path and the rest nil must encode to the cli_binaries shape

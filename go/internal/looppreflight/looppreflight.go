@@ -27,6 +27,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -122,6 +123,18 @@ type Options struct {
 	DirWritable   func(dir string) bool                   // default real touch-probe
 	DiskFreeBytes func(path string) (uint64, error)       // default statfs; error → disk check skipped
 
+	// Verified-fallback (sandbox.nested_fallback) seams.
+	// NestedFallbackStage gates the write-canary that verifies the OUTER
+	// environment confines source-writing phases when the inner sandbox is
+	// skipped under nesting. Resolved from policy at the composition root via
+	// parseGateStage; the zero value (StageOff) disables the canary.
+	NestedFallbackStage config.Stage
+	// SandboxCanaryProbe reports whether a write OUTSIDE the inner sandbox's
+	// allow-list was BLOCKED by the outer environment (true = confined/verified).
+	// Default: defaultSandboxCanary(ProjectRoot). Tests inject a deterministic
+	// verdict to avoid touching the real filesystem.
+	SandboxCanaryProbe func() bool
+
 	// BootTester really boots one *-tmux driver's REPL (boot-only, no prompt)
 	// under the supplied context and returns its bridge exit code + scrollback.
 	// Default wraps bridge.BootSmokeTest (mirrors `evolve doctor boot`).
@@ -172,6 +185,9 @@ type resolved struct {
 	diskFreeBytes func(string) (uint64, error)
 	bootTester    func(context.Context, string, bool) (int, string)
 
+	nestedFallbackStage config.Stage
+	sandboxCanaryProbe  func() bool
+
 	selfUpdateEvidence func(string) (bool, string, error)
 	pinnedLister       func() ([]string, error)
 	cliHealthActive    func() []clihealth.Entry
@@ -206,6 +222,9 @@ func resolve(opts Options) (resolved, error) {
 		dirWritable:   opts.DirWritable,
 		diskFreeBytes: opts.DiskFreeBytes,
 		bootTester:    opts.BootTester,
+
+		nestedFallbackStage: opts.NestedFallbackStage,
+		sandboxCanaryProbe:  opts.SandboxCanaryProbe,
 
 		selfUpdateEvidence: opts.SelfUpdateEvidence,
 		pinnedLister:       opts.PinnedLister,
@@ -251,7 +270,11 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.hostProbe == nil {
 		o.hostProbe = func() preflight.Profile {
-			return preflight.Probe(preflight.Options{ProjectRoot: o.projectRoot, WorktreeBase: policy.WorktreeBaseFor(o.projectRoot)})
+			return preflight.Probe(preflight.Options{
+				ProjectRoot:    o.projectRoot,
+				WorktreeBase:   policy.WorktreeBaseFor(o.projectRoot),
+				SandboxCapable: preflight.MeasuredSandboxCapability,
+			})
 		}
 	}
 	if o.dirWritable == nil {
@@ -262,6 +285,9 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.bootTester == nil {
 		o.bootTester = newDefaultBootTester(o.projectRoot, o.stderr)
+	}
+	if o.sandboxCanaryProbe == nil {
+		o.sandboxCanaryProbe = defaultSandboxCanary(o.projectRoot)
 	}
 	if o.selfUpdateEvidence == nil {
 		o.selfUpdateEvidence = defaultSelfUpdateEvidence
@@ -308,6 +334,7 @@ func Run(opts Options) (Result, error) {
 		checkCLIHealth(o),
 		checkCLIVersionDrift(o),
 		checkBridgeBoot(o),
+		checkSandboxNestedFallback(o),
 	}
 	r := finalize(checks, o.now())
 	r.CLIVersions = o.versionInventory()
