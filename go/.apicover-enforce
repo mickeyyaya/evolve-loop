@@ -42,6 +42,7 @@
 ./internal/mergegate
 ./internal/paths
 ./internal/phaseblock
+./internal/phaseintegrity
 ./internal/phaseio
 ./internal/phaseorder
 ./internal/phases/debugger
