@@ -82,6 +82,17 @@ func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
 	return builtinControlSpec(p)
 }
 
+// phaseArchetype resolves a phase's composition class (plan/build/evaluate/
+// control) from the existing phasespec taxonomy — the registry spec's explicit
+// archetype when present, else name inference. The single source the latency
+// roll-up buckets by; see recordPhaseOutcome (ADR-0044 C1 chokepoint).
+func (o *Orchestrator) phaseArchetype(phase string) string {
+	if spec, ok := o.specFor(Phase(phase)); ok {
+		return string(spec.RoleOrDefault())
+	}
+	return string(phasespec.PhaseSpec{Name: phase}.RoleOrDefault())
+}
+
 // builtinControlSpec is the control-phase metadata seam (ADR-0058 §5): the one
 // place Go data describes a phase, justified because the control phases
 // (debugger; start/end) are registered as runners in cmd_cycle.go and have no

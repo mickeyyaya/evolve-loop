@@ -239,7 +239,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 						// budget — record it before routing to recovery. A
 						// later successful ship records its own outcome.
 						cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
-							fmt.Sprintf("ship error %s: recovering via %s", se.Code, rec)))
+							fmt.Sprintf("ship error %s: recovering via %s", se.Code, rec), cr.cs.PhaseStartedAt))
 						cr.recoveryDepth++
 						cr.scheduledNext = rec
 						cr.current = PhaseShip // ship ran (and failed); keep forensics accurate
@@ -252,7 +252,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// failure-learning retro so the timing record stays
 				// chronological (failed phase, then retro). No canonical
 				// agent verdict exists on this path → synthesized FAIL.
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error()))
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt, cr.o.now)
 				// ADR-0044 C3: enforce-only, best-effort — classify the
 				// unclassified pane via the LLM tail and promote, so the
@@ -280,7 +280,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 				// ADR-0044 C1: a non-canonical verdict is never recorded
 				// raw and never upgraded — phaseOutcomeFrom synthesizes FAIL.
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error()))
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error(), cr.cs.PhaseStartedAt))
 				writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt, cr.o.now)
 				cr.recordFailureLearning(next, ferr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, ferr)

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"text/template"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
 // RenderJSON serialises d to indented JSON bytes with a trailing newline.
@@ -31,7 +33,9 @@ func ParseJSON(data []byte) (*Dossier, error) {
 	return &d, nil
 }
 
-var markdownTmpl = template.Must(template.New("dossier-md").Parse(`# Cycle {{.Cycle}} Dossier
+var markdownTmpl = template.Must(template.New("dossier-md").
+	Funcs(template.FuncMap{"humanMS": phasetiming.HumanMS}).
+	Parse(`# Cycle {{.Cycle}} Dossier
 
 **Goal:** {{.Goal}}
 **Final verdict:** {{.FinalVerdict}}
@@ -50,10 +54,22 @@ var markdownTmpl = template.Must(template.New("dossier-md").Parse(`# Cycle {{.Cy
 
 ## Phases
 
-| Phase | Verdict | Key Findings |
-|-------|---------|--------------|
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
 {{- range .Phases}}
-| {{.Name}} | {{.Verdict}} | {{.KeyFindings}} |
+| {{.Name}} | {{.Archetype}} | {{.Verdict}} | {{if .DurationMS}}{{humanMS .DurationMS}}{{end}} | {{.KeyFindings}} |
+{{- end}}
+{{- if .Timing}}
+
+## Timing
+
+**Total:** {{humanMS .Timing.TotalMS}} across {{.Timing.PhaseCount}} phases ({{.Timing.RetriedCount}} retried) · **Longest:** {{.Timing.LongestPhase}} {{humanMS .Timing.LongestMS}}
+
+| Archetype | Wall-clock |
+|-----------|------------|
+{{- range $k, $v := .Timing.ByArchetype}}
+| {{$k}} | {{humanMS $v}} |
+{{- end}}
 {{- end}}
 {{- if .Defects}}
 
