@@ -246,6 +246,11 @@ type RolloutStages struct {
 	// Concurrency is ParallelEvaluateConcurrency (RoutingConfig). Composition-root
 	// view, loaded from policy.ParallelEvaluateConfig.
 	ParallelEvaluate Stage
+	// ScoutDecompose is the scout map-reduce dial (off->shadow->enforce, default off):
+	// enforce runs N scout-scan workers over codebase slices concurrently and the
+	// scout agent synthesizes from their merged digests instead of scanning itself.
+	// Concurrency = ScoutDecomposeConcurrency. Flip to enforce only after a shadow soak.
+	ScoutDecompose Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -264,8 +269,10 @@ type RoutingConfig struct {
 	// ParallelEvaluate=enforce dispatcher runs at once. Default 3 (the soak sweet
 	// spot: ~11% saving, diminishing past it). Resolved from policy.
 	ParallelEvaluateConcurrency int
-	PhaseEnable                 map[string]Enable       // phase -> enablement source
-	Triggers                    map[string]RoutingBlock // phase -> declarative triggers
+	// ScoutDecomposeConcurrency bounds the parallel scout-scan workers. Default 4.
+	ScoutDecomposeConcurrency int
+	PhaseEnable               map[string]Enable       // phase -> enablement source
+	Triggers                  map[string]RoutingBlock // phase -> declarative triggers
 	// Order is the linear phase sequence the router walks, in registry order.
 	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
 	// loaded without a registry stays byte-identical to pre-Order behavior).
@@ -441,7 +448,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -451,6 +458,7 @@ func defaults() RoutingConfig {
 		Conditional:                 map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions:               4,
 		ParallelEvaluateConcurrency: 3, // soak sweet spot (~11% saving; diminishing past it)
+		ScoutDecomposeConcurrency:   4,
 		RePlanMaxDepth:              1, // ADR-0052 WS2-S5: one measured re-plan/cycle, then escalate
 
 		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing

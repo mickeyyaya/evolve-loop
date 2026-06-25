@@ -1,0 +1,12 @@
+{
+  "name": "scout-scan",
+  "archetype": "plan",
+  "kind": "llm",
+  "optional": true,
+  "enabled": "off",
+  "tier": "tier-2",
+  "agent": "evolve-scout-scan",
+  "artifact": "scout-scan-digest.json",
+  "emits_verdict": false,
+  "description": "MAP-step slice scanner for scout map-reduce (dispatched by the scout phase, not the spine). Off by default; activated via ScoutDecompose=enforce."
+}
