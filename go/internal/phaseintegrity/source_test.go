@@ -3,12 +3,54 @@ package phaseintegrity
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 )
+
+func TestSource_TreeSHA_RealGitWorktree(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) error {
+		return exec.Command("git", append([]string{"-C", dir}, args...)...).Run()
+	}
+	if err := run("init"); err != nil {
+		t.Skipf("git unavailable: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := run("add", "-A"); err != nil {
+		t.Fatalf("git add: %v", err)
+	}
+	got, err := (Source{WorktreePath: dir}).TreeSHA() // GitTree nil → defaultGitTree
+	if err != nil {
+		t.Fatalf("TreeSHA real git: %v", err)
+	}
+	if len(got) != 40 && len(got) != 64 { // sha1 or sha256 tree oid
+		t.Errorf("write-tree sha = %q, want a 40/64-char hex oid", got)
+	}
+}
+
+func TestSource_TreeSHA_DefaultErrorsOnNonGitDir(t *testing.T) {
+	if _, err := (Source{WorktreePath: t.TempDir()}).TreeSHA(); err == nil {
+		t.Fatal("expected git write-tree to error in a non-git directory")
+	}
+}
+
+func TestSource_ProfileSHA_SurfacesNonENOENTStatError(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "afile")
+	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A child path UNDER a regular file → ENOTDIR (not IsNotExist) → must surface.
+	if _, err := (Source{ProfilePath: filepath.Join(f, "child")}).ProfileSHA(); err == nil {
+		t.Fatal("expected a non-ENOENT stat error to surface (fail loudly)")
+	}
+}
 
 func TestSource_ImplementsDigestSource(t *testing.T) {
 	var _ phaseblock.DigestSource = Source{}

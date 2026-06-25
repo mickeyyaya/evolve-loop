@@ -106,6 +106,15 @@ func TestRepinShipSHA_RejectsRelativeStatePath(t *testing.T) {
 	}
 }
 
+func TestRepinShipSHA_SurfacesReadError(t *testing.T) {
+	// Authorized + absolute path, but the state file does not exist → the read
+	// inside the lock must surface as an error (not a silent success).
+	missing := filepath.Join(t.TempDir(), "no-such-dir", "state.json")
+	if _, err := RepinShipSHA(missing, "SHA", "abc", "v", trueProv, false); err == nil {
+		t.Fatal("expected a read error for a missing state file")
+	}
+}
+
 func TestRepinShipSHA_EmptyPluginVer_LeavesVersionUntouched(t *testing.T) {
 	p := seedStateJSON(t, t.TempDir(), nil)
 	if _, err := RepinShipSHA(p, "NEW_SHA", "abc", "", trueProv, false); err != nil {
