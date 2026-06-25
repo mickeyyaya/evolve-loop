@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // reset.go — the complement of resume.go. Where resume CONTINUES a
@@ -36,6 +37,13 @@ import (
 // (no cycle-state.json, or cycle_id == 0).
 var ErrNothingToReset = errors.New("reset: no in-progress cycle to seal")
 
+// ErrCycleOwnedLive is returned when the cycle's per-run lease is still FRESH
+// (its owner is alive, heartbeating) and SealOptions.Force was not set. Sealing
+// a running loop's cycle out from under it is the cycle-395 race this fence
+// closes; a stale/missing lease (dead owner) seals freely. SealResult carries
+// LeaseOwnerPID + LeaseHeartbeatAge so the caller can name the live owner.
+var ErrCycleOwnedLive = errors.New("reset: cycle is owned by a live run (fresh lease) — refusing to seal without --force")
+
 // ledgerAppender is the narrow slice of core.Ledger that SealCycle needs.
 // Accepting it (rather than the full Ledger) keeps the dependency minimal and
 // the test fake trivial; *ledger.FileLedger satisfies it.
@@ -51,6 +59,11 @@ type SealOptions struct {
 	DryRun      bool                                     // compute the plan, mutate nothing
 	Now         func() time.Time                         // defaults to time.Now
 	GitHead     func(projectRoot string) (string, error) // defaults to defaultCurrentHead
+	// Force seals even when the cycle's run lease is FRESH (a live owner). The
+	// default refuses with ErrCycleOwnedLive. A stale/missing lease never needs it.
+	Force bool
+	// LeaseTTL overrides the liveness-fence freshness window; 0 = runlease.DefaultTTL.
+	LeaseTTL time.Duration
 }
 
 // SealResult reports what was (or, in dry-run, would be) sealed.
@@ -61,6 +74,13 @@ type SealResult struct {
 	ArchiveDir    string
 	NextCycle     int
 	DryRun        bool
+	// ForcedOverLiveOwner is true when Force sealed a cycle whose lease was still
+	// fresh (a live owner was overridden) — recorded for the audit trail.
+	ForcedOverLiveOwner bool
+	// LeaseOwnerPID / LeaseHeartbeatAge surface the live owner on an
+	// ErrCycleOwnedLive refusal (and in dry-run) so the caller can name it.
+	LeaseOwnerPID     int
+	LeaseHeartbeatAge time.Duration
 }
 
 // SealCycle seals the in-progress cycle described by
@@ -111,6 +131,28 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		NextCycle:     cycleID + 1,
 		DryRun:        opts.DryRun,
 	}
+
+	// F1 — liveness fence: refuse to seal a cycle whose run owner is still alive
+	// (a fresh .lease heartbeat). runlease is the SSOT for liveness (heartbeat
+	// freshness, NOT pid — a recycled pid must never read as alive). A
+	// stale/missing/unparsable lease ⇒ the owner is gone ⇒ safe to seal. Dry-run
+	// is a read-only preview and never blocks; Force overrides a live owner
+	// (loud, operator-attested) and is recorded in ForcedOverLiveOwner.
+	if lease, ok, _ := runlease.Read(workspace); ok && runlease.Fresh(lease, t, opts.LeaseTTL) {
+		res.LeaseOwnerPID = lease.OwnerPID
+		if hb, perr := time.Parse(time.RFC3339Nano, lease.HeartbeatAt); perr == nil {
+			res.LeaseHeartbeatAge = t.Sub(hb)
+		}
+		switch {
+		case opts.DryRun:
+			// preview surfaces the live owner but never blocks
+		case opts.Force:
+			res.ForcedOverLiveOwner = true
+		default:
+			return res, ErrCycleOwnedLive
+		}
+	}
+
 	if opts.DryRun {
 		return res, nil
 	}

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // reset_test.go — SealCycle abandons a stuck/unfinished cycle while
@@ -251,4 +253,150 @@ func readJSONMap(t *testing.T, path string) map[string]any {
 		t.Fatalf("parse %s: %v", path, err)
 	}
 	return m
+}
+
+// TestSealCycle_RegressionCycle395 (F3) pins the exact incident: a sibling
+// `evolve cycle reset` ran in the BETWEEN-CYCLES gap — the loop's per-cycle
+// .evolve/.lock was NOT held at that instant — and the old code sealed the
+// running loop's cycle out from under it. With the lease fence the FRESH
+// heartbeat refuses the seal regardless of whether any flock is held: the
+// per-run lease, not the coarse cycle lock, is the liveness SSOT. (Design note:
+// we deliberately do NOT make .evolve/.lock batch-scoped — that would break
+// shipped fleet concurrency; the heartbeat already spans the whole run.)
+func TestSealCycle_RegressionCycle395(t *testing.T) {
+	t.Parallel()
+	ev := t.TempDir()
+	ws := sealFixture(t, ev, 395)
+	// Fresh lease ⇒ the loop is alive (heartbeating) even with no .evolve/.lock
+	// held — the exact gap that defeated the old guard.
+	if err := runlease.Write(ws, runlease.Lease{RunID: "01KVZ8FCPP", OwnerPID: 84055},
+		time.Date(2026, 5, 27, 8, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatalf("write lease: %v", err)
+	}
+	led := &recordingLedger{}
+	_, err := SealCycle(context.Background(), led, sealOpts(ev))
+	if !errors.Is(err, ErrCycleOwnedLive) {
+		t.Fatalf("a live loop's cycle must NOT be sealable (cycle-395 regression), got %v", err)
+	}
+	if _, statErr := os.Stat(ws); statErr != nil {
+		t.Errorf("the running cycle's workspace must survive the refusal: %v", statErr)
+	}
+	if len(led.entries) != 0 {
+		t.Errorf("no seal ⇒ no ledger entry; got %d", len(led.entries))
+	}
+}
+
+// TestSealCycle_LeaseFencing (F1) — the load-bearing concurrency fix. SealCycle
+// must consult the per-run .lease heartbeat (runlease) before sealing: a FRESH
+// lease means a live owner, so sealing is refused (ErrCycleOwnedLive) unless
+// --force; a STALE/missing/unparsable lease means the owner is gone, so the
+// cycle auto-reclaims with no --force. This is the regression guard for the
+// cycle-395 incident where a sibling `evolve cycle reset` sealed a RUNNING loop.
+func TestSealCycle_LeaseFencing(t *testing.T) {
+	t.Parallel()
+	// sealClock matches sealOpts().Now — the single clock the fence uses.
+	sealClock := time.Date(2026, 5, 27, 8, 0, 0, 0, time.UTC)
+	writeLease := func(t *testing.T, ws string, hb time.Time) {
+		t.Helper()
+		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN", OwnerPID: 4242}, hb); err != nil {
+			t.Fatalf("write lease: %v", err)
+		}
+	}
+
+	t.Run("fresh lease refuses without --force", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		writeLease(t, ws, sealClock) // heartbeat == now ⇒ fresh ⇒ owner alive
+		led := &recordingLedger{}
+		res, err := SealCycle(context.Background(), led, sealOpts(ev))
+		if !errors.Is(err, ErrCycleOwnedLive) {
+			t.Fatalf("fresh lease must refuse with ErrCycleOwnedLive, got %v", err)
+		}
+		if res.LeaseOwnerPID != 4242 {
+			t.Errorf("res.LeaseOwnerPID = %d, want 4242 (the cmd needs it for the owner message)", res.LeaseOwnerPID)
+		}
+		if _, statErr := os.Stat(ws); statErr != nil {
+			t.Errorf("workspace must be untouched on refusal: %v", statErr)
+		}
+		if _, statErr := os.Stat(filepath.Join(ev, "cycle-state.json")); statErr != nil {
+			t.Errorf("cycle-state must survive refusal: %v", statErr)
+		}
+		if len(led.entries) != 0 {
+			t.Errorf("refusal must not append a ledger entry; got %d", len(led.entries))
+		}
+	})
+
+	t.Run("stale lease auto-seals without --force", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		writeLease(t, ws, sealClock.Add(-20*time.Minute)) // > DefaultTTL (10m) ⇒ owner gone
+		res, err := SealCycle(context.Background(), &recordingLedger{}, sealOpts(ev))
+		if err != nil {
+			t.Fatalf("stale lease must auto-seal (owner is dead): %v", err)
+		}
+		if res.SealedCycleID != 108 {
+			t.Errorf("sealed=%d, want 108", res.SealedCycleID)
+		}
+		if _, statErr := os.Stat(ws); !os.IsNotExist(statErr) {
+			t.Errorf("stale-lease seal must archive the workspace; stat err=%v", statErr)
+		}
+	})
+
+	t.Run("force overrides a fresh lease", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		writeLease(t, ws, sealClock)
+		opts := sealOpts(ev)
+		opts.Force = true
+		res, err := SealCycle(context.Background(), &recordingLedger{}, opts)
+		if err != nil {
+			t.Fatalf("--force must override a live lease: %v", err)
+		}
+		if !res.ForcedOverLiveOwner {
+			t.Errorf("res.ForcedOverLiveOwner must be true for the audit trail")
+		}
+		if _, statErr := os.Stat(ws); !os.IsNotExist(statErr) {
+			t.Errorf("--force must seal (archive) the workspace; stat err=%v", statErr)
+		}
+	})
+
+	t.Run("dry-run never blocks on a fresh lease", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		writeLease(t, ws, sealClock)
+		opts := sealOpts(ev)
+		opts.DryRun = true
+		res, err := SealCycle(context.Background(), &recordingLedger{}, opts)
+		if err != nil {
+			t.Fatalf("dry-run must not block on a live lease: %v", err)
+		}
+		if res.LeaseOwnerPID != 4242 {
+			t.Errorf("dry-run should still surface the live owner pid; got %d", res.LeaseOwnerPID)
+		}
+		if _, statErr := os.Stat(ws); statErr != nil {
+			t.Errorf("dry-run must not touch the workspace: %v", statErr)
+		}
+	})
+
+	t.Run("no lease seals (legacy behavior)", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		if _, err := SealCycle(context.Background(), &recordingLedger{}, sealOpts(ev)); err != nil {
+			t.Fatalf("absent lease must seal as before: %v", err)
+		}
+		if _, statErr := os.Stat(ws); !os.IsNotExist(statErr) {
+			t.Errorf("no-lease seal must archive the workspace")
+		}
+	})
+
+	t.Run("unparsable lease is not fresh, seals", func(t *testing.T) {
+		ev := t.TempDir()
+		ws := sealFixture(t, ev, 108)
+		if err := os.WriteFile(runlease.PathIn(ws), []byte("{not json"), 0o644); err != nil {
+			t.Fatalf("write bad lease: %v", err)
+		}
+		if _, err := SealCycle(context.Background(), &recordingLedger{}, sealOpts(ev)); err != nil {
+			t.Fatalf("unparsable lease must not block the seal: %v", err)
+		}
+	})
 }

@@ -200,9 +200,16 @@ func TestRunCycleReset_Seals(t *testing.T) {
 	}
 }
 
-func TestRunCycleReset_ForceBypassesHeldLock(t *testing.T) {
+// TestRunCycleReset_HeldLockAloneDoesNotBlock pins the cycle-395 fix direction:
+// holding the coarse .evolve/.lock WITHOUT a fresh run lease must NOT block a
+// reset. The old lock pre-check was a false negative — the dispatcher's lock is
+// per-CYCLE (released between cycles), so a sibling acquired it in the gap and
+// sealed a running loop. Liveness is now the per-run lease (the FRESH-lease
+// refusal is covered by TestRunCycleReset_LeaseFencing); a held lock with no
+// proof-of-life owner does not gate the seal.
+func TestRunCycleReset_HeldLockAloneDoesNotBlock(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
-	// Hold the .evolve lock to simulate a live dispatcher.
+	// Hold the .evolve lock; write NO lease (no live owner is proven).
 	st := storage.New(evolveDir)
 	release, err := st.AcquireLock(context.Background())
 	if err != nil {
@@ -210,19 +217,12 @@ func TestRunCycleReset_ForceBypassesHeldLock(t *testing.T) {
 	}
 	defer func() { _ = release() }()
 
-	// Without --force the reset must refuse (lock held).
 	var so, se bytes.Buffer
-	if rc := runCycleReset([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir}, &so, &se); rc == 0 {
-		t.Fatalf("expected refusal while the lock is held; rc=0 stderr=%q", se.String())
-	}
-	// With --force it seals despite the held lock.
-	so.Reset()
-	se.Reset()
-	if rc := runCycleReset([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir, "--force"}, &so, &se); rc != 0 {
-		t.Fatalf("--force should seal despite the held lock; rc=%d stderr=%q", rc, se.String())
+	if rc := runCycleReset([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir}, &so, &se); rc != 0 {
+		t.Fatalf("a held lock with no fresh lease must NOT block reset; rc=%d stderr=%q", rc, se.String())
 	}
 	if _, err := os.Stat(filepath.Join(evolveDir, "cycle-state.json")); !os.IsNotExist(err) {
-		t.Errorf("cycle-state.json should be cleared after a --force seal; err=%v", err)
+		t.Errorf("cycle-state.json should be cleared after seal; err=%v", err)
 	}
 }
 

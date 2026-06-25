@@ -17,7 +17,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
@@ -33,6 +35,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // validStrategies mirrors the bash whitelist at
@@ -86,6 +89,28 @@ type loopConfig struct {
 }
 
 // runLoop implements `evolve loop`.
+// loopSignalContext builds the loop's signal-aware context: SIGINT/SIGTERM
+// cancel it so the in-flight cycle unwinds gracefully (the orchestrator's
+// deferred checkpoint + run-lease release run) instead of the OS default
+// disposition — the silent kill that lost cycles 394/395. A package var so
+// tests can inject a cancellable context without delivering a real signal.
+var loopSignalContext = func(parent context.Context) (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
+}
+
+// emitSignalStop logs a graceful, resumable stop after a SIGINT/SIGTERM
+// cancelled the run mid-cycle (the orchestrator's deferred checkpoint + lease
+// release have already run) and emits the loop result. Callers poll ctx.Err()
+// BEFORE the cycle error so a cancellation reads as a clean signal stop, not a
+// confusing "context canceled" cycle error. A signal racing a clean cycle
+// completion (a ~µs window) only yields a harmless extra --resume hint: the
+// next fresh run finds no unfinished cycle (it was finalized) and proceeds.
+func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
+	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) at cycle %d — checkpointed; resume with: evolve loop --resume\n", cycle)
+	lr.StopReason = "signal"
+	lr.emit(stdout)
+}
+
 func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	cfg, rc := parseLoopArgs(args, stderr)
 	if rc != 0 {
@@ -103,6 +128,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, string(buf))
 		return 0
 	}
+
+	// Graceful interruption (F4): a SIGINT/SIGTERM (Ctrl-C, a polite `kill`, or a
+	// sibling stopping this run) cancels ctx so the in-flight cycle unwinds and
+	// checkpoints — resumable via `evolve loop --resume` — instead of the silent
+	// default-disposition kill. SIGKILL can't be trapped; its recovery is the
+	// stale-lease auto-reclaim in `evolve cycle reset`.
+	ctx, stop := loopSignalContext(context.Background())
+	defer stop()
 
 	// Crash-recovery GC, before any cycle runs: reap tmux sessions left by a
 	// PRIOR crashed run. The per-run registry reaper cannot — a SIGKILL'd loop
@@ -176,7 +209,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// cycle from the paused phase, then exit. M3 protocol.
 	if cfg.Resume {
 		lr.Resumed = true
-		rp, err := core.LoadResumeState(context.Background(), cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{})
+		rp, err := core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{})
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
 			lr.StopReason = "error"
@@ -193,9 +226,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 			BypassPolicy:          cfg.BypassPolicy,
 		}
-		result, err := orch.RunCycleFromPhase(context.Background(), req, rp)
+		result, err := orch.RunCycleFromPhase(ctx, req, rp)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
 		lr.Cycles = append(lr.Cycles, result)
+		if ctx.Err() != nil {
+			emitSignalStop(stdout, stderr, &lr, result.Cycle)
+			return 130
+		}
 		if err != nil {
 			lr.StopReason = "error"
 			fmt.Fprintf(stderr, "evolve loop: resume cycle %d: %v\n", result.Cycle, err)
@@ -226,6 +263,21 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// swallowed parse error would yield a zero CycleState that the
 		// predicate treats as "no cycle", letting the fresh run clobber it.
 		if csErr != nil || unfinishedCycle(cs, last) {
+			// F1-sibling: if the unfinished cycle's run lease is still FRESH, a
+			// LIVE loop owns it — steer to attach/wait, never to `evolve cycle
+			// reset` (sealing a running cycle is the cycle-395 race; reset would
+			// refuse anyway). A stale/absent lease falls through to the normal
+			// resume-or-seal guidance below.
+			if csErr == nil && cs.WorkspacePath != "" {
+				if lease, ok, _ := runlease.Read(cs.WorkspacePath); ok && runlease.Fresh(lease, time.Now(), 0) {
+					fmt.Fprintf(stderr, "[loop] cycle %d is owned by a LIVE run (pid %d, lease heartbeat fresh) — another evolve loop is already running it.\n", cs.CycleID, lease.OwnerPID)
+					fmt.Fprintln(stderr, "[loop]   • continue/attach:  evolve loop --resume")
+					fmt.Fprintln(stderr, "[loop]   • or let it finish — do NOT `evolve cycle reset` or `pkill` a live run (Ctrl-C lets it checkpoint).")
+					lr.StopReason = "owned_by_live_run"
+					lr.emit(stdout)
+					return 2
+				}
+			}
 			if csErr != nil {
 				fmt.Fprintf(stderr, "[loop] cycle-state.json is unreadable (%v) — treating as an unfinished cycle to avoid clobbering history.\n", csErr)
 			} else {
@@ -287,6 +339,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	for i := 0; i < effectiveMax; i++ {
+		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
+		if ctx.Err() != nil {
+			fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) before cycle %d — stopping; resume with: evolve loop --resume\n", i+1)
+			lr.StopReason = "signal"
+			lr.emit(stdout)
+			return 130
+		}
 		// CLI-health canary (the per-cycle health seam): one cheap live probe
 		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
 		// ones re-bench with a doubled cooldown, instead of a full phase
@@ -310,9 +369,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 			BypassPolicy:          cfg.BypassPolicy,
 		}
-		result, err := orch.RunCycle(context.Background(), req)
+		result, err := orch.RunCycle(ctx, req)
 		reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)
 		lr.Cycles = append(lr.Cycles, result)
+		if ctx.Err() != nil {
+			emitSignalStop(stdout, stderr, &lr, result.Cycle)
+			return 130
+		}
 		if err != nil {
 			var clf *core.ErrCycleLevelFailure
 			if errors.As(err, &clf) {
