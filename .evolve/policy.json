@@ -15,7 +15,6 @@
     "scout": { "cli": "codex", "model": "deep" },
     "build-planner": { "cli": "codex", "model": "deep" },
     "builder": { "cli": "codex", "model": "deep" },
-    "triage": { "cli": "agy", "model": "balanced" },
     "memo": { "cli": "agy", "model": "fast" }
   }
 }

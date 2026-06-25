@@ -40,6 +40,7 @@ Commands:
   campaign   Plan and execute dependency-ordered multi-cycle campaigns
               ( campaign study|replan|run )
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
+  gc         Reap orphaned tmux sessions whose creator PID is dead ( gc [--dry-run] )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N [strategy] "goal" )
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )

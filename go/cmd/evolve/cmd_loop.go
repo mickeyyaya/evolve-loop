@@ -104,6 +104,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	// Crash-recovery GC, before any cycle runs: reap tmux sessions left by a
+	// PRIOR crashed run. The per-run registry reaper cannot — a SIGKILL'd loop
+	// never ran its teardown, and its sessions aren't in this run's registry.
+	// This is the "the GC still works even when the last pipeline broke"
+	// guarantee. Liveness-scoped, so a live concurrent run is never touched.
+	gcOrphanSessions("startup", stderr)
+
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
 	// orch is narrowed to loopCycleRunner so tests can inject a scripted
 	// orchestrator (loopOrchOverride) — the real *core.Orchestrator cannot be
