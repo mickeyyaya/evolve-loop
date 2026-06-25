@@ -14,6 +14,8 @@ package dossier
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
 // Verdict values a cycle (or phase) can carry.
@@ -38,16 +40,24 @@ type Dossier struct {
 	Carryover    []Carryover   `json:"carryover,omitempty"`
 	StartedAt    string        `json:"started_at,omitempty"`
 	EndedAt      string        `json:"ended_at,omitempty"`
+	// Timing is the cycle-level latency roll-up (where the wall-clock went),
+	// ingested from phase-timing.json. Nil when the cycle wrote no timing log.
+	Timing *phasetiming.Summary `json:"timing,omitempty"`
 }
 
 // PhaseRecord is one phase's outcome within the cycle (mirrors a ledger entry +
-// its handoff report).
+// its handoff report). The timing fields (omitempty) carry the durable per-phase
+// latency evidence ingested from phase-timing.json.
 type PhaseRecord struct {
 	Name        string         `json:"name"`
 	Verdict     string         `json:"verdict"`
 	KeyFindings string         `json:"key_findings,omitempty"`
 	ArtifactSHA string         `json:"artifact_sha,omitempty"`
 	Signals     map[string]any `json:"signals,omitempty"`
+	DurationMS  int64          `json:"duration_ms,omitempty"`
+	StartedAt   string         `json:"started_at,omitempty"`
+	EndedAt     string         `json:"ended_at,omitempty"`
+	Archetype   string         `json:"archetype,omitempty"`
 }
 
 // Defect is one audit finding (the H1/H2 taxonomy) — preserved so a failed cycle

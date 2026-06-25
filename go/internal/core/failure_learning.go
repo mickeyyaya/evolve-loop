@@ -16,23 +16,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-type phaseTimingEntry struct {
-	Phase      string `json:"phase"`
-	DurationMS int64  `json:"duration_ms"`
-	// BootMS is the cold REPL-boot slice of DurationMS (ADR-0043 A0) — pure
-	// dispatch overhead before the model worked. omitempty: 0 for warm/headless.
-	BootMS       int64   `json:"boot_ms,omitempty"`
-	Verdict      string  `json:"verdict"`
-	CostUSD      float64 `json:"cost_usd"`
-	AttemptCount int     `json:"attempt_count"`
-	// AbortReason is set when the cycle aborted AFTER this phase produced its
-	// outcome (ADR-0044 C1): the verdict above stays the agent's own; the
-	// abort is a cycle-level disposition. omitempty: absent on happy paths.
-	AbortReason string `json:"abort_reason,omitempty"`
-}
+// phaseTimingEntry is an alias for the single-source schema in internal/
+// phasetiming — defined once there so the orchestrator (sole writer), the
+// dossier producer, and the `evolve cycle timing` CLI cannot drift apart.
+type phaseTimingEntry = phasetiming.Entry
 
 type phaseUsageSidecar struct {
 	Phase        string  `json:"phase"`
@@ -40,6 +31,10 @@ type phaseUsageSidecar struct {
 	DurationMS   int64   `json:"duration_ms"`
 	AttemptCount int     `json:"attempt_count"`
 	Verdict      string  `json:"verdict"`
+	// StartedAt/EndedAt/Archetype mirror phaseTimingEntry (ADR-0044 C1).
+	StartedAt string `json:"started_at,omitempty"`
+	EndedAt   string `json:"ended_at,omitempty"`
+	Archetype string `json:"archetype,omitempty"`
 	// AbortReason mirrors phaseTimingEntry.AbortReason (ADR-0044 C1).
 	AbortReason string `json:"abort_reason,omitempty"`
 }
@@ -64,7 +59,7 @@ type failureLearningRequest struct {
 // non-canonical, error-path zero response) synthesizes FAIL. A synthesized
 // PASS is structurally impossible — reconciliation only ever describes what
 // the agent itself reported.
-func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason string) recovery.PhaseOutcome {
+func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason, startedAt string) recovery.PhaseOutcome {
 	verdict := resp.Verdict
 	if !IsVerdict(verdict) {
 		verdict = VerdictFAIL
@@ -75,6 +70,7 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 		CostUSD:      resp.CostUSD,
 		DurationMS:   resp.DurationMS,
 		BootMS:       resp.BootMS,
+		StartedAt:    startedAt,
 		AttemptCount: attempts,
 		AbortReason:  abortReason,
 	}
@@ -92,6 +88,12 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 // dispatched (no runner registered, pre-phase state-write failure) have no
 // outcome to record and stay bare.
 func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseTimingEntry, workspace string, out recovery.PhaseOutcome) {
+	// EndedAt and Archetype are stamped HERE — the single chokepoint owns the
+	// end-of-dispatch clock reading and the phase classification, so every
+	// terminal path records them consistently without each call site re-reading
+	// the clock (drift) or re-deriving the taxonomy (duplication).
+	out.EndedAt = o.now().UTC().Format(time.RFC3339)
+	out.Archetype = o.phaseArchetype(out.Phase)
 	result.PhasesRun = append(result.PhasesRun, Phase(out.Phase))
 	*timings = append(*timings, phaseTimingEntry{
 		Phase:        out.Phase,
@@ -99,6 +101,9 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		BootMS:       out.BootMS,
 		Verdict:      out.Verdict,
 		CostUSD:      out.CostUSD,
+		StartedAt:    out.StartedAt,
+		EndedAt:      out.EndedAt,
+		Archetype:    out.Archetype,
 		AttemptCount: out.AttemptCount,
 		AbortReason:  out.AbortReason,
 	})
@@ -126,6 +131,9 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		DurationMS:   out.DurationMS,
 		AttemptCount: out.AttemptCount,
 		Verdict:      out.Verdict,
+		StartedAt:    out.StartedAt,
+		EndedAt:      out.EndedAt,
+		Archetype:    out.Archetype,
 		AbortReason:  out.AbortReason,
 	}
 	data, err := json.MarshalIndent(sidecar, "", "  ")
@@ -154,7 +162,7 @@ func writePhaseTimings(workspace string, timings []phaseTimingEntry) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping phase-timing.json write\n")
 		return
 	}
-	timingPath := filepath.Join(workspace, "phase-timing.json")
+	timingPath := phasetiming.Path(workspace)
 	if prev, rerr := os.ReadFile(timingPath); rerr == nil {
 		var existing []phaseTimingEntry
 		if jerr := json.Unmarshal(prev, &existing); jerr == nil && len(existing) > 0 {
@@ -317,7 +325,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	fl.Result.FinalVerdict = retroResp.Verdict
 	fl.Result.RetroDecision = "failure-learning: queued " + todoID
-	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, phaseOutcomeFrom(PhaseRetro, retroResp, 1, ""))
+	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, phaseOutcomeFrom(PhaseRetro, retroResp, 1, "", fl.CycleState.PhaseStartedAt))
 	o.writeFailureLearningState(ctx, fl.State)
 }
 

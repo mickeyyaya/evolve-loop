@@ -118,7 +118,11 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 					// record only; the gate, not Decide, owns blocking.)
 				case cr.o.cfg.PhaseRecovery == config.StageEnforce && cleanAbsence:
 					spineErr := fmt.Errorf("spine gate: next=%s blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-283 class)", next)
-					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, PhaseResponse{Phase: string(next)}, 0, spineErr.Error()))
+					// startedAt="" — the spine gate blocks BEFORE this phase
+					// dispatches, so it has no measured wall-clock start (the
+					// omitempty entry honestly records "never ran"). EndedAt is
+					// still stamped at the chokepoint to mark when it was blocked.
+					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, PhaseResponse{Phase: string(next)}, 0, spineErr.Error(), ""))
 					cr.recordFailureLearning(next, spineErr, 1)
 					return "", loopAbort, spineErr
 				default:

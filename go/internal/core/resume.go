@@ -248,6 +248,11 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		}
 
 		cs.Phase = string(next)
+		// Stamp the per-phase wall-clock start here too (mirrors
+		// cyclerun_dispatch.go): the resume path is a first-class dispatch
+		// surface, so a resumed phase's timing record must carry started_at —
+		// a post-crash resume is exactly when latency evidence matters most.
+		cs.PhaseStartedAt = o.now().UTC().Format(time.RFC3339)
 		cs.ActiveAgent = string(next)
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
@@ -271,12 +276,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		})
 		if err != nil {
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, phaseErr.Error()))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, phaseErr.Error(), cs.PhaseStartedAt))
 			return result, phaseErr
 		}
 		if !IsVerdict(resp.Verdict) {
 			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ferr.Error()))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ferr.Error(), cs.PhaseStartedAt))
 			return result, ferr
 		}
 
@@ -288,7 +293,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			ExitCode: 0,
 		}); err != nil {
 			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, lerr.Error()))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, lerr.Error(), cs.PhaseStartedAt))
 			return result, lerr
 		}
 
@@ -301,12 +306,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, werr.Error()))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, werr.Error(), cs.PhaseStartedAt))
 			return result, werr
 		}
 
 		result.FinalVerdict = resp.Verdict
-		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ""))
+		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, "", cs.PhaseStartedAt))
 		current = next
 		lastVerdict = resp.Verdict
 

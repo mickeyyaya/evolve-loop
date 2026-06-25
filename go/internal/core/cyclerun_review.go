@@ -191,7 +191,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			if rerr != nil {
 				recordCorrection(interaction.ResultDispatchFailed)
 				phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, rerr)
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, corr)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
@@ -203,7 +203,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			if !IsVerdict(dr.resp.Verdict) {
 				recordCorrection(interaction.ResultNonCanonicalVerdict)
 				phaseErr := fmt.Errorf("phase %q correction %d produced a non-canonical verdict %q", next, corr, dr.resp.Verdict)
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, corr)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
@@ -226,12 +226,12 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
 				// ADR-0044 C1: the phase ran and produced its own verdict;
 				// the reject is recorded as the abort reason, not a rewrite.
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, 1)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
 			phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
-			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 			cr.recordFailureLearning(next, phaseErr, maxCorrections)
 			return loopAbort, wrapCycleLevelError(next, phaseErr)
 		}
@@ -263,7 +263,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	if WorktreePhase(next) && cr.cs.ActiveWorktree != "" {
 		if !recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline) {
 			phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
-			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 			cr.recordFailureLearning(next, phaseErr, 1)
 			return loopAbort, phaseErr
 		}
@@ -333,7 +333,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 					// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
 					// and burned tokens before the guard caught its main-tree
 					// leak. The abort is correct; erasing the outcome was not.
-					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error()))
+					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 					cr.recordFailureLearning(next, phaseErr, 1)
 					// After abort, check if go/bin/evolve is absent
 					evolveBinPath := filepath.Join(cr.req.ProjectRoot, "go/bin/evolve")

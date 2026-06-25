@@ -47,6 +47,20 @@ type PhaseOutcome struct {
 	CostUSD    float64
 	DurationMS int64
 	BootMS     int64
+	// StartedAt and EndedAt are the per-phase wall-clock anchors (RFC3339):
+	// the durable latency evidence. StartedAt is the dispatch start (the
+	// orchestrator's PhaseStartedAt); EndedAt is stamped by recordPhaseOutcome
+	// — the single C1 chokepoint — when the dispatch's outcome is finalized.
+	// DurationMS above is the runner's self-reported compute; the StartedAt→
+	// EndedAt span is the orchestrator-observed wall-clock and the two may
+	// differ by the surrounding review/guard work (that delta is itself signal).
+	StartedAt string
+	EndedAt   string
+	// Archetype is the phase's composition class (plan/build/evaluate/control)
+	// — stamped at the chokepoint from the existing phasespec taxonomy so the
+	// latency roll-up can bucket cycle time (build=productive, evaluate=checking,
+	// plan=discovery, control=recovery/orchestration) without a duplicate list.
+	Archetype string
 	// AttemptCount is the dispatch-loop attempt count that produced this
 	// outcome (matches the attempt_count key in phase-timing.json and the
 	// usage sidecar, so the C1 data flow reads uniformly end to end).

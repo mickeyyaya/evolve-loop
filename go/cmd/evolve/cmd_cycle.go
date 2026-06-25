@@ -52,10 +52,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// runCycle implements `evolve cycle <subcommand>`. Subcommands: run.
+// runCycle implements `evolve cycle <subcommand>`. Subcommands: run | reset | timing.
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset)")
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing)")
 		return 10
 	}
 	switch args[0] {
@@ -63,6 +63,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCycleRun(args[1:], stdout, stderr)
 	case "reset":
 		return runCycleReset(args[1:], stdout, stderr)
+	case "timing":
+		return runCycleTiming(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve cycle: unknown subcommand %q\n", args[0])
 		return 10

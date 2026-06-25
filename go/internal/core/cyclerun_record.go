@@ -32,7 +32,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		lerr := fmt.Errorf("ledger append for %s: %w", next, err)
 		// ADR-0044 C1: the phase completed; a persistence failure must
 		// not erase its outcome from the timing/usage record.
-		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, lerr.Error()))
+		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, lerr.Error(), cr.cs.PhaseStartedAt))
 		return loopAbort, lerr
 	}
 
@@ -49,7 +49,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, werr.Error()))
+		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, werr.Error(), cr.cs.PhaseStartedAt))
 		return loopAbort, werr
 	}
 
@@ -60,7 +60,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	}
 
 	cr.result.FinalVerdict = dr.resp.Verdict
-	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, ""))
+	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict
 
