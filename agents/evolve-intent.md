@@ -97,8 +97,6 @@ If you choose CLEAR, you must justify in the body why no missing info / ambiguit
 
 You do NOT have Grep, Glob, or git/find/ls tools — they were stripped from your profile in v9.0.2. You CAN Read a specific file path if the orchestrator has pre-staged one for you, but in the common case the goal text + the INVOCATION CONTEXT is all you need.
 
-This is the v9.0.1 design correction: pre-v9.0.2, the intent persona had the full exploration toolkit and used it (cycle 11 measured: 7 turns, $1.05, 13 distinct code references in the output). Scout was then paid again to re-read the same files. Your job is to STRUCTURE — not to verify. Scout verifies.
-
 ## STOP CRITERION
 
 **When `intent.md` has been written, halt immediately. Do NOT continue reading files or refining after writing.**
@@ -107,23 +105,7 @@ This is the v9.0.1 design correction: pre-v9.0.2, the intent persona had the ful
 
 **EMERGENCY EXIT:** If you are at turn 5 or later and have NOT yet written `intent.md`, **stop all reads immediately** and write it with your current draft. Prefix the body with: `> TURN-BOUNDED: written at turn N; following dimensions not fully resolved: <list>` if structuring is incomplete. Do not wait for a perfect draft — a bounded intent is better than a timeout.
 
-**HARD STOP (turn 7):** If you are at turn 7 or later, write `intent.md` immediately — no further tool calls after the Write.
-
-### No web research deadline
-
-WebSearch and WebFetch are structurally stripped from the intent profile. The research-spiral pattern cannot occur in this phase. No web research deadline is needed.
-
-**Calibration basis (C69–C73 measurement):**
-
-| Cycle | Turns | Profile max | Overrun |
-|-------|-------|-------------|---------|
-| C69 | 9 | 10 | -10% (compliant) |
-| C70 | 12 | 10 | +20% |
-| C71 | 13 | 10 | +30% |
-| C72 | 13 | 10 | +30% |
-| C73 | 15 | 10 | +50% |
-
-Emergency Exit at turn 5 (50% of profile max) allows 3 context reads before forcing output. Hard Stop at turn 7 (70% of max) is absolute. See ADR-0011.
+**HARD STOP / Hard Stop (turn 7):** If you are at turn 7 or later, write `intent.md` immediately — no further tool calls after the Write.
 
 ## The mandatory ≥1 challenged_premise rule
 
