@@ -90,7 +90,7 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.StringVar(&reason, "reason", "operator-requested reset", "reason recorded in the seal manifest + ledger")
 	fs.BoolVar(&dryRun, "dry-run", false, "print the seal plan without mutating any state")
-	fs.BoolVar(&force, "force", false, "seal even if a dispatcher appears to hold the .evolve lock")
+	fs.BoolVar(&force, "force", false, "seal even when the cycle's run lease is still fresh (override a live, heartbeating owner — last resort)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -104,31 +104,40 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
 
-	// Refuse to seal under a live dispatcher — it holds the .evolve flock
-	// (LOCK_NB). Skipped for dry-run (read-only) and when --force is set.
-	if !dryRun && !force {
-		st := storage.New(evolveDir)
-		release, err := st.AcquireLock(context.Background())
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve cycle reset: .evolve appears locked by a running dispatcher (%v); stop it first or pass --force\n", err)
-			return 1
-		}
-		defer func() { _ = release() }()
-	}
-
+	// The liveness fence lives in SealCycle — it reads the per-run .lease
+	// heartbeat (the SSOT for "is the owner alive?"). The OLD `.evolve/.lock`
+	// pre-check here was a false negative that caused the cycle-395 race: the
+	// dispatcher's lock is per-CYCLE (released between cycles), so a sibling
+	// reset acquired it in the gap and sealed a RUNNING loop. We pass Force
+	// through and let the heartbeat-backed fence decide.
 	res, err := core.SealCycle(context.Background(), ledger.New(evolveDir), core.SealOptions{
 		EvolveDir:   evolveDir,
 		ProjectRoot: projectRoot,
 		Reason:      reason,
 		DryRun:      dryRun,
+		Force:       force,
 	})
 	if err != nil {
-		if errors.Is(err, core.ErrNothingToReset) {
+		switch {
+		case errors.Is(err, core.ErrNothingToReset):
 			fmt.Fprintln(stderr, "evolve cycle reset: no in-progress cycle to seal")
 			return 1
+		case errors.Is(err, core.ErrCycleOwnedLive):
+			fmt.Fprintf(stderr, "evolve cycle reset: cycle %d is owned by a LIVE run (pid %d, lease heartbeat %s ago) — refusing to seal a running loop.\n",
+				res.SealedCycleID, res.LeaseOwnerPID, res.LeaseHeartbeatAge.Round(time.Second))
+			fmt.Fprintln(stderr, "  • continue it:      evolve loop --resume")
+			fmt.Fprintln(stderr, "  • stop it cleanly:  send SIGINT/SIGTERM (Ctrl-C) to that loop — it checkpoints, then `evolve loop --resume`")
+			fmt.Fprintln(stderr, "  • override (only if you KNOW the owner is wedged): evolve cycle reset --force")
+			fmt.Fprintln(stderr, "  Do NOT `pkill evolve` or `tmux kill-server` — that corrupts the run and sibling sessions.")
+			return 1
+		default:
+			fmt.Fprintf(stderr, "evolve cycle reset: %v\n", err)
+			return 1
 		}
-		fmt.Fprintf(stderr, "evolve cycle reset: %v\n", err)
-		return 1
+	}
+	if res.ForcedOverLiveOwner {
+		fmt.Fprintf(stderr, "evolve cycle reset: WARN --force sealed cycle %d while its lease was still FRESH (pid %d, heartbeat %s ago) — a live owner was overridden.\n",
+			res.SealedCycleID, res.LeaseOwnerPID, res.LeaseHeartbeatAge.Round(time.Second))
 	}
 
 	verb := "sealed"
