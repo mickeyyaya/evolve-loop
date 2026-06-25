@@ -673,6 +673,20 @@ OuterLoop:
 			break OuterLoop
 		}
 
+		// PR2b: at ParallelEvaluate=enforce, when `next` begins a run of
+		// independent post-build checking phases (archetype "evaluate", audit
+		// excluded), dispatch the whole run CONCURRENTLY as one batch and skip
+		// the per-phase path. StageOff/Shadow (the default) never enter here, so
+		// the sequential dispatch below is byte-identical to pre-PR2b.
+		if cr.o.cfg.ParallelEvaluate == config.StageEnforce {
+			if batch := cr.evaluateBatchAt(next); len(batch) >= 2 {
+				if bact, berr := cr.dispatchEvaluateBatch(batch); bact == loopAbort {
+					return cr.result, berr
+				}
+				continue
+			}
+		}
+
 		// Runner lookup + pre-phase state write + tree-diff snapshot + phase-request
 		// build + the inner attempt loop (retries/backfill/optional-infra-skip/
 		// ship-recovery) → dispatch. Produces the per-phase dispatchResult.

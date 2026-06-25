@@ -233,6 +233,19 @@ type RolloutStages struct {
 	// promoter call site reads it. Default StageShadow (set in defaults()) — the
 	// auto-merge in enforce activates only after a human-watched shadow soak.
 	MergeGate Stage
+	// ParallelEvaluate is the post-build checking-phase parallelization dial. It
+	// uses the off→shadow→enforce trichotomy:
+	//   StageOff      — the dispatcher is dormant; phases run sequentially
+	//                   (DEFAULT, byte-identical legacy).
+	//   StageShadow   — the would-be batch + projected saving is recorded only.
+	//   StageEnforce  — the independent post-build evaluate phases (archetype
+	//                   "evaluate", excluding the audit verdict-brancher) run
+	//                   CONCURRENTLY; a single serialized merge records all
+	//                   outcomes (weakest-link verdict). The enforce flip activates
+	//                   only after a shadow soak (the ~11% projected fleet saving).
+	// Concurrency is ParallelEvaluateConcurrency (RoutingConfig). Composition-root
+	// view, loaded from policy.ParallelEvaluateConfig.
+	ParallelEvaluate Stage
 }
 
 // RoutingConfig is the immutable, typed configuration object. Loaded once at
@@ -247,8 +260,12 @@ type RoutingConfig struct {
 	Mandatory     []string            // ordered mandatory phase names
 	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
 	MaxInsertions int
-	PhaseEnable   map[string]Enable       // phase -> enablement source
-	Triggers      map[string]RoutingBlock // phase -> declarative triggers
+	// ParallelEvaluateConcurrency bounds how many post-build evaluate phases the
+	// ParallelEvaluate=enforce dispatcher runs at once. Default 3 (the soak sweet
+	// spot: ~11% saving, diminishing past it). Resolved from policy.
+	ParallelEvaluateConcurrency int
+	PhaseEnable                 map[string]Enable       // phase -> enablement source
+	Triggers                    map[string]RoutingBlock // phase -> declarative triggers
 	// Order is the linear phase sequence the router walks, in registry order.
 	// Empty ⇒ the router falls back to its built-in canonicalOrder (so a config
 	// loaded without a registry stays byte-identical to pre-Order behavior).
@@ -424,16 +441,17 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow},
+		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff},
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
 		// scope-clamp). Tests constructing RoutingConfig directly keep this
 		// 4-phase baseline.
-		Mandatory:      []string{"scout", "build", "audit", "ship"},
-		Conditional:    map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
-		MaxInsertions:  4,
-		RePlanMaxDepth: 1, // ADR-0052 WS2-S5: one measured re-plan/cycle, then escalate
+		Mandatory:                   []string{"scout", "build", "audit", "ship"},
+		Conditional:                 map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
+		MaxInsertions:               4,
+		ParallelEvaluateConcurrency: 3, // soak sweet spot (~11% saving; diminishing past it)
+		RePlanMaxDepth:              1, // ADR-0052 WS2-S5: one measured re-plan/cycle, then escalate
 
 		// Legacy phase-enable defaults, so PhasePolicy reproduces pre-routing
 		// behavior even when the registry file is absent (e.g. tests): triage
