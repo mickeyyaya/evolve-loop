@@ -49,6 +49,30 @@ func TestRunCycleTiming_RendersTableAndRollup(t *testing.T) {
 	}
 }
 
+// With ≥2 independent (non-audit) evaluate phases, the shadow parallel-evaluate
+// projection line must appear, naming the group and the would-be saving.
+func TestRunCycleTiming_ParallelProjection(t *testing.T) {
+	root := t.TempDir()
+	writeTimingFixture(t, root, "55", []phasetiming.Entry{
+		{Phase: "build", DurationMS: 600_000, Verdict: "PASS", Archetype: "build", AttemptCount: 1},
+		{Phase: "coverage-gate", DurationMS: 240_000, Verdict: "PASS", Archetype: "evaluate", AttemptCount: 1},
+		{Phase: "adversarial-review", DurationMS: 300_000, Verdict: "PASS", Archetype: "evaluate", AttemptCount: 1},
+		{Phase: "audit", DurationMS: 290_000, Verdict: "PASS", Archetype: "evaluate", AttemptCount: 1},
+	})
+	var out, errb bytes.Buffer
+	if code := runCycleTiming([]string{"--project-root", root, "--concurrency", "2", "55"}, &out, &errb); code != 0 {
+		t.Fatalf("exit=%d, stderr=%s", code, errb.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "Parallel-evaluate projection") {
+		t.Errorf("expected the shadow projection line; got:\n%s", s)
+	}
+	// Group is coverage-gate + adversarial-review (audit excluded as the brancher).
+	if !strings.Contains(s, "coverage-gate") || strings.Contains(s, "audit — ") {
+		t.Errorf("projection group must include checking phases and exclude audit; got:\n%s", s)
+	}
+}
+
 // With no positional cycle, the reporter picks the highest-numbered cycle that
 // has a timing log (reset-suffixed dirs and log-less dirs are ignored).
 func TestRunCycleTiming_DefaultsToLatestCycle(t *testing.T) {

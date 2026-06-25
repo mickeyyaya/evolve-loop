@@ -111,3 +111,60 @@ func HumanMS(ms int64) string {
 	}
 	return d.String()
 }
+
+// ParallelProjection is the SHADOW estimate (ADR shadow-stage discipline) of
+// parallelizing the independent post-build checking phases: their sequential
+// wall-clock vs the makespan if run concurrently at Concurrency. It is pure
+// projection from recorded durations — no execution change — and the evidence
+// that justifies the enforce-stage dispatcher (PR2b). SavingMS is a best-case
+// figure (makespan lower bound; real scheduling cannot beat it).
+type ParallelProjection struct {
+	GroupPhases         []string `json:"group_phases"`
+	Concurrency         int      `json:"concurrency"`
+	SequentialMS        int64    `json:"sequential_ms"`
+	ProjectedParallelMS int64    `json:"projected_parallel_ms"`
+	SavingMS            int64    `json:"saving_ms"`
+}
+
+// ProjectParallelSaving identifies the parallelizable checking group — the
+// archetype "evaluate" phases EXCLUDING audit (the verdict-branching anchor that
+// must stay serial) — and projects its makespan at the given concurrency.
+//
+// The estimate is the standard makespan lower bound max(longestPhase,
+// ceil(sum/concurrency)): with concurrency ≥ group size it is the single longest
+// phase; with concurrency 1 (or <2 parallelizable phases) there is no saving.
+// The projection assumes the evaluate phases are mutually independent (the
+// common case — each reads the same immutable build output); a real After-edge
+// between two of them would make this an upper bound on the achievable saving.
+func ProjectParallelSaving(entries []Entry, concurrency int) ParallelProjection {
+	p := ParallelProjection{Concurrency: concurrency}
+	var sum, longest int64
+	for _, e := range entries {
+		// "audit" is excluded by name: it is the verdict-branching anchor that
+		// must stay serial, and Entry carries no serial-anchor field.
+		if e.Archetype != "evaluate" || e.Phase == "audit" {
+			continue
+		}
+		p.GroupPhases = append(p.GroupPhases, e.Phase)
+		sum += e.DurationMS
+		if e.DurationMS > longest {
+			longest = e.DurationMS
+		}
+	}
+	p.SequentialMS = sum
+	// No parallelism possible: fewer than 2 phases, or concurrency ≤ 1.
+	if len(p.GroupPhases) < 2 || concurrency <= 1 {
+		p.ProjectedParallelMS = sum
+		return p
+	}
+	makespan := ceilDiv(sum, int64(concurrency))
+	if longest > makespan {
+		makespan = longest
+	}
+	p.ProjectedParallelMS = makespan
+	p.SavingMS = sum - makespan
+	return p
+}
+
+// ceilDiv returns ceil(a/b) for non-negative a and positive b.
+func ceilDiv(a, b int64) int64 { return (a + b - 1) / b }
