@@ -22,6 +22,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 )
 
 // Reason mirrors the four bash-canonical checkpoint reasons.
@@ -58,6 +59,10 @@ type Checkpoint struct {
 	QuotaResetSource      string   `json:"quotaResetSource"`
 	AutoResumeAttempts    int      `json:"autoResumeAttempts"`
 	AutoResumeMaxAttempts int      `json:"autoResumeMaxAttempts"`
+	// PhaseIntegrity is the per-phase agent-block digest chain (ADR-0065).
+	// Additive + omitempty: absent on pre-field checkpoints, so old state
+	// round-trips byte-clean and plain Compose stays integrity-free.
+	PhaseIntegrity []phaseblock.Digest `json:"phaseIntegrity,omitempty"`
 }
 
 // DefaultAutoResumeAttempts is the default cap on automatic resume attempts
@@ -85,6 +90,15 @@ func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, no
 		AutoResumeAttempts:    0,
 		AutoResumeMaxAttempts: DefaultAutoResumeAttempts,
 	}
+}
+
+// ComposeWithIntegrity is Compose plus the per-phase integrity chain (ADR-0065),
+// so a phase-complete checkpoint write carries (never clobbers) the recorded
+// chain. Pure; no I/O. Plain Compose stays integrity-free for back-compat.
+func ComposeWithIntegrity(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time, integrity []phaseblock.Digest) Checkpoint {
+	cp := Compose(cs, reason, cost, gitHead, now)
+	cp.PhaseIntegrity = integrity
+	return cp
 }
 
 // ComposeChecked is Compose with reason validation. Returns an error
@@ -194,7 +208,12 @@ func init() {
 				// their consumer (e.g. detectQuotaPause after RunCycle) reads them.
 				return nil
 			}
-			return applyWithHooks(defaultHooks(), cycleStatePath, Compose(cs, ReasonPhaseComplete, 0, "", now))
+			// ADR-0065: CARRY the recorded per-phase integrity chain through the
+			// phase-complete write (ComposeWithIntegrity), else this Compose would
+			// drop it (omitempty nil clobbers the on-disk phaseIntegrity). Read +
+			// write under the one lock — no TOCTOU with a peer's append.
+			existing := readExistingIntegrity(cycleStatePath)
+			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonPhaseComplete, 0, "", now, existing))
 		})
 	}
 }

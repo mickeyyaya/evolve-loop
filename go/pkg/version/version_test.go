@@ -217,3 +217,62 @@ func TestShortSHA(t *testing.T) {
 		})
 	}
 }
+
+// composeCommit resolves the raw build-commit (short sha) used for provenance
+// (ADR-0065): ldflag-injected `commit` wins; else BuildInfo vcs.revision; else
+// "". Truncated/trimmed via shortSHA. Drives every branch deterministically.
+func TestComposeCommit(t *testing.T) {
+	mustNotRead := func() (*debug.BuildInfo, bool) {
+		t.Helper()
+		t.Fatal("composeCommit must not read BuildInfo when commit is set")
+		return nil, false
+	}
+	mkBI := func(rev string) func() (*debug.BuildInfo, bool) {
+		return func() (*debug.BuildInfo, bool) {
+			info := &debug.BuildInfo{}
+			if rev != "" {
+				info.Settings = append(info.Settings, debug.BuildSetting{Key: "vcs.revision", Value: rev})
+			}
+			return info, true
+		}
+	}
+	cases := []struct {
+		name string
+		c    string
+		bi   func() (*debug.BuildInfo, bool)
+		want string
+	}{
+		{"ldflag_commit_truncated_to_12", "abcdef0123456789", mustNotRead, "abcdef012345"},
+		{"ldflag_short_commit_kept", "abc", mustNotRead, "abc"},
+		{"empty_falls_back_to_vcs_revision", "", mkBI("0123456789abcdef0123"), "0123456789ab"},
+		{"empty_and_no_vcs_revision", "", mkBI(""), ""},
+		{"empty_and_no_buildinfo", "", func() (*debug.BuildInfo, bool) { return nil, false }, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := composeCommit(tc.c, tc.bi); got != tc.want {
+				t.Errorf("composeCommit(%q)=%q, want %q", tc.c, got, tc.want)
+			}
+		})
+	}
+}
+
+// Commit() under `go test` must never panic and must honor the shortSHA
+// contract (<=12 chars). Exact value is environment-dependent (VCS info may
+// or may not be embedded), so we don't pin it.
+func TestCommit_ShortShapeNeverPanics(t *testing.T) {
+	got := Commit()
+	if len(got) > 12 {
+		t.Errorf("Commit()=%q exceeds 12-char shortSHA contract", got)
+	}
+}
+
+// Drive Commit()'s ldflag branch by mutating the package var.
+func TestCommit_HonorsLdflagInjectedCommit(t *testing.T) {
+	saveC := commit
+	t.Cleanup(func() { commit = saveC })
+	commit = "abcdef0123456789"
+	if got := Commit(); got != "abcdef012345" {
+		t.Errorf("Commit()=%q, want %q", got, "abcdef012345")
+	}
+}

@@ -41,6 +41,7 @@
 ./internal/logfilter
 ./internal/mergegate
 ./internal/paths
+./internal/phaseblock
 ./internal/phaseio
 ./internal/phaseorder
 ./internal/phases/debugger
@@ -53,6 +54,7 @@
 ./internal/redteamcheck
 ./internal/releaseconsistency
 ./internal/runlease
+./internal/selfsha
 ./internal/sessionrecord
 ./internal/setup
 ./internal/sysexec

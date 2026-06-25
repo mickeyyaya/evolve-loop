@@ -148,6 +148,11 @@ type Policy struct {
 	// read (flag-reduction, ADR-0064): the operator override now flows from this
 	// config block, loaded once, rather than a process env dial.
 	Worktree *WorktreePolicy `json:"worktree,omitempty"`
+	// Integrity configures the binary self-SHA integrity model (ADR-0065).
+	// Absent ⇒ Mode="pipeline", Stage="shadow", ProvenanceRequired=true —
+	// byte-neutral with the legacy single-pin ship check. Mode="phase" verifies
+	// the per-phase agent-block chain; Stage="enforce" blocks (shadow logs only).
+	Integrity *IntegrityPolicy `json:"integrity,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -180,6 +185,42 @@ func (p Policy) FailurePolicy() (alwaysLearn bool, auditFailRoutesTo string) {
 		auditFailRoutesTo = p.FailureFloor.AuditFailRoutesTo
 	}
 	return alwaysLearn, auditFailRoutesTo
+}
+
+// IntegrityPolicy configures the per-phase binary-integrity model (ADR-0065).
+type IntegrityPolicy struct {
+	// Mode: "pipeline" (default — the legacy single-pin ship check) or "phase"
+	// (verify the per-phase agent-block chain). Unknown ⇒ "pipeline".
+	Mode string `json:"mode,omitempty"`
+	// Stage: "shadow" (default — record + verify but log-only, never block) or
+	// "enforce" (block on a chain/provenance violation). Unknown ⇒ "shadow".
+	Stage string `json:"stage,omitempty"`
+	// ProvenanceRequired: when true (default), a resume re-pin / cross-binary
+	// chain is only accepted when the binary's embedded build-commit is an
+	// ancestor of HEAD (or an explicit operator authorization is present).
+	ProvenanceRequired *bool `json:"provenance_required,omitempty"`
+}
+
+// IntegrityMode resolves the integrity sub-policy with safe defaults applied:
+// ("pipeline", "shadow", true) for an absent/partial block; unknown mode/stage
+// values fall back to the default. Pure; never mutates the receiver.
+func (p Policy) IntegrityMode() (mode, stage string, provenanceRequired bool) {
+	mode, stage, provenanceRequired = "pipeline", "shadow", true
+	if p.Integrity == nil {
+		return mode, stage, provenanceRequired
+	}
+	switch p.Integrity.Mode {
+	case "pipeline", "phase":
+		mode = p.Integrity.Mode
+	}
+	switch p.Integrity.Stage {
+	case "shadow", "enforce":
+		stage = p.Integrity.Stage
+	}
+	if p.Integrity.ProvenanceRequired != nil {
+		provenanceRequired = *p.Integrity.ProvenanceRequired
+	}
+	return mode, stage, provenanceRequired
 }
 
 // evaluatorFloorPhase is the single non-removable floor phase: a plan can never
