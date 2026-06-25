@@ -85,7 +85,7 @@ In this Go-only repo the default is a Go ACS predicate (`go/acs/cycle<N>/predica
 
 ### Step 3: Write Failing Tests (RED)
 
-**For `predicate`-dispositioned ACs (the default in this Go-only repo), the RED test IS the Go ACS predicate** — a `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `<worktree>/go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). Author from the [go/acs/README.md](../go/acs/README.md) template. There is no separate `acs/cycle-<N>/*.sh` (bash predicates are retired) and no separate `tests/test-<slug>.sh` for these — the one Go test is both the RED test Builder turns GREEN and the audit-gating predicate (`evolve acs suite` runs it). The `tests/test-<slug>.sh` shell form below is a fallback only for a criterion that genuinely cannot be a Go test.
+**For `predicate`-dispositioned ACs (the default in this Go-only repo), the RED test IS the Go ACS predicate** — a `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `<worktree>/go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). Author from the [go/acs/README.md](../go/acs/README.md) template. There is no separate `acs/cycle-<N>/*.sh` and no separate `tests/test-<slug>.sh` for these — the one Go test is both the RED test Builder turns GREEN and the audit-gating predicate (`evolve acs suite` runs it). A shell script in `tests/` is a fallback only for a criterion that genuinely cannot be a Go test.
 
 **Predicates bind ONLY to triage-committed work (R9.3).** Author predicates exclusively for tasks in the triage report's `## top_n` — never for `## deferred` or `## dropped` items. In particular, a coverage-floor predicate may target only packages whose floors `## top_n` commits THIS cycle; floors triage deferred get **zero** predicates (they carry over and get predicates in the cycle that commits them). The host enforces this deterministically (the evalgate `floor-binding` gate rejects the tdd deliverable on a deferred-floor predicate — cycle-280 lesson: predicates that gated deferred tasks starved the committed task).
 
@@ -100,42 +100,15 @@ test_<criterion_slug>   # pytest / shell
 it('<criterion slug>')  # jest
 ```
 
-**Shell test example** (for filesystem/CLI tasks where no framework exists):
-```bash
-#!/usr/bin/env bash
-# tests/test-add-tdd-engineer-agent.sh
-set -uo pipefail
-
-PASS=0; FAIL=0
-
-assert_exit_0() {
-  local label="$1"; shift
-  if "$@" 2>/dev/null; then
-    echo "PASS: $label"; PASS=$((PASS+1))
-  else
-    echo "FAIL: $label"; FAIL=$((FAIL+1))
-  fi
-}
-
-assert_exit_0 "evolve-tdd-engineer.md exists" test -f agents/evolve-tdd-engineer.md
-assert_exit_0 "perspective field present" grep -q "^perspective:" agents/evolve-tdd-engineer.md
-assert_exit_0 "output-format field present" grep -q "^output-format:" agents/evolve-tdd-engineer.md
-assert_exit_0 "RED or TDD keyword present" grep -qiE "(RED|TDD|test.first)" agents/evolve-tdd-engineer.md
-assert_exit_0 "agent-templates references tdd-engineer" grep -q "tdd-engineer\|TDD Engineer" agents/agent-templates.md
-
-echo ""; echo "Results: $PASS PASS, $FAIL FAIL"
-[ "$FAIL" -eq 0 ]
-```
 
 ### Step 3b: Adversarial Test Diversity
 
-Canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6. A happy-path test alone is gameable — a no-op implementation can pass it. For each criterion that has a rejection/error dimension, also write the **negative test**: the input that must be REJECTED (assert non-zero exit / error / `stdout_absent`). This is not over-testing — the rejection behavior is part of the criterion. Cover the four diversity axes:
+Canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6. A happy-path test alone is gameable — a no-op implementation can pass it. For each criterion that has a rejection/error dimension, also write the **negative test**: the input that must be REJECTED (assert non-zero exit / error / `stdout_absent`). This is not over-testing — the rejection behavior is part of the criterion. Cover three diversity axes (for grep-only classification → see Predicate Quality Requirements):
 
 | Axis | Encode |
 |---|---|
 | Negative | an input that must FAIL (the strongest anti-no-op signal) |
 | Edge / OOD | empty, boundary (`0`/`-1`/max), malformed (`invalid`/`missing`/`corrupt`) |
-| Lexical | vary command verbs across a feature's tests — don't `grep` everything |
 | Semantic | distinct behaviors, not one behavior restated |
 
 The negative test is the highest-leverage one: a predicate that passes on a GREEN build but would also pass on an EMPTY repo does not actually require the feature (SKILL §2, implicit-adversarial class).
@@ -287,7 +260,7 @@ Post to `workspace/agent-mailbox.md` for Builder:
 2. **RED is success.** A failing test suite is the correct output of this phase. Do not treat RED as a problem to fix.
 3. **Tests encode intent, not implementation.** Test the observable behavior specified in acceptance criteria, not internal implementation details.
 4. **One test per criterion.** Over-testing creates maintenance burden; under-testing creates gaps. One direct test per acceptance criterion is the target.
-5. **Go ACS predicates are the EGPS form.** evolve-loop is a Go-only project; acceptance criteria are materialized as Go tests in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`). Bash `.sh` predicates are retired (EGPS Go-native migration); shell assertions remain valid only as a fallback for criteria that genuinely cannot be a Go test. Don't force-fit Python or Jest.
+5. **Go ACS predicates are the EGPS form.** evolve-loop is a Go-only project; acceptance criteria are materialized as Go tests in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`). Shell fallback for genuinely non-Go criteria only (see Step 3). Don't force-fit Python or Jest.
 
 ## AC-Materialization Contract (cycle-91+) — REQUIRED
 
@@ -299,7 +272,7 @@ Each AC is assigned exactly one of:
 
 | Disposition | When to use | Required artifact |
 |-------------|-------------|-------------------|
-| **predicate** | The criterion is mechanically verifiable (file exists, token present, exit code, behavioral subprocess call) | A **Go test** `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). See [go/acs/README.md](../go/acs/README.md) for the template. **Bash `acs/cycle-<N>/<id>.sh` is RETIRED for new ACs** (EGPS Go-native migration) — do not author new `.sh` predicates. |
+| **predicate** | The criterion is mechanically verifiable (file exists, token present, exit code, behavioral subprocess call) | A **Go test** `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). See [go/acs/README.md](../go/acs/README.md) for the template (bash `.sh` predicates retired; see Step 3). |
 | **manual+checklist** | The criterion is verifiable by a human but not automatable (UI appearance, UX flow, operator judgment) | Checklist item in `test-report.md` with explicit steps |
 | **unverifiable-remove** | The criterion cannot be verified by any means AND carries no enforcement value | Remove the AC from the cycle with documented rationale in `test-report.md` |
 
