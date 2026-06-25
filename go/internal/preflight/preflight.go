@@ -102,6 +102,12 @@ type Options struct {
 	IsNested func() bool
 	// OSType overrides runtime detection ("darwin", "linux", "other").
 	OSType string
+	// SandboxCapable injects the MEASURED sandbox-apply capability
+	// (capable, checked) — the ground-truth replacement for the nested env-var
+	// guess. Production wires it to sandbox.Probe()'s measurement at the
+	// composition root; nil (the default) leaves the result UNMEASURED so the
+	// legacy guess stands and existing callers stay byte-identical.
+	SandboxCapable func() (capable bool, checked bool)
 	// WorktreeBase is the operator override for the per-cycle worktree base,
 	// resolved from policy.json (worktree.base) at the composition root. Empty ⇒
 	// preflight selects a default writable base. Replaces the former
@@ -161,7 +167,24 @@ func Probe(opts Options) Profile {
 	if _, err := opts.LookPath("bwrap"); err == nil {
 		bwrap = true
 	}
+	// Measured capability (opt-in seam; nil ⇒ unmeasured ⇒ legacy byte-identical).
+	var capable, capChecked bool
+	if opts.SandboxCapable != nil {
+		capable, capChecked = opts.SandboxCapable()
+	}
+
 	sandbox := decideSandbox(osType, nested, sandboxExec, bwrap)
+	// Subtractive measured override: a MEASURED-incapable sandbox demotes a
+	// would-be-working host-capability report to "won't work", correcting the
+	// optimistic guess (e.g. a broken/SIP-weird standalone host that today is
+	// guessed working and then hangs the REPL boot). Gated on ExpectedToWork so
+	// it only ever demotes a TRUE to false — never promotes, and never re-explains
+	// an already-false report (which would double the reason text). Mirrors the
+	// subtractive ShouldWrap gate so the report can't hide a confinement gap.
+	if capChecked && !capable && sandbox.ExpectedToWork {
+		sandbox.ExpectedToWork = false
+		sandbox.Reason += " (measured: sandbox_apply failed — EPERM/timeout)"
+	}
 
 	// Filesystem
 	stateDir := filepath.Join(opts.ProjectRoot, ".evolve")
@@ -205,7 +228,12 @@ func Probe(opts Options) Profile {
 	// SAME decision the bridge launch path applies, so preflight's promise and
 	// the hot path can't drift. The reason strings stay preflight-local
 	// (operator-facing host-profile context, not duplicated decision logic).
-	innerProbe := sbx.ProbeResult{OS: osType, Available: (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap)}
+	innerProbe := sbx.ProbeResult{
+		OS:                osType,
+		Available:         (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap),
+		Capable:           capable,
+		CapabilityChecked: capChecked,
+	}
 	innerSandbox, wrapReason := sbx.ShouldWrap(nested, innerProbe)
 	innerReason := "standalone shell with working sandbox: defense-in-depth enabled"
 	switch {
@@ -258,6 +286,15 @@ func Probe(opts Options) Profile {
 			Reasoning:              autoReasoning,
 		},
 	}
+}
+
+// MeasuredSandboxCapability returns the cached sandbox.Probe() measurement of
+// whether the OS sandbox actually applies on this host. Production call sites
+// wire it into Options.SandboxCapable so the host-capability report reflects a
+// measured fact rather than the nested env-var guess.
+func MeasuredSandboxCapability() (capable bool, checked bool) {
+	pr := sbx.Probe()
+	return pr.Capable, pr.CapabilityChecked
 }
 
 func decideSandbox(osType string, nested, sbExec, bwrap bool) Sandbox {

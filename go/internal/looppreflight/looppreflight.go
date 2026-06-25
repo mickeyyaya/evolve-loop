@@ -251,7 +251,11 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.hostProbe == nil {
 		o.hostProbe = func() preflight.Profile {
-			return preflight.Probe(preflight.Options{ProjectRoot: o.projectRoot, WorktreeBase: policy.WorktreeBaseFor(o.projectRoot)})
+			return preflight.Probe(preflight.Options{
+				ProjectRoot:    o.projectRoot,
+				WorktreeBase:   policy.WorktreeBaseFor(o.projectRoot),
+				SandboxCapable: preflight.MeasuredSandboxCapability,
+			})
 		}
 	}
 	if o.dirWritable == nil {
