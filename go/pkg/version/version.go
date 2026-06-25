@@ -33,6 +33,32 @@ func Get() string {
 	return composeVersion(version, commit, builtAt, readBuildInfo)
 }
 
+// Commit returns the raw embedded build-commit (short sha) used for
+// provenance checks (ADR-0065: a binary is legitimate when its build-commit
+// is an ancestor of HEAD). Returns "" when the binary was not stamped (the
+// `go run` / `go test`-without-VCS path), which callers treat as
+// unverifiable provenance. Preference: ldflag `commit`, else BuildInfo
+// vcs.revision.
+func Commit() string {
+	return composeCommit(commit, readBuildInfo)
+}
+
+// composeCommit is the pure resolver — separated from package-level state so
+// tests drive every branch deterministically.
+func composeCommit(c string, readBI func() (*debug.BuildInfo, bool)) string {
+	if c == "" {
+		if info, ok := readBI(); ok {
+			for _, s := range info.Settings {
+				if s.Key == "vcs.revision" {
+					c = s.Value
+					break
+				}
+			}
+		}
+	}
+	return shortSHA(c)
+}
+
 // composeVersion is the pure composer — separated from package-level
 // state so tests can drive all branches deterministically.
 func composeVersion(v, c, b string, readBI func() (*debug.BuildInfo, bool)) string {
