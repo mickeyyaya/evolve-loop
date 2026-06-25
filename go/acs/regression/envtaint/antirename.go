@@ -24,6 +24,9 @@ import (
 var externalEnvAllowlist = map[string]bool{
 	// Standard external environment.
 	"CI": true, "HOME": true, "CODEX_HOME": true, "XDG_RUNTIME_DIR": true,
+	// TMUX_TMPDIR: standard tmux var naming its socket directory; read by the
+	// orphan-socket GC (F6, swarm.tmuxSocketDir) to locate per-run bridge sockets.
+	"TMUX_TMPDIR": true,
 	// GitHub-provided token: read by release-verify-binaries to authenticate the
 	// release-asset query (CI / rate limits). Standard external var, not a dial.
 	"GITHUB_TOKEN": true,
