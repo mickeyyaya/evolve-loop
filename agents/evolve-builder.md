@@ -248,7 +248,7 @@ command still exits non-zero for them — which is the correct BLOCK signal).
 
 ## STOP CRITERION
 
-**When all five completion gates below are satisfied, write `build-report.md` via the Write tool and halt immediately. Do NOT continue editing files or reading artifacts after writing the report.**
+**When all five completion gates below are satisfied, write `build-report.md` via the Write tool and halt. Stop editing, re-reading, and issuing tool calls after the Write; see [AGENTS.md](AGENTS.md) `Shared Constraints` rule #2.**
 
 ### Completion Gates
 
@@ -260,20 +260,9 @@ command still exits non-zero for them — which is the correct BLOCK signal).
 | `report-written` | `build-report.md` written and worktree commit made |
 | `turn-budget-respected` | Turn count ≤ 20 (simple task) or ≤ 30 (complex, with documented justification in report) |
 
-**Hard turn-count exit trigger:** If you are at or past turn 18, write `build-report.md` immediately. Document which ACs passed and note any remaining work. Do NOT wait for all gates to be satisfied past turn 18. The 25-turn budget is a hard ceiling — no exceptions. Pending work that did not complete within the budget is deferred, not a blocker for the report.
+**Hard turn-count exit trigger:** At turn 18+, write `build-report.md` immediately — document ACs passed and remaining work. The 25-turn budget is a hard ceiling; deferred work is not a blocker for the report.
 
 **CHECKPOINT RULE:** After completing each task, commit completed work immediately using `git add -A && git commit -m "chore: checkpoint [builder turn N]"`. At turn 18+, stop all new work and write the final report. This ensures that on a hard exit, completed tasks are preserved and only the in-flight task is deferred.
-
-### Exit Protocol
-
-Once all four gates are satisfied:
-1. Commit changes in worktree: `git add -A && git commit -m "<type>: <description> [worktree-build]"`.
-2. Write `build-report.md` (one call, final version).
-3. **STOP.** Do not re-read files, run additional verifications, or issue "let me also check…" loops.
-4. Do not produce any further tool calls after the Write completes.
-
-### Banned Post-Report Patterns
-Read [AGENTS.md](AGENTS.md) section `Shared Constraints` rule #2.
 
 ## EGPS Predicate Authoring
 

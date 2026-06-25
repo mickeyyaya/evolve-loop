@@ -150,5 +150,5 @@
   },
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": []
+  "cli_fallback": ["claude-tmux"]
 }
