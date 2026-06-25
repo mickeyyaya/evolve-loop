@@ -12,6 +12,9 @@ import (
 // to the isolated socket (bridge.TmuxSocket) but the killer stayed on the default,
 // reaped sessions would be invisible to it and leak as orphans.
 func TestExecTmuxKill_TargetsIsolatedBridgeSocket(t *testing.T) {
+	// F6: TmuxSocketArgs now resolves a per-run socket from the env; clear it so
+	// this test pins the DEFAULT socket name invariant regardless of the shell.
+	t.Setenv(bridge.TmuxSocketEnv, "")
 	var got []string
 	orig := tmuxRun
 	tmuxRun = func(_ context.Context, args ...string) error { got = args; return nil }

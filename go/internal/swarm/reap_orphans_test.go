@@ -38,6 +38,38 @@ func recordingTmuxKiller() (TmuxKiller, *[]string) {
 	return k, &killed
 }
 
+// TestReapOrphanSockets (F6): kill the tmux server of a per-run socket whose
+// owner loop pid is dead; never touch a live owner's socket nor the shared
+// default / probe sockets.
+func TestReapOrphanSockets(t *testing.T) {
+	t.Parallel()
+	var list SocketLister = func() ([]string, error) {
+		return []string{"evolve-bridge-p111", "evolve-bridge-p222", "evolve-bridge", "evolve-bridge-codex-c0-probe-pid5"}, nil
+	}
+	var killed []string
+	var kill ServerKiller = func(_ context.Context, s string) error { killed = append(killed, s); return nil }
+
+	rep := ReapOrphanSockets(context.Background(), list, aliveSet(222), kill) // 111 dead, 222 alive
+
+	if len(killed) != 1 || killed[0] != "evolve-bridge-p111" {
+		t.Fatalf("killed=%v, want only the dead per-run socket evolve-bridge-p111 (default + probe must be untouched)", killed)
+	}
+	if rep.SkippedLive != 1 {
+		t.Fatalf("SkippedLive=%d, want 1 (the live p222 owner)", rep.SkippedLive)
+	}
+}
+
+func TestReapOrphanSockets_ListErrorIsSafe(t *testing.T) {
+	t.Parallel()
+	list := func() ([]string, error) { return nil, errors.New("no socket dir") }
+	var killed []string
+	kill := func(_ context.Context, s string) error { killed = append(killed, s); return nil }
+	rep := ReapOrphanSockets(context.Background(), list, aliveSet(), kill)
+	if len(killed) != 0 || len(rep.Errors) != 1 {
+		t.Fatalf("list error must kill nothing + record 1 error; killed=%v rep=%+v", killed, rep)
+	}
+}
+
 func TestSessionPID(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

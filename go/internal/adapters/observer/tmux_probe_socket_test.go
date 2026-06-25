@@ -12,6 +12,9 @@ import (
 // default, `tmux ls` would never see them — the probe would report every agent
 // dead and the stall clock would never be reset by genuine liveness.
 func TestSocketTmuxRunner_PrependsIsolatedSocket(t *testing.T) {
+	// F6: TmuxSocketArgs now resolves a per-run socket from the env; clear it so
+	// this test pins the DEFAULT socket name invariant regardless of the shell.
+	t.Setenv(bridge.TmuxSocketEnv, "")
 	var got []string
 	wrapped := socketTmuxRunner(func(args ...string) ([]byte, error) {
 		got = args

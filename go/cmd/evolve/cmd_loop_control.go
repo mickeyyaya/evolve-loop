@@ -222,6 +222,15 @@ func gcOrphanSessions(label string, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[loop] orphan-session GC (%s): killed=%d skipped(live=%d foreign=%d no-pid=%d) errors=%d\n",
 			label, len(rep.Killed), rep.SkippedLive, rep.SkippedForeign, rep.SkippedUnparseable, len(rep.Errors))
 	}
+	// F6: also reap whole per-run tmux sockets (evolve-bridge-p<pid>) left by a
+	// crashed loop — a different socket than ours, which the per-session sweep
+	// above (it lists only THIS run's socket) can't see. Liveness-scoped: a live
+	// loop's socket is never killed.
+	srep := swarm.ExecReapOrphanSockets(ctx)
+	if len(srep.Killed) > 0 || len(srep.Errors) > 0 {
+		fmt.Fprintf(stderr, "[loop] orphan-socket GC (%s): killed=%d dead per-run socket(s) skipped-live=%d errors=%d\n",
+			label, len(srep.Killed), srep.SkippedLive, len(srep.Errors))
+	}
 }
 
 // updateBreaker is the pure step function of the same-cycle circuit

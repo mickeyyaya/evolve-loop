@@ -28,6 +28,7 @@ import (
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
 	// so the orchestrator writes a resumable checkpoint at every phase boundary.
 	// Without this the hook stays nil and the feature silently no-ops in production.
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
@@ -136,6 +137,16 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// stale-lease auto-reclaim in `evolve cycle reset`.
 	ctx, stop := loopSignalContext(context.Background())
 	defer stop()
+
+	// Per-run tmux socket (F6): give THIS loop its own bridge tmux server so an
+	// external `tmux -L evolve-bridge kill-server` (a sibling session / operator)
+	// can't tear down our agent panes mid-cycle. buildCycleEnv below propagates
+	// EVOLVE_TMUX_SOCKET (an EVOLVE_* var) to every bridge subprocess, and the
+	// in-process reaper + orphan GC read it too, so all target the same socket. A
+	// pre-set value (operator override / nested run) is respected.
+	if os.Getenv(bridge.TmuxSocketEnv) == "" {
+		_ = os.Setenv(bridge.TmuxSocketEnv, bridge.DeriveRunSocket(os.Getpid()))
+	}
 
 	// Crash-recovery GC, before any cycle runs: reap tmux sessions left by a
 	// PRIOR crashed run. The per-run registry reaper cannot — a SIGKILL'd loop

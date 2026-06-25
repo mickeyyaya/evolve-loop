@@ -53,7 +53,25 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, e := range rep.Errors {
 		fmt.Fprintf(stderr, "evolve gc: error: %s\n", e)
 	}
-	if len(rep.Errors) > 0 {
+
+	// F6: also sweep whole per-run tmux sockets a crashed loop left behind.
+	var srep swarm.OrphanSocketReport
+	if *dryRun {
+		noopKill := func(_ context.Context, _ string) error { return nil }
+		srep = swarm.ReapOrphanSockets(ctx, swarm.ExecListBridgeSockets, swarm.ExecPidAlive, noopKill)
+		fmt.Fprintf(stdout, "evolve gc --dry-run: %d dead per-run socket(s) would be reaped\n", len(srep.Killed))
+	} else {
+		srep = swarm.ExecReapOrphanSockets(ctx)
+		fmt.Fprintf(stdout, "evolve gc: reaped %d dead per-run socket(s)\n", len(srep.Killed))
+	}
+	for _, s := range srep.Killed {
+		fmt.Fprintf(stdout, "  socket %s\n", s)
+	}
+	for _, e := range srep.Errors {
+		fmt.Fprintf(stderr, "evolve gc: socket error: %s\n", e)
+	}
+
+	if len(rep.Errors) > 0 || len(srep.Errors) > 0 {
 		return 1
 	}
 	return 0
