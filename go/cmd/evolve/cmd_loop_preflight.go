@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // runLoopPreflightFn is the test seam for the pre-batch readiness gate; tests
@@ -19,12 +20,16 @@ var runLoopPreflightFn = defaultLoopPreflight
 // checks but skips the (slow, tmux-touching) real REPL boot (--skip-preflight-boot).
 func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result {
 	layout := paths.ResolveFromEnv()
+	// Resolve the verified-fallback dial from policy (absent/malformed ⇒ off, the
+	// dormant default — the canary never runs nor halts unless an operator opts in).
+	pol, _ := policy.Load(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"))
 	res, err := looppreflight.Run(looppreflight.Options{
-		ProjectRoot: cfg.ProjectRoot,
-		EvolveDir:   cfg.EvolveDir,
-		ProfileDir:  layout.ProfilesDir,
-		Stderr:      stderr,
-		SkipBoot:    cfg.SkipPreflightBoot,
+		ProjectRoot:         cfg.ProjectRoot,
+		EvolveDir:           cfg.EvolveDir,
+		ProfileDir:          layout.ProfilesDir,
+		Stderr:              stderr,
+		SkipBoot:            cfg.SkipPreflightBoot,
+		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
 	})
 	if err != nil {
 		// A harness fault (e.g. an unresolved project root) must fail LOUD as a
