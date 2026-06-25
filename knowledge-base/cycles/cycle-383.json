@@ -1,0 +1,28 @@
+{
+  "cycle": 383,
+  "run_id": "01KVXMJ70W2BEHW1D2MTW61H7M",
+  "goal": "optimize token usage per phase and pipeline-wide. Ship SMALL, FULLY-WIRED increments only: every policy/config/option surface you add MUST have real production callers this cycle (no inert levers — a resolver with zero non-test callers is contract under-delivery and will FAIL audit). Prefer unconditional prompt-size reductions (agent prompt trimming, context-anchor pruning, schema-filter tightening). If a task cannot be fully wired to production this cycle, drop it rather than ship a dead surface.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice"
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 383",
+      "priority": "high"
+    }
+  ]
+}

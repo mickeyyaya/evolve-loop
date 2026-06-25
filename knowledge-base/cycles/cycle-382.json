@@ -1,0 +1,28 @@
+{
+  "cycle": 382,
+  "run_id": "01KVXFGASW8Z1JZTCBG0TSP1JE",
+  "goal": "optimize the token usage for the pipeline and each phase: reduce per-phase prompt and context tokens without losing capability; find and cut waste in agent prompts, context anchors, schema filtering, and routing",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice"
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 382",
+      "priority": "high"
+    }
+  ]
+}
