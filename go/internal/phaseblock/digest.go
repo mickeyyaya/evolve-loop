@@ -16,13 +16,6 @@ import (
 	"fmt"
 )
 
-// Identity locates a phase block within a run.
-type Identity struct {
-	Cycle int    `json:"cycle"`
-	Phase string `json:"phase"`
-	RunID string `json:"runId,omitempty"`
-}
-
 // Digest is the per-phase content-addressed integrity record. Combined is the
 // content address — a stable hash of the integrity-relevant fields and the
 // previous phase's Combined (the chain link). RunID/CompletedAt are metadata
