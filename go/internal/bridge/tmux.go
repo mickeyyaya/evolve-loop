@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -77,24 +79,53 @@ func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args
 	return out.String(), err
 }
 
-// TmuxSocket is the dedicated tmux socket the bridge runs every agent pane on,
-// isolating them from the operator's shared default socket
-// (/tmp/tmux-<uid>/default). A stray `tmux attach` on the default socket can land
-// in a live agent REPL and send the operator's keystrokes to it — the
-// flag-campaign-8 "show progress" leak. Routing the bridge onto its own socket
-// forecloses that: the operator's default-socket tmux never sees agent panes.
-// Session names already carry the run id, so a single shared bridge socket is
-// safe for concurrent runs (no name collisions); the reaper kills by session
-// name, never kill-server, so runs never tear down one another.
+// TmuxSocket is the DEFAULT bridge tmux socket — isolating agent panes from the
+// operator's shared default socket (/tmp/tmux-<uid>/default), where a stray
+// `tmux attach` could land in a live agent REPL (the flag-campaign-8 "show
+// progress" leak). The bridge runs every pane on its own socket so the
+// operator's default-socket tmux never sees agent panes.
+//
+// F6: the socket name is now PER-RUN by default (the loop sets TmuxSocketEnv to
+// evolve-bridge-p<looppid> and propagates it to every bridge subprocess). The
+// old single-shared-socket design relied on session names carrying the run id +
+// reap-by-name (never kill-server) so concurrent runs never tore down one
+// another — that holds for evolve's OWN reaper, but an EXTERNAL `tmux -L
+// evolve-bridge kill-server` (a sibling session / operator) would still nuke
+// every run's panes at once. A per-run socket forecloses that: a kill-server on
+// one run's socket leaves the others untouched. Crashed runs' sockets are
+// reclaimed by the orphan-socket GC (swarm.ExecReapOrphanSockets).
 const TmuxSocket = "evolve-bridge"
 
+// TmuxSocketEnv overrides the active socket name for a run. It is an IPC channel
+// (loop → its bridge subprocesses, like BRIDGE_RUN_ID), NOT a user feature flag:
+// the loop derives one per-run value (DeriveRunSocket) and exports it so the
+// loop, every bridge subprocess, the reaper, and the GC all resolve the same
+// socket. Empty/unset ⇒ the shared TmuxSocket default (backward compatible).
+const TmuxSocketEnv = "EVOLVE_TMUX_SOCKET"
+
+// DeriveRunSocket builds a per-run socket name from a run-scoped integer key
+// (the loop master's pid). Result: "evolve-bridge-p<pid>" — a valid tmux -L name.
+func DeriveRunSocket(pid int) string {
+	return TmuxSocket + "-p" + strconv.Itoa(pid)
+}
+
+// tmuxSocketName resolves the active socket at call time (so loop + bridge
+// subprocess + reaper + GC all agree via the inherited env): the per-run
+// override if set, else the shared default.
+func tmuxSocketName() string {
+	if s := strings.TrimSpace(os.Getenv(TmuxSocketEnv)); s != "" {
+		return s
+	}
+	return TmuxSocket
+}
+
 // TmuxSocketArgs prepends tmux's GLOBAL -L socket selector (which must precede the
-// subcommand) so the invocation targets the isolated bridge server. It is the
-// single SSOT for socket selection across every bridge tmux consumer — execTmux
-// (here), swarm teardown (swarm.ExecTmuxKill), and the observer liveness probe —
-// so none can drift back onto the default socket and go blind to agent panes.
+// subcommand) so the invocation targets the bridge server. It is the single SSOT
+// for socket selection across every bridge tmux consumer — execTmux (here), swarm
+// teardown (swarm.ExecTmuxKill), the orphan GC, and the observer liveness probe —
+// so all resolve the same per-run socket and none drift onto the default socket.
 func TmuxSocketArgs(args ...string) []string {
-	return append([]string{"-L", TmuxSocket}, args...)
+	return append([]string{"-L", tmuxSocketName()}, args...)
 }
 
 func (execTmux) run(ctx context.Context, args ...string) (string, error) {

@@ -3,7 +3,9 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -163,4 +165,109 @@ func ExecListBridgeSessions(ctx context.Context) ([]string, error) {
 // `evolve gc` command).
 func ExecReapOrphans(ctx context.Context) OrphanReapReport {
 	return ReapOrphanSessions(ctx, ExecListBridgeSessions, ExecPidAlive, ExecTmuxKill)
+}
+
+// ───────────────────────── per-run socket GC (F6) ─────────────────────────
+// With per-run tmux sockets (bridge.DeriveRunSocket → evolve-bridge-p<looppid>),
+// a crashed loop leaves its WHOLE socket server running with orphaned panes —
+// reap-by-session-name on one socket (ReapOrphanSessions) can't see another
+// socket's sessions. ReapOrphanSockets finds per-run socket files whose owner
+// loop pid is dead and kills that socket's server outright. kill-server is safe
+// here (unlike the shared default) precisely because the socket is the dead
+// run's alone; a live owner's socket is skipped.
+
+// socketPidRE matches a per-run socket name and captures the owner loop pid. The
+// shared default ("evolve-bridge") and any other name never match → never killed.
+var socketPidRE = regexp.MustCompile(`^evolve-bridge-p(\d+)$`)
+
+// OrphanSocketReport summarizes one per-run-socket sweep.
+type OrphanSocketReport struct {
+	Killed      []string // per-run sockets whose dead-owner server was killed
+	SkippedLive int      // owner pid still alive (a running loop — left alone)
+	Errors      []string // per-socket kill errors (best-effort; sweep continues)
+}
+
+// SocketLister returns the bridge per-run socket names present on the host.
+// Injected so the unit suite never touches the real tmux socket directory.
+type SocketLister func() ([]string, error)
+
+// ServerKiller kills the tmux server on one socket (kill-server -L socket).
+// Injected for testability.
+type ServerKiller func(ctx context.Context, socket string) error
+
+// ReapOrphanSockets kills the tmux server of every per-run bridge socket whose
+// owner pid is dead. Non-matching names (the shared default, probe sockets) are
+// left untouched — kill-server is only ever aimed at a socket provably owned by
+// a dead loop. Best-effort: a list error reaps nothing; a kill error is recorded
+// and the sweep continues.
+func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness, killServer ServerKiller) OrphanSocketReport {
+	var rep OrphanSocketReport
+	socks, err := list()
+	if err != nil {
+		rep.Errors = append(rep.Errors, fmt.Sprintf("list sockets: %v", err))
+		return rep
+	}
+	for _, s := range socks {
+		m := socketPidRE.FindStringSubmatch(s)
+		if m == nil {
+			continue // not a per-run socket — never kill-server
+		}
+		pid, perr := strconv.Atoi(m[1])
+		if perr != nil || pid <= 0 {
+			continue
+		}
+		if alive(pid) {
+			rep.SkippedLive++
+			continue
+		}
+		if err := killServer(ctx, s); err != nil {
+			rep.Errors = append(rep.Errors, fmt.Sprintf("%s: %v", s, err))
+			continue
+		}
+		rep.Killed = append(rep.Killed, s)
+	}
+	return rep
+}
+
+// tmuxSocketDir returns tmux's per-uid socket directory ($TMUX_TMPDIR or /tmp,
+// subdir tmux-<uid>) — where -L socket files live.
+func tmuxSocketDir() string {
+	base := os.Getenv("TMUX_TMPDIR")
+	if base == "" {
+		base = "/tmp"
+	}
+	return filepath.Join(base, fmt.Sprintf("tmux-%d", os.Getuid()))
+}
+
+// socketGlob is the exec/fs seam for ExecListBridgeSockets, overridden in tests.
+var socketGlob = func() ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(tmuxSocketDir(), "evolve-bridge-p*"))
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		names = append(names, filepath.Base(m))
+	}
+	return names, nil
+}
+
+// ExecListBridgeSockets is the production SocketLister.
+func ExecListBridgeSockets() ([]string, error) { return socketGlob() }
+
+// ExecKillServer is the production ServerKiller: best-effort kill-server on the
+// named socket (a missing server is the desired end state). Refuses an empty
+// name (tmux would resolve -L "" oddly).
+func ExecKillServer(ctx context.Context, socket string) error {
+	if socket == "" {
+		return fmt.Errorf("refusing kill-server with an empty socket name")
+	}
+	_ = tmuxRun(ctx, "-L", socket, "kill-server")
+	return nil
+}
+
+// ExecReapOrphanSockets wires the production socket lister, liveness probe, and
+// server killer into ReapOrphanSockets.
+func ExecReapOrphanSockets(ctx context.Context) OrphanSocketReport {
+	return ReapOrphanSockets(ctx, ExecListBridgeSockets, ExecPidAlive, ExecKillServer)
 }

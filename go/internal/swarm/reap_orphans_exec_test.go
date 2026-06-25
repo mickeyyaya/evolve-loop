@@ -87,3 +87,35 @@ func TestExecReapOrphans_CleanServerNoop(t *testing.T) {
 		t.Fatalf("clean server must be a no-op, got %+v", rep)
 	}
 }
+
+// TestExecListBridgeSockets_NamesOnly drives the production socket lister through
+// the socketGlob seam (never touches the real tmux socket dir).
+func TestExecListBridgeSockets_NamesOnly(t *testing.T) {
+	old := socketGlob
+	defer func() { socketGlob = old }()
+	socketGlob = func() ([]string, error) { return []string{"evolve-bridge-p7"}, nil }
+	got, err := ExecListBridgeSockets()
+	if err != nil || len(got) != 1 || got[0] != "evolve-bridge-p7" {
+		t.Fatalf("ExecListBridgeSockets = (%v, %v), want ([evolve-bridge-p7], nil)", got, err)
+	}
+}
+
+// TestExecReapOrphanSockets_NoSocketsNoop names+executes the production socket-GC
+// wiring against an empty host — a harmless no-op.
+func TestExecReapOrphanSockets_NoSocketsNoop(t *testing.T) {
+	old := socketGlob
+	defer func() { socketGlob = old }()
+	socketGlob = func() ([]string, error) { return nil, nil }
+	var rep OrphanSocketReport = ExecReapOrphanSockets(context.Background())
+	if len(rep.Killed) != 0 || len(rep.Errors) != 0 {
+		t.Fatalf("no sockets must be a no-op, got %+v", rep)
+	}
+}
+
+// TestExecKillServer_RefusesEmpty: never aim kill-server at an empty socket name.
+func TestExecKillServer_RefusesEmpty(t *testing.T) {
+	t.Parallel()
+	if ExecKillServer(context.Background(), "") == nil {
+		t.Fatal("ExecKillServer must refuse an empty socket name")
+	}
+}
