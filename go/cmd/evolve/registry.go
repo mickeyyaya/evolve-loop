@@ -66,6 +66,7 @@ var commands = []subcommand{
 	{Name: "campaign", Summary: "Multi-cycle campaign planner (study|replan|run|status)", Run: runCampaign},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
+	{Name: "gc", Summary: "Reap orphaned tmux sessions whose creator PID is dead (gc [--dry-run])", Run: runGC},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
 	{Name: "reset-sha", Summary: "Re-pin the ship-gate binary SHA to the running binary (provenance-gated; --operator to override)", Run: runResetSHA},

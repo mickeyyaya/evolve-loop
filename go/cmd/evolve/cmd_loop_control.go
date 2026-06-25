@@ -38,6 +38,11 @@ const (
 
 const defaultCircuitBreakerThreshold = 5
 
+// orphanGCTimeout bounds the crash-recovery session sweep so a wedged tmux
+// socket (corrupted server, not the common "no server" case) can never hang the
+// loop — the GC must stay robust even when the surrounding pipeline is broken.
+const orphanGCTimeout = 15 * time.Second
+
 // resolveDispatchPolicy maps a policy string (from DispatchConfig.Policy) to
 // the corresponding dispatch policy. Unknown values default to
 // dispatchPolicyVerify with a WARN logged to stderr.
@@ -193,6 +198,29 @@ func reapCycleSessions(projectRoot string, cycle int, stderr io.Writer) {
 	if rep.Killed > 0 || rep.Errors > 0 || rep.Skipped > 0 {
 		fmt.Fprintf(stderr, "[loop] session registry reap cycle=%d: killed=%d skipped=%d errors=%d\n",
 			cycle, rep.Killed, rep.Skipped, rep.Errors)
+	}
+	// Belt-and-suspenders: a liveness sweep also reaps any orphan whose creator
+	// PID is dead — sessions a crashed phase left behind that never made it into
+	// (or were lost from) the registry. Safe under concurrency: live runs' PIDs
+	// are alive, so their sessions are skipped.
+	gcOrphanSessions(fmt.Sprintf("cycle=%d", cycle), stderr)
+}
+
+// gcOrphanSessions runs the crash-recovery liveness GC (swarm.ExecReapOrphans):
+// it reaps evolve-namespace tmux sessions whose creator PID is dead — corpses a
+// crashed or SIGKILL'd run left on the shared bridge server. It complements the
+// per-run registry reap, which is structurally blind to a crashed run's (and any
+// other run's) sessions; a SIGKILL'd loop never runs its teardown, so without
+// this the next loop inherits the corpses until the server starves the machine.
+// Liveness-scoped, so a LIVE concurrent run is never touched. Quiet on a clean
+// sweep; logs only when it killed or errored.
+func gcOrphanSessions(label string, stderr io.Writer) {
+	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
+	defer cancel()
+	rep := swarm.ExecReapOrphans(ctx)
+	if len(rep.Killed) > 0 || len(rep.Errors) > 0 {
+		fmt.Fprintf(stderr, "[loop] orphan-session GC (%s): killed=%d skipped(live=%d foreign=%d no-pid=%d) errors=%d\n",
+			label, len(rep.Killed), rep.SkippedLive, rep.SkippedForeign, rep.SkippedUnparseable, len(rep.Errors))
 	}
 }
 

@@ -178,6 +178,13 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
 
+	if !simulate {
+		// Crash-recovery GC before the cycle: reap dead-owner tmux sessions left
+		// by a prior crashed run (see gcOrphanSessions). Skipped in --simulate —
+		// the no-LLM parity walk launches no sessions.
+		gcOrphanSessions("cycle-start", stderr)
+	}
+
 	var orch *core.Orchestrator
 	if simulate {
 		orch = wireSimulateOrchestrator(projectRoot, evolveDir)
