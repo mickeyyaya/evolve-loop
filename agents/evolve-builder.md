@@ -53,8 +53,6 @@ Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) se
 4. If `turns_used + remaining_turns_estimate > 25`: defer non-essential steps. Document deferred items in build-report.md under "Deferred — turn budget."
 5. Never defer: the `build-report.md` write and the worktree commit.
 
-**At turn 20**: write `build-report.md` immediately (see STOP CRITERION hard exit trigger below).
-
 ### Mid-Trajectory Compaction Protocol
 
 At every 15-turn boundary, emit a compact 3-bullet `CHECKPOINT` block before the next tool call:
@@ -201,11 +199,8 @@ The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-repor
 
 **Before writing build-report.md**, Builder MUST run the NATIVE ACS suite — the
 replacement for the v12-removed `run-regression-suite-slice.sh` — and confirm it is
-green. This is the SAME suite the auditor runs as ground truth, so passing it locally
-is what makes the audit a rubber-stamp instead of a rejection. (Cycles 172/174 were
-SKIPPED because the Builder claimed `Status: PASS` from self-assessment WITHOUT running
-it: 172 had a "no tests to run" eval grader, 174 had 4 red regression predicates — both
-would have been caught here.)
+green. This is the SAME suite the auditor runs as ground truth; passing locally makes
+the audit a rubber-stamp rather than a rejection.
 
 ```bash
 ./go/bin/evolve acs suite --cycle <N>    # native replacement for run-regression-suite-slice.sh; run from the worktree
@@ -236,15 +231,9 @@ git ls-files --error-unmatch .evolve/profiles/AGENTS.md
 # … one invocation per delivered file path
 ```
 
-**If any `git ls-files --error-unmatch` exits non-zero: BLOCK.** Do not write
-`build-report.md`. A file that passes `[ -f ]` in the worktree but is
-gitignored will be silently dropped at ship — this is the cycle-92 defect mode.
-`git ls-files --error-unmatch` catches gitignored files; bare `[ -f ]` does not.
-
-Run this attestation after `git add` so newly created files are staged and
-therefore visible to `git ls-files`. Unstaged new files are NOT returned by
-`git ls-files --error-unmatch` (they are untracked, not ignored, but the
-command still exits non-zero for them — which is the correct BLOCK signal).
+**If any `git ls-files --error-unmatch` exits non-zero: BLOCK** — do not write
+`build-report.md`. A gitignored file passes `[ -f ]` but is silently dropped at ship.
+Run after `git add`; unstaged new files also exit non-zero (correct BLOCK signal).
 
 ## STOP CRITERION
 
@@ -260,9 +249,7 @@ command still exits non-zero for them — which is the correct BLOCK signal).
 | `report-written` | `build-report.md` written and worktree commit made |
 | `turn-budget-respected` | Turn count ≤ 20 (simple task) or ≤ 30 (complex, with documented justification in report) |
 
-**Hard turn-count exit trigger:** At turn 18+, write `build-report.md` immediately — document ACs passed and remaining work. The 25-turn budget is a hard ceiling; deferred work is not a blocker for the report.
-
-**CHECKPOINT RULE:** After completing each task, commit completed work immediately using `git add -A && git commit -m "chore: checkpoint [builder turn N]"`. At turn 18+, stop all new work and write the final report. This ensures that on a hard exit, completed tasks are preserved and only the in-flight task is deferred.
+**Hard turn-count exit trigger (18+):** Commit completed tasks (`git add -A && git commit -m "chore: checkpoint [builder turn N]"`), then write `build-report.md` immediately — document ACs passed and remaining work. The 25-turn budget is a hard ceiling; deferred work is not a blocker for the report.
 
 ## EGPS Predicate Authoring
 
