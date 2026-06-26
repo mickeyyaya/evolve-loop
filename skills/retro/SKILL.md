@@ -45,7 +45,7 @@ description: Use after ship completes. Three sub-reflectors (instinct, gene, fai
 |---|---|
 | Phase | `retrospective` (control archetype, optional) |
 | Persona | `agents/evolve-retrospective.md` |
-| Profile | `.evolve/profiles/retrospective.json` — CLI `claude-tmux`, tier `deep`, fan-out ×3 |
+| Profile | `.evolve/profiles/retrospective.json` — CLI `agy-tmux`, tier `deep`, fan-out ×3 |
 | Inputs | `audit-report.md` · `build-report.md` |
 | Artifact | `retrospective-report.md` (cycle workspace) |
 
