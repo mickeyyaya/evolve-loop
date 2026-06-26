@@ -296,6 +296,86 @@ func TestPublishCodex_PrunesOnlySentinelMarked(t *testing.T) {
 	}
 }
 
+// TestPublishAgy_IncludesCommandStubs: agy is a Claude-Code-shaped plugin host,
+// so its projection must carry the same commands/<name>.md stubs (and declare
+// them in plugin.json) that surface /evo:<name> in the menu — otherwise agy has
+// the identical skills-only discoverability gap this projection exists to close.
+func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
+	stubPublishExec(t, true)
+	doc := "---\nname: scout\ndescription: Scout the codebase\nargument-hint: \"[area]\"\n---\n\nbody\n"
+	project := publishTestProject(t, map[string]string{"scout": doc})
+	cfg := publishConfig{Targets: []string{"agy"}, Prune: true, CodexHome: t.TempDir(), OllamaBase: "test:base"}
+
+	var out, errBuf bytes.Buffer
+	if code := runSkillsPublish(project, cfg, &out, &errBuf); code != 0 {
+		t.Fatalf("exit %d\nstderr:\n%s", code, errBuf.String())
+	}
+
+	stagingPlugin := filepath.Join(project, ".evolve", "publish", "agy", "evo")
+	cmd, err := os.ReadFile(filepath.Join(stagingPlugin, "commands", "evo-scout.md"))
+	if err != nil {
+		t.Fatalf("agy commands/evo-scout.md missing — no /evo-scout in agy's menu: %v", err)
+	}
+	for _, want := range []string{"evo:scout", "$ARGUMENTS", `argument-hint: "[area]"`} {
+		if !strings.Contains(string(cmd), want) {
+			t.Errorf("agy commands/scout.md missing %q\n%s", want, cmd)
+		}
+	}
+
+	manifest, _ := os.ReadFile(filepath.Join(stagingPlugin, "plugin.json"))
+	var pj struct {
+		Name     string   `json:"name"`
+		Commands []string `json:"commands"`
+	}
+	if err := json.Unmarshal(manifest, &pj); err != nil {
+		t.Fatalf("plugin.json parse: %v\n%s", err, manifest)
+	}
+	if len(pj.Commands) == 0 {
+		t.Errorf("agy plugin.json must declare a commands dir so agy loads the stubs; got %s", manifest)
+	}
+}
+
+// TestPublish_CrossCLISurfaces pins the deliberate per-CLI discoverability
+// surface across all three targets so a future change can't silently drop or
+// mismatch one: codex skills load natively (no command layer), agy is a
+// plugin host that needs the command stubs, ollama has only models.
+func TestPublish_CrossCLISurfaces(t *testing.T) {
+	stubPublishExec(t, true)
+	doc := "---\nname: scout\ndescription: Scout the codebase\nargument-hint: \"[area]\"\n---\n\nScout body.\n"
+	project := publishTestProject(t, map[string]string{"scout": doc})
+	cfg := publishConfig{Targets: []string{"codex", "agy", "ollama"}, Prune: true, CodexHome: t.TempDir(), OllamaBase: "test:base"}
+
+	var out, errBuf bytes.Buffer
+	if code := runSkillsPublish(project, cfg, &out, &errBuf); code != 0 {
+		t.Fatalf("publish all CLIs: exit %d\nstderr:\n%s", code, errBuf.String())
+	}
+	pub := filepath.Join(project, ".evolve", "publish")
+
+	// codex: skills ARE the native surface — evolve-prefixed skill, no commands/.
+	if _, err := os.Stat(filepath.Join(pub, "codex", "evolve-scout", "SKILL.md")); err != nil {
+		t.Errorf("codex skill projection missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pub, "codex", "commands")); !os.IsNotExist(err) {
+		t.Errorf("codex must NOT get a commands/ layer (skills load natively)")
+	}
+
+	// agy: Claude-Code-shaped plugin host — skill AND command stub present.
+	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "skills", "scout", "SKILL.md")); err != nil {
+		t.Errorf("agy skill missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "commands", "evo-scout.md")); err != nil {
+		t.Errorf("agy command stub missing: %v", err)
+	}
+
+	// ollama: model only — no slash-command concept.
+	if _, err := os.Stat(filepath.Join(pub, "ollama", "evolve-scout", "Modelfile")); err != nil {
+		t.Errorf("ollama Modelfile missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pub, "ollama", "commands")); !os.IsNotExist(err) {
+		t.Errorf("ollama must NOT get a commands/ layer")
+	}
+}
+
 func TestPublishAgy_StagingLayoutAndValidate(t *testing.T) {
 	calls := stubPublishExec(t, true)
 	project := publishTestProject(t, map[string]string{

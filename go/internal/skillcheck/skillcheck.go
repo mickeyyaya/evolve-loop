@@ -161,11 +161,47 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 			drift = true
 		}
 	}
+
+	// Command-stub projection (ADR-0040 second surface): mirror every skill into
+	// commands/<name>.md so /evo:<name> appears in the Claude Code `/` menu.
+	cmdDiffs, cmdErr := commandDiffs(projectRoot)
+	if cmdErr != nil {
+		fmt.Fprintf(stderr, "%v\n", cmdErr)
+		return 1
+	}
+	for _, d := range cmdDiffs {
+		if !d.drifted {
+			continue
+		}
+		if write {
+			if d.orphan {
+				if rmErr := os.Remove(d.path); rmErr != nil && !os.IsNotExist(rmErr) {
+					fmt.Fprintf(stderr, "remove %s: %v\n", d.path, rmErr)
+					return 1
+				}
+				fmt.Fprintf(stdout, "[skills] reaped orphan %s\n", d.rel)
+				continue
+			}
+			if werr := atomicwrite.Bytes(d.path, []byte(d.next)); werr != nil {
+				fmt.Fprintf(stderr, "write %s: %v\n", d.path, werr)
+				return 1
+			}
+			fmt.Fprintf(stdout, "[skills] generated %s\n", d.rel)
+		} else {
+			if d.orphan {
+				fmt.Fprintf(stderr, "DRIFT: %s is an orphaned generated command (run `evolve skills generate`)\n", d.rel)
+			} else {
+				fmt.Fprintf(stderr, "DRIFT: %s is stale or missing (run `evolve skills generate`)\n", d.rel)
+			}
+			drift = true
+		}
+	}
+
 	if !write && drift {
 		return 2
 	}
 	if !write {
-		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all names match dirs")
+		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, all names match dirs")
 	}
 	return 0
 }
@@ -182,6 +218,15 @@ func Check(projectRoot string) ([]string, error) {
 	}
 	var drift []string
 	for _, d := range diffs {
+		if d.drifted {
+			drift = append(drift, d.rel)
+		}
+	}
+	cmdDiffs, cmdErr := commandDiffs(projectRoot)
+	if cmdErr != nil {
+		return nil, cmdErr
+	}
+	for _, d := range cmdDiffs {
 		if d.drifted {
 			drift = append(drift, d.rel)
 		}

@@ -179,7 +179,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		case len(drift) > 0:
 			diags = append(diags, core.Diagnostic{
 				Severity: "error",
-				Message:  fmt.Sprintf("SKILL.md drift: %d region(s) stale vs their SSOTs — CI TestSkills_NoDrift would FAIL. Run `evolve skills generate`. Drifted: %s", len(drift), strings.Join(drift, ", ")),
+				Message:  fmt.Sprintf("skill projection drift: %d artifact(s) stale vs their SSOTs (SKILL.md phase-facts and/or commands/ stubs) — CI TestSkills_NoDrift would FAIL. Run `evolve skills generate`. Drifted: %s", len(drift), strings.Join(drift, ", ")),
 			})
 			verdict = core.VerdictFAIL
 		}

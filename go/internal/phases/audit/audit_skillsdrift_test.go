@@ -39,6 +39,32 @@ func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
 	}
 }
 
+// A drifted commands/<name>.md stub (the /-menu projection surface added with
+// the skill→command projection) must FAIL audit just like a drifted SKILL.md.
+// The gate is drift-source-agnostic, so this guards against anyone later
+// narrowing it to only "SKILL.md" and letting command drift ship CI-red.
+func TestRun_CommandStubDrift_FAILsAudit(t *testing.T) {
+	ws := t.TempDir()
+	writeACSVerdict(t, ws, 0)
+	phase := New(Config{
+		Bridge:  &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"},
+		Prompts: fakePromptsFS("body"),
+		CheckSkillsDrift: func(core.PhaseRequest) ([]string, error) {
+			return []string{"commands/loop.md"}, nil
+		},
+	})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/p", Workspace: ws})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Fatalf("Verdict=%q, want FAIL (commands/ stub drift present)", resp.Verdict)
+	}
+	if !hasDiagContaining(resp.Diagnostics, "commands/loop.md") {
+		t.Errorf("want a diagnostic naming the drifted command; got %+v", resp.Diagnostics)
+	}
+}
+
 func TestRun_SkillsDriftClean_PASSPreserved(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
