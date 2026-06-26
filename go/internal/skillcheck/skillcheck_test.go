@@ -165,7 +165,7 @@ func prepareSkillsTree(t *testing.T) string {
 	tmp := t.TempDir()
 	copyFile(t, filepath.Join(root, "docs", "architecture", "phase-registry.json"),
 		filepath.Join(tmp, "docs", "architecture", "phase-registry.json"))
-	for _, dir := range []string{"skills", "agents", filepath.Join(".evolve", "profiles")} {
+	for _, dir := range []string{"skills", "commands", "agents", filepath.Join(".evolve", "profiles")} {
 		copyTree(t, filepath.Join(root, dir), filepath.Join(tmp, dir))
 	}
 	return tmp

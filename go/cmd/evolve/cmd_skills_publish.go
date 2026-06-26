@@ -35,6 +35,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 //go:embed templates/modelfile.tmpl
@@ -96,6 +97,7 @@ type canonicalSkill struct {
 	Raw         string // full SKILL.md contents
 	Body        string // markdown after frontmatter
 	Description string
+	ArgHint     string // frontmatter argument-hint (for the command-stub projection)
 }
 
 // parsePublishFlags parses args into a publishConfig. Returns ok=false (after
@@ -292,7 +294,8 @@ func enumerateCanonicalSkills(project string) ([]canonicalSkill, error) {
 			return nil, fmt.Errorf("skills/%s/SKILL.md: frontmatter: %w", name, err)
 		}
 		desc, _ := fm["description"].(string)
-		skills = append(skills, canonicalSkill{Name: name, Raw: string(doc), Body: body, Description: desc})
+		argHint, _ := fm["argument-hint"].(string)
+		skills = append(skills, canonicalSkill{Name: name, Raw: string(doc), Body: body, Description: desc, ArgHint: argHint})
 	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
 	return skills, nil
@@ -314,17 +317,22 @@ func renderCodex(skills []canonicalSkill) (map[string][]byte, error) {
 }
 
 // renderAgy projects skills into agy's native plugin layout. Skill names stay
-// unprefixed — the evo plugin name supplies the namespace.
+// unprefixed — the evo plugin name supplies the namespace. agy is a
+// Claude-Code-shaped plugin host, so it gets the same commands/<name>.md stubs
+// (declared in plugin.json) that surface /evo:<name> in the menu — projected
+// from the one shared renderer so the stub format never diverges across CLIs.
 func renderAgy(skills []canonicalSkill) map[string][]byte {
 	manifest, _ := json.MarshalIndent(struct {
-		Name string `json:"name"`
-	}{Name: publishPluginName}, "", "  ") // const input — cannot fail
+		Name     string   `json:"name"`
+		Commands []string `json:"commands"`
+	}{Name: publishPluginName, Commands: []string{"./commands/"}}, "", "  ") // const input — cannot fail
 	files := map[string][]byte{
 		filepath.Join(publishPluginName, "plugin.json"): append(manifest, '\n'),
 	}
 	for _, s := range skills {
 		doc := injectProvenance(s.Raw, provenanceHeader("skills/"+s.Name+"/SKILL.md", "agy"))
 		files[filepath.Join(publishPluginName, "skills", s.Name, "SKILL.md")] = []byte(doc)
+		files[filepath.Join(publishPluginName, "commands", skillcheck.CommandFileName(s.Name))] = []byte(skillcheck.RenderCommandStub(s.Name, s.Description, s.ArgHint))
 	}
 	return files
 }

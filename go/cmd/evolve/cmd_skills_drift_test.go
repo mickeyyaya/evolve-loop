@@ -47,14 +47,14 @@ func TestSkills_CheckDetectsDrift(t *testing.T) {
 	root := repoRootForSkills(t)
 	tmp := t.TempDir()
 
-	// Minimal repo copy: registry + profiles + agents + skills (the four
-	// inputs skillsRun reads).
+	// Minimal repo copy: registry + profiles + agents + skills + commands (the
+	// inputs skillsRun reads — commands/ is the second projection surface).
 	for _, rel := range []string{
 		filepath.Join("docs", "architecture", "phase-registry.json"),
 	} {
 		copyFileForTest(t, filepath.Join(root, rel), filepath.Join(tmp, rel))
 	}
-	for _, dir := range []string{"skills", "agents", filepath.Join(".evolve", "profiles")} {
+	for _, dir := range []string{"skills", "commands", "agents", filepath.Join(".evolve", "profiles")} {
 		copyTreeForTest(t, filepath.Join(root, dir), filepath.Join(tmp, dir))
 	}
 

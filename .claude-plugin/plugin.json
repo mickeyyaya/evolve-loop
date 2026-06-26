@@ -73,6 +73,9 @@
     "./skills/setup/",
     "./skills/verify-release/"
   ],
+  "commands": [
+    "./commands/"
+  ],
   "binaries": [
     {
       "name": "evolve",
