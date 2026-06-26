@@ -32,6 +32,7 @@
     "Write(.evolve/runs/cycle-*/handoff-scout.json)",
     "Write(.evolve/runs/cycle-*/scout-stdout.log)",
     "Write(.evolve/runs/cycle-*/workers/*)",
+    "Write(.evolve/runs/cycle-*/.evolve/evals/*)",
     "Write(.evolve/evals/cycle-*/*)",
     "Bash(scripts/utility/research-cache.sh:*)",
     "Bash(scripts/utility/task-fingerprint.sh:*)",
@@ -113,6 +114,7 @@
     "enabled": true,
     "write_subpaths": [
       ".evolve/runs/cycle-*",
+      ".evolve/runs/cycle-*/.evolve/evals",
       ".evolve/evals/cycle-*"
     ],
     "read_only_repo": false,

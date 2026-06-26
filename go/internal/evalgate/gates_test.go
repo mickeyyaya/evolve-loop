@@ -72,6 +72,16 @@ func TestMaterializationGate(t *testing.T) {
 		}
 	})
 
+	t.Run("eval in cycle worktree is invisible → block", func(t *testing.T) {
+		ws, root, wt := t.TempDir(), t.TempDir(), t.TempDir()
+		writeScoutReport(t, ws, "a")
+		writeEval(t, wt, "a", "go test ./...") // mirrors an agent cwd inside .evolve/worktrees/cycle-*
+		reason, block := materializationGate{}.check(core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
+		if !block || !strings.Contains(reason, "a") {
+			t.Errorf("worktree-local eval must not satisfy Gate A; got reason=%q block=%v", reason, block)
+		}
+	})
+
 	t.Run("no report → fail-open", func(t *testing.T) {
 		reason, block := materializationGate{}.check(core.ReviewInput{Phase: "scout", Workspace: t.TempDir(), ProjectRoot: t.TempDir()})
 		if reason != "" || block {

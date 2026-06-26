@@ -49,13 +49,15 @@ func TestGenerateSBPL_RepoReadAlwaysAllowed(t *testing.T) {
 }
 
 // TestGenerateSBPL_HomeDirReadAndKnownWrites — HOME is readable + the
-// canonical Claude config dirs are writable. Without these, claude
-// blocks at startup trying to read ~/.claude or write a cache.
+// canonical tmux CLI state dirs are writable. Without these, cloud CLIs block
+// at startup trying to update auth/config/cache files before the REPL prompt.
 func TestGenerateSBPL_HomeDirReadAndKnownWrites(t *testing.T) {
 	out := GenerateSBPL(canonicalConfig())
 	mustContain(t, out,
 		`(allow file-read* (subpath "/Users/test"))`,
 		`(allow file-write* (subpath "/Users/test/.claude"))`,
+		`(allow file-write* (subpath "/Users/test/.codex"))`,
+		`(allow file-write* (subpath "/Users/test/.gemini"))`,
 		`(allow file-write* (subpath "/Users/test/.cache"))`,
 		`(allow file-write* (subpath "/Users/test/.config"))`,
 	)
@@ -171,6 +173,16 @@ func TestGenerateBwrapArgv_BaseRules(t *testing.T) {
 	if !endsWithArgv(args, innerArgv) {
 		t.Errorf("inner argv missing at tail: %v", args)
 	}
+}
+
+// TestGenerateBwrapArgv_HomeStateDirsTryBoundRW — Linux bridge launches need
+// the same CLI HOME state writes as macOS, but some CLI dirs may not exist on a
+// given host, so these must be try-binds rather than mandatory binds.
+func TestGenerateBwrapArgv_HomeStateDirsTryBoundRW(t *testing.T) {
+	args := GenerateBwrapArgv(canonicalConfig(), []string{"codex"})
+	mustContainArg(t, args, "--bind-try", "/Users/test/.claude", "/Users/test/.claude")
+	mustContainArg(t, args, "--bind-try", "/Users/test/.codex", "/Users/test/.codex")
+	mustContainArg(t, args, "--bind-try", "/Users/test/.gemini", "/Users/test/.gemini")
 }
 
 // TestGenerateBwrapArgv_RepoBind — bind-mount the repo dir, read-write

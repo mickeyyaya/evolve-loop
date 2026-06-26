@@ -32,6 +32,23 @@ type Config struct {
 	DenyPaths    []string // explicit write denies (claude.sh:540 deny loop)
 }
 
+// homeStateWriteDirs are CLI-owned HOME state dirs that tmux REPLs may update
+// during boot (auth refresh, config pre-trust, PATH aliases, installation ids).
+func homeStateWriteDirs(home string) []string {
+	if home == "" {
+		return nil
+	}
+	return []string{
+		filepath.Join(home, ".claude"),
+		filepath.Join(home, ".codex"),
+		filepath.Join(home, ".gemini"),
+		filepath.Join(home, ".cache"),
+		filepath.Join(home, ".config"),
+		filepath.Join(home, "Library/Caches"),
+		filepath.Join(home, "Library/Application Support"),
+	}
+}
+
 // ProbeResult reports the host's sandboxing capability.
 type ProbeResult struct {
 	OS         string // runtime.GOOS
@@ -189,8 +206,8 @@ func GenerateSBPL(cfg Config) string {
 	}
 	// HOME writes for known Claude config dirs.
 	if cfg.HomeDir != "" {
-		for _, sub := range []string{".claude", ".cache", ".config", "Library/Caches", "Library/Application Support"} {
-			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", filepath.Join(cfg.HomeDir, sub))
+		for _, p := range homeStateWriteDirs(cfg.HomeDir) {
+			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
 		}
 	}
 	// ReadOnlyRepo: explicit deny before per-write-path allows so later
@@ -250,6 +267,11 @@ func BwrapPrefix(cfg Config) []string {
 	// HOME read-only by default.
 	if cfg.HomeDir != "" {
 		out = append(out, "--ro-bind", cfg.HomeDir, cfg.HomeDir)
+	}
+	// Re-bind known CLI state dirs rw so REPL boot can update auth/cache/config.
+	// Use bind-try: not every host has every CLI directory.
+	for _, p := range homeStateWriteDirs(cfg.HomeDir) {
+		out = append(out, "--bind-try", p, p)
 	}
 	// Repo: rw or ro by ReadOnlyRepo.
 	if cfg.RepoRoot != "" {

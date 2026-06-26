@@ -1,7 +1,7 @@
 {
   "name": "router",
   "role": "router",
-  "cli": "claude-tmux",
+  "cli": "agy-tmux",
   "model_tier_default": "deep",
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
@@ -95,8 +95,8 @@
   "allowed_clis": [
     "all"
   ],
+  "cli_fallback": ["claude-tmux"],
   "stream_output": true,
   "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY — router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm.",
-  "generated_from": "hand-authored",
-  "cli_fallback": []
+  "generated_from": "hand-authored"
 }
