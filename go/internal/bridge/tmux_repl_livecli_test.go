@@ -54,7 +54,7 @@ var liveCLISpecs = []liveCLISpec{
 	{
 		name: "claude-tmux", bin: "claude",
 		launchCmd: "claude --model haiku --dangerously-skip-permissions",
-		marker:    "❯", bootScrollback: 0, bootIntervalS: 1,
+		marker:    "❯", bootScrollback: 0, bootIntervalS: 1, tickDuringBoot: true,
 		exitSeq: []tmuxKey{{keys: "/exit", enter: true, pauseS: 1}},
 	},
 	{

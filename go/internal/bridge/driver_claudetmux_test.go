@@ -24,8 +24,10 @@ type fakeTmux struct {
 	sentSeq           []string // recorded SendKeys as "keys|enter", preserving order
 	paneSeq           []string // CapturePane returns, consumed in order; last value repeats
 	paneIdx           int
-	captureScrollback []int // recorded scrollback (3rd) arg of each CapturePane call
-	newSessErr        error // when set, NewSession fails (covers the spawn-error path)
+	captureScrollback []int  // recorded scrollback (3rd) arg of each CapturePane call
+	newSessErr        error  // when set, NewSession fails (covers the spawn-error path)
+	lastPane          string // most recent CapturePane return — the pane "on screen"
+	pasteContext      string // the pane on screen when PasteBuffer was last called
 }
 
 func (f *fakeTmux) HasSession(_ context.Context, name string) bool { return f.existing[name] }
@@ -49,19 +51,29 @@ func (f *fakeTmux) SendKeys(_ context.Context, _, keys string, enter bool) error
 
 func (f *fakeTmux) CapturePane(_ context.Context, _ string, scrollback int) (string, error) {
 	f.captureScrollback = append(f.captureScrollback, scrollback)
-	if len(f.paneSeq) == 0 {
-		return "", nil
+	v := ""
+	if len(f.paneSeq) > 0 {
+		if f.paneIdx < len(f.paneSeq) {
+			v = f.paneSeq[f.paneIdx]
+			f.paneIdx++
+		} else {
+			v = f.paneSeq[len(f.paneSeq)-1]
+		}
 	}
-	if f.paneIdx < len(f.paneSeq) {
-		v := f.paneSeq[f.paneIdx]
-		f.paneIdx++
-		return v, nil
-	}
-	return f.paneSeq[len(f.paneSeq)-1], nil
+	f.lastPane = v
+	return v, nil
 }
 
 func (f *fakeTmux) LoadBuffer(_ context.Context, _, _ string) error { return nil }
-func (f *fakeTmux) PasteBuffer(_ context.Context, _ string) error   { return nil }
+func (f *fakeTmux) PasteBuffer(_ context.Context, _ string) error {
+	// Record the paste as an ordered event so tests can assert that boot-time
+	// dialog dismissals (auto-respond sends) happen BEFORE prompt delivery, and
+	// capture the pane that was on screen so tests can assert the prompt lands
+	// on a clean REPL — not a still-open dialog (where the paste would be lost).
+	f.sentSeq = append(f.sentSeq, "paste-buffer")
+	f.pasteContext = f.lastPane
+	return nil
+}
 func (f *fakeTmux) KillSession(_ context.Context, name string) error {
 	delete(f.existing, name)
 	return nil
@@ -186,13 +198,76 @@ func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // REPL boots immediately
+	// Two marker frames: claude-tmux ticks the auto-responder during boot, so
+	// the first iteration reads the pane twice (boot loop + tick); the clean
+	// marker matches no trust rule, so it boots immediately.
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, tmuxPromptMarkerDefault}}
 	code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass")
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
 	}
 	if !tmux.sentContains("/exit") {
 		t.Fatalf("ephemeral session should be closed with /exit; sentKeys=%v", tmux.sentKeys)
+	}
+}
+
+func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
+	// Regression (claude v2.1.193): the folder-trust dialog renders its
+	// selection cursor as ❯ — the same char claude-tmux uses as its REPL
+	// prompt marker. The boot loop must auto-dismiss the dialog (tick) BEFORE
+	// delivering the prompt, or the paste lands in the dialog and is lost
+	// (rc=81 artifact-timeout). Same class as the Cycle-121 codex trust-modal
+	// bug, now for claude: the fix is tickDuringBoot:true + a trust_prompt
+	// manifest rule.
+	fx := newFixture(t, "claude-tmux", "")
+	// Seed the artifact so a correctly-delivered prompt completes — this test
+	// isolates the boot-time trust handling, not the artifact wait itself.
+	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
+		t.Fatalf("seed artifact: %v", err)
+	}
+	trust := "Quick safety check: Is this a project you created or one you trust?\n" +
+		"❯ 1. Yes, I trust this folder\n  2. No, exit\nEnter to confirm · Esc to cancel"
+	// The trust dialog's ❯ cursor satisfies the marker check, so the boot loop
+	// must NOT declare ready while the dialog is on screen. Frames: the dialog
+	// shows for the first iteration's two reads (boot loop + tick), then clears
+	// to a clean REPL marker — the driver must wait for THAT before delivering.
+	tmux := &fakeTmux{paneSeq: []string{trust, trust, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault}}
+	code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass")
+	if code != ExitOK {
+		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stderr, "[auto-respond] sent keys") {
+		t.Fatalf("expected the auto-responder to fire on the trust dialog during boot; stderr=%q", stderr)
+	}
+	pasteIdx := -1
+	for i, s := range tmux.sentSeq {
+		if s == "paste-buffer" {
+			pasteIdx = i
+			break
+		}
+	}
+	if pasteIdx < 0 {
+		t.Fatalf("prompt was never delivered (no paste-buffer); sentSeq=%v", tmux.sentSeq)
+	}
+	// The trust-accept keystroke (a bare Enter, "|true") must precede the paste:
+	// cd/launch carry non-empty keys, so a bare Enter before the paste is the
+	// auto-responder dismissing the dialog during boot.
+	dismissedBeforePaste := false
+	for _, s := range tmux.sentSeq[:pasteIdx] {
+		if s == "|true" {
+			dismissedBeforePaste = true
+			break
+		}
+	}
+	if !dismissedBeforePaste {
+		t.Fatalf("trust dialog was not auto-dismissed before prompt delivery; sentSeq=%v", tmux.sentSeq)
+	}
+	// The decisive property (the live rc=81 the minimal fix missed): the prompt
+	// must be pasted onto a CLEAN REPL, not the still-open trust dialog. If the
+	// boot loop breaks on the dialog's ❯ cursor, the paste lands in the dialog
+	// and is lost — so the pane on screen at paste time must not be the dialog.
+	if strings.Contains(tmux.pasteContext, "trust this folder") {
+		t.Fatalf("prompt pasted while the trust dialog was still on screen — paste lost; pasteContext=%q", tmux.pasteContext)
 	}
 }
 

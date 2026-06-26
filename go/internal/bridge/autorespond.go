@@ -193,6 +193,27 @@ type autoResponder struct {
 	// sends NOTHING. shadowFired dedups to one signal per rule per launch.
 	shadowRules []shadowObserver
 	shadowFired map[string]bool
+	// firedOnceThisTick is set by tick when the rule it just auto-responded to
+	// (rc 1) is a fire-once boot dialog. The boot loop reads it to re-poll
+	// instead of mistaking the dismissed dialog's selection cursor for a ready
+	// REPL marker (claude/codex trust dialogs render the REPL marker char).
+	firedOnceThisTick bool
+}
+
+// firedRuleOnce reports whether the rule decideAutoRespond just fired (the one
+// whose counter advanced past prevCounts) is fire-once. once:true is the marker
+// of a boot-time dialog (trust/safety prompt) — whether built-in or operator-
+// promoted — and only such dialogs render a selection cursor that can masquerade
+// as the REPL prompt marker. So only a once-rule dismissal warrants a boot-loop
+// re-poll; a repeating non-once in-REPL prompt must still fall through to the
+// wait-loop guard rather than spin boot.
+func (ar *autoResponder) firedRuleOnce(prevCounts map[string]int) bool {
+	for _, p := range ar.prompts {
+		if ar.counts[p.Name] > prevCounts[p.Name] {
+			return p.Once
+		}
+	}
+	return false
 }
 
 // pendingAutoRespond is one injection awaiting its outcome: the rule/source
@@ -246,13 +267,15 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 			}
 		}
 	}
-	var prevCounts map[string]int
-	if ar.rec != nil {
-		prevCounts = make(map[string]int, len(ar.counts))
-		for k, v := range ar.counts {
-			prevCounts[k] = v
-		}
+	// Snapshot counts so we can identify which rule decideAutoRespond fires (it
+	// increments that rule's counter). Used both for I1 telemetry (openPending)
+	// and to tell the boot loop whether the prompt just dismissed was a
+	// fire-once boot dialog (firedOnceThisTick).
+	prevCounts := make(map[string]int, len(ar.counts))
+	for k, v := range ar.counts {
+		prevCounts[k] = v
 	}
+	ar.firedOnceThisTick = false
 	// pane here stays RAW: resolvePending, shadow matching, and writeEscalation
 	// (above/below) need the real terminal. stripAgentDiffLines runs only
 	// inside decideAutoRespond, scoped to the prompt-matching decision.
@@ -260,6 +283,7 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)
 	switch rc {
 	case 1:
+		ar.firedOnceThisTick = ar.firedRuleOnce(prevCounts)
 		keysCSV := strings.TrimPrefix(action, "send:")
 		if ar.human {
 			humanReadingPause(ar.deps, pane)

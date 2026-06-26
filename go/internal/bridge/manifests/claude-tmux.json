@@ -88,6 +88,14 @@
   },
   "interactive_prompts": [
     {
+      "name": "trust_prompt",
+      "regex": "1\\.\\s+Yes, I trust this folder",
+      "response_keys": "Enter",
+      "policy": "auto_respond",
+      "once": true,
+      "note": "claude v2.1.193 folder-trust dialog: 'Quick safety check: Is this a project you created or one you trust?' with '❯ 1. Yes, I trust this folder' pre-highlighted and footer 'Enter to confirm'. The selection cursor ❯ is the SAME char as claude's REPL prompt marker, so the boot loop mistakes the dialog for a ready REPL and pastes the prompt INTO the dialog (lost → rc=81 artifact-timeout). tickDuringBoot dismisses it during boot before prompt delivery: a single Enter confirms the pre-highlighted 'Yes' (verified 2026-06-26, fresh-dir launch with --dangerously-skip-permissions). Regex anchors on the numbered menu-option line ('1. Yes, I trust this folder') so prose/agent output that merely mentions trusting a folder cannot false-match (tick also runs during the artifact-wait loop). once:true — fired a single time per launch. Same class as the Cycle-121 codex trust-modal premature-ready bug."
+    },
+    {
       "name": "askuserquestion_multiselect",
       "regex": "(?s)\\[ \\].*Enter to select",
       "response_keys": "Enter,Right,Enter",
