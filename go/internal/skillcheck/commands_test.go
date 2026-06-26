@@ -25,6 +25,25 @@ func writeSkillFixture(t *testing.T, root, name, desc, argHint string) {
 	}
 }
 
+// TestCommandFileName pins the slash-command filename contract: the evo- prefix
+// is what namespaces the command under /evo and keeps it from colliding with the
+// built-in /loop, /tdd, /refactor. Both projection surfaces (Claude Code and the
+// agy cross-CLI publisher) derive their filenames here, so the convention must
+// not drift.
+func TestCommandFileName(t *testing.T) {
+	for _, tc := range []struct {
+		skill, want string
+	}{
+		{"loop", "evo-loop.md"},
+		{"tdd", "evo-tdd.md"},
+		{"security-review-scored", "evo-security-review-scored.md"},
+	} {
+		if got := CommandFileName(tc.skill); got != tc.want {
+			t.Errorf("CommandFileName(%q) = %q, want %q", tc.skill, got, tc.want)
+		}
+	}
+}
+
 // TestCommandDiffs_ProjectsStubPerSkill is the RED proof: every skill must
 // project a commands/<name>.md stub carrying the skill's description and
 // argument-hint (for the `/` menu), a delegation to evo:<name>, the $ARGUMENTS
