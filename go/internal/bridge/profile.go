@@ -17,12 +17,18 @@ type Profile struct {
 	PermissionMode string
 	StreamOutput   bool
 	SessionName    string
+	Sandbox        *ProfileSandbox
 	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch (ADR-0022). Flags
 	// are keyed by the CLI they belong to ("claude-tmux": [...]) and realized
 	// ONLY for the matching CLI, so a claude-origin profile switched to
 	// agy/codex realizes none of claude's argv. Replaces the flat extra_flags
 	// that forwarded one CLI's vocabulary verbatim to every CLI.
 	ExtraFlagsByCLI map[string][]string
+}
+
+// ProfileSandbox is the bridge's minimal view of profile.sandbox.
+type ProfileSandbox struct {
+	AllowNetwork bool
 }
 
 // validPermissionModes mirrors the claude --permission-mode choice set
@@ -52,6 +58,7 @@ type profileWire struct {
 	PermissionMode  string              `json:"permission_mode"`
 	StreamOutput    *bool               `json:"stream_output"`
 	SessionName     string              `json:"session_name"`
+	Sandbox         *ProfileSandbox     `json:"sandbox"`
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
@@ -99,6 +106,7 @@ func LoadProfile(path string) (Profile, error) {
 		AllowedTools:    w.AllowedTools,
 		PermissionMode:  w.PermissionMode,
 		SessionName:     w.SessionName,
+		Sandbox:         w.Sandbox,
 		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {

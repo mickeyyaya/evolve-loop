@@ -83,7 +83,7 @@ func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Con
 			return exitWorkspaceSetupFailed, "could not create boot workspace: " + err.Error()
 		}
 		defer func() { _ = os.RemoveAll(ws) }()
-		cfg := &bridge.Config{Workspace: ws, ProjectRoot: projectRoot}
+		cfg := &bridge.Config{Workspace: ws, ProjectRoot: projectRoot, AllowNetwork: true}
 		if sandbox {
 			wt, werr := os.MkdirTemp("", "evolve-looppreflight-wt-*")
 			if werr == nil {

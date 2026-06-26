@@ -31,7 +31,12 @@ import (
 // up trusted in the codex config, so the boot that follows renders no
 // "Press enter to confirm" modal (the cycle-122 tdd hang).
 func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
-	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "codex", "config.toml")
+	versionPath := filepath.Join(dir, "codex", "version.json")
+	old := codexVersionPathFn
+	t.Cleanup(func() { codexVersionPathFn = old })
+	codexVersionPathFn = func() (string, error) { return versionPath, nil }
 	freshWorktree := t.TempDir() // fresh = no prior trust entry anywhere
 
 	cfg := &Config{CLI: "codex-tmux", Worktree: freshWorktree, Workspace: t.TempDir(), codexConfigPath: cfgPath}

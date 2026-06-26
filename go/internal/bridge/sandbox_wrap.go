@@ -84,11 +84,15 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		// Build the sandbox.Config for this phase. WritePaths covers the
 		// worktree (the only place source writes are permitted) plus the
 		// workspace (for artifact/log files the agent must write) plus /tmp
-		// (the bridge's scratch space).
+		// (the bridge's scratch space). HomeDir is read-allowed so tmux CLIs can
+		// load their own config/auth state; repo writes remain confined below.
+		home, _ := os.UserHomeDir()
 		cfg := sandbox.Config{
 			RepoRoot:     req.RepoRoot,
+			HomeDir:      home,
 			ReadOnlyRepo: true,
 			WritePaths:   sandboxWritePaths(req),
+			AllowNetwork: req.AllowNetwork,
 		}
 
 		switch probe.OS {
@@ -197,10 +201,11 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
 		return nil, false
 	}
 	return deps.SandboxWrap(SandboxWrapRequest{
-		Phase:     cfg.Agent,
-		Workspace: cfg.Workspace,
-		Worktree:  cfg.Worktree,
-		RepoRoot:  cfg.ProjectRoot,
+		Phase:        cfg.Agent,
+		Workspace:    cfg.Workspace,
+		Worktree:     cfg.Worktree,
+		RepoRoot:     cfg.ProjectRoot,
+		AllowNetwork: cfg.AllowNetwork,
 	})
 }
 

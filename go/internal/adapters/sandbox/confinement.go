@@ -8,7 +8,7 @@ import "strings"
 //
 // Before this file, the two decisions it owns were duplicated:
 //
-//   - "is this a nested-Claude session?" was detected by two different
+//   - "is this a nested LLM-CLI sandbox session?" was detected by two different
 //     heuristics — preflight read CLAUDECODE; the bridge read
 //     CLAUDE_CODE_ENTRYPOINT / CLAUDE_CODE_SESSION_ID.
 //   - "should the inner OS sandbox wrap this launch?" was decided twice — the
@@ -20,10 +20,10 @@ import "strings"
 // Centralizing both here removes the duplication and makes the two consumers
 // agree by construction.
 
-// DetectNested reports whether we are running inside an outer Claude Code
-// session. It is the single nested-Claude heuristic: any of the known signals
-// counts, EXCEPT that CLAUDECODE_TYPE=host marks the top-level host process
-// (which is not nested-under-another-sandbox and so can confine its children).
+// DetectNested reports whether we are running inside an outer LLM CLI sandbox
+// session. Any known managed-sandbox signal counts, EXCEPT that
+// CLAUDECODE_TYPE=host marks the top-level host process (which is not
+// nested-under-another-sandbox and so can confine its children).
 //
 // getenv is injected (os.Getenv in production, a map lookup in tests / on the
 // bridge's request-local env chain).
@@ -36,18 +36,22 @@ func DetectNested(getenv func(string) string) bool {
 			return true
 		}
 	}
+	path := getenv("PATH")
+	if strings.Contains(path, "/codex.system/bootstrap/") || strings.Contains(path, "/.codex/tmp/arg0/") {
+		return true
+	}
 	return false
 }
 
 // ShouldWrap is the single wrap-policy decision: should a source-writing phase
-// launch be wrapped in the inner OS sandbox, given the nested-Claude signal and
+// launch be wrapped in the inner OS sandbox, given the nested-sandbox signal and
 // the host probe? It returns (wrap, reason) where reason is always non-empty so
 // callers can surface it (the bridge WARNs it for EVOLVE_SANDBOX=on; preflight
 // records it).
 //
 // Policy: wrap IFF the OS is supported AND a sandbox binary is available AND we
 // are NOT nested. The nested exclusion is universal (not OS-specific and not
-// mode-specific): under an outer Claude Code session the inner sandbox is both
+// mode-specific): under an outer LLM CLI sandbox session the inner sandbox is both
 // redundant (the outer session already imposes OS sandbox + Tier-1 hooks) and,
 // on macOS, non-functional (sandbox_apply() returns EPERM and the REPL never
 // boots). When !nested, capability collapses to availability — the host can't
@@ -68,7 +72,7 @@ func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 		return false, reason
 	}
 	if nested {
-		return false, "nested-Claude: outer Claude Code OS sandbox + Tier-1 hooks already confine; inner sandbox redundant (and on macOS sandbox_apply() returns EPERM, hanging REPL boot)"
+		return false, "nested LLM-CLI sandbox: outer OS sandbox + Tier-1 hooks already confine; inner sandbox redundant (and on macOS sandbox_apply() returns EPERM, hanging REPL boot)"
 	}
 	// Subtractive capability gate: a MEASURED-incapable sandbox (binary present
 	// but sandbox_apply fails — e.g. a broken/SIP-weird standalone host) must NOT

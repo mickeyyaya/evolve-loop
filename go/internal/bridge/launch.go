@@ -162,6 +162,9 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		Realization:      RealizeFor(raw.cli, intent),
 		AnthropicBaseURL: raw.anthropicBaseURL,
 	}
+	if prof.Sandbox != nil {
+		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
+	}
 
 	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →
 	// require-full → driver dispatch).

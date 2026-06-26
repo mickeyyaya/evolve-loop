@@ -79,6 +79,21 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	}
 }
 
+func TestSandboxPrefix_PassesNetworkPolicy(t *testing.T) {
+	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
+	deps := Deps{SandboxWrap: fw.wrap()}
+	_, _ = sandboxPrefixForLaunch(deps, &Config{
+		Worktree:     "/wt",
+		Workspace:    "/ws",
+		ProjectRoot:  "/repo",
+		Agent:        "build",
+		AllowNetwork: true,
+	})
+	if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
+		t.Fatalf("AllowNetwork was not threaded to SandboxWrapRequest: %+v", fw.calls)
+	}
+}
+
 func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 	// A deps with no SandboxWrap (older test harness, or explicit off) must
 	// return (nil, false) — drivers then run unwrapped. Never panic on nil.
@@ -216,6 +231,34 @@ func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 	}
 	if filepath.Base(sbpl) != "sandbox-build.sb" {
 		t.Errorf("SBPL basename=%q, want sandbox-build.sb", filepath.Base(sbpl))
+	}
+}
+
+func TestDefaultSandboxWrap_Darwin_AllowsHomeReadAndProfileNetwork(t *testing.T) {
+	ws := t.TempDir()
+	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
+	prefix, ok := wrap(SandboxWrapRequest{
+		Phase:        "build",
+		Worktree:     t.TempDir(),
+		Workspace:    ws,
+		RepoRoot:     t.TempDir(),
+		AllowNetwork: true,
+	})
+	if !ok {
+		t.Fatal("sandbox wrapper did not return a prefix")
+	}
+	raw, err := os.ReadFile(prefix[2])
+	if err != nil {
+		t.Fatalf("read SBPL: %v", err)
+	}
+	sbpl := string(raw)
+	home, _ := os.UserHomeDir()
+	if home != "" && !strings.Contains(sbpl, `(allow file-read* (subpath "`+home+`"))`) {
+		t.Fatalf("SBPL missing HOME read allow for tmux CLI config/auth state:\n%s", sbpl)
+	}
+	if strings.Contains(sbpl, "(deny network*)") {
+		t.Fatalf("SBPL denied network even though profile allowed it:\n%s", sbpl)
 	}
 }
 

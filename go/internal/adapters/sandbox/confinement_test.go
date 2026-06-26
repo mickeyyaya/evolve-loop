@@ -3,7 +3,7 @@ package sandbox
 import "testing"
 
 // SSOT tests for the unified sandbox-confinement decision (DetectNested +
-// ShouldWrap). Before this, "is this a nested-Claude session?" was detected by
+// ShouldWrap). Before this, "is this a nested LLM CLI sandbox session?" was detected by
 // two different heuristics (preflight read CLAUDECODE; the bridge read
 // CLAUDE_CODE_ENTRYPOINT/SESSION_ID), and "should the inner OS sandbox wrap?"
 // was decided in two places — the bridge (auto-mode-only nested skip, which
@@ -22,6 +22,12 @@ func TestDetectNested(t *testing.T) {
 		{"session id only (bridge's old signal)", map[string]string{"CLAUDE_CODE_SESSION_ID": "abc"}, true},
 		{"all signals (our real env)", map[string]string{
 			"CLAUDECODE": "1", "CLAUDE_CODE_ENTRYPOINT": "cli", "CLAUDE_CODE_SESSION_ID": "abc",
+		}, true},
+		{"codex managed sandbox bootstrap path", map[string]string{
+			"PATH": "/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/bin",
+		}, true},
+		{"codex arg0 path", map[string]string{
+			"PATH": "/usr/bin:/Users/test/.codex/tmp/arg0/codex-arg0abc:/bin",
 		}, true},
 		// CLAUDECODE_TYPE=host marks the top-level host process, which is NOT
 		// nested-under-another-sandbox — it overrides the other signals
@@ -50,7 +56,7 @@ func TestShouldWrap(t *testing.T) {
 		probe    ProbeResult
 		wantWrap bool
 	}{
-		// The core regression: nested-Claude must NOT wrap regardless of binary
+		// The core regression: nested managed LLM CLIs must NOT wrap regardless of binary
 		// availability — on darwin the inner sandbox-exec hangs the REPL boot,
 		// and on every OS the outer Claude session already confines. This is
 		// the cell the bridge's auto-only skip missed for EVOLVE_SANDBOX=on.

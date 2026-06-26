@@ -393,6 +393,9 @@ func TestExec_DarwinSandboxExec(t *testing.T) {
 	if !pr.Available {
 		t.Skip("sandbox-exec not available on this host")
 	}
+	if pr.CapabilityChecked && !pr.Capable {
+		t.Skipf("sandbox-exec present but cannot apply on this host: %s", pr.Reason)
+	}
 	s := New(canonicalConfig())
 	var stderr strings.Builder
 	err := s.Exec(context.Background(), []string{"/usr/bin/true"}, nil, nil, &stderr)
