@@ -18,14 +18,15 @@ import (
 func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	// CapturePane always "" → the marker is never seen → the boot loop polls to
-	// its deadline then returns ExitREPLBootTimeout. captureScrollback records
-	// one entry per poll iteration PLUS one from the deferred tmuxCleanup
-	// final-scrollback capture (it fires on every exit path, including the
-	// boot-timeout return), so its length == BootTimeoutS / bootIntervalS
-	// + 1 (claude bootIntervalS=1). With the field at 4 that is 5; without the
-	// field it would be 61 (the hardcoded 60s default), so an exact 5 proves
-	// the typed field bounds the loop.
-	const wantPolls = 4 + 1 // 4 boot-poll iterations (env) + 1 deferred tmuxCleanup capture
+	// its deadline then returns ExitREPLBootTimeout. claude-tmux now ticks the
+	// auto-responder during boot (tickDuringBoot), so each poll iteration reads
+	// the pane TWICE (boot loop capture + auto-respond tick capture). captureScrollback
+	// records every CapturePane PLUS one from the deferred tmuxCleanup final-scrollback
+	// capture (it fires on every exit path, including the boot-timeout return), so its
+	// length == 2 * (BootTimeoutS / bootIntervalS) + 1 (claude bootIntervalS=1). With
+	// the field at 4 that is 9; without the field it would be 121 (the hardcoded 60s
+	// default), so an exact 9 proves the typed field bounds the loop.
+	const wantPolls = 4*2 + 1 // 4 boot-poll iterations × 2 captures (loop + tick) + 1 deferred tmuxCleanup capture
 	tmux := &fakeTmux{}
 	eng := NewEngine(Deps{
 		Tmux:         tmux,

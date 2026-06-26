@@ -127,7 +127,8 @@ func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
 	// the cycle-117 advisor deadlock, fixed.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{
-		tmuxPromptMarkerDefault,                  // boot: marker seen → REPL ready
+		tmuxPromptMarkerDefault,                  // boot loop capture: marker seen → REPL ready
+		tmuxPromptMarkerDefault,                  // boot-time auto-respond tick capture (tickDuringBoot)
 		tmuxPromptMarkerDefault,                  // interval baseline pre-capture
 		"thinking…",                              // detector baseline (poll 1)
 		"⏺ [ done ]\n" + tmuxPromptMarkerDefault, // settles here; repeats → idle accrues

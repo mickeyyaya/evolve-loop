@@ -42,7 +42,10 @@ func (a *liveArtifactTmux) PasteBuffer(ctx context.Context, session string) erro
 // artifact is healthy — ExitOK, no wall pattern.
 func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
-	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "done ❯", "cleanup"}}
+	// Two leading "❯" frames: claude-tmux now ticks the auto-responder during
+	// boot (tickDuringBoot), so the first boot iteration reads the pane twice
+	// (boot loop + tick) before the marker check breaks.
+	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
 	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
 	if rc != ExitOK {

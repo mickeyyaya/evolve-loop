@@ -270,7 +270,20 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// Running tick first lets the interactive_prompts regex match +
 			// dismiss the modal so the true REPL prompt can appear cleanly.
 			if lp.tickDuringBoot {
-				ar.tick(ctx, lp.session) // codex/agy: handle trust prompts during boot
+				// codex/agy/claude: dismiss boot dialogs (trust prompts) BEFORE the
+				// marker check (Cycle-121). A fire-once dialog's selection cursor can
+				// BE the REPL marker (claude v2.1.193's ❯ trust dialog, codex's ›
+				// modal), so the pane captured ABOVE still shows that dialog after the
+				// tick dismisses it. Declaring ready on that stale frame and pasting
+				// the prompt delivers it INTO the dialog, where it is lost (claude
+				// v2.1.193 rc=81). When a once-dialog was just dismissed, re-poll so
+				// the next iteration sees the real REPL. Gated on a once-dialog
+				// dismiss (not any auto-respond) so a repeating in-REPL prompt still
+				// falls through to the wait-loop guard instead of spinning boot.
+				ar.tick(ctx, lp.session)
+				if ar.firedOnceThisTick {
+					continue
+				}
 			}
 			if strings.Contains(pane, lp.promptMarker) {
 				if lp.bootMenuSkip != "" && tmuxPaneLooksLikeUpdateMenu(pane) {
