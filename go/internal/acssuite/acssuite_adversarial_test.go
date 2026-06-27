@@ -6,6 +6,7 @@ package acssuite
 // WriteVerdict (83.3%), changedPackagesForCycle (28.6%).
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -123,6 +124,56 @@ func TestExcerpt_AllBranches(t *testing.T) {
 			t.Errorf("over-limit excerpt must end with ellipsis; got suffix %q", got[max(0, len(got)-5):])
 		}
 	})
+}
+
+func TestHasGoACSTree_GoModDirectoryIsNotModule(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "go.mod"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if hasGoACSTree(dir) {
+		t.Fatal("go.mod directory must not be treated as a Go ACS module")
+	}
+}
+
+func TestHasGoACSTree_ACSPathMustBeDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "acs"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if hasGoACSTree(dir) {
+		t.Fatal("acs file must not be treated as a Go ACS predicate tree")
+	}
+}
+
+func TestDefaultGoExec_RunsGoTestJSON(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/acs\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgDir := filepath.Join(dir, "acs", "cycle1")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testFile := `package cycle1
+
+import "testing"
+
+func TestPredicate(t *testing.T) {}
+`
+	if err := os.WriteFile(filepath.Join(pkgDir, "predicate_test.go"), []byte(testFile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := defaultGoExec(context.Background(), dir, "./acs/cycle1", os.Environ())
+	if err != nil {
+		t.Fatalf("defaultGoExec: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, `"Test":"TestPredicate"`) {
+		t.Fatalf("go test json missing predicate event: %s", out)
+	}
 }
 
 // TestPredicateEnv_AllBranches — adversarial: verify every env injection path.

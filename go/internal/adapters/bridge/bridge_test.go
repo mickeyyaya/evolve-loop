@@ -92,6 +92,18 @@ func TestLaunch_DelegatesToEngine(t *testing.T) {
 	}
 }
 
+func TestLaunch_OnStopReviewBranchStillValidatesViaEngine(t *testing.T) {
+	a := New()
+	a.SetOnStopReview(func(int, string, string, string) {})
+	_, err := a.Launch(context.Background(), core.BridgeRequest{
+		CLI: "not-a-real-cli", Profile: "/p", Model: "auto",
+		Prompt: "body", Workspace: t.TempDir(), ArtifactPath: "/a.md", Agent: "scout",
+	})
+	if err == nil {
+		t.Fatal("Launch with unsupported CLI must return an engine error")
+	}
+}
+
 // TestLaunch_InjectsDeliverableContract — for a registered agent the prompt the
 // engine receives carries the Deliverable Contract block AND a footer with the
 // EXACT artifact path as (essentially) the last line. The per-cycle path must
@@ -148,6 +160,19 @@ func TestProbe_DelegatesToEngine(t *testing.T) {
 	}
 	if got.Version != "darwin" || got.CLIs["claude-tmux"] != "full" {
 		t.Errorf("probe not delegated: %+v", got)
+	}
+}
+
+func TestProbe_DefaultEngineFactoryIsUsable(t *testing.T) {
+	got, err := New().Probe(context.Background())
+	if err != nil {
+		t.Fatalf("Probe through default engine factory: %v", err)
+	}
+	if got.Version == "" {
+		t.Fatalf("Probe version is empty: %+v", got)
+	}
+	if len(got.CLIs) == 0 {
+		t.Fatalf("Probe CLI map is empty: %+v", got)
 	}
 }
 

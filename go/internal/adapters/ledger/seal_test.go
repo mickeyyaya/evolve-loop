@@ -115,6 +115,35 @@ func TestSeal_SecondSealAppendsSecondSegment(t *testing.T) {
 	}
 }
 
+func TestSealLocked_ReadError(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := &FileLedger{ledgerPath: filepath.Join(blocker, "ledger.jsonl")}
+	if _, err := l.sealLocked(1); err == nil {
+		t.Fatal("sealLocked with unreadable ledger path must return read error")
+	}
+}
+
+func TestSealLocked_WriteSegmentError(t *testing.T) {
+	l, dir := seedLedger(t, 5)
+	if err := os.WriteFile(filepath.Join(dir, segmentsDirName), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.sealLocked(1); err == nil {
+		t.Fatal("sealLocked with ledger-segments occupied by a file must return write segment error")
+	}
+}
+
+func TestAnchorFor_RelativeBaseError(t *testing.T) {
+	l := &FileLedger{ledgerPath: filepath.Join("relative", "ledger.jsonl")}
+	if _, err := l.anchorFor(filepath.Join(t.TempDir(), "seg-0001.jsonl.gz"), "sha", 1); err == nil {
+		t.Fatal("anchorFor with relative ledger path and absolute segment path must return rel error")
+	}
+}
+
 func TestVerifyDeep_TamperedSegmentFails(t *testing.T) {
 	l, dir := seedLedger(t, 10)
 	if err := l.Seal(context.Background(), 3); err != nil {
@@ -148,6 +177,18 @@ func TestVerifyDeep_NoSegmentsEqualsVerify(t *testing.T) {
 	}
 	if err := l.VerifyDeep(context.Background()); err != nil {
 		t.Fatalf("VerifyDeep with no segments must behave like Verify: %v", err)
+	}
+}
+
+func TestVerifyDeep_LiveReadError(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := &FileLedger{ledgerPath: filepath.Join(blocker, "ledger.jsonl")}
+	if err := l.VerifyDeep(context.Background()); err == nil {
+		t.Fatal("VerifyDeep with unreadable live ledger path must return error")
 	}
 }
 

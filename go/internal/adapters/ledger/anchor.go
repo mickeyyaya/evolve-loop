@@ -31,6 +31,12 @@ type ledgerAnchor struct {
 	Note          string `json:"note"`
 }
 
+var (
+	anchorCreateTemp = os.CreateTemp
+	anchorWrite      = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
+	anchorClose      = func(f *os.File) error { return f.Close() }
+)
+
 // loadAnchorSHA returns the recorded epoch-anchor line SHA, or "" when no anchor
 // is set or the file is unreadable/corrupt. Degrading to "" means FULL-STRICT
 // verification (no relaxation) — a missing/garbled anchor never silently trusts
@@ -87,17 +93,17 @@ func (l *FileLedger) Anchor(_ context.Context, seq int, note string) error {
 	// os.CreateTemp gives a unique name so concurrent invocations never collide
 	// on the temp path; rename is atomic (POSIX). Clean up the temp on any
 	// failure after creation so a failed anchor leaves no residue.
-	f, err := os.CreateTemp(filepath.Dir(l.anchorPath), "ledger-anchor.*.tmp")
+	f, err := anchorCreateTemp(filepath.Dir(l.anchorPath), "ledger-anchor.*.tmp")
 	if err != nil {
 		return fmt.Errorf("ledger anchor: create temp: %w", err)
 	}
 	tmp := f.Name()
-	if _, err := f.Write(append(b, '\n')); err != nil {
-		_ = f.Close()
+	if _, err := anchorWrite(f, append(b, '\n')); err != nil {
+		_ = anchorClose(f)
 		_ = os.Remove(tmp)
 		return fmt.Errorf("ledger anchor: write: %w", err)
 	}
-	if err := f.Close(); err != nil {
+	if err := anchorClose(f); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("ledger anchor: close: %w", err)
 	}

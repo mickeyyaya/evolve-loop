@@ -2,6 +2,7 @@ package acssuite
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,5 +107,32 @@ func TestWriteVerdict_CreateTempError(t *testing.T) {
 		t.Fatal("WriteVerdict must error when the temp file cannot be created")
 	} else if !strings.Contains(err.Error(), "create tmp") {
 		t.Errorf("error must carry the 'create tmp' context; got %q", err.Error())
+	}
+}
+
+func TestWriteVerdict_CloseError(t *testing.T) {
+	old := writeVerdictClose
+	t.Cleanup(func() { writeVerdictClose = old })
+	writeVerdictClose = func(f *os.File) error {
+		_ = old(f)
+		return errors.New("close failed")
+	}
+
+	if _, err := WriteVerdict(t.TempDir(), Verdict{Cycle: 1}); err == nil {
+		t.Fatal("WriteVerdict must surface temp close errors")
+	} else if !strings.Contains(err.Error(), "close tmp") {
+		t.Fatalf("error = %v, want close tmp context", err)
+	}
+}
+
+func TestWriteVerdict_WriteFileError(t *testing.T) {
+	old := writeVerdictWriteFile
+	t.Cleanup(func() { writeVerdictWriteFile = old })
+	writeVerdictWriteFile = func(string, []byte, os.FileMode) error { return errors.New("write failed") }
+
+	if _, err := WriteVerdict(t.TempDir(), Verdict{Cycle: 1}); err == nil {
+		t.Fatal("WriteVerdict must surface temp write errors")
+	} else if !strings.Contains(err.Error(), "write") {
+		t.Fatalf("error = %v, want write context", err)
 	}
 }

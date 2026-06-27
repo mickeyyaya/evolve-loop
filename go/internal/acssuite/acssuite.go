@@ -506,6 +506,12 @@ func excerpt(s string) string {
 	return s[:evidenceMax] + "…"
 }
 
+var (
+	writeVerdictCreateTemp = os.CreateTemp
+	writeVerdictClose      = func(f *os.File) error { return f.Close() }
+	writeVerdictWriteFile  = os.WriteFile
+)
+
 // WriteVerdict marshals v to <evolveDir>/runs/cycle-<N>/acs-verdict.json
 // atomically (tmp + rename) and returns the path written.
 func WriteVerdict(evolveDir string, v Verdict) (string, error) {
@@ -520,15 +526,15 @@ func WriteVerdict(evolveDir string, v Verdict) (string, error) {
 	}
 	// Random tmp suffix (not PID) so concurrent same-process writers to the
 	// same cycle dir cannot collide — matches acsrunner.WriteVerdict.
-	tmpf, err := os.CreateTemp(dir, "acs-verdict.*.tmp")
+	tmpf, err := writeVerdictCreateTemp(dir, "acs-verdict.*.tmp")
 	if err != nil {
 		return "", fmt.Errorf("acssuite: create tmp: %w", err)
 	}
 	tmp := tmpf.Name()
-	if cerr := tmpf.Close(); cerr != nil {
+	if cerr := writeVerdictClose(tmpf); cerr != nil {
 		return "", fmt.Errorf("acssuite: close tmp: %w", cerr)
 	}
-	if err := os.WriteFile(tmp, buf, 0o644); err != nil {
+	if err := writeVerdictWriteFile(tmp, buf, 0o644); err != nil {
 		return "", fmt.Errorf("acssuite: write %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, dst); err != nil {

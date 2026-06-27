@@ -53,6 +53,20 @@ func TestWithPathLock_SerializesConcurrentRMW(t *testing.T) {
 	}
 }
 
+func TestWithPathLock_ReturnsPathLockError(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithPathLock(filepath.Join(blocker, "state.json"), func() error {
+		t.Fatal("callback must not run when PathLock fails")
+		return nil
+	}); err == nil {
+		t.Fatal("WithPathLock on a directory path must surface PathLock error")
+	}
+}
+
 // TestPathLock_LocksSidecarNotData verifies PathLock locks "<path>.lock" and
 // leaves the data file untouched — the lock must never open/truncate the file
 // the atomic writers rename-replace.

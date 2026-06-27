@@ -149,6 +149,19 @@ func TestAnchor_RecordsLineSHA(t *testing.T) {
 	}
 }
 
+func TestAnchor_SkipsMalformedLedgerLines(t *testing.T) {
+	evolveDir := t.TempDir()
+	lines, _ := chainLines()
+	body := "{not-json}\n" + lines[2] + "\n"
+	if err := os.WriteFile(filepath.Join(evolveDir, "ledger.jsonl"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := New(evolveDir)
+	if err := l.Anchor(context.Background(), 2, "skip malformed line"); err != nil {
+		t.Fatalf("Anchor must skip malformed lines and find seq 2: %v", err)
+	}
+}
+
 // TestAnchor_SeqNotFound_Errors: anchoring a seq with no matching line errors,
 // leaving no anchor file behind.
 func TestAnchor_SeqNotFound_Errors(t *testing.T) {

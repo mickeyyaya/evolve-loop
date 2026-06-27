@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,6 +31,56 @@ func TestAnchor_CreateTempError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "create temp") {
 		t.Fatalf("error = %v, want create temp context", err)
+	}
+}
+
+func TestAnchor_CreateTempParentFileError(t *testing.T) {
+	l, dir := seedLedger(t, 3)
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l.anchorPath = filepath.Join(blocker, "ledger-anchor.json")
+
+	err := l.Anchor(context.Background(), 1, "anchor parent is a file")
+	if err == nil {
+		t.Fatal("Anchor with file parent for anchor path succeeded, want create temp error")
+	}
+	if !strings.Contains(err.Error(), "create temp") {
+		t.Fatalf("error = %v, want create temp context", err)
+	}
+}
+
+func TestAnchor_WriteError(t *testing.T) {
+	old := anchorWrite
+	t.Cleanup(func() { anchorWrite = old })
+	anchorWrite = func(*os.File, []byte) (int, error) { return 0, errors.New("write failed") }
+
+	l, _ := seedLedger(t, 3)
+	err := l.Anchor(context.Background(), 1, "write fails")
+	if err == nil {
+		t.Fatal("Anchor with write failure succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "write") {
+		t.Fatalf("error = %v, want write context", err)
+	}
+}
+
+func TestAnchor_CloseError(t *testing.T) {
+	old := anchorClose
+	t.Cleanup(func() { anchorClose = old })
+	anchorClose = func(f *os.File) error {
+		_ = old(f)
+		return errors.New("close failed")
+	}
+
+	l, _ := seedLedger(t, 3)
+	err := l.Anchor(context.Background(), 1, "close fails")
+	if err == nil {
+		t.Fatal("Anchor with close failure succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "close") {
+		t.Fatalf("error = %v, want close context", err)
 	}
 }
 
