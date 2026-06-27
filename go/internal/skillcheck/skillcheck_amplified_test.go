@@ -198,3 +198,63 @@ func TestRegistryRoles_InvalidJSON(t *testing.T) {
 		t.Errorf("expected empty map for invalid JSON; got %v", roles)
 	}
 }
+
+// TestCheck_InvalidCatalogError verifies Check returns an error if catalog fails to load.
+func TestCheck_InvalidCatalogError(t *testing.T) {
+	tmp := t.TempDir()
+	_, err := Check(tmp)
+	if err == nil {
+		t.Fatal("expected error from Check with invalid/empty catalog root")
+	}
+}
+
+// TestCheck_MissingSkillMDError verifies Check returns an error if a required SKILL.md is missing.
+func TestCheck_MissingSkillMDError(t *testing.T) {
+	tmp := t.TempDir()
+	// write valid phase registry
+	regDir := filepath.Join(tmp, "docs", "architecture")
+	if err := os.MkdirAll(regDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(regDir, "phase-registry.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// but do not create the skills dir, so reading SKILL.md fails
+	_, err := Check(tmp)
+	if err == nil {
+		t.Fatal("expected error from Check when skills are missing")
+	}
+}
+
+// TestCheck_CorruptSkillMDError verifies Check returns an error if a SKILL.md has corrupt markers.
+func TestCheck_CorruptSkillMDError(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	// corrupt skills/build/SKILL.md
+	target := filepath.Join(tmp, "skills", "build", "SKILL.md")
+	corruptContent := factsBegin + " test -->\nno end marker\n"
+	if err := os.WriteFile(target, []byte(corruptContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Check(tmp)
+	if err == nil {
+		t.Fatal("expected error from Check when SKILL.md has corrupt markers")
+	}
+}
+
+// TestRun_WriteFail verifies Run returns 1 if writing to SKILL.md fails.
+func TestRun_WriteFail(t *testing.T) {
+	tmp := prepareSkillsTree(t)
+	target := mutateBuildSkill(t, tmp)
+	// make target a directory so writing to it fails
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr strings.Builder
+	code := Run(tmp, true, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected Run to return 1 on write failure, got %d. stderr: %s", code, stderr.String())
+	}
+}

@@ -240,7 +240,7 @@ func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
 	sess := itSession("ovrto")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(10*time.Millisecond),
+	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(100*time.Millisecond),
 		itLaunch(sess, launchCmd, "OVR-READY", 0, false))
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout under the 2s override)", code, ExitArtifactTimeout)

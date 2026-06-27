@@ -80,3 +80,12 @@ func TestOf_ConcurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestOf_DirectoryReadError(t *testing.T) {
+	dir := t.TempDir()
+	// Open on a directory succeeds on Unix, but reading it should fail.
+	_, err := Of(dir)
+	if err == nil {
+		t.Fatal("expected an error when hashing a directory")
+	}
+}
