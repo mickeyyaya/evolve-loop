@@ -32,7 +32,7 @@
         "tiers": {
           "claude-code": "tier-1",
           "gemini-cli": "tier-1-hybrid",
-          "codex-cli": "tier-3-stub"
+          "codex-cli": "tier-2-projected"
         },
         "see_also": "docs/platform-compatibility.md"
       },

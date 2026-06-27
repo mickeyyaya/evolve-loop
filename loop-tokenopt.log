@@ -1,0 +1,273 @@
+[phases] WARN user phase memo clashes with a built-in — built-in kept, user definition ignored
+[phases] WARN phase memo not routed (invalid): name "memo" must be multi-word kebab-case for user/optional phases (e.g. my-check); single-word names are reserved for built-in phases
+[loop] auto-prune: removed 3 expired failedApproaches (24→21)
+[agy-tmux] session=evolve-bridge-agy-c0-probe-pid70139-n1-1782355987 model= workdir=/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/evolve-looppreflight-1992340515/bridge-scratch-cwd
+[agy-tmux] launching: agy
+[agy-tmux] REPL prompt (? for shortcuts) detected
+[agy-tmux] BOOT-SMOKE: REPL booted; exiting without prompt
+[agy-tmux] session killed: evolve-bridge-agy-c0-probe-pid70139-n1-1782355987
+[claude-tmux] session=evolve-bridge-c0-probe-pid70139-n2-1782355993 model= workdir=/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/evolve-looppreflight-2796385890/bridge-scratch-cwd
+[claude-tmux] launching: claude
+[claude-tmux] REPL prompt (❯) detected
+[claude-tmux] BOOT-SMOKE: REPL booted; exiting without prompt
+[claude-tmux] session killed: evolve-bridge-c0-probe-pid70139-n2-1782355993
+[codex-tmux] session=evolve-bridge-codex-c0-probe-pid70139-n3-1782355998 model= workdir=/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/evolve-looppreflight-3058497710/bridge-scratch-cwd
+[codex-tmux] launching: codex
+[auto-respond] sent keys: 1,Enter
+[codex-tmux] REPL prompt (›) detected
+[codex-tmux] BOOT-SMOKE: REPL booted; exiting without prompt
+[codex-tmux] session killed: evolve-bridge-codex-c0-probe-pid70139-n3-1782355998
+Loop readiness: WARN (5/7 checks passed)
+  [pass] pipeline-structure: 6 spine phases wired; 89 profile(s) resolve to known drivers
+  [pass] llm-cli-status: 3 CLI binary/binaries present
+  [warn] host-capabilities: 1 host-capability warning(s)
+      profiles request sandboxing but host sandbox is not expected to work (Darwin nested-Claude: sandbox_apply() returns EPERM (rc=71)) — the bridge degrades gracefully
+  [pass] cli-version-freeze: 1 self-updating tmux CLI(s) version-frozen (convergent steady state)
+      codex (/Users/danleemh/.codex/version.json present (codex updater state))
+  [warn] cli-health: 1 CLI family/families benched (transient wall remembered)
+      codex benched until 17:40 CST (rate_limit, strikes=24) — dispatch chains start at fallback
+  [pass] cli-version-drift: CLI version inventory captured (3 bins)
+      agy=1.0.11
+      claude=2.1.191
+      codex=0.140.0
+  [pass] bridge-boot: 3 driver(s) booted (sandbox=false)
+[loop] no --cycles: advisor-decided, completion-driven (stops when the backlog drains), safety cap=25
+[loop] usage-probe: checking [agy claude codex ollama] for quota caps before dispatch
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] launching: claude --dangerously-skip-permissions
+[recipe] launching: agy --dangerously-skip-permissions
+[recipe] REPL prompt (❯) detected
+[recipe] REPL prompt (? for shortcuts) detected
+[orchestrator] integrity-floor clamp: ship-requires-tdd (tdd=skip → tdd=run)
+[runner] phase=scout policy pin: cli="codex" model="deep"
+[runner] phase=scout agent=scout cli=codex-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] cli-health: benched family codex until 2026-06-25T17:40:00+08:00 (pattern=rate_limit strikes=25)
+[runner] phase=scout fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=scout dispatch chain: codex-tmux=85 -> claude-tmux=0
+[orchestrator] WARN spine not satisfied for next=triage (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=triage policy pin: cli="agy" model="balanced"
+[runner] phase=triage agent=triage cli=agy-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/triage.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=tdd agent=tdd-engineer cli=claude-tmux (source=profile.tdd-engineer.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
+[orchestrator] WARN spine not satisfied for next=build (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=build cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 17:40 (rate_limit)])
+[runner] phase=build agent=builder cli=claude-tmux (source=profile.builder.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/builder.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[runner] phase=prompt-regression-eval cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 17:40 (rate_limit)])
+[runner] phase=prompt-regression-eval agent=prompt-regression-eval cli=claude-tmux (source=profile.prompt-regression-eval.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/prompt-regression-eval.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[runner] phase=adversarial-review agent=adversarial-review cli=claude-tmux (source=profile.adversarial-review.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/adversarial-review.json
+[orchestrator] WARN spine not satisfied for next=audit (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=audit agent=auditor cli=claude-tmux (source=profile.auditor.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/auditor.json
+[orchestrator] WARN spine not satisfied for next=ship (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[commit-prefix-gate] WARN: commit message lacks conventional prefix; pass-through. Use 'type(scope): message' for gate coverage.
+[cycle-21f9f7ae-387 5abc9166] evolve-cycle 387: goal=4c09c1afde63d16e49d727ef329b3036e8b6a20e690ec88f52aef24b2da284ca
+ 2 files changed, 145 insertions(+), 31 deletions(-)
+ create mode 100644 go/acs/cycle387/predicates_test.go
+Updating 73cdf91b..5abc9166
+Fast-forward
+ agents/evolve-tdd-engineer.md      |  35 ++-------
+ go/acs/cycle387/predicates_test.go | 141 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 145 insertions(+), 31 deletions(-)
+ create mode 100644 go/acs/cycle387/predicates_test.go
+To https://github.com/mickeyyaya/evolve-loop.git
+   73cdf91b..5abc9166  main -> main
+[inbox-mover] release-cycle: processing/cycle-387/ absent — nothing to release
+[loop] session registry reap cycle=387: killed=11 skipped=0 errors=0
+[loop] cycle 387 cost: $0.0000 (batch total: $0.0000)
+[loop] usage-probe: checking [agy claude codex ollama] for quota caps before dispatch
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] launching: claude --dangerously-skip-permissions
+[recipe] launching: agy --dangerously-skip-permissions
+[recipe] REPL prompt (❯) detected
+[recipe] REPL prompt (? for shortcuts) detected
+[orchestrator] integrity-floor clamp: ship-requires-tdd (tdd=skip → tdd=run)
+[verdict-cache SHADOW] worktree tree_sha=1631c94728a12ca5e6080b256073767cc9495014 matched cycle=387 verdict=PASS — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)
+[runner] phase=scout policy pin: cli="codex" model="deep"
+[runner] phase=scout agent=scout cli=codex-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=scout fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=81)
+[runner] phase=scout dispatch chain: codex-tmux=81 -> claude-tmux=0
+[orchestrator] WARN spine not satisfied for next=triage (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=triage policy pin: cli="agy" model="balanced"
+[runner] phase=triage agent=triage cli=agy-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/triage.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=tdd agent=tdd-engineer cli=claude-tmux (source=profile.tdd-engineer.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
+[orchestrator] build-gofmt: ran gofmt -s over 1 changed file(s) before audit (gate verifies): /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-21f9f7ae-388/go/acs/cycle388/predicates_test.go
+[orchestrator] WARN spine not satisfied for next=build (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=build cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 17:40 (rate_limit)])
+[runner] phase=build agent=builder cli=claude-tmux (source=profile.builder.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/builder.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[runner] phase=prompt-regression-eval cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 17:40 (rate_limit)])
+[runner] phase=prompt-regression-eval agent=prompt-regression-eval cli=claude-tmux (source=profile.prompt-regression-eval.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/prompt-regression-eval.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[runner] phase=adversarial-review agent=adversarial-review cli=claude-tmux (source=profile.adversarial-review.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/adversarial-review.json
+[orchestrator] WARN spine not satisfied for next=audit (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=audit agent=auditor cli=claude-tmux (source=profile.auditor.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/auditor.json
+[orchestrator] WARN spine not satisfied for next=ship (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[commit-prefix-gate] WARN: commit message lacks conventional prefix; pass-through. Use 'type(scope): message' for gate coverage.
+[cycle-21f9f7ae-388 d84e1fa7] evolve-cycle 388: goal=4c09c1afde63d16e49d727ef329b3036e8b6a20e690ec88f52aef24b2da284ca
+ 2 files changed, 221 insertions(+), 19 deletions(-)
+ create mode 100644 go/acs/cycle388/predicates_test.go
+Updating 5abc9166..d84e1fa7
+Fast-forward
+ agents/evolve-builder.md           |  25 ++---
+ go/acs/cycle388/predicates_test.go | 215 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 221 insertions(+), 19 deletions(-)
+ create mode 100644 go/acs/cycle388/predicates_test.go
+To https://github.com/mickeyyaya/evolve-loop.git
+   5abc9166..d84e1fa7  main -> main
+[inbox-mover] release-cycle: processing/cycle-388/ absent — nothing to release
+[loop] session registry reap cycle=388: killed=11 skipped=0 errors=0
+[loop] cycle 388 cost: $0.0000 (batch total: $0.0000)
+[loop] usage-probe: checking [agy claude codex ollama] for quota caps before dispatch
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] launching: claude --dangerously-skip-permissions
+[recipe] launching: agy --dangerously-skip-permissions
+[recipe] REPL prompt (❯) detected
+[recipe] REPL prompt (? for shortcuts) detected
+[orchestrator] integrity-floor clamp: ship-requires-tdd (tdd=skip → tdd=run)
+[verdict-cache SHADOW] worktree tree_sha=47273d788f23bd425e6f08ce408ebe002f973b7d matched cycle=388 verdict=PASS — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)
+[runner] phase=scout policy pin: cli="codex" model="deep"
+[runner] phase=scout agent=scout cli=codex-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] cli-health: benched family codex until 2026-06-25T16:25:31+08:00 (pattern=rate_limit strikes=26)
+[runner] phase=scout fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=scout dispatch chain: codex-tmux=85 -> claude-tmux=0
+[orchestrator] WARN spine not satisfied for next=triage (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=triage policy pin: cli="agy" model="balanced"
+[runner] phase=triage agent=triage cli=agy-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/triage.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] phase=premise-challenge agent=premise-challenge cli=claude-tmux (source=profile.premise-challenge.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/premise-challenge.json
+[runner] phase=tdd agent=tdd-engineer cli=claude-tmux (source=profile.tdd-engineer.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/tdd-engineer.json
+[orchestrator] build-gofmt: ran gofmt -s over 1 changed file(s) before audit (gate verifies): /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-21f9f7ae-389/go/acs/cycle389/predicates_test.go
+[orchestrator] WARN spine not satisfied for next=build (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=build cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 16:25 (rate_limit)])
+[runner] phase=build agent=builder cli=claude-tmux (source=profile.builder.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/builder.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[orchestrator] worktree-normalize: soft-reset builder commits to base d84e1fa7df27 — changes now pending for audit
+[runner] phase=prompt-regression-eval cli-health bench reordered chain: [codex-tmux claude-tmux] -> [claude-tmux codex-tmux] (benched: [codex until 16:25 (rate_limit)])
+[runner] phase=prompt-regression-eval agent=prompt-regression-eval cli=claude-tmux (source=profile.prompt-regression-eval.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/prompt-regression-eval.json fallback=[codex-tmux] triggers=[80 81 85 124 127]
+[runner] phase=adversarial-review agent=adversarial-review cli=claude-tmux (source=profile.adversarial-review.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/adversarial-review.json
+[orchestrator] WARN spine not satisfied for next=audit (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=audit agent=auditor cli=claude-tmux (source=profile.auditor.cli) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/auditor.json
+[orchestrator] WARN spine not satisfied for next=ship (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[commit-prefix-gate] WARN: commit message lacks conventional prefix; pass-through. Use 'type(scope): message' for gate coverage.
+[cycle-21f9f7ae-389 c50c281f] evolve-cycle 389: goal=4c09c1afde63d16e49d727ef329b3036e8b6a20e690ec88f52aef24b2da284ca
+ 2 files changed, 231 insertions(+), 21 deletions(-)
+ create mode 100644 go/acs/cycle389/predicates_test.go
+Updating d84e1fa7..c50c281f
+Fast-forward
+ agents/evolve-tester.md            |  26 +----
+ go/acs/cycle389/predicates_test.go | 226 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 231 insertions(+), 21 deletions(-)
+ create mode 100644 go/acs/cycle389/predicates_test.go
+To https://github.com/mickeyyaya/evolve-loop.git
+   d84e1fa7..c50c281f  main -> main
+[inbox-mover] WARN: promote: task 'trim-evolve-tester-prompt' not found in processing/ or inbox/ — already moved?
+[inbox-mover] promoted: 2026-06-14T22-32-08Z-bridge-integration-tests-flaky-ci.json → processed/
+[inbox-mover] promoted: 2026-06-14T22-32-08Z-cycle-audit-cycle-scoped-ci-gap.json → processed/
+[inbox-mover] promoted: 2026-06-14T22-32-08Z-ship-phase-no-deliverable-contract.json → processed/
+[inbox-mover] release-cycle: processing/cycle-389/ absent — nothing to release
+[orchestrator] WARN: relBin path "go/bin/evolve" is gitignored; skipping discardMainLeak to prevent checkout error
+[orchestrator] WARN tree-diff: phase ship wrote only legitimate main-tree paths (.evolve/ workspace); continuing
+[loop] session registry reap cycle=389: killed=12 skipped=0 errors=0
+[loop] cycle 389 cost: $0.0000 (batch total: $0.0000)
+[loop] usage-probe: checking [agy claude codex ollama] for quota caps before dispatch
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] WARN no worktree designated — falling back to process cwd /Users/danleemh/ai/claude/evolve-loop (single-driver mode only; fleet mode refuses this)
+[recipe] launching: agy --dangerously-skip-permissions
+[recipe] launching: claude --dangerously-skip-permissions
+[recipe] REPL prompt (❯) detected
+[recipe] REPL prompt (? for shortcuts) detected
+[orchestrator] integrity-floor clamp: ship-requires-tdd (tdd=skip → tdd=run)
+[verdict-cache SHADOW] worktree tree_sha=7a95ca202cb09ff329a92dc7307f04cca4b5237f matched cycle=389 verdict=PASS — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)
+[runner] phase=scout policy pin: cli="codex" model="deep"
+[runner] phase=scout agent=scout cli=codex-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/scout.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[runner] cli-health: benched family codex until 2026-06-25T17:40:00+08:00 (pattern=rate_limit strikes=27)
+[runner] phase=scout fallback 2/2: trying cli=claude-tmux (previous=codex-tmux exit=85)
+[runner] phase=scout dispatch chain: codex-tmux=85 -> claude-tmux=0
+[orchestrator] WARN spine not satisfied for next=triage (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)
+[runner] phase=triage policy pin: cli="agy" model="balanced"
+[runner] phase=triage agent=triage cli=agy-tmux (source=policy.pin) profile=/Users/danleemh/ai/claude/evolve-loop/.evolve/profiles/triage.json fallback=[claude-tmux] triggers=[80 81 85 124 127]
+[orchestrator] WARN: relBin path "go/bin/evolve" is gitignored; skipping discardMainLeak to prevent checkout error
+[orchestrator] preserving worktree /Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-21f9f7ae-390 — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`
+[loop] session registry reap cycle=390: killed=5 skipped=0 errors=0
+evolve loop: cycle 390: tree-diff guard: phase "triage" wrote to the main tree outside its worktree "/Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-21f9f7ae-390" — leaked paths: [AGENTS.md]
+{
+  "stop_reason": "error",
+  "cycles": [
+    {
+      "Cycle": 387,
+      "FinalVerdict": "PASS",
+      "PhasesRun": [
+        "scout",
+        "triage",
+        "tdd",
+        "build",
+        "prompt-regression-eval",
+        "adversarial-review",
+        "audit",
+        "ship"
+      ],
+      "RetroDecision": ""
+    },
+    {
+      "Cycle": 388,
+      "FinalVerdict": "PASS",
+      "PhasesRun": [
+        "scout",
+        "triage",
+        "tdd",
+        "build",
+        "prompt-regression-eval",
+        "adversarial-review",
+        "audit",
+        "ship"
+      ],
+      "RetroDecision": ""
+    },
+    {
+      "Cycle": 389,
+      "FinalVerdict": "PASS",
+      "PhasesRun": [
+        "scout",
+        "triage",
+        "premise-challenge",
+        "tdd",
+        "build",
+        "prompt-regression-eval",
+        "adversarial-review",
+        "audit",
+        "ship"
+      ],
+      "RetroDecision": ""
+    },
+    {
+      "Cycle": 390,
+      "FinalVerdict": "FAIL",
+      "PhasesRun": [
+        "scout",
+        "triage",
+        "retro"
+      ],
+      "RetroDecision": "failure-learning: queued cycle-390-failed-triage"
+    }
+  ],
+  "total_cost_usd": 0,
+  "cycle_outcomes": [
+    {
+      "cycle": 387,
+      "outcome": "SHIPPED",
+      "detail": "ship dispatch recorded verdict PASS"
+    },
+    {
+      "cycle": 388,
+      "outcome": "SHIPPED",
+      "detail": "ship dispatch recorded verdict PASS"
+    },
+    {
+      "cycle": 389,
+      "outcome": "SHIPPED",
+      "detail": "ship dispatch recorded verdict PASS"
+    },
+    {
+      "cycle": 390,
+      "outcome": "FAILED_EXPLAINED",
+      "detail": "tree-diff guard: phase \"triage\" wrote to the main tree outside its worktree \"/Users/danleemh/ai/claude/evolve-loop/.evolve/worktrees/cycle-21f9f7ae-390\" — leaked paths: [AGENTS.md]"
+    }
+  ]
+}
