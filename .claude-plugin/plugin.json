@@ -8,22 +8,6 @@
   "homepage": "https://github.com/mickeyyaya/evolve-loop",
   "repository": "https://github.com/mickeyyaya/evolve-loop",
   "license": "Apache-2.0",
-  "compatibility": {
-    "primary_cli": "claude-code",
-    "tiers": {
-      "claude-code": "tier-1",
-      "gemini-cli": "tier-1-hybrid",
-      "codex-cli": "tier-2-projected",
-      "other": "tier-4-skill-text-only"
-    },
-    "tier_notes": {
-      "tier-1": "Production. Both skill content and runtime tested.",
-      "tier-1-hybrid": "Skill activates via Gemini CLI; runtime delegates to claude binary via legacy/scripts/cli_adapters/gemini.sh. Requires Claude CLI installed.",
-      "tier-2-projected": "Skill and command projection verified for Codex; cycle runtime quality depends on the installed Codex bridge capability.",
-      "tier-4-skill-text-only": "Documentation portable; no tested runtime adapter."
-    },
-    "see_also": "docs/platform-compatibility.md"
-  },
   "keywords": [
     "claude-code",
     "agents",
@@ -75,23 +59,5 @@
   ],
   "commands": [
     "./commands/"
-  ],
-  "binaries": [
-    {
-      "name": "evolve",
-      "description": "Go orchestrator binary. Hosts in-process phase runners and serves the phaseproto wire protocol (`evolve serve-phase <name>`) for cross-CLI subprocess agents.",
-      "module": "./go",
-      "package": "./cmd/evolve",
-      "source_build": "cd go && make build",
-      "cross_compile": "cd go && make dist",
-      "release_matrix_source": ".goreleaser.yml (builds[].targets) is the single source of truth for the published prebuilt binaries. `make dist` cross-compiles the local-dev subset (go/Makefile dist-* targets); the release workflow verifies every target archive + checksums.txt is published via `evolve release-verify-binaries <tag>`. Do not re-list the matrix here.",
-      "tier": "tier-1-primary",
-      "tier_note": "Canonical runtime as of v12.0.0. The legacy bash pipeline was removed in the v12 flag day; only the archived dispatcher at archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh remains as an emergency rollback hatch (EVOLVE_USE_LEGACY_BASH=1).",
-      "fallback": {
-        "env_var": "EVOLVE_USE_LEGACY_BASH",
-        "fallback_path": "archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh",
-        "see_also": "docs/migration-from-bash.md"
-      }
-    }
   ]
 }
