@@ -5,6 +5,7 @@
 //
 //	.claude-plugin/plugin.json        json "version" field
 //	.claude-plugin/marketplace.json   json "version" field
+//	.codex-plugin/plugin.json         json "version" field (generated mirror; skipped if absent)
 //	skills/loop/SKILL.md       `# Evolve Loop vX.Y` heading
 //	README.md                          `Current (vX.Y)` cell
 //	CHANGELOG.md                       contains `[<target>]` entry
@@ -86,7 +87,7 @@ func extractJSONVersion(path string) (string, error) {
 	return m[1], nil
 }
 
-// Run executes all 6 marker verifications.
+// Run executes every marker verification and reports per-check outcomes.
 func Run(opts Options) (Result, error) {
 	res := Result{}
 	if opts.ProjectRoot == "" {
@@ -135,6 +136,10 @@ func Run(opts Options) (Result, error) {
 			func() Check {
 				return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/marketplace.json", "marketplace.json version", target)
 			}},
+		{".codex-plugin/plugin.json", "codex plugin.json version (generated mirror)",
+			func() Check {
+				return checkJSONVersionIfPresent(opts.ProjectRoot, ".codex-plugin/plugin.json", "codex plugin.json version (generated mirror)", target)
+			}},
 		{"skills/loop/SKILL.md", "SKILL.md heading (major.minor)",
 			func() Check { return checkSkillHeading(opts.ProjectRoot, res.MajorMinor) }},
 		{"README.md", "README.md current version table",
@@ -149,7 +154,7 @@ func Run(opts Options) (Result, error) {
 			}},
 	}
 
-	contentMarkerStart := 4 // index 4 = CHANGELOG; 5 = README history
+	contentMarkerStart := 5 // version markers 0-4 (plugin, marketplace, codex, SKILL, README); 5 = CHANGELOG, 6 = README history
 	for i, c := range checks {
 		if i == contentMarkerStart {
 			fmt.Fprintln(logw, "")
@@ -182,6 +187,18 @@ func Run(opts Options) (Result, error) {
 }
 
 // --- Per-check helpers -----------------------------------------------------
+
+// checkJSONVersionIfPresent is like checkJSONVersion but returns OK with
+// "absent (skipped)" when the file does not exist. Used for generated mirrors
+// (e.g. .codex-plugin/plugin.json) that may not be present in every checkout
+// but MUST match target when they are — a release that forgot to bump the
+// Codex surface fails here (rollback) instead of shipping drift.
+func checkJSONVersionIfPresent(repoRoot, relPath, desc, target string) Check {
+	if _, err := os.Stat(filepath.Join(repoRoot, relPath)); errors.Is(err, os.ErrNotExist) {
+		return Check{File: relPath, Description: desc, Status: "OK", Found: "absent (skipped)"}
+	}
+	return checkJSONVersion(repoRoot, relPath, desc, target)
+}
 
 func checkJSONVersion(repoRoot, relPath, desc, target string) Check {
 	c := Check{File: relPath, Description: desc, Expected: target}

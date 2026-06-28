@@ -65,6 +65,41 @@ func TestCheck_PluginJSONMismatch(t *testing.T) {
 	}
 }
 
+// === Codex mirror drift → MISMATCH (the D3 release-safety guard) ===========
+// A release that bumped the Claude manifest but left the generated Codex mirror
+// behind must FAIL here (→ rollback), never ship the drift to main.
+func TestCheck_CodexMirrorMismatch(t *testing.T) {
+	d := makeRepo(t, "21.4.2")
+	codexDir := filepath.Join(d, ".codex-plugin")
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codexDir, "plugin.json"), []byte(`{"name":"evo","version":"21.4.1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	_, err := Run(Options{ProjectRoot: d, Target: "21.4.2", Stderr: &buf})
+	if !errors.Is(err, ErrInconsistent) {
+		t.Fatalf("stale Codex mirror must fail consistency, err = %v\nlog=%s", err, buf.String())
+	}
+	if !strings.Contains(buf.String(), ".codex-plugin/plugin.json") {
+		t.Errorf("log should flag the codex mismatch: %s", buf.String())
+	}
+}
+
+// === Codex mirror absent → tolerated (generated; not in every checkout) =====
+func TestCheck_CodexMirrorAbsentTolerated(t *testing.T) {
+	d := makeRepo(t, "21.4.2") // no .codex-plugin/ created
+	var buf bytes.Buffer
+	res, err := Run(Options{ProjectRoot: d, Target: "21.4.2", Stderr: &buf})
+	if err != nil {
+		t.Fatalf("absent Codex mirror must be tolerated, err = %v\nlog=%s", err, buf.String())
+	}
+	if res.Errors != 0 {
+		t.Errorf("Errors = %d, want 0 (absent codex is skipped)", res.Errors)
+	}
+}
+
 // === No CHANGELOG entry → MISSING ==========================================
 func TestCheck_NoChangelogEntry(t *testing.T) {
 	d := makeRepo(t, "11.8.2")
