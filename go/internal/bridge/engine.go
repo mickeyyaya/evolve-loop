@@ -147,11 +147,14 @@ type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available
 // prefix. Phase is the agent name (used as the SBPL file suffix). Workspace
 // is the absolute path to write the per-phase SBPL into when needed.
 type SandboxWrapRequest struct {
-	Phase        string // e.g. "build", "tdd"
-	Workspace    string // absolute path; SBPL file lives here on darwin
-	Worktree     string // absolute path; the only write-allowed location
-	RepoRoot     string // absolute path; the read-only main repo root
-	AllowNetwork bool   // profile.sandbox.allow_network; cloud tmux CLIs need this to boot
+	Phase     string // e.g. "build", "tdd"
+	Workspace string // absolute path; SBPL file lives here on darwin
+	Worktree  string // absolute path; the only write-allowed location
+	RepoRoot  string // absolute path; the read-only main repo root
+	// AllowNetwork is always true on the sandboxPrefixForLaunch path (forced):
+	// a phase that reaches the sandbox runs a cloud CLI that needs the model API.
+	// See sandbox_wrap.go for the rationale.
+	AllowNetwork bool
 }
 
 // defaultIfZero returns val if val > 0, otherwise returns def.
@@ -263,9 +266,11 @@ type Config struct {
 	// AnthropicBaseURL is the policy-sourced proxy URL override, replacing
 	// the EVOLVE_ANTHROPIC_BASE_URL env read. Non-empty → claude-tmux proxy guard fires.
 	AnthropicBaseURL string
-	// AllowNetwork threads profile.sandbox.allow_network into the OS sandbox.
-	// Without it, sandboxed tmux cloud CLIs boot with network denied despite the
-	// profile opting in.
+	// AllowNetwork carries profile.sandbox.allow_network. NOTE: on the OS-sandbox
+	// path (sandboxPrefixForLaunch) the value is FORCED true regardless — a phase
+	// that reaches the sandbox runs a cloud CLI that must reach the model API, and
+	// network-denial there isn't a valid control (see sandbox_wrap.go). The field
+	// then only decides whether a misconfig WARN fires; it does not gate the deny.
 	AllowNetwork bool
 	// codexConfigPath overrides the default ~/.codex/config.toml path used by
 	// pretrustCodexProjects. Set in tests to avoid touching the real user config.

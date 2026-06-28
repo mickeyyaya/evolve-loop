@@ -200,12 +200,32 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
 	if deps.SandboxWrap == nil {
 		return nil, false
 	}
+	// Reaching here means cfg.Worktree != "", which guarantees a CLOUD
+	// model-reaching CLI: ollama-tmux — the only local driver — rejects any
+	// non-empty Worktree at launch (driver_ollamatmux.go), so only
+	// claude/codex/agy-tmux get here. That covers both source-writing phases
+	// (built-in build/tdd or a custom writes_source phase) AND the boot/live-smoke
+	// probes, which set a scratch Worktree via applyScratchCwd — all of them need
+	// the network to reach the model API. The sandbox's network deny would block
+	// that connection, and "allow model, deny the rest" is NOT expressible: SBPL/
+	// bwrap can't filter per-host, and the model endpoint can't be proxied without
+	// breaking subscription billing (driver_claudetmux.go aborts on a proxy base
+	// URL). So network MUST be allowed here regardless of the profile value — a
+	// false sandbox.allow_network on a phase that reaches the sandbox is a
+	// misconfiguration, not a control. Force it true structurally so nothing —
+	// including a future custom writes_source phase — boots network-denied and
+	// hangs unable to reach the model. The real confinement boundary here is
+	// filesystem (ReadOnlyRepo + WritePaths + DenyPaths) + the kernel PreToolUse
+	// hooks, not network.
+	if !cfg.AllowNetwork && deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
+	}
 	return deps.SandboxWrap(SandboxWrapRequest{
 		Phase:        cfg.Agent,
 		Workspace:    cfg.Workspace,
 		Worktree:     cfg.Worktree,
 		RepoRoot:     cfg.ProjectRoot,
-		AllowNetwork: cfg.AllowNetwork,
+		AllowNetwork: true, // forced — see above; source-writing ⇒ model network required
 	})
 }
 

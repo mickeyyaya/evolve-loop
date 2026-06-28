@@ -79,19 +79,51 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	}
 }
 
-func TestSandboxPrefix_PassesNetworkPolicy(t *testing.T) {
-	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
-	deps := Deps{SandboxWrap: fw.wrap()}
-	_, _ = sandboxPrefixForLaunch(deps, &Config{
-		Worktree:     "/wt",
-		Workspace:    "/ws",
-		ProjectRoot:  "/repo",
-		Agent:        "build",
-		AllowNetwork: true,
-	})
-	if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
-		t.Fatalf("AllowNetwork was not threaded to SandboxWrapRequest: %+v", fw.calls)
+// TestSandboxPrefix_ForcesNetwork pins the structural invariant: every phase that
+// reaches the sandbox (cfg.Worktree != "") runs a cloud model-reaching CLI —
+// ollama-tmux, the only local driver, rejects any Worktree — so AllowNetwork is
+// FORCED true regardless of the profile value, guarding source-writing phases
+// (incl. future custom ones) and scratch-CWD probes from booting network-denied.
+// The profile value controls only whether a misconfig WARN fires.
+func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
+	base := func() *Config {
+		return &Config{Worktree: "/wt", Workspace: "/ws", ProjectRoot: "/repo", Agent: "tdd"}
 	}
+	t.Run("false profile overridden with WARN", func(t *testing.T) {
+		fw := &fakeWrap{prefix: []string{"x"}, available: true}
+		var stderr strings.Builder
+		cfg := base()
+		cfg.AllowNetwork = false
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg)
+		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
+			t.Fatalf("must force AllowNetwork=true; got %+v", fw.calls)
+		}
+		if !strings.Contains(stderr.String(), "allow_network=false; forcing true") {
+			t.Errorf("expected a forcing WARN; stderr=%q", stderr.String())
+		}
+	})
+	t.Run("true profile forces true without WARN", func(t *testing.T) {
+		fw := &fakeWrap{prefix: []string{"x"}, available: true}
+		var stderr strings.Builder
+		cfg := base()
+		cfg.AllowNetwork = true
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg)
+		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
+			t.Fatalf("must keep AllowNetwork=true; got %+v", fw.calls)
+		}
+		if stderr.Len() != 0 {
+			t.Errorf("no WARN expected when the profile already allows network; stderr=%q", stderr.String())
+		}
+	})
+	t.Run("nil Stderr still forces true", func(t *testing.T) {
+		fw := &fakeWrap{prefix: []string{"x"}, available: true}
+		cfg := base()
+		cfg.AllowNetwork = false
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: nil}, cfg)
+		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
+			t.Fatalf("must force AllowNetwork=true even with nil Stderr; got %+v", fw.calls)
+		}
+	})
 }
 
 func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
