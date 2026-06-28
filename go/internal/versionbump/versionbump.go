@@ -17,6 +17,7 @@ package versionbump
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,6 +40,7 @@ type Result struct {
 type Paths struct {
 	PluginJSON      string // <repo>/.claude-plugin/plugin.json
 	MarketplaceJSON string // <repo>/.claude-plugin/marketplace.json
+	CodexPluginJSON string // <repo>/.codex-plugin/plugin.json (generated Codex mirror; tolerated-absent)
 	SkillMD         string // <repo>/skills/loop/SKILL.md
 	ReadmeMD        string // <repo>/README.md
 }
@@ -48,6 +50,7 @@ func DefaultPaths(repoRoot string) Paths {
 	return Paths{
 		PluginJSON:      filepath.Join(repoRoot, ".claude-plugin", "plugin.json"),
 		MarketplaceJSON: filepath.Join(repoRoot, ".claude-plugin", "marketplace.json"),
+		CodexPluginJSON: filepath.Join(repoRoot, ".codex-plugin", "plugin.json"),
 		SkillMD:         filepath.Join(repoRoot, "skills", "loop", "SKILL.md"),
 		ReadmeMD:        filepath.Join(repoRoot, "README.md"),
 	}
@@ -81,6 +84,24 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 		return res, err
 	} else if changed {
 		res.Modified = append(res.Modified, ".claude-plugin/marketplace.json")
+	}
+	// .codex-plugin/plugin.json is a generated mirror of the Claude manifest
+	// (skillcheck Codex projection); bump its version in lockstep so a release
+	// never leaves the Codex install surface stale. Tolerated-absent: a checkout
+	// without the generated file is skipped, not failed.
+	if paths.CodexPluginJSON != "" {
+		if _, statErr := os.Stat(paths.CodexPluginJSON); statErr != nil {
+			// Absent → generated mirror not in this checkout; skip. Any other
+			// stat error (permission, unreadable parent) must fail loudly, never
+			// silently leave the Codex surface on a stale version.
+			if !errors.Is(statErr, os.ErrNotExist) {
+				return res, fmt.Errorf("versionbump: stat %s: %w", paths.CodexPluginJSON, statErr)
+			}
+		} else if changed, err := BumpJSONVersion(paths.CodexPluginJSON, target, dryRun); err != nil {
+			return res, err
+		} else if changed {
+			res.Modified = append(res.Modified, ".codex-plugin/plugin.json")
+		}
 	}
 	if changed, err := BumpSkillHeading(paths.SkillMD, mm, dryRun); err != nil {
 		return res, err
@@ -141,20 +162,6 @@ func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 	var obj map[string]any
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return false, fmt.Errorf("versionbump: parse %s: %w", path, err)
-	}
-	if _, ok := obj["version"]; ok {
-		obj["version"] = target
-	}
-	if plugins, ok := obj["plugins"].([]any); ok {
-		for i, p := range plugins {
-			if pm, ok := p.(map[string]any); ok {
-				if _, has := pm["version"]; has {
-					pm["version"] = target
-					plugins[i] = pm
-				}
-			}
-		}
-		obj["plugins"] = plugins
 	}
 	// Re-encoding via json.MarshalIndent would reorder keys; the bash
 	// version uses jq which preserves order. To stay close to bash output

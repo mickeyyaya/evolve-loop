@@ -1,0 +1,20 @@
+{
+  "name": "evo",
+  "interface": {
+    "displayName": "Evolve Loop"
+  },
+  "plugins": [
+    {
+      "name": "evo",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -197,11 +197,36 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 		}
 	}
 
+	// Codex manifest projection (cross-CLI third surface): render
+	// .codex-plugin/plugin.json + .agents/plugins/marketplace.json from the
+	// canonical .claude-plugin/plugin.json so a Codex install mirrors the Claude
+	// one from a single source.
+	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
+	if codexErr != nil {
+		fmt.Fprintf(stderr, "%v\n", codexErr)
+		return 1
+	}
+	for _, d := range codexDiffs {
+		if !d.drifted {
+			continue
+		}
+		if write {
+			if werr := atomicwrite.Bytes(d.path, []byte(d.next)); werr != nil {
+				fmt.Fprintf(stderr, "write %s: %v\n", d.path, werr)
+				return 1
+			}
+			fmt.Fprintf(stdout, "[skills] generated %s\n", d.rel)
+		} else {
+			fmt.Fprintf(stderr, "DRIFT: %s is stale or missing (run `evolve skills generate`)\n", d.rel)
+			drift = true
+		}
+	}
+
 	if !write && drift {
 		return 2
 	}
 	if !write {
-		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, all names match dirs")
+		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, Codex manifests projected, all names match dirs")
 	}
 	return 0
 }
@@ -227,6 +252,15 @@ func Check(projectRoot string) ([]string, error) {
 		return nil, cmdErr
 	}
 	for _, d := range cmdDiffs {
+		if d.drifted {
+			drift = append(drift, d.rel)
+		}
+	}
+	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
+	if codexErr != nil {
+		return nil, codexErr
+	}
+	for _, d := range codexDiffs {
 		if d.drifted {
 			drift = append(drift, d.rel)
 		}
