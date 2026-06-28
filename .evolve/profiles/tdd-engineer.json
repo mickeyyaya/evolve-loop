@@ -103,7 +103,7 @@
       "agents",
       "skills"
     ],
-    "allow_network": false
+    "allow_network": true
   },
   "parallel_eligible": false,
   "context_anchors": [
