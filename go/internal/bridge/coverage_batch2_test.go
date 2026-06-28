@@ -47,12 +47,30 @@ func TestLoadProfile_AllBranches(t *testing.T) {
 		t.Fatal("session_name bad chars should error")
 	}
 	p, err := LoadProfile(writeJSON(t, filepath.Join(dir, "ok.json"),
-		`{"name":"n","model":"haiku","stream_output":true,"session_name":"ok-1","permission_mode":"plan","allowed_tools":["Read","Write"]}`))
+		`{"name":"n","model":"haiku","stream_output":true,"session_name":"ok-1","permission_mode":"plan","allowed_tools":["Read","Write"],"sandbox":{"allow_network":true}}`))
 	if err != nil {
 		t.Fatalf("valid profile err: %v", err)
 	}
 	if !p.StreamOutput || p.SessionName != "ok-1" || p.PermissionMode != "plan" || len(p.AllowedTools) != 2 {
 		t.Fatalf("valid profile fields wrong: %+v", p)
+	}
+	// sandbox.allow_network must parse into ProfileSandbox.AllowNetwork — the
+	// snake_case key only maps with the json tag, so this guards a silent drop.
+	if p.Sandbox == nil || *p.Sandbox != (ProfileSandbox{AllowNetwork: true}) {
+		t.Fatalf("sandbox = %+v, want &{AllowNetwork:true}", p.Sandbox)
+	}
+}
+
+// TestLoadProfile_NoSandbox pins the back-compat default: an absent sandbox
+// block leaves Sandbox nil (v1 profiles never carried one).
+func TestLoadProfile_NoSandbox(t *testing.T) {
+	p, err := LoadProfile(writeJSON(t, filepath.Join(t.TempDir(), "nosb.json"),
+		`{"name":"n","permission_mode":"default"}`))
+	if err != nil {
+		t.Fatalf("valid profile err: %v", err)
+	}
+	if p.Sandbox != nil {
+		t.Errorf("Sandbox = %+v, want nil for an absent block", p.Sandbox)
 	}
 }
 

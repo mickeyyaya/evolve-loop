@@ -26,9 +26,13 @@ type Profile struct {
 	ExtraFlagsByCLI map[string][]string
 }
 
-// ProfileSandbox is the bridge's minimal view of profile.sandbox.
+// ProfileSandbox is the bridge's minimal view of profile.sandbox. The json tag
+// is load-bearing: profiles spell the key snake_case (profile.sandbox.allow_network),
+// and encoding/json does not fold snake_case onto the CamelCase field name, so
+// without the tag the value is silently dropped and AllowNetwork is always false
+// (which would leave a profile.sandbox.allow_network=true CLI network-blocked).
 type ProfileSandbox struct {
-	AllowNetwork bool
+	AllowNetwork bool `json:"allow_network"`
 }
 
 // validPermissionModes mirrors the claude --permission-mode choice set
