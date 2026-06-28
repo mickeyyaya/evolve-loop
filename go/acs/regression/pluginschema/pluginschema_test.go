@@ -156,6 +156,23 @@ func TestClaudeMarketplace_EntriesUseStandardKeysOnly(t *testing.T) {
 	}
 }
 
+// TestCodexManifest_InSyncWithClaude is the D3 drift guard: the generated Codex
+// mirror (.codex-plugin/plugin.json) must carry the same name + version as the
+// canonical .claude-plugin/plugin.json, so neither `evolve release` (versionbump)
+// nor the skillcheck Codex projection can leave the Codex install surface on a
+// stale version. A mismatch means someone hand-edited a manifest or skipped
+// `evolve skills generate`.
+func TestCodexManifest_InSyncWithClaude(t *testing.T) {
+	claude := decodeObject(t, ".claude-plugin/plugin.json", loadRepoJSON(t, ".claude-plugin/plugin.json"))
+	codex := decodeObject(t, ".codex-plugin/plugin.json", loadRepoJSON(t, ".codex-plugin/plugin.json"))
+	for _, field := range []string{"name", "version"} {
+		if !bytes.Equal(claude[field], codex[field]) {
+			t.Errorf(".codex-plugin/plugin.json %s = %s, want %s (== .claude-plugin/plugin.json) — run `evolve skills generate`",
+				field, codex[field], claude[field])
+		}
+	}
+}
+
 // --- Detection-logic guards: prove the rules CATCH the known breaks. ---
 
 // TestBinariesRule_CatchesArrayAndString verifies the shape rule rejects exactly

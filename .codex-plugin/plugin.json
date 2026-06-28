@@ -1,0 +1,27 @@
+{
+  "name": "evo",
+  "version": "21.4.1",
+  "description": "Self-evolving development pipeline — 3 lean agents across 6 phases with compound discovery loop, proactive research, and strict evaluation. No external dependencies.",
+  "author": {
+    "name": "Dan Lee"
+  },
+  "homepage": "https://github.com/mickeyyaya/evolve-loop",
+  "repository": "https://github.com/mickeyyaya/evolve-loop",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude-code",
+    "agents",
+    "skills",
+    "evolve",
+    "autonomous",
+    "pipeline",
+    "self-evolving",
+    "eval"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Evolve Loop",
+    "shortDescription": "Self-evolving development pipeline with eval gating and continuous learning",
+    "category": "Developer Tools"
+  }
+}

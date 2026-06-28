@@ -56,6 +56,9 @@ func TestDefaultPaths(t *testing.T) {
 	if p.MarketplaceJSON != "/repo/.claude-plugin/marketplace.json" {
 		t.Errorf("MarketplaceJSON=%q", p.MarketplaceJSON)
 	}
+	if p.CodexPluginJSON != "/repo/.codex-plugin/plugin.json" {
+		t.Errorf("CodexPluginJSON=%q", p.CodexPluginJSON)
+	}
 	if p.SkillMD != "/repo/skills/loop/SKILL.md" {
 		t.Errorf("SkillMD=%q", p.SkillMD)
 	}
@@ -396,6 +399,73 @@ func TestRun_FullBumpPipeline(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "| v11.7 |") {
 		t.Errorf("README history not appended")
+	}
+}
+
+// TestRun_BumpsCodexPluginJSON pins the D3 fix: the generated Codex mirror is
+// version-bumped in lockstep with the Claude manifest, so a release never leaves
+// the Codex install surface stale.
+func TestRun_BumpsCodexPluginJSON(t *testing.T) {
+	tmp := t.TempDir()
+	paths := Paths{
+		PluginJSON:      filepath.Join(tmp, "plugin.json"),
+		MarketplaceJSON: filepath.Join(tmp, "marketplace.json"),
+		CodexPluginJSON: filepath.Join(tmp, ".codex-plugin", "plugin.json"),
+		SkillMD:         filepath.Join(tmp, "SKILL.md"),
+		ReadmeMD:        filepath.Join(tmp, "README.md"),
+	}
+	writeFile(t, paths.PluginJSON, `{"name":"evo","version":"21.4.1"}`)
+	writeFile(t, paths.MarketplaceJSON, `{"plugins":[{"name":"evo","version":"21.4.1"}]}`)
+	writeFile(t, paths.CodexPluginJSON, `{"name":"evo","version":"21.4.1","skills":"./skills/"}`)
+	writeFile(t, paths.SkillMD, "# Evolve Loop v21.4\n")
+	writeFile(t, paths.ReadmeMD, "Current (v21.4)\n\n| v21.4 | Jun 29 | shipped |\n")
+	res, err := Run(paths, "21.4.2", false, time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	body, _ := os.ReadFile(paths.CodexPluginJSON)
+	if !strings.Contains(string(body), `"version": "21.4.2"`) {
+		t.Errorf(".codex-plugin/plugin.json not bumped: %s", body)
+	}
+	// surgical replace preserves the rest (drift gate stays green post-release)
+	if !strings.Contains(string(body), `"skills":"./skills/"`) {
+		t.Errorf("surgical bump altered non-version content: %s", body)
+	}
+	var sawCodex bool
+	for _, m := range res.Modified {
+		if m == ".codex-plugin/plugin.json" {
+			sawCodex = true
+		}
+	}
+	if !sawCodex {
+		t.Errorf("Modified should list .codex-plugin/plugin.json, got %v", res.Modified)
+	}
+}
+
+// TestRun_CodexPluginJSON_ToleratedAbsent — a checkout without the generated
+// Codex mirror must not fail the bump (the file is generated, not hand-tracked
+// in every working tree).
+func TestRun_CodexPluginJSON_ToleratedAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	paths := Paths{
+		PluginJSON:      filepath.Join(tmp, "plugin.json"),
+		MarketplaceJSON: filepath.Join(tmp, "marketplace.json"),
+		CodexPluginJSON: filepath.Join(tmp, ".codex-plugin", "plugin.json"), // never created
+		SkillMD:         filepath.Join(tmp, "SKILL.md"),
+		ReadmeMD:        filepath.Join(tmp, "README.md"),
+	}
+	writeFile(t, paths.PluginJSON, `{"name":"evo","version":"21.4.1"}`)
+	writeFile(t, paths.MarketplaceJSON, `{"plugins":[{"name":"evo","version":"21.4.1"}]}`)
+	writeFile(t, paths.SkillMD, "# Evolve Loop v21.4\n")
+	writeFile(t, paths.ReadmeMD, "Current (v21.4)\n\n| v21.4 | Jun 29 | shipped |\n")
+	res, err := Run(paths, "21.4.2", false, time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("absent Codex mirror must be tolerated, got error: %v", err)
+	}
+	for _, m := range res.Modified {
+		if m == ".codex-plugin/plugin.json" {
+			t.Errorf("absent Codex mirror should not appear in Modified: %v", res.Modified)
+		}
 	}
 }
 
