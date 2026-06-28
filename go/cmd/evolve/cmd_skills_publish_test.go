@@ -312,9 +312,9 @@ func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
 	}
 
 	stagingPlugin := filepath.Join(project, ".evolve", "publish", "agy", "evo")
-	cmd, err := os.ReadFile(filepath.Join(stagingPlugin, "commands", "evo-scout.md"))
+	cmd, err := os.ReadFile(filepath.Join(stagingPlugin, "commands", "scout.md"))
 	if err != nil {
-		t.Fatalf("agy commands/evo-scout.md missing — no /evo-scout in agy's menu: %v", err)
+		t.Fatalf("agy commands/scout.md missing — no /evo:scout in agy's menu: %v", err)
 	}
 	for _, want := range []string{"evo:scout", "$ARGUMENTS", `argument-hint: "[area]"`} {
 		if !strings.Contains(string(cmd), want) {
@@ -363,7 +363,7 @@ func TestPublish_CrossCLISurfaces(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "skills", "scout", "SKILL.md")); err != nil {
 		t.Errorf("agy skill missing: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "commands", "evo-scout.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "commands", "scout.md")); err != nil {
 		t.Errorf("agy command stub missing: %v", err)
 	}
 

@@ -25,21 +25,29 @@ func writeSkillFixture(t *testing.T, root, name, desc, argHint string) {
 	}
 }
 
-// TestCommandFileName pins the slash-command filename contract: the evo- prefix
-// is what namespaces the command under /evo and keeps it from colliding with the
-// built-in /loop, /tdd, /refactor. Both projection surfaces (Claude Code and the
-// agy cross-CLI publisher) derive their filenames here, so the convention must
-// not drift.
+// TestCommandFileName pins the slash-command filename contract: a skill projects
+// to a BARE commands/<name>.md so Claude Code's native plugin-command namespacing
+// surfaces it as /evo:<name> (the plugin name supplies the /evo: prefix). A file
+// named evo-<name>.md would instead surface as /evo:evo-<name> (double-prefixed),
+// and the built-in /loop, /tdd, /refactor no longer collide because /evo:loop is
+// already namespaced. This matches .evolve/naming.json canonical.commandPrefix
+// "/evo:" and Anthropic's own plugins (ecc/aside.md → /ecc:aside). Both projection
+// surfaces (Claude Code and the agy cross-CLI publisher) derive filenames here, so
+// the convention must not drift.
 func TestCommandFileName(t *testing.T) {
 	for _, tc := range []struct {
 		skill, want string
 	}{
-		{"loop", "evo-loop.md"},
-		{"tdd", "evo-tdd.md"},
-		{"security-review-scored", "evo-security-review-scored.md"},
+		{"loop", "loop.md"},
+		{"tdd", "tdd.md"},
+		{"security-review-scored", "security-review-scored.md"},
 	} {
-		if got := CommandFileName(tc.skill); got != tc.want {
+		got := CommandFileName(tc.skill)
+		if got != tc.want {
 			t.Errorf("CommandFileName(%q) = %q, want %q", tc.skill, got, tc.want)
+		}
+		if strings.HasPrefix(got, "evo-") {
+			t.Errorf("CommandFileName(%q) keeps the legacy evo- prefix → /evo:evo-%s double-namespace", tc.skill, tc.skill)
 		}
 	}
 }
@@ -59,12 +67,12 @@ func TestCommandDiffs_ProjectsStubPerSkill(t *testing.T) {
 
 	var got *commandDiff
 	for i := range diffs {
-		if diffs[i].rel == filepath.Join("commands", "evo-foo.md") {
+		if diffs[i].rel == filepath.Join("commands", "foo.md") {
 			got = &diffs[i]
 		}
 	}
 	if got == nil {
-		t.Fatalf("no diff for commands/evo-foo.md; got %+v", diffs)
+		t.Fatalf("no diff for commands/foo.md; got %+v", diffs)
 	}
 	if !got.drifted {
 		t.Errorf("want drifted=true for a missing command file")
