@@ -20,6 +20,7 @@ func TestTmuxSocket_IsDedicatedNotDefault(t *testing.T) {
 // server. It is the single SSOT every bridge tmux consumer (execTmux, swarm
 // teardown, observer probe) routes through.
 func TestTmuxSocketArgs_PrependsGlobalSocketSelector(t *testing.T) {
+	t.Setenv(TmuxSocketEnv, "")
 	got := TmuxSocketArgs("capture-pane", "-t", "sess", "-p")
 	want := []string{"-L", TmuxSocket, "capture-pane", "-t", "sess", "-p"}
 	if len(got) != len(want) {
@@ -35,6 +36,7 @@ func TestTmuxSocketArgs_PrependsGlobalSocketSelector(t *testing.T) {
 // TestTmuxSocketArgs_EmptyStillSelectsSocket: even a bare call carries the
 // selector, so a consumer can never accidentally hit the default socket.
 func TestTmuxSocketArgs_EmptyStillSelectsSocket(t *testing.T) {
+	t.Setenv(TmuxSocketEnv, "")
 	got := TmuxSocketArgs()
 	if len(got) != 2 || got[0] != "-L" || got[1] != TmuxSocket {
 		t.Fatalf("TmuxSocketArgs() = %v, want [-L %s]", got, TmuxSocket)
