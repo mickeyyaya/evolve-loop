@@ -50,6 +50,7 @@ func TestExecTmuxKill_EmptySessionRefusedBeforeExec(t *testing.T) {
 }
 
 func TestExecTmuxKill_NamedSessionKillArgs(t *testing.T) {
+	t.Setenv(bridge.TmuxSocketEnv, "")
 	calls := withTmuxRunStub(t, nil)
 
 	if err := ExecTmuxKill(context.Background(), "sess-w0"); err != nil {

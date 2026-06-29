@@ -49,6 +49,14 @@
   },
   "interactive_prompts": [
     {
+      "name": "cli_feedback_rating",
+      "regex": "How's the CLI experience so far\\?|Help us improve:",
+      "response_keys": "0,Enter",
+      "policy": "auto_respond",
+      "once": true,
+      "note": "Quick feedback rating prompt from the CLI wrapper; '0' skips/cancels"
+    },
+    {
       "name": "trust_prompt",
       "regex": "Do you trust the contents of this project|Antigravity CLI requires permission",
       "response_keys": "Enter",

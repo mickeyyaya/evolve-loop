@@ -147,6 +147,43 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 	}
 }
 
+// TestAutoRespond_FeedbackRatingFiresOnce pins the cli_feedback_rating rule as
+// fire-once, the same loop-guard fix as the trust dialog (see above). The CLI
+// wrappers (claude/agy) print a "How's the CLI experience so far?" rating prompt
+// that is dismissed by one `0,Enter`, but — like the trust dialog — its text
+// lingers in the re-captured scrollback every poll. Without `"once": true` the
+// responder re-fires `0,Enter` until counts>5 trips the loop guard (rc 86) and
+// abandons the very run the rule was added to protect. This guards against the
+// `once` flag being dropped from either manifest.
+func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
+	for _, cli := range []string{"claude-tmux", "agy-tmux"} {
+		t.Run(cli, func(t *testing.T) {
+			m, err := LoadManifest(cli)
+			if err != nil {
+				t.Fatalf("LoadManifest(%s): %v", cli, err)
+			}
+			pane := "How's the CLI experience so far?\n  Rate 0-9 then Enter"
+			counts := map[string]int{} // shared across ticks, like the live ar.counts
+
+			// First tick: the rating prompt → auto-respond once.
+			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
+			if a == "noop" || rc == 0 {
+				t.Fatalf("%s first tick must auto-respond to the feedback prompt; got (%q,%d)", cli, a, rc)
+			}
+
+			// Later ticks: prompt dismissed but its text lingers in scrollback. A
+			// fire-once rule must NOT re-fire (rc 0) and must never reach the loop
+			// guard (rc 86); it surfaces the suppress_once sentinel instead.
+			for i := 0; i < 8; i++ {
+				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
+				if rc != 0 || a != "suppress_once:cli_feedback_rating" {
+					t.Fatalf("%s tick %d = (%q,%d), want (suppress_once:cli_feedback_rating, 0) — feedback rating is fire-once; re-firing trips the loop guard and abandons the run", cli, i+2, a, rc)
+				}
+			}
+		})
+	}
+}
+
 // TestAutoRespond_MultiSelectRuleWinsOverSingleSelect guards the manifest
 // ordering invariant: a multi-select pane contains BOTH the checkbox markers
 // and the single-select footer, so the checkbox rule MUST be listed first or
