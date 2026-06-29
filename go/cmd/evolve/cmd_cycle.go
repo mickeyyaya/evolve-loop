@@ -336,27 +336,30 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	cfg.RoutingJudge = routerCfg.RoutingJudge
 	cfg.ReconDigest = routerCfg.ReconDigest
 	cfg.RePlanMaxDepth = routerCfg.ReplanDepth
+	// Resolved once here so all phase constructors below share the same value.
+	// Avoids a second pol.WorkflowConfig() call at line ~538.
+	wfCfg := pol.WorkflowConfig()
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
 		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
 		// them across N parallel workers (reader fan-out / writer merge-train).
 		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
 		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
 		// (the shipping default) keeps these byte-identical.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeReader, swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}),
-		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm}),
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeReader, swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO}), br, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStage(br, prm, cfg.PhaseIO),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompact(br, prm, cfg.PhaseIO, cfg.CompactPrompts),
 		core.PhaseShip:         ship.NewWithDefaultRunnerStage(cfg.PhaseIO),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto"}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm}),
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
@@ -535,7 +538,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
-	opts = append(opts, core.WithWorkflowConfig(pol.WorkflowConfig()))
+	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	return orchDeps{

@@ -130,6 +130,10 @@ type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
+	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
+	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
+	// never set to a bare literal here (standing rule: phase-settings-from-config).
+	CompactPrompts bool
 }
 
 // Phase wraps a runner.BaseRunner so callers still get a concrete
@@ -141,10 +145,11 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{},
-			Bridge:  c.Bridge,
-			Prompts: c.Prompts,
-			NowFn:   c.NowFn,
+			Hooks:          hooks{},
+			Bridge:         c.Bridge,
+			Prompts:        c.Prompts,
+			NowFn:          c.NowFn,
+			CompactPrompts: c.CompactPrompts,
 		}),
 	}
 }

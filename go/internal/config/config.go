@@ -328,6 +328,13 @@ type RoutingConfig struct {
 	// debugger rather than thrash. A cycle-scoped counter cr.replanDepth tracks
 	// the live depth. A non-positive policy value falls back to 1.
 	RePlanMaxDepth int
+	// CompactPrompts, when true, enables on-demand reference-section stripping from
+	// disk-loaded agent docs before dispatch ("## Reference Index (Layer 3, on-demand)"
+	// and everything after it). Default true (set in defaults()). Config path:
+	// registry config.workflow.compact_prompts=false disables for all phases.
+	// The value flows: config.Load → RoutingConfig.CompactPrompts → phase Config.CompactPrompts
+	// → runner.Options.CompactPrompts — never a bare literal in a phase constructor.
+	CompactPrompts bool
 }
 
 // Sandbox mode string constants — exported so the bridge + tests can match
@@ -355,6 +362,11 @@ type registryDoc struct {
 		ConditionalMandatory  map[string]string   `json:"conditional_mandatory"`
 		MaxOptionalInsertions *int                `json:"max_optional_insertions"`
 		GoalRecipes           map[string][]string `json:"goal_recipes"`
+		Workflow              struct {
+			// CompactPrompts enables/disables on-demand reference-section stripping.
+			// Absent = use RoutingConfig default (true). Explicit false opts out.
+			CompactPrompts *bool `json:"compact_prompts,omitempty"`
+		} `json:"workflow"`
 	} `json:"config"`
 	Phases []struct {
 		Name     string        `json:"name"`
@@ -448,7 +460,8 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:         StageAdvisory,
 		Mode:          ModeDynamicLLM,
-		RolloutStages: RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
+		RolloutStages:  RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
+		CompactPrompts: true, // default ON: strips ~23 KB/cycle of on-demand reference tails
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via
 		// applyRegistry (cycles 263/264: the advisory router skipped the
@@ -509,6 +522,9 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	}
 	if len(c.GoalRecipes) > 0 {
 		cfg.GoalRecipes = c.GoalRecipes
+	}
+	if c.Workflow.CompactPrompts != nil {
+		cfg.CompactPrompts = *c.Workflow.CompactPrompts
 	}
 	for phase, expr := range c.ConditionalMandatory {
 		if rule, err := parseCondRule(expr); err == nil {

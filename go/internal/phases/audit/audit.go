@@ -272,6 +272,10 @@ type Config struct {
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
 	// §3.10 Slice 5). Zero value (StageOff) = byte-identical (prose fallbacks active).
 	PhaseIO config.Stage
+	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
+	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
+	// never set to a bare literal here (standing rule: phase-settings-from-config).
+	CompactPrompts bool
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -279,10 +283,11 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift, phaseIO: c.PhaseIO},
-			Bridge:  c.Bridge,
-			Prompts: c.Prompts,
-			NowFn:   c.NowFn,
+			Hooks:          hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift, phaseIO: c.PhaseIO},
+			Bridge:         c.Bridge,
+			Prompts:        c.Prompts,
+			NowFn:          c.NowFn,
+			CompactPrompts: c.CompactPrompts,
 		}),
 	}
 }
@@ -305,7 +310,14 @@ func NewDefault(br core.Bridge, prm *prompts.Loader) *Phase {
 // verdict extraction enforces the sentinel at >= StageEnforce. NewDefault stays as
 // the StageOff (byte-identical) convenience for the registry init() and tests.
 func NewDefaultWithStage(br core.Bridge, prm *prompts.Loader, stage config.Stage) *Phase {
-	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault, PhaseIO: stage})
+	return NewDefaultWithStageCompact(br, prm, stage, false)
+}
+
+// NewDefaultWithStageCompact is NewDefaultWithStage plus the compact-prompts flag
+// (workflow.compact_prompts). Called from cmd_cycle.go with wfCfg.CompactPrompts so
+// the reference tail is stripped before dispatch when the policy default is on.
+func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool) *Phase {
+	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault, PhaseIO: stage, CompactPrompts: compact})
 }
 
 // skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs the

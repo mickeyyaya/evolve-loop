@@ -48,6 +48,16 @@ func TestStripOnDemandSections(t *testing.T) {
 			body: "alpha\nbeta\n## Reference Index\ngamma\n",
 			want: "alpha\nbeta\n",
 		},
+		{
+			name: "production heading with suffix → strip (Layer 3, on-demand)",
+			body: "# Agent\n\nBody text.\n\n## Reference Index (Layer 3, on-demand)\n\n- ref one\n- ref two\n",
+			want: "# Agent\n\nBody text.\n\n",
+		},
+		{
+			name: "production heading at start → empty result",
+			body: "## Reference Index (Layer 3, on-demand)\n- only refs here\n",
+			want: "",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
