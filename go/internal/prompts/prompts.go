@@ -150,10 +150,16 @@ func (l *Loader) load(p, name string) (Prompt, error) {
 
 // StripOnDemandSections removes the static reference tail from prompt bodies
 // when compact prompt mode is explicitly enabled by the caller.
+//
+// Match is line-anchored and prefix-based so that both the bare "## Reference Index"
+// heading (used in fixtures/tests) and the production form "## Reference Index (Layer 3,
+// on-demand)" are stripped. An inline prose mention ("see ## Reference Index below")
+// is never matched because the trimmed line does not start with the heading prefix.
 func StripOnDemandSections(body string) string {
 	offset := 0
 	for _, line := range strings.SplitAfter(body, "\n") {
-		if strings.TrimRight(line, "\r\n") == "## Reference Index" {
+		trimmed := strings.TrimRight(line, "\r\n")
+		if trimmed == "## Reference Index" || strings.HasPrefix(trimmed, "## Reference Index ") {
 			return body[:offset]
 		}
 		offset += len(line)

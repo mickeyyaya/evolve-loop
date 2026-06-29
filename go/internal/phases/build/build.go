@@ -71,6 +71,10 @@ type Config struct {
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
 	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
 	PhaseIO config.Stage
+	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
+	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
+	// never set to a bare literal here (standing rule: phase-settings-from-config).
+	CompactPrompts bool
 }
 
 // Phase wraps a core.PhaseRunner so callers still get a concrete
@@ -80,11 +84,12 @@ type Phase struct{ core.PhaseRunner }
 // New constructs the build phase from the BaseRunner.
 func New(c Config) *Phase {
 	base := runner.New(runner.Options{
-		Hooks:   hooks{},
-		Bridge:  c.Bridge,
-		Prompts: c.Prompts,
-		NowFn:   c.NowFn,
-		PhaseIO: c.PhaseIO,
+		Hooks:          hooks{},
+		Bridge:         c.Bridge,
+		Prompts:        c.Prompts,
+		NowFn:          c.NowFn,
+		PhaseIO:        c.PhaseIO,
+		CompactPrompts: c.CompactPrompts,
 	})
 	return &Phase{PhaseRunner: base}
 }

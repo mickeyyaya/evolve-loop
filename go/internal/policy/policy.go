@@ -622,6 +622,10 @@ type WorkflowPolicy struct {
 	// env read (flag-reduction, ADR-0064). A plain bool (not *bool): false is the
 	// product default, so an absent block and an explicit false are the same posture.
 	StrictAudit bool `json:"strict_audit,omitempty"`
+	// CompactPrompts enables on-demand reference-section stripping from disk-loaded
+	// agent docs before dispatch (strips "## Reference Index (Layer 3, on-demand)"
+	// and everything after it). Absent/nil = default ON; explicit false opts out.
+	CompactPrompts *bool `json:"compact_prompts,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -639,6 +643,9 @@ type WorkflowConfig struct {
 	ConsensusAuditEnabled bool
 	PSMASEnabled          bool
 	StrictAudit           bool
+	// CompactPrompts mirrors WorkflowPolicy.CompactPrompts with the default applied.
+	// Default true: phase runners strip the on-demand reference tail before dispatch.
+	CompactPrompts bool
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -654,6 +661,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		AutoPrune:             true,
 		BackfillEnabled:       true,
 		ConsensusAuditEnabled: true,
+		CompactPrompts:        true, // default ON: strips ~23 KB/cycle of reference tails
 	}
 	if p.Workflow == nil {
 		return c
@@ -685,6 +693,9 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		c.PSMASEnabled = *p.Workflow.PSMASEnabled
 	}
 	c.StrictAudit = p.Workflow.StrictAudit
+	if p.Workflow.CompactPrompts != nil {
+		c.CompactPrompts = *p.Workflow.CompactPrompts
+	}
 	return c
 }
 
