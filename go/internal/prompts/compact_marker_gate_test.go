@@ -43,6 +43,12 @@ func TestTddEngineerCompaction(t *testing.T) {
 		"Do NOT implement production code",
 		"15-turn boundary",
 		"challenge-token",
+		// cycle-85 anti-degenerate-predicate safeguard: cycle 415 buried the full
+		// "Predicate Quality Requirements" section below the marker (compact mode
+		// strips it). The above-marker REQUIRED summary must survive compaction so
+		// the tdd-engineer never authors grep-only predicates blind to this rule.
+		"MUST exercise the system under test",
+		"degenerate-predicate failure mode",
 	} {
 		if !strings.Contains(stripped, anchor) {
 			t.Errorf("required anchor %q lost below ## Reference Index — must stay above marker in evolve-tdd-engineer.md", anchor)

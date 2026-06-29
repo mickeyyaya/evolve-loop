@@ -288,6 +288,18 @@ Before writing `test-report.md`, verify:
 - [ ] Zero bare `defer to Auditor` entries without accompanying checklist.
 - [ ] `predicate` count + `manual+checklist` count + `unverifiable-remove` count == total AC count.
 
+## Predicate Quality — REQUIRED (cycle-85 lesson, kept in compact mode)
+
+**Every ACS predicate MUST exercise the system under test** — call the function, run a
+subprocess (`acsassert.SubprocessOutput`), or assert on a real emitted artifact — and assert
+on its return value, output, exit code, or side effect. A predicate whose only load-bearing
+assertion is "source file contains text X" (`acsassert.FileContains`/`FileMatchesRegex`/`FileExists`
+over source) is **FORBIDDEN**: it passes when the implementer adds the magic string regardless of
+the fix (the cycle-85 degenerate-predicate failure mode). Sole exception: an inherent
+config-presence check declared with a `// acs-predicate: config-check` waiver. Full classification
+table, canonical template, and worked examples are in the on-demand reference tail below — but this
+rule is mandatory every cycle and must never be stripped.
+
 ## Reference Index (Layer 3, on-demand)
 
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
