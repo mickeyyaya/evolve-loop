@@ -335,6 +335,86 @@ func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
 	}
 }
 
+// TestPublishAgy_StagesSkillCompanionFiles pins the D5 fix: agy stages each skill
+// WHOLE — SKILL.md plus companion files and reference/ overlays — so the body's
+// "read reference/agy-tools.md first" instruction does not 404 in the installed
+// plugin. Staging only SKILL.md (the old behavior) silently dropped them.
+func TestPublishAgy_StagesSkillCompanionFiles(t *testing.T) {
+	stubPublishExec(t, true)
+	doc := "---\nname: loop\ndescription: Run the loop\n---\n\nbody: read reference/agy-tools.md first\n"
+	project := publishTestProject(t, map[string]string{"loop": doc})
+	// A reference/ overlay + a sibling companion file the SKILL.md body depends on.
+	refDir := filepath.Join(project, "skills", "loop", "reference")
+	if err := os.MkdirAll(refDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(refDir, "agy-tools.md"), []byte("agy tool map"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "skills", "loop", "phase1.md"), []byte("phase one"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := publishConfig{Targets: []string{"agy"}, Prune: true, CodexHome: t.TempDir(), OllamaBase: "test:base"}
+	var out, errBuf bytes.Buffer
+	if code := runSkillsPublish(project, cfg, &out, &errBuf); code != 0 {
+		t.Fatalf("exit %d\nstderr:\n%s", code, errBuf.String())
+	}
+
+	stagingPlugin := filepath.Join(project, ".evolve", "publish", "agy", "evo")
+	for _, rel := range []string{"skills/loop/SKILL.md", "skills/loop/reference/agy-tools.md", "skills/loop/phase1.md"} {
+		if _, err := os.Stat(filepath.Join(stagingPlugin, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("agy bundle missing %s — agy runtime would 404 on it: %v", rel, err)
+		}
+	}
+	// Companion files are staged verbatim (a provenance header would corrupt them).
+	if ref, _ := os.ReadFile(filepath.Join(stagingPlugin, "skills", "loop", "reference", "agy-tools.md")); string(ref) != "agy tool map" {
+		t.Errorf("reference file must be staged verbatim, got: %q", ref)
+	}
+	// Only the entry SKILL.md carries the provenance marker.
+	if skill, _ := os.ReadFile(filepath.Join(stagingPlugin, "skills", "loop", "SKILL.md")); !strings.Contains(string(skill), publishProvenanceSentinel) {
+		t.Error("agy SKILL.md should carry the provenance header")
+	}
+}
+
+// TestPublishAgy_PrunesStalePreRenamePlugin pins D7: installing evo prunes the
+// pre-rename evolve-loop plugin so an upgrading user doesn't keep both with
+// colliding skills (mirrors the ollama stale-model prune).
+func TestPublishAgy_PrunesStalePreRenamePlugin(t *testing.T) {
+	calls := stubPublishExec(t, true)
+	doc := "---\nname: scout\ndescription: Scout\n---\n\nbody\n"
+	project := publishTestProject(t, map[string]string{"scout": doc})
+	cfg := publishConfig{Targets: []string{"agy"}, Prune: true, Install: true, CodexHome: t.TempDir(), OllamaBase: "test:base"}
+	var out, errBuf bytes.Buffer
+	if code := runSkillsPublish(project, cfg, &out, &errBuf); code != 0 {
+		t.Fatalf("exit %d\nstderr:\n%s", code, errBuf.String())
+	}
+	var pruned bool
+	for _, c := range *calls {
+		if c.Name == "agy" && len(c.Args) >= 3 && c.Args[1] == "uninstall" && c.Args[2] == agyStalePluginName {
+			pruned = true
+		}
+	}
+	if !pruned {
+		t.Errorf("agy install must prune the stale %s plugin; calls: %v", agyStalePluginName, *calls)
+	}
+}
+
+// TestPublishAgy_NoPruneWithoutPruneFlag — --no-prune must not uninstall anything.
+func TestPublishAgy_NoPruneWithoutPruneFlag(t *testing.T) {
+	calls := stubPublishExec(t, true)
+	doc := "---\nname: scout\ndescription: Scout\n---\n\nbody\n"
+	project := publishTestProject(t, map[string]string{"scout": doc})
+	cfg := publishConfig{Targets: []string{"agy"}, Prune: false, Install: true, CodexHome: t.TempDir(), OllamaBase: "test:base"}
+	var out, errBuf bytes.Buffer
+	runSkillsPublish(project, cfg, &out, &errBuf)
+	for _, c := range *calls {
+		if c.Name == "agy" && len(c.Args) >= 2 && c.Args[1] == "uninstall" {
+			t.Errorf("--no-prune must not uninstall; calls: %v", *calls)
+		}
+	}
+}
+
 // TestPublish_CrossCLISurfaces pins the deliberate per-CLI discoverability
 // surface across all three targets so a future change can't silently drop or
 // mismatch one: codex skills load natively (no command layer), agy is a

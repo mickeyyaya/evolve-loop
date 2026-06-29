@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -194,7 +195,7 @@ func runSkillsPublish(project string, cfg publishConfig, stdout, stderr io.Write
 	}
 	drift, failed := false, false
 	for _, target := range cfg.Targets {
-		files, err := renderTarget(target, skills, cfg, stdout)
+		files, err := renderTarget(project, target, skills, cfg, stdout)
 		if err != nil {
 			fmt.Fprintf(stderr, "%s: render: %v\n", target, err)
 			failed = true
@@ -232,12 +233,12 @@ func runSkillsPublish(project string, cfg publishConfig, stdout, stderr io.Write
 
 // renderTarget produces the deterministic projection for one target: a map of
 // path-relative-to-staging-root → content. Pure except for skip logging.
-func renderTarget(target string, skills []canonicalSkill, cfg publishConfig, out io.Writer) (map[string][]byte, error) {
+func renderTarget(project, target string, skills []canonicalSkill, cfg publishConfig, out io.Writer) (map[string][]byte, error) {
 	switch target {
 	case "codex":
 		return renderCodex(skills)
 	case "agy":
-		return renderAgy(skills), nil
+		return renderAgy(project, skills)
 	case "ollama":
 		return renderOllama(skills, cfg.OllamaBase, out)
 	}
@@ -316,12 +317,20 @@ func renderCodex(skills []canonicalSkill) (map[string][]byte, error) {
 	return files, nil
 }
 
+// agyStalePluginName is the pre-rename (v21.0.0) plugin name installAgy prunes
+// so an upgrading agy user does not keep both evo and evolve-loop installed with
+// colliding skills (mirrors installOllama's stale-model prune).
+const agyStalePluginName = "evolve-loop"
+
 // renderAgy projects skills into agy's native plugin layout. Skill names stay
 // unprefixed — the evo plugin name supplies the namespace. agy is a
 // Claude-Code-shaped plugin host, so it gets the same commands/<name>.md stubs
 // (declared in plugin.json) that surface /evo:<name> in the menu — projected
 // from the one shared renderer so the stub format never diverges across CLIs.
-func renderAgy(skills []canonicalSkill) map[string][]byte {
+// Each skill is staged WHOLE: SKILL.md plus its companion files and reference/
+// overlays (e.g. loop's reference/agy-*.md, which the SKILL.md body tells the agy
+// runtime to read first) — staging only SKILL.md left those references 404.
+func renderAgy(project string, skills []canonicalSkill) (map[string][]byte, error) {
 	manifest, _ := json.MarshalIndent(struct {
 		Name     string   `json:"name"`
 		Commands []string `json:"commands"`
@@ -330,11 +339,41 @@ func renderAgy(skills []canonicalSkill) map[string][]byte {
 		filepath.Join(publishPluginName, "plugin.json"): append(manifest, '\n'),
 	}
 	for _, s := range skills {
-		doc := injectProvenance(s.Raw, provenanceHeader("skills/"+s.Name+"/SKILL.md", "agy"))
-		files[filepath.Join(publishPluginName, "skills", s.Name, "SKILL.md")] = []byte(doc)
+		if err := stageAgySkillTree(project, s, files); err != nil {
+			return nil, err
+		}
 		files[filepath.Join(publishPluginName, "commands", skillcheck.CommandFileName(s.Name))] = []byte(skillcheck.RenderCommandStub(s.Name, s.Description, s.ArgHint))
 	}
-	return files
+	return files, nil
+}
+
+// stageAgySkillTree copies every file under skills/<name>/ into the agy plugin,
+// injecting the provenance header only into the entry SKILL.md — companions and
+// reference/ overlays are read by the runtime verbatim, so a header would corrupt
+// their yaml/markdown.
+func stageAgySkillTree(project string, s canonicalSkill, files map[string][]byte) error {
+	skillDir := filepath.Join(project, "skills", s.Name)
+	return filepath.WalkDir(skillDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(skillDir, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if filepath.ToSlash(rel) == "SKILL.md" {
+			content = []byte(injectProvenance(string(content), provenanceHeader("skills/"+s.Name+"/SKILL.md", "agy")))
+		}
+		files[filepath.Join(publishPluginName, "skills", s.Name, rel)] = content
+		return nil
+	})
 }
 
 // renderOllama projects the read-only-compatible subset as Modelfiles plus a
@@ -548,6 +587,16 @@ func installAgy(project, staging string, cfg publishConfig, stdout, stderr io.Wr
 		return fmt.Errorf("agy plugin install: %w", err)
 	}
 	fmt.Fprintf(stdout, "[skills] agy: installed plugin %s\n", publishPluginName)
+	if cfg.Prune {
+		// Best-effort prune of the pre-rename plugin so an upgrading user does not
+		// keep both evo and evolve-loop installed with colliding skills. A missing
+		// stale plugin makes uninstall non-zero — expected, not an error.
+		if err := publishRunCmd(io.Discard, io.Discard, project, "agy", "plugin", "uninstall", agyStalePluginName); err != nil {
+			fmt.Fprintf(stdout, "[skills] agy: no stale %s plugin to prune\n", agyStalePluginName)
+		} else {
+			fmt.Fprintf(stdout, "[skills] agy: pruned stale pre-rename plugin %s\n", agyStalePluginName)
+		}
+	}
 	return nil
 }
 
