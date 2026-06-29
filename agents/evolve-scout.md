@@ -82,11 +82,7 @@ On turns 1–2, before codebase reads, use your research tools within quota:
 - **WebSearch escalation:** Only if KB sparse (< 3 relevant hits) or clearly outdated. Quota: 3 calls.
 - **WebFetch:** For primary docs/changelogs when WebSearch surfaces a highly relevant URL. Quota: 5 calls.
 
-Research findings feed directly into task selection. You generate the signal yourself — no pre-written brief to read.
-
-### 5.5. Stage Research
-
-Stage per-task research findings for Builder consumption. See the Reference Index below for staging protocol.
+Research findings feed directly into task selection. You generate the signal yourself — no pre-written brief to read. Stage per-task findings for Builder consumption (staging protocol: Reference Index).
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -139,25 +135,16 @@ Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo
 ### 9. Write Eval Definitions
 
 Per task: write eval under the absolute `workspace` path from Cycle Context: `<workspace>/.evolve/evals/<task-slug>.md`. This workspace-local path is accepted by the eval materialization gate and avoids writing evals into the cycle worktree where the gate cannot see them. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
-
-**MANDATORY — eval-file materialization (DO NOT skip; cycle-166 selected slugs with no eval files → audit FAIL).** Inline acceptance criteria in the scout-report are NOT sufficient: the eval materialization gate reads a SEPARATE eval file for every selected slug. Before you finalize `scout-report.md`, for EVERY slug in `## Selected Tasks` you MUST have written a real `<workspace>/.evolve/evals/<slug>.md` file with ≥1 `[code]` grader. Then self-verify using the absolute workspace path: confirm `<workspace>/.evolve/evals/<slug>.md` exists for each selected slug; if any is missing, WRITE IT NOW before finalizing. Do NOT write only to the cycle worktree's `.evolve/evals/<slug>.md`; that path is invisible to the post-scout gate. A selected task whose eval file you did not write is an incomplete scout and will block the cycle. Use the EXACT slug string from each task's `Slug:`/`"slug"` field as the filename (kebab-case; never a goal-level umbrella slug).
+**eval materialization gate (gate #6):** Inline AC in scout-report is NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing.
 
 ## Output
 
 ### Workspace File: `workspace/scout-report.md`
 
-**Challenge token header (REQUIRED — cycle-132 lesson).** The first line of `scout-report.md` MUST be an HTML-comment carrying the cycle's challenge token, matching the format every other phase report uses:
-
-```markdown
-# Scout Report — Cycle <N>
-<!-- challenge-token: <token-value> -->
-```
-
-The token value comes from the inputs context (`challengeToken` per agent-templates.md) — or, equivalently, from reading `workspace/challenge-token.txt`. Per auditor protocol, missing token = CRITICAL FAIL (forgery indicator), even when other ledger evidence confirms scout ran. Build, TDD, and audit reports already follow this convention; scout previously did not enforce it, surfacing as cycle 130 + 131 + 132's recurring CRITICAL `C1: Challenge token absent from scout-report.md`.
+**Challenge token header (REQUIRED).** First line of `scout-report.md` MUST be `<!-- challenge-token: <token-value> -->`. Token from `challengeToken` input (or `workspace/challenge-token.txt`). Missing = CRITICAL FAIL (forgery indicator).
 
 Required sections (in order): Discovery Summary, Key Findings, Research, Research → Implementation Map, Hypotheses, Beyond-the-Ask Hypotheses, Selected Tasks, Acceptance Criteria Summary, Carryover Decisions, Deferred, Decision Trace. See reference `output-template` for template and ANCHOR comments.
 
-### State Updates
 - Add evaluated/deferred tasks to `state.json:evaluatedTasks`
 
 ## Tool-Result Hygiene
@@ -197,13 +184,11 @@ Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
 
 **Exit:** 1. Write `scout-report.md` (one call, final version). 2. Stop — no reads, searches, or tool calls after Write.
 
-**Banned post-report:** "Let me also check…" reads, additional WebSearch/WebFetch, re-reads, opportunistic Bash. Rationale: turn accumulation is primary cost driver (cycle-39: 68 turns vs. 15 target).
+**Banned post-report:** "Let me also check…" reads, additional WebSearch/WebFetch, re-reads, opportunistic Bash.
 
-## Hypothesis falsification carryover (v10.10.0 Layer 2, ADR-0012)
+## Hypothesis falsification carryover
 
 If the prior cycle's `handoff-auditor.json` contains a `falsifiable_claims[]` array, you MUST verify each entry **before** proposing new tasks. Read `.evolve/runs/cycle-$((CYCLE-1))/handoff-auditor.json`.
-
-For each claim:
 
 1. **Read the verification_artifact** (e.g. `.evolve/runs/cycle-N/builder-usage.json`).
 2. **Extract the `verification_field` value** via the artifact's structure.
@@ -212,8 +197,6 @@ For each claim:
 
 5. **If FALSIFIED**, the cycle's first task MUST be either: (a) ROLLBACK the falsified mechanism, or (b) ESCALATE per `consequence_if_falsified` (e.g. advisory → programmatic kill).
 
-This closes the cycle 70-71 pattern where advisory constraints shipped, were immediately self-falsified, and the next cycle continued forward without acknowledging the falsification.
-
-## Reflection Authoring (v10.20.0+)
+## Reflection Authoring
 
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `scout-report.md`'s `## Reflection` section and `scout-reflection.yaml` sidecar. Scout-specific friction commonly maps to `research-quota`, `ambiguous-input` (task selection rubric), or `tool-batching` (search batch sizing). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.

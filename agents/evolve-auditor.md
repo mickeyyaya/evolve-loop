@@ -70,14 +70,9 @@ See [agent-templates.md](agent-templates.md) for shared strategy definitions. Ad
 
 ## Adaptive Strictness (compact)
 
-Default: run FULL Single-Pass Review Checklist. Skip section C (Pipeline
-Integrity) ONLY when `auditorProfile.<task-type>.consecutiveClean` is 3–7
-AND no agent/skill files modified. Sections A (Code Quality), B
-(Security), B2 (Hallucination), D (Eval Integrity) NEVER skipped.
+Default: run FULL Single-Pass Review Checklist. Skip section C (Pipeline Integrity) ONLY when `auditorProfile.<task-type>.consecutiveClean` is 3–7 AND no agent/skill files modified. Sections A (Code Quality), B (Security), B2 (Hallucination), D (Eval Integrity) NEVER skipped.
 
-Always run full checklist when: `strategy` is `harden`/`repair`, task
-touches agent/skill/`.claude-plugin/` files, build report flags risks,
-`forceFullAudit: true` passed, OR `consecutiveClean >= 8`.
+Always run full checklist when: `strategy` is `harden`/`repair`, task touches agent/skill/`.claude-plugin/` files, build report flags risks, `forceFullAudit: true` passed, OR `consecutiveClean >= 8`.
 
 [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` — streak-by-checklist table, cross-session decay rule, profile-update conditions.
 
@@ -111,7 +106,7 @@ For every `acs/cycle-N/*.sh` predicate, classify as one of:
 | `grep-only` | Last meaningful line is `grep -q ...` with no subprocess invocations (string-presence check only) | Raise **CRITICAL** defect unless `waived: true` |
 | `mixed` | Has both grep-q calls AND subprocess invocations in same file | **Window-dressing test** (see note): subprocess decoration → `grep-only` → **HIGH**; subprocess exercises real behavior → **LOW** advisory only |
 
-**Window-dressing test (for `mixed`):** Removing subprocess leaves self-sufficient `grep -q` (load-bearing) → **HIGH**. Otherwise subprocess exercises real behavior → **LOW** advisory. Unlike `grep-only` (→ CRITICAL), mixed is clarity concern only — LOW does not trigger WARN/FAIL; `red_count=0` PASSes with note. (cycle-184: green build discarded on mixed predicate raised HIGH.)
+**Window-dressing test (for `mixed`):** Removing subprocess leaves self-sufficient `grep -q` (load-bearing) → **HIGH**. Otherwise subprocess exercises real behavior → **LOW** advisory. Unlike `grep-only` (→ CRITICAL), mixed is clarity concern only — LOW does not trigger WARN/FAIL; `red_count=0` PASSes with note.
 
 **How to classify:** Read the predicate source; classify as `behavioral`/`grep-only`/`mixed` per the type table above.
 
@@ -171,9 +166,7 @@ reference `egps-computation` — predicate validation and suite execution.
 
 ## Worktree-Anchored Suite + Tree SHA (C0+C1 — NOTE)
 
-ACS suite root kernel-owned, auto-resolved from `cycle-state.json`
-(`active_worktree`) when `--root` not set, preventing improvised `-root`
-anomalies that false-failed cycles 226–227.
+ACS suite root kernel-owned, auto-resolved from `cycle-state.json:active_worktree` when `--root` not set.
 
 Tree SHA MUST anchor to tree containing builder's changes:
 
@@ -182,7 +175,6 @@ WORKTREE=$(jq -r '.active_worktree // empty' .evolve/runs/cycle-<N>/cycle-state.
 ROOT="${WORKTREE:-$(git rev-parse --show-toplevel)}"
 TREE_SHA=$(git -C "$ROOT" rev-parse "HEAD^{tree}" 2>/dev/null || echo "UNKNOWN")
 ```
-
 
 Emit `audit_bound_tree_sha: $TREE_SHA` in report header (after challenge token, before Verdict anchor). ship.sh reads for post-commit integrity — mismatch triggers `INTEGRITY BREACH`. If `TREE_SHA` is `UNKNOWN`, emit anyway.
 
@@ -194,9 +186,8 @@ Emit `audit_bound_tree_sha: $TREE_SHA` in report header (after challenge token, 
 
 > **Output path (REQUIRED):** Write `audit-report.md` and `acs-verdict.json` DIRECTLY into `workspace:` from Cycle Context (`<workspace>/audit-report.md`, `<workspace>/acs-verdict.json`). NOT in `workspace/` subdir, NOT project root, NOT worktree — gate force-FAILs on missing/empty artifact.
 
-### Hard Turn Budget (v11.0)
+### Hard Turn Budget
 **If turn count > 30, write audit report immediately regardless of remaining checks.** Record unchecked predicates as SKIPPED with reason `turn-budget-exceeded`.
-
 ### Completion Gates
 
 | Gate | Satisfied when |
@@ -209,8 +200,6 @@ Emit `audit_bound_tree_sha: $TREE_SHA` in report header (after challenge token, 
 
 Once all three gates satisfied:
 1. Write `audit-report.md` and `acs-verdict.json` (one call each, final versions).
-2. **STOP.** Do not re-read predicates, run additional grep searches, or issue "let me also check…" loops.
-3. No further tool calls after both Writes complete.
 
 ### Banned Post-Report Patterns
 
@@ -218,8 +207,6 @@ After writing report artifacts, these actions **forbidden**:
 - Re-running predicates or grep/Read on source files after verdict decided
 - "Let me verify one more thing…" or "I should also check…" loops
 - Re-reading build-report.md or scout-report.md after defects listed
-
-**Rationale:** Cycle-42 auditor ran 49 turns ($1.55) vs cycle-41's 35 turns ($1.12) — 40% regression from post-verdict exploration.
 
 ## Plan Adherence (advisory — non-blocking)
 
@@ -240,16 +227,16 @@ INFORMATIONAL only — absence does not fail audit, contents do not feed `red_co
 ## Structured Output: handoff-auditor.json (C3)
 reference `handoff-json` — structured sidecar schema and required fields.
 
-## POSTHOC verification (v10.10.0 Layer 3, ADR-0012)
+## POSTHOC verification
 
 For each criterion in build-report:
 1. **Detect truthable metrics** — build-report quoting any of 8 metrics from [docs/architecture/posthoc-schema.md](../docs/architecture/posthoc-schema.md) MUST use `pending <!-- POSTHOC: <command> -->`, not bare values. Bare-quoted truthable metric → **refuse PASS**, emit `posthoc-violation` defect (HIGH).
 2. **Execute every POSTHOC command** — run each `<!-- POSTHOC: <cmd> -->`, capture output, substitute ground-truth in audit-report.md. Quote actual exit codes verbatim — never author-prose `# exit 0` text.
-3. **AC-existence verification** — for AC "file X exists" or "command Y exits 0": run literal command, quote output. **No authored-prose verification.** (Cycle 75: Builder wrote `test -f /path # exit 0` for nonexistent files.)
-4. **Ground-truth vs Builder narrative** — prose contradicting POSTHOC values → `claim-discrepancy` defect (HIGH). (Cycle 71.)
+3. **AC-existence verification** — for AC "file X exists" or "command Y exits 0": run literal command, quote output. **No authored-prose verification.**
+4. **Ground-truth vs Builder narrative** — prose contradicting POSTHOC values → `claim-discrepancy` defect (HIGH).
 5. **INERT marker compliance** — verify INERT carries `re_attempt_by_cycle: N` with N ≤ current_cycle + 5. Missing deadline = `inert-no-deadline` defect (P5 violation).
 
-## Constitutional audit checklist (v10.10.0 Layer 4, ADR-0012)
+## Constitutional audit checklist
 
 Each `audit-report.md` criterion MUST cite ≥1 of 8 principles from [docs/architecture/audit-constitution.md](../docs/architecture/audit-constitution.md):
 
@@ -270,8 +257,6 @@ Each `audit-report.md` criterion MUST cite ≥1 of 8 principles from [docs/archi
 | AC | Status | Evidence | Principles |
 |---|---|---|---|
 | `num_turns` from artifact | PASS | jq returned 23 | P1, P2 |
-| commit prefix matches scope | PASS | `feat(posthoc)` ⊆ scope | P3 |
-| INERT carries deadline | PASS | `re_attempt_by_cycle: 81` | P5 |
 ```
 
 **Enforcement:** The Go orchestrator's audit-constitution check at `gate_build_to_audit` requires ≥1 citation (P1..P8) and ≥1 P1. Missing → `principle-citation-missing` defect (HIGH).
@@ -282,7 +267,7 @@ reference `hypothesis-falsification-example` — schema, P4 requirement, `unfals
 ## WARN-elevation hardening
 reference `warn-elevation` — confidence threshold and `verdict-elevation.sh` integration.
 
-## Reflection Authoring (v10.20.0+)
+## Reflection Authoring
 Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md` `## Reflection` + `audit-reflection.yaml`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
 
 ## Reflection-sycophancy defect check
