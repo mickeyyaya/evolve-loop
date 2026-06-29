@@ -62,6 +62,28 @@ func TestDefaultPaths(t *testing.T) {
 	if p.SkillMD != "/repo/skills/loop/SKILL.md" {
 		t.Errorf("SkillMD=%q", p.SkillMD)
 	}
+	// Files() is the SSOT release staging consumes — it MUST include the Codex
+	// mirror, in canonical order, so the release commit can't omit it.
+	want := []string{
+		"/repo/.claude-plugin/plugin.json",
+		"/repo/.claude-plugin/marketplace.json",
+		"/repo/.codex-plugin/plugin.json",
+		"/repo/skills/loop/SKILL.md",
+		"/repo/README.md",
+	}
+	got := p.Files()
+	if len(got) != len(want) {
+		t.Fatalf("Files() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("Files()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+	// Empty fields are skipped (partial Paths in tests).
+	if g := (Paths{PluginJSON: "/a", CodexPluginJSON: "/c"}).Files(); len(g) != 2 || g[0] != "/a" || g[1] != "/c" {
+		t.Errorf("sparse Files() = %v, want [/a /c]", g)
+	}
 	if p.ReadmeMD != "/repo/README.md" {
 		t.Errorf("ReadmeMD=%q", p.ReadmeMD)
 	}

@@ -672,11 +672,15 @@ func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args 
 // rebuild-binary produces. Paths absent on disk are skipped so a partial
 // layout (tests, exotic repos) never fails staging on a nonexistent pathspec.
 func stageReleaseSet(ctx context.Context, opts *Options) error {
+	// versionbump.Paths.Files() is the SSOT for the marker files the version-bump
+	// step writes; consuming it (not a hand-listed subset) means a newly added
+	// marker — e.g. .codex-plugin/plugin.json — is staged automatically and can
+	// never be committed one version behind the rest of the release.
 	vb := versionbump.DefaultPaths(opts.ProjectRoot)
-	abs := []string{vb.PluginJSON, vb.MarketplaceJSON, vb.SkillMD, vb.ReadmeMD,
+	abs := append(vb.Files(),
 		filepath.Join(opts.ProjectRoot, "CHANGELOG.md"),
 		filepath.Join(opts.ProjectRoot, "go", "evolve"),
-	}
+	)
 	if p := opts.ShipBinaryPath; p != "" {
 		if rel, err := filepath.Rel(opts.ProjectRoot, p); err == nil && !strings.HasPrefix(rel, "..") {
 			abs = append(abs, p)
