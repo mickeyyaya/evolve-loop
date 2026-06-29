@@ -14,8 +14,6 @@ output-format: "scout-report.md — Gap Analysis table, Research Executed (sourc
 
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Phase control and research-cache lookups are now in-process (Go orchestrator + state.json:researchCache). Treat bash snippets as contracts; do not invoke them directly.
-
 **Research techniques:** [docs/reference/scout-techniques.md](docs/reference/scout-techniques.md) — failure patterns, difficulty scoring, goal milestones, research quality scoring, pre-execution simulation.
 
 ## Inputs
@@ -75,7 +73,7 @@ Read `workspace/agent-mailbox.md` (`"scout"`/`"all"` messages). Post hints for B
 
 ### 4.5. Per-Task Research Cache Lookup
 
-Check `legacy/scripts/research/research-cache.sh` for each proposed task. Exit codes: `0 (HIT)`, `10 (STALE)`, `20 (MISS)`, `30 (INVALIDATED)`, `40 (NO_ENTRY)`, `50 (DISABLED)`. Full protocol in `agents/evolve-scout-reference.md`.
+Check `state.json:researchCache` for each proposed task. Exit codes: `0 (HIT)`, `10 (STALE)`, `20 (MISS)`, `30 (INVALIDATED)`, `40 (NO_ENTRY)`, `50 (DISABLED)`. See reference `task-selection-tables`.
 
 ### 5. Inline Upfront Research (Scout owns it)
 
@@ -88,7 +86,7 @@ Research findings feed directly into task selection. You generate the signal you
 
 ### 5.5. Stage Research
 
-Stage per-task research findings for Builder consumption. See `agents/evolve-scout-reference.md` for staging protocol and cache worker paths.
+Stage per-task research findings for Builder consumption. See the Reference Index below for staging protocol.
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -168,15 +166,17 @@ Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rul
 
 ## Reference Index (Layer 3, on-demand)
 
-| When | Read this |
-|------|-----------|
-| Turn budget debugging (exceeded 12 turns) | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `turn-budget-rationale` |
-| First cycle (full mode) or convergence-confirmation | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `mode-discovery-detail` |
-| Writing eval definitions | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `eval-integrity-rules` |
-| Eval format reference | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `eval-format-template` |
-| Full scout-report.md template | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `output-template` |
-| Task selection tables (carryover, difficulty, boosts) | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `task-selection-tables` |
-| Cycle 1 project digest format | [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md) — section `project-digest-template` |
+Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
+
+| When | Section |
+|------|---------|
+| Turn budget debugging (exceeded 12 turns) | `turn-budget-rationale` |
+| First cycle (full mode) or convergence-confirmation | `mode-discovery-detail` |
+| Writing eval definitions | `eval-integrity-rules` |
+| Eval format reference | `eval-format-template` |
+| Full scout-report.md template | `output-template` |
+| Task selection tables (carryover, difficulty, boosts) | `task-selection-tables` |
+| Cycle 1 project digest format | `project-digest-template` |
 
 ## STOP CRITERION
 

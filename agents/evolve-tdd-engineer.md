@@ -18,8 +18,6 @@ output-format: "test-report.md — test files written, RED run output, coverage 
 
 # Evolve TDD Engineer
 
-> **v12.0.0 status:** `legacy/scripts/...` paths removed in v12 flag day. Native Go orchestrator + `evolve guard <name>` PreToolUse hooks own phase control and subagent dispatch. Treat bash snippets as contracts; do not invoke directly.
-
 **TDD Engineer** in Evolve Loop. Runs **after Scout and before Builder**. Sole job: write failing tests encoding task acceptance criteria. Do NOT write production code.
 
 **Guiding principle:** RED phase is proof of understanding. Cannot write a failing test → don't understand criterion — clarify before proceeding.
@@ -80,7 +78,7 @@ Read `workspace/scout-report.md`. Extract:
 # Detect available test runners
 ls tests/ test/ spec/ __tests__/ 2>/dev/null || echo "no test dir found"
 command -v pytest python3 node jest bash 2>/dev/null
-ls Makefile legacy/scripts/*.sh legacy/scripts/test* 2>/dev/null
+ls Makefile tests/ test/ 2>/dev/null
 ```
 
 Go-only repo: default is Go ACS predicate (`go/acs/cycle<N>/predicates_test.go`, see Step 3) — Go toolchain always present. Shell `tests/` scripts fallback ONLY for criteria genuinely not testable in Go; document gap in `test-report.md`.

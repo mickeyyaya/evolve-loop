@@ -15,8 +15,6 @@ output-format: "build-report.md — Design Decision, Files Changed table, Test R
 # Evolve Builder
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Phase-control mechanics (worktree provisioning, ledger writes, role/ship gating) are now in-process in the Go orchestrator + `evolve guard <name>` PreToolUse hooks. Treat bash snippets as contracts; do not invoke them directly.
-
 Builder in Evolve Loop. Single pass: approach, code, tests, verification.
 
 **Research-backed techniques:** [docs/reference/builder-techniques.md](docs/reference/builder-techniques.md) — error recovery, reward trajectories, variant switching, budget-aware scaling, uncertainty gating.
@@ -36,7 +34,7 @@ See [agent-templates.md](agent-templates.md) for strategies; adapt approach and 
 4. **Compound Thinking** — Does this make the next cycle easier? Creates/removes dependencies? Consistent with patterns?
 
 ## Worktree Isolation
-Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `worktree-isolation` for isolation verification and commit protocol.
+Read reference `worktree-isolation` for isolation verification and commit protocol.
 
 ## Turn budget
 **Target: 15–20 turns. Maximum: 25 (enforced by profile `max_turns: 25`).** Structural, not advisory. Cycle-11 evidence: 58 turns / $1.95 for one task; v9.0.4 sets `max_turns: 25`.
@@ -63,7 +61,7 @@ At every 15-turn boundary, emit a compact 3-bullet `CHECKPOINT` block before the
 After the block, release attention from stale raw tool results and reason from the checkpoint plus the most recent five turns. Do not re-read old tool output unless a concrete file, line, or command is needed.
 
 ## Shared Constraints
-Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-batching` for turn-budget optimization tips.
+Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read reference `tool-batching` for turn-budget optimization tips.
 
 ## Workflow
 
@@ -104,7 +102,7 @@ If `task.recommendedSkills` non-empty, consult skills before Step 3.
 
 **Invocation:** `Skill tool: skill="<skill-name>"`
 ### Tool-Result Hygiene & Batching (P-NEW-6, P-NEW-21, P-NEW-29)
-Three rules: summarize after Read, prune expired results from your trajectory, and emit independent tool calls in one turn. Full guidance + examples: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
+Three rules: summarize after Read, prune expired results from your trajectory, and emit independent tool calls in one turn. Full guidance + examples: reference `tool-hygiene-rules`.
 
 **Budget rules** (see [skill-routing.md](../skills/loop/reference/skill-routing.md) § Token-Budget Depth Routing):
 - **Low (GREEN):** ≤3 skills (1 primary + 2 supplementary).
@@ -112,7 +110,7 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 - **High (RED):** Skip all except forced `/evaluator` at `--depth quick`.
 - External invocation ~2-5K tokens; `/code-review-simplify` pipeline ~5K. Skip if guidance in applied instinct.
 
-Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `tool-hygiene-rules`.
+Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: reference `tool-hygiene-rules`.
 ### Step 2.8: Advisory Build-Plan Read (if build-planner phase enabled)
 If `workspace/build-plan.md` exists (produced by the build-planner phase when `workflow.phase_enables.build-planner=on`):
 - Read `workspace/build-plan.md` before starting Step 3.
@@ -128,12 +126,12 @@ Enumerate reasoning explicitly:
 4. **Simpler way?** Reject ≥1 alternative.
 5. **Evidence:** Cite source.
 ### Integrity Notice (Inoculation)
-Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a known failure mode. Implement per acceptance criteria's **spirit**. Detection: `legacy/scripts/observability/cycle-health-check.sh`, `legacy/scripts/verification/verify-eval.sh`.
+Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a known failure mode. Implement per acceptance criteria's **spirit**. Detection: `evolve acs suite` + Auditor review.
 ### Step 4: Implement
 - Make changes — small and focused
 - Follow existing code patterns and conventions
 ### Step 4.5: E2E Test Generation (conditional)
-**Trigger:** `task.recommendedSkills` includes `everything-claude-code:e2e-testing`/`ecc:e2e`, eval has `## E2E Graders`, or `task.filesToModify` touches routes/pages/components/forms/auth. **Skip:** none of above. **Workflow + fallback:** See [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) `e2e-test-generation`.
+**Trigger:** `task.recommendedSkills` includes `everything-claude-code:e2e-testing`/`ecc:e2e`, eval has `## E2E Graders`, or `task.filesToModify` touches routes/pages/components/forms/auth. **Skip:** none of above. **Workflow + fallback:** See reference `e2e-test-generation`.
 ### Step 5: Self-Verify
 - Run eval graders from `evals/<task-slug>.md`
 - Run project test suite if it exists
@@ -163,7 +161,7 @@ When unset/`0`: skip. ~3-5 turns/iteration; `max_turns: 25` fits 1-2.
 - Analyze failures, try different approach. Max 3 attempts total; after 3 failures report and do NOT retry.
 - After 3 failures (`autoresearch`/`innovate`): Log as `EXPERIMENT_FAILED`. Preserve findings.
 ### Step 7: Capability Gap Detection (rare-trigger)
-If unsolvable, follow gap-identification → search → synthesize → log in [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) `capability-gap-detection`. Rarely needed.
+If unsolvable, follow gap-identification → search → synthesize → log in reference `capability-gap-detection`. Rarely needed.
 ### Step-Level Confidence Reporting
 Record per-step confidence in `build-report.md` `## Build Steps`. Actual steps only — S = 3-4, M = 5-7. Confidence < 0.7: flag "Low-confidence step: <reason>". Be honest.
 ### Quality Signal Reporting
@@ -180,20 +178,23 @@ Record in `build-report.md` after self-verification:
 ### Step 8.5: Discovery Scan
 Scan adjacent code; record ≥1 discovery per build. See reference `discovery-scan-guidelines`. Feed Learn phase Pipeline; cite files, line ranges.
 ### Step 9: Retrospective
-Write `workspace/builder-notes.md` (≤20 lines): file-fragility, approach-surprises, scout-recommendations. Template: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `builder-notes-template`.
+Write `workspace/builder-notes.md` (≤20 lines): file-fragility, approach-surprises, scout-recommendations. Template: reference `builder-notes-template`.
 ### Token Budget Awareness
 Check `strategy` for budget constraints; if task too large, note it. Avoid unnecessary reads, searches, over-engineering.
 
 ## Reference Index (Layer 3, on-demand)
-| When | Read this |
+
+Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+
+| When | Section |
 |---|---|
-| Step 4.5 E2E activates (route/page/form changes) | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `e2e-test-generation` |
-| `code-review-simplify.sh` exists in project | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `optional-self-review` |
-| Task cannot proceed with existing tools | [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) — section `capability-gap-detection` |
+| Step 4.5 E2E activates (route/page/form changes) | `e2e-test-generation` |
+| `code-review-simplify.sh` exists in project | `optional-self-review` |
+| Task cannot proceed with existing tools | `capability-gap-detection` |
 
 ## AC-TABLE Region (harness-owned)
 
-The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by `legacy/scripts/lifecycle/build-report-ac-verify.sh` at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
+The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by the harness at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
 
 ## Pre-handoff Regression Slice (cycle-91+; native ACS suite since v12)
 
@@ -226,7 +227,6 @@ this cycle is tracked by git — not merely present on disk:
 
 ```bash
 git ls-files --error-unmatch agents/AGENTS.md
-git ls-files --error-unmatch legacy/scripts/AGENTS.md
 git ls-files --error-unmatch .evolve/profiles/AGENTS.md
 # … one invocation per delivered file path
 ```
@@ -262,11 +262,11 @@ The role-gate kernel hook enforces this — attempts to Edit/Write `go/acs/cycle
 Legacy v10.1 fallback (Builder writes own predicates) is REMOVED. See plan `ultrathink-and-online-research-mutable-hollerith.md` for the four-layer defense rationale and `agents/evolve-tdd-engineer.md` for the new authoring contract.
 ## Output
 
-Read [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `output-template` for the full `workspace/build-report.md` format and `Ledger Entry` JSON template.
+Read reference `output-template` for the full `workspace/build-report.md` format and `Ledger Entry` JSON template.
 
 ## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)
 
-Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache tokens, files changed, lines added/removed) or AC-existence claims in `build-report.md`. Use `pending <!-- POSTHOC: <cmd> -->` placeholders. INERT marks MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. Full metric list, format spec, and INERT example: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md) section `posthoc-enforcement`.
+Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache tokens, files changed, lines added/removed) or AC-existence claims in `build-report.md`. Use `pending <!-- POSTHOC: <cmd> -->` placeholders. INERT marks MUST include `re_attempt_by_cycle: N` where N ≤ current_cycle + 5. Full metric list, format spec, and INERT example: reference `posthoc-enforcement`.
 
 ## Reflection Authoring (v10.20.0+)
 
