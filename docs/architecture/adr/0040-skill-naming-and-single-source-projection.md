@@ -1,8 +1,14 @@
 # ADR-0040: Skill Naming Normalization + Single-Source Skill Projection
 
-- Status: Accepted
+- Status: Accepted — **§1 "commands layer deleted" clause superseded by [ADR-0067](0067-command-surface-reintroduction.md)** (2026-06-29)
 - Date: 2026-06-07
 - Extends: ADR-0033 (verdict single source), ADR-0034/0035 (deliverable contracts), ADR-0038 (phase plugins)
+
+> **⚠️ §1 partially superseded (2026-06-29, ADR-0067):** §1 deleted the `commands/` layer ("skills are the
+> only invocation surface"). That premise was false — plugin **skills do not appear in Claude Code's `/`
+> typeahead** (CC #18949/#17271/#21125). v21.3.0/v21.4.0 **re-introduced** a *generated* `commands/<name>.md`
+> projection so each skill surfaces as `/evo:<name>`. The no-stutter naming and SKILL.md-as-projection
+> decisions below **stand**; only "commands deleted / skills-only" is reversed. See ADR-0067.
 
 ## Context
 
