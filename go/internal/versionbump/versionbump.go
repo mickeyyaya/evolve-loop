@@ -56,6 +56,21 @@ func DefaultPaths(repoRoot string) Paths {
 	}
 }
 
+// Files returns every marker file a bump may touch, in canonical order,
+// skipping any field left empty. It is the single source of truth for "which
+// files does a version bump write" — release-time staging
+// (ship.stageReleaseSet) consumes it so a marker added to Paths can never be
+// silently left unstaged (the .codex-plugin/plugin.json regression).
+func (p Paths) Files() []string {
+	out := make([]string, 0, 5)
+	for _, f := range []string{p.PluginJSON, p.MarketplaceJSON, p.CodexPluginJSON, p.SkillMD, p.ReadmeMD} {
+		if f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // MajorMinor extracts "X.Y" from "X.Y.Z".
 func MajorMinor(version string) string {
 	parts := strings.Split(version, ".")

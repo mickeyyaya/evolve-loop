@@ -76,6 +76,7 @@ func initReleaseStagingTree(t *testing.T) string {
 	for _, rel := range []string{
 		".claude-plugin/plugin.json",
 		".claude-plugin/marketplace.json",
+		".codex-plugin/plugin.json",
 		"skills/loop/SKILL.md",
 		"README.md",
 		"CHANGELOG.md",
@@ -131,6 +132,7 @@ func TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary(t *testing.T) {
 	for _, want := range []string{
 		".claude-plugin/plugin.json",
 		".claude-plugin/marketplace.json",
+		".codex-plugin/plugin.json", // the generated Codex mirror must ride into the release commit
 		"skills/loop/SKILL.md",
 		"README.md",
 		"CHANGELOG.md",
