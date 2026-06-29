@@ -21,8 +21,11 @@
    load. Enforced by `evolve skills check` / `cmd_skills_drift_test.go`.
 4. **Every skill on disk is listed in `.claude-plugin/plugin.json:skills[]`** — filesystem
    discovery is not an excuse for an incomplete manifest.
-5. **Skills are the only invocation surface.** No parallel `.claude-plugin/commands/` entries
-   (layer deleted in ADR-0040).
+5. **Skills are the canonical source; `commands/<name>.md` is a generated projection of them.**
+   Each skill is mirrored into a thin `commands/<name>.md` stub so it surfaces as `/evo:<name>` in
+   Claude Code's slash-command menu (plugin skills alone are not discoverable in the `/` typeahead).
+   The stub is generated and drift-gated by `evolve skills generate` / `check` — SKILL.md stays the
+   single source; never hand-author a stub. See [ADR-0067](../architecture/adr/0067-command-surface-reintroduction.md).
 6. **Phase skills are projections.** Structured facts (output-contract headings, artifacts,
    gates, fan-out) are generated from their SSOTs by `evolve skills generate`; edit the SSOT,
    not the generated region.
