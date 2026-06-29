@@ -1,8 +1,15 @@
 # ADR-0041: Cross-CLI Skill Publishing (`evolve skills publish`)
 
-- **Status**: Accepted
+- **Status**: Accepted — **codex section superseded by [ADR-0066](0066-cross-cli-plugin-install-and-manifest-schema-conformance.md)** (2026-06-29)
 - **Date**: 2026-06-07
 - **Extends**: [ADR-0040](0040-skill-naming-and-single-source-projection.md) (skill naming + single-source projection)
+
+> **⚠️ Codex superseded (2026-06-29, ADR-0066):** the codex target below projects loose
+> `$CODEX_HOME/skills/evolve-<name>/SKILL.md` files. **codex 0.142.2 no longer discovers loose skills** — it
+> ships a native plugin + marketplace system. The primary codex install is now `codex plugin marketplace add
+> mickeyyaya/evolve-loop` → `codex plugin add evo@evo`, served by the repo-committed `.codex-plugin/plugin.json`
+> + `.agents/plugins/marketplace.json` (projected by `skillcheck`). The agy and ollama targets here remain
+> current. See ADR-0066 for the native-plugin decision and the manifest-schema-conformance principle.
 
 ## Context
 

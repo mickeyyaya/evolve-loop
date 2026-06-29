@@ -113,26 +113,45 @@ Note: in NATIVE mode, cost is reported as `cost_blind:true` (zero attribution). 
 
 You can read SKILL.md and the phase docs from any CLI. To run cycles, implement an adapter at `legacy/scripts/cli_adapters/<your-cli>.sh` mirroring `gemini.sh`'s pattern + ship a `<your-cli>.capabilities.json` manifest. See [Adapter contract](#adapter-contract) below.
 
-### Skill publishing to other CLIs (ADR-0041)
+### Native plugin install — Claude Code, Codex, agy (ADR-0066)
 
-Independent of *runtime* tiers above, the canonical skills can be **published** to foreign CLI
-skill surfaces via `evolve skills publish` (single-source projection; see
+evo installs as a **native plugin** on all three plugin-host CLIs from the same canonical repo. The
+manifests are projected from `.claude-plugin/plugin.json` by `skillcheck` (single source; `evolve skills
+generate` writes them, `evolve skills check` gates drift) and carry **only** fields each host's schema
+accepts — vendor metadata lives in evo-owned files (`.goreleaser.yml`, this doc), never in platform manifest
+keys. See [ADR-0066](adr/0066-cross-cli-plugin-install-and-manifest-schema-conformance.md).
+
+| CLI (current) | Install | Surface |
+|---|---|---|
+| Claude Code 2.1.195 | `/plugin marketplace add mickeyyaya/evolve-loop` → `/plugin install evo@evo` | 23 skills + 23 `/evo:<name>` commands; `.claude-plugin/{plugin,marketplace}.json` |
+| Codex 0.142.2 | `codex plugin marketplace add mickeyyaya/evolve-loop` → `codex plugin add evo@evo` | 23 skills under `~/.codex/plugins/cache/evo/evo/<ver>/`; `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` (`source.path:"."`) |
+| Antigravity (agy) 1.0.13 | `evolve skills publish --target agy --install` → `agy plugin install <bundle>` | whole skill trees incl. `reference/` overlays; prunes the pre-rename `evolve-loop` plugin |
+
+> **Manifest-schema gotcha (ADR-0066):** platform manifests must hold only schema-recognized keys. CC 2.1.195
+> rejecting evo's `binaries` (a documentation array; CC types `binaries` as a record) + custom `compatibility`
+> caused a hard `/plugin install` failure (surfaced misleadingly as *"source type … not supported"*). The
+> `acs/regression/pluginschema` gate now pins this; the codex version stays in sync via the
+> `versionbump.Paths.Files()` SSOT + `releaseconsistency` codex marker.
+
+### Skill publishing to other CLIs (`evolve skills publish` — ADR-0041)
+
+Independent of native-plugin install and *runtime* tiers above, canonical skills are also **projected** to
+foreign skill surfaces via `evolve skills publish` (single-source projection; see
 [ADR-0041](adr/0041-cross-cli-skill-publishing.md)):
 
 | Target | Surface | What lands there |
 |---|---|---|
-| Codex CLI | `$CODEX_HOME/skills/evolve-<name>/` | all 22 skills, `evolve-` prefixed (flat namespace) |
-| Antigravity (agy) | `agy plugin install` → `~/.gemini/config/plugins/evo/` | all 22 skills, unprefixed under the `evo` plugin |
+| Codex CLI | `$CODEX_HOME/skills/evolve-<name>/` — **⚠️ superseded** by the native marketplace above (codex 0.142.2 no longer discovers loose skills); usable for the open-standard `--codex-home ~/.agents` surface | `evolve-` prefixed |
+| Antigravity (agy) | `agy plugin install` → `~/.gemini/config/plugins/evo/` | all skills (whole trees), unprefixed under the `evo` plugin |
 | Ollama | `ollama create evolve-<name>` Modelfiles | read-only reasoning/review subset only (no tool use in `ollama run`) |
 
 ```bash
 evolve skills publish                 # stage-only: gitignored mirrors under .evolve/publish/ + agy validate
-evolve skills publish --install       # mutate: copy to $CODEX_HOME/skills, agy plugin install, ollama create
+evolve skills publish --install       # mutate: agy plugin install, ollama create (+ codex copy)
 evolve skills publish --check         # CI drift gate against the staged mirrors (exit 2 on drift)
 ```
 
-In-repo Codex discovery via the `.agents/skills/` symlink layer is unaffected — publish adds
-the user-global surface.
+In-repo Codex discovery via the `.agents/skills/` symlink layer is unaffected.
 
 ## Adapter contract
 
