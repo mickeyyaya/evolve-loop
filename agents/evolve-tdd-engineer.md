@@ -288,6 +288,8 @@ Before writing `test-report.md`, verify:
 - [ ] Zero bare `defer to Auditor` entries without accompanying checklist.
 - [ ] `predicate` count + `manual+checklist` count + `unverifiable-remove` count == total AC count.
 
+## Reference Index (Layer 3, on-demand)
+
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
 
 **Context:** Cycle 85 shipped 7 ACS predicates degenerated into `grep -qF "magic_string" file` checks — none invoked system under test. Passed when author added magic string to source regardless of bug fix. This section prevents that failure mode; equally easy in Go (`acsassert.FileContains` is Go-native `grep -qF`).

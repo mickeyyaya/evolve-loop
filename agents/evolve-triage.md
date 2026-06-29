@@ -62,48 +62,7 @@ When including or deferring a `carryoverTodo`, preserve the fields `research_poi
 
 ## Process (single-pass)
 
-### 0a. Idempotency skip-list (v9.6.0+)
-
-For each `.evolve/inbox/*.json` (maxdepth 1):
-
-1. **Git log check with content-verification** (authoritative — the single source of truth):
-   - If `non_state_changes > 0` → **skip-shipped**: genuine code commit; do NOT ingest;
-     record in `skip_shipped[]` with the SHA.
-     File stays in inbox/ until ship.sh promotes it to processed/ after the cycle commits.
-   - If `non_state_changes == 0` (all changes are state-mutation paths only) →
-     **INTEGRITY_BREACH**: commit subject claims the task but contains no code deliverables.
-     Record in `escalate_block[]` with `reason="fraudulent-commit:<candidate_sha>"`.
-     Do NOT claim as skip_shipped. Continue to next inbox file (do NOT ingest this cycle).
-   - If `candidate_sha` is empty → proceed to checks 2–4 normally.
-
-2. **Rejected dir check** (defense-in-depth):
-   `find .evolve/inbox/rejected -name "*${id}*" 2>/dev/null | grep -q .`
-   Match → **skip-rejected**: record in `skip_rejected[]`; proceed to next file.
-
-3. **Failure count check** (escalation guard):
-   Count `state.json:failedApproaches[]` entries where `.task_id == $id` AND
-   `.classification` matches `code-(build|audit)-fail`. Count ≥ 2 → **escalate-block**:
-   record in `escalate_block[]`; proceed to next file.
-
-4. **Claim the file** (atomic hand-off to this cycle):
-   `bash inbox-mover.sh claim "$id" "$CYCLE"`
-   If claim exits non-zero: log WARN in `## Inbox Errors`, skip this file (another
-   cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
-
-Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
-`skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]`.
-
-### 0. Inbox ingestion (v9.5.0+)
-
-Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
-
-1. List `.evolve/inbox/*.json` (maxdepth 1; skip `processed/` and `rejected/` subdirs).
-2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, reject.
-6. Transform to reconcile-compatible schema: set `defer_count=0`, `cycles_unpicked=0`, `first_seen_cycle=last_seen_cycle=<N>`; wrap operator metadata in `_inbox_source`.
-7. Append to in-memory carryoverTodos working set. (File move is handled by Step 0a's claim call + ship.sh's post-commit promote — do NOT manually mv files here.)
-8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
-
-Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
+Before Step 1: run inbox pre-checks (idempotency) and ingest any pending `.evolve/inbox/` files. Emit `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]` in `triage-decision.json`. Honor `weight` tie-breaker (default 0.5). Full algorithms: see reference tail and [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count.
 
 ### 1. Read inputs
 
@@ -248,6 +207,51 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
 
 If any check fails, fix in place. Do not mark complete until all six hold.
+
+## Reference Index (Layer 3, on-demand)
+
+### 0a. Idempotency skip-list (v9.6.0+)
+
+For each `.evolve/inbox/*.json` (maxdepth 1):
+
+1. **Git log check with content-verification** (authoritative — the single source of truth):
+   - If `non_state_changes > 0` → **skip-shipped**: genuine code commit; do NOT ingest;
+     record in `skip_shipped[]` with the SHA.
+     File stays in inbox/ until ship.sh promotes it to processed/ after the cycle commits.
+   - If `non_state_changes == 0` (all changes are state-mutation paths only) →
+     **INTEGRITY_BREACH**: commit subject claims the task but contains no code deliverables.
+     Record in `escalate_block[]` with `reason="fraudulent-commit:<candidate_sha>"`.
+     Do NOT claim as skip_shipped. Continue to next inbox file (do NOT ingest this cycle).
+   - If `candidate_sha` is empty → proceed to checks 2–4 normally.
+
+2. **Rejected dir check** (defense-in-depth):
+   `find .evolve/inbox/rejected -name "*${id}*" 2>/dev/null | grep -q .`
+   Match → **skip-rejected**: record in `skip_rejected[]`; proceed to next file.
+
+3. **Failure count check** (escalation guard):
+   Count `state.json:failedApproaches[]` entries where `.task_id == $id` AND
+   `.classification` matches `code-(build|audit)-fail`. Count ≥ 2 → **escalate-block**:
+   record in `escalate_block[]`; proceed to next file.
+
+4. **Claim the file** (atomic hand-off to this cycle):
+   `bash inbox-mover.sh claim "$id" "$CYCLE"`
+   If claim exits non-zero: log WARN in `## Inbox Errors`, skip this file (another
+   cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
+
+Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
+`skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]`.
+
+### 0. Inbox ingestion (v9.5.0+)
+
+Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
+
+1. List `.evolve/inbox/*.json` (maxdepth 1; skip `processed/` and `rejected/` subdirs).
+2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, reject.
+6. Transform to reconcile-compatible schema: set `defer_count=0`, `cycles_unpicked=0`, `first_seen_cycle=last_seen_cycle=<N>`; wrap operator metadata in `_inbox_source`.
+7. Append to in-memory carryoverTodos working set. (File move is handled by Step 0a's claim call + ship.sh's post-commit promote — do NOT manually mv files here.)
+8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
+
+Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
 
 ## Reflection Authoring (v10.20.0+)
 
