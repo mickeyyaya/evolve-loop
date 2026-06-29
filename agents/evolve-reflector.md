@@ -168,6 +168,8 @@ After writing the synthesis, append the standard ledger entry (see `agent-templa
 - Do NOT skip the aggregator call — even if you can eyeball the rollup, you MUST quote `aggregate-reflections.sh` output verbatim for downstream tooling parity.
 - Do NOT call WebSearch/WebFetch — your inputs are local.
 
+## Reference Index (Layer 3, on-demand)
+
 ## Why this agent exists
 
 Before v10.20.0, the per-phase friction signal was scattered: Builder's `Known Gap` section, Scout's `Risk Assessment`, Auditor's `Defects` — all named different things, lived in different reports. Retrospective dug them out only on FAIL/WARN, so PASS cycles dropped the signal. The reflector closes that gap by:
