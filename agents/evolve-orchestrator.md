@@ -26,7 +26,7 @@ output-format: "orchestrator-report.md — Goal, Phase Outcomes table (phase × 
 
 ## Inputs
 
-You receive a context block appended after this prompt by `archive/legacy/scripts/dispatch/run-cycle.sh`:
+You receive a context block assembled by the Go orchestrator (`core.Orchestrator`) before this prompt is sent:
 
 | Field | Description |
 |-------|-------------|
@@ -106,7 +106,7 @@ After Audit completes, **`acs-verdict.json` in workspace is verdict-of-record** 
    - `verdict == "PASS"` AND `red_count == 0` → advance to ship phase
    - `verdict == "FAIL"` OR `red_count > 0` → advance to retrospective; cycle does NOT ship
    - No WARN level in v10 — see EGPS design doc for rationale
-4. After ship: `legacy/scripts/utility/promote-acs-to-regression.sh "$cycle"` moves `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. Next cycle inherits all prior predicates.
+4. After ship: the Go orchestrator automatically promotes `acs/cycle-N/` to `acs/regression-suite/cycle-N/`. Next cycle inherits all prior predicates.
 
 See `docs/architecture/egps-v10.md` for full EGPS design + lifecycle.
 
@@ -147,17 +147,11 @@ If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files mod
 
 ### Per-phase prompt context (Layer B)
 
-When writing phase agent task prompt, **prepend role-filtered context** from `role-context-builder.sh`. Each role gets only declared inputs. Replaces pre-v8.56 kitchen-sink dump.
+When writing phase agent task prompt, **prepend role-filtered context**. Each role gets only declared inputs.
 
 ```bash
-# Example: assemble Builder's prompt
-ROLE_CTX=$(bash legacy/scripts/lifecycle/role-context-builder.sh builder $CYCLE $WORKSPACE)
-cat <<TASK_PROMPT | bash legacy/scripts/dispatch/subagent-run.sh builder $CYCLE $WORKSPACE
-$ROLE_CTX
-
-## Builder task
-<your imperative for THIS cycle's build>
-TASK_PROMPT
+# Example: dispatch Builder (in-process via core.Orchestrator)
+# evolve subagent run builder $CYCLE $WORKSPACE
 ```
 
 Helper emits `## Intent`, `## Scout report`, etc. — only role-relevant artifacts. Do NOT manually re-include `audit-report.md`, `retrospective-report.md`, or `failedApproaches[]`; role-context-builder is canonical source-of-truth.
@@ -168,7 +162,7 @@ If role-context prompt exceeds soft token cap, helper emits stderr WARN — *tri
 
 Layer-R runs on EVERY cycle (PASS, WARN, or FAIL) immediately after `ship.sh` returns — regardless of audit verdict. Precedes Layer-P (memo, PASS) and retrospective (FAIL/WARN). Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1`; `0` to opt out).
 
-Reflector reads `<phase>-reflection.yaml` per phase + runs `legacy/scripts/observability/aggregate-reflections.sh --window 5` for cross-cycle rollup, then writes:
+Reflector reads `<phase>-reflection.yaml` per phase + aggregates cross-cycle rollup in-process (window 5), then writes:
 
 - `learn/reflector-synthesis.md` (≤150 lines, sections: This-Cycle Per-Phase Reflections, Cross-Cycle Rollup, Top Pipeline-Level Patterns, Handoff to Retrospective/Memo)
 

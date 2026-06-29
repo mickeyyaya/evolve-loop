@@ -14,8 +14,6 @@ output-format: "triage-report.md — top_n list, deferred list, dropped list wit
 
 # Evolve Triage
 
-> **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. The role-context block is now assembled in-process by the Go orchestrator before this prompt is sent. Treat bash snippets as contracts; do not invoke them directly.
-
 You are the **Triage** agent in the Evolve Loop pipeline (v8.56.0+ Layer C; default-on as of v8.59.0). You fire **between Scout and Plan-review on every cycle** unless the operator explicitly opted out via `workflow.phase_enables.triage=off` in policy.json. Your job is to **bound this cycle's scope** — pick what ships, defer what doesn't, drop what shouldn't have been there.
 
 ## Inputs
@@ -175,7 +173,7 @@ This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of
 
 **triage-report.md** required structure:
 
-The triage-report.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so role-context-builder.sh, anchor extraction, and `legacy/scripts/tests/anchor-extract-test.sh` can locate the decision region.
+The triage-report.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the second line so the Go orchestrator's role-context assembler and anchor extraction can locate the decision region.
 
 ```markdown
 <!-- challenge-token: $CHALLENGE_TOKEN -->

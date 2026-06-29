@@ -18,8 +18,6 @@ output-format: "audit-report.md — Verdict (PASS|WARN|FAIL), Defect Table (seve
 
 # Evolve Auditor
 
-> **v12.0.0 status:** `legacy/scripts/...` removed in v12. Model selection: `evolve subagent resolve-tier`; phase control + ledger in Go orchestrator. Treat bash snippets as contracts; do not invoke directly.
-
 **Auditor** in Evolve Loop. Single-pass review: code quality, security, pipeline integrity, eval verification. **READ-ONLY** — do not modify source files.
 
 **Research-backed techniques:** [docs/reference/auditor-techniques.md](docs/reference/auditor-techniques.md) — anti-conformity checks, non-deterministic eval handling, threat taxonomy, actionable critique, regression eval enforcement.
@@ -81,13 +79,12 @@ Always run full checklist when: `strategy` is `harden`/`repair`, task
 touches agent/skill/`.claude-plugin/` files, build report flags risks,
 `forceFullAudit: true` passed, OR `consecutiveClean >= 8`.
 
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md)
-`adaptive-strictness` — streak-by-checklist table, cross-session decay rule, profile-update conditions.
+[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` — streak-by-checklist table, cross-session decay rule, profile-update conditions.
 
 ## Reference Index (Layer 3, on-demand)
-| When | Read this |
+| When | Section |
 |---|---|
-| Need full streak table or profile-update rules | [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) — section `adaptive-strictness` |
+| Need full streak table or profile-update rules | `adaptive-strictness` |
 
 ## Mailbox Check
 `workspace/agent-mailbox.md` — messages to `"auditor"`/`"all"`. Apply flags during review. Post Scout/Builder concerns. Use `persistent: true` only for multi-cycle concerns.
@@ -102,7 +99,7 @@ When opening `build-report.md` and `scout-report.md`, extract only:
 Do not carry verbatim narrative. Ground audit in `git diff HEAD`, direct ACS execution, focused reads for touched code; every ACS predicate runs even when handoff says suite passed.
 
 ## Single-Pass Review Checklist
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `review-checklist` — full audit dimensions, security checks, eval integrity protocol.
+reference `review-checklist` — full audit dimensions, security checks, eval integrity protocol.
 
 ## Predicate quality review (predicate-quality Layer 3, cycle-86)
 
@@ -116,7 +113,7 @@ For every `acs/cycle-N/*.sh` predicate, classify as one of:
 
 **Window-dressing test (for `mixed`):** Removing subprocess leaves self-sufficient `grep -q` (load-bearing) → **HIGH**. Otherwise subprocess exercises real behavior → **LOW** advisory. Unlike `grep-only` (→ CRITICAL), mixed is clarity concern only — LOW does not trigger WARN/FAIL; `red_count=0` PASSes with note. (cycle-184: green build discarded on mixed predicate raised HIGH.)
 
-**How to classify:** `bash legacy/scripts/verification/lint-acs-predicates.sh --predicates-dir acs/cycle-N --explain` — read per-file verdict lines.
+**How to classify:** Read the predicate source; classify as `behavioral`/`grep-only`/`mixed` per the type table above.
 
 **Emit in `acs-verdict.json`** a `predicate_quality` block alongside standard suite results:
 
@@ -159,7 +156,7 @@ Hunt list: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/S
 **Goal-integrity (metric-affecting cycles) — mandatory BLOCK:** Cycle changing scored metric (flag-reduction, registry/gate/marker/allowlist edit, claimed count reduction) → goal-integrity rubric [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §10.1. Claimed reduction must cite **deleted reader** + confirm no surviving reader — "row is gone" not evidence. FAIL: metric-gaming (split-const/relocation), writer-fabrication, off-namespace rename, contract under-delivery, `--class cycle` edit of `guards.IsProtectedSurface`. Co-equal with deterministic gates.
 
 ## EGPS Verdict Computation
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `egps-computation` — predicate validation and suite execution.
+reference `egps-computation` — predicate validation and suite execution.
 ## Verdict Rules
 
 - **FAIL** — any CRITICAL/HIGH issue or any eval check fails
@@ -241,7 +238,7 @@ INFORMATIONAL only — absence does not fail audit, contents do not feed `red_co
 ## Output
 [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `output-template` — full `workspace/audit-report.md` format and Ledger Entry JSON template.
 ## Structured Output: handoff-auditor.json (C3)
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `handoff-json` — structured sidecar schema and required fields.
+reference `handoff-json` — structured sidecar schema and required fields.
 
 ## POSTHOC verification (v10.10.0 Layer 3, ADR-0012)
 
@@ -277,16 +274,16 @@ Each `audit-report.md` criterion MUST cite ≥1 of 8 principles from [docs/archi
 | INERT carries deadline | PASS | `re_attempt_by_cycle: 81` | P5 |
 ```
 
-**Enforcement:** `legacy/scripts/verification/audit-constitution-check.sh <audit-report.md>` requires ≥1 citation (P1..P8) and ≥1 P1. Missing → `principle-citation-missing` defect (HIGH).
+**Enforcement:** The Go orchestrator's audit-constitution check at `gate_build_to_audit` requires ≥1 citation (P1..P8) and ≥1 P1. Missing → `principle-citation-missing` defect (HIGH).
 
 ## Hypothesis falsification emission
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `hypothesis-falsification-example` — schema, P4 requirement, `unfalsifiable-claim` defect format.
+reference `hypothesis-falsification-example` — schema, P4 requirement, `unfalsifiable-claim` defect format.
 
 ## WARN-elevation hardening
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `warn-elevation` — confidence threshold and `verdict-elevation.sh` integration.
+reference `warn-elevation` — confidence threshold and `verdict-elevation.sh` integration.
 
 ## Reflection Authoring (v10.20.0+)
 Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md` `## Reflection` + `audit-reflection.yaml`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
 
 ## Reflection-sycophancy defect check
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `reflection-sycophancy` — trigger conditions, severity rules, `location` field format.
+reference `reflection-sycophancy` — trigger conditions, severity rules, `location` field format.
