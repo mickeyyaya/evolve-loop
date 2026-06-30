@@ -26,6 +26,11 @@ func cliHealthEnabled(env map[string]string) bool {
 // chain starts at a healthy CLI (lazy expiry: a past-due bench stops
 // demoting, giving the family its canary shot). No-op under policy pin or
 // EVOLVE_CLI_HEALTH=0.
+//
+// Boot-timeout entries (Reason==BootTimeoutPattern) are driver-keyed and routed
+// to ApplyDriverBench; all others are family-keyed and routed to ApplyBench.
+// Driver-bench runs first so a boot-benched driver is demoted before family-bench
+// reorders the remaining candidates.
 func (b *BaseRunner) applyBenchToPlan(projectRoot, phase string, plan llmroute.Plan, pinned bool, env map[string]string) llmroute.Plan {
 	if pinned || !cliHealthEnabled(env) {
 		return plan
@@ -34,15 +39,31 @@ func (b *BaseRunner) applyBenchToPlan(projectRoot, phase string, plan llmroute.P
 	if len(active) == 0 {
 		return plan
 	}
-	benched := make(map[string]time.Time, len(active))
-	for fam, e := range active {
-		benched[fam] = e.BenchedAt
+
+	// Split active entries by Reason: boot-timeout entries are driver-keyed;
+	// all others are family-keyed.
+	bootDrivers := make(map[string]time.Time, len(active))
+	familyBenched := make(map[string]time.Time, len(active))
+	for key, e := range active {
+		if e.Reason == clihealth.BootTimeoutPattern {
+			bootDrivers[key] = e.BenchedAt
+		} else {
+			familyBenched[key] = e.BenchedAt
+		}
 	}
-	out := llmroute.ApplyBench(plan, benched)
+
+	// Apply driver-bench (boot-timeout entries) first, then family-bench.
+	out := llmroute.ApplyDriverBench(plan, bootDrivers)
 	if !sameCandidates(plan.Candidates, out.Candidates) {
-		fmt.Fprintf(os.Stderr, "[runner] phase=%s cli-health bench reordered chain: %v -> %v (benched: %v)\n",
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s cli-health driver-bench reordered chain: %v -> %v (boot-benched: %v)\n",
 			phase, plan.Candidates, out.Candidates, benchedSummary(active))
-	} else if allBenched(out.Candidates, benched) {
+	}
+	afterDriver := out
+	out = llmroute.ApplyBench(out, familyBenched)
+	if !sameCandidates(afterDriver.Candidates, out.Candidates) {
+		fmt.Fprintf(os.Stderr, "[runner] phase=%s cli-health bench reordered chain: %v -> %v (benched: %v)\n",
+			phase, afterDriver.Candidates, out.Candidates, benchedSummary(active))
+	} else if allBenched(out.Candidates, familyBenched) {
 		fmt.Fprintf(os.Stderr, "[runner] WARN phase=%s ALL candidates benched (%v) — dispatching least-recently-benched first; bench is advice, not a veto\n",
 			phase, benchedSummary(active))
 	}

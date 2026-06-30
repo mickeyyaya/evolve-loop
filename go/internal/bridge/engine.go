@@ -416,6 +416,13 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	var stderrBuf bytes.Buffer
 	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
 	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
+	// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
+	// the consecutive-strike counter so non-adjacent failures never bench.
+	if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(code) {
+		if err := e.deps.BootTimeoutStore.ClearBootStrike(req.CLI); err != nil {
+			_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-strike clear failed for %s: %v\n", req.CLI, err)
+		}
+	}
 	if code == ExitOK {
 		// Strategy-aware result read (ADR-0027): the stdout contract writes no
 		// artifact file — its answer is the captured scrollback (stdoutLog), so

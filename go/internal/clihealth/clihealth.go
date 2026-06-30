@@ -202,6 +202,24 @@ func (s *Store) Clear(family string) error {
 	})
 }
 
+// ClearBootStrike removes the boot-timeout bench entry for driver if its
+// Reason is BootTimeoutPattern. No-op when driver has no entry or when the
+// stored Reason is not BootTimeoutPattern (guards against clobbering a
+// rate-limit bench keyed under the same name). Called by the engine on any
+// non-ExitREPLBootTimeout exit (REPL booted) to restart the consecutive-
+// strike counter — strike→success→strike must not bench.
+func (s *Store) ClearBootStrike(driver string) error {
+	return s.withLock(func() error {
+		benches, _ := s.Load()
+		e, ok := benches[driver]
+		if !ok || e.Reason != BootTimeoutPattern {
+			return nil
+		}
+		delete(benches, driver)
+		return s.write(benches)
+	})
+}
+
 // RecordBootStrike atomically records one boot-timeout strike for the named
 // driver (keyed by driver name, not CLI family — a tmux-REPL boot failure is
 // driver-specific, not family-wide). Returns benched=true when consecutive

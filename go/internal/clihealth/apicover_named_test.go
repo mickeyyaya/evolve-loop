@@ -5,6 +5,17 @@ import (
 	"time"
 )
 
+// TestClearBootStrike_Named names the exported ClearBootStrike method so
+// apicover -enforce confirms its identifier is tracked. Verifies it is callable
+// and returns nil on an absent driver (the no-op path).
+func TestClearBootStrike_Named(t *testing.T) {
+	t.Parallel()
+	s := NewStore(t.TempDir(), nil)
+	if err := s.ClearBootStrike("absent-driver"); err != nil {
+		t.Errorf("ClearBootStrike on absent driver: %v", err)
+	}
+}
+
 // TestCooldownBounds_DefaultAndMax pins DefaultCooldown and MaxCooldown to their
 // real consumer, CooldownForStrikes: the first strike yields exactly
 // DefaultCooldown, and a high strike count saturates at exactly MaxCooldown. If
