@@ -49,6 +49,10 @@ type StopEvent struct {
 	Progressed bool   // did the agent emit new output during the last interval?
 	Busy       bool   // is the agent visibly mid-turn per the per-CLI busy affordance?
 	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer (Stage 1)
+	// State, when non-zero, carries the per-CLI liveness detector's structured
+	// verdict; the reviewer uses it in preference to the coarse Progressed+Busy
+	// booleans. Zero value (0) means "not set" — falls back to Progressed+Busy.
+	State panestream.LivenessState
 }
 
 // ReviewAction is the Translate-layer verdict vocabulary.
@@ -97,46 +101,71 @@ func newDeterministicReviewer(maxExtends int) deterministicReviewer {
 	return deterministicReviewer{maxExtends: maxExtends}
 }
 
-func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
-	// Two liveness signals, two budgets — conflating them killed working agents:
-	//
-	//  Progressed = the agent emitted substantive new output this interval. Real
-	//  output is proof of work that is CONVERGING, so it is never "stuck": a
-	//  scout reading a large failure backlog produces output for 30+ min and
-	//  must extend UNCONDITIONALLY. Capping progress at maxExtends killed
-	//  cycle-311/312's producing scout mid-work with a bogus "artifact timeout".
-	//
-	//  Busy (no Progressed) = the per-CLI busy affordance is up but the pane has
-	//  no content delta. Load-bearing for quiet extended-thinking models (Opus):
-	//  the only delta is the "Deliberating Ns"/token-counter lines that
-	//  PaneHasSubstantiveChange strips as volatile, so Progressed reads false
-	//  while the agent is demonstrably alive. Pausing such an agent at interval 0
-	//  recorded a PASS audit report as FAIL and halted the batch (cycles
-	//  254/255). But a bare spinner only proves the process is up, not that it is
-	//  converging — so this signal stays BOUNDED by maxExtends to surface a
-	//  genuinely-hung busy-spinner agent. A busy pane buys extensions, not
-	//  immortality.
+// NewDeterministicReviewer constructs the Stage-0 deterministic reviewer.
+// Exported so external callers (ACS predicates, integration wiring) can use it
+// without depending on the unexported newDeterministicReviewer.
+func NewDeterministicReviewer(maxExtends int) StopReviewer {
+	return newDeterministicReviewer(maxExtends)
+}
+
+// livenessState extracts the structured LivenessState for the reviewer decision.
+// When ev.State is set (non-zero), it is returned directly; otherwise it is
+// derived from the coarse Progressed+Busy booleans for backward compatibility
+// with callers that do not yet populate State (legacy path).
+func (ev StopEvent) livenessState() panestream.LivenessState {
+	if ev.State != 0 {
+		return ev.State
+	}
 	if ev.Progressed {
-		return ReviewVerdict{
-			Action: ReviewExtend,
-			Reason: fmt.Sprintf("agent still producing output (interval %d) — extend; real output is never stuck", ev.Attempt+1),
-		}
+		return panestream.LivenessConverging
 	}
 	if ev.Busy {
+		return panestream.LivenessBusyButStagnant
+	}
+	return panestream.LivenessIdle
+}
+
+func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
+	// Reviewer decides from LivenessState → ReviewAction. The legacy coarse
+	// Progressed+Busy booleans are converted to LivenessState by ev.livenessState()
+	// when ev.State is not set, preserving backward compatibility with existing
+	// test paths that do not populate State.
+	//
+	// Invariants preserved from the boolean era:
+	//  Converging → Extend UNCONDITIONALLY (cycles 311/312: producing scout killed
+	//    mid-work by the backstop — real output is never "stuck").
+	//  BusyButStagnant → Extend BOUNDED by maxExtends (cycles 254/255: quiet-Opus
+	//    extended-thinking paused at interval 0).
+	//  Hung → fast-fail BEFORE maxExtends×interval backstop (new: the detector
+	//    declares Hung after stallThreshold consecutive busy-stagnant intervals).
+	//  Idle → Pause (no liveness signal at all).
+	switch ev.livenessState() {
+	case panestream.LivenessConverging:
+		return ReviewVerdict{
+			Action: ReviewExtend,
+			Reason: fmt.Sprintf("agent converging: new output at interval %d — extend; real output is never capped", ev.Attempt+1),
+		}
+	case panestream.LivenessBusyButStagnant:
 		if ev.Attempt < r.maxExtends {
 			return ReviewVerdict{
 				Action: ReviewExtend,
-				Reason: fmt.Sprintf("agent busy mid-turn (no pane delta — likely extended thinking) (interval %d/%d) — extend", ev.Attempt+1, r.maxExtends),
+				Reason: fmt.Sprintf("agent busy mid-turn, no content delta (interval %d/%d) — extend", ev.Attempt+1, r.maxExtends),
 			}
 		}
 		return ReviewVerdict{
 			Action: ReviewPause,
 			Reason: fmt.Sprintf("agent busy but produced no output — exhausted %d extensions, pause for investigation", r.maxExtends),
 		}
-	}
-	return ReviewVerdict{
-		Action: ReviewPause,
-		Reason: fmt.Sprintf("no output during the last %ds interval — stalled; pause for investigation", ev.IntervalS),
+	case panestream.LivenessHung:
+		return ReviewVerdict{
+			Action: ReviewPause,
+			Reason: fmt.Sprintf("agent hung: stalled for %d consecutive busy intervals — fast-fail before %d-interval backstop", ev.Attempt+1, r.maxExtends),
+		}
+	default: // LivenessIdle or zero (fallback exhausted)
+		return ReviewVerdict{
+			Action: ReviewPause,
+			Reason: fmt.Sprintf("no output during the last %ds interval — stalled; pause for investigation", ev.IntervalS),
+		}
 	}
 }
 

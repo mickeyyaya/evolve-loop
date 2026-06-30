@@ -20,6 +20,14 @@ func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
 	return panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
 }
 
+// detectorFor returns a per-run LivenessProbe for the tmux driver identified by
+// lp. Co-located with paneProfileFor (single-source-with-projection, ADR-0047):
+// the profile drives both the content-boundary extractor and the strategy
+// registry without duplicating the CLI→name mapping.
+func detectorFor(lp tmuxLaunch) panestream.LivenessProbe {
+	return panestream.DetectorFor(paneProfileFor(lp))
+}
+
 func tmuxPaneLooksLikeUpdateMenu(pane string) bool {
 	return strings.Contains(pane, "Update available!") &&
 		strings.Contains(pane, "Update now") &&

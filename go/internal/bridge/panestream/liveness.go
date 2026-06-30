@@ -1,0 +1,177 @@
+package panestream
+
+import (
+	"regexp"
+	"strconv"
+)
+
+// liveness.go — Strategy-based liveness detection over a sequence of rendered
+// pane snapshots (ADR-0047 projection seam). All detectors are projections of
+// ClassifyLine / PaneDelta — the single channel separator — so chrome/affordance
+// vocabulary cannot drift between liveness and progress paths.
+//
+// LivenessProbe is the per-run interface. DefaultDetector uses stable-content
+// growth velocity (new content lines / interval via PaneDelta), closing the
+// codex weak-signal gap (PaneBusy=false on codex → Idle or Converging from
+// growth alone). ClaudeDetector composes over DefaultDetector, layering a
+// monotonic ↓ token counter as higher-confidence Converging for claude.
+//
+// Registry: DetectorFor(profile) is co-located with Profiles (ADR-0047
+// single-source-with-projection); the only per-CLI branch is here, never in
+// the reviewer (stopreview.go).
+
+// LivenessState is the structured liveness vocabulary replacing the coarse
+// Progressed+Busy boolean pair. Zero value (0) means "not set" — the reviewer
+// falls back to the legacy boolean path when StopEvent.State == 0.
+type LivenessState int
+
+const (
+	// LivenessIdle: quiet prompt, no busy signal, no new content. Reviewer: pause.
+	LivenessIdle LivenessState = iota + 1
+	// LivenessBusyButStagnant: busy affordance present, no new content for fewer
+	// than stallThreshold intervals. Reviewer: extend (bounded by maxExtends).
+	LivenessBusyButStagnant
+	// LivenessConverging: new stable content lines emitted this interval (growth
+	// velocity > 0). Reviewer: extend unconditionally — real output is never stuck.
+	LivenessConverging
+	// LivenessHung: busy but no new content for stallThreshold consecutive
+	// intervals. Reviewer: fast-fail before the maxExtends×interval backstop.
+	LivenessHung
+)
+
+// LivenessProbe is the per-run liveness detector interface. Implementations are
+// stateful across calls (they hold PaneDelta cursors and stall counters). Call
+// Assess once per review interval with the current rendered pane snapshot.
+type LivenessProbe interface {
+	Assess(rendered string, profile PaneProfile) (LivenessState, float64)
+}
+
+// defaultHungAfter is how many consecutive busy-but-stagnant intervals the
+// DefaultDetector accumulates before declaring LivenessHung. Must be less than
+// defaultArtifactMaxExtends (6 in stopreview.go) so Hung fast-fails BEFORE the
+// maxExtends×interval backstop.
+const defaultHungAfter = 3
+
+// DefaultDetector derives liveness from stable-content growth velocity: new
+// stable content lines per interval (via PaneDelta / ClassifyLine). Works for
+// any CLI including codex which has no busy affordance — the content-line
+// count alone classifies Converging vs Hung without needing PaneBusy.
+type DefaultDetector struct {
+	delta     PaneDelta
+	hungAfter int // consecutive busy-stagnant intervals before LivenessHung
+	stalls    int // current consecutive busy-stagnant interval count
+}
+
+// NewDefaultDetector creates a DefaultDetector. stallThreshold controls how many
+// consecutive busy-but-no-content intervals trigger LivenessHung; ≤0 uses
+// defaultHungAfter (3).
+func NewDefaultDetector(stallThreshold int) *DefaultDetector {
+	if stallThreshold <= 0 {
+		stallThreshold = defaultHungAfter
+	}
+	return &DefaultDetector{hungAfter: stallThreshold}
+}
+
+// Assess evaluates one rendered pane snapshot. Returns (LivenessConverging, 0.9)
+// when new stable content lines appeared; (LivenessHung, 0.8) after hungAfter
+// consecutive busy-stagnant intervals; (LivenessBusyButStagnant, 0.6) for busy
+// panes within the stall budget; (LivenessIdle, 0.7) for quiet panes.
+func (d *DefaultDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
+	newLines := d.delta.Next(rendered, p)
+	if len(newLines) > 0 {
+		d.stalls = 0
+		return LivenessConverging, 0.9
+	}
+	busy := PaneBusy(rendered, p)
+	if !busy {
+		// Idle resets the stall counter — a non-busy quiet frame is not a
+		// busy-stagnant accumulation toward Hung.
+		d.stalls = 0
+		return LivenessIdle, 0.7
+	}
+	d.stalls++
+	if d.stalls >= d.hungAfter {
+		return LivenessHung, 0.8
+	}
+	return LivenessBusyButStagnant, 0.6
+}
+
+// rxLivenessTokens extracts the peak ↓ response-token count from a rendered
+// pane. Handles both "↓ Nk tokens" (k-scaled) and "↓ N tokens" (plain integer)
+// so test frames and real capture frames match uniformly.
+var rxLivenessTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)(k?)\s+tokens`)
+
+func extractTokenCountLiveness(pane string) int {
+	peak := 0
+	for _, m := range rxLivenessTokens.FindAllStringSubmatch(pane, -1) {
+		if len(m) < 3 {
+			continue
+		}
+		v, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			continue
+		}
+		var n int
+		if m[2] == "k" {
+			n = int(v*1000 + 0.5)
+		} else {
+			n = int(v + 0.5)
+		}
+		if n > peak {
+			peak = n
+		}
+	}
+	return peak
+}
+
+// ClaudeDetector composes over DefaultDetector, layering the monotonic ↓
+// response-token counter as a higher-confidence Converging signal for claude.
+// A strictly-increasing ↓ N tokens line across intervals confirms the model is
+// still generating, even when content lines are being streamed as chrome.
+// When the counter is absent or static, it falls back to the DefaultDetector
+// verdict — byte-identical on non-claude frames. Non-claude CLIs receive
+// DefaultDetector via DetectorFor.
+type ClaudeDetector struct {
+	base       *DefaultDetector
+	lastTokens int  // highest ↓ token count seen so far; 0 before first non-prime call
+	primed     bool // true after the first Assess call (prime / baseline)
+}
+
+// NewClaudeDetector creates a ClaudeDetector. stallThreshold is forwarded to
+// the inner DefaultDetector; ≤0 uses defaultHungAfter.
+func NewClaudeDetector(stallThreshold int) *ClaudeDetector {
+	return &ClaudeDetector{base: NewDefaultDetector(stallThreshold)}
+}
+
+// Assess evaluates one rendered pane snapshot. On the prime (first) call,
+// it always returns the base DefaultDetector verdict (the baseline is being
+// established, not compared). On subsequent calls, a strictly-increasing ↓
+// token counter overrides to (LivenessConverging, 0.95) — higher confidence
+// than the default's growth-velocity path. Static or absent counters fall
+// through to the base verdict unchanged.
+func (c *ClaudeDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
+	base, baseConf := c.base.Assess(rendered, p)
+	tokens := extractTokenCountLiveness(rendered)
+	if !c.primed {
+		c.primed = true
+		c.lastTokens = tokens
+		return base, baseConf
+	}
+	if tokens > c.lastTokens {
+		c.lastTokens = tokens
+		return LivenessConverging, 0.95
+	}
+	return base, baseConf
+}
+
+// DetectorFor returns a new LivenessProbe for the given pane profile.
+// Co-located with Profiles (ADR-0047 single-source-with-projection): the
+// per-CLI strategy selection lives here, never in the reviewer.
+// Non-claude CLIs receive DefaultDetector, so DetectorFor(codexProfile) and
+// NewDefaultDetector(0) produce identical Assess results on the same frames.
+func DetectorFor(p PaneProfile) LivenessProbe {
+	if p.Name == "claude" {
+		return NewClaudeDetector(0)
+	}
+	return NewDefaultDetector(0)
+}

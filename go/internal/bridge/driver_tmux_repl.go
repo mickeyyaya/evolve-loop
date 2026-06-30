@@ -422,6 +422,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	if reviewer == nil {
 		reviewer = newDeterministicReviewer(defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends))
 	}
+	// Per-run liveness detector: co-located with paneProfileFor so the profile
+	// registry drives both the content-boundary extractor and the strategy
+	// selection (ADR-0047 single-source-with-projection). One instance per run;
+	// its PaneDelta cursor and stall counter persist across review checkpoints.
+	livenessDetector := detectorFor(lp)
 	// ADR-0044 C2: the fatal-pane registry consulted before each review
 	// checkpoint (fatalpane.go). Stage off ⇒ fatalPaneVerdict short-circuits
 	// before touching the detector; nil detector is unreachable on that path.
@@ -622,6 +627,15 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
 			progressed := PaneHasSubstantiveChange(intervalBaselinePane, curPane)
+			livenessState, _ := livenessDetector.Assess(curPane, paneProfile)
+			// Render-wedge override (cycle-291): a blank pane from a live session
+			// reads as Idle by the content-velocity detector (no affordance in blank
+			// frame). recoverBlankPane already confirmed the session is alive
+			// (renderWedged=true); treat as BusyButStagnant so the reviewer extends
+			// rather than pausing a working agent on a pane-rendering failure.
+			if renderWedged && livenessState == panestream.LivenessIdle {
+				livenessState = panestream.LivenessBusyButStagnant
+			}
 			lastEv = StopEvent{
 				Kind:       StopArtifactTimeout,
 				Phase:      cfg.Agent,
@@ -632,6 +646,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Progressed: progressed,
 				Busy:       panestream.PaneBusy(curPane, paneProfile) || renderWedged,
 				StdoutTail: lastLines(evidencePane, 40),
+				State:      livenessState,
 			}
 			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
 			// self-update, dead shell) preempts the reviewer in enforce —
