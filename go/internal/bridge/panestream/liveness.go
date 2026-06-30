@@ -97,14 +97,17 @@ func (d *DefaultDetector) Assess(rendered string, p PaneProfile) (LivenessState,
 	return LivenessBusyButStagnant, 0.6
 }
 
-// rxLivenessTokens extracts the peak ↓ response-token count from a rendered
-// pane. Handles both "↓ Nk tokens" (k-scaled) and "↓ N tokens" (plain integer)
-// so test frames and real capture frames match uniformly.
-var rxLivenessTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)(k?)\s+tokens`)
+// rxExtractTokens is the single regex for ↓ response-token counts. Handles
+// "↓ Nk tokens" (k-scaled) and "↓ N tokens" (plain integer) as the superset
+// contract — early-response sub-1k counts render without the k suffix.
+var rxExtractTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)(k?)\s+tokens`)
 
-func extractTokenCountLiveness(pane string) int {
+// ExtractTokenCount returns the peak ↓ response-token count visible in pane.
+// Accepts both "↓ Nk tokens" (k-scaled) and "↓ N tokens" (plain integer).
+// Returns 0 when no counter is present or all matches are malformed.
+func ExtractTokenCount(pane string) int {
 	peak := 0
-	for _, m := range rxLivenessTokens.FindAllStringSubmatch(pane, -1) {
+	for _, m := range rxExtractTokens.FindAllStringSubmatch(pane, -1) {
 		if len(m) < 3 {
 			continue
 		}
@@ -152,7 +155,7 @@ func NewClaudeDetector(stallThreshold int) *ClaudeDetector {
 // through to the base verdict unchanged.
 func (c *ClaudeDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
 	base, baseConf := c.base.Assess(rendered, p)
-	tokens := extractTokenCountLiveness(rendered)
+	tokens := ExtractTokenCount(rendered)
 	if !c.primed {
 		c.primed = true
 		c.lastTokens = tokens

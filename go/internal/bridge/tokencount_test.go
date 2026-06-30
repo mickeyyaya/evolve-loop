@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 // tokencount_test.go — RED contract for cycle-256 task `token-counter-extraction`.
 //
-// The bridge already compiles `rxTokens` (↓ N.Nk tokens) only to STRIP volatile
-// counter lines from cleanPane(). This task repurposes that same pattern to
-// EXTRACT the peak observed token count into a structured value, write a
-// `token-usage.json` sidecar after a tmux phase, and surface it on bridge.Report.
+// panestream.ExtractTokenCount (↓ N tokens or ↓ Nk tokens) is the unified
+// extractor that writes a token-usage.json sidecar after a tmux phase and
+// surfaces the peak on bridge.Report.
 //
 // These tests are behavioral: TestExtractTokenCount exercises the pure parser
 // across positive/fractional/multi/no-match/malformed inputs (the strongest
@@ -41,14 +42,14 @@ func TestExtractTokenCount(t *testing.T) {
 		{"no counter at all", "❯ ready\nTool: Read main.go\n", 0},
 		{"empty pane", "", 0},
 		{"malformed: no digits", "↓ k tokens", 0},
-		{"malformed: missing k suffix", "↓ 5200 tokens", 0},
+		{"plain integer (unified contract)", "↓ 5200 tokens", 5200},
 		{"malformed: missing tokens word", "↓ 5.2k", 0},
 		{"malformed: non-numeric", "↓ abck tokens", 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := extractTokenCount(c.pane); got != c.want {
-				t.Fatalf("extractTokenCount(%q) = %d, want %d", c.pane, got, c.want)
+			if got := panestream.ExtractTokenCount(c.pane); got != c.want {
+				t.Fatalf("panestream.ExtractTokenCount(%q) = %d, want %d", c.pane, got, c.want)
 			}
 		})
 	}
