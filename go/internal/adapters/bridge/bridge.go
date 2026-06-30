@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -85,6 +86,8 @@ type Adapter struct {
 	// bridgeConfig carries the timing overrides loaded from policy.json at
 	// construction time. Zero values mean "use bridge built-in defaults".
 	bridgeConfig policy.BridgePolicy
+	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
+	bootTimeoutStore *clihealth.Store
 }
 
 // New constructs an Adapter backed by the native-Go bridge.Engine. Tests
@@ -106,7 +109,25 @@ func NewDefault(projectRoot string) *Adapter {
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
 	}
+	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
+	a.engineFactory = func(env map[string]string) core.Bridge {
+		return gobridge.NewEngine(gobridge.Deps{
+			Env:                env,
+			BootTimeoutStore:   a.bootTimeoutStore,
+			BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
+			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
+			ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
+			ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
+		})
+	}
 	return a
+}
+
+// BootTimeoutStoreWired reports whether the Adapter has a non-nil boot-timeout
+// bench store. True for any Adapter built via NewDefault; false for bare New().
+// Used by acceptance tests to confirm production deps inject the strike writer.
+func (a *Adapter) BootTimeoutStoreWired() bool {
+	return a.bootTimeoutStore != nil
 }
 
 // SetOnStopReview wires a callback invoked for every stop-review verdict the
@@ -178,6 +199,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
 			ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
 			ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
+			BootTimeoutStore:   a.bootTimeoutStore,
 		}).Launch(ctx, inproc)
 	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)

@@ -232,12 +232,70 @@ func (d *OllamaDetector) Assess(rendered string, p PaneProfile) (LivenessState, 
 // per-CLI strategy selection lives here, never in the reviewer.
 // ollama routes to OllamaDetector; claude routes to ClaudeDetector;
 // all others receive DefaultDetector.
+// agyGeneratingSpinner is the exact spinner text that agy renders while the
+// model is generating a response. It disappears when the answer is complete.
+const agyGeneratingSpinner = "⣯ Generating..."
+
+// containsAgyGeneratingSignal returns true when the rendered pane contains
+// agy's generating spinner as a complete trimmed line. The spinner vanishes in
+// the answer frame, so its presence confirms the model is actively generating.
+func containsAgyGeneratingSignal(rendered string) bool {
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.TrimSpace(line) == agyGeneratingSpinner {
+			return true
+		}
+	}
+	return false
+}
+
+// AgyDetector composes over DefaultDetector, layering agy's "⣯ Generating..."
+// spinner affordance as a higher-confidence Converging signal. When the spinner
+// is present, the model is actively generating: returns (LivenessConverging, 0.92)
+// even when no new content lines appeared in the interval. When the spinner is
+// absent (answer frame), falls back to DefaultDetector byte-identical.
+// Non-agy CLIs receive DefaultDetector via DetectorFor.
+type AgyDetector struct {
+	base   *DefaultDetector
+	primed bool
+}
+
+// NewAgyDetector creates an AgyDetector. stallThreshold is forwarded to
+// the inner DefaultDetector; ≤0 uses defaultHungAfter.
+func NewAgyDetector(stallThreshold int) *AgyDetector {
+	return &AgyDetector{base: NewDefaultDetector(stallThreshold)}
+}
+
+// Assess evaluates one rendered pane snapshot. On the prime (first) call it
+// always returns the base DefaultDetector verdict (establishing baseline). On
+// subsequent calls, presence of "⣯ Generating..." as a complete line overrides
+// to (LivenessConverging, 0.92) — higher confidence than BusyButStagnant (0.6),
+// confirming the model is live without requiring a content-line delta. Absent
+// spinner falls through to the base DefaultDetector verdict unchanged.
+func (d *AgyDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
+	base, baseConf := d.base.Assess(rendered, p)
+	if !d.primed {
+		d.primed = true
+		return base, baseConf
+	}
+	if containsAgyGeneratingSignal(rendered) {
+		return LivenessConverging, 0.92
+	}
+	return base, baseConf
+}
+
+// DetectorFor returns a new LivenessProbe for the given pane profile.
+// Co-located with Profiles (ADR-0047 single-source-with-projection): the
+// per-CLI strategy selection lives here, never in the reviewer.
+// claude routes to ClaudeDetector; ollama routes to OllamaDetector;
+// agy routes to AgyDetector; all others receive DefaultDetector.
 func DetectorFor(p PaneProfile) LivenessProbe {
 	switch p.Name {
 	case "claude":
 		return NewClaudeDetector(0)
 	case "ollama":
 		return NewOllamaDetector(0)
+	case "agy":
+		return NewAgyDetector(0)
 	default:
 		return NewDefaultDetector(0)
 	}

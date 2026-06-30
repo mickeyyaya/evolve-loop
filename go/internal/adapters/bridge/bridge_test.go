@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -325,5 +326,22 @@ func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
 	if prefix1 != prefix2 {
 		t.Errorf("cacheable prefix not stable across runs (cache invalidation risk)\n  run1: %q\n  run2: %q",
 			truncate(prefix1, 100), truncate(prefix2, 100))
+	}
+}
+
+func TestLaunch_BootTimeoutStoreWired(t *testing.T) {
+	projectRoot := t.TempDir()
+	a := NewDefault(projectRoot)
+	if a.bootTimeoutStore == nil {
+		t.Error("expected bootTimeoutStore to be non-nil in Adapter constructed via NewDefault")
+	}
+
+	eng := a.engineFactory(nil)
+	concrete, ok := eng.(*gobridge.Engine)
+	if !ok {
+		t.Fatalf("expected engineFactory to return a *bridge.Engine, got %T", eng)
+	}
+	if concrete == nil {
+		t.Error("expected concrete engine to be non-nil")
 	}
 }
