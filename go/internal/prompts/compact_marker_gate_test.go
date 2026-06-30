@@ -1,7 +1,7 @@
 package prompts
 
-// compact_marker_gate_test.go — RED contract for cycle-415 tasks:
-//   tdd-prompt-reference-index-tail, triage-prompt-reference-index-tail, compact-marker-presence-gate.
+// compact_marker_gate_test.go — RED contract for cycle-415 tasks (tdd/triage marker) and
+// cycle-422 triage threshold raise (triage-prompt-reference-index-expansion).
 //
 // RED state (before builder):
 //   - evolve-tdd-engineer.md has no ## Reference Index heading → 0 bytes stripped (want ≥1500)
@@ -72,9 +72,10 @@ func TestTddEngineerCompaction_BuriedRuleNegative(t *testing.T) {
 }
 
 // TestTriageCompaction asserts that evolve-triage.md has a line-anchored ## Reference Index
-// heading enabling ≥1200 bytes of compaction, required output sections and gate-bearing
+// heading enabling ≥4200 bytes of compaction, required output sections and gate-bearing
 // rules survive above the heading, and versioned-historical subsections are relocated below it.
-// RED: heading absent → 0 bytes stripped (0 < 1200); versioned sections appear in stripped body.
+// Cycle-415 RED: heading absent → 0 bytes stripped (0 < 1200).
+// Cycle-422 RED: ~3209B currently stripped; 3209 < 4200 → FAIL (threshold raised).
 func TestTriageCompaction(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-triage.md"))
@@ -87,8 +88,8 @@ func TestTriageCompaction(t *testing.T) {
 	}
 	stripped := StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 1200 {
-		t.Errorf("triage compaction saved only %d bytes (want ≥1200); add ## Reference Index heading (body=%d stripped=%d)", saved, len(body), len(stripped))
+	if saved < 4200 {
+		t.Errorf("triage compaction saved only %d bytes (want ≥4200); relocate additional on-demand reference (step-3b detection example, verbose tables) below ## Reference Index in evolve-triage.md (body=%d stripped=%d)", saved, len(body), len(stripped))
 	}
 	// Required output sections and gate-bearing rules must survive strip (remain above marker).
 	// Pre-existing GREEN when stripped==body; regression guard fires if builder buries them.

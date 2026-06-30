@@ -106,26 +106,6 @@ When `workflow.psmas_enabled=true` in `.evolve/policy.json`, emit a `phase_skip[
 
 **Important:** The `phase_skip[]` field is only acted on when `workflow.psmas_enabled=true` in `.evolve/policy.json`. When the config is absent or false, emit the field (value `[]`) but the orchestrator ignores it entirely. Never recommend skipping `tdd-engineer` or `retrospective` unless the size is `trivial` or `small`+PASS respectively.
 
-### 3b. Predicate-graph reachability risk floor (cycle-91+)
-
-**MEDIUM minimum regardless of content domain**: any cycle whose touched files appear as grep targets in `acs/regression-suite/` predicates is rated MEDIUM risk minimum — even if the changes are documentation-only, config-only, or trivially small.
-
-The prior docs-domain=low-risk heuristic does NOT override this floor. Doc edits that touch files grepped by regression predicates have broken predicates in past cycles (cycle-91 incident: three regression predicates RED after a CLAUDE.md trim classified as LOW risk).
-
-**Detection rule:** run `grep -rl <basename> acs/regression-suite/` for each touched file. If any output is non-empty, apply the MEDIUM minimum floor.
-
-```bash
-# Example detection (run from repo root):
-for f in path/to/touched/file1 path/to/touched/file2; do
-  bn=$(basename "$f")
-  if grep -rl "$bn" acs/regression-suite/ | grep -q .; then
-    echo "$bn is predicate-graph-reachable — MEDIUM minimum applies"
-  fi
-done
-```
-
-This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of audit attention — cycle size estimate remains accurate for scope; risk rating is independently floored.
-
 ### 4. Write the decision
 
 **Write `triage-report.md` to the exact path `$ARTIFACT_PATH`** — this canonical path is substituted in for you; write there directly. Write the companion `triage-decision.json` and `triage-reflection.yaml` in the **same directory** as `$ARTIFACT_PATH`. Do NOT create a `workspace/` subdirectory or write the artifacts anywhere else — the orchestrator only detects them at the canonical path.
@@ -256,3 +236,23 @@ Honor `weight` as tie-breaker within priority class (default 0.5 when null). Ful
 ## Reflection Authoring (v10.20.0+)
 
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-report.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+
+### 3b. Predicate-graph reachability risk floor (cycle-91+)
+
+**MEDIUM minimum regardless of content domain**: any cycle whose touched files appear as grep targets in `acs/regression-suite/` predicates is rated MEDIUM risk minimum — even if the changes are documentation-only, config-only, or trivially small.
+
+The prior docs-domain=low-risk heuristic does NOT override this floor. Doc edits that touch files grepped by regression predicates have broken predicates in past cycles (cycle-91 incident: three regression predicates RED after a CLAUDE.md trim classified as LOW risk).
+
+**Detection rule:** run `grep -rl <basename> acs/regression-suite/` for each touched file. If any output is non-empty, apply the MEDIUM minimum floor.
+
+```bash
+# Example detection (run from repo root):
+for f in path/to/touched/file1 path/to/touched/file2; do
+  bn=$(basename "$f")
+  if grep -rl "$bn" acs/regression-suite/ | grep -q .; then
+    echo "$bn is predicate-graph-reachable — MEDIUM minimum applies"
+  fi
+done
+```
+
+This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of audit attention — cycle size estimate remains accurate for scope; risk rating is independently floored.

@@ -45,14 +45,14 @@ func TestIntentStrippedBodyFloor(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_ReflectionAuthoringAboveMarker asserts that the Reflection Authoring
-// operational rule is present in the stripped evolve-intent.md body — confirming it sits ABOVE
-// the ## Reference Index marker.
+// TestIntentCompaction_ReflectionAuthoringNotDeleted asserts that the Reflection Authoring
+// section still exists in the raw evolve-intent.md body (relocated, not deleted).
 //
-// Eval gap: the regression graders require "## Reflection Authoring" above the marker, but the
-// 5-anchor list in TestIntentCompaction_OperationalAnchorsAboveMarker does NOT include it.
-// The build-report explicitly states it was moved above the marker in the cycle-416 edit.
-func TestIntentCompaction_ReflectionAuthoringAboveMarker(t *testing.T) {
+// Cycle-416 placed ## Reflection Authoring (v10.20.0+) above the marker.
+// Cycle-422 intentionally moves it BELOW the marker as on-demand reference — so checking
+// for it in the stripped body would fail correctly. This test guards the complementary
+// invariant: the section must still exist in the full document (relocated, not removed).
+func TestIntentCompaction_ReflectionAuthoringNotDeleted(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
 	if err != nil {
@@ -62,9 +62,8 @@ func TestIntentCompaction_ReflectionAuthoringAboveMarker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse frontmatter: %v", err)
 	}
-	stripped := StripOnDemandSections(body)
-	if !strings.Contains(stripped, "Reflection Authoring") {
-		t.Error("required anchor 'Reflection Authoring' lost below ## Reference Index — must remain above marker in evolve-intent.md (eval spec regression grader)")
+	if !strings.Contains(body, "Reflection Authoring") {
+		t.Error("'Reflection Authoring' section was deleted from evolve-intent.md — it must be RELOCATED below ## Reference Index, not removed; operators need it for reference")
 	}
 }
 
