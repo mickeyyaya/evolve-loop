@@ -238,3 +238,44 @@ func TestDetectorFor_ClaudeIsClaudeDetector(t *testing.T) {
 		t.Errorf("claude DetectorFor: conf %v must be > default %v on increasing tokens", detConf, baseConf)
 	}
 }
+
+// TestExtractResponseTokens pins the exported ExtractResponseTokens contract:
+// the single-source token extractor (S1, cycle-429). Named so apicover -enforce
+// can locate the exported symbol. Table covers k-form, plain-integer (superset
+// behavior vs. old stopreview k-only extractor), peak-across-matches, malformed
+// inputs, and empty — the adversarial negative (malformed→0) prevents a no-op
+// that returns a constant from passing the k-form cases.
+func TestExtractResponseTokens(t *testing.T) {
+	cases := []struct {
+		name string
+		pane string
+		want int
+	}{
+		// k-form — the real claude production rendering
+		{"k-form integer", "↓ 12k tokens", 12000},
+		{"k-form fractional", "↓ 5.2k tokens", 5200},
+		{"k-form half", "↓ 3.5k tokens", 3500},
+		// plain-integer — synthetic test frames; superset of the old k-only extractor
+		{"plain-integer 50", "↓ 50 tokens", 50},
+		{"plain-integer 200", "↓ 200 tokens", 200},
+		// peak-across-matches
+		{"multiple → peak", "↓ 1k tokens\n↓ 5k tokens\n↓ 3k tokens\n", 5000},
+		{"peak-is-last", "↓ 2k tokens\n↓ 9.9k tokens\n", 9900},
+		// chrome-embedded
+		{"in chrome line", "✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n", 50},
+		// adversarial negative — malformed must return 0 (no-op can't pass k-form)
+		{"empty pane", "", 0},
+		{"no counter", "❯ ready\n", 0},
+		{"malformed: no digits", "↓ k tokens", 0},
+		{"malformed: missing tokens word", "↓ 5.2k", 0},
+		{"malformed: non-numeric", "↓ abck tokens", 0},
+		{"malformed: no arrow", "5.2k tokens", 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := ExtractResponseTokens(c.pane); got != c.want {
+				t.Fatalf("ExtractResponseTokens(%q) = %d, want %d", c.pane, got, c.want)
+			}
+		})
+	}
+}

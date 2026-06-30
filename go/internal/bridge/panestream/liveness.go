@@ -97,14 +97,18 @@ func (d *DefaultDetector) Assess(rendered string, p PaneProfile) (LivenessState,
 	return LivenessBusyButStagnant, 0.6
 }
 
-// rxLivenessTokens extracts the peak ↓ response-token count from a rendered
+// rxResponseTokens extracts the peak ↓ response-token count from a rendered
 // pane. Handles both "↓ Nk tokens" (k-scaled) and "↓ N tokens" (plain integer)
 // so test frames and real capture frames match uniformly.
-var rxLivenessTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)(k?)\s+tokens`)
+var rxResponseTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)(k?)\s+tokens`)
 
-func extractTokenCountLiveness(pane string) int {
+// ExtractResponseTokens returns the peak ↓ response-token count from a rendered
+// pane. It is the single-source token extractor for the signal-center campaign
+// (S1, ADR-0047): both ClaudeDetector and the stopreview callsite use this
+// instead of maintaining separate per-package extractors.
+func ExtractResponseTokens(pane string) int {
 	peak := 0
-	for _, m := range rxLivenessTokens.FindAllStringSubmatch(pane, -1) {
+	for _, m := range rxResponseTokens.FindAllStringSubmatch(pane, -1) {
 		if len(m) < 3 {
 			continue
 		}
@@ -152,7 +156,7 @@ func NewClaudeDetector(stallThreshold int) *ClaudeDetector {
 // through to the base verdict unchanged.
 func (c *ClaudeDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
 	base, baseConf := c.base.Assess(rendered, p)
-	tokens := extractTokenCountLiveness(rendered)
+	tokens := ExtractResponseTokens(rendered)
 	if !c.primed {
 		c.primed = true
 		c.lastTokens = tokens

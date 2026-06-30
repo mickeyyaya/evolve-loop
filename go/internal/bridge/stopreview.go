@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -182,28 +181,6 @@ func envInt(deps Deps, key string, def int) int {
 		return def
 	}
 	return n
-}
-
-// rxTokens parses a ↓ response-token count for extractTokenCount (a VALUE
-// extractor, distinct from panestream.ClassifyLine's chrome classification).
-var rxTokens = regexp.MustCompile(`↓\s*([0-9]+(?:\.[0-9]+)?)k\s+tokens`)
-
-func extractTokenCount(pane string) int {
-	peak := 0
-	for _, match := range rxTokens.FindAllStringSubmatch(pane, -1) {
-		if len(match) < 2 {
-			continue
-		}
-		v, err := strconv.ParseFloat(match[1], 64)
-		if err != nil {
-			continue
-		}
-		tokens := int(v*1000 + 0.5)
-		if tokens > peak {
-			peak = tokens
-		}
-	}
-	return peak
 }
 
 // PaneHasSubstantiveChange split each pane string by newline, discard lines that

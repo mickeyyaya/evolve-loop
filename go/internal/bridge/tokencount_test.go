@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 // tokencount_test.go — RED contract for cycle-256 task `token-counter-extraction`.
@@ -41,14 +43,18 @@ func TestExtractTokenCount(t *testing.T) {
 		{"no counter at all", "❯ ready\nTool: Read main.go\n", 0},
 		{"empty pane", "", 0},
 		{"malformed: no digits", "↓ k tokens", 0},
-		{"malformed: missing k suffix", "↓ 5200 tokens", 0},
+		// Reconciled (cycle-429 S1): the old k-only extractor returned 0 here; the
+		// unified ExtractResponseTokens superset correctly yields 5200 (plain-integer
+		// path). Production panes always render the k-form; this form only appears in
+		// synthetic test frames where 5200 is the correct value.
+		{"unified extractor: plain-integer → 5200", "↓ 5200 tokens", 5200},
 		{"malformed: missing tokens word", "↓ 5.2k", 0},
 		{"malformed: non-numeric", "↓ abck tokens", 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := extractTokenCount(c.pane); got != c.want {
-				t.Fatalf("extractTokenCount(%q) = %d, want %d", c.pane, got, c.want)
+			if got := panestream.ExtractResponseTokens(c.pane); got != c.want {
+				t.Fatalf("panestream.ExtractResponseTokens(%q) = %d, want %d", c.pane, got, c.want)
 			}
 		})
 	}

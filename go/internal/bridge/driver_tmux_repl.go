@@ -472,7 +472,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	detectErrLogged := false
 	peakTokens := 0
 	recordTokens := func(pane string) {
-		if n := extractTokenCount(pane); n > peakTokens {
+		if n := panestream.ExtractResponseTokens(pane); n > peakTokens {
 			peakTokens = n
 		}
 	}
