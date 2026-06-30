@@ -332,8 +332,13 @@ func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
 func TestLaunch_BootTimeoutStoreWired(t *testing.T) {
 	projectRoot := t.TempDir()
 	a := NewDefault(projectRoot)
-	if a.bootTimeoutStore == nil {
-		t.Error("expected bootTimeoutStore to be non-nil in Adapter constructed via NewDefault")
+	if !a.BootTimeoutStoreWired() {
+		t.Error("expected BootTimeoutStoreWired() true for an Adapter built via NewDefault (production deps inject the boot-timeout strike writer)")
+	}
+	// A bare New() Adapter has no strike writer injected — pins the accessor's
+	// documented contract (true for NewDefault, false for New).
+	if New().BootTimeoutStoreWired() {
+		t.Error("expected BootTimeoutStoreWired() false for a bare New() Adapter")
 	}
 
 	eng := a.engineFactory(nil)
