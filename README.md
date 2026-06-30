@@ -310,7 +310,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v21.4)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v21.5)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
@@ -320,6 +320,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v21.2 | Jun 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v21.3 | Jun 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v21.4 | Jun 29 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v21.5 | Jun 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
