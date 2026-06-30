@@ -333,6 +333,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
 	cfg.PhaseRecovery = parseGateStage(recoveryCfg.PhaseRecovery)
 	cfg.RouterReplan = parseRouterStage(routerCfg.RouterReplan)
+	peCfg := pol.ParallelEvaluateConfig()
+	cfg.ParallelEvaluate = parseRouterStage(peCfg.Stage)
+	cfg.ParallelEvaluateConcurrency = peCfg.Concurrency
 	cfg.RoutingJudge = routerCfg.RoutingJudge
 	cfg.ReconDigest = routerCfg.ReconDigest
 	cfg.RePlanMaxDepth = routerCfg.ReplanDepth

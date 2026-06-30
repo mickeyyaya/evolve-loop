@@ -244,7 +244,8 @@ type RolloutStages struct {
 	//                   outcomes (weakest-link verdict). The enforce flip activates
 	//                   only after a shadow soak (the ~11% projected fleet saving).
 	// Concurrency is ParallelEvaluateConcurrency (RoutingConfig). Composition-root
-	// view, loaded from policy.ParallelEvaluateConfig.
+	// view: cmd_cycle.go calls policy.ParallelEvaluateConfig() and writes both
+	// ParallelEvaluate and ParallelEvaluateConcurrency before the runners are built.
 	ParallelEvaluate Stage
 	// ScoutDecompose is the scout map-reduce dial (off->shadow->enforce, default off):
 	// enforce runs N scout-scan workers over codebase slices concurrently and the

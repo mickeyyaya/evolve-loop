@@ -127,6 +127,10 @@ type Policy struct {
 	// (stage="shadow" — byte-neutral; the gate records its would-be verdict
 	// but promotes nothing).
 	MergeGate *MergeGatePolicy `json:"merge_gate,omitempty"`
+	// ParallelEvaluate configures post-build evaluate-phase parallelization.
+	// Absent ⇒ built-in defaults apply (stage="off" — dispatcher dormant,
+	// byte-identical to pre-T1 baseline; concurrency=3, the soak sweet spot).
+	ParallelEvaluate *ParallelEvaluatePolicy `json:"parallel_evaluate,omitempty"`
 	// Classify configures the cycle-failure classifier. Absent ⇒ built-in
 	// defaults apply (HangClassifier=false — the exit-transport-hang
 	// reclassifier is opt-in).
@@ -1015,6 +1019,53 @@ func (p Policy) MergeGateConfig() MergeGateConfig {
 	}
 	if p.MergeGate.CarryoverStallCycles > 0 {
 		c.CarryoverStallCycles = p.MergeGate.CarryoverStallCycles
+	}
+	return c
+}
+
+// ParallelEvaluatePolicy is the .evolve/policy.json "parallel_evaluate" block —
+// the config-as-code surface for post-build evaluate-phase parallelization (no
+// flags). Stage drives the off→shadow→enforce rollout; Concurrency bounds the
+// parallel runner pool. See [[phase_settings_from_config_not_code]].
+type ParallelEvaluatePolicy struct {
+	// Stage selects the rollout stage: "off" / "shadow" / "enforce".
+	// Empty/absent ⇒ "off" (dispatcher dormant; byte-identical baseline).
+	// Any unknown value (e.g. a typo) maps to "off" — a fail-safe so a
+	// misspelling can never silently arm the parallel dispatcher.
+	Stage string `json:"stage,omitempty"`
+	// Concurrency bounds the parallel runner pool when Stage="enforce".
+	// Zero/negative/absent ⇒ 3 (the soak sweet spot: ~11% saving, diminishing
+	// past it). Applies only; use cases where an explicit cap is needed.
+	Concurrency int `json:"concurrency,omitempty"`
+}
+
+// ParallelEvaluateConfig is the resolved parallel-evaluate configuration with
+// defaults applied.
+type ParallelEvaluateConfig struct {
+	Stage       string
+	Concurrency int
+}
+
+// ParallelEvaluateConfig returns parallel-evaluate configuration with built-in
+// defaults resolved. The zero-value Policy{} yields safe defaults (stage="off",
+// concurrency=3). Stage overrides apply only for the closed vocabulary
+// {"off","shadow","advisory","enforce"}; any other value falls back to "off"
+// (fail-safe). Concurrency overrides apply only when > 0. Pure.
+func (p Policy) ParallelEvaluateConfig() ParallelEvaluateConfig {
+	c := ParallelEvaluateConfig{Stage: "off", Concurrency: 3}
+	if p.ParallelEvaluate == nil {
+		return c
+	}
+	if s := p.ParallelEvaluate.Stage; s != "" {
+		switch s {
+		case "off", "shadow", "advisory", "enforce":
+			c.Stage = s
+		default:
+			c.Stage = "off"
+		}
+	}
+	if p.ParallelEvaluate.Concurrency > 0 {
+		c.Concurrency = p.ParallelEvaluate.Concurrency
 	}
 	return c
 }
