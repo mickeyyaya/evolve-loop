@@ -34,13 +34,17 @@ type Config struct {
 	// Model is the LLM model passed to the bridge for the retrospective run.
 	// Empty string defaults to "auto".
 	Model string
+	// CompactPrompts strips the on-demand reference tail (below ## Reference Index)
+	// from the agent body before dispatching, mirroring BaseRunner compaction.
+	CompactPrompts bool
 }
 
 type Phase struct {
-	bridge  core.Bridge
-	prompts *prompts.Loader
-	nowFn   func() time.Time
-	model   string
+	bridge         core.Bridge
+	prompts        *prompts.Loader
+	nowFn          func() time.Time
+	model          string
+	compactPrompts bool
 }
 
 func New(c Config) *Phase {
@@ -52,7 +56,7 @@ func New(c Config) *Phase {
 	if model == "" {
 		model = "auto"
 	}
-	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model}
+	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model, compactPrompts: c.CompactPrompts}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -82,7 +86,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		return core.PhaseResponse{}, fmt.Errorf("retro: load agent: %w", err)
 	}
 
-	prompt := composePrompt(agent.Body, req, prev)
+	body := agent.Body
+	if p.compactPrompts {
+		body = prompts.StripOnDemandSections(body)
+	}
+	prompt := composePrompt(body, req, prev)
 	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
 	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
 

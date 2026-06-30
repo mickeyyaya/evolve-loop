@@ -53,35 +53,6 @@ See [agent-templates.md](agent-templates.md) for shared context schema (cycle, w
 
 Read in order: `audit-report.md` → `build-report.md` → `scout-report.md` → `failedDiffPath` if present. Skim `priorLessons` for systemic patterns.
 
-### 1.5 Read abnormal-events.jsonl (v46+)
-
-```bash
-test -f "$WORKSPACE/abnormal-events.jsonl" && cat "$WORKSPACE/abnormal-events.jsonl"
-```
-If `abnormal-events.jsonl` exists and is non-empty: **for each unique `event_type`, emit one additional lesson** in addition to any lessons derived from audit defects. Schema:
-
-Map `event_type` → lesson `errorCategory`:
-- `dispatch-error` → `tool-use`
-- `stall-detected` → `tool-use`
-- `ship-refused` → `integration`
-- `persistence-fail` → `context`
-- (any other) → `integration`
-
-### 1.7 Read reflector synthesis (v10.20.0+)
-
-```bash
-test -f "$WORKSPACE/learn/reflector-synthesis.md" && cat "$WORKSPACE/learn/reflector-synthesis.md"
-```
-
-The Learn-phase reflector runs before you and aggregates per-phase reflections + cross-cycle patterns. Read the full synthesis. Two sections matter most:
-
-- **"This-Cycle Per-Phase Reflections"** — each phase's self-reported friction; weight HIGH-confidence (≥0.5) entries into your root-cause analysis. A phase that called out `category: research-quota` with `evidence: <log:line>` is providing first-person testimony you should cite, not duplicate.
-- **"Top Pipeline-Level Patterns"** — categories with ≥3/5 cycles affected are SYSTEMIC candidates. If your audit's root cause matches a pattern here, flag `systemic: true` in the resulting lesson YAML's `pattern` field — this is the bridge between per-cycle retrospection and durable instinct extraction.
-
-Do NOT re-aggregate the reflections (the reflector already did that). Do NOT modify any `<phase>-reflection.yaml` (immutable inputs). Reference the synthesis path in your retrospective-report.md's "Research" section so future-self can trace the citation.
-
-**ExpeL lesson-extract persona note (micro-phase-catalog §3):** When ≥5 consecutive retrospectives share the same `errorCategory` and `failedStep`, perform a corpus-level lesson-extract pass: mine across all matching `.evolve/instincts/lessons/*.yaml`, identify the recurring root pattern, and emit a synthesized instinct with `confidence: 0.9` and `systemic: true`. The instinct/KB system is the storage layer; this pass runs inside the retrospective phase (not a separate phase) when the pattern threshold is crossed.
-
 ### 2. Extract the failure narrative
 
 Identify per-defect:
@@ -208,3 +179,32 @@ Output path: `.evolve/runs/cycle-N/lessons-digest.md`. Write a compressed (≤ 5
 | Digest format template for `lessons-digest.md` | [evolve-retrospective-reference.md § digest-format-template](evolve-retrospective-reference.md#section-digest-format-template) |
 | `handoff-retrospective.json` schema field reference | [evolve-retrospective-reference.md § handoff-schema](evolve-retrospective-reference.md#section-handoff-schema) |
 | Diagnosing a recurring phase-agent failure or persistent WARN/FAIL | [agents/evolve-diagnose-reference.md](agents/evolve-diagnose-reference.md) |
+
+### 1.5 Read abnormal-events.jsonl (v46+)
+
+```bash
+test -f "$WORKSPACE/abnormal-events.jsonl" && cat "$WORKSPACE/abnormal-events.jsonl"
+```
+If `abnormal-events.jsonl` exists and is non-empty: **for each unique `event_type`, emit one additional lesson** in addition to any lessons derived from audit defects. Schema:
+
+Map `event_type` → lesson `errorCategory`:
+- `dispatch-error` → `tool-use`
+- `stall-detected` → `tool-use`
+- `ship-refused` → `integration`
+- `persistence-fail` → `context`
+- (any other) → `integration`
+
+### 1.7 Read reflector synthesis (v10.20.0+)
+
+```bash
+test -f "$WORKSPACE/learn/reflector-synthesis.md" && cat "$WORKSPACE/learn/reflector-synthesis.md"
+```
+
+The Learn-phase reflector runs before you and aggregates per-phase reflections + cross-cycle patterns. Read the full synthesis. Two sections matter most:
+
+- **"This-Cycle Per-Phase Reflections"** — each phase's self-reported friction; weight HIGH-confidence (≥0.5) entries into your root-cause analysis. A phase that called out `category: research-quota` with `evidence: <log:line>` is providing first-person testimony you should cite, not duplicate.
+- **"Top Pipeline-Level Patterns"** — categories with ≥3/5 cycles affected are SYSTEMIC candidates. If your audit's root cause matches a pattern here, flag `systemic: true` in the resulting lesson YAML's `pattern` field — this is the bridge between per-cycle retrospection and durable instinct extraction.
+
+Do NOT re-aggregate the reflections (the reflector already did that). Do NOT modify any `<phase>-reflection.yaml` (immutable inputs). Reference the synthesis path in your retrospective-report.md's "Research" section so future-self can trace the citation.
+
+**ExpeL lesson-extract persona note (micro-phase-catalog §3):** When ≥5 consecutive retrospectives share the same `errorCategory` and `failedStep`, perform a corpus-level lesson-extract pass: mine across all matching `.evolve/instincts/lessons/*.yaml`, identify the recurring root pattern, and emit a synthesized instinct with `confidence: 0.9` and `systemic: true`. The instinct/KB system is the storage layer; this pass runs inside the retrospective phase (not a separate phase) when the pattern threshold is crossed.
