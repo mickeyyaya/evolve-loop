@@ -508,12 +508,7 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 		writeCard(b, c)
 	}
 	if len(overflow) > 0 {
-		names := make([]string, 0, len(overflow))
-		for _, c := range overflow {
-			names = append(names, c.Name)
-		}
-		fmt.Fprintf(b, "- also available (same SELECT rules; details in .evolve/phase-inventory.json): %s\n",
-			strings.Join(names, ", "))
+		b.WriteString("- All remaining selectable phases are in the \"## Phase Catalog — Core Values\" table (this prompt) and .evolve/phase-inventory.json (same SELECT rules; type/domain details there).\n")
 	}
 }
 
