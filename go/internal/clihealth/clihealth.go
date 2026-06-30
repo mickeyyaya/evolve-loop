@@ -44,14 +44,28 @@ const (
 	MaxCooldown     = 4 * time.Hour
 )
 
+// BootTimeoutPattern is the classifier pattern name for a driver-scoped REPL
+// boot failure (ExitREPLBootTimeout, exit 80). Used as the Reason field in
+// boot-timeout bench entries so the pattern vocabulary stays in a single home.
+const BootTimeoutPattern = "repl_boot_timeout"
+
+// DefaultBootBenchThreshold is how many consecutive RecordBootStrike calls for
+// the same driver (exit-80 events) promote it to an active bench. Below
+// threshold the strikes are tracked but the driver remains retryable.
+const DefaultBootBenchThreshold = 2
+
+// IsBootTimeoutExitCode reports whether exitCode is the REPL boot-timeout class
+// (exit 80 = ExitREPLBootTimeout in bridge/exitcodes.go). Kept as an integer
+// literal to avoid an import cycle (bridge imports clihealth, not vice versa).
+func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == 80 }
+
 // Benchable reports whether an escalation pattern name marks a classified
-// transient outage worth benching the whole CLI family for. Deliberately a
-// tiny closed set (single home — runner bench-writer and loop canary both
-// consult it): re-dispatching a walled family is guaranteed waste, while most
-// escalations (trust prompts, auth rechecks) are situational. auth_recheck is
-// the documented next candidate (operator call).
+// transient outage worth benching for. Deliberately a tiny closed set (single
+// home — runner bench-writer and loop canary both consult it): re-dispatching a
+// walled resource is guaranteed waste, while most escalations (trust prompts,
+// auth rechecks) are situational. auth_recheck is the documented next candidate.
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit"
+	return pattern == "rate_limit" || pattern == BootTimeoutPattern
 }
 
 // CooldownForStrikes returns DefaultCooldown doubled per re-bench beyond the
@@ -186,6 +200,40 @@ func (s *Store) Clear(family string) error {
 		delete(benches, family)
 		return s.write(benches)
 	})
+}
+
+// RecordBootStrike atomically records one boot-timeout strike for the named
+// driver (keyed by driver name, not CLI family — a tmux-REPL boot failure is
+// driver-specific, not family-wide). Returns benched=true when consecutive
+// strikes reach DefaultBootBenchThreshold; below the threshold the driver's
+// strike count is persisted but it remains retryable (BenchedUntil is not in
+// the future, so Active() excludes it). Single-strike transient retries are
+// preserved. Reason is always BootTimeoutPattern (single home).
+func (s *Store) RecordBootStrike(driver string) (benched bool, err error) {
+	err = s.withLock(func() error {
+		benches, _ := s.Load()
+		prev := benches[driver]
+		strikes := prev.Strikes + 1
+		now := s.now()
+		var until time.Time
+		if strikes >= DefaultBootBenchThreshold {
+			until = now.Add(CooldownForStrikes(strikes))
+			benched = true
+		} else {
+			// Below threshold: record the strike count but expire immediately so
+			// Active() excludes this entry (the driver stays retryable).
+			until = now
+		}
+		benches[driver] = Entry{
+			Family:       driver,
+			Reason:       BootTimeoutPattern,
+			BenchedAt:    now,
+			BenchedUntil: until,
+			Strikes:      strikes,
+		}
+		return s.write(benches)
+	})
+	return benched, err
 }
 
 // withLock serializes a read-modify-write on the bench file. The "<file>.lock"

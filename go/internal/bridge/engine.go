@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -110,6 +111,11 @@ type Deps struct {
 	//
 	// Default reads cfg.SandboxMode from deps.Env + nested-claude / Probe.
 	SandboxWrap SandboxWrapper
+	// BootTimeoutStore records driver-scoped boot-timeout bench strikes. When set,
+	// consecutive ExitREPLBootTimeout (exit 80) exits for the same driver are
+	// counted; reaching clihealth.DefaultBootBenchThreshold promotes the driver to
+	// an active bench so llmroute.ApplyDriverBench can demote it. Nil disables.
+	BootTimeoutStore *clihealth.Store
 	// OnStopReview is called when a stop-review decision is made.
 	// Nil-safe: drivers must check if it is non-nil before invoking.
 	OnStopReview func(phase, action, reason string)
@@ -446,6 +452,11 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrArtifactTimeout)
 	}
 	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard {
+		if code == ExitREPLBootTimeout && e.deps.BootTimeoutStore != nil {
+			if _, err := e.deps.BootTimeoutStore.RecordBootStrike(req.CLI); err != nil {
+				_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-timeout bench record failed for %s: %v\n", req.CLI, err)
+			}
+		}
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
 	return resp, errors.New(msg)

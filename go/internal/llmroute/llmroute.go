@@ -278,6 +278,38 @@ func Family(cli string) string {
 	return cli
 }
 
+// ApplyDriverBench demotes candidates whose specific driver is bench-flagged
+// (driver-scoped boot-timeout bench: "codex-tmux" benched ≠ "codex" benched).
+// benchedDrivers maps driver name → BenchedAt from clihealth.Active(). Bench
+// is advice, never a veto: when ALL candidates are driver-benched, the chain is
+// ordered least-recently-benched first (same policy as ApplyBench). Keyed on
+// the full driver name, never on Family(cli), so headless/tmux variants are
+// independent. Copy-struct convention carries non-Candidates fields.
+func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
+	if len(p.Candidates) <= 1 || len(benchedDrivers) == 0 {
+		return p
+	}
+	var healthy, demoted []string
+	for _, cli := range p.Candidates {
+		if _, hit := benchedDrivers[cli]; hit {
+			demoted = append(demoted, cli)
+		} else {
+			healthy = append(healthy, cli)
+		}
+	}
+	out := p
+	if len(healthy) == 0 {
+		all := append([]string(nil), p.Candidates...)
+		sort.SliceStable(all, func(i, j int) bool {
+			return benchedDrivers[all[i]].Before(benchedDrivers[all[j]])
+		})
+		out.Candidates = all
+		return out
+	}
+	out.Candidates = append(healthy, demoted...)
+	return out
+}
+
 // ApplyBench demotes candidates whose family is benched (cycle-283: a walled
 // codex re-burned its 5-15min boot on every dispatch) to the chain end,
 // mirroring Probe's demote-not-drop reorder. benched maps family → BenchedAt.

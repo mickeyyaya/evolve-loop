@@ -3,6 +3,7 @@ package panestream
 import (
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // liveness.go — Strategy-based liveness detection over a sequence of rendered
@@ -164,14 +165,80 @@ func (c *ClaudeDetector) Assess(rendered string, p PaneProfile) (LivenessState, 
 	return base, baseConf
 }
 
+// ollamaThinkingHeader is the exact line text that ollama renders while its
+// chain-of-thought model is streaming. ollamaThinkingDone is the terminator
+// line that appears when the thinking phase is complete. The signal is active
+// only while the header is present AND the done-marker is absent.
+const (
+	ollamaThinkingHeader = "Thinking..."
+	ollamaThinkingDone   = "...done thinking."
+)
+
+// containsOllamaThinkingSignal returns true when the rendered pane contains
+// the ollama thinking header as a complete trimmed line AND does NOT yet
+// contain the thinking-done terminator. The pane accumulates cumulatively —
+// after the thinking phase completes, "Thinking..." stays visible but
+// "...done thinking." appears, ending the active-generation signal.
+func containsOllamaThinkingSignal(rendered string) bool {
+	if strings.Contains(rendered, ollamaThinkingDone) {
+		return false
+	}
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.TrimSpace(line) == ollamaThinkingHeader {
+			return true
+		}
+	}
+	return false
+}
+
+// OllamaDetector composes over DefaultDetector, layering ollama's "Thinking..."
+// header as a higher-confidence Converging signal. When the header is present as
+// a complete line, the model is streaming its chain-of-thought: the detector
+// returns (LivenessConverging, 0.92) even when no new stable content lines
+// appeared in the interval (a frame DefaultDetector would classify as
+// BusyButStagnant). When the header is absent, falls back to DefaultDetector
+// byte-identical. Non-ollama CLIs receive DefaultDetector via DetectorFor.
+type OllamaDetector struct {
+	base   *DefaultDetector
+	primed bool
+}
+
+// NewOllamaDetector creates an OllamaDetector. stallThreshold is forwarded to
+// the inner DefaultDetector; ≤0 uses defaultHungAfter.
+func NewOllamaDetector(stallThreshold int) *OllamaDetector {
+	return &OllamaDetector{base: NewDefaultDetector(stallThreshold)}
+}
+
+// Assess evaluates one rendered pane snapshot. On the prime (first) call it
+// always returns the base DefaultDetector verdict (establishing baseline). On
+// subsequent calls, presence of the "Thinking..." header as a complete line
+// overrides to (LivenessConverging, 0.92) — higher confidence than DefaultDetector's
+// BusyButStagnant (0.6) or Hung (0.8), confirming the model is live without
+// requiring a content-line delta. Absent/partial header falls through to base.
+func (d *OllamaDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
+	base, baseConf := d.base.Assess(rendered, p)
+	if !d.primed {
+		d.primed = true
+		return base, baseConf
+	}
+	if containsOllamaThinkingSignal(rendered) {
+		return LivenessConverging, 0.92
+	}
+	return base, baseConf
+}
+
 // DetectorFor returns a new LivenessProbe for the given pane profile.
 // Co-located with Profiles (ADR-0047 single-source-with-projection): the
 // per-CLI strategy selection lives here, never in the reviewer.
-// Non-claude CLIs receive DefaultDetector, so DetectorFor(codexProfile) and
-// NewDefaultDetector(0) produce identical Assess results on the same frames.
+// ollama routes to OllamaDetector; claude routes to ClaudeDetector;
+// all others receive DefaultDetector.
 func DetectorFor(p PaneProfile) LivenessProbe {
-	if p.Name == "claude" {
+	switch p.Name {
+	case "claude":
 		return NewClaudeDetector(0)
+	case "ollama":
+		return NewOllamaDetector(0)
+	default:
+		return NewDefaultDetector(0)
 	}
-	return NewDefaultDetector(0)
 }
