@@ -291,8 +291,9 @@ type RoutingConfig struct {
 	Stage Stage
 	Mode  Mode
 	// ModelRouting is the cycle-436 model-authority axis (static|advisory|
-	// auto). Zero value ModelRoutingStatic — byte-identical default for every
-	// operator who never sets model_routing/EVOLVE_MODEL_ROUTING.
+	// auto), config-driven via .evolve/policy.json `model_routing`. Zero value
+	// ModelRoutingStatic — byte-identical default for every operator who never
+	// sets model_routing.
 	ModelRouting ModelRouting
 	// RolloutStages embeds CommitEvidence / ReviewGate / SandboxMode — the
 	// three subsystem-migration dials, promoted so existing field access is
@@ -594,9 +595,9 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_ROUTING_MODE"]; v != "" {
 		cfg.Mode = parseMode(v, ws)
 	}
-	if v := env["EVOLVE_MODEL_ROUTING"]; v != "" {
-		cfg.ModelRouting = parseModelRouting(v, "EVOLVE_MODEL_ROUTING", ws)
-	}
+	// model_routing is CONFIG-DRIVEN via .evolve/policy.json only — no env dial.
+	// The flag-ceiling ratchet forbids adding operator env flags; the axis lives
+	// in policy.json (parsed above via the registry model_routing key).
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
