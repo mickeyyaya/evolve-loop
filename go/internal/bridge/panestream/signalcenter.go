@@ -212,6 +212,20 @@ func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool {
 	return PaneBusy(rendered, profile)
 }
 
+// ExhaustedOf reports whether rendered shows profile's quota/rate-limit wall,
+// with NO session key and NO Observe (the exhaustion twin of BusyOf). The
+// driver's ~2s fast poll calls it to fast-fail a walled CLI immediately, rather
+// than waiting for the next 300s stop-review checkpoint's Observe to reach
+// LivenessExhausted (the production gap the checkpoint-only path left — a
+// 5-minute hang per walled phase). It shares matchExhaustedPattern with the
+// ExhaustionProbe, so the fast-poll and checkpoint detections can never disagree;
+// empty/invalid ExhaustedRegex → false (fail-open). Safe on a nil *SignalCenter
+// (it reads no receiver state), so a caller holding an optional center reference
+// never needs a nil guard.
+func (sc *SignalCenter) ExhaustedOf(rendered string, profile PaneProfile) bool {
+	return matchExhaustedPattern(profile.ExhaustedRegex, rendered)
+}
+
 // aggregatePriority defines the winner-takes-all aggregation order.
 // Any Converging session beats all others; Hung beats BusyButStagnant; etc.
 var aggregatePriority = [...]LivenessState{

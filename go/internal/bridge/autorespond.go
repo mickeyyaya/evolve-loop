@@ -157,12 +157,18 @@ func allDigits(s string) bool {
 // autoResponder is the per-launch effectful wrapper: it owns the manifest
 // prompt set + match counts + workspace for one *-tmux run.
 type autoResponder struct {
-	prompts   []ManifestPrompt
-	workspace string
-	cli       string
-	counts    map[string]int
-	deps      Deps
-	human     bool // when true, deliver keys with human-input cadence
+	prompts []ManifestPrompt
+	// exhaustedRegex is the CLI's quota/rate-limit wall pattern (manifest
+	// controls.usage.exhausted_regex via manifestExhaustedPattern, single-source),
+	// checked each tick so a walled CLI escalates (rc 85) IMMEDIATELY — the
+	// fast-poll path that fast-fails an exhausted phase without waiting for the
+	// 300s stop-review checkpoint's Observe.
+	exhaustedRegex string
+	workspace      string
+	cli            string
+	counts         map[string]int
+	deps           Deps
+	human          bool // when true, deliver keys with human-input cadence
 	// scrollback is the capture-pane depth: 0 for visible-pane CLIs (claude),
 	// >0 for alt-screen CLIs (codex/agy) whose bare visible pane is blank.
 	scrollback int
@@ -235,10 +241,12 @@ type pendingAutoRespond struct {
 // human engages the keystroke-plausibility send path.
 func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback int) *autoResponder {
 	var prompts []ManifestPrompt
+	var exhaustedRegex string
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
+		exhaustedRegex = manifestExhaustedPattern(m) // single-source wall pattern
 	}
-	return &autoResponder{prompts: prompts, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
+	return &autoResponder{prompts: prompts, exhaustedRegex: exhaustedRegex, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
@@ -286,6 +294,15 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// can never pollute the checkpoint's own Observe/Aggregate baseline.
 	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)
+	// Exhaustion override (reuses THIS tick's capture — no extra CapturePane, so no
+	// paneSeq churn): a quota/rate-limit wall escalates (rc 85), ungated by paneBusy
+	// (a wall blocks regardless of the spinner) and overriding a lesser verdict —
+	// the artifact will never come. Detected via the SignalCenter (ExhaustedOf, the
+	// fast-poll twin of BusyOf); the rc==85 arm below then writes the escalation
+	// report exactly as for any escalate, so the fallback fires within one poll.
+	if rc != 85 && ar.exhaustedRegex != "" && ar.deps.LivenessCenter.ExhaustedOf(pane, panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex}) {
+		action, rc = "escalate:exhausted", 85
+	}
 	switch rc {
 	case 1:
 		ar.firedOnceThisTick = ar.firedRuleOnce(prevCounts)
