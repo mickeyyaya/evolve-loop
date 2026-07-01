@@ -14,10 +14,22 @@ import (
 // content boundary.
 func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
 	cli := strings.TrimSuffix(lp.name, "-tmux")
-	if p, ok := panestream.Profiles[cli]; ok {
-		return p
+	p, ok := panestream.Profiles[cli]
+	if !ok {
+		p = panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
 	}
-	return panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
+	// Project the manifest's quota/rate-limit pattern into the profile
+	// (single-source, ADR-0047): the SignalCenter's ExhaustionProbe reads
+	// ExhaustedRegex to detect a mid-phase wall through the SAME abstraction as
+	// liveness. manifestExhaustedPattern is the one maintained source ("what a
+	// wall looks like") shared with the usage probe (usageclassify.go), so the
+	// probe-time and phase-execution detections can never drift. Best-effort: an
+	// unloadable manifest leaves ExhaustedRegex empty (detection off, fail-open —
+	// p is a value copy, so this never mutates the shared Profiles map).
+	if m, err := LoadManifest(lp.name); err == nil {
+		p.ExhaustedRegex = manifestExhaustedPattern(m)
+	}
+	return p
 }
 
 // detectorFor returns a per-run LivenessProbe for the tmux driver identified by

@@ -133,6 +133,14 @@ type PaneProfile struct {
 	// ">>> Send a message"). Empty for CLIs whose busy state is detected by the
 	// interrupt/spinner affordance instead (claude/agy) or not at all (codex).
 	IdlePlaceholder string
+	// ExhaustedRegex is the per-CLI quota/rate-limit wall pattern, projected
+	// single-source from the bridge manifest's controls.usage.exhausted_regex
+	// (the bridge layer sets it in paneProfileFor; panestream stays
+	// manifest-agnostic). When the rendered pane matches it the session is
+	// LivenessExhausted regardless of any liveness signal — the ExhaustionProbe
+	// override that stops a re-printed quota error from masquerading as
+	// Converging. Empty = no exhaustion detection for this CLI (fail-open).
+	ExhaustedRegex string
 }
 
 // Profiles holds the tuned PaneProfile for each supported tmux LLM CLI.
