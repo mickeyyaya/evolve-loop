@@ -481,8 +481,11 @@ func buildPlanPrompt(in router.RouteInput) string {
 	b.WriteString("they can never reach ship without audit. Omit \"mint\" for existing phases. Minted phases default to ")
 	b.WriteString("writes_source:true; set \"writes_source\":false only for phases that never edit source.\n")
 
+	b.WriteString("\nYou MAY also propose a dispatch \"cli\" and abstract \"tier\" (fast|balanced|deep — never a raw model name) ")
+	b.WriteString("for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.\n")
+
 	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
-	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>"},`)
+	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},`)
 	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude"}}]`)
 	b.WriteString("\n")
 	return b.String()
@@ -565,6 +568,16 @@ func writeCard(b *strings.Builder, c router.PhaseCard) {
 		fmt.Fprintf(b, " — when: %s", hint)
 	}
 	b.WriteString("\n")
+	// Project this phase's own dispatch guardrails (cycle-436 MR1) so an
+	// advisor proposing {cli,tier} for it has the legal bounds in hand instead
+	// of guessing blind. Omitted entirely when the phase carries no per-phase
+	// guardrail (the common case today).
+	if len(c.AllowedCLIs) > 0 {
+		fmt.Fprintf(b, "  allowed_clis: %s\n", strings.Join(c.AllowedCLIs, ", "))
+	}
+	if env := c.ModelTierEnvelope; env != nil {
+		fmt.Fprintf(b, "  model_tier_envelope: {min: %s, default: %s, max: %s}\n", env.Min, env.Default, env.Max)
+	}
 }
 
 // maxGoalTextChars bounds the goal text rendered into the advisor prompt so an
@@ -828,7 +841,26 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("empty phase plan")
 	}
+	for i := range entries {
+		entries[i].Tier = sanitizeAdvisorTier(entries[i].Tier)
+	}
 	return &router.PhasePlan{Entries: entries, MintPhases: mintConfigsFrom(entries)}, nil
+}
+
+// sanitizeAdvisorTier confines the advisor's OWN emitted tier to the strict
+// canonical vocabulary (driver_agnostic_model_routing invariant): the advisor
+// proposes an ABSTRACT tier, never a raw or legacy model alias. Unlike
+// policy.TierRank (which accepts "opus"/"sonnet"/"haiku" for an OPERATOR
+// pin), an advisor-emitted alias or garbage value is dropped outright rather
+// than translated — MR2's clamp downstream trusts this invariant instead of
+// re-validating it. Empty stays empty (the common no-op case).
+func sanitizeAdvisorTier(tier string) string {
+	switch tier {
+	case "fast", "balanced", "deep":
+		return tier
+	default:
+		return ""
+	}
 }
 
 // reservedAdvisorNames are the control-plane identities a minted phase may never

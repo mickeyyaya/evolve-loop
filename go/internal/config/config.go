@@ -56,6 +56,37 @@ func (m Mode) String() string {
 	return "llm"
 }
 
+// ModelRouting is the model-authority axis (cycle-436): who decides the LLM
+// CLI + abstract model TIER for an EXISTING phase's dispatch. A THIRD axis,
+// genuinely orthogonal to Stage (sequencing: which phases run) and Mode (the
+// routing brain) — parsing/applying it must never read or write cfg.Stage or
+// cfg.Mode, and vice versa (H3/TestC436_015).
+type ModelRouting int
+
+const (
+	// ModelRoutingStatic is the zero value (safe default): every phase's CLI/
+	// tier stays profile-pinned, exactly as today — an advisor {cli,tier}
+	// proposal (if any) is never even generated as an authority signal.
+	ModelRoutingStatic ModelRouting = iota
+	// ModelRoutingAdvisory logs the advisor's proposed {cli,tier} per phase
+	// (forensics/soak) but never applies it — dispatch stays profile-pinned.
+	ModelRoutingAdvisory
+	// ModelRoutingAuto applies the advisor's proposed {cli,tier} as a soft
+	// overlay, clamped by router.ClampPlanModelRouting before dispatch.
+	ModelRoutingAuto
+)
+
+func (m ModelRouting) String() string {
+	switch m {
+	case ModelRoutingAdvisory:
+		return "advisory"
+	case ModelRoutingAuto:
+		return "auto"
+	default:
+		return "static"
+	}
+}
+
 // Enable is the per-phase enablement decision source.
 type Enable int
 
@@ -259,6 +290,11 @@ type RolloutStages struct {
 type RoutingConfig struct {
 	Stage Stage
 	Mode  Mode
+	// ModelRouting is the cycle-436 model-authority axis (static|advisory|
+	// auto), config-driven via .evolve/policy.json `model_routing`. Zero value
+	// ModelRoutingStatic — byte-identical default for every operator who never
+	// sets model_routing.
+	ModelRouting ModelRouting
 	// RolloutStages embeds CommitEvidence / ReviewGate / SandboxMode — the
 	// three subsystem-migration dials, promoted so existing field access is
 	// unchanged (see RolloutStages).
@@ -357,6 +393,7 @@ type registryDoc struct {
 	Config struct {
 		DynamicRouting        string              `json:"dynamic_routing"`
 		RoutingMode           string              `json:"routing_mode"`
+		ModelRouting          string              `json:"model_routing"`
 		MandatoryPhases       []string            `json:"mandatory_phases"`
 		SpineOrder            []string            `json:"spine_order"`
 		LegalSuccessors       map[string][]string `json:"legal_successors"`
@@ -509,6 +546,9 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	if c.RoutingMode != "" {
 		cfg.Mode = parseMode(c.RoutingMode, ws)
 	}
+	if c.ModelRouting != "" {
+		cfg.ModelRouting = parseModelRouting(c.ModelRouting, "model_routing", ws)
+	}
 	if len(c.MandatoryPhases) > 0 {
 		cfg.Mandatory = c.MandatoryPhases
 	}
@@ -555,6 +595,9 @@ func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	if v := env["EVOLVE_ROUTING_MODE"]; v != "" {
 		cfg.Mode = parseMode(v, ws)
 	}
+	// model_routing is CONFIG-DRIVEN via .evolve/policy.json only — no env dial.
+	// The flag-ceiling ratchet forbids adding operator env flags; the axis lives
+	// in policy.json (parsed above via the registry model_routing key).
 	if v := env["EVOLVE_COMMIT_EVIDENCE"]; v != "" {
 		cfg.CommitEvidence = parseEvidenceStage(v, "EVOLVE_COMMIT_EVIDENCE", ws)
 	}
@@ -692,6 +735,24 @@ func parseMode(v string, ws *[]Warning) Mode {
 	default:
 		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("routing_mode=%q unknown, defaulting to llm", v)})
 		return ModeDynamicLLM
+	}
+}
+
+// parseModelRouting parses the cycle-436 model-authority axis. Unknown values
+// fall back to the SAFE static side (never silently enable auto) with a
+// warning — mirroring parseStage/parseMode's fail-safe-with-warning contract.
+// varName names the offending key/env var in the warning.
+func parseModelRouting(v, varName string, ws *[]Warning) ModelRouting {
+	switch strings.TrimSpace(v) {
+	case "static":
+		return ModelRoutingStatic
+	case "advisory":
+		return ModelRoutingAdvisory
+	case "auto":
+		return ModelRoutingAuto
+	default:
+		*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("%s=%q unknown (want static|advisory|auto), defaulting to static", varName, v)})
+		return ModelRoutingStatic
 	}
 }
 

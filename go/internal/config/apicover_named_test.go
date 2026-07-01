@@ -80,3 +80,34 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 		t.Errorf("Order = %v, want [tester]", cfg.Order)
 	}
 }
+
+// TestModelRouting_ParsesAndStringifies binds the cycle-436 ModelRouting axis
+// (type + its three consts + String) to its real producer, Load, exercising
+// all three values through the registry's model_routing key and asserting the
+// human-readable String() form each renders to.
+func TestModelRouting_ParsesAndStringifies(t *testing.T) {
+	cases := []struct {
+		value string
+		want  ModelRouting
+		str   string
+	}{
+		{"static", ModelRoutingStatic, "static"},
+		{"advisory", ModelRoutingAdvisory, "advisory"},
+		{"auto", ModelRoutingAuto, "auto"},
+	}
+	for _, tc := range cases {
+		dir := t.TempDir()
+		regPath := filepath.Join(dir, "phase-registry.json")
+		reg := `{"schema_version":3,"config":{"model_routing":"` + tc.value + `"},"phases":[]}`
+		if err := os.WriteFile(regPath, []byte(reg), 0o644); err != nil {
+			t.Fatalf("write registry: %v", err)
+		}
+		cfg, _ := Load(regPath, map[string]string{})
+		if cfg.ModelRouting != tc.want {
+			t.Errorf("model_routing=%q => ModelRouting = %v, want %v", tc.value, cfg.ModelRouting, tc.want)
+		}
+		if got := cfg.ModelRouting.String(); got != tc.str {
+			t.Errorf("ModelRouting(%v).String() = %q, want %q", cfg.ModelRouting, got, tc.str)
+		}
+	}
+}
