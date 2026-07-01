@@ -45,7 +45,7 @@ Three models were considered:
 - Readers (`Aggregate`) hold a read lock — allows concurrent aggregation across
   evaluation phases.
 - Per-session sharding is explicitly **deferred to S5** (after consumers migrate
-  in S3/S4 and ParallelEvaluate contention can be measured).
+  in S3/S4 and ParallelEvaluate contention can be measured) — **resolved below.**
 
 ## Decision
 
@@ -74,12 +74,75 @@ editing the `DetectorFor` switch. On first session creation, `Observe` looks up
 the registry; on miss it falls through to `DetectorFor` (backward-compatible
 default). Add-a-CLI = `RegisterHandler` + profile-entry only.
 
+### S5 (resolved): per-session sharding, measured
+
+**Measured evidence.** `BenchmarkSignalCenter_ParallelObserve`
+(`signalcenter_bench_test.go`) drives `-P` goroutines, each repeatedly calling
+`Observe` on its OWN distinct session key (the ParallelEvaluate shape: N
+independent sessions, no key sharing), across `-cpu=1,2,4,8`:
+
+| GOMAXPROCS | Before (single RWMutex across `Assess`) | After (per-session lock) |
+|---|---|---|
+| 1 | 7738 ns/op | 7763 ns/op |
+| 2 | 8916 ns/op (worse) | 3923 ns/op |
+| 4 | 9699 ns/op (worse) | 2029 ns/op |
+| 8 | 9737 ns/op (worse) | 1265 ns/op |
+
+Under the original single-`sync.RWMutex`-across-`Assess()` model, ns/op *rises*
+with parallelism instead of falling — proof that `Observe` calls on disjoint
+session keys were serializing on one process-global write lock (H1 confirmed:
+material contention, not a theoretical concern). After sharding, throughput
+scales ~6.1× from `P=1` to `P=8` (near-linear), because independent sessions no
+longer contend on a shared lock at all.
+
+**Decision: implement minimal per-session sharding.** Each `sessionSignals` now
+carries its own `sync.Mutex` (`ss.mu`) guarding `probe`/`last`/`busy`/`clean`/
+`changed`. `SignalCenter.mu` (the global `sync.RWMutex`) is demoted to a purely
+**structural** lock: it guards only the `sessions` map's shape (insert, lookup)
+and the `registry` map — never the stateful `probe.Assess()` call or any field
+read on `sessionSignals`.
+
+**Ownership.** `SignalCenter.mu` owns "does this session key exist in the map
+yet" and the `registry` contents. `sessionSignals.mu` owns everything about
+ONE session's observed state (`probe`, `last`, `busy`, `clean`, `changed`) — no
+other lock may read or write those fields.
+
+**Lock ordering (invariant, enforced by code shape).** The global structural
+lock is always acquired and **fully released** before any per-session lock is
+acquired:
+1. `Observe` takes `sc.mu.Lock()`, does the map lookup/insert, then
+   `sc.mu.Unlock()` — only THEN does it take `ss.mu.Lock()` to run `Assess` and
+   mutate the session's fields.
+2. `Aggregate` takes `sc.mu.RLock()`, copies the `*sessionSignals` pointers into
+   a slice, then `sc.mu.RUnlock()` — only THEN does it lock each `ss.mu` in
+   turn to read `ss.last`.
+3. `Busy`/`Changed` follow the same shape: `sc.mu.RLock()` → lookup → `sc.mu.RUnlock()`
+   → `ss.mu.Lock()` → read → `ss.mu.Unlock()`.
+
+No code path holds `sc.mu` and any `ss.mu` at the same time, and no code path
+acquires a per-session lock before the global lock. This eliminates lock-order
+inversion by construction (there is only one direction).
+
+**No torn reads.** `Aggregate`/`Busy`/`Changed` read `ss.last`/`ss.busy`/
+`ss.changed` under the exact same `ss.mu` that `Observe` writes them under, so
+no read can observe a partially-updated `sessionSignals` — verified by
+`TestSignalCenter_ObserveAggregateSameKeyRaceClean` (same-key concurrent
+Observe/Aggregate/Busy/Changed, `-race`-clean).
+
+**No new exported surface.** `sessionSignals.mu` is an unexported field on an
+already-unexported type — zero `apicover` delta.
+
 ## Consequences
 
-- **Positive:** `-race` clean under ≥8 concurrent producers (verified, cycle 430).
+- **Positive:** `-race` clean under ≥8 concurrent producers (verified, cycle 430)
+  and under the ParallelEvaluate mixed-op stress harness (cycle 433, ≥16
+  producers × ≥100 cycles + concurrent readers + concurrent registration).
 - **Positive:** OCP — new CLIs register without a switch edit.
 - **Positive:** No goroutine lifecycle; no shutdown path required.
-- **Deferred (S5):** Per-session locking if ParallelEvaluate concurrency reveals
-  contention on shared session keys.
+- **Resolved (S5):** Per-session sharding implemented — measured ~6.1×
+  throughput improvement at `GOMAXPROCS=8` (see benchmark table above);
+  `Observe` no longer holds a process-global lock across `Assess()`. Lock
+  ordering and ownership documented above; no torn reads (verified under
+  `-race`).
 - **Invariant (S3):** Consumers (`driver_tmux_repl.go`, `stopreview.go`) remain
   untouched this slice; they migrate in S3/S4.
