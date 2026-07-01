@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -516,6 +517,18 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 			o.recordPlanRejections(ctx, cycle, cs, router.ValidatePlan(planIn, raw))
 			var clamps []router.Clamp
 			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
+			// MR4(a): re-validate every entry's {cli,tier} against its phase's
+			// guardrails + the live catalog, regardless of ModelRouting mode — even
+			// under advisory the clamped proposal is what gets LOGGED to
+			// phase-plan.json (I2); only the projection onto PhaseRequest in
+			// dispatch() is gated on ==Auto. Skipped entirely under the static
+			// zero-value (nothing to clamp: static never proposes anything to
+			// dispatch, so there is nothing worth persisting either).
+			if o.cfg.ModelRouting != config.ModelRoutingStatic {
+				var mrClamps []router.Clamp
+				clampedPlan, mrClamps = router.ClampPlanModelRouting(clampedPlan, o.profileForModelRouting, o.modelCatalogLookup)
+				clamps = append(clamps, mrClamps...)
+			}
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
 			// Register advisor-minted phases (Steps 11/12) into runners +
 			// catalog + routing BEFORE the dispatch loop, so a minted phase the
@@ -533,4 +546,19 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		clampedPlan:   clampedPlan,
 		directivesSet: directivesSet,
 	}
+}
+
+// profileForModelRouting resolves a phase's profiles.Profile for the MR4(a)
+// guardrail check. Always nil today: a phase's profile file is keyed by AGENT
+// name (e.g. "builder.json"), and the phase→agent mapping is only known inside
+// each phase package (internal/phases/build, .../audit, ...) — which already
+// imports core, so core resolving it here would be an import cycle. A nil
+// profile is ValidatePin's own "nothing to validate ⇒ ok" contract (matching
+// router.ClampPlanModelRouting's doc comment), so this degrades safely rather
+// than silently fabricating a wrong mapping; the catalog-resolvability gate
+// (modelCatalogLookup) still applies independently. Wiring a real per-phase
+// profile lookup is future work (a composition-root DI seam mirroring
+// catalogRefresh), out of MR4's scope.
+func (o *Orchestrator) profileForModelRouting(string) *profiles.Profile {
+	return nil
 }

@@ -336,9 +336,9 @@ func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {
 		return nil
 	}
 	if pin.CLI != "" && len(prof.AllowedCLIs) > 0 &&
-		!contains(prof.AllowedCLIs, "all") && !contains(prof.AllowedCLIs, baseCLI(pin.CLI)) {
+		!contains(prof.AllowedCLIs, "all") && !contains(prof.AllowedCLIs, BaseCLI(pin.CLI)) {
 		return fmt.Errorf("policy: pin for phase %q: cli %q not in allowed_clis %v",
-			phase, baseCLI(pin.CLI), prof.AllowedCLIs)
+			phase, BaseCLI(pin.CLI), prof.AllowedCLIs)
 	}
 	if pin.Model != "" && prof.ModelTierEnvelope != nil {
 		rank := TierRank(pin.Model)
@@ -379,10 +379,22 @@ func TierRank(s string) int {
 	return 0
 }
 
-// baseCLI strips driver suffixes: claude-tmux/claude-p → claude, codex-tmux →
-// codex, agy-tmux → agy.
-func baseCLI(cli string) string {
-	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(cli), "-tmux"), "-p")
+// BaseCLI is the single exported base-name normalizer for driver-qualified CLI
+// names: claude-tmux/claude-p → claude, codex-tmux → codex, agy-tmux → agy.
+// It strips "-tmux" then "-p" repeatedly until neither suffix matches, so a
+// (never-occurring-in-practice) doubly-qualified name like "codex-tmux-p"
+// still resolves to its bare family "codex". This is the ONE exported source
+// consolidating the formerly-duplicated policy.baseCLI and
+// bridge.baseCLIName (cycle-440 MR4b, F2/F3).
+func BaseCLI(cli string) string {
+	s := strings.TrimSpace(cli)
+	for {
+		next := strings.TrimSuffix(strings.TrimSuffix(s, "-tmux"), "-p")
+		if next == s {
+			return next
+		}
+		s = next
+	}
 }
 
 func contains(xs []string, s string) bool {

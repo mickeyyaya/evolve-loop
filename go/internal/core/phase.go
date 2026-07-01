@@ -142,6 +142,19 @@ type PhaseRequest struct {
 	// namespaced <phase>.<key> (e.g. "build.files_touched"). A phase keys its
 	// own routing/classify decisions off these without re-reading artifacts.
 	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
+
+	// ModelRoutingCLI/ModelRoutingTier (cycle-440 MR4a/c) carry the whole-cycle
+	// plan's clamped {cli,tier} proposal for THIS phase — but ONLY when
+	// config.ModelRouting==ModelRoutingAuto (advisory computes and logs the
+	// same clamped proposal to phase-plan.json but leaves these empty; static
+	// never sets them). The runner applies them as a SOFT dispatch overlay
+	// (llmroute.ApplySoftOverlay): promote to chain primary without discarding
+	// the profile's fallback chain, so a benched/failing proposal still falls
+	// back via the ordinary cli-health chain. Empty on every pre-cycle-440
+	// dispatch and on any mode other than auto — omitempty keeps a zero-value
+	// PhaseRequest's JSON shape byte-identical.
+	ModelRoutingCLI  string `json:"model_routing_cli,omitempty"`
+	ModelRoutingTier string `json:"model_routing_tier,omitempty"`
 }
 
 // PhaseResponse is the output envelope from PhaseRunner.Run.

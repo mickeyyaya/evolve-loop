@@ -54,7 +54,7 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 			continue
 		}
 		if catalogLookup != nil && e.CLI != "" && e.Tier != "" {
-			if _, ok := catalogLookup(e.CLI, e.Tier); !ok {
+			if _, ok := catalogLookup(policy.BaseCLI(e.CLI), e.Tier); !ok {
 				clamps = append(clamps, Clamp{
 					Rule:     "model-routing-catalog-miss",
 					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),

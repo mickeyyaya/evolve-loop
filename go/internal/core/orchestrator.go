@@ -220,6 +220,12 @@ type Orchestrator struct {
 	// (the composition root wires the closure; core never imports modelcatalog).
 	catalogRefresh func(ctx context.Context) error
 
+	// modelCatalogLookup is the optional live model-catalog resolvability check
+	// (WithModelCatalogLookup) injected into router.ClampPlanModelRouting. Nil
+	// (default) ⇒ the catalog-resolvability gate is skipped (guardrail
+	// validation still runs); the composition root wires modelcatalog.Catalog.Lookup.
+	modelCatalogLookup func(cli, tier string) (string, bool)
+
 	// directivesProvider optionally returns the runtime operator-directives snapshot
 	// for a cycle (WithDirectivesProvider). The injected closure owns ALL config —
 	// home/lane/path resolution — so core stays config- and environment-agnostic; it
@@ -450,6 +456,17 @@ func WithObserver(o Observer) Option {
 // it once per cycle before any phase runs and only WARNs on error (never blocks).
 func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 	return func(o *Orchestrator) { o.catalogRefresh = fn }
+}
+
+// WithModelCatalogLookup injects the live model-catalog resolvability check
+// (cycle-440 MR4a) consulted by router.ClampPlanModelRouting: (cli,tier)→
+// (model,ok). Nil (default) skips the catalog-resolvability gate — the plan's
+// guardrail validation (allowed_clis/model_tier_envelope) still applies. The
+// composition root wires modelcatalog.Catalog.Lookup so core stays a leaf and
+// never imports modelcatalog directly (dependency inversion, mirroring
+// catalogRefresh above).
+func WithModelCatalogLookup(fn func(cli, tier string) (string, bool)) Option {
+	return func(o *Orchestrator) { o.modelCatalogLookup = fn }
 }
 
 // WithDirectivesProvider injects the runtime operator-directives provider. The

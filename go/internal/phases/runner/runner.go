@@ -414,6 +414,17 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		return "", false
 	}
 	plan := llmroute.Resolve(profileName, phase, b.hooks.DefaultModel(), req.Env, prof, autoExpand, pin)
+	// Soft dispatch overlay (cycle-440 MR4c): an advisor-proposed {cli,tier}
+	// threaded via PhaseRequest.ModelRoutingCLI/Tier (already clamped upstream
+	// by router.ClampPlanModelRouting under model_routing=auto) promotes to
+	// chain PRIMARY without discarding the profile's fallback chain — unlike an
+	// absolute policy.Pin, a benched overlay CLI still falls back via the
+	// capability-probe + cli-health bench passes below. A policy pin always
+	// wins (soft overlay never applies alongside one); zero overlay fields are
+	// a byte-identical noop.
+	if pin == nil && (req.ModelRoutingCLI != "" || req.ModelRoutingTier != "") {
+		plan = llmroute.ApplySoftOverlay(plan, llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier})
+	}
 	// Capability probe: demote (don't delete) candidates whose binary isn't on
 	// PATH so a missing CLI doesn't burn a 60s boot timeout before the chain
 	// advances. Log the reorder inline with the dispatch log.

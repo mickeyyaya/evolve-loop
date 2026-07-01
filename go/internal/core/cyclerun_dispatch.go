@@ -106,6 +106,22 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		// for every phase this cycle); empty ⇒ byte-identical dispatch.
 		OperatorDirectives: cr.directivesSet.Merged,
 	}
+	// MR4(c): project this phase's clamped {cli,tier} plan proposal onto the
+	// dispatched request ONLY under model_routing=auto — the mode gate that
+	// distinguishes "auto applies" from "advisory logs, never applies" (the
+	// clamp itself already ran, and was persisted to phase-plan.json, for both
+	// modes in planCycle). A nil cr.clampedPlan (advisor outage) or no
+	// matching/proposing entry for this phase leaves both fields empty — the
+	// degrade-to-profile-static floor (I4).
+	if cr.o.cfg.ModelRouting == config.ModelRoutingAuto && cr.clampedPlan != nil {
+		for _, e := range cr.clampedPlan.Entries {
+			if e.Phase == string(next) {
+				phaseReq.ModelRoutingCLI = e.CLI
+				phaseReq.ModelRoutingTier = e.Tier
+				break
+			}
+		}
+	}
 	// ADR-0050 Phase 3.7: at advisory+, serve the build phase's upstream
 	// build-plan via the typed envelope (read once here at the seam) instead of
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase

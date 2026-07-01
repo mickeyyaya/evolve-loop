@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -96,6 +97,36 @@ func TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject(t *testing.T) {
 	}
 	if out.Entries[0].CLI != "codex" {
 		t.Errorf("cross-family CLI forced to %q, want unchanged codex", out.Entries[0].CLI)
+	}
+}
+
+// TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName (mr4b AC1, F2 fix):
+// a suffixed CLI like "claude-tmux" whose BASE FAMILY ("claude", via
+// policy.BaseCLI) resolves in the live catalog must be HONORED — not wrongly
+// clamped as a catalog miss. Before the F2 fix, ClampPlanModelRouting passed
+// the raw suffixed e.CLI to catalogLookup, which is keyed on the base family,
+// so a valid suffixed proposal always missed. The suffixed CLI string itself
+// (e.CLI) must survive UNCHANGED on the honored path (api-contract Invariant
+// I1: normalization is catalogLookup-only, never a rewrite of e.CLI).
+func TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName(t *testing.T) {
+	if got := policy.BaseCLI("claude-tmux"); got != "claude" {
+		t.Fatalf("setup: policy.BaseCLI(%q) = %q, want claude", "claude-tmux", got)
+	}
+	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
+		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
+	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
+		// Catalog is keyed on the BASE family "claude", never on a driver-
+		// qualified name — exactly the mismatch F2 exploited.
+		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "opus"}},
+	}}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "scout", Run: true, CLI: "claude-tmux", Tier: "deep"}}}
+
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
+	if len(clamps) != 0 {
+		t.Fatalf("clamps = %+v, want none (suffixed CLI's base family resolves in the catalog)", clamps)
+	}
+	if out.Entries[0].CLI != "claude-tmux" || out.Entries[0].Tier != "deep" {
+		t.Errorf("entry = %+v, want unchanged {cli:claude-tmux,tier:deep} (I1: honored entry keeps its original CLI string)", out.Entries[0])
 	}
 }
 

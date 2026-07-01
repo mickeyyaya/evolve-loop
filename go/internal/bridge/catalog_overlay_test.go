@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // injectCatalogDir injects dir as the model-catalog directory for the duration
@@ -75,8 +76,8 @@ func TestApplyCatalogTierMap_NoEntryIsByteIdentical(t *testing.T) {
 func TestBaseCLIName(t *testing.T) {
 	cases := map[string]string{"claude-tmux": "claude", "codex-p": "codex", "agy": "agy", "ollama-tmux": "ollama"}
 	for in, want := range cases {
-		if got := baseCLIName(in); got != want {
-			t.Fatalf("baseCLIName(%q) = %q, want %q", in, got, want)
+		if got := policy.BaseCLI(in); got != want {
+			t.Fatalf("policy.BaseCLI(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

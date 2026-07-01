@@ -3,7 +3,6 @@ package bridge
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -89,7 +88,7 @@ func loadCatalogCached() modelcatalog.Catalog {
 // LIVE model merged over m.ModelTierMap. When no live entry hits for this CLI it
 // returns m unchanged (same ModelTierMap) — the byte-identical property.
 func applyCatalogTierMap(m Manifest, cat modelcatalog.Catalog) Manifest {
-	base := baseCLIName(m.CLI)
+	base := policy.BaseCLI(m.CLI)
 	var merged map[string]string
 	for _, tier := range modelcatalog.CanonicalTiers {
 		live, ok := cat.DispatchModel(base, tier)
@@ -109,15 +108,4 @@ func applyCatalogTierMap(m Manifest, cat modelcatalog.Catalog) Manifest {
 	}
 	m.ModelTierMap = merged
 	return m
-}
-
-// baseCLIName strips driver suffixes (-tmux, -p) to the provider family used as
-// the catalog key (claude-tmux → claude).
-func baseCLIName(cli string) string {
-	for _, suffix := range []string{"-tmux", "-p"} {
-		if strings.HasSuffix(cli, suffix) {
-			return strings.TrimSuffix(cli, suffix)
-		}
-	}
-	return cli
 }

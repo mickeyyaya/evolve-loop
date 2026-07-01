@@ -5,6 +5,7 @@
   "config": {
     "dynamic_routing": "advisory",
     "routing_mode": "llm",
+    "model_routing": "auto",
     "mandatory_phases": ["scout", "triage", "build", "audit", "ship"],
     "spine_order": ["intent", "scout", "triage", "tdd", "build-planner", "build", "audit", "ship", "end"],
     "_legal_successors_note": "PA-DDK DDK-5 (ADR-0060 §1a): the transition LEGALITY graph — phase → legal successors. The single SSOT for the graph (replaces the kernel's literal `allowed`); keyed by NAME so it spans the graph sentinels start/end and the control phase debugger, which are not phases[] entries. 'retrospective' denormalizes to the kernel's retro node. scout/triage→end are the guarded early-exit edges (semantic authority = early_exit + CanTerminateEarly); ship/debugger fan-outs are the structured-error recovery routes. config.Load projects this into RoutingConfig.LegalSuccessors; the load-time ValidateSafetyInvariants validator HARD-fails any edit that could ship without the floor.",
