@@ -68,9 +68,7 @@ type LivenessProbe interface {
 // wall). This keeps exhaustion detection single-source (the manifest pattern),
 // per-CLI (via PaneProfile), and applied uniformly to every registered strategy.
 type ExhaustionProbe struct {
-	inner   LivenessProbe
-	pattern string         // pattern the cached re was compiled from (recompile only on change)
-	re      *regexp.Regexp // compiled ExhaustedRegex; nil = no/invalid pattern
+	inner LivenessProbe
 }
 
 // NewExhaustionProbe wraps inner with exhaustion-override detection. The
@@ -85,29 +83,32 @@ func NewExhaustionProbe(inner LivenessProbe) *ExhaustionProbe {
 // inner probe's verdict, unchanged.
 func (e *ExhaustionProbe) Assess(rendered string, profile PaneProfile) (LivenessState, float64) {
 	state, conf := e.inner.Assess(rendered, profile) // always advance the inner cursor
-	if e.walled(rendered, profile.ExhaustedRegex) {
+	if matchExhaustedPattern(profile.ExhaustedRegex, rendered) {
 		return LivenessExhausted, 1.0
 	}
 	return state, conf
 }
 
-// walled reports whether rendered matches pattern, compiling and caching pattern
-// (stable per session, so compiled at most once). An empty or uncompilable
-// pattern matches nothing — the gate's own misconfiguration must never brick a
-// session.
-func (e *ExhaustionProbe) walled(rendered, pattern string) bool {
+// matchExhaustedPattern reports whether rendered shows the quota/rate-limit wall
+// described by pattern — the shared matcher for the two panestream exhaustion
+// paths (ExhaustionProbe's 300s-checkpoint Observe and SignalCenter.ExhaustedOf's
+// ~2s fast poll), so they can never disagree. (bridge/usageclassify.go's
+// matchExhausted is its cross-layer sibling — the same predicate, kept separate
+// only by the one-way bridge→panestream import boundary; a future modularization
+// could host one copy in a shared leaf.) It compiles per call rather than caching
+// a *regexp.Regexp: the patterns are small and the per-poll CapturePane IPC
+// dominates by orders of magnitude, so a cache is not worth the state. An empty
+// or uncompilable pattern matches nothing — fail-open: the gate's own
+// misconfiguration must never brick a session.
+func matchExhaustedPattern(pattern, rendered string) bool {
 	if pattern == "" {
 		return false
 	}
-	if pattern != e.pattern {
-		e.pattern = pattern
-		if re, err := regexp.Compile(pattern); err != nil {
-			e.re = nil // fail-open on a bad pattern
-		} else {
-			e.re = re
-		}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
 	}
-	return e.re != nil && e.re.MatchString(rendered)
+	return re.MatchString(rendered)
 }
 
 // defaultHungAfter is how many consecutive busy-but-stagnant intervals the

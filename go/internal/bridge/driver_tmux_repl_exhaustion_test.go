@@ -1,6 +1,12 @@
 package bridge
 
-import "testing"
+import (
+	"bytes"
+	"context"
+	"strings"
+	"testing"
+	"time"
+)
 
 // driver_tmux_repl_exhaustion_test.go — the wait-loop fast-fail (S2). A CLI that
 // hits its quota/rate-limit MID-PHASE renders the manifest's exhausted_regex
@@ -21,6 +27,39 @@ func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 	if code != ExitUnknownPrompt {
 		t.Fatalf("exit = %d, want %d (ExitUnknownPrompt — exhaustion fast-fail, not %d ExitArtifactTimeout); stderr=%q",
 			code, ExitUnknownPrompt, ExitArtifactTimeout, stderr)
+	}
+	// Fast path: the ~2s poll must catch the wall BEFORE any 300s stop-review
+	// checkpoint runs (the production gap — the checkpoint-only path recovered at
+	// the 300s interval, not immediately), and BEFORE the walled CLI is nudged.
+	if strings.Contains(stderr, "stop-review") {
+		t.Errorf("exhaustion must fast-fail on the poll loop before any stop-review checkpoint; stderr=%q", stderr)
+	}
+	if n := tmux.deliveriesNaming(fx.artifact); n != 0 {
+		t.Errorf("a walled CLI must NOT be nudged (%d nudge deliveries) — the fast-fail preempts the nudge", n)
+	}
+}
+
+// The exhaustion check must run on the FAST poll loop (~2s cadence), not only
+// the 300s stop-review checkpoint: a walled pane fails over in a handful of poll
+// iterations, NOT the ~150 it takes for elapsed to reach the review interval.
+// (The checkpoint-only path recovered — but at the 300s interval, which in
+// production is a 5-minute hang per walled phase.) Counts deps.Sleep calls (one
+// per poll) as the iteration proxy.
+func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	walled := "❯\n⚠ You've reached your usage limit — upgrade to continue.\n❯"
+	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
+	polls := 0
+	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) { polls++ }, LookupEnv: mapLookup(nil)})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
+	if code != ExitUnknownPrompt {
+		t.Fatalf("exit = %d, want %d (ExitUnknownPrompt); stderr=%q", code, ExitUnknownPrompt, stderr.String())
+	}
+	if polls > 10 {
+		t.Errorf("exhaustion fast-fail took %d poll iterations — must catch the wall on the fast loop, not wait ~150 iters for the 300s checkpoint", polls)
 	}
 }
 
