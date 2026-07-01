@@ -279,7 +279,12 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// pane here stays RAW: resolvePending, shadow matching, and writeEscalation
 	// (above/below) need the real terminal. stripAgentDiffLines runs only
 	// inside decideAutoRespond, scoped to the prompt-matching decision.
-	paneBusy := panestream.PaneBusy(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
+	// Routed through SignalCenter.BusyOf (cycle-434 S4 completion), not the
+	// standalone PaneBusy: BusyOf is nil-receiver-safe and stateless (no
+	// Observe), so ar.deps.LivenessCenter — nil outside the driver's
+	// Deps-injected test seam — needs no guard here, and this tick's read
+	// can never pollute the checkpoint's own Observe/Aggregate baseline.
+	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
 	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)
 	switch rc {
 	case 1:

@@ -581,10 +581,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			// Busy/idle is NOT the prompt-marker's presence — the input box
 			// persists during generation for claude/agy (and ollama echoes the
-			// marker on the prompt line). panestream.PaneBusy reads the real
+			// marker on the prompt line). livenessCenter.BusyOf reads the real
 			// per-CLI busy signal (interrupt/spinner affordance, or ollama's
-			// vanished idle placeholder). idle_reached fires once on busy→idle.
-			if panestream.PaneBusy(pane, paneProfile) {
+			// vanished idle placeholder) via the same stateless projection
+			// PaneBusy defines — routed through the center (cycle-434 S4
+			// completion) rather than called directly, so no bridge consumer
+			// parses CLI chrome outside SignalCenter. idle_reached fires once
+			// on busy→idle.
+			if livenessCenter.BusyOf(pane, paneProfile) {
 				sawBusy = true
 			} else if sawBusy {
 				emitChannelBreadcrumb(breadcrumbW, "idle_reached", openCorrID)

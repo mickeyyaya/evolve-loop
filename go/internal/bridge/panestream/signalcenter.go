@@ -149,6 +149,23 @@ func (sc *SignalCenter) Changed(sessionKey string) bool {
 	return ss.changed
 }
 
+// BusyOf reports the live-turn busy affordance for rendered/profile directly,
+// with NO session key and NO Observe call (cycle-434 S4 completion). It
+// delegates to the SAME standalone PaneBusy definition Observe folds into
+// Busy(sessionKey), so it can never drift from that projection, and it never
+// touches sc.sessions — repeated calls create no session entry and leave
+// Aggregate/Busy/Changed at their unobserved defaults. This is what lets
+// callers that fire at different loop points than the checkpoint's own
+// Observe (autorespond.go's tick busy-gate, driver_tmux_repl.go's idle_reached
+// bracket) read the same busy signal without polluting the checkpoint's
+// Observe/Aggregate baseline.
+//
+// Safe on a nil *SignalCenter — it reads no receiver state — so a caller
+// holding an optional (possibly-nil) center reference never needs a nil guard.
+func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool {
+	return PaneBusy(rendered, profile)
+}
+
 // aggregatePriority defines the winner-takes-all aggregation order.
 // Any Converging session beats all others; Hung beats BusyButStagnant; etc.
 var aggregatePriority = [...]LivenessState{
