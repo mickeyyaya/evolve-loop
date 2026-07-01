@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -264,27 +265,57 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 	if profile == "" && in.ProjectRoot != "" {
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "router.json")
 	}
-	resp, err := p.bridge.Launch(context.Background(), BridgeRequest{
-		CLI:          p.identity.CLI,
-		Profile:      profile,
-		Model:        p.identity.Model,
-		Prompt:       prompt,
-		Workspace:    in.Workspace,
-		Worktree:     in.ActiveWorktree,
-		ArtifactPath: filepath.Join(in.Workspace, artifactFile),
-		Completion:   completion,
-		Agent:        p.identity.AgentLabel,
-		Cycle:        in.Cycle,
-		Env:          in.Env,
+	// Cycle-435: walk [identity.CLI]+profile.cli_fallback via llmroute.Dispatch —
+	// the SAME chain-walk the runner uses for every ordinary phase — instead of a
+	// single un-fallback-able Launch. identity.CLI (not llmroute.resolvePrimary,
+	// which re-reads profile.cli) is the explicit primary so the composition
+	// root's bench-aware CLI swap is honored (llmroute.ChainFor's H2 seam).
+	plan := llmroute.ChainFor(p.identity.CLI, loadDispatchProfile(profile))
+	var resp BridgeResponse
+	dispatched := llmroute.Dispatch(plan, func(cli string) (int, error) {
+		var launchErr error
+		resp, launchErr = p.bridge.Launch(context.Background(), BridgeRequest{
+			CLI:          cli,
+			Profile:      profile,
+			Model:        p.identity.Model,
+			Prompt:       prompt,
+			Workspace:    in.Workspace,
+			Worktree:     in.ActiveWorktree,
+			ArtifactPath: filepath.Join(in.Workspace, artifactFile),
+			Completion:   completion,
+			Agent:        p.identity.AgentLabel,
+			Cycle:        in.Cycle,
+			Env:          in.Env,
+		})
+		return resp.ExitCode, launchErr
 	})
-	if err != nil {
-		return BridgeResponse{}, fmt.Errorf("%s: bridge launch: %w", errPfx, err)
+	if dispatched.Err != nil {
+		return BridgeResponse{}, fmt.Errorf("%s: bridge launch: %w", errPfx, dispatched.Err)
 	}
 	// WS3-S1/S3: capture the redacted prompt+response and the decision span
 	// BEFORE the caller parses, so the decision is debuggable + replayable.
 	// Fail-open — never block the path.
 	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS, replanDepth)
 	return resp, nil
+}
+
+// loadDispatchProfile parses the router profile at profilePath (the same path
+// advisorLaunch passes as BridgeRequest.Profile) into a profiles.Profile so
+// llmroute.ChainFor can read its cli_fallback chain. Fail-open (nil) on an
+// empty path or any read/parse error — CLI-fallback resilience is advisory;
+// a missing/malformed profile degrades to a single-candidate chain, never a
+// dispatch failure.
+func loadDispatchProfile(profilePath string) *profiles.Profile {
+	if profilePath == "" {
+		return nil
+	}
+	dir := filepath.Dir(profilePath)
+	name := strings.TrimSuffix(filepath.Base(profilePath), ".json")
+	prof, err := profiles.NewFromDir(dir).Get(name)
+	if err != nil {
+		return nil
+	}
+	return &prof
 }
 
 // AdvisorSpan is the OTel-GenAI decision span (ADR-0052 WS3-S3) persisted per
@@ -728,10 +759,7 @@ func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 		return
 	}
 	b.WriteString("\n## Carryover todos from previous cycles (consider when selecting phases)\n")
-	limit := len(todos)
-	if limit > maxCarryoverTodosInPrompt {
-		limit = maxCarryoverTodosInPrompt
-	}
+	limit := min(len(todos), maxCarryoverTodosInPrompt)
 	for i := 0; i < limit; i++ {
 		t := todos[i]
 		fmt.Fprintf(b, "- [%s] %s: %s (first_seen_cycle=%d, cycles_unpicked=%d)\n",
