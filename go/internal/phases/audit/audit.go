@@ -82,6 +82,16 @@ type hooks struct {
 	// drift must FAIL audit. nil = no skills gate. NewDefault wires
 	// skillsDriftCheckDefault (in-process skillcheck.Check — no subprocess).
 	skillsDriftCheck func(req core.PhaseRequest) ([]string, error)
+	// goVetCheck / acsDurableCheck / apicoverEnforceCheck are the CI-parity
+	// gates: each runs the EXACT whole-repo CI command (go vet ./..., -tags acs
+	// acs-durable, apicover -enforce over touched-enforced packages) against the
+	// cycle worktree and FAILs audit on offenders — closing the "per-cycle proof
+	// ≠ repo-wide CI gate" gap (import cycles, flagregistry/flag-ceiling, unnamed
+	// exports). nil = no gate (tests). NewDefaultWithStageCompact wires the
+	// *Default impls (subprocess); each fails OPEN (warning) if it cannot run.
+	goVetCheck           func(req core.PhaseRequest) ([]string, error)
+	acsDurableCheck      func(req core.PhaseRequest) ([]string, error)
+	apicoverEnforceCheck func(req core.PhaseRequest) ([]string, error)
 	// phaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
 	// §3.10 Slice 5). At >= StageEnforce the evolve-verdict sentinel is mandatory —
 	// the legacy prose/regex fallbacks are gated off. Zero value (StageOff) keeps
@@ -185,6 +195,35 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}
 	}
 
+	// CI-parity gates (go vet ./..., -tags acs acs-durable, apicover -enforce):
+	// each runs the exact whole-repo CI command against this cycle's worktree.
+	// Offenders → FAIL (the cycle would break main CI). Could-not-run → WARN
+	// diagnostic, verdict unchanged (fail-open, same as the gofmt/skills gates).
+	applyCIGate := func(check func(core.PhaseRequest) ([]string, error), name, failTmpl string) {
+		if check == nil {
+			return
+		}
+		switch offenders, cerr := check(req); {
+		case cerr != nil:
+			diags = append(diags, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("%s skipped (could not run): %s", name, cerr.Error()),
+			})
+		case len(offenders) > 0:
+			diags = append(diags, core.Diagnostic{
+				Severity: "error",
+				Message:  fmt.Sprintf(failTmpl, len(offenders), strings.Join(offenders, "; ")),
+			})
+			verdict = core.VerdictFAIL
+		}
+	}
+	applyCIGate(h.goVetCheck, "go vet gate",
+		"go vet ./... reported %d issue(s) — CI `vet + fmt` would FAIL (e.g. import cycle). Offenders: %s")
+	applyCIGate(h.acsDurableCheck, "acs-durable gate",
+		"acs-durable (-tags acs) FAILED %d check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: %s")
+	applyCIGate(h.apicoverEnforceCheck, "apicover-enforce gate",
+		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
+
 	if verdict == core.VerdictWARN && policy.StrictAuditFor(req.ProjectRoot) {
 		verdict = core.VerdictFAIL
 		diags = append(diags, core.Diagnostic{
@@ -269,6 +308,13 @@ type Config struct {
 	// (CI TestSkills_NoDrift parity). nil = no skills gate. NewDefault wires
 	// skillsDriftCheckDefault.
 	CheckSkillsDrift func(req core.PhaseRequest) ([]string, error)
+	// CheckGoVet / CheckACSDurable / CheckApicoverEnforce are the CI-parity gates
+	// (whole-repo go vet ./..., -tags acs acs-durable, apicover -enforce over
+	// touched packages); any offender FAILs the audit. nil = no gate.
+	// NewDefaultWithStageCompact wires the *Default impls.
+	CheckGoVet           func(req core.PhaseRequest) ([]string, error)
+	CheckACSDurable      func(req core.PhaseRequest) ([]string, error)
+	CheckApicoverEnforce func(req core.PhaseRequest) ([]string, error)
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
 	// §3.10 Slice 5). Zero value (StageOff) = byte-identical (prose fallbacks active).
 	PhaseIO config.Stage
@@ -283,7 +329,15 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:          hooks{genVerdict: c.GenerateVerdict, gofmtCheck: c.CheckGofmt, skillsDriftCheck: c.CheckSkillsDrift, phaseIO: c.PhaseIO},
+			Hooks: hooks{
+				genVerdict:           c.GenerateVerdict,
+				gofmtCheck:           c.CheckGofmt,
+				skillsDriftCheck:     c.CheckSkillsDrift,
+				goVetCheck:           c.CheckGoVet,
+				acsDurableCheck:      c.CheckACSDurable,
+				apicoverEnforceCheck: c.CheckApicoverEnforce,
+				phaseIO:              c.PhaseIO,
+			},
 			Bridge:         c.Bridge,
 			Prompts:        c.Prompts,
 			NowFn:          c.NowFn,
@@ -317,7 +371,18 @@ func NewDefaultWithStage(br core.Bridge, prm *prompts.Loader, stage config.Stage
 // (workflow.compact_prompts). Called from cmd_cycle.go with wfCfg.CompactPrompts so
 // the reference tail is stripped before dispatch when the policy default is on.
 func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool) *Phase {
-	return New(Config{Bridge: br, Prompts: prm, GenerateVerdict: generateACSVerdict, CheckGofmt: gofmtCheckDefault, CheckSkillsDrift: skillsDriftCheckDefault, PhaseIO: stage, CompactPrompts: compact})
+	return New(Config{
+		Bridge:               br,
+		Prompts:              prm,
+		GenerateVerdict:      generateACSVerdict,
+		CheckGofmt:           gofmtCheckDefault,
+		CheckSkillsDrift:     skillsDriftCheckDefault,
+		CheckGoVet:           goVetCheckDefault,
+		CheckACSDurable:      acsDurableCheckDefault,
+		CheckApicoverEnforce: apicoverEnforceChangedDefault,
+		PhaseIO:              stage,
+		CompactPrompts:       compact,
+	})
 }
 
 // skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs the

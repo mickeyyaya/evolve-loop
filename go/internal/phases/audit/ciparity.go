@@ -1,0 +1,220 @@
+package audit
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+)
+
+// ciparity.go — the audit phase's "CI-parity" deterministic gates. Each runs a
+// whole-repo CI command (the EXACT one .github/workflows/go.yml runs) against
+// THIS cycle's worktree, so a cycle can never ship green-locally / red-in-CI —
+// the recurring "per-cycle proof ≠ repo-wide CI gate" disease that broke main
+// via import cycles (go vet ./...), unregistered/over-ceiling env flags (-tags
+// acs acs-durable), and unnamed exports (apicover -enforce).
+//
+// These are wired ONLY in NewDefaultWithStageCompact (production); New(Config{})
+// leaves them nil so the audit package's own `go test` never recursively forks
+// the go toolchain. They run in the phase-runner process (not the sandboxed
+// auditor LLM), so the subprocess is unrestricted.
+//
+// Contract (matches gofmtCheckDefault): returns ([]offenders, nil) → FAIL when
+// the CI command reports failures; (nil, err) → WARN (fail-open) when the gate
+// itself cannot run (no toolchain / no module); (nil, nil) → clean.
+
+const (
+	goVetTimeout      = 4 * time.Minute
+	acsDurableTimeout = 8 * time.Minute
+	apicoverTimeout   = 8 * time.Minute
+)
+
+// moduleDirForReq resolves the cycle's go/ module dir (where the builder's code
+// lives), preferring the worktree. Empty → no-op signal ("").
+func moduleDirForReq(req core.PhaseRequest) string {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	if root == "" {
+		return ""
+	}
+	dir := codequality.ModuleDir(root)
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return ""
+	}
+	return dir
+}
+
+// runCIGate runs one CI command in the cycle's go/ dir and maps the result to
+// the hook contract via the EXIT CODE (see the Capture note in the body): an
+// exec-start failure (binary not found, context cancelled) → error → fail-open
+// WARN; ANY non-zero exit → offenders → FAIL (a synthesized line covers the
+// rare no-output case); exit 0 → clean.
+func runCIGate(req core.PhaseRequest, label string, timeout time.Duration, name string, args ...string) ([]string, error) {
+	dir := moduleDirForReq(req)
+	if dir == "" {
+		return nil, nil // no go module in the worktree → nothing to check
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// Capture (NOT CombinedOutput): DefaultRunner maps a non-zero process EXIT to
+	// (code, nil), reserving err for unrecoverable start failures. So only the
+	// exit code distinguishes "the tool ran and found problems" (code != 0 →
+	// FAIL) from "the gate could not run" (err != nil → fail-open WARN). Capture
+	// returns stdout AND stderr — go vet writes its diagnostics to stderr.
+	out, errOut, code, err := sysexec.Capture(ctx, sysexec.DefaultRunner, dir, name, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s gate could not run: %w", label, err) // fail-open → WARN
+	}
+	if code == 0 {
+		return nil, nil // clean
+	}
+	combined := strings.TrimSpace(out + "\n" + errOut)
+	if combined == "" {
+		combined = fmt.Sprintf("%s exited %d (no output)", name, code)
+	}
+	return offenderLines(combined), nil // ran + non-zero exit → FAIL
+}
+
+// offenderLines extracts the most informative tail of a failing command's
+// output (the actual FAIL/error lines) so the diagnostic is legible, bounded so
+// a runaway log cannot bloat the verdict.
+func offenderLines(out string) []string {
+	all := strings.Split(out, "\n")
+	var keep []string
+	for _, ln := range all {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		if strings.Contains(ln, "FAIL") || strings.Contains(ln, "error") ||
+			strings.Contains(ln, "import cycle") || strings.Contains(ln, "UNCOVERED") ||
+			strings.Contains(ln, "cannot") || strings.HasPrefix(ln, "--- FAIL") {
+			keep = append(keep, ln)
+		}
+	}
+	if len(keep) == 0 { // no recognizable marker — fall back to the last few lines
+		start := len(all) - 6
+		if start < 0 {
+			start = 0
+		}
+		for _, ln := range all[start:] {
+			if ln = strings.TrimSpace(ln); ln != "" {
+				keep = append(keep, ln)
+			}
+		}
+	}
+	if len(keep) > 12 {
+		keep = keep[len(keep)-12:]
+	}
+	return keep
+}
+
+// goVetCheckDefault runs `go vet ./...` (CI go.yml "vet + fmt" step / `make
+// lint`) over the whole worktree module — catches import cycles and other
+// vet-level defects a scoped build misses.
+func goVetCheckDefault(req core.PhaseRequest) ([]string, error) {
+	return runCIGate(req, "go vet ./...", goVetTimeout, "go", "vet", "./...")
+}
+
+// acsDurableCheckDefault runs the durable ACS regression suite with -tags acs
+// (CI ci.yml acs-durable gate / `make test-acs-durable`) — catches flagregistry
+// / flag-ceiling / skills-drift regressions invisible without the acs build tag.
+func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
+	return runCIGate(req, "acs-durable (-tags acs)", acsDurableTimeout,
+		"go", "test", "-count=1", "-tags", "acs", "./acs/regression/...")
+}
+
+// apicoverEnforceChangedDefault runs `apicover -enforce` (CI go.yml "api-coverage
+// enforce" step) over the enforced packages this cycle actually touched — the
+// AST-level UNCOVERED (unnamed-export) check that repeatedly broke main. Scoped
+// to the touched∩enforced set (O(change)); a no-op when the cycle touched no
+// enforced package. FALSE-GREEN (coverage-dependent) is left to CI, matching the
+// acs/regression/apicover completeness/correctness split.
+func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
+	dir := moduleDirForReq(req)
+	if dir == "" {
+		return nil, nil
+	}
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	changed := changedPackagesForAudit(root, req.Cycle)
+	enforceBytes, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
+	if err != nil {
+		return nil, nil // no enforce list → nothing to enforce
+	}
+	touched := ciparity.IntersectEnforced(changed, enforceBytes)
+	if len(touched) == 0 {
+		return nil, nil // cycle touched no enforced package
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), apicoverTimeout)
+	defer cancel()
+	run := sysexec.DefaultRunner
+
+	// Build apicover from this worktree, then a scoped coverage profile over the
+	// touched packages (apicover -enforce reads a func-coverage file), then run
+	// -enforce over just those dirs — the same pipeline as go.yml, scoped.
+	if _, err := sysexec.Output(ctx, run, dir, "go", "build", "-o", "bin/apicover", "./cmd/apicover"); err != nil {
+		return nil, fmt.Errorf("apicover gate: build apicover: %w", err)
+	}
+	covPath := filepath.Join(dir, "bin", "ciparity-cover.txt")
+	defer func() { _ = os.Remove(covPath) }() // scratch profile — don't accumulate on a persistent worktree
+	testArgs := append([]string{"test", "-coverprofile=" + covPath}, touched...)
+	if _, err := sysexec.Output(ctx, run, dir, "go", testArgs...); err != nil {
+		return nil, fmt.Errorf("apicover gate: scoped coverage run: %w", err)
+	}
+	funcPath := covPath + ".func.txt"
+	defer func() { _ = os.Remove(funcPath) }()
+	funcOut, err := sysexec.Output(ctx, run, dir, "go", "tool", "cover", "-func="+covPath)
+	if err != nil {
+		return nil, fmt.Errorf("apicover gate: cover -func: %w", err)
+	}
+	if werr := os.WriteFile(funcPath, []byte(funcOut+"\n"), 0o644); werr != nil {
+		return nil, fmt.Errorf("apicover gate: write func cover: %w", werr)
+	}
+	dirsOut, err := sysexec.Output(ctx, run, dir, "go", append([]string{"list", "-e", "-f", "{{.Dir}}"}, touched...)...)
+	if err != nil {
+		return nil, fmt.Errorf("apicover gate: go list: %w", err)
+	}
+	dirs := strings.Fields(dirsOut)
+	if len(dirs) == 0 {
+		return nil, nil
+	}
+	args := append([]string{"-enforce", "-cover", funcPath}, dirs...)
+	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, filepath.Join(dir, "bin", "apicover"), args...)
+	if cerr != nil {
+		return nil, fmt.Errorf("apicover -enforce gate could not run: %w", cerr) // fail-open → WARN
+	}
+	if code == 0 {
+		return nil, nil
+	}
+	return offenderLines(strings.TrimSpace(out + "\n" + errOut)), nil // non-zero → FAIL
+}
+
+// changedPackagesForAudit locates this cycle's changed-package set from the
+// build handoff (same locator the EGPS suite uses). Best-effort: nil when no
+// handoff is found, which makes the apicover gate a no-op (fail-open).
+func changedPackagesForAudit(projectRoot string, cycle int) []string {
+	if projectRoot == "" {
+		return nil
+	}
+	dir := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
+	for _, name := range []string{"handoff-build.json", "handoff-builder.json"} {
+		if pkgs := changedpkgs.ChangedPackages(filepath.Join(dir, name)); len(pkgs) > 0 {
+			return pkgs
+		}
+	}
+	return nil
+}
