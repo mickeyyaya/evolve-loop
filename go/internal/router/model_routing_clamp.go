@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -22,9 +21,13 @@ import (
 // profile with an empty AllowedCLIs (B2: no restriction configured is a
 // PREFERENCE, not a violation — ValidatePin already encodes this). An entry
 // that proposes neither CLI nor Tier is left untouched (nothing to clamp).
+// catalogLookup resolves (cli,tier)→(model,ok); it is INJECTED (dependency
+// inversion) so router stays a leaf and never imports modelcatalog — the
+// caller passes modelcatalog.Catalog.Lookup. A nil catalogLookup skips the
+// catalog-resolvability gate (guardrail validation still applies).
 // PURE: returns a NEW plan (input unmutated) plus the clamps applied, so it
 // composes with ClampPlanToFloorWith exactly like every other router clamp.
-func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile, catalog modelcatalog.Catalog) (*PhasePlan, []Clamp) {
+func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile, catalogLookup func(cli, tier string) (string, bool)) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
 	}
@@ -50,8 +53,8 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 			e.CLI, e.Tier = "", ""
 			continue
 		}
-		if e.CLI != "" && e.Tier != "" {
-			if _, ok := catalog.Lookup(e.CLI, e.Tier); !ok {
+		if catalogLookup != nil && e.CLI != "" && e.Tier != "" {
+			if _, ok := catalogLookup(e.CLI, e.Tier); !ok {
 				clamps = append(clamps, Clamp{
 					Rule:     "model-routing-catalog-miss",
 					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),

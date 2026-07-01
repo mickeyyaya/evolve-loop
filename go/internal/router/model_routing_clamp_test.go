@@ -21,7 +21,7 @@ func TestClampPlanModelRouting_InBoundsHonored(t *testing.T) {
 	}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "codex", Tier: "balanced"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
 	if len(clamps) != 0 {
 		t.Fatalf("clamps = %+v, want none", clamps)
 	}
@@ -40,7 +40,7 @@ func TestClampPlanModelRouting_ClampsOutOfEnvelopeTier(t *testing.T) {
 	}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "fast"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
 	if len(clamps) != 1 {
 		t.Fatalf("clamps = %+v, want exactly one", clamps)
 	}
@@ -55,7 +55,7 @@ func TestClampPlanModelRouting_ClampsDisallowedCLI(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "mallory-cli"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), modelcatalog.Catalog{})
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), (modelcatalog.Catalog{}).Lookup)
 	if len(clamps) != 1 {
 		t.Fatalf("clamps = %+v, want exactly one", clamps)
 	}
@@ -71,7 +71,7 @@ func TestClampPlanModelRouting_ClampsCatalogMiss(t *testing.T) {
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "balanced"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), modelcatalog.Catalog{})
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), (modelcatalog.Catalog{}).Lookup)
 	if len(clamps) != 1 {
 		t.Fatalf("clamps = %+v, want exactly one", clamps)
 	}
@@ -90,7 +90,7 @@ func TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject(t *testing.T) {
 	}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "codex", Tier: "balanced"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
 	if len(clamps) != 0 {
 		t.Errorf("cross-family proposal produced clamps %+v, want none", clamps)
 	}
@@ -102,11 +102,11 @@ func TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject(t *testing.T) {
 // TestClampPlanModelRouting_NilPlanAndNoProposal covers the defensive nil-plan
 // return and the "nothing proposed" no-op path (an entry with CLI==Tier=="").
 func TestClampPlanModelRouting_NilPlanAndNoProposal(t *testing.T) {
-	if out, clamps := ClampPlanModelRouting(nil, profileFunc(nil), modelcatalog.Catalog{}); out != nil || clamps != nil {
+	if out, clamps := ClampPlanModelRouting(nil, profileFunc(nil), (modelcatalog.Catalog{}).Lookup); out != nil || clamps != nil {
 		t.Errorf("nil plan => (%v, %v), want (nil, nil)", out, clamps)
 	}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "scout", Run: true}}}
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(nil), modelcatalog.Catalog{})
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(nil), (modelcatalog.Catalog{}).Lookup)
 	if len(clamps) != 0 {
 		t.Errorf("clamps = %+v, want none for an entry proposing neither cli nor tier", clamps)
 	}
