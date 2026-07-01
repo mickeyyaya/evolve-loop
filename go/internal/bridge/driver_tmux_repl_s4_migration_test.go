@@ -126,8 +126,10 @@ func checkpointRegionSource(t *testing.T) string {
 		if start == -1 && strings.Contains(ln, "Review checkpoint: a full interval elapsed") {
 			start = i
 		}
-		if start != -1 && strings.Contains(ln, "intervalBaselinePane = curPane") {
+		if start != -1 && strings.Contains(ln, "intervalStart = elapsed") {
 			end = i // keep scanning — take the LAST match, the outer-block close
+			// (was "intervalBaselinePane = curPane" until that vestigial S4 dead
+			// assignment was removed; the interval reset now closes the region)
 		}
 	}
 	if start == -1 || end == -1 {

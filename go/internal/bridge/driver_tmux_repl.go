@@ -638,6 +638,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// disambiguate genuine work from animation.
 			livenessCenter.Observe(lp.session, curPane, paneProfile)
 			livenessState := livenessCenter.Aggregate()
+			// Exhaustion fast-fail (SignalCenter ExhaustionProbe, ADR-0068): the
+			// pane shows a quota/rate-limit WALL, so the artifact will NEVER come —
+			// fail over to the fallback CLI (exit 85) NOW instead of nudging and
+			// burning the full artifact timeout. Without this the re-printed error
+			// reads as Converging and wedges the phase in an extend-forever livelock
+			// (the agy hang-without-exit incident).
+			if livenessState == panestream.LivenessExhausted {
+				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall — failing over to fallback CLI (exit %d)\n", pfx, ExitUnknownPrompt)
+				return ExitUnknownPrompt, nil
+			}
 			// Progressed is sourced from the center's Changed(session)
 			// projection (S4) — a consecutive-observation comparison, not the
 			// interval-baseline diff. Behavior-preserving: .Progressed has no
@@ -707,7 +717,6 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					}
 					nudgeAt = deps.Now()
 					intervalStart = elapsed
-					intervalBaselinePane = curPane
 					attempt++
 					continue
 				}
@@ -715,7 +724,6 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 			attempt++
 			intervalStart = elapsed
-			intervalBaselinePane = curPane
 		}
 	}
 	if !completed {

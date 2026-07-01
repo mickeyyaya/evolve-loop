@@ -24,14 +24,15 @@ import (
 )
 
 // validAggregateStates is the complete, documented Aggregate() return set
-// (ADR-0068 aggregation rule): 0 (empty center, no observations) plus the
-// four LivenessState values. Any other value is a spec violation.
+// (ADR-0068 aggregation rule + ADR-0070): 0 (empty center, no observations) plus
+// the five LivenessState values. Any other value is a spec violation.
 var validAggregateStates = map[LivenessState]bool{
 	0:                       true,
 	LivenessIdle:            true,
 	LivenessBusyButStagnant: true,
 	LivenessHung:            true,
 	LivenessConverging:      true,
+	LivenessExhausted:       true,
 }
 
 // TestSignalCenter_ParallelEvaluateStress_MixedOpsRaceClean (AC1/AC2/AC4,

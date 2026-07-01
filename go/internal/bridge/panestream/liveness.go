@@ -38,6 +38,14 @@ const (
 	// LivenessHung: busy but no new content for stallThreshold consecutive
 	// intervals. Reviewer: fast-fail before the maxExtends×interval backstop.
 	LivenessHung
+	// LivenessExhausted: the pane shows a quota/rate-limit WALL (the per-CLI
+	// ExhaustedRegex matched). This is an ORTHOGONAL axis to the growth-velocity
+	// liveness above — a walled CLI can still look Converging because its error
+	// re-prints as "new content" — so ExhaustionProbe returns this state to
+	// OVERRIDE the inner verdict. It is terminal: the artifact will never come,
+	// so the reviewer/driver must fast-fail to the fallback CLI (exit 85), never
+	// extend. Top of the aggregate priority order (a wall dominates).
+	LivenessExhausted
 )
 
 // LivenessProbe is the per-run liveness detector interface. Implementations are
@@ -45,6 +53,61 @@ const (
 // Assess once per review interval with the current rendered pane snapshot.
 type LivenessProbe interface {
 	Assess(rendered string, profile PaneProfile) (LivenessState, float64)
+}
+
+// ExhaustionProbe is a Decorator over any LivenessProbe that layers the
+// orthogonal, DOMINATING exhaustion signal: when the rendered pane matches the
+// profile's ExhaustedRegex (the per-CLI quota/rate-limit wall), Assess returns
+// LivenessExhausted regardless of the inner liveness verdict. This is what stops
+// a re-printed quota error from reading as LivenessConverging ("real output is
+// never stuck") and wedging the phase in an extend-forever livelock. The inner
+// probe is ALWAYS assessed (advancing its stateful PaneDelta cursor) so its
+// verdict stays consistent for any later frame; the override only replaces the
+// RESULT. When ExhaustedRegex is empty, uncompilable, or unmatched the decorator
+// is transparent — it delegates byte-identically (fail-open: never invents a
+// wall). This keeps exhaustion detection single-source (the manifest pattern),
+// per-CLI (via PaneProfile), and applied uniformly to every registered strategy.
+type ExhaustionProbe struct {
+	inner   LivenessProbe
+	pattern string         // pattern the cached re was compiled from (recompile only on change)
+	re      *regexp.Regexp // compiled ExhaustedRegex; nil = no/invalid pattern
+}
+
+// NewExhaustionProbe wraps inner with exhaustion-override detection. The
+// SignalCenter wraps every per-CLI probe in one of these so exhaustion flows
+// through the same abstraction as liveness.
+func NewExhaustionProbe(inner LivenessProbe) *ExhaustionProbe {
+	return &ExhaustionProbe{inner: inner}
+}
+
+// Assess returns (LivenessExhausted, 1.0) when the pane matches
+// profile.ExhaustedRegex (a wall is unambiguous — confidence 1.0); otherwise the
+// inner probe's verdict, unchanged.
+func (e *ExhaustionProbe) Assess(rendered string, profile PaneProfile) (LivenessState, float64) {
+	state, conf := e.inner.Assess(rendered, profile) // always advance the inner cursor
+	if e.walled(rendered, profile.ExhaustedRegex) {
+		return LivenessExhausted, 1.0
+	}
+	return state, conf
+}
+
+// walled reports whether rendered matches pattern, compiling and caching pattern
+// (stable per session, so compiled at most once). An empty or uncompilable
+// pattern matches nothing — the gate's own misconfiguration must never brick a
+// session.
+func (e *ExhaustionProbe) walled(rendered, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	if pattern != e.pattern {
+		e.pattern = pattern
+		if re, err := regexp.Compile(pattern); err != nil {
+			e.re = nil // fail-open on a bad pattern
+		} else {
+			e.re = re
+		}
+	}
+	return e.re != nil && e.re.MatchString(rendered)
 }
 
 // defaultHungAfter is how many consecutive busy-but-stagnant intervals the
@@ -231,11 +294,6 @@ func (d *OllamaDetector) Assess(rendered string, p PaneProfile) (LivenessState, 
 	return base, baseConf
 }
 
-// DetectorFor returns a new LivenessProbe for the given pane profile.
-// Co-located with Profiles (ADR-0047 single-source-with-projection): the
-// per-CLI strategy selection lives here, never in the reviewer.
-// ollama routes to OllamaDetector; claude routes to ClaudeDetector;
-// all others receive DefaultDetector.
 // agyGeneratingSpinner is the exact spinner text that agy renders while the
 // model is generating a response. It disappears when the answer is complete.
 const agyGeneratingSpinner = "⣯ Generating..."

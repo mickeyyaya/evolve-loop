@@ -19,14 +19,30 @@ import "sync"
 // per-session lock is acquired. No code path holds both locks at once, and no
 // code path acquires a per-session lock before the global lock.
 //
-// Aggregation rule: any Converging session ⇒ Converging; else Hung if any
-// session is Hung; else BusyButStagnant; else Idle; else 0 (empty center).
+// Aggregation rule: any Exhausted session ⇒ Exhausted (a quota/rate-limit wall
+// dominates — the artifact will never come); else Converging if any session is
+// Converging; else Hung; else BusyButStagnant; else Idle; else 0 (empty center).
 // The rule is documented and testable, not implicit.
 type SignalCenter struct {
 	mu       sync.RWMutex
 	sessions map[string]*sessionSignals
 	registry map[string]func() LivenessProbe
+	handlers []SignalHandler // signal observers (RegisterSignalHandler); dispatched edge-triggered on state transition
 }
+
+// SignalEvent is one CLI-status observation dispatched to registered handlers:
+// the session whose state changed and its new liveness state. Handlers filter
+// for the states they act on (e.g. the CLI-bench reacts to LivenessExhausted).
+type SignalEvent struct {
+	SessionKey string
+	State      LivenessState
+}
+
+// SignalHandler reacts to a CLI-status transition. Registered via
+// RegisterSignalHandler; invoked edge-triggered whenever a session's state
+// changes. It runs inline under Observe (outside all locks), so it must be cheap
+// and non-blocking.
+type SignalHandler func(SignalEvent)
 
 // sessionSignals holds the stateful probe and the most recent liveness verdict
 // for one session key, plus the Busy/Changed projections (S4): busy and clean
@@ -69,6 +85,21 @@ func (sc *SignalCenter) RegisterHandler(name string, factory func() LivenessProb
 	sc.mu.Unlock()
 }
 
+// RegisterSignalHandler registers h to receive a SignalEvent whenever any
+// session's liveness state transitions. This is the PUSH half of the center (the
+// "detected and sent to the registered handler" path): a reactive consumer —
+// e.g. the CLI-bench that benches a walled driver so later phases route around
+// it — registers here instead of polling Aggregate. A nil handler is a no-op
+// (mirroring RegisterHandler's empty-name tolerance). Safe for concurrent use.
+func (sc *SignalCenter) RegisterSignalHandler(h SignalHandler) {
+	if h == nil {
+		return
+	}
+	sc.mu.Lock()
+	sc.handlers = append(sc.handlers, h)
+	sc.mu.Unlock()
+}
+
 // Observe records one liveness observation for sessionKey. On the first call
 // for a key, the probe is created via the registry (if profile.Name is
 // registered) or DetectorFor (fallback). Subsequent calls reuse the same
@@ -88,14 +119,16 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 		} else {
 			probe = DetectorFor(profile)
 		}
-		ss = &sessionSignals{probe: probe}
+		// Decorator: wrap every probe so exhaustion (profile.ExhaustedRegex) is
+		// detected through the SAME abstraction as liveness and overrides it.
+		ss = &sessionSignals{probe: NewExhaustionProbe(probe)}
 		sc.sessions[sessionKey] = ss
 	}
+	handlers := append([]SignalHandler(nil), sc.handlers...) // snapshot under the structural lock
 	sc.mu.Unlock()
 
 	ss.mu.Lock()
-	defer ss.mu.Unlock()
-
+	prev := ss.last
 	state, _ := ss.probe.Assess(rendered, profile)
 	ss.last = state
 
@@ -108,6 +141,19 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 	clean := cleanPane(rendered)
 	ss.changed = existed && clean != ss.clean
 	ss.clean = clean
+	ss.mu.Unlock()
+
+	// Edge-triggered dispatch (Observer): only on a state TRANSITION, and OUTSIDE
+	// both locks so a slow or re-entrant handler never serializes other sessions'
+	// Observe calls nor deadlocks on the center's locks. The first observation of
+	// a key transitions 0→initial, so a session walled on its very first frame
+	// still dispatches Exhausted; staying in a state re-fires nothing.
+	if state != prev {
+		ev := SignalEvent{SessionKey: sessionKey, State: state}
+		for _, h := range handlers {
+			h(ev)
+		}
+	}
 }
 
 // Busy reports the most-recent Observe's busy affordance for sessionKey
@@ -169,6 +215,7 @@ func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool {
 // aggregatePriority defines the winner-takes-all aggregation order.
 // Any Converging session beats all others; Hung beats BusyButStagnant; etc.
 var aggregatePriority = [...]LivenessState{
+	LivenessExhausted, // a quota/rate-limit wall dominates every other state
 	LivenessConverging,
 	LivenessHung,
 	LivenessBusyButStagnant,
