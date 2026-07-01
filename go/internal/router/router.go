@@ -7,6 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // canonicalOrder is the linear phase sequence the walk advances through. The
@@ -121,6 +122,15 @@ type PhaseCard struct {
 	Description  string   `json:"description,omitempty"` // one line: what the phase produces
 	WhenToUse    string   `json:"when_to_use,omitempty"` // the SELECT hint
 	Categories   []string `json:"categories,omitempty"`  // goal types
+	// AllowedCLIs + ModelTierEnvelope (cycle-436 MR1) project this phase's own
+	// profile guardrails into the plan prompt, so the advisor's per-phase
+	// {cli,tier} proposal is grounded in-bounds instead of guessing blind.
+	// Both nil/empty in the common case (no per-phase guardrail configured);
+	// the MR2 clamp re-validates regardless of whether the advisor honored
+	// the projection. Reuses profiles.ModelTierEnvelope's exact JSON shape
+	// rather than forking a router-local type.
+	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
+	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
 }
 
 // CarryoverTodo is the router/advisor-facing projection of one unresolved
@@ -184,6 +194,16 @@ type PhasePlanEntry struct {
 	Phase         string `json:"phase"`
 	Run           bool   `json:"run"`
 	Justification string `json:"justification,omitempty"`
+	// CLI/Tier mirror MintSpec{Tier,CLI} (cycle-436 MR1) onto an EXISTING
+	// (non-minted) phase's plan entry: the advisor's proposed dispatch CLI and
+	// abstract model TIER (fast|balanced|deep — never a raw model name). Both
+	// omitempty so a plan that never sets them (today's entire static-routing
+	// fleet) marshals BYTE-IDENTICAL to the pre-MR1 wire form — the H1
+	// regression floor. Advisory only: router.ClampPlanModelRouting
+	// re-validates against the phase's profile guardrails + the live model
+	// catalog before either ever reaches dispatch.
+	CLI  string `json:"cli,omitempty"`
+	Tier string `json:"tier,omitempty"`
 	// Mint, when present, marks this entry as a NEW phase the advisor is
 	// proposing (absent from the catalog). The orchestrator registers it via
 	// the trust-kernel clamp and dispatches it by Phase name. Absent (the
