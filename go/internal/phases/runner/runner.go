@@ -469,20 +469,24 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// (profileName keys both the profile lookup and the EVOLVE_<AGENT>_* env).
 	sysPrompt := systemprompt.Resolve(profileName, profileDir, req.Env)
 
-	// WS-G1: dispatch through the chain. Each attempt: build BridgeRequest
-	// for the candidate CLI, Launch, normalize events. On a trigger exit
-	// (default {80, 81, 124, 127} per cli_chain.go:defaultFallbackOnExit
-	// — REPL-boot-timeout / artifact-timeout / coreutils-timeout /
-	// missing-binary) we advance to the next candidate. Any other exit
-	// (or success) breaks the loop — a legitimate FAIL verdict from a
-	// model never silently routes to a different CLI. Final attempt's
-	// (bres, bridgeErr, cli) is what the rest of the function consumes;
-	// events file reflects the final CLI's stdout so cycleclassify sees
-	// what actually happened last.
+	// WS-G1: dispatch through the chain via llmroute.Dispatch — the SAME
+	// chain-walk implementation the advisor uses (cycle-435,
+	// [[never_duplicate_centralize_via_design_patterns]]), rather than a
+	// hand-rolled copy of it. Each attempt: build BridgeRequest for the
+	// candidate CLI, Launch, normalize events. On a trigger exit (default
+	// {80, 81, 124, 127} per cli_chain.go:defaultFallbackOnExit —
+	// REPL-boot-timeout / artifact-timeout / coreutils-timeout /
+	// missing-binary) Dispatch advances to the next candidate. Any other exit
+	// (or success) stops the walk — a legitimate FAIL verdict from a model
+	// never silently routes to a different CLI. Final attempt's (bres,
+	// bridgeErr) is what the rest of the function consumes; events file
+	// reflects the final CLI's stdout so cycleclassify sees what actually
+	// happened last.
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
-	for i, candidateCLI := range plan.Candidates {
+	llmroute.Dispatch(plan, func(candidateCLI string) (int, error) {
+		i := len(attemptLog)
 		if i > 0 {
 			log.Diag().Infof(
 				"[runner] phase=%s fallback %d/%d: trying cli=%s (previous=%s exit=%d)\n",
@@ -523,18 +527,8 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(req.ProjectRoot, req.Workspace, candidateCLI, start, req.Env)
 		}
-		// (Pre-existing WS-G dead assignment removed in cycle-122 Fix 2:
-		// `cli` was assigned here but never read downstream — the
-		// per-attempt CLI lives in attemptLog instead. Comment kept so
-		// `git blame` reveals the cleanup intent for a future reader.)
-		if bridgeErr == nil {
-			break // success
-		}
-		if !plan.TriggersFallback(bres.ExitCode) {
-			break // non-trigger error: surface to caller (real FAIL, real timeout on mandatory phase, etc.)
-		}
-		// trigger exit + more candidates → loop continues
-	}
+		return bres.ExitCode, bridgeErr
+	})
 	if len(attemptLog) > 1 {
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
