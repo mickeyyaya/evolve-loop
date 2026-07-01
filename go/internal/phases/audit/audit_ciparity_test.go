@@ -95,6 +95,17 @@ func TestNewDefault_WiresCIParityGates(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeACSVerdict(t, ws, 0) // EGPS green → only the go-vet gate can FAIL.
+	// A build handoff naming a changed Go package makes cycleTouchedGo true, so
+	// the real repo-wide go-vet gate actually runs (it no-ops without one — the
+	// guard that keeps the gate off synthetic/incomplete test worktrees).
+	buildRun := filepath.Join(root, ".evolve", "runs", "cycle-7")
+	if err := os.MkdirAll(buildRun, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(buildRun, "handoff-build.json"),
+		[]byte(`{"thrusts":[{"files_modified":["go/internal/p/x.go"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	fb := &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 	phase := NewDefault(fb, fakePromptsFS("body"))

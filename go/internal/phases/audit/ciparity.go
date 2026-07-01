@@ -37,6 +37,11 @@ const (
 	apicoverTimeout   = 8 * time.Minute
 )
 
+// runCmd is the subprocess runner the CI-parity gates use. It is a package var
+// so tests can inject a fake runner and exercise the exit-code mapping + the
+// apicover pipeline without forking the real go toolchain.
+var runCmd sysexec.RunFunc = sysexec.DefaultRunner
+
 // moduleDirForReq resolves the cycle's go/ module dir (where the builder's code
 // lives), preferring the worktree. Empty → no-op signal ("").
 func moduleDirForReq(req core.PhaseRequest) string {
@@ -48,7 +53,11 @@ func moduleDirForReq(req core.PhaseRequest) string {
 		return ""
 	}
 	dir := codequality.ModuleDir(root)
-	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+	// Require a real go module (go.mod present). ModuleDir falls back to `root`
+	// itself when there is no go/ subdir, so an IsDir check alone would run the
+	// gate in a non-module directory — go vet then fails "go.mod not found",
+	// a false offender. A synthetic/incomplete test worktree has no go.mod.
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
 		return ""
 	}
 	return dir
@@ -64,6 +73,7 @@ func runCIGate(req core.PhaseRequest, label string, timeout time.Duration, name 
 	if dir == "" {
 		return nil, nil // no go module in the worktree → nothing to check
 	}
+	run := runCmd // capture once at entry (consistent with apicoverEnforceChangedDefault)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	// Capture (NOT CombinedOutput): DefaultRunner maps a non-zero process EXIT to
@@ -71,7 +81,7 @@ func runCIGate(req core.PhaseRequest, label string, timeout time.Duration, name 
 	// exit code distinguishes "the tool ran and found problems" (code != 0 →
 	// FAIL) from "the gate could not run" (err != nil → fail-open WARN). Capture
 	// returns stdout AND stderr — go vet writes its diagnostics to stderr.
-	out, errOut, code, err := sysexec.Capture(ctx, sysexec.DefaultRunner, dir, name, args...)
+	out, errOut, code, err := sysexec.Capture(ctx, run, dir, name, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s gate could not run: %w", label, err) // fail-open → WARN
 	}
@@ -119,17 +129,38 @@ func offenderLines(out string) []string {
 	return keep
 }
 
+// cycleTouchedGo reports whether this cycle has a build handoff naming >=1
+// changed Go package — the signal that this worktree is a REAL cycle build (a
+// synthetic test fixture or a docs-only cycle has none). The whole-repo gates
+// (go vet, acs-durable) run only then, so they never fire against an incomplete
+// module (e.g. a unit-test worktree with a bare go/ dir but no go.mod / repo
+// structure).
+func cycleTouchedGo(req core.PhaseRequest) bool {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	return len(changedPackagesForAudit(root, req.Cycle)) > 0
+}
+
 // goVetCheckDefault runs `go vet ./...` (CI go.yml "vet + fmt" step / `make
 // lint`) over the whole worktree module — catches import cycles and other
-// vet-level defects a scoped build misses.
+// vet-level defects a scoped build misses. No-op unless the cycle built Go.
 func goVetCheckDefault(req core.PhaseRequest) ([]string, error) {
+	if !cycleTouchedGo(req) {
+		return nil, nil
+	}
 	return runCIGate(req, "go vet ./...", goVetTimeout, "go", "vet", "./...")
 }
 
 // acsDurableCheckDefault runs the durable ACS regression suite with -tags acs
 // (CI ci.yml acs-durable gate / `make test-acs-durable`) — catches flagregistry
 // / flag-ceiling / skills-drift regressions invisible without the acs build tag.
+// No-op unless the cycle built Go.
 func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
+	if !cycleTouchedGo(req) {
+		return nil, nil
+	}
 	return runCIGate(req, "acs-durable (-tags acs)", acsDurableTimeout,
 		"go", "test", "-count=1", "-tags", "acs", "./acs/regression/...")
 }
@@ -161,7 +192,7 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), apicoverTimeout)
 	defer cancel()
-	run := sysexec.DefaultRunner
+	run := runCmd
 
 	// Build apicover from this worktree, then a scoped coverage profile over the
 	// touched packages (apicover -enforce reads a func-coverage file), then run

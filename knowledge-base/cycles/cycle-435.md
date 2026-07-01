@@ -1,11 +1,29 @@
 # Cycle 435 Dossier
 
-**Goal:** 427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164
-**Final verdict:** PASS
-**Run ID:** 01KWDZYT94VQJTWW1T2K9B4FRT
+**Goal:** Fix the ADVISOR's own dispatch resilience so the dynamic-routing brain stops failing every cycle. Small cycle-sized slices, strict TDD (red->green->refactor), clean code, ALL LLM-CLI control through the agent-bridge abstraction, driver-agnostic, every new exported symbol named in a _test.go AST (apicover -enforce), no regression to any wedge/floor invariant.
+
+PROBLEM: the advisor (the `router` phase) runs its Plan/Propose call via a DIRECT bridge.Launch inside advisorLaunch (go/internal/core/phase_advisor.go:248-281), bypassing the runner's fallback-chain machinery (go/internal/phases/runner + internal/cli_health). So when the advisor's primary CLI fails (agy exit=81, the artifact-timeout wall), it does NOT fall back to the profile's declared cli_fallback ["claude-tmux"] — it returns an error and the orchestrator degrades to the static spine (cyclerun.go:510). This happens EVERY cycle, so the advisor is effectively offline and any dynamic/auto routing is inert.
+
+SLICES:
+  A1 (core fix): make advisorLaunch honor the advisor profile's cli_fallback chain + the standard fallback triggers [80 81 85 124 127] — the same resilience regular phases get via the runner — so agy-exit-81 falls back to claude and PRODUCES a plan instead of degrading. REUSE the existing fallback machinery (llmroute / cli_health), do not duplicate it (single-source-with-projection). The advisor's own dispatch must be the MOST resilient path in the system because everything depends on it (it bootstraps all other routing). Preserve degrade-to-static ONLY as the last-resort backstop when EVERY CLI in the chain is exhausted.
+  A2 (if budget remains): last-good-plan reuse — cache the last successful routing plan and, on a transient advisor failure, reuse it within a freshness bound (bounded by cycle count) instead of degrading straight to static, for routing continuity.
+
+VERIFY: a test where the advisor's primary CLI returns exit=81 must fall back to the next CLI and produce a plan (NOT degrade); degrade-to-static must occur only when every CLI in the chain fails; the fallback dispatch goes THROUGH THE BRIDGE (no direct-exec bypass); go test -race green; apicover -enforce clean on touched packages.
+**Final verdict:** FAIL
+**Run ID:** 01KWE4NH7G33JNR3454P02RE7J
 
 ## Phases
 
 | Phase | Archetype | Verdict | Duration | Key Findings |
 |-------|-----------|---------|----------|--------------|
-| cycle-recorded |  | PASS |  | cycle completed; ledger walk deferred to future slice |
+| cycle-recorded |  | FAIL |  | cycle completed; ledger walk deferred to future slice |
+
+## Defects
+
+- **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Carryover
+
+- **address-audit-findings** (high): resolve the audit findings that failed cycle 435
+
