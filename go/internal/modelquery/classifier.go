@@ -9,13 +9,27 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
+// PromptDispatcher sends a one-shot prompt to cli and returns its reply. The
+// production implementation lives in cmd/evolve, routing through
+// bridge.Engine.Launch (sandboxed, liveness-probed, cli_fallback-aware) — this
+// seam is what keeps that fragile, live-only dispatch out of the unit-tested
+// classifier package (mirrors ModelCapturer/recipe.go). Named generically
+// (DispatchPrompt, not Classify-specific) so any future one-shot
+// model-reaching helper in this package can reuse it.
+type PromptDispatcher interface {
+	DispatchPrompt(ctx context.Context, cli, prompt string) (string, error)
+}
+
 // CLIClassifier maps raw model ids to canonical tiers by asking a working LLM
 // CLI (codex/agy/claude) to do the judgment — never a hardcoded model table.
 type CLIClassifier struct {
 	// CLI is the ready CLI used to run the one-shot classification prompt.
 	CLI string
-	// Run defaults to the package exec runner when nil.
-	Run Runner
+	// Dispatcher sends the classification prompt to CLI. Required — a nil
+	// Dispatcher errors rather than falling back to a raw exec (every
+	// LLM-CLI control that reaches a model must go through the bridge; see
+	// docs/architecture — C1).
+	Dispatcher PromptDispatcher
 }
 
 // Classify asks CLIClassifier.CLI to map the offered model ids of targetCLI into
@@ -28,12 +42,10 @@ func (c CLIClassifier) Classify(ctx context.Context, targetCLI string, modelIDs 
 	if len(modelIDs) == 0 {
 		return nil, fmt.Errorf("modelquery: no model ids to classify")
 	}
-	run := c.Run
-	if run == nil {
-		run = defaultRunner
+	if c.Dispatcher == nil {
+		return nil, fmt.Errorf("modelquery: classifier %s has no PromptDispatcher", c.CLI)
 	}
-	name, args := classifierArgv(c.CLI, buildClassifyPrompt(targetCLI, modelIDs))
-	out, err := run(ctx, name, args, "")
+	out, err := c.Dispatcher.DispatchPrompt(ctx, c.CLI, buildClassifyPrompt(targetCLI, modelIDs))
 	if err != nil {
 		return nil, fmt.Errorf("classifier %s: %w (output: %s)", c.CLI, err, truncate(out, 200))
 	}
@@ -78,19 +90,6 @@ func sanitizeTierMap(parsed map[string]string, offered []string) map[string]stri
 		out[tier] = model
 	}
 	return out
-}
-
-// classifierArgv builds the per-CLI non-interactive invocation for a one-shot
-// prompt. codex needs `exec --skip-git-repo-check`; agy/claude take `-p`.
-func classifierArgv(cli, prompt string) (name string, args []string) {
-	switch cli {
-	case "codex":
-		return "codex", []string{"exec", "--skip-git-repo-check", prompt}
-	case "agy":
-		return "agy", []string{"-p", prompt}
-	default: // claude and any -p-style CLI
-		return cli, []string{"-p", prompt}
-	}
 }
 
 // buildClassifyPrompt is deterministic so identical inputs cache the same way at

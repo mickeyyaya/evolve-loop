@@ -15,6 +15,12 @@ type OllamaLister struct {
 
 // List returns the model ids from `ollama list`. The cli argument is ignored
 // (this lister is ollama-specific) but kept for interface uniformity.
+//
+// C1 exception: `ollama list` is metadata-only — it enumerates locally
+// installed models and reaches no model, so it is exempt from the
+// PromptDispatcher/bridge requirement that governs actual model-reaching
+// dispatch elsewhere in this package (see CLIClassifier). No prompt or
+// stdin is ever passed to this call.
 func (l OllamaLister) List(ctx context.Context, _ string) ([]string, error) {
 	run := l.Run
 	if run == nil {

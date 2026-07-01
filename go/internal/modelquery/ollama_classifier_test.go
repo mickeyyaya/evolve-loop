@@ -3,21 +3,26 @@ package modelquery
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-// stubRunner returns canned output/err and records the last invocation.
+// stubRunner returns canned output/err and records the last invocation,
+// including stdin — TestOllamaListerReachesNoModel below asserts stdin is
+// always empty for `ollama list` (the metadata-only, no-prompt guarantee).
 type stubRunner struct {
-	out      string
-	err      error
-	lastName string
-	lastArgs []string
+	out       string
+	err       error
+	lastName  string
+	lastArgs  []string
+	lastStdin string
 }
 
-func (s *stubRunner) run(_ context.Context, name string, args []string, _ string) (string, error) {
-	s.lastName, s.lastArgs = name, args
+func (s *stubRunner) run(_ context.Context, name string, args []string, stdin string) (string, error) {
+	s.lastName, s.lastArgs, s.lastStdin = name, args, stdin
 	return s.out, s.err
 }
 
@@ -60,6 +65,46 @@ func TestOllamaListerError(t *testing.T) {
 	}
 }
 
+// TestOllamaListerReachesNoModel is GAP 2's decision-(b) predicate (scout
+// finding #3): `ollama list` is a non-interactive metadata enumeration, not a
+// model-reaching dispatch, so C1 (every LLM-CLI control that reaches a model
+// must go through the bridge) does not apply to it. This asserts the call
+// site invokes ONLY `ollama list` — no prompt argument, no stdin — which is
+// the structural difference between "enumerate what's installed" and
+// "dispatch a prompt to a model".
+func TestOllamaListerReachesNoModel(t *testing.T) {
+	s := &stubRunner{out: "NAME\nllama3.3:latest  x  y  z\n"}
+	if _, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.lastArgs) != 1 || s.lastArgs[0] != "list" {
+		t.Fatalf("args = %v, want exactly [\"list\"] (no prompt argument)", s.lastArgs)
+	}
+	if s.lastStdin != "" {
+		t.Fatalf("stdin = %q, want empty (no prompt piped to ollama)", s.lastStdin)
+	}
+}
+
+// TestOllamaListMetadataExceptionDocumented pins GAP 2's required call-site
+// comment (scout mailbox → Auditor: "ollama list is an ALLOWED metadata
+// exception (must be commented + tested as no-model-reached)"). A grep-gamed
+// magic string alone would be a degenerate predicate (cycle-85 lesson), so
+// this test also runs alongside TestOllamaListerReachesNoModel, which
+// exercises the actual no-prompt behavior the comment documents.
+func TestOllamaListMetadataExceptionDocumented(t *testing.T) {
+	src, err := os.ReadFile("ollama.go")
+	if err != nil {
+		t.Fatalf("read ollama.go: %v", err)
+	}
+	matched, err := regexp.MatchString(`(?i)metadata|no model|not model-reaching`, string(src))
+	if err != nil {
+		t.Fatalf("regexp: %v", err)
+	}
+	if !matched {
+		t.Error("ollama.go must document its List call site as a metadata-only / non-model-reaching C1 exception")
+	}
+}
+
 func TestJSONObjects(t *testing.T) {
 	tests := []struct {
 		name, in string
@@ -91,24 +136,8 @@ func TestJSONObjects(t *testing.T) {
 	}
 }
 
-// TestClassifierSkipsPromptEcho is the regression guard for the live bug: codex
-// echoes the prompt's literal JSON template before the real answer; the
-// classifier must skip the template (models = "<id>", not offered) and use the
-// real reply.
-func TestClassifierSkipsPromptEcho(t *testing.T) {
-	echoed := `{"fast":"<id>","balanced":"<id>","deep":"<id>"}` + "\ncodex\n" +
-		`{"fast":"phi4:latest","balanced":"llama3.3:latest","deep":"gemma4:31b-cloud"}` + "\ntokens used\n"
-	s := &stubRunner{out: echoed}
-	got, err := (CLIClassifier{CLI: "codex", Run: s.run}).Classify(
-		context.Background(), "ollama",
-		[]string{"gemma4:latest", "gemma4:31b-cloud", "phi4:latest", "llama3.3:latest"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got["fast"] != "phi4:latest" || got["deep"] != "gemma4:31b-cloud" || got["balanced"] != "llama3.3:latest" {
-		t.Fatalf("classifier picked the wrong object: %v", got)
-	}
-}
+// (The CLIClassifier prompt-echo regression guard lives in classifier_test.go
+// now, exercised through the PromptDispatcher seam.)
 
 func TestSanitizeTierMap(t *testing.T) {
 	offered := []string{"m-fast", "m-bal", "m-deep"}
@@ -128,46 +157,11 @@ func TestSanitizeTierMap(t *testing.T) {
 	}
 }
 
-func TestClassifierArgv(t *testing.T) {
-	tests := []struct {
-		cli, wantName, wantArg0 string
-	}{
-		{"codex", "codex", "exec"},
-		{"agy", "agy", "-p"},
-		{"claude", "claude", "-p"},
-	}
-	for _, tt := range tests {
-		name, args := classifierArgv(tt.cli, "PROMPT")
-		if name != tt.wantName || args[0] != tt.wantArg0 {
-			t.Fatalf("argv(%q) = %s %v", tt.cli, name, args)
-		}
-		if args[len(args)-1] != "PROMPT" {
-			t.Fatalf("prompt not last arg for %q: %v", tt.cli, args)
-		}
-	}
-}
-
-func TestCLIClassifierClassify(t *testing.T) {
-	s := &stubRunner{out: "OpenAI Codex\ncodex\n{\"fast\":\"gpt-5.4-mini\",\"balanced\":\"gpt-5.4\",\"deep\":\"gpt-5.5\"}\ntokens used\n"}
-	c := CLIClassifier{CLI: "codex", Run: s.run}
-	got, err := c.Classify(context.Background(), "codex", []string{"gpt-5.4-mini", "gpt-5.4", "gpt-5.5"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got["deep"] != "gpt-5.5" || got["fast"] != "gpt-5.4-mini" {
-		t.Fatalf("classify = %v", got)
-	}
-	if s.lastName != "codex" || s.lastArgs[0] != "exec" {
-		t.Fatalf("expected codex exec, got %s %v", s.lastName, s.lastArgs)
-	}
-}
-
-func TestCLIClassifierBadReply(t *testing.T) {
-	s := &stubRunner{out: "I cannot help with that."}
-	if _, err := (CLIClassifier{CLI: "codex", Run: s.run}).Classify(context.Background(), "codex", []string{"x"}); err == nil {
-		t.Fatal("expected error when reply has no JSON")
-	}
-}
+// (classifierArgv and the exec-argv-based CLIClassifier tests are retired:
+// GAP 1's fix removes classifierArgv from classifier.go entirely — the bridge's
+// headless drivers (driver_codex.go/driver_claudep.go/driver_agy.go) already
+// own the exact same per-CLI invocation shape it duplicated. See
+// TestGuard_ClassifierHasNoDirectModelExec in classifier_test.go.)
 
 // TestDefaultRunner_CapturesOutput exercises the production exec runner end to
 // end against a guaranteed-present shell builtin wrapper. Skipped only when the
@@ -246,46 +240,10 @@ func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 	}
 }
 
-// TestCLIClassifier_NilRunDefaultsToExecRunner covers the `run == nil` default
-// branch in Classify: with no injected Runner it shells out to the named CLI,
-// which is absent in CI, so Classify returns the wrapped classifier error.
-func TestCLIClassifier_NilRunDefaultsToExecRunner(t *testing.T) {
-	t.Parallel()
-	const absentCLI = "evolve-absent-cli-xyz"
-	if _, err := exec.LookPath(absentCLI); err == nil {
-		t.Skip("sentinel CLI unexpectedly present on PATH")
-	}
-	_, err := (CLIClassifier{CLI: absentCLI}).Classify(
-		context.Background(), absentCLI, []string{"m1"})
-	if err == nil {
-		t.Fatal("want error when classifier CLI binary is absent")
-	}
-	if !strings.Contains(err.Error(), "classifier "+absentCLI) {
-		t.Errorf("want wrapped classifier error, got %v", err)
-	}
-}
-
-// TestCLIClassifier_AllObjectsFailToMap covers the loop's continue branch
-// (json.Unmarshal failure on a non-object) AND the terminal "no JSON object
-// mapped a tier" error: a reply with one malformed-typed object and one valid
-// JSON object whose models are all hallucinated → no tier survives sanitize.
-func TestCLIClassifier_AllObjectsFailToMap(t *testing.T) {
-	t.Parallel()
-	// First object has a non-string value → json.Unmarshal into map[string]string
-	// fails → continue. Second object is valid JSON but maps tiers to models that
-	// were never offered → sanitizeTierMap returns empty → loop continues → the
-	// terminal error fires.
-	reply := `{"fast":123}` + "\n" + `{"fast":"not-offered","deep":"also-not"}`
-	s := &stubRunner{out: reply}
-	_, err := (CLIClassifier{CLI: "codex", Run: s.run}).Classify(
-		context.Background(), "codex", []string{"real-model"})
-	if err == nil {
-		t.Fatal("want error when no object maps a tier to an offered model")
-	}
-	if !strings.Contains(err.Error(), "no JSON object mapped a tier") {
-		t.Errorf("want terminal mapping error, got %v", err)
-	}
-}
+// (TestCLIClassifier_AllObjectsFailToMap moved to classifier_test.go, rewired
+// through the fakeDispatcher seam. The nil-Run-defaults-to-exec-runner
+// scenario no longer applies: CLIClassifier has no exec fallback at all now —
+// see TestCLIClassifierClassify_NilDispatcherErrorsNeverShellsOut.)
 
 // TestTruncate_LongStringTruncates covers truncate's tail branch (len > n):
 // it returns the first n runes plus an ellipsis. Multi-byte runes confirm the
@@ -299,11 +257,6 @@ func TestTruncate_LongStringTruncates(t *testing.T) {
 	}
 }
 
-func TestCLIClassifierGuards(t *testing.T) {
-	if _, err := (CLIClassifier{Run: (&stubRunner{}).run}).Classify(context.Background(), "codex", []string{"x"}); err == nil {
-		t.Fatal("expected error when classifier CLI unset")
-	}
-	if _, err := (CLIClassifier{CLI: "codex", Run: (&stubRunner{}).run}).Classify(context.Background(), "codex", nil); err == nil {
-		t.Fatal("expected error when no model ids")
-	}
-}
+// (TestCLIClassifierGuards moved to classifier_test.go, rewired through the
+// fakeDispatcher seam, and additionally asserts the dispatcher is never
+// called when the pre-flight guards reject.)

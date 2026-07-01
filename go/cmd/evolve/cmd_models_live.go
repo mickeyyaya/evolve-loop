@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
@@ -73,6 +74,40 @@ func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string)
 	return bridge.CaptureModelPicker(ctx, cfg, bridge.Deps{}, driver)
 }
 
+// bridgePromptDispatcher adapts bridge.Engine.Launch to
+// modelquery.PromptDispatcher (GAP 1, C1 fix): the tier-classification
+// prompt is dispatched through the same sandboxed, liveness-probed,
+// cli_fallback-aware bridge every phase uses, instead of a raw exec. It
+// translates a base CLI name (codex|agy|claude) to the headless driver the
+// bridge launches (driver_codex.go/driver_agy.go/driver_claudep.go), mirroring
+// bridgeModelCapturer's cli->driver translation for the tmux pickers.
+type bridgePromptDispatcher struct {
+	workspace   string
+	projectRoot string
+}
+
+func (d bridgePromptDispatcher) DispatchPrompt(ctx context.Context, cli, prompt string) (string, error) {
+	driver := cli
+	if cli == "claude" {
+		driver = "claude-p"
+	}
+	eng := bridge.NewEngine(bridge.Deps{})
+	resp, err := eng.Launch(ctx, core.BridgeRequest{
+		CLI:          driver,
+		Profile:      filepath.Join(d.projectRoot, ".evolve", "profiles", "router.json"),
+		Prompt:       prompt,
+		Workspace:    d.workspace,
+		ProjectRoot:  d.projectRoot,
+		Agent:        "model-classifier",
+		ArtifactPath: filepath.Join(d.workspace, "model-classifier-artifact.txt"),
+		Completion:   "artifact",
+	})
+	if err != nil {
+		return "", fmt.Errorf("bridgePromptDispatcher: launch %s: %w", driver, err)
+	}
+	return resp.Stdout, nil
+}
+
 // classifierCLIPreference orders the CLIs we'd rather run the one-shot tier
 // classification on (codex's `exec` is the most validated headless path).
 var classifierCLIPreference = []string{"codex", "claude", "agy"}
@@ -112,10 +147,11 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, workspace string, 
 		ByCLI:   map[string]modelquery.Lister{"ollama": modelquery.OllamaLister{}},
 		Default: modelquery.RecipeLister{Capturer: capturer},
 	}
+	dispatcher := bridgePromptDispatcher{workspace: workspace, projectRoot: workspace}
 	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
 		CLIs:       readyCLIs,
 		Lister:     router,
-		Classifier: modelquery.CLIClassifier{CLI: classifierCLI},
+		Classifier: modelquery.CLIClassifier{CLI: classifierCLI, Dispatcher: dispatcher},
 		Fallback:   fallback,
 		Now:        time.Now,
 		Log:        log,
