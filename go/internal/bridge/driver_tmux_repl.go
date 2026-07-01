@@ -422,11 +422,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	if reviewer == nil {
 		reviewer = newDeterministicReviewer(defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends))
 	}
-	// Per-run liveness detector: co-located with paneProfileFor so the profile
-	// registry drives both the content-boundary extractor and the strategy
-	// selection (ADR-0047 single-source-with-projection). One instance per run;
-	// its PaneDelta cursor and stall counter persist across review checkpoints.
-	livenessDetector := detectorFor(lp)
+	// SignalCenter (ADR-0068, S3): the authoritative liveness source for the
+	// checkpoint below — Observe+Aggregate replace the bare per-run detectorFor(lp)
+	// probe. deps.LivenessCenter injects a shared/test instance; nil (production)
+	// builds a private center whose empty registry makes Observe fall back to
+	// panestream.DetectorFor(profile) — the SAME probe detectorFor(lp) built, so
+	// the migration is verdict-identical (H1) unless a caller has registered a
+	// handler for this profile's name.
+	livenessCenter := deps.LivenessCenter
+	if livenessCenter == nil {
+		livenessCenter = panestream.NewSignalCenter()
+	}
 	// ADR-0044 C2: the fatal-pane registry consulted before each review
 	// checkpoint (fatalpane.go). Stage off ⇒ fatalPaneVerdict short-circuits
 	// before touching the detector; nil detector is unreachable on that path.
@@ -627,7 +633,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
 			progressed := PaneHasSubstantiveChange(intervalBaselinePane, curPane)
-			livenessState, _ := livenessDetector.Assess(curPane, paneProfile)
+			livenessCenter.Observe(lp.session, curPane, paneProfile)
+			livenessState := livenessCenter.Aggregate()
 			// Render-wedge override (cycle-291): a blank pane from a live session
 			// reads as Idle by the content-velocity detector (no affordance in blank
 			// frame). recoverBlankPane already confirmed the session is alive

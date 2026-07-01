@@ -48,9 +48,13 @@ type StopEvent struct {
 	Progressed bool   // did the agent emit new output during the last interval?
 	Busy       bool   // is the agent visibly mid-turn per the per-CLI busy affordance?
 	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer (Stage 1)
-	// State, when non-zero, carries the per-CLI liveness detector's structured
-	// verdict; the reviewer uses it in preference to the coarse Progressed+Busy
-	// booleans. Zero value (0) means "not set" — falls back to Progressed+Busy.
+	// State carries the per-CLI liveness detector's structured verdict — the
+	// reviewer's SOLE decision input (ev.livenessState()). Populated by the
+	// driver via panestream.SignalCenter.Observe+Aggregate (ADR-0068, S3); the
+	// pre-S3 Progressed+Busy boolean fallback is retired (an actually-unset
+	// State carries no liveness signal, never a boolean-derived extend).
+	// Progressed/Busy stay populated for fatalpane.go's C2 detector and
+	// checkpoint logging — they are evidence fields, not a decision path.
 	State panestream.LivenessState
 }
 
@@ -107,28 +111,17 @@ func NewDeterministicReviewer(maxExtends int) StopReviewer {
 	return newDeterministicReviewer(maxExtends)
 }
 
-// livenessState extracts the structured LivenessState for the reviewer decision.
-// When ev.State is set (non-zero), it is returned directly; otherwise it is
-// derived from the coarse Progressed+Busy booleans for backward compatibility
-// with callers that do not yet populate State (legacy path).
+// livenessState returns ev.State — the reviewer's sole liveness input (S3: the
+// driver always supplies State via panestream.SignalCenter, so an unset State
+// carries no signal at all and must never be derived from Progressed/Busy).
 func (ev StopEvent) livenessState() panestream.LivenessState {
-	if ev.State != 0 {
-		return ev.State
-	}
-	if ev.Progressed {
-		return panestream.LivenessConverging
-	}
-	if ev.Busy {
-		return panestream.LivenessBusyButStagnant
-	}
-	return panestream.LivenessIdle
+	return ev.State
 }
 
 func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
-	// Reviewer decides from LivenessState → ReviewAction. The legacy coarse
-	// Progressed+Busy booleans are converted to LivenessState by ev.livenessState()
-	// when ev.State is not set, preserving backward compatibility with existing
-	// test paths that do not populate State.
+	// Reviewer decides from LivenessState → ReviewAction alone (S3: the
+	// Progressed+Busy boolean fallback is retired; zero State falls through to
+	// the default case below and pauses).
 	//
 	// Invariants preserved from the boolean era:
 	//  Converging → Extend UNCONDITIONALLY (cycles 311/312: producing scout killed

@@ -7,15 +7,20 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 // TestDeterministicReviewer covers the Stage-0 review decision: extend while
-// the agent produces SUBSTANTIVE output (Progressed) — extend without bound;
-// the maxExtends backstop applies only to a busy-but-STALLED pane (spinner, no
-// new content). The key property — a genuinely-progressing agent is NEVER told
-// to stop (cycle-311/312: a scout producing output for >30min was killed at the
-// backstop) — is what keeps a slow-but-working phase alive. Cost/budget caps
-// bound a pathological infinite-producer, not this wait reviewer.
+// the agent produces SUBSTANTIVE output (State=Converging) — extend without
+// bound; the maxExtends backstop applies only to a busy-but-STALLED pane
+// (spinner, no new content). The key property — a genuinely-progressing agent
+// is NEVER told to stop (cycle-311/312: a scout producing output for >30min was
+// killed at the backstop) — is what keeps a slow-but-working phase alive.
+// Cost/budget caps bound a pathological infinite-producer, not this wait
+// reviewer. StopEvent.State is set explicitly (S3: the driver's
+// panestream.SignalCenter is the sole liveness source; the pre-S3
+// Progressed/Busy boolean fallback is retired).
 func TestDeterministicReviewer(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	cases := []struct {
@@ -23,11 +28,11 @@ func TestDeterministicReviewer(t *testing.T) {
 		ev   StopEvent
 		want ReviewAction
 	}{
-		{"progressing, first interval → extend", StopEvent{Progressed: true, Attempt: 0}, ReviewExtend},
-		{"progressing, under cap → extend", StopEvent{Progressed: true, Attempt: 1}, ReviewExtend},
-		{"progressing, at cap → EXTEND (real output is never stuck)", StopEvent{Progressed: true, Attempt: 2}, ReviewExtend},
-		{"progressing, past cap → EXTEND (cycle-311/312: a producing scout killed mid-work)", StopEvent{Progressed: true, Attempt: 9}, ReviewExtend},
-		{"no output → pause immediately", StopEvent{Progressed: false, Attempt: 0}, ReviewPause},
+		{"progressing, first interval → extend", StopEvent{State: panestream.LivenessConverging, Attempt: 0}, ReviewExtend},
+		{"progressing, under cap → extend", StopEvent{State: panestream.LivenessConverging, Attempt: 1}, ReviewExtend},
+		{"progressing, at cap → EXTEND (real output is never stuck)", StopEvent{State: panestream.LivenessConverging, Attempt: 2}, ReviewExtend},
+		{"progressing, past cap → EXTEND (cycle-311/312: a producing scout killed mid-work)", StopEvent{State: panestream.LivenessConverging, Attempt: 9}, ReviewExtend},
+		{"no output → pause immediately", StopEvent{State: panestream.LivenessIdle, Attempt: 0}, ReviewPause},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -40,12 +45,15 @@ func TestDeterministicReviewer(t *testing.T) {
 
 // TestDeterministicReviewer_BusyPaneIsLiveness pins the fix for the Opus
 // recovery-audit false-FAIL (cycles 254/255): a pane with no substantive delta
-// (Progressed=false) but a visible per-CLI busy affordance (Busy=true) is a
-// WORKING agent — extended-thinking models (Opus) render only the stripped
+// but a visible per-CLI busy affordance (State=BusyButStagnant) is a WORKING
+// agent — extended-thinking models (Opus) render only the stripped
 // "Deliberating Ns"/token-counter lines, so PaneHasSubstantiveChange reads false
 // while the agent is demonstrably alive. Such an agent must be EXTENDED (bounded
 // by maxExtends), never paused/killed at interval 0 — that kill recorded a PASS
-// audit report as FAIL and halted the batch.
+// audit report as FAIL and halted the batch. StopEvent.State is set explicitly
+// (S3: verdict is a pure function of State, not the retired Progressed/Busy
+// booleans — Progressed/Busy still ride along on the event as evidence for
+// fatalpane.go + logging, but the reviewer no longer reads them).
 func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	cases := []struct {
@@ -53,11 +61,11 @@ func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 		ev   StopEvent
 		want ReviewAction
 	}{
-		{"busy AND progressing → extend", StopEvent{Progressed: true, Busy: true, Attempt: 0}, ReviewExtend},
-		{"busy, no delta, first interval → extend", StopEvent{Progressed: false, Busy: true, Attempt: 0}, ReviewExtend},
-		{"busy, no delta, under cap → extend", StopEvent{Progressed: false, Busy: true, Attempt: 1}, ReviewExtend},
-		{"busy, no delta, at cap → pause (backstop)", StopEvent{Progressed: false, Busy: true, Attempt: 2}, ReviewPause},
-		{"idle, no delta → pause immediately", StopEvent{Progressed: false, Busy: false, Attempt: 0}, ReviewPause},
+		{"busy AND progressing → extend", StopEvent{State: panestream.LivenessConverging, Progressed: true, Busy: true, Attempt: 0}, ReviewExtend},
+		{"busy, no delta, first interval → extend", StopEvent{State: panestream.LivenessBusyButStagnant, Busy: true, Attempt: 0}, ReviewExtend},
+		{"busy, no delta, under cap → extend", StopEvent{State: panestream.LivenessBusyButStagnant, Busy: true, Attempt: 1}, ReviewExtend},
+		{"busy, no delta, at cap → pause (backstop)", StopEvent{State: panestream.LivenessBusyButStagnant, Busy: true, Attempt: 2}, ReviewPause},
+		{"idle, no delta → pause immediately", StopEvent{State: panestream.LivenessIdle, Attempt: 0}, ReviewPause},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -74,7 +82,7 @@ func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 func TestDeterministicReviewer_NonPositiveMaxFallsBack(t *testing.T) {
 	for _, max := range []int{0, -1} {
 		r := newDeterministicReviewer(max)
-		if got := r.Review(StopEvent{Progressed: true, Attempt: 0}).Action; got != ReviewExtend {
+		if got := r.Review(StopEvent{State: panestream.LivenessConverging, Attempt: 0}).Action; got != ReviewExtend {
 			t.Fatalf("newDeterministicReviewer(%d): first progressing interval = %q, want extend", max, got)
 		}
 	}

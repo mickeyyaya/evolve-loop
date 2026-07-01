@@ -76,27 +76,29 @@ func TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends(t *testing.T) {
 	}
 }
 
-// TestLivenessMatrix_BackwardCompatBooleans verifies the legacy Progressed+Busy
-// boolean path (State==0) still maps correctly to the reviewer's decision. This
-// ensures existing callers that have not yet been updated to populate State
-// continue to work without regression.
-func TestLivenessMatrix_BackwardCompatBooleans(t *testing.T) {
+// TestLivenessMatrix_BooleanFallbackRetired (S3) verifies the pre-S3
+// Progressed+Busy boolean fallback is RETIRED, not merely shadowed: a
+// StopEvent with State left at its zero value gets ReviewPause regardless of
+// what Progressed/Busy carry — those fields are evidence for fatalpane.go +
+// logging now, never a reviewer decision path. Supersedes the old
+// TestLivenessMatrix_BackwardCompatBooleans, which pinned the opposite
+// (now-retired) behavior.
+func TestLivenessMatrix_BooleanFallbackRetired(t *testing.T) {
 	r := NewDeterministicReviewer(3)
 	cases := []struct {
 		name string
 		ev   StopEvent
-		want ReviewAction
 	}{
-		{"progressed → extend", StopEvent{Progressed: true, Attempt: 0}, ReviewExtend},
-		{"progressed past cap → extend", StopEvent{Progressed: true, Attempt: 9}, ReviewExtend},
-		{"busy under cap → extend", StopEvent{Busy: true, Attempt: 0}, ReviewExtend},
-		{"busy at cap → pause", StopEvent{Busy: true, Attempt: 3}, ReviewPause},
-		{"idle → pause", StopEvent{Attempt: 0}, ReviewPause},
+		{"progressed, no State → pause", StopEvent{Progressed: true, Attempt: 0}},
+		{"progressed past cap, no State → pause", StopEvent{Progressed: true, Attempt: 9}},
+		{"busy, no State → pause", StopEvent{Busy: true, Attempt: 0}},
+		{"busy+progressed, no State → pause", StopEvent{Progressed: true, Busy: true, Attempt: 0}},
+		{"neither, no State → pause", StopEvent{Attempt: 0}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := r.Review(c.ev).Action; got != c.want {
-				t.Errorf("Review(%+v).Action = %q, want %q", c.ev, got, c.want)
+			if got := r.Review(c.ev).Action; got != ReviewPause {
+				t.Errorf("Review(%+v).Action = %q, want %q (retired boolean fallback must not extend)", c.ev, got, ReviewPause)
 			}
 		})
 	}

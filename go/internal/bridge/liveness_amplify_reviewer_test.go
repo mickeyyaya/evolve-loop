@@ -14,7 +14,8 @@ import (
 //   B2  State=BusyButStagnant under maxExtends → ReviewExtend (bounded budget path)
 //   B3  State=BusyButStagnant at/past maxExtends → NOT ReviewExtend (backstop, cycles 254/255)
 //   B4  State=Hung at attempt=0 → fast-fail (AC10 only tests attempt=1)
-//   B5  StopEvent.State zero-value falls back to legacy Progressed/Busy fields (backward compat)
+//   B5  StopEvent.State zero-value ignores the retired legacy Progressed/Busy
+//       fields (S3: the boolean fallback is retired, not backward-compat)
 //   B6  Converging with non-positive maxExtends still extends (mirrors pre-existing Progressed test)
 
 // TestAmp_Reviewer_IdleStateNotExtend verifies that State=LivenessIdle never
@@ -83,30 +84,35 @@ func TestAmp_Reviewer_HungAtAttemptZeroFastFails(t *testing.T) {
 	}
 }
 
-// TestAmp_Reviewer_BackwardCompatStateZeroUsesLegacyFields verifies that a
-// StopEvent with its State field at the zero value (no LivenessState set) falls
-// back to the legacy Progressed/Busy boolean fields, preserving compatibility with
-// callers that have not yet been updated to populate State.
-// Build-report: "backward-compat {Progressed,Busy} → LivenessState when State==0".
-func TestAmp_Reviewer_BackwardCompatStateZeroUsesLegacyFields(t *testing.T) {
+// TestAmp_Reviewer_StateZeroIgnoresRetiredLegacyFields (S3) verifies that a
+// StopEvent with its State field at the zero value NEVER extends, regardless of
+// what the legacy Progressed/Busy booleans carry — the pre-S3 fallback that
+// derived LivenessState from those booleans is retired (the driver always
+// supplies State via panestream.SignalCenter now; an actually-unset State
+// carries no liveness signal at all). Supersedes
+// TestAmp_Reviewer_BackwardCompatStateZeroUsesLegacyFields, which pinned the
+// opposite (now-retired) behavior.
+func TestAmp_Reviewer_StateZeroIgnoresRetiredLegacyFields(t *testing.T) {
 	r := NewDeterministicReviewer(2)
 
-	// Legacy progressing agent: Progressed=true → should still extend.
-	progEv := StopEvent{Progressed: true, Attempt: 0} // State is zero value
-	if got := r.Review(progEv).Action; got != ReviewExtend {
-		t.Errorf("backward compat: State=0, Progressed=true, attempt=0: got %q, want ReviewExtend (legacy path must preserve Progressed→extend)", got)
+	// Progressed=true, State=0: the retired fallback would have extended; must
+	// now pause.
+	progEv := StopEvent{Progressed: true, Attempt: 0}
+	if got := r.Review(progEv).Action; got != ReviewPause {
+		t.Errorf("State=0, Progressed=true, attempt=0: got %q, want ReviewPause (boolean fallback retired)", got)
 	}
 
-	// Legacy progressing agent past maxExtends: must still extend (unconditional, cycles 311/312).
-	progPastCap := StopEvent{Progressed: true, Attempt: 9} // State=0, past maxExtends=2
-	if got := r.Review(progPastCap).Action; got != ReviewExtend {
-		t.Errorf("backward compat: State=0, Progressed=true, attempt=9: got %q, want ReviewExtend (legacy progressing must extend past cap)", got)
+	// Same past maxExtends — still must pause; Progressed carries no weight now.
+	progPastCap := StopEvent{Progressed: true, Attempt: 9}
+	if got := r.Review(progPastCap).Action; got != ReviewPause {
+		t.Errorf("State=0, Progressed=true, attempt=9: got %q, want ReviewPause (boolean fallback retired)", got)
 	}
 
-	// Legacy idle pane: Progressed=false, Busy=false → should NOT extend.
-	idleEv := StopEvent{Progressed: false, Busy: false, Attempt: 0} // State=0
+	// Legacy idle shape: Progressed=false, Busy=false → pause (unchanged outcome,
+	// but now via the default/zero-State case, not a boolean read).
+	idleEv := StopEvent{Progressed: false, Busy: false, Attempt: 0}
 	if got := r.Review(idleEv).Action; got == ReviewExtend {
-		t.Errorf("backward compat: State=0, Progressed=false, Busy=false, attempt=0: got ReviewExtend, want non-extend (legacy idle must not extend)")
+		t.Errorf("State=0, Progressed=false, Busy=false, attempt=0: got ReviewExtend, want non-extend")
 	}
 }
 

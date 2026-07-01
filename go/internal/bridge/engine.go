@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -142,6 +143,15 @@ type Deps struct {
 	// profile (ADR-0049 S0 / gap G6). Tests inject a stub to drive the
 	// mkdir-error fallback branch deterministically.
 	MkScratchDir func(dir, pattern string) (string, error)
+	// LivenessCenter (ADR-0068, S3) is the SignalCenter the tmux-REPL stop-review
+	// checkpoint observes/aggregates for StopEvent.State — the authoritative
+	// liveness source, replacing the bare per-run detectorFor(lp) probe. nil (the
+	// production default) has the driver build a private panestream.NewSignalCenter()
+	// per run; tests inject a shared instance so a registered LivenessProbe can be
+	// proven both to win (its state reaches StopEvent.State) and to be invoked
+	// (its call count is observable) — a bypassed center could satisfy the former
+	// by coincidence but never the latter.
+	LivenessCenter *panestream.SignalCenter
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision — the bridge
