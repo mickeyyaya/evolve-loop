@@ -206,6 +206,31 @@ func PaneBusy(rendered string, p PaneProfile) bool {
 	return false
 }
 
+// PaneHasSubstantiveChange reports whether prev and cur differ once volatile
+// chrome is stripped from both (cycle-432 S4: relocated from
+// bridge/stopreview.go into panestream, the single home for pane-chrome
+// parsing — panestream.SignalCenter's Changed projection folds this in).
+func PaneHasSubstantiveChange(prev, cur string) bool {
+	return cleanPane(prev) != cleanPane(cur)
+}
+
+// cleanPane keeps only the agent CONTENT lines, dropping every chrome/
+// affordance line per the single channel separator (ClassifyLine, ADR-0047).
+// This is what makes a ticking spinner-stats line (claude `· Schlepping… (Ns ·
+// ↑ Nk tokens)`) NOT count as progress — it is the live-turn affordance, the
+// same line PaneBusy reads as busy. A genuinely-working agent still progresses
+// via its real transcript (tool calls, output); a stalled one whose only delta
+// is the clock no longer reads as progress (closes the ticking-clock hole).
+func cleanPane(pane string) string {
+	var lines []string
+	for _, line := range strings.Split(pane, "\n") {
+		if IsContentLine(line) {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // PaneDelta tracks how much stable content has already been emitted so each
 // capture-pane snapshot yields only NEW content lines (the assistant output),
 // excluding the volatile bottom UI (input box / footer / spinner).

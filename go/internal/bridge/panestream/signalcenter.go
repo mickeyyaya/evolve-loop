@@ -23,10 +23,15 @@ type SignalCenter struct {
 }
 
 // sessionSignals holds the stateful probe and the most recent liveness verdict
-// for one session key.
+// for one session key, plus the Busy/Changed projections (S4): busy and clean
+// are folded from the standalone PaneBusy/cleanPane so the driver checkpoint
+// never parses pane chrome a second time itself.
 type sessionSignals struct {
-	probe LivenessProbe
-	last  LivenessState
+	probe   LivenessProbe
+	last    LivenessState
+	busy    bool
+	clean   string
+	changed bool
 }
 
 // NewSignalCenter returns an empty, ready-to-use SignalCenter.
@@ -60,8 +65,8 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
-	ss, ok := sc.sessions[sessionKey]
-	if !ok {
+	ss, existed := sc.sessions[sessionKey]
+	if !existed {
 		var probe LivenessProbe
 		if f, found := sc.registry[profile.Name]; found {
 			probe = f()
@@ -74,6 +79,44 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 
 	state, _ := ss.probe.Assess(rendered, profile)
 	ss.last = state
+
+	// Busy/Changed projections (S4): folded from the standalone functions so
+	// they can never drift from panestream.PaneBusy / the cleaned-content
+	// diff. Changed compares this Observe's cleaned content against the PRIOR
+	// Observe's for this key (checkpoint-to-checkpoint) — a brand-new key has
+	// no prior observation, so its first Changed reads false.
+	ss.busy = PaneBusy(rendered, profile)
+	clean := cleanPane(rendered)
+	ss.changed = existed && clean != ss.clean
+	ss.clean = clean
+}
+
+// Busy reports the most-recent Observe's busy affordance for sessionKey
+// (folded from the standalone PaneBusy for the same observed pane). An
+// unknown or empty key reads false — Busy never panics on an unobserved
+// session. Safe for concurrent use alongside Observe.
+func (sc *SignalCenter) Busy(sessionKey string) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	ss, ok := sc.sessions[sessionKey]
+	if !ok {
+		return false
+	}
+	return ss.busy
+}
+
+// Changed reports whether the most-recent Observe's cleaned content (chrome
+// stripped) differs from the prior Observe's for sessionKey. A key with fewer
+// than two observations, or that was never observed, reads false. Safe for
+// concurrent use alongside Observe.
+func (sc *SignalCenter) Changed(sessionKey string) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	ss, ok := sc.sessions[sessionKey]
+	if !ok {
+		return false
+	}
+	return ss.changed
 }
 
 // aggregatePriority defines the winner-takes-all aggregation order.

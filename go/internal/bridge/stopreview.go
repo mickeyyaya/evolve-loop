@@ -175,28 +175,3 @@ func envInt(deps Deps, key string, def int) int {
 	}
 	return n
 }
-
-// PaneHasSubstantiveChange split each pane string by newline, discard lines that
-// match any volatile pattern, compare the stripped slices joined back as strings.
-func PaneHasSubstantiveChange(prev, cur string) bool {
-	cleanPrev := cleanPane(prev)
-	cleanCur := cleanPane(cur)
-	return cleanPrev != cleanCur
-}
-
-// cleanPane keeps only the agent CONTENT lines, dropping every chrome/affordance
-// line per the single channel separator (panestream.ClassifyLine, ADR-0047).
-// This is what makes a ticking spinner-stats line (claude `· Schlepping… (Ns ·
-// ↑ Nk tokens)`) NOT count as progress — it is the live-turn affordance, the
-// same line PaneBusy reads as busy. A genuinely-working agent still progresses
-// via its real transcript (tool calls, output); a stalled one whose only delta
-// is the clock no longer reads as progress (closes the ticking-clock hole).
-func cleanPane(pane string) string {
-	var lines []string
-	for _, line := range strings.Split(pane, "\n") {
-		if panestream.IsContentLine(line) {
-			lines = append(lines, line)
-		}
-	}
-	return strings.Join(lines, "\n")
-}

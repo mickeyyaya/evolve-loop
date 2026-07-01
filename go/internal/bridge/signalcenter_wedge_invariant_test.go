@@ -20,9 +20,11 @@ package bridge
 //	  after the last good frame).
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
@@ -104,5 +106,46 @@ func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
 	if _, ok := r.(deterministicReviewer); !ok {
 		t.Fatalf("corpus must exercise the real deterministicReviewer, got %T", r)
+	}
+}
+
+// TestStopReview_RenderWedgeOverride (cycle-432 S4, AC4, edge): the
+// cycle-291 render-wedge override must survive the migration to
+// center-sourced Busy — a blank pane from a LIVE session still classifies
+// LivenessBusyButStagnant (never Idle) AND StopEvent.Busy stays true via the
+// `center.Busy(session) || renderWedged` term, so a working agent is never
+// paused purely on a pane-render failure. Pre-existing GREEN is acceptable
+// here (the `|| renderWedged` term already exists pre-migration); this test
+// pins it as a regression guard so S4 cannot silently drop the term while
+// relocating the Busy source.
+func TestStopReview_RenderWedgeOverride(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
+		tmuxPromptMarkerDefault, // boot
+		"⏺ working on it…",      // post-paste baseline (non-blank)
+		"",                      // every subsequent capture: blank (live session, render wedge)
+	}}}
+	rev := &scriptedReviewer{}
+	eng := NewEngine(Deps{
+		Tmux:             tmux,
+		Sleep:            func(time.Duration) {},
+		ArtifactTimeoutS: 2,
+		Reviewer:         rev,
+	})
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
+
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr=%s", code, stderr.String())
+	}
+	if len(rev.events) == 0 {
+		t.Fatal("reviewer never consulted — no checkpoint ran")
+	}
+	ev := rev.events[0]
+	if ev.State != panestream.LivenessBusyButStagnant {
+		t.Fatalf("StopEvent.State = %v at the first blank-live checkpoint, want LivenessBusyButStagnant (cycle-291 render-wedge override lost)", ev.State)
+	}
+	if !ev.Busy {
+		t.Fatal("StopEvent.Busy = false, want true — a blank pane from a live session must never read Busy=false (center.Busy(session) || renderWedged must stay true)")
 	}
 }

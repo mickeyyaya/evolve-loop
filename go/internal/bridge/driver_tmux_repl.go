@@ -632,9 +632,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// maxExtends backstop, not this diff, bounds a spinner-stuck agent
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
-			progressed := PaneHasSubstantiveChange(intervalBaselinePane, curPane)
 			livenessCenter.Observe(lp.session, curPane, paneProfile)
 			livenessState := livenessCenter.Aggregate()
+			// Progressed is sourced from the center's Changed(session)
+			// projection (S4) — a consecutive-observation comparison, not the
+			// interval-baseline diff. Behavior-preserving: .Progressed has no
+			// decision consumer (evidence/logging only), so the shift from
+			// baseline-relative to checkpoint-to-checkpoint is safe.
+			progressed := livenessCenter.Changed(lp.session)
 			// Render-wedge override (cycle-291): a blank pane from a live session
 			// reads as Idle by the content-velocity detector (no affordance in blank
 			// frame). recoverBlankPane already confirmed the session is alive
@@ -651,7 +656,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				IntervalS:  interval,
 				Attempt:    attempt,
 				Progressed: progressed,
-				Busy:       panestream.PaneBusy(curPane, paneProfile) || renderWedged,
+				Busy:       livenessCenter.Busy(lp.session) || renderWedged,
 				StdoutTail: lastLines(evidencePane, 40),
 				State:      livenessState,
 			}
@@ -684,7 +689,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				// shell is exactly the echo that bought cycle-262's dead
 				// panes their extensions. Behavior-identical for the legacy
 				// reviewer, which only ever emits extend|pause.
-				if lastVerdict.Action == ReviewPause && isDeterministic && !panestream.PaneBusy(curPane, paneProfile) && !nudgeSent {
+				if lastVerdict.Action == ReviewPause && isDeterministic && !livenessCenter.Busy(lp.session) && !nudgeSent {
 					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
