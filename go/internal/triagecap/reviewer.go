@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -83,6 +84,15 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 	pkgs := r.pkgsFn(in.ProjectRoot)
 	companionPath := filepath.Join(in.Workspace, TriageDecisionName())
 	floors := CommittedFloorCount(string(data), companionPath, pkgs)
+	// F3 producer check: the declaration-primary design needs its producer.
+	// A floor-bearing report still governed by the prose fallback gets a
+	// WARN naming the companion, so a missing declaration is visible in the
+	// logs instead of silently leaving the count to prose semantics.
+	if floors > 0 {
+		if _, declared, err := ReadDeclaredFloors(companionPath); err == nil && !declared {
+			r.logf("[triage-cap] WARN: floor-bearing triage report has no %s companion declaring committed_floors — prose counting is the fallback; declare {\"committed_floors\":[...]} to make the commitment authoritative", TriageDecisionName())
+		}
+	}
 	window := r.windowFn(in.ProjectRoot)
 	k := K(window)
 	capacity := Cap(k)
@@ -91,9 +101,19 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 	}
 
 	corrective := FloorDivergenceCorrective(string(data), companionPath, pkgs)
+	// F2+F5: the correction must be actionable and self-explanatory — state
+	// the counting rule, WHICH packages the counter attributed, and the
+	// declaration-primary escape. Cycles 448/449 complied with the natural
+	// reading of the bare cap directive twice and were killed twice because
+	// they could not see either the rule or the escape.
+	counted := CommittedFloorPackages(string(data), companionPath, pkgs)
+	countedList := "none package-resolved (aggregate items count 1 each)"
+	if len(counted) > 0 {
+		countedList = strings.Join(counted, ", ")
+	}
 	reason := fmt.Sprintf(
-		"triage overpacked: %d committed coverage floors exceed the capacity cap %d (= ceil(1.25×K), K=%d observed floors/turn over %d shipped cycles). Re-emit the triage report keeping at most %d coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.",
-		floors, capacity, k, len(window), capacity)
+		"triage overpacked: %d committed coverage floors exceed the capacity cap %d (= ceil(1.25×K), K=%d observed floors/turn over %d shipped cycles). Counting rule: each floor-bearing ## top_n item counts one floor per distinct package in floor-TARGET position (named before its ≥N%% target), minimum one; packages counted: %s. Preferred fix: declare the true commitment by writing %s with {\"committed_floors\":[...]} beside the report — the declaration overrides prose counting. Otherwise re-emit the triage report keeping at most %d coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.",
+		floors, capacity, k, len(window), countedList, TriageDecisionName(), capacity)
 	if corrective != "" {
 		reason += " " + corrective
 	}
@@ -102,15 +122,24 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 		return core.ReviewResult{Approve: true}
 	}
 	// ADR-0046 Layer 2: before enforcing, consult the identical-rejection
-	// demotion (demotion.go). Two consecutive cycles rejected with this
-	// exact template ⇒ the gate is the suspect ⇒ shadow for this cycle only,
-	// with an auto-filed defect. Consulted at rejection time so a healthy
-	// approve path never pays the state.json read.
+	// demotion (demotion.go). The last two RECORDED cycles rejected with
+	// this exact template (reset-sealed cycles are transparent gaps, F4) ⇒
+	// the gate is the suspect ⇒ shadow for ONE cycle, with an auto-filed
+	// defect. Consulted at rejection time so a healthy approve path never
+	// pays the state.json read.
 	if cycle, ok := workspaceCycleID(in.Workspace); ok {
-		if demote, why := ShouldDemote(r.failsFn(in.ProjectRoot), cycle); demote {
-			r.logf("[triage-cap] DEMOTED to shadow for cycle %d — %s; gate defect suspected (ADR-0046 L2). Would-block: %s", cycle, why, reason)
-			autoFileDemotionDefect(in.ProjectRoot, cycle, why)
-			return core.ReviewResult{Approve: true}
+		if older, newer, why, demote := demotionDecision(r.failsFn(in.ProjectRoot), cycle); demote {
+			// One-cycle relief: the pair's auto-filed defect doubles as the
+			// relief-consumption marker. A pair whose relief another cycle
+			// already consumed keeps enforcing — gap transparency must not
+			// widen into a window of free passes.
+			if by, consumed := reliefConsumedBy(in.ProjectRoot, older, newer); consumed && by != cycle {
+				r.logf("[triage-cap] demotion relief for the c%d/c%d pair already consumed by cycle %d — enforcing (one-cycle relief)", older, newer, by)
+			} else {
+				r.logf("[triage-cap] DEMOTED to shadow for cycle %d — %s; gate defect suspected (ADR-0046 L2). Would-block: %s", cycle, why, reason)
+				autoFileDemotionDefect(in.ProjectRoot, cycle, older, newer, why)
+				return core.ReviewResult{Approve: true}
+			}
 		}
 	}
 	r.logf("[triage-cap] %s (stage=enforce, BLOCK)", reason)

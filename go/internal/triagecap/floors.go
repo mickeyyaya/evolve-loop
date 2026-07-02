@@ -56,12 +56,27 @@ var (
 	floorPercentRE = regexp.MustCompile(`\d+(?:\.\d+)?\s*%`)
 )
 
+// targetPercentRE marks a floor-TARGET percent — one the item explicitly
+// commits to with ≥ (or its ASCII spelling >=) or the "to N%" idiom ("raise
+// bridge coverage to 95%"). Evidence citations quote bare measured percents
+// ("core 83.1%", "matchExhausted 66.7%", "at 0%") and carry no target
+// marker. \b keeps "toward 93%" an aggregate, not a target. minimal: these
+// are the only committed-target spellings observed across the replay
+// corpus (281/283/298/301/448/449); extend here if triage grows another.
+var targetPercentRE = regexp.MustCompile(`(?:(?:≥|>=)\s*|\bto\s+)\d+(?:\.\d+)?\s*%`)
+
 // CountCommittedFloors counts the coverage floors committed in the triage
 // artifact's ## top_n section. Each floor-bearing item contributes one floor
-// per distinct known package it names (word-boundary match), with a minimum
-// of one (an aggregate target like "toward 93%" is one floor). Items in
-// ## deferred / ## dropped contribute nothing — that is the point: deferral
-// is the relief valve the capacity clamp pushes overpacked floors into.
+// per distinct known package in floor-TARGET position (named in the clause
+// leading up to a ≥-marked percent — see floorTargetPackages), with a
+// minimum of one (an aggregate target like "toward 93%" is one floor).
+// Packages named only in evidence citations contribute nothing: cycles
+// 448/449 committed exactly three floors yet counted 7 because the
+// contract-mandated evidence sentences named other packages with
+// percentages — the gate punished what the eval-quality rules demand (F1).
+// Items in ## deferred / ## dropped contribute nothing — that is the point:
+// deferral is the relief valve the capacity clamp pushes overpacked floors
+// into.
 func CountCommittedFloors(artifact string, knownPkgs []string) int {
 	body, ok := topNSection(artifact)
 	if !ok {
@@ -73,13 +88,48 @@ func CountCommittedFloors(artifact string, knownPkgs []string) int {
 		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 			continue
 		}
-		n := len(mentionedPackages(item, knownPkgs))
+		n := len(floorTargetPackages(item, knownPkgs))
 		if n < 1 {
 			n = 1
 		}
 		total += n
 	}
 	return total
+}
+
+// floorTargetPackages returns the distinct known packages in floor-TARGET
+// position in one item: named in the clause leading up to a ≥-marked
+// percent. A clause reaches back to the previous percent occurrence (or the
+// item start), so an earlier measurement citation never leaks into a later
+// target's clause, while list-style commitments ("floors core ≥85.0%,
+// audit ≥96.0%, bridge ≥94.5%") attribute each package to its own target.
+// Items whose floors carry no ≥ marker resolve to nil and fall back to the
+// min-1 aggregate rule in CountCommittedFloors.
+func floorTargetPackages(item string, candidatePkgs []string) []string {
+	stripped := metadataFieldRE.ReplaceAllString(item, " ")
+	targets := targetPercentRE.FindAllStringIndex(stripped, -1)
+	if len(targets) == 0 {
+		return nil
+	}
+	percents := floorPercentRE.FindAllStringIndex(stripped, -1)
+	seen := map[string]bool{}
+	var pkgs []string
+	for _, tgt := range targets {
+		start := 0
+		for _, p := range percents {
+			if p[1] > tgt[0] {
+				break
+			}
+			start = p[1]
+		}
+		for _, pkg := range packagesInText(stripped[start:tgt[0]], candidatePkgs) {
+			if !seen[pkg] {
+				seen[pkg] = true
+				pkgs = append(pkgs, pkg)
+			}
+		}
+	}
+	return pkgs
 }
 
 // ReadDeclaredFloors reads committed_floors from a triage-decision.json
@@ -213,6 +263,9 @@ func FloorDivergenceCorrective(artifact, companionPath string, knownPkgs []strin
 		strings.Join(proseOnly, ", "), strings.Join(declaredOnly, ", "))
 }
 
+// proseFloorPackages is target-scoped like CountCommittedFloors, so the
+// counted-package list in the reject reason and the divergence corrective
+// describe exactly what the counter attributed — never a superset of it.
 func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 	seen := map[string]bool{}
 	body, ok := topNSection(artifact)
@@ -224,7 +277,7 @@ func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 			continue
 		}
-		for _, pkg := range mentionedPackages(item, knownPkgs) {
+		for _, pkg := range floorTargetPackages(item, knownPkgs) {
 			seen[pkg] = true
 		}
 	}
@@ -276,11 +329,19 @@ var pathOnlyPkgs = map[string]*regexp.Regexp{
 }
 
 // mentionedPackages returns the candidate package names that appear as
-// whole tokens in the item text, after contract metadata is stripped.
+// whole tokens anywhere in the item text, after contract metadata is
+// stripped. Deferred/dropped scanning (deferred.go) stays mention-based on
+// purpose: those sections answer "which targets did triage push out", not
+// "what did triage commit to" — only committed counting is target-scoped.
 func mentionedPackages(item string, candidatePkgs []string) []string {
-	item = metadataFieldRE.ReplaceAllString(item, " ")
+	return packagesInText(metadataFieldRE.ReplaceAllString(item, " "), candidatePkgs)
+}
+
+// packagesInText is the token matcher shared by mention-scoped and
+// target-scoped extraction; text must already be metadata-stripped.
+func packagesInText(text string, candidatePkgs []string) []string {
 	tokens := map[string]bool{}
-	for _, tok := range tokenRE.FindAllString(item, -1) {
+	for _, tok := range tokenRE.FindAllString(text, -1) {
 		tokens[tok] = true
 	}
 	var pkgs []string
@@ -289,7 +350,7 @@ func mentionedPackages(item string, candidatePkgs []string) []string {
 			continue
 		}
 		if re, pathOnly := pathOnlyPkgs[pkg]; pathOnly {
-			if re.MatchString(item) {
+			if re.MatchString(text) {
 				pkgs = append(pkgs, pkg)
 			}
 			continue

@@ -75,9 +75,20 @@ func TestShouldDemote(t *testing.T) {
 			t.Errorf("detail %q must name the evidence cycles", detail)
 		}
 	})
-	t.Run("one-cycle scope: does NOT fire for cycle 304", func(t *testing.T) {
-		if ok, _ := ShouldDemote(pair, 304); ok {
-			t.Error("demotion is scoped to the cycle immediately after the pair — 304 must enforce again")
+	// Adapted for F4 (cycle 459, inbox triagecap-prose-counter-defect):
+	// ShouldDemote is now window-scoped so reset-sealed cycles between the
+	// pair and the review are transparent gaps; the one-cycle relief bound
+	// moved to the Review seam, which tracks consumption via the pair's
+	// auto-filed defect marker (TestCapReviewer_ReliefIsOneCycleThenEnforces
+	// pins that production behavior).
+	t.Run("window scope: fires through a reset-sealed gap (cycle 304)", func(t *testing.T) {
+		if ok, _ := ShouldDemote(pair, 304); !ok {
+			t.Error("the 301/302 pair is within the demotion window of cycle 304 — a reset-sealed 303 must be a transparent gap")
+		}
+	})
+	t.Run("beyond the demotion window does NOT fire", func(t *testing.T) {
+		if ok, _ := ShouldDemote(pair, 306); ok {
+			t.Error("cycle 306 is beyond the demotion window of the 301/302 pair — stale pairs must keep enforcing")
 		}
 	})
 	t.Run("non-consecutive pair does not fire", func(t *testing.T) {
