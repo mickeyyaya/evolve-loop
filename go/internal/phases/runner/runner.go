@@ -159,6 +159,12 @@ type Options struct {
 	// Replaces the former EVOLVE_STDOUT_FILTER=off env check. Default false =
 	// filter enabled, matching the historical "on" default.
 	DisableStdoutFilter bool
+	// Diag is the injectable diagnostics logger (T3, cycle-463): the MR4c
+	// advisor-overlay observability lines route through it so a test can
+	// capture them instead of the global log.Diag() stderr sink. Zero value
+	// (both sinks nil) defaults to log.Diag() — production behavior is
+	// unchanged.
+	Diag log.Console
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
@@ -175,6 +181,7 @@ type BaseRunner struct {
 	verifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
 	compactPrompts      bool
 	disableStdoutFilter bool
+	diag                log.Console
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -217,6 +224,10 @@ func New(opts Options) *BaseRunner {
 			return deliverable.VerifyCatalogAwareStage(phase, roots, stage)
 		}
 	}
+	diag := opts.Diag
+	if diag.Out == nil && diag.Err == nil {
+		diag = log.Diag()
+	}
 	return &BaseRunner{
 		hooks:               opts.Hooks,
 		bridge:              opts.Bridge,
@@ -229,6 +240,7 @@ func New(opts Options) *BaseRunner {
 		verifyFn:            verifyFn,
 		compactPrompts:      opts.CompactPrompts,
 		disableStdoutFilter: opts.DisableStdoutFilter,
+		diag:                diag,
 	}
 }
 
@@ -422,8 +434,19 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// capability-probe + cli-health bench passes below. A policy pin always
 	// wins (soft overlay never applies alongside one); zero overlay fields are
 	// a byte-identical noop.
-	if pin == nil && (req.ModelRoutingCLI != "" || req.ModelRoutingTier != "") {
+	overlayProposed := req.ModelRoutingCLI != "" || req.ModelRoutingTier != ""
+	modelSource := "profile"
+	switch {
+	case pin != nil:
+		modelSource = "pin"
+	case overlayProposed:
+		modelSource = "advisor"
+	}
+	if pin == nil && overlayProposed {
 		plan = llmroute.ApplySoftOverlay(plan, llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier})
+		b.diag.Infof("[runner] phase=%s advisor overlay cli=%s tier=%s\n", phase, req.ModelRoutingCLI, req.ModelRoutingTier)
+	} else if pin == nil {
+		b.diag.Infof("[runner] phase=%s no advisor overlay (profile default)\n", phase)
 	}
 	// Capability probe: demote (don't delete) candidates whose binary isn't on
 	// PATH so a missing CLI doesn't burn a 60s boot timeout before the chain
@@ -652,15 +675,17 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	verdict, diags, nextPhase := b.hooks.Classify(artifact, req, bres)
 
 	resp := core.PhaseResponse{
-		Phase:        phase,
-		Verdict:      verdict,
-		ArtifactsDir: req.Workspace,
-		NextPhase:    nextPhase,
-		CostUSD:      bres.CostUSD,
-		Tokens:       bres.Tokens,
-		DurationMS:   durationMS,
-		BootMS:       bres.BootMS,
-		Diagnostics:  diags,
+		Phase:         phase,
+		Verdict:       verdict,
+		ArtifactsDir:  req.Workspace,
+		NextPhase:     nextPhase,
+		CostUSD:       bres.CostUSD,
+		Tokens:        bres.Tokens,
+		DurationMS:    durationMS,
+		BootMS:        bres.BootMS,
+		Diagnostics:   diags,
+		ModelSource:   modelSource,
+		ResolvedModel: model,
 	}
 	if reconciled {
 		// A well-formed deliverable on a bridge timeout means the phase actually

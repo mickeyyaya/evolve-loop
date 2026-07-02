@@ -188,6 +188,15 @@ type PhaseResponse struct {
 	// of synthesizing FAIL. Surfaced for the auditable self-healing trail
 	// (orchestrator appends a reconciled_timeout ledger entry).
 	Reconciled bool `json:"reconciled,omitempty"`
+
+	// ModelSource + ResolvedModel (T3, cycle-463) record WHICH resolution path
+	// won this phase's dispatch — "profile" (neither pin nor advisor overlay),
+	// "pin" (an operator policy.json pin, which always wins), or "advisor" (the
+	// MR4c soft overlay applied) — plus the concrete resolved model/tier. Closes
+	// the P3 observability gap: per-phase model provenance was previously
+	// unrecorded, so a dormant advisor overlay had no artifact proving it.
+	ModelSource   string `json:"model_source,omitempty"`
+	ResolvedModel string `json:"resolved_model,omitempty"`
 }
 
 // PhaseRunner runs a single phase. The orchestrator never knows which

@@ -65,14 +65,16 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 		verdict = VerdictFAIL
 	}
 	return recovery.PhaseOutcome{
-		Phase:        string(phase),
-		Verdict:      verdict,
-		CostUSD:      resp.CostUSD,
-		DurationMS:   resp.DurationMS,
-		BootMS:       resp.BootMS,
-		StartedAt:    startedAt,
-		AttemptCount: attempts,
-		AbortReason:  abortReason,
+		Phase:         string(phase),
+		Verdict:       verdict,
+		CostUSD:       resp.CostUSD,
+		DurationMS:    resp.DurationMS,
+		BootMS:        resp.BootMS,
+		StartedAt:     startedAt,
+		AttemptCount:  attempts,
+		AbortReason:   abortReason,
+		ModelSource:   resp.ModelSource,
+		ResolvedModel: resp.ResolvedModel,
 	}
 }
 
@@ -96,16 +98,18 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	out.Archetype = o.phaseArchetype(out.Phase)
 	result.PhasesRun = append(result.PhasesRun, Phase(out.Phase))
 	*timings = append(*timings, phaseTimingEntry{
-		Phase:        out.Phase,
-		DurationMS:   out.DurationMS,
-		BootMS:       out.BootMS,
-		Verdict:      out.Verdict,
-		CostUSD:      out.CostUSD,
-		StartedAt:    out.StartedAt,
-		EndedAt:      out.EndedAt,
-		Archetype:    out.Archetype,
-		AttemptCount: out.AttemptCount,
-		AbortReason:  out.AbortReason,
+		Phase:         out.Phase,
+		DurationMS:    out.DurationMS,
+		BootMS:        out.BootMS,
+		Verdict:       out.Verdict,
+		CostUSD:       out.CostUSD,
+		StartedAt:     out.StartedAt,
+		EndedAt:       out.EndedAt,
+		Archetype:     out.Archetype,
+		AttemptCount:  out.AttemptCount,
+		AbortReason:   out.AbortReason,
+		ModelSource:   out.ModelSource,
+		ResolvedModel: out.ResolvedModel,
 	})
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still

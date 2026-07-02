@@ -70,4 +70,10 @@ type PhaseOutcome struct {
 	// ledger/state persistence failure). Verdict above remains the agent's
 	// own — an abort is a cycle-level disposition, never a verdict rewrite.
 	AbortReason string
+	// ModelSource + ResolvedModel (T3, cycle-463) carry the phase response's
+	// per-phase model provenance through to phase-timing.json, so the dossier
+	// can record WHICH resolution path won ("profile"|"pin"|"advisor") plus
+	// the concrete resolved model/tier.
+	ModelSource   string
+	ResolvedModel string
 }

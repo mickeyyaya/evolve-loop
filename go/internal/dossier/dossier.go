@@ -58,6 +58,12 @@ type PhaseRecord struct {
 	StartedAt   string         `json:"started_at,omitempty"`
 	EndedAt     string         `json:"ended_at,omitempty"`
 	Archetype   string         `json:"archetype,omitempty"`
+	// ModelSource + ResolvedModel (T3, cycle-463) project the per-phase model
+	// provenance ingested from phase-timing.json — "profile"|"pin"|"advisor"
+	// plus the concrete resolved model/tier. Both absent (never fabricated) on
+	// a legacy timing log written before this field existed.
+	ModelSource   string `json:"model_source,omitempty"`
+	ResolvedModel string `json:"resolved_model,omitempty"`
 }
 
 // Defect is one audit finding (the H1/H2 taxonomy) — preserved so a failed cycle

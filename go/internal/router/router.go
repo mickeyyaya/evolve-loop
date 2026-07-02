@@ -145,7 +145,10 @@ type CarryoverTodo struct {
 }
 
 // Clamp records a hard-rule override applied to a soft/proposed decision.
+// Phase names which phase entry the clamp fired on (empty for a whole-plan
+// clamp with no single-phase owner, e.g. an empty-plan rejection).
 type Clamp struct {
+	Phase    string `json:"phase,omitempty"`
 	Rule     string `json:"rule"`
 	Proposed string `json:"proposed"`
 	Forced   string `json:"forced"`

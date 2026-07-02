@@ -43,9 +43,31 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 			continue // nothing proposed — nothing to clamp
 		}
 		prof := profileFor(e.Phase)
+
+		// Operator low-model floor (cycle-463 T4): a tier proposal BELOW the
+		// phase's envelope minimum clamps UP to the floor rather than emptying
+		// the whole proposal — the CLI is left untouched since only the tier
+		// violated a bound. TierRank returns 0 for an unclassifiable string, so
+		// this only fires when both ranks are real.
+		if prof != nil && e.Tier != "" && prof.ModelTierEnvelope != nil {
+			tierRank := policy.TierRank(e.Tier)
+			minRank := policy.TierRank(prof.ModelTierEnvelope.Min)
+			if tierRank > 0 && minRank > 0 && tierRank < minRank {
+				clamps = append(clamps, Clamp{
+					Phase:    e.Phase,
+					Rule:     "model-routing-guardrail",
+					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
+					Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (clamped up to envelope floor)", e.Phase, e.CLI, prof.ModelTierEnvelope.Min),
+				})
+				e.Tier = prof.ModelTierEnvelope.Min
+				continue
+			}
+		}
+
 		pin := policy.Pin{CLI: e.CLI, Model: e.Tier}
 		if err := policy.ValidatePin(e.Phase, pin, prof); err != nil {
 			clamps = append(clamps, Clamp{
+				Phase:    e.Phase,
 				Rule:     "model-routing-guardrail",
 				Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
 				Forced:   e.Phase + "={cli:,tier:} (profile default)",
@@ -56,6 +78,7 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 		if catalogLookup != nil && e.CLI != "" && e.Tier != "" {
 			if _, ok := catalogLookup(policy.BaseCLI(e.CLI), e.Tier); !ok {
 				clamps = append(clamps, Clamp{
+					Phase:    e.Phase,
 					Rule:     "model-routing-catalog-miss",
 					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
 					Forced:   e.Phase + "={cli:,tier:} (profile default)",
@@ -65,4 +88,25 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 		}
 	}
 	return out, clamps
+}
+
+// RejectionsFromClamps converts router Clamps (from ClampPlanModelRouting or
+// the integrity-floor clamp) into the PlanRejection shape the
+// advisor-rejections.json artifact already uses, so a model-routing clamp is
+// visible in the SAME rejection artifact operators already read — naming the
+// phase and the rule that fired. Empty input yields nil (no artifact noise
+// for the common no-clamp cycle).
+func RejectionsFromClamps(clamps []Clamp) []PlanRejection {
+	if len(clamps) == 0 {
+		return nil
+	}
+	out := make([]PlanRejection, len(clamps))
+	for i, c := range clamps {
+		out[i] = PlanRejection{
+			Phase:  c.Phase,
+			Reason: c.Rule,
+			Detail: fmt.Sprintf("proposed %s, forced %s", c.Proposed, c.Forced),
+		}
+	}
+	return out
 }

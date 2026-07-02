@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // IO is the typed input/output contract of a phase: the artifact files it
@@ -70,17 +71,24 @@ type PhaseSpec struct {
 	// Advisor-facing metadata (ADR-0038): rendered into the phase inventory and
 	// the advisor's SELECT catalog so routing decisions are informed, not
 	// name-guessing. All optional; absence degrades to today's name-only card.
-	Description   string               `json:"description,omitempty"` // one line: what the phase produces
-	WhenToUse     string               `json:"when_to_use,omitempty"` // the signal/goal that should trigger SELECTing it
-	Categories    []string             `json:"categories,omitempty"`  // goal types, validated softly by UnknownCategories
-	Enabled       string               `json:"enabled,omitempty"`
-	EnableVar     string               `json:"enable_var,omitempty"`
-	Inputs        IO                   `json:"inputs,omitempty"`
-	Outputs       IO                   `json:"outputs,omitempty"`
-	PromptContext []string             `json:"prompt_context,omitempty"`
-	Classify      *ClassifyRules       `json:"classify,omitempty"`
-	Routing       *config.RoutingBlock `json:"routing,omitempty"`
-	Gates         Gates                `json:"gates,omitempty"`
+	Description string   `json:"description,omitempty"` // one line: what the phase produces
+	WhenToUse   string   `json:"when_to_use,omitempty"` // the signal/goal that should trigger SELECTing it
+	Categories  []string `json:"categories,omitempty"`  // goal types, validated softly by UnknownCategories
+	// AllowedCLIs + ModelTierEnvelope (cycle-463 T1) carry this phase's OWN
+	// dispatch guardrails (phase-registry.json contracts) so the advisor's
+	// plan-prompt catalog can project them (router.PhaseCard mirrors these
+	// exact fields) instead of the advisor proposing a {cli,tier} blind. Both
+	// nil/empty in the common case (no per-phase guardrail configured).
+	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
+	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
+	Enabled           string                      `json:"enabled,omitempty"`
+	EnableVar         string                      `json:"enable_var,omitempty"`
+	Inputs            IO                          `json:"inputs,omitempty"`
+	Outputs           IO                          `json:"outputs,omitempty"`
+	PromptContext     []string                    `json:"prompt_context,omitempty"`
+	Classify          *ClassifyRules              `json:"classify,omitempty"`
+	Routing           *config.RoutingBlock        `json:"routing,omitempty"`
+	Gates             Gates                       `json:"gates,omitempty"`
 	// After names the phase this one slots in right after, in the routing order
 	// (e.g. "build" → runs between build and audit). Empty defaults to running
 	// just before "audit" — the canonical post-build check slot.

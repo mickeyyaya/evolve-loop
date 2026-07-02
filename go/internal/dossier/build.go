@@ -18,12 +18,14 @@ func timingRecords(workspace string) ([]PhaseRecord, *phasetiming.Summary, bool)
 	records := make([]PhaseRecord, 0, len(entries))
 	for _, e := range entries {
 		records = append(records, PhaseRecord{
-			Name:       e.Phase,
-			Verdict:    normalizeVerdict(e.Verdict),
-			DurationMS: e.DurationMS,
-			StartedAt:  e.StartedAt,
-			EndedAt:    e.EndedAt,
-			Archetype:  e.Archetype,
+			Name:          e.Phase,
+			Verdict:       normalizeVerdict(e.Verdict),
+			DurationMS:    e.DurationMS,
+			StartedAt:     e.StartedAt,
+			EndedAt:       e.EndedAt,
+			Archetype:     e.Archetype,
+			ModelSource:   e.ModelSource,
+			ResolvedModel: e.ResolvedModel,
 		})
 	}
 	summary := phasetiming.Rollup(entries)

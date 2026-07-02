@@ -226,6 +226,7 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile stri
 		router.RenderReconDigest(&b, gatherPreplanRecon(in))
 	}
 	writeCatalog(&b, in.Catalog)
+	writePlanResponseSchema(&b)
 	// Instruct the ABSOLUTE artifact path — the same path advisorLaunch tells the
 	// bridge to watch (filepath.Join(in.Workspace, artifactFile)). A relative path
 	// lands in the REPL's cwd (under claude-tmux that is NOT the workspace — it
@@ -474,6 +475,18 @@ func buildPlanPrompt(in router.RouteInput) string {
 
 	writeCatalog(&b, in.Catalog)
 
+	writePlanResponseSchema(&b)
+	return b.String()
+}
+
+// writePlanResponseSchema renders the whole-cycle plan's response contract —
+// the optional MINT block, the optional per-phase {cli,tier} dispatch
+// proposal with the operator's model-tier policy, and the strict-JSON
+// example — shared by composePlanPrompt (persona path, PRODUCTION) and
+// buildPlanPrompt (legacy fallback), so the two prompt-assembly paths can
+// never diverge again the way they did at #293 (the persona path never
+// called this section at all).
+func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
 	b.WriteString("by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER ")
@@ -484,11 +497,16 @@ func buildPlanPrompt(in router.RouteInput) string {
 	b.WriteString("\nYou MAY also propose a dispatch \"cli\" and abstract \"tier\" (fast|balanced|deep — never a raw model name) ")
 	b.WriteString("for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.\n")
 
+	b.WriteString("\n## Operator model-tier policy (apply when proposing a tier)\n")
+	b.WriteString("- deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.\n")
+	b.WriteString("- balanced: review/scan/triage-class phases — the safe default for anything not covered below.\n")
+	b.WriteString("- fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.\n")
+	b.WriteString("- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.\n")
+
 	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
 	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},`)
 	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude"}}]`)
 	b.WriteString("\n")
-	return b.String()
 }
 
 // maxEnrichedCatalogCards bounds how many cards render with full metadata
@@ -629,8 +647,12 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 		benched := append([]router.BenchedCLI(nil), in.BenchedCLIs...)
 		sort.Slice(benched, func(i, j int) bool { return benched[i].Family < benched[j].Family })
 		for _, e := range benched {
-			fmt.Fprintf(b, "- %s: benched (%s) until %s — its dispatch chains start at the fallback CLI\n",
-				e.Family, e.Reason, e.Until.UTC().Format("15:04Z"))
+			label := "benched"
+			if strings.Contains(strings.ToLower(e.Reason), "exhaust") {
+				label = "WALLED/unavailable"
+			}
+			fmt.Fprintf(b, "- %s: %s (%s) until %s — its dispatch chains start at the fallback CLI\n",
+				e.Family, label, e.Reason, e.Until.UTC().Format("15:04Z"))
 		}
 		b.WriteString("\n")
 	}

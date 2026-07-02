@@ -40,6 +40,14 @@ type Entry struct {
 	Archetype    string  `json:"archetype,omitempty"`
 	AttemptCount int     `json:"attempt_count"`
 	AbortReason  string  `json:"abort_reason,omitempty"`
+	// ModelSource + ResolvedModel (T3, cycle-463) mirror core.PhaseResponse's
+	// per-phase model provenance into the timing log, so the dossier (which
+	// ingests this file, not the live PhaseResponse) can project WHICH
+	// resolution path won — "profile"|"pin"|"advisor" — plus the concrete
+	// resolved model/tier. Both empty on a legacy log written before this
+	// change; that degrades to "absent", never a fabricated claim.
+	ModelSource   string `json:"model_source,omitempty"`
+	ResolvedModel string `json:"resolved_model,omitempty"`
 }
 
 // Path is the timing-log path for a cycle workspace.
