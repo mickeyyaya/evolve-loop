@@ -12,6 +12,14 @@
 | internal | Set by the runner for subprocess injection (IPC/bootstrap); not operator-facing |
 | deprecated | Still honored via a bridge; emits a stderr WARN; remove in a future cycle |
 
+## Policy Config Blocks (non-flag, `.evolve/policy.json`)
+
+Not every operator dial is an `EVOLVE_*` env flag — some are typed `.evolve/policy.json`
+blocks (see [runtime-reference.md](../operations/runtime-reference.md) for the full table).
+This section documents the closed-vocabulary fields those blocks use.
+
+- `fleet.plan_source` (`.evolve/policy.json:fleet.plan_source`) — closed vocabulary: `triage` (the default, empty/absent maps here) or `manual`; any other value fails safe to `manual` (never passthrough, never the `triage` default) plus a surfaced warning naming the rejected value.
+
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 
 ## Generated Flag Index

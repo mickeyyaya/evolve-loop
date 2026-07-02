@@ -161,6 +161,10 @@ type Policy struct {
 	// applies (NestedFallback="off" — the verified-fallback write-canary is
 	// opt-in; a fresh policy.json never halts a nested run).
 	Sandbox *SandboxPolicy `json:"sandbox,omitempty"`
+	// Fleet configures multi-cycle fleet planning: lane count, per-lane
+	// concurrency, and the todo-source strategy. Absent ⇒ Count=1 —
+	// byte-identical to today's single-cycle sequential execution.
+	Fleet *FleetPolicy `json:"fleet,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -841,6 +845,64 @@ func (p Policy) SwarmConfig() SwarmConfig {
 		c.Stage = p.Swarm.Stage
 	}
 	c.PortBase = p.Swarm.PortBase
+	return c
+}
+
+// FleetPolicy is the .evolve/policy.json "fleet" block (S1 of the
+// FLEET-AS-POLICY goal). Establishes the configuration surface multi-lane
+// fleet planning will read; this cycle ships no behavior change.
+type FleetPolicy struct {
+	// Count is the number of fleet lanes. Zero/negative/absent ⇒ 1.
+	Count int `json:"count,omitempty"`
+	// Concurrency is the number of lanes run in parallel. Zero/negative/absent
+	// ⇒ follows the resolved Count.
+	Concurrency int `json:"concurrency,omitempty"`
+	// PlanSource selects the todo-source strategy: "triage" / "manual".
+	// Empty/absent ⇒ "triage". Unlike most closed-vocab blocks in this
+	// package, an UNKNOWN value fails safe to "manual" (not the default),
+	// per the goal spec — and the getter surfaces a warning rather than
+	// logging it, keeping this package I/O-free.
+	PlanSource string `json:"plan_source,omitempty"`
+}
+
+// FleetConfig is the resolved fleet configuration with defaults applied.
+// Warnings carries non-fatal advisories (e.g. an unknown PlanSource) for the
+// caller to log/report; the getter itself performs no I/O.
+type FleetConfig struct {
+	Count       int
+	Concurrency int
+	PlanSource  string
+	Warnings    []string
+}
+
+// FleetConfig returns fleet configuration with built-in defaults resolved.
+// Count defaults to 1 and clamps any non-positive override back to 1 — a
+// fleet block never yields a zero-lane or negative-lane wave. Concurrency
+// defaults to the resolved Count when absent/non-positive, independent of
+// whether Count itself was overridden. PlanSource defaults to "triage"; an
+// unknown value fails safe to "manual" plus a surfaced warning naming the
+// rejected value.
+func (p Policy) FleetConfig() FleetConfig {
+	c := FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
+	if p.Fleet == nil {
+		return c
+	}
+	if p.Fleet.Count > 0 {
+		c.Count = p.Fleet.Count
+	}
+	c.Concurrency = c.Count
+	if p.Fleet.Concurrency > 0 {
+		c.Concurrency = p.Fleet.Concurrency
+	}
+	switch p.Fleet.PlanSource {
+	case "", "triage":
+		c.PlanSource = "triage"
+	case "manual":
+		c.PlanSource = "manual"
+	default:
+		c.PlanSource = "manual"
+		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.plan_source: unknown value %q, falling back to \"manual\"", p.Fleet.PlanSource))
+	}
 	return c
 }
 
