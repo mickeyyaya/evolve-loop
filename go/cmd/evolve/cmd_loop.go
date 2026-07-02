@@ -349,6 +349,25 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[loop] no --cycles: advisor-decided, completion-driven (stops when the backlog drains), safety cap=%d\n", effectiveMax)
 	}
 
+	// FLEET-AS-POLICY S2: resolved once per batch (not per iteration — the
+	// policy block does not change mid-batch). Count==1 (absent block, the
+	// default) keeps every iteration on the existing sequential path below —
+	// shouldRunWave gates the wave branch off entirely, so no Supervisor is
+	// ever constructed.
+	fleetCfg := loadFleetConfig(cfg.EvolveDir)
+	for _, w := range fleetCfg.Warnings {
+		fmt.Fprintf(stderr, "[loop] WARN: fleet: %s\n", w)
+	}
+	var waveBinPath string
+	if shouldRunWave(fleetCfg) {
+		if bp, err := os.Executable(); err == nil {
+			waveBinPath = bp
+		} else {
+			fmt.Fprintf(stderr, "[loop] WARN: fleet: cannot resolve binary for wave dispatch, staying sequential: %v\n", err)
+			fleetCfg.Count = 1
+		}
+	}
+
 	for i := 0; i < effectiveMax; i++ {
 		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
 		if ctx.Err() != nil {
@@ -367,6 +386,36 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// phase boots one — so a fresh cap costs zero wasted boots. Off unless
 		// policy.json cli_health.proactive_probe is set.
 		runUsageProbe(cfg.ProjectRoot, cfg.EvolveDir, cycleEnv, stderr)
+
+		// FLEET-AS-POLICY S2 wave path: this iteration IS a wave (--max-cycles
+		// counts waves). Each lane runs its own full `evolve cycle run`
+		// subprocess (own ship/audit/ledger, serialized on the existing
+		// .evolve/ship.lock), so a successful wave simply advances to the next
+		// iteration — it does not append to lr.Cycles or the sequential
+		// breaker/failurelog bookkeeping below, which is scoped to the single
+		// in-process orch.RunCycle path. A wave-plan/adapter error, or a
+		// triage plan that committed zero lanes (D1: empty-plan guard),
+		// WARNs and falls through to that unchanged sequential path for this
+		// iteration instead of silently consuming it.
+		if shouldRunWave(fleetCfg) {
+			launcher := productionWaveLauncher(fleetCfg, waveBinPath, cfg.ProjectRoot, stdout, stderr)
+			ran, _, results, werr := dispatchIteration(ctx, fleetCfg, productionWavePlanFn(cfg, deps.Storage), launcher, i)
+			switch {
+			case werr != nil:
+				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", i, werr)
+			case ran:
+				failedLanes := 0
+				for _, r := range results {
+					if r.Err != nil || r.ExitCode != 0 {
+						failedLanes++
+					}
+				}
+				fmt.Fprintf(stderr, "[loop] wave %d: %d/%d lanes ok\n", i, len(results)-failedLanes, len(results))
+				continue
+			default:
+				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d triage plan committed zero lanes, falling back to sequential\n", i)
+			}
+		}
 
 		// Snapshot state.LastCycleNumber so we can detect
 		// counter-non-advance after RunCycle returns.

@@ -18,7 +18,7 @@ Not every operator dial is an `EVOLVE_*` env flag — some are typed `.evolve/po
 blocks (see [runtime-reference.md](../operations/runtime-reference.md) for the full table).
 This section documents the closed-vocabulary fields those blocks use.
 
-- `fleet.plan_source` (`.evolve/policy.json:fleet.plan_source`) — closed vocabulary: `triage` (the default, empty/absent maps here) or `manual`; any other value fails safe to `manual` (never passthrough, never the `triage` default) plus a surfaced warning naming the rejected value.
+- `fleet.plan_source` (`.evolve/policy.json:fleet.plan_source`) — closed vocabulary: `triage` (the default, empty/absent maps here) or `manual`; any other value fails safe to `manual` (never passthrough, never the `triage` default) plus a surfaced warning naming the rejected value. Runtime meaning: `triage` is the ONLY value that arms native `evolve loop` wave dispatch (S2) — with `fleet.count>1` it makes each batch iteration a wave (one single-writer triage plan fanned out to disjoint lanes) and `--max-cycles` counts waves, not lanes; `manual` (or any fallback) keeps wave dispatch off, so multi-lane fan-out only happens via an explicit `evolve fleet` invocation. A wave whose triage plan commits zero lanes never consumes an iteration: it WARNs and falls through to the sequential path instead (D1 empty-plan guard).
 
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 
