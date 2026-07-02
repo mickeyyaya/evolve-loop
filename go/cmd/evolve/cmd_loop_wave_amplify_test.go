@@ -83,10 +83,10 @@ func TestShouldRunWave_AdversarialGateTable(t *testing.T) {
 func TestDispatchIteration_EmptyPlanNeverClaimsAWave(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[]}`), nil, nil
 	}
-	ran, specs, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration(empty plan) returned error: %v, want nil (an empty plan is not itself an error)", err)
 	}
@@ -117,10 +117,10 @@ func TestDispatchIteration_LaneResultsPropagateVerbatim(t *testing.T) {
 		{Index: 1, ExitCode: 81, Err: laneErr},
 	}
 	launcher := &resultEchoLauncher{canned: canned}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core","audit"]}`), nil, nil
 	}
-	ran, _, results, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, _, results, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration returned error: %v (lane failures must be results, not a dispatch error)", err)
 	}
@@ -148,11 +148,11 @@ func TestDispatchIteration_WaveIndexReachesPlanFn(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	for _, waveIndex := range []int{0, 7} {
 		got := -1
-		planFn := func(i int) ([]byte, []string, error) {
+		planFn := func(_ context.Context, i int) ([]byte, []string, error) {
 			got = i
 			return []byte(`{"committed_floors":["core"]}`), nil, nil
 		}
-		if _, _, _, err := dispatchIteration(context.Background(), fc, planFn, &fakeWaveLauncher{}, waveIndex); err != nil {
+		if _, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, &fakeWaveLauncher{}, waveIndex); err != nil {
 			t.Fatalf("waveIndex %d: dispatchIteration returned error: %v", waveIndex, err)
 		}
 		if got != waveIndex {
@@ -169,11 +169,11 @@ func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
 	type ctxKey struct{}
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &resultEchoLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core"]}`), nil, nil
 	}
 	ctx := context.WithValue(context.Background(), ctxKey{}, "wave-ctx-sentinel")
-	if _, _, _, err := dispatchIteration(ctx, fc, planFn, launcher, 0); err != nil {
+	if _, _, _, err := dispatchIteration(ctx, fc, passingPreflight, planFn, launcher, 0); err != nil {
 		t.Fatalf("dispatchIteration returned error: %v", err)
 	}
 	if launcher.calls != 1 {
@@ -191,10 +191,10 @@ func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
 func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{}`), []string{"core", "audit"}, nil
 	}
-	ran, specs, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration returned error: %v", err)
 	}
@@ -226,10 +226,10 @@ func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
 func TestDispatchIteration_DuplicateFloorsNeverCoScheduled(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core","core","audit"]}`), nil, nil
 	}
-	ran, specs, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration returned error: %v", err)
 	}

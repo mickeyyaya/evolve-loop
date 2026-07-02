@@ -95,14 +95,14 @@ func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 		{"bridge", "core", "audit"},
 		{"policy", "fleet", "ipcenv"},
 	}
-	planFn := func(waveIndex int) ([]byte, []string, error) {
+	planFn := func(_ context.Context, waveIndex int) ([]byte, []string, error) {
 		floors := waveFloors[waveIndex]
 		return []byte(`{"committed_floors":["` + strings.Join(floors, `","`) + `"]}`), nil, nil
 	}
 
 	seenAcrossWaves := map[string]bool{}
 	for wave := 0; wave < 2; wave++ {
-		ran, specs, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, wave)
+		ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, wave)
 		if err != nil {
 			t.Fatalf("wave %d: dispatchIteration returned error: %v", wave, err)
 		}
@@ -135,11 +135,11 @@ func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		t.Fatal("planFn must never be called when the wave path is not taken (Count==1)")
 		return nil, nil, nil
 	}
-	ran, specs, results, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, specs, results, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration returned error: %v", err)
 	}
@@ -162,10 +162,10 @@ func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
-	planFn := func(int) ([]byte, []string, error) {
+	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[`), nil, nil // truncated JSON
 	}
-	ran, _, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if err == nil {
 		t.Fatalf("dispatchIteration(malformed triage plan) returned nil error — want an explicit error so the caller WARNs and falls back to sequential")
 	}
@@ -185,8 +185,8 @@ func TestDispatchIteration_PlanFnErrorFallsBackSequential(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	wantErr := errors.New("triage phase failed")
-	planFn := func(int) ([]byte, []string, error) { return nil, nil, wantErr }
-	ran, _, _, err := dispatchIteration(context.Background(), fc, planFn, launcher, 0)
+	planFn := func(context.Context, int) ([]byte, []string, error) { return nil, nil, wantErr }
+	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("dispatchIteration error = %v, want it to wrap %v", err, wantErr)
 	}
