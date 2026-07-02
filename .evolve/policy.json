@@ -22,9 +22,25 @@
     "concurrency": 3
   },
   "pins": {
-    "scout": { "cli": "claude", "model": "deep" },
-    "build-planner": { "cli": "claude", "model": "deep" },
-    "builder": { "cli": "claude", "model": "deep" },
-    "memo": { "cli": "agy", "model": "fast" }
+    "scout": {
+      "cli": "claude",
+      "model": "deep"
+    },
+    "build-planner": {
+      "cli": "claude",
+      "model": "deep"
+    },
+    "memo": {
+      "cli": "agy",
+      "model": "fast"
+    },
+    "build": {
+      "cli": "claude",
+      "model": "deep"
+    }
+  },
+  "fleet": {
+    "count": 2,
+    "plan_source": "triage"
   }
 }

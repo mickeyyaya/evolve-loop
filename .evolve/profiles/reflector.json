@@ -1,9 +1,9 @@
 {
-  "_comment": "Reflector — runs every cycle in the formalized Learn phase (v10.20.0+). Reads per-phase <phase>-reflection.yaml sidecars, calls aggregate-reflections.sh for cross-cycle rollup, emits learn/reflector-synthesis.md. Strict read-only-repo per single-writer invariant; writes confined to .evolve/runs/cycle-*/learn/. Lightweight cost target (~$0.05–0.15/cycle), modelled on memo.json.",
+  "_comment": "Reflector \u2014 runs every cycle in the formalized Learn phase (v10.20.0+). Reads per-phase <phase>-reflection.yaml sidecars, calls aggregate-reflections.sh for cross-cycle rollup, emits learn/reflector-synthesis.md. Strict read-only-repo per single-writer invariant; writes confined to .evolve/runs/cycle-*/learn/. Lightweight cost target (~$0.05\u20130.15/cycle), modelled on memo.json.",
   "name": "reflector",
   "role": "reflector",
   "cli": "agy-tmux",
-  "model_tier_default": "fast",
+  "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -132,8 +132,8 @@
   "parallel_eligible": false,
   "schema_filter_enabled": true,
   "model_tier_envelope": {
-    "min": "fast",
-    "default": "fast",
+    "min": "balanced",
+    "default": "balanced",
     "max": "balanced"
   },
   "allowed_clis": [

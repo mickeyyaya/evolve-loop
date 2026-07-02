@@ -5,7 +5,7 @@
   "cli_fallback": [
     "claude-tmux"
   ],
-  "model_tier_default": "fast",
+  "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -44,5 +44,9 @@
     ],
     "allow_network": false
   },
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "model_tier_envelope": {
+    "min": "balanced",
+    "max": "deep"
+  }
 }

@@ -1,0 +1,25 @@
+# Cycle 463 Dossier
+
+**Goal:** GOAL: ADVISOR-TIER ACTIVATION (P1-P4) — the advisor must ACTUALLY DECIDE {cli, tier} per phase. OPERATOR PRIORITY OVERRIDE: this goal OUTRANKS every carryover/inbox item; triage MUST commit THIS work as top_n item 1 and defer the backlog (cycle-459's triage diverted to backlog over the operator goal — do NOT repeat that). Strict TDD red-first, clean code, reuse existing seams only.
+
+CONTEXT (all verified): model_routing=auto is the DEFAULT (phase-registry.json, since v21.6.0) and the FULL apply chain is live — router.PhasePlanEntry has optional CLI/Tier fields (MR1), ClampPlanModelRouting validates against allowed_clis + model_tier_envelope + catalog (MR2), the runner applies a clamped soft overlay with pin==nil fallback preserved (MR4), degrade path = profile-static. BUT THE FEATURE IS DORMANT: across cycles 446/456/458/459 the advisor emitted ZERO cli/tier fields (verified: every advisor-response-plan.txt has run/skip+justification only) — because buildPlanPrompt/composePlanPrompt (go/internal/core/phase_advisor.go) never SHOWS the fields in the response schema/example nor says when to propose them. advisor-rejections.json is always [] — nothing proposed, nothing clamped. Meanwhile the justification QUALITY is good (evidence citations, lesson refs) — keep that style.
+
+P1 PROMPT ELICITATION (the core fix): the plan prompt's response schema/example MUST include the optional cli+tier fields per phase entry, with guidance encoding the OPERATOR MODEL POLICY: deep for judgment-heavy phases (build/tdd/audit/architecture/adversarial); balanced for review/scan/triage-class phases; **fast ONLY for the simplest mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist and similar) — NEVER for anything that writes source, makes verdicts, or scopes work; when in doubt choose the HIGHER tier (operator rule: low models break things that cost more to fix than they save)**. Judgment phases (triage, evaluator, context-condense, reflector, memo) carry envelope min=balanced — the kernel clamps any lower proposal; do not fight the clamp. Propose a CLI only when deviating from the profile is justified. INJECT INTO THE PROMPT: each phase's allowed_clis + model_tier_envelope (guardrails), AND the LIVE quota/bench state (clihealth benches + usage-probe walls — agy and codex are currently quota-walled; the advisor must know a CLI is dead before proposing it). Absent fields stay valid (degrade path untouched).
+
+P2 MEASURED INPUTS: inject per-phase MEASURED duration/cost history (the <phase>-usage.json sidecars from recent cycles — same data failure_learning.go writes) so run/skip AND tier choices weigh measured cost, not 'expected diff_loc' speculation. Keep the citation style; prefer measured over expected wherever available.
+
+P3 OBSERVABILITY (dormancy can never hide again): the runner MUST log every applied overlay ('[runner] phase=X advisor overlay cli=Y tier=Z (clamped: ...)' or 'no advisor overlay (profile default)'), and the cycle dossier/knowledge-base record MUST carry per-phase model source (profile|pin|advisor) + the resolved concrete model.
+
+P4 GOLDEN REPLAY: extend the routing replay corpus with a plan response carrying {cli,tier} entries; assert end-to-end that under model_routing=auto the dispatch line carries the CLAMPED overlay (and advisory mode only logs it); an out-of-envelope tier + a disallowed CLI + a catalog-miss each CLAMP with a recorded rejection — INCLUDING a 'fast' proposal against a min=balanced envelope (the operator low-model floor) clamping UP to balanced. Plus a live-shape test: the NEW prompt fed to a recorded advisor must show the schema fields.
+
+CONSTRAINTS: no clamp relaxation (model proposes, kernel disposes); degrade path byte-identical when fields absent; tier vocabulary stays fast/balanced/deep (the top/high split is a SEPARATE queued campaign — do not implement it here); go test -race green; apicover -enforce clean (every new exported symbol named in a _test.go AST); no new env flags. TOUCHES: go/internal/core/phase_advisor.go (prompt), go/internal/phases/runner/runner.go (overlay logging), go/internal/router (replay corpus), dossier producer (model source field).
+
+ACCEPTANCE: next production cycle's advisor-response-plan.txt contains tier fields for run=true phases; runner log shows applied overlays; dossier records per-phase model source; goldens green; a deliberately out-of-envelope proposal (incl. fast-below-floor) clamps with a recorded rejection.
+**Final verdict:** PASS
+**Run ID:** 01KWHBMM1BJPKEABC16X4BKSYY
+
+## Phases
+
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
+| cycle-recorded |  | PASS |  | cycle completed; ledger walk deferred to future slice |

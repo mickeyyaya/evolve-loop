@@ -2,7 +2,7 @@
   "name": "triage",
   "role": "triage",
   "cli": "agy-tmux",
-  "model_tier_default": "fast",
+  "model_tier_default": "balanced",
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
     "Read",
@@ -123,7 +123,7 @@
     "scout-report.md:proposed_tasks"
   ],
   "model_tier_envelope": {
-    "min": "fast",
+    "min": "balanced",
     "default": "balanced",
     "max": "balanced"
   },
@@ -137,5 +137,7 @@
   },
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": ["claude-tmux"]
+  "cli_fallback": [
+    "claude-tmux"
+  ]
 }
