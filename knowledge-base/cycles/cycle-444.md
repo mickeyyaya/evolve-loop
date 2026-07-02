@@ -1,0 +1,29 @@
+# Cycle 444 Dossier
+
+**Goal:** PRIORITY (recent-features hardening — user directive): BEFORE the general lowest-coverage sweep, bring the v21.6.0 model-routing + resilience code to ~100% coverage (freshest, highest-risk). MODEL-ROUTING HAS NOW LANDED (MR1-MR5 on main, v21.6.0) — its code is live and must be covered. Close these MEASURED package gaps with edge-case tests that exercise the REAL code paths (no grep-only predicates):
+  - internal/core — 82.9% (BIGGEST GAP; the MR4 model_routing projection/apply/degrade + advisor). Cover the uncovered branches: the model_routing DEGRADE path (failed/absent advisor => profile-static per phase), the advisory-mode log-only path, the auto-apply soft-overlay wiring (cyclerun_dispatch.go / decision_branch.go / orchestrator.go / phase.go), the ClampPlanModelRouting integration, and phase_advisor.go advisorLaunch all-candidates-fail / error-wrap fallback branch.
+  - internal/phases/audit — 92.6%. CI-parity gate (ciparity.go): moduleDirForReq without <dir>/go.mod, cycleTouchedGo handoff guard (no-op on synthetic fixtures), runCIGate non-zero-exit via sysexec.Capture (NOT CombinedOutput), the go-vet / acs-durable / apicover-enforce sub-branches, applyCIGate closure in Classify.
+  - internal/bridge — 93.4%. autorespond.go exhaustion fast-fail branches (the rc!=85 guard, ExhaustedOf override, escalate:exhausted rc==85 report arm, exhaustedRegex empty/invalid fail-open); driver_tmux_repl.go LivenessExhausted backstop; isAgentDiffLine / firedRuleOnce / openPending / tryKernelAnswer edge branches; runner.go dispatch-dedup branches.
+  - internal/router (94.9%), internal/llmroute (95.3%), internal/config (95.7%) — small surgical gaps: router/floor.go + model_routing_clamp.go base-name normalization + catalog Lookup-miss clamp; llmroute model_routing_overlay soft-overlay (pin==nil so benched CLI still falls back) + chainCandidates nil-profile/whitespace/dup-skip edges; config parseModelRouting escape-hatch (static/off) + checked-in default-flip (auto) branches.
+  (ALREADY 100%/99%: internal/ciparity, internal/modelquery [MR5], internal/bridge/panestream — keep green; SKIP unless a genuinely uncovered branch is found.)
+THEN continue the general sweep below.
+
+Drive each Go module toward 100% code/API test coverage, lowest-coverage and highest-value packages first. As an adversarial test engineer, write edge-case-thorough tests that exercise every exported API and code path: boundary values, error branches, nil/empty/zero inputs, malformed/oversized input, concurrency races, and anticipated API misuse — deliberately try to break the code and surface real defects for the builder to fix and recover. Tests MUST exercise the system under test (call functions, run subprocesses, assert on real output/exit/side-effects); grep-only/degenerate predicates over source are forbidden (cycle-85 rule). A test that merely executes a line without asserting its contract is a NO-OP and must be REJECTED (Rule 9: tests verify intent, not surface coverage). This is COVERAGE HARDENING of EXISTING shipped code — NO new features, NO behavior change; if a branch is genuinely unreachable/defensive, document WHY in the cycle report rather than forcing a contrived test. Preserve all existing tests and every phase-integrity gate. Each cycle: measure via `go test -coverprofile` + `go tool cover -func` to find the EXACT uncovered functions, add MEANINGFUL tests, verify coverage delta UP + `go test -race` green + `apicover -enforce` clean (every new exported symbol named in a _test.go AST).
+**Final verdict:** FAIL
+**Run ID:** 01KWFSSPHZAQPEC128VX02409G
+
+## Phases
+
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
+| cycle-recorded |  | FAIL |  | cycle completed; ledger walk deferred to future slice |
+
+## Defects
+
+- **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Carryover
+
+- **address-audit-findings** (high): resolve the audit findings that failed cycle 444
+

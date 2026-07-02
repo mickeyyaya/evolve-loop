@@ -1,0 +1,44 @@
+Reading prompt from stdin...
+OpenAI Codex v0.142.2
+--------
+workdir: /Users/danleemh/ai/claude/evolve-loop
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f2082-883c-7690-aa65-6152e9bd068e
+--------
+user
+You map LLM model ids to capability tiers for the "ollama" CLI.
+Models offered (use these ids EXACTLY, do not invent):
+  - evolve-plan-review:latest
+  - evolve-retro:latest
+  - evolve-adversarial-testing:latest
+  - evolve-golang-test-review:latest
+  - evolve-intent:latest
+  - evolve-scout:latest
+  - evolve-inspirer:latest
+  - evolve-audit:latest
+  - evolve-security-review-scored:latest
+  - evolve-evaluator:latest
+  - evolve-code-review-simplify:latest
+  - evolve-verify-release:latest
+  - llama3.1:8b
+  - gemma4:latest
+  - gemma4:31b-cloud
+  - phi4:latest
+  - llama3.3:latest
+
+Pick the single best model id for each tier:
+  fast     = cheapest / lowest-latency
+  balanced = mid capability/cost
+  deep     = most capable
+If fewer than three distinct models exist, reuse the closest id.
+Reply with ONLY this JSON, no prose:
+{"fast":"<id>","balanced":"<id>","deep":"<id>"}
+codex
+{"fast":"llama3.1:8b","balanced":"llama3.3:latest","deep":"gemma4:31b-cloud"}
+tokens used
+11,413

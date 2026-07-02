@@ -1,0 +1,27 @@
+You map LLM model ids to capability tiers for the "ollama" CLI.
+Models offered (use these ids EXACTLY, do not invent):
+  - evolve-plan-review:latest
+  - evolve-retro:latest
+  - evolve-adversarial-testing:latest
+  - evolve-golang-test-review:latest
+  - evolve-intent:latest
+  - evolve-scout:latest
+  - evolve-inspirer:latest
+  - evolve-audit:latest
+  - evolve-security-review-scored:latest
+  - evolve-evaluator:latest
+  - evolve-code-review-simplify:latest
+  - evolve-verify-release:latest
+  - llama3.1:8b
+  - gemma4:latest
+  - gemma4:31b-cloud
+  - phi4:latest
+  - llama3.3:latest
+
+Pick the single best model id for each tier:
+  fast     = cheapest / lowest-latency
+  balanced = mid capability/cost
+  deep     = most capable
+If fewer than three distinct models exist, reuse the closest id.
+Reply with ONLY this JSON, no prose:
+{"fast":"<id>","balanced":"<id>","deep":"<id>"}

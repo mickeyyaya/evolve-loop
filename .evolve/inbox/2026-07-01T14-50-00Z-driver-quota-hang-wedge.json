@@ -1,0 +1,22 @@
+{
+  "id": "driver-quota-hang-wedge",
+  "created_at": "2026-07-01T14:50:00Z",
+  "weight": 0.97,
+  "title": "Driver wedges when a CLI hits a quota/rate-limit MID-EXECUTION (hang-without-exit)",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "A tmux CLI that hits its quota DURING a phase (not at boot) prints its rate-limit error and returns to the REPL prompt WITHOUT exiting a code. The phase wait loop (driver_tmux_repl.go artifact-wait, ~line 539) detects completion ONLY by 'did the artifact file appear?' (detector.poll / artifact contract) — it has no TERMINAL-FAILURE signal. So a quota-walled CLI (artifact will NEVER come) is treated identically to a working one. Worse: the driver's nudge-on-missing-artifact re-prompts the walled CLI, which re-emits its error, which the liveness/busy detector reads as 'pane activity = still working' and resets the stall timer -> LIVELOCK (nudge -> error -> 'activity' -> nudge -> forever). Observed: agy/Gemini 'Individual quota reached ... Resets in 52h' wedged the router (advisor) + behavior-baseline phases 15+ min with no fallback; only a manual kill recovered.",
+  "root_cause": "Completion detection conflates three states: (1) working->wait, (2) done->complete, (3) terminally-blocked (quota/auth/crash, artifact never comes)->should fail-fast->fallback. States 1 and 3 both present as 'no artifact yet'. Exit-code fallback (llmroute dispatch triggers {80,81,85,124,127}) and the advisor A1/A2 chain-walk (PR #292) BOTH key on a process EXIT that a hung REPL never produces. The one pattern that matches ('quota reached') is manifests/agy-tmux.json:44 usage.exhausted_regex, but ClassifyExhausted (usageclassify.go) is only called at usage-probe time, NOT in the wait loop. The interactive_prompt regexes checked during execution (agy-tmux.json:75 rate_limit, :81 quota_exhausted) do NOT match 'Individual quota reached', and even if they did, autorespond.go:100 gates escalation off when paneBusy (a quota wall blocks regardless of spinner).",
+  "fix": "ROOT (single-source): wire the existing ClassifyExhausted / exhausted_regex into the phase wait loop (driver_tmux_repl.go ~:539) as a terminal-failure check PARALLEL to detector.poll — on exhaustion return ExitUnknownPrompt(85) immediately -> dispatch fallback fires in one poll interval instead of 300s+/infinite. Reuses the already-correct pattern (no duplication); driver-agnostic (works for any CLI manifest with exhausted_regex). HARDENING: (a) autorespond.go:100 — a BLOCKING escalate prompt (quota/auth) must not be gated by paneBusy; (b) widen/single-source the rate_limit+quota_exhausted interactive_prompt regexes so they match 'quota reached' too (or have them consult exhausted_regex).",
+  "secondary_findings": [
+    "The advisor/router phase ignores EVOLVE_CLI (advisorLaunch uses identity.CLI + cli_fallback, its own dispatch path) — so operators cannot route the advisor around a dead CLI via EVOLVE_CLI; only dynamic_routing=off avoids the router phase.",
+    "18 phases pin agy-tmux as primary (triage, behavior-baseline, router, retrospective, memo, ...). With agy down 52h this walls the batch. This is the fragility the model-routing MR4 campaign (advisor-authoritative routing) is meant to eliminate — but the advisor itself is pinned to the dead CLI (bootstrap problem)."
+  ],
+  "connects_to": ["driver-bench-artifact-timeout", "campaign_provider_routing", "cli_control_abstraction (refine exhausted_regex, ParseResetHint)", "advisor-dispatch-resilience PR #292 (A1/A2 chain-walk only fires on exit codes)"],
+  "files": [
+    "go/internal/bridge/driver_tmux_repl.go (~:539 wait-loop poll — wire terminal-failure check)",
+    "go/internal/bridge/usageclassify.go (ClassifyExhausted — reuse in the loop)",
+    "go/internal/bridge/autorespond.go:100 (paneBusy escalation gate)",
+    "go/internal/bridge/manifests/agy-tmux.json (:44 exhausted_regex matches; :75/:81 interactive regexes do not)"
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Evolve loop policy pins (ADR-0055 D3). Each entry names a gate that must pass before a cycle can ship.",
+  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout, parallel-evaluate rollout, per-phase CLI/model pins).",
   "floor": [
     {
       "id": "dossier-closeout",
@@ -11,10 +11,20 @@
   "cli_health": {
     "proactive_probe": true
   },
+  "catalog": {
+    "auto_refresh": false
+  },
+  "acs": {
+    "go_timeout_s": 300
+  },
+  "parallel_evaluate": {
+    "stage": "enforce",
+    "concurrency": 3
+  },
   "pins": {
-    "scout": { "cli": "codex", "model": "deep" },
-    "build-planner": { "cli": "codex", "model": "deep" },
-    "builder": { "cli": "codex", "model": "deep" },
+    "scout": { "cli": "claude", "model": "deep" },
+    "build-planner": { "cli": "claude", "model": "deep" },
+    "builder": { "cli": "claude", "model": "deep" },
     "memo": { "cli": "agy", "model": "fast" }
   }
 }
