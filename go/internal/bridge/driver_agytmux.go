@@ -3,8 +3,9 @@ package bridge
 import "context"
 
 // agyTmuxDriver drives an interactive `agy` (Gemini-backed) TUI through
-// tmux — the Go port of drivers/agy-tmux.sh. agy has no model flag and no
-// permission-mode; it renders alt-screen (boot wait reads scrollback), its
+// tmux — the Go port of drivers/agy-tmux.sh. agy 1.0.15 selects its model
+// via the --model launch flag (display-name tokens, cycle-447 probe); it has
+// no permission-mode, renders alt-screen (boot wait reads scrollback), its
 // ready marker is the "? for shortcuts" footer, and it exits via Ctrl+C ×2.
 type agyTmuxDriver struct{}
 
@@ -20,8 +21,9 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
 	// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
-	// permission=bypass → --dangerously-skip-permissions; model tier is a no-op
-	// (agy has no -m flag) and claude-keyed raw flags realize to nothing.
+	// permission=bypass → --dangerously-skip-permissions and model_tier →
+	// --model "<display name>" (agy 1.0.15, cycle-447; launchCmdLine quotes
+	// the space/paren tokens). claude-keyed raw flags realize to nothing.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name:           "agy-tmux",
 		session:        session,

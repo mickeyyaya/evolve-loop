@@ -23,7 +23,9 @@
   "default_args": [],
   "params": {
     "model_tier": {
-      "channel": "noop"
+      "channel": "flag",
+      "flag": "--model",
+      "from": "model_tier_map"
     },
     "permission": {
       "channel": "flag",
@@ -100,9 +102,9 @@
   ],
   "stub": false,
   "model_tier_map": {
-    "fast": "gemini-3.5-flash",
-    "balanced": "gemini-3.5-flash",
-    "deep": "gemini-3.5-flash"
+    "fast": "Gemini 3.5 Flash (Low)",
+    "balanced": "Gemini 3.5 Flash (High)",
+    "deep": "Gemini 3.1 Pro (High)"
   },
-  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=noop: agy 1.0.3 has NO -m/--model flag (verified live 2026-05-31: `agy -m X` -> 'flags provided but not defined: -m' + usage dump, REPL never boots -> exit=80). The 2026-05 'correction' to channel=flag was wrong and caused every agy-tmux launch to fail the 60s REPL boot wait; reverted to noop. model_tier_map retained as documentation of the implicit default (gemini-3.5-flash); agy selects its model server-side / via config, not a launch flag. See docs/architecture/cli-capability-matrix.md."
+  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=flag via --model (probed live 2026-07-02, agy 1.0.15: `agy --model \"Claude Opus 4.6 (Thinking)\"` boots the REPL in ~2s with the model in banner+footer; `agy models` lists the selectable tokens, which are display names with spaces/parens \u2014 launchCmdLine shell-quotes every realized flag token). `-m` remains UNDEFINED ('flags provided but not defined: -m'), so the cycle-154 incident claim about -m still holds; agy 1.0.3 had no model flag at all and channel was noop 2026-05-31..2026-07-02 (docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md). model_tier_map holds offline defaults only; the LIVE model catalog overlays real per-tier picks at LoadManifest (catalog_overlay.go). See docs/architecture/cli-capability-matrix.md."
 }

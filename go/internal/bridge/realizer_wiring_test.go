@@ -61,6 +61,7 @@ func launchedCmd(tmux *fakeTmux, binary string) string {
 }
 
 func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
+	injectCatalogDir(t, t.TempDir()) // pin manifest offline defaults (no host-catalog overlay)
 	// The claude flags every profile carried before the migration. Keyed under
 	// claude-tmux so a profile switched to agy/codex realizes none of them.
 	claudeRaw := []string{
@@ -89,12 +90,13 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "agy-tmux",
 			binary: "agy",
 			marker: "? for shortcuts",
-			// agy 1.0.3 has NO -m/--model flag (model_tier=noop). The realized
-			// launch cmd is just the binary + permission flag; -m is in `absent`
-			// to lock the regression out. See
-			// docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md.
-			want:   "agy --dangerously-skip-permissions",
-			absent: []string{"-m", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--model", "--no-session-persistence"},
+			// agy 1.0.15 selects its model via --model (cycle-447 live probe);
+			// the display-name token is shell-quoted by launchCmdLine. The
+			// undefined -m short flag stays in `absent` (space-delimited so the
+			// substring can't match inside --model) — the cycle-154 regression
+			// lock. Model "sonnet" → legacy ladder → balanced → offline default.
+			want:   "agy --model 'Gemini 3.5 Flash (High)' --dangerously-skip-permissions",
+			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 		{
 			cli:    "codex-tmux",

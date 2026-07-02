@@ -129,14 +129,18 @@ func TestAgyTmux_LaunchCmd(t *testing.T) {
 	fx := newFixture(t, "agy-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "agy-tmux", tmux, nil, "--allow-bypass")
-	// agy 1.0.3 has NO -m/--model flag (model_tier=noop in the manifest); the
-	// launch cmd is just the binary + its permission flag. See
+	// agy 1.0.15 selects its model via the --model launch flag (cycle-447
+	// probe); the tokens are display names, shell-quoted by launchCmdLine.
+	// 1.0.3 had no model flag at all and `-m` remains undefined — see
 	// docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md.
-	if !tmux.sentContains("agy --dangerously-skip-permissions") {
-		t.Fatalf("agy-tmux launch cmd should be 'agy --dangerously-skip-permissions' (no -m); sentKeys=%v", tmux.sentKeys)
+	if !tmux.sentContains("--model") {
+		t.Fatalf("agy-tmux launch cmd should carry --model (agy 1.0.15); sentKeys=%v", tmux.sentKeys)
 	}
-	if tmux.sentContains("-m") {
-		t.Fatalf("agy-tmux must NOT emit -m (agy has no model flag); sentKeys=%v", tmux.sentKeys)
+	if !tmux.sentContains("--dangerously-skip-permissions") {
+		t.Fatalf("agy-tmux launch cmd should carry the permission flag; sentKeys=%v", tmux.sentKeys)
+	}
+	if tmux.sentContains(" -m ") {
+		t.Fatalf("agy-tmux must NOT emit the undefined -m short flag; sentKeys=%v", tmux.sentKeys)
 	}
 }
 
