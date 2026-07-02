@@ -1,0 +1,17 @@
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:63:	Validate		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:75:	Run			100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:106:	launchOne		92.3%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:17:	PlanCycles		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:78:	Partition		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:104:	owningBuckets		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:116:	place			100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:125:	leastLoaded		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:137:	only			66.7%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/partition.go:147:	normalizeFiles		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/preflight.go:31:	PreflightControlPlane	100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/quota.go:23:	QuotaAwareCount		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/triageplan.go:38:	PlanFromTriage		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:21:	PlanWaves		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:71:	combinedContract	100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:90:	groupByFiles		93.8%
+total:									(statements)		98.0%
