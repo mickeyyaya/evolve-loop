@@ -9,11 +9,11 @@ import (
 // manifests (not constructed fixtures). This is the contract the cycle-1 boot
 // failure violated: the SAME intent must realize to each CLI's own launch
 // flags and never leak one CLI's vocabulary into another. Flags-first: model
-// is a launch flag for claude (--model) and codex (-m) ONLY. agy 1.0.3 has NO
-// -m/--model flag (model_tier=noop) — verified live 2026-05-31; the 2026-05
-// channel=flag "correction" was wrong and caused exit=80 REPL-boot aborts.
+// is a launch flag for claude (--model), codex (-m), and — since the
+// cycle-447 live probe of agy 1.0.15 — agy (--model, display-name tokens).
 
 func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
+	injectCatalogDir(t, t.TempDir()) // pin manifest offline defaults (no host-catalog overlay)
 	intent := LaunchIntent{ModelTier: "sonnet", Permission: "bypass", SettingsScope: "project", SessionMode: "ephemeral"}
 
 	t.Run("claude-tmux", func(t *testing.T) {
@@ -33,12 +33,15 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 
 	t.Run("agy-tmux", func(t *testing.T) {
 		r := RealizeFor("agy-tmux", intent)
-		// agy 1.0.3 has NO -m/--model flag (verified live: `agy -m X` fails with
-		// "flags provided but not defined: -m" and dumps usage, so the REPL never
-		// boots → exit=80). model_tier is channel=noop; agy realizes ONLY its
-		// permission flag. settings_scope is also a no-op for agy.
-		if !reflect.DeepEqual(r.LaunchFlags, []string{"--dangerously-skip-permissions"}) {
-			t.Fatalf("agy-tmux = %v, want [--dangerously-skip-permissions]", r.LaunchFlags)
+		// agy 1.0.15 selects its model via --model (cycle-447 live probe;
+		// 1.0.3 had no model flag — incident cycle-154, `-m` is still
+		// undefined). Tier "sonnet" resolves via the legacy ladder to
+		// balanced → the manifest's offline display-name default. The scalar
+		// order (model before permission) is part of the pin; settings_scope
+		// stays a no-op for agy.
+		want := []string{"--model", "Gemini 3.5 Flash (High)", "--dangerously-skip-permissions"}
+		if !reflect.DeepEqual(r.LaunchFlags, want) {
+			t.Fatalf("agy-tmux = %v, want %v", r.LaunchFlags, want)
 		}
 	})
 

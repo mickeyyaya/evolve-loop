@@ -40,6 +40,23 @@ Routing decisions need the **models a CLI can actually serve right now**, not a 
 
 `LoadManifest` finishes by overlaying live catalog entries onto the embedded manifest's `ModelTierMap` (`go/internal/bridge/catalog_overlay.go`), memoized by file mtime. Policy pins (`.evolve/policy.json`) name an exact model and never trigger a catalog lookup ([policy-config.md](policy-config.md)). Fallback chain on missing/corrupt/stale catalog: unchanged manifest → static tier map; corrupt cache logs `[models] WARN unreadable catalog` and returns empty (fail-open, never blocks dispatch).
 
+### Model-tier translation channels (per-CLI, cycle 447)
+
+The **Realizer** (`go/internal/bridge/realizer.go`, ADR-0022) is the **single translation seam** from the abstract tier vocabulary — `fast | balanced | deep` — to whatever each CLI actually accepts. Each `*-tmux` manifest declares its channel in `params.model_tier`; the table below is a cross-checked projection of those manifests (the manifests stay the SSOT — `TestModelTierMatrixParity` and the cycle-447 doc predicates fail this table against them):
+
+| CLI | Channel | Mechanism | Verified |
+|---|---|---|---|
+| claude | flag | `--model <model>` launch flag | manifest + realizer tests |
+| codex | flag | `-m <model>` launch flag | manifest + realizer tests |
+| agy | flag | `--model "<display name>"` launch flag (agy 1.0.15; tokens are `agy models` display names with spaces/parens, shell-quoted by `launchCmdLine`) | probed live 2026-07-02 |
+| ollama | positional | model is the positional argument of `ollama run <model>` (`driver_ollamatmux.go`), composed by the driver, not a flag | launch-cmd test pins |
+
+Rules the seam enforces, matrix-wide:
+
+- **`auto` sentinel omission**: `auto` is the loop's resolve-me sentinel, never a concrete model — when tier resolution leaves `auto` intact, the Realizer omits the model parameter entirely and the CLI boots on its own default (cycle-262 guard, `realizer.go`). One guard at the single emit point covers every flag/repl CLI.
+- **Resolution order**: policy pin (exact model, bypasses the catalog) → live catalog overlay (`source=="live"` entries only) → the manifest's `model_tier_map` offline defaults. Unknown non-tier values pass through verbatim as raw model identifiers.
+- **No silent drops**: a multi-model CLI may not declare a do-nothing channel — the parity pin (`go/internal/bridge/model_tier_parity_test.go`) rejects that shape; agy carried exactly that defect from 2026-05-31 (agy 1.0.3 had no model flag at all — incident cycle-154) until the 2026-07-02 re-probe found agy 1.0.15 grew `--model`.
+
 ## Deferred
 
 - Feed picker capability-descriptions to the classifier for sharper tiering (noted in PR #31).

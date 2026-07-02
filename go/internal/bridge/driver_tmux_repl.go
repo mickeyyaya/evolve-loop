@@ -85,11 +85,20 @@ type tmuxLaunch struct {
 // launchCmdLine joins an inner-CLI binary with its realized launch flags
 // (ADR-0022) into the single REPL launch command line. The flags are the
 // per-CLI Realization, so the line carries only argv this CLI understands.
+// Each token is shell-quoted because SendKeys delivers ONE shell line, not an
+// argv slice: agy 1.0.15's --model values are display names with spaces and
+// parens ("Gemini 3.1 Pro (High)", cycle-447). shellQuotePOSIX passes
+// safe-charset tokens through verbatim, so claude/codex/ollama launch lines
+// are byte-identical to the pre-quoting join.
 func launchCmdLine(binary string, flags []string) string {
 	if len(flags) == 0 {
 		return binary
 	}
-	return binary + " " + strings.Join(flags, " ")
+	quoted := make([]string, len(flags))
+	for i, f := range flags {
+		quoted[i] = shellQuotePOSIX(f)
+	}
+	return binary + " " + strings.Join(quoted, " ")
 }
 
 // runTmuxREPL drives the shared interactive-REPL flow and returns a bridge

@@ -62,11 +62,14 @@ commands. Exit 0 = clean, 3 = drift, 10 = usage error.
 
 ## Known-pending validations
 
-- agy model selection: **agy 1.0.3 has NO `-m`/`--model` flag** (verified live
-  2026-05-31: `agy -m X` → `flags provided but not defined: -m`). The agy-tmux
-  manifest's `model_tier` is `channel: "noop"` accordingly; the `model_tier_map`
-  entries are documentation of the implicit default (`gemini-3.5-flash`) only. A
-  2026-05 edit to `channel: "flag"` was wrong and caused exit=80 REPL-boot aborts —
-  see `docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md`. Per-tier model
-  selection on agy, if ever supported, would arrive via config/server-side, not a flag.
+- agy model selection: **agy 1.0.15 HAS a `--model` launch flag** (probed live
+  2026-07-02: `agy --model "Gemini 3.1 Pro (High)"` boots the REPL in ~2s with
+  the model in banner + footer; selectable tokens are the `agy models` display names,
+  which contain spaces/parens and are shell-quoted by `launchCmdLine`). `-m` remains
+  UNDEFINED (`agy -m X` → `flags provided but not defined: -m` — the cycle-154 claim
+  about `-m` still holds). History: agy 1.0.3 had NO model flag at all; the agy-tmux
+  manifest was `channel: "noop"` 2026-05-31..2026-07-02, and a premature 2026-05 edit
+  to `channel: "flag"` caused exit=80 REPL-boot aborts —
+  see `docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md`. Re-wired to
+  `channel: "flag"` with `--model` in cycle 447 after the fresh probe.
 - codex `--no-alt-screen` for clean scrollback capture under tmux — empirical.

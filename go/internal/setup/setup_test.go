@@ -101,11 +101,17 @@ func TestAuthMode(t *testing.T) {
 
 func TestTierModelsFor(t *testing.T) {
 	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
-	// agy has no model selector → all tiers map to gemini-3.5-flash.
+	// agy 1.0.15 gained --model: distinct Gemini-only tiers (family purity —
+	// cross-family coverage lives in cli_fallback, never a CLI's own tier map).
 	agy := tierModelsFor("agy")
-	for _, tier := range []string{"fast", "balanced", "deep"} {
-		if agy[tier] != "gemini-3.5-flash" {
-			t.Errorf("agy[%s] = %q, want gemini-3.5-flash", tier, agy[tier])
+	wantAgy := map[string]string{
+		"fast":     "Gemini 3.5 Flash (Low)",
+		"balanced": "Gemini 3.5 Flash (High)",
+		"deep":     "Gemini 3.1 Pro (High)",
+	}
+	for tier, m := range wantAgy {
+		if agy[tier] != m {
+			t.Errorf("agy[%s] = %q, want %q", tier, agy[tier], m)
 		}
 	}
 	// codex maps to its native GPT tiers.

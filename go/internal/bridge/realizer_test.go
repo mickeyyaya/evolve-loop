@@ -8,11 +8,12 @@ import (
 // realizer_test.go — the heart of ADR-0022: ONE CLI-agnostic LaunchIntent must
 // realize correctly AND differently per CLI, via each manifest's declarative
 // `params` table. The same intent that yields `--dangerously-skip-permissions
-// --model sonnet --setting-sources project` for claude must yield ONLY
-// `--dangerously-skip-permissions` for agy (no model selector, no settings
-// flag) and a post-boot `/model gpt-5.4` REPL command for codex — and NEVER a
-// flag the target CLI does not define. An intent with no manifest entry is a
-// no-op (the property that makes foreign params unable to break a launch).
+// --model sonnet --setting-sources project` for claude must yield
+// `--dangerously-skip-permissions --model "Gemini 3.5 Flash (High)"` for agy
+// (display-name model tokens, no settings flag; cycle-447) and `-m gpt-5.4`
+// for codex — and NEVER a flag the target CLI does not define. An intent with
+// no manifest entry is a no-op (the property that makes foreign params unable
+// to break a launch).
 
 func claudeTmuxManifest() Manifest {
 	return Manifest{
@@ -44,9 +45,11 @@ func codexTmuxManifest() Manifest {
 func agyTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "agy-tmux", Binary: "agy",
-		ModelTierMap: map[string]string{"haiku": "gemini-3.5-flash", "sonnet": "gemini-3.5-flash", "opus": "gemini-3.5-flash"},
+		// Mirrors the real manifest post-cycle-447: agy 1.0.15 grew a --model
+		// launch flag whose selectable tokens are display names (spaces/parens).
+		ModelTierMap: map[string]string{"fast": "Gemini 3.5 Flash (Low)", "balanced": "Gemini 3.5 Flash (High)", "deep": "Gemini 3.1 Pro (High)"},
 		Params: map[string]ParamSpec{
-			"model_tier":     {Channel: "noop"}, // agy has no model selector
+			"model_tier":     {Channel: "flag", Flag: "--model", From: "model_tier_map"},
 			"permission":     {Channel: "flag", Values: map[string][]string{"bypass": {"--dangerously-skip-permissions"}}},
 			"settings_scope": {Channel: "noop"},
 			"session_mode":   {Channel: "controller"},
@@ -80,12 +83,14 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 		}
 	})
 
-	t.Run("agy-tmux: only the permission flag it defines; model is no-op", func(t *testing.T) {
+	t.Run("agy-tmux: permission flag + --model display-name token (cycle-447)", func(t *testing.T) {
 		got := Realize(agyTmuxManifest(), intent)
-		if !sameFlags(got.LaunchFlags, []string{"--dangerously-skip-permissions"}) {
-			t.Fatalf("LaunchFlags = %v, want [--dangerously-skip-permissions] only", got.LaunchFlags)
+		// intent tier "sonnet" → legacy ladder → "balanced" → display name.
+		wantFlags := []string{"--dangerously-skip-permissions", "--model", "Gemini 3.5 Flash (High)"}
+		if !sameFlags(got.LaunchFlags, wantFlags) {
+			t.Fatalf("LaunchFlags = %v, want (any order) %v", got.LaunchFlags, wantFlags)
 		}
-		if containsToken(got.LaunchFlags, "--model") || containsToken(got.LaunchFlags, "--setting-sources") {
+		if containsToken(got.LaunchFlags, "--setting-sources") {
 			t.Fatalf("agy must not get claude-only flags; got %v", got.LaunchFlags)
 		}
 		if !got.Ephemeral {
