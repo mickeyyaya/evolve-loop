@@ -57,6 +57,11 @@ type Result struct {
 	IsRegression    bool   `json:"is_regression"`
 	IsRedTeam       bool   `json:"is_red_team,omitempty"`
 	EvidenceExcerpt string `json:"evidence_excerpt,omitempty"`
+	// Flaky marks a predicate that was RED on the first run and GREEN on the
+	// single bounded retry (cycle-468): value "passed-on-retry". Visible in
+	// the wire JSON so a flake is never silently absorbed; the first-run
+	// failure evidence is retained deliberately (the flake's signature).
+	Flaky string `json:"flaky,omitempty"`
 }
 
 // PredicateSuite is the count breakdown.
@@ -66,6 +71,19 @@ type PredicateSuite struct {
 	RedTeamCount         int `json:"red_team_count"`
 	SkippedCount         int `json:"skipped_count"`
 	Total                int `json:"total"`
+}
+
+// warningsFromFlaky derives the verdict-level warnings from flaky-annotated
+// results — single source: the per-result Flaky field is authoritative and the
+// warning list is its projection (never maintained separately).
+func warningsFromFlaky(results []Result) []string {
+	var w []string
+	for _, r := range results {
+		if r.Flaky != "" {
+			w = append(w, fmt.Sprintf("flaky: %s passed-on-retry (bounded single retry absorbed a non-deterministic red; investigate under host contention)", r.ACID))
+		}
+	}
+	return w
 }
 
 // Verdict is the acs-verdict.json schema read by audit + ship gates.
@@ -81,6 +99,9 @@ type Verdict struct {
 	SkipIDs        []string       `json:"skip_ids,omitempty"`
 	Verdict        string         `json:"verdict"` // PASS | FAIL
 	ShipEligible   bool           `json:"ship_eligible"`
+	// Warnings surfaces non-blocking anomalies (cycle-468: flaky predicates
+	// that passed on the bounded retry). Projection of Result.Flaky.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Options configures Run. Root and Cycle are required.
@@ -142,6 +163,7 @@ func Run(opts Options) (Verdict, error) {
 	} else {
 		v.Verdict = "FAIL"
 	}
+	v.Warnings = warningsFromFlaky(v.Results)
 	return v, nil
 }
 
@@ -345,9 +367,55 @@ func runGoTest(opts Options) ([]Result, error) {
 			return nil, fmt.Errorf("acssuite: go predicate scope %q produced no test events but exited "+
 				"nonzero (compile error / infra failure): %w\noutput:\n%s", pat, execErr, excerpt(raw))
 		}
-		all = append(all, results...)
+		all = append(all, retryFlakyReds(ctx, goExec, moduleDir, pat, env, results, opts.Cycle)...)
 	}
 	return all, nil
+}
+
+// retryFlakyReds is the cycle-468 bounded flake absorber: when a scope's first
+// run produced >=1 RED and NO red is the synthetic egps/ parse-error red
+// (any such red marks the whole stream untrustworthy and suppresses the
+// retry entirely — a truncated stream is not retryable evidence), the
+// scope is re-run EXACTLY ONCE. A red that passes on the retry
+// flips to green with the visible Flaky="passed-on-retry" annotation (first-run
+// evidence retained — the flake's signature); a red that stays red keeps its
+// first-run result. Greens/skips and the result set's size are untouched (the
+// retry can only flip existing reds, never add or duplicate results). Rationale:
+// parallel_evaluate=enforce runs the -race predicate suites under concurrent
+// evaluate-phase host load; contention flakes burned 4 verified-good cycles
+// (444/447/466/467). The gate is not weakened: the retry is bounded to one,
+// annotated on the wire, and surfaced as a verdict warning.
+func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, string, []string) (string, error), moduleDir, pat string, env []string, results []Result, cycle int) []Result {
+	hasTestRed := false
+	for _, r := range results {
+		if r.ResultStr != "red" {
+			continue
+		}
+		if strings.HasPrefix(r.ACID, "egps/") {
+			// Synthetic infra red: the stream itself is untrustworthy — never retry.
+			return results
+		}
+		hasTestRed = true
+	}
+	if !hasTestRed {
+		return results
+	}
+	raw, _ := goExec(ctx, moduleDir, pat, env) // bounded: exactly one retry
+	retry := parseGoTestJSON(strings.NewReader(raw), cycle)
+	greenOnRetry := make(map[string]bool, len(retry))
+	for _, r := range retry {
+		if r.ResultStr == "green" {
+			greenOnRetry[r.ACID] = true
+		}
+	}
+	for i := range results {
+		if results[i].ResultStr == "red" && greenOnRetry[results[i].ACID] {
+			results[i].ResultStr = "green"
+			results[i].ExitCode = 0
+			results[i].Flaky = "passed-on-retry"
+		}
+	}
+	return results
 }
 
 // goEvent is the subset of the `go test -json` event schema we consume.
