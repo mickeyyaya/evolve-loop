@@ -145,7 +145,7 @@ func waveBenchedFamilies(projectRoot string) map[string]string {
 // batch-level fleet config is resolved once and must not compound shrink
 // across iterations; benches expire, so each wave re-reads them.
 func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Writer) policy.FleetConfig {
-	fc.Count = fleet.QuotaAwareCount(fc.Count, waveBenchedFamilies(projectRoot), warn)
+	fc.Count = fleet.QuotaAwareCount(fc.Count, waveBenchedFamilies(projectRoot), fc.MinLanes, warn)
 	return fc
 }
 

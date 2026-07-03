@@ -857,6 +857,15 @@ type FleetPolicy struct {
 	// Concurrency is the number of lanes run in parallel. Zero/negative/absent
 	// ⇒ follows the resolved Count.
 	Concurrency int `json:"concurrency,omitempty"`
+	// MinLanes is the operator's capacity floor for the quota-aware wave shrink:
+	// the shrink never drops the wave below MinLanes lanes, even when required
+	// CLI families are benched. The operator asserts "I have budget for this many
+	// concurrent lanes" — e.g. min_lanes=2 keeps 2 lanes on the healthy claude
+	// family through a transient codex rate-limit, instead of the blind −1-per-
+	// benched-family collapse to sequential. Zero/negative/absent ⇒ 1 (the
+	// unconditional min-1 floor, byte-identical to pre-field behaviour). Clamped
+	// to ≤ Count (you cannot floor above the configured lane count).
+	MinLanes int `json:"min_lanes,omitempty"`
 	// PlanSource selects the todo-source strategy: "triage" / "manual".
 	// Empty/absent ⇒ "triage". Unlike most closed-vocab blocks in this
 	// package, an UNKNOWN value fails safe to "manual" (not the default),
@@ -871,8 +880,12 @@ type FleetPolicy struct {
 type FleetConfig struct {
 	Count       int
 	Concurrency int
-	PlanSource  string
-	Warnings    []string
+	// MinLanes is the resolved quota-shrink floor (≥1, ≤Count). The quota-aware
+	// wave shrink never drops below it — the operator's asserted concurrent-lane
+	// budget survives a transient CLI-family bench.
+	MinLanes   int
+	PlanSource string
+	Warnings   []string
 }
 
 // FleetConfig returns fleet configuration with built-in defaults resolved.
@@ -883,7 +896,7 @@ type FleetConfig struct {
 // unknown value fails safe to "manual" plus a surfaced warning naming the
 // rejected value.
 func (p Policy) FleetConfig() FleetConfig {
-	c := FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
+	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage"}
 	if p.Fleet == nil {
 		return c
 	}
@@ -893,6 +906,15 @@ func (p Policy) FleetConfig() FleetConfig {
 	c.Concurrency = c.Count
 	if p.Fleet.Concurrency > 0 {
 		c.Concurrency = p.Fleet.Concurrency
+	}
+	// MinLanes floor: default 1 (unconditional min-1 shrink). A positive override
+	// raises the floor but never above Count — a floor above the lane count is
+	// meaningless, so clamp rather than surface a nonsensical wave width.
+	if p.Fleet.MinLanes > 1 {
+		c.MinLanes = p.Fleet.MinLanes
+		if c.MinLanes > c.Count {
+			c.MinLanes = c.Count
+		}
 	}
 	switch p.Fleet.PlanSource {
 	case "", "triage":
