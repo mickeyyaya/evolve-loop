@@ -7,3 +7,13 @@ package ipcenv
 const FleetKey = "EVOLVE_FLEET"                // SSOT IPC-protocol-allowed
 const FleetScopeKey = "EVOLVE_FLEET_SCOPE"     // SSOT IPC-protocol-allowed
 const WorktreeRootKey = "EVOLVE_WORKTREE_ROOT" // SSOT IPC-protocol-allowed
+
+// CycleStateFileKey overrides the absolute path a process reads/writes cycle
+// state at, replacing the host-global <evolveDir>/cycle-state.json default.
+// Under the fleet supervisor each concurrent lane sets this to its OWN per-run
+// file (runs/cycle-N/cycle-state.json), so two lockstep lanes never clobber a
+// shared singleton's Phase/CycleID — the race that stalled a lane's phase-gate
+// (guards.Phase.Decide reads cycle state) before it could reach audit. Child
+// guard subprocesses inherit it, so the orchestrator and its gate checks agree
+// on THIS lane's phase. Unset ⇒ host-global default (sequential loop unchanged).
+const CycleStateFileKey = "EVOLVE_CYCLE_STATE_FILE" // SSOT IPC-protocol-allowed

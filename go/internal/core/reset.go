@@ -95,7 +95,7 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		gitHead = defaultCurrentHead
 	}
 
-	csPath := filepath.Join(opts.EvolveDir, CycleStateFile)
+	csPath := ResolveCycleStatePath(opts.EvolveDir) // fleet per-run override when set
 	raw, err := os.ReadFile(csPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

@@ -184,7 +184,12 @@ func applyWithHooks(h hooks, path string, cp Checkpoint) error {
 
 func init() {
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
-		cycleStatePath := filepath.Join(projectRoot, ".evolve", "cycle-state.json")
+		// Under fleet each lane's resume/checkpoint block must land in the SAME
+		// per-run cycle-state file the orchestrator's WriteCycleState uses, else
+		// this lane's resume block would be written to (and read from) the wrong
+		// file. The SSOT resolver honors the fleet per-run override; unset ⇒ the
+		// host-global default (sequential loop unchanged).
+		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		// ADR-0049 N17: check-and-act under ONE lock. The escalation guard read
 		// used to be UNLOCKED and the phase-complete write took the cycle-state
 		// lock SEPARATELY — a TOCTOU. Under fleet mode concurrent cycles share the

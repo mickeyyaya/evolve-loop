@@ -31,10 +31,12 @@ func upsertIntegrity(existing []phaseblock.Digest, d phaseblock.Digest) []phaseb
 
 // RecordPhaseIntegrity appends/upserts a phase's integrity digest into the
 // checkpoint block of cycle-state.json, under the shared sidecar lock,
-// atomically (temp + rename). It is safe for concurrent fleet cycles AND
-// pipeline goroutines sharing the host-global cycle-state.json — flock
-// serializes both (flock.go:8-9), so the read-modify-write never loses a peer's
-// update. Every other state + checkpoint field is preserved.
+// atomically (temp + rename). Under fleet each lane's `path` is its OWN per-run
+// file (core.ResolveCycleStatePath / ipcenv.CycleStateFileKey), so concurrent
+// lanes' RecordPhaseIntegrity calls operate on DISTINCT files — no cross-lane
+// clobber; flock still serializes same-file (intra-lane) goroutines (flock.go:8-9)
+// so a read-modify-write never loses a peer's update. Every other state +
+// checkpoint field is preserved.
 func RecordPhaseIntegrity(path string, d phaseblock.Digest) error {
 	return flock.WithPathLock(path, func() error {
 		return recordIntegrityWithHooks(defaultHooks(), path, d)

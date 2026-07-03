@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -68,7 +67,7 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 		opts.PathExists = defaultPathExists
 	}
 
-	statePath := filepath.Join(evolveDir, CycleStateFile)
+	statePath := ResolveCycleStatePath(evolveDir) // fleet per-run override when set
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

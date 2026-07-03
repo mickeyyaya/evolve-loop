@@ -14,6 +14,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// cycleStatePath resolves where THIS process reads/writes cycle state via the
+// SSOT core.ResolveCycleStatePath: the fleet per-run override when set, else
+// <evolveDir>/cycle-state.json. Delegating (not re-deriving) keeps every reader
+// on one resolver so the isolation hole can't be reopened.
+func (s *FilesystemStorage) cycleStatePath() string {
+	return core.ResolveCycleStatePath(s.evolveDir)
+}
+
 // FilesystemStorage reads/writes JSON state files under a fixed .evolve
 // directory. Concurrent-safe via flock on .evolve/.lock (see lock.go).
 type FilesystemStorage struct {
@@ -49,7 +57,7 @@ func (s *FilesystemStorage) WriteState(_ context.Context, st core.State) error {
 // CycleState (no error) — matches bash cycle-state.sh bootstrap behaviour.
 func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {
 	var cs core.CycleState
-	path := filepath.Join(s.evolveDir, core.CycleStateFile)
+	path := s.cycleStatePath()
 	if err := readJSON(path, &cs); err != nil {
 		return core.CycleState{}, err
 	}
@@ -64,7 +72,7 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 // inside a cycle worktree read this run's phase — not whichever concurrent
 // run last wrote the global file.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	path := filepath.Join(s.evolveDir, core.CycleStateFile)
+	path := s.cycleStatePath()
 	// ADR-0049 G7: serialize the whole read-modify-write (and the run.json
 	// mirror) on the cycle-state.json sidecar lock. checkpoint.ApplyToStateFile
 	// (the other read-modify-writer of this file) holds the SAME lock, so a
