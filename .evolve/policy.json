@@ -15,28 +15,16 @@
     "auto_refresh": false
   },
   "acs": {
-    "go_timeout_s": 300
+    "go_timeout_s": 600
   },
   "parallel_evaluate": {
     "stage": "enforce",
     "concurrency": 3
   },
   "pins": {
-    "scout": {
-      "cli": "claude",
-      "model": "deep"
-    },
-    "build-planner": {
-      "cli": "claude",
-      "model": "deep"
-    },
     "memo": {
       "cli": "agy",
       "model": "fast"
-    },
-    "build": {
-      "cli": "claude",
-      "model": "deep"
     }
   },
   "fleet": {

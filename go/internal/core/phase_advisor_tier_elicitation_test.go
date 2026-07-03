@@ -1,12 +1,16 @@
 package core
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -201,5 +205,127 @@ func TestSanitizeAdvisorTier_RejectsHighTopAndRawModel(t *testing.T) {
 		if got := sanitizeAdvisorTier(good); got != good {
 			t.Errorf("sanitizeAdvisorTier(%q) = %q, want unchanged", good, got)
 		}
+	}
+}
+
+// --- cycle-476 T1: advisor-real-persona-liveness-golden ---
+//
+// The missing test class scout root-caused: EVERY other advisor-prompt test
+// injects a STUB persona (WithPersona("PERSONA BODY")) and so is structurally
+// blind to the SHIPPED agents/evolve-router.md, whose own existing-phase
+// response-schema example (line 35) omits {cli,tier} and — appearing BEFORE and
+// competing with the Go-appended {cli,tier} example (writePlanResponseSchema) —
+// makes the composed prompt show two conflicting schemas. LLMs mimic the
+// earliest/most-authoritative example, so the optional tier fields are emitted
+// intermittently. These goldens load the REAL persona exactly as production does.
+
+// realRouterPersona reads the SHIPPED agents/evolve-router.md exactly as the
+// production planner does (cmd_cycle.go: prm.Agent("evolve-router").Body — the
+// frontmatter is parsed off and the body is injected as the persona) and returns
+// both halves. The path is resolved off runtime.Caller so it is cwd-independent,
+// and it points at the WORKTREE copy (three levels up from this test file), so
+// the golden validates the file Builder harmonizes THIS cycle, not a stub and not
+// main's stale copy.
+func realRouterPersona(t *testing.T) (frontmatter map[string]any, body string) {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed; cannot locate the test file to resolve agents/evolve-router.md")
+	}
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
+	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-router.md"))
+	if err != nil {
+		t.Fatalf("read agents/evolve-router.md: %v", err)
+	}
+	fm, body, err := prompts.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter(agents/evolve-router.md): %v", err)
+	}
+	return fm, body
+}
+
+// topLevelJSONObjects returns every balanced top-level {...} substring in s. A
+// nested object (e.g. a "mint" block) stays INSIDE its parent object and is never
+// emitted on its own, so each returned string can be classified as a whole
+// response-schema entry.
+func topLevelJSONObjects(s string) []string {
+	var objs []string
+	depth, start := 0, -1
+	for i, r := range s {
+		switch r {
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+				if depth == 0 && start >= 0 {
+					objs = append(objs, s[start:i+1])
+					start = -1
+				}
+			}
+		}
+	}
+	return objs
+}
+
+// existingPhaseExamples filters topLevelJSONObjects to the response-schema
+// examples for an EXISTING phase: a plan entry (has "phase" and "run") that is
+// NOT a mint block. These are exactly the objects whose {cli,tier} shape the
+// advisor mimics; the bare persona example at agents/evolve-router.md:35 is one.
+func existingPhaseExamples(s string) []string {
+	var out []string
+	for _, o := range topLevelJSONObjects(s) {
+		if strings.Contains(o, `"phase"`) && strings.Contains(o, `"run"`) && !strings.Contains(o, `"mint"`) {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI (T1 AC1): the
+// PRODUCTION composed plan prompt, built with the REAL shipped persona, must show
+// {cli,tier} on EVERY existing-phase response-schema example — no surviving bare
+// example the advisor could mimic. RED today: agents/evolve-router.md:35 ships a
+// bare {"phase","run","justification"} example, so the composed prompt carries a
+// competing schema that omits the optional fields. Builder harmonizes :35 to gain
+// optional cli/tier to turn this GREEN. The >=2 floor is the anti-delete guard:
+// silently deleting the persona example (leaving only the Go-appended one) must
+// NOT green the golden — the persona itself must teach the tiered schema.
+func TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI(t *testing.T) {
+	t.Parallel()
+	_, body := realRouterPersona(t)
+	p := NewPhaseAdvisor(nil, WithPersona(body))
+	got := p.composePlanPrompt(baseRouteInput(), "routing-plan.json")
+
+	examples := existingPhaseExamples(got)
+	if len(examples) < 2 {
+		t.Fatalf("found %d existing-phase schema example(s) in the real-persona prompt, want >=2 (the persona's own example + the Go-appended one); deleting the persona example is not a valid harmonization:\n%s", len(examples), got)
+	}
+	for _, ex := range examples {
+		if !strings.Contains(ex, `"tier"`) || !strings.Contains(ex, `"cli"`) {
+			t.Errorf("existing-phase schema example lacks {cli,tier} — a competing bare example the advisor will mimic:\n%s", ex)
+		}
+	}
+}
+
+// TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI (T1 AC1, distinct
+// surface): the persona frontmatter's output-format contract string
+// (agents/evolve-router.md:10) must enumerate cli/tier alongside
+// phase/run/justification, so the one-line schema summary agrees with the body
+// example and the Go schema. RED today: it lists only {phase, run,
+// justification, [mint]}. Semantic diversity vs the body-example test above — a
+// fix to the body example alone must not silently satisfy this frontmatter AC.
+func TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI(t *testing.T) {
+	t.Parallel()
+	fm, _ := realRouterPersona(t)
+	of, ok := fm["output-format"].(string)
+	if !ok {
+		t.Fatalf("frontmatter output-format missing or not a string: %#v", fm["output-format"])
+	}
+	if !strings.Contains(of, "cli") || !strings.Contains(of, "tier") {
+		t.Errorf("frontmatter output-format must enumerate cli/tier; got: %q", of)
 	}
 }

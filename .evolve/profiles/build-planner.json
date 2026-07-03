@@ -2,7 +2,7 @@
   "name": "build-planner",
   "role": "build-planner",
   "cli": "claude-tmux",
-  "model_tier_default": "deep",
+  "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",
     "Grep",
@@ -41,8 +41,15 @@
     ],
     "allow_network": false
   },
-  "_note": "Opt C build-planner phase (cycle-103). Shadow mode default — EVOLVE_BUILD_PLANNER=0. max_turns=10 and max_budget_usd=0.30 enforce a lightweight planning-only session.",
+  "_note": "Opt C build-planner phase (cycle-103). Shadow mode default \u2014 EVOLVE_BUILD_PLANNER=0. max_turns=10 and max_budget_usd=0.30 enforce a lightweight planning-only session.",
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": ["claude-tmux"]
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "deep"
+  }
 }
