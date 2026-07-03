@@ -12,11 +12,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleetbudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -139,14 +143,45 @@ func waveBenchedFamilies(projectRoot string) map[string]string {
 	return benched
 }
 
-// quotaAwareWaveConfig returns fc with Count shrunk per the active quota
-// benches (fleet.QuotaAwareCount over waveBenchedFamilies; min 1, one WARN
-// per benched family naming family + reason). Operates on a copy — the
-// batch-level fleet config is resolved once and must not compound shrink
-// across iterations; benches expire, so each wave re-reads them.
-func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Writer) policy.FleetConfig {
+// quotaAwareWaveConfig returns fc with Count sized for this wave, plus the
+// inter-wave PaceDelay the loop should idle before the next wave (0 unless the
+// budget is enforcing a floor-forced pace).
+//
+// Two composed layers: (1) the availability envelope — fleet.QuotaAwareCount
+// shrinks Count per the active quota benches (min 1, one WARN per benched
+// family); (2) the budget sizing — when the operator opted into a fleet.budget
+// block, fleetbudget.Plan sizes the (already bench-shrunk) count against the
+// measured quota headroom + pace. Absent the block (fc.Budget==nil) layer 2 is
+// skipped entirely: byte-identical to the pre-Q4 bench-only behavior, and the
+// caller never even probes quota. With the block, Stage governs application:
+// "shadow" (default) computes + LOGS the decision but HOLDS the bench-shrunk
+// count (a genuine soak); "enforce" applies plan.Lanes + returns plan.PaceDelay.
+//
+// Operates on a copy — the batch-level fleet config is resolved once and must
+// not compound shrink across iterations; benches expire and quota moves, so
+// each wave re-reads them.
+func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Writer, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
 	fc.Count = fleet.QuotaAwareCount(fc.Count, waveBenchedFamilies(projectRoot), fc.MinLanes, warn)
-	return fc
+	if fc.Budget == nil {
+		return fc, 0
+	}
+	plan := fleetbudget.Plan(states, tp, fleetbudget.Config{
+		Count:          fc.Count,
+		Floor:          fc.MinLanes,
+		CapacityCycles: fc.Budget.CapacityCycles,
+		Safety:         fc.Budget.Safety,
+	}, now)
+	switch fc.Budget.Stage {
+	case "enforce":
+		fmt.Fprintf(warn, "[budget] enforce: sizing wave to %d lane(s) [%s] — %s\n", plan.Lanes, plan.DerivedFrom, plan.Reason)
+		fc.Count = plan.Lanes
+		return fc, plan.PaceDelay
+	default:
+		// shadow (the resolved default; any non-enforce stage): compute + log the
+		// would-be decision, hold the count — a genuine soak that never resizes.
+		fmt.Fprintf(warn, "[budget] shadow: would size wave to %d lane(s) (holding at %d) [%s] — %s\n", plan.Lanes, fc.Count, plan.DerivedFrom, plan.Reason)
+		return fc, 0
+	}
 }
 
 // productionWavePlanFn reads the previous cycle's triage-decision.json as
