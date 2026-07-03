@@ -77,6 +77,35 @@ func TestFleetConfig_Resolution(t *testing.T) {
 	}
 }
 
+// TestFleetConfig_MinLanesResolution pins the min_lanes floor resolution
+// (2026-07-03): absent/≤1 ⇒ 1 (historical min-1 shrink); a positive override
+// raises the floor but clamps to ≤ Count (a floor above the lane count is
+// meaningless). This floor is what lets the quota-aware wave shrink keep the
+// operator's asserted concurrent-lane budget through a transient CLI bench.
+func TestFleetConfig_MinLanesResolution(t *testing.T) {
+	cases := []struct {
+		name string
+		pol  policy.Policy
+		want int
+	}{
+		{"absent-defaults-to-1", policy.Policy{}, 1},
+		{"empty-block-defaults-to-1", policy.Policy{Fleet: &policy.FleetPolicy{}}, 1},
+		{"zero-defaults-to-1", policy.Policy{Fleet: &policy.FleetPolicy{Count: 2, MinLanes: 0}}, 1},
+		{"negative-defaults-to-1", policy.Policy{Fleet: &policy.FleetPolicy{Count: 2, MinLanes: -4}}, 1},
+		{"one-is-1", policy.Policy{Fleet: &policy.FleetPolicy{Count: 2, MinLanes: 1}}, 1},
+		{"override-2-of-count-2", policy.Policy{Fleet: &policy.FleetPolicy{Count: 2, MinLanes: 2}}, 2},
+		{"override-3-of-count-4", policy.Policy{Fleet: &policy.FleetPolicy{Count: 4, MinLanes: 3}}, 3},
+		{"override-above-count-clamps-down", policy.Policy{Fleet: &policy.FleetPolicy{Count: 2, MinLanes: 9}}, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pol.FleetConfig().MinLanes; got != tc.want {
+				t.Errorf("FleetConfig().MinLanes = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestFleetConfig_PlanSourceClosedVocab pins the plan_source closed
 // vocabulary: "triage" is the default (empty/absent), "manual" passes
 // through, and any OTHER value (an operator typo, e.g. "yolo") fails safe
