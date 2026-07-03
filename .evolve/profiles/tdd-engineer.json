@@ -111,13 +111,13 @@
   ],
   "model_tier_envelope": {
     "min": "balanced",
-    "default": "deep",
+    "default": "balanced",
     "max": "deep"
   },
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude — RED-phase test writing is safety-critical.",
+  "_note": "Restricted to claude \u2014 RED-phase test writing is safety-critical.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,
