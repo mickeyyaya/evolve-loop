@@ -579,6 +579,31 @@ func TestExtractVerdict(t *testing.T) {
 		{"heading bare FAIL not accepted", "## Verdict\nFAIL\n", false, "", false},
 		{"bare PASS inside sentence not accepted", "## Verdict\nAll tests PASS here\n", false, "", false},
 		{"heading bare PASS too far", "## Verdict\n\n\n\n\n\nPASS\n", false, "", false},
+		// Machine-readable marker (the SSOT the auditor emits) — parsed first,
+		// immune to prose variation. This is the cycle-480 release-blocker shape:
+		// the prose is `**PASS.**` (trailing period in the bold), which the prose
+		// forms below miss, but the marker is unambiguous.
+		{"marker PASS with trailing-period prose", "## Verdict\n\n**PASS.** The change is correct.\n\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n", false, "PASS", true},
+		{"marker WARN non-strict", "<!-- evolve-verdict: {\"verdict\":\"WARN\"} -->\n", false, "WARN", true},
+		{"marker WARN strict-rejected", "<!-- evolve-verdict: {\"verdict\":\"WARN\"} -->\n", true, "", false},
+		// A FAIL marker must block even when stray prose says PASS — the marker
+		// wins and there is no fall-through to the prose scan.
+		{"marker FAIL blocks despite prose PASS", "<!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n\n## Verdict\n\n**PASS**\n", false, "", false},
+		// Prose hardening (markerless legacy report): bold PASS with a trailing
+		// period is still a PASS.
+		{"heading bold PASS trailing period no marker", "## Verdict\n\n**PASS.** Correct and minimal.\n", false, "PASS", true},
+		// Multiple markers: the LAST (the report's own final verdict) wins — a
+		// quoted earlier PASS must NOT silence a later FAIL.
+		{"marker last wins PASS-before-FAIL blocks", "## Context\nPrior: <!-- evolve-verdict: {\"verdict\":\"PASS\"} -->\n\n## Verdict\n<!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n", false, "", false},
+		// ...and a quoted earlier FAIL must NOT block the report's own later PASS.
+		{"marker last wins FAIL-before-PASS accepts", "## Context\nPrior: <!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n\n## Verdict\n<!-- evolve-verdict: {\"verdict\":\"PASS\"} -->\n", false, "PASS", true},
+		// Nested JSON before "verdict" must still parse (regex captures to `-->`,
+		// then JSON-decodes — not a brace-class scrape).
+		{"marker nested json parsed", "<!-- evolve-verdict: {\"meta\":{\"cycle\":480},\"verdict\":\"PASS\"} -->\n", false, "PASS", true},
+		// A `-->` literal INSIDE a JSON string value must not truncate the capture
+		// and silently drop the marker: the FAIL here must still block despite the
+		// prose **PASS** (a latent bypass the `}`-anchored capture closes).
+		{"marker arrow in json string still read", "## Verdict\n\n**PASS**\n\n<!-- evolve-verdict: {\"note\":\"see diff -->\",\"verdict\":\"FAIL\"} -->\n", false, "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

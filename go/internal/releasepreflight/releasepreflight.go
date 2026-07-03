@@ -26,6 +26,7 @@ package releasepreflight
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -480,6 +481,51 @@ func makeInlineVerdictRE(strict bool) *regexp.Regexp {
 // awk-based fallback in bash. We scan up to 5 lines after the heading.
 var verdictHeadingRE = regexp.MustCompile(`(?i)^#+\s+(?:[0-9]+\.\s+)?Verdict\s*$`)
 
+// machineVerdictRE captures the JSON object of the auditor's machine-readable
+// marker `<!-- evolve-verdict: {…} -->` — the structured SSOT emitted for
+// exactly this check. The capture ends at the first `}` that precedes `-->`
+// (`(.+?})\s*-->`), so it spans a full nested-object payload yet is NOT fooled
+// by a `-->` literal inside a JSON string value (which would otherwise truncate
+// the capture and silently drop the marker). The captured object is JSON-parsed
+// by markerVerdict, never regex-scraped, so it is immune to prose variation
+// (e.g. `**PASS.**` with a trailing period, which the prose forms below miss).
+var machineVerdictRE = regexp.MustCompile(`evolve-verdict:\s*(.+?})\s*-->`)
+
+// verdictMarker is the auditor's machine-readable verdict payload.
+type verdictMarker struct {
+	Verdict string `json:"verdict"`
+}
+
+// markerVerdict returns the report's authoritative machine-readable verdict
+// (upper-cased PASS/WARN/FAIL) and whether any valid marker was present. When
+// multiple markers appear (e.g. a quoted prior-cycle verdict in a context
+// section plus the report's own), the LAST one — the report's own final verdict
+// — wins, so a stray earlier PASS can never silence a later FAIL. Each candidate
+// is JSON-parsed (robust to nested fields), not regex-scraped.
+func markerVerdict(body string) (string, bool) {
+	var last string
+	var found bool
+	for _, m := range machineVerdictRE.FindAllStringSubmatch(body, -1) {
+		var vm verdictMarker
+		if json.Unmarshal([]byte(strings.TrimSpace(m[1])), &vm) != nil {
+			continue
+		}
+		switch v := strings.ToUpper(strings.TrimSpace(vm.Verdict)); v {
+		case "PASS", "WARN", "FAIL":
+			last, found = v, true
+		}
+	}
+	return last, found
+}
+
+// boldPassRE / boldWarnRE match a bold-wrapped verdict token with at most one
+// trailing punctuation char — `**PASS**`, `**PASS.**`, `**WARN!**` — since
+// auditors legitimately end the bold with a period ("**PASS.** The change is…").
+var (
+	boldPassRE = regexp.MustCompile(`\*\*PASS[.!]?\*\*`)
+	boldWarnRE = regexp.MustCompile(`\*\*WARN[.!]?\*\*`)
+)
+
 // auditVerdictNone marks that no on-disk audit artifact was available to check
 // (absent ledger, no auditor entry, or all artifacts GC'd) — distinct from a
 // real PASS/WARN/FAIL. Determinism fix: a release MUST NOT be blocked by absent
@@ -578,26 +624,39 @@ func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResul
 // inline (`Verdict: PASS`) and heading form (`## Verdict\n**PASS**`).
 // When strict=true, WARN is rejected.
 func extractVerdict(body string, strict bool) (string, bool) {
+	// Machine-readable marker first — the structured SSOT the auditor emits for
+	// exactly this check, immune to prose variation. A present marker is
+	// AUTHORITATIVE: if it is not an acceptable verdict (FAIL, or WARN under
+	// strict) we return not-ok and do NOT fall through to the prose scan, so a
+	// stray "PASS" elsewhere in the body cannot override a real FAIL.
+	if v, present := markerVerdict(body); present {
+		if v == "PASS" || (!strict && v == "WARN") {
+			return v, true
+		}
+		return "", false
+	}
+
 	inline := makeInlineVerdictRE(strict)
 	if m := inline.FindStringSubmatch(body); m != nil {
 		v := strings.ToUpper(m[1])
 		return v, true
 	}
 	// Heading form: scan for `## Verdict` line, then within 5 lines look
-	// for **PASS**/**WARN** or a BARE verdict line (exactly `PASS`/`WARN`,
-	// the cycle-249 shape — auditors legitimately omit the bold). A sentence
-	// merely containing the word must not match.
+	// for **PASS**/**WARN** (with optional trailing punctuation) or a BARE
+	// verdict line (exactly `PASS`/`WARN`, the cycle-249 shape — auditors
+	// legitimately omit the bold). A sentence merely containing the word must
+	// not match.
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		if !verdictHeadingRE.MatchString(line) {
 			continue
 		}
 		for j := i + 1; j <= i+5 && j < len(lines); j++ {
-			trimmed := strings.TrimSpace(lines[j])
-			if strings.Contains(lines[j], "**PASS**") || trimmed == "PASS" {
+			line := lines[j]
+			if boldPassRE.MatchString(line) || strings.TrimSpace(line) == "PASS" {
 				return "PASS", true
 			}
-			if !strict && (strings.Contains(lines[j], "**WARN**") || trimmed == "WARN") {
+			if !strict && (boldWarnRE.MatchString(line) || strings.TrimSpace(line) == "WARN") {
 				return "WARN", true
 			}
 		}
