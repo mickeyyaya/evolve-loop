@@ -255,6 +255,26 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		IntentRequired: intentRequired,
 		RunID:          runID,
 	}
+	// Fleet cycle-state isolation (ADR-0049): under the fleet supervisor two
+	// lanes run concurrently. Point THIS lane's cycle-state reads+writes at its
+	// OWN per-run file so a peer lane's Phase/CycleID write never clobbers this
+	// lane's — the singleton clobber that made a lane's phase-gate (guards.Phase
+	// reads cycle state) see the wrong phase and stall before audit. os.Setenv
+	// propagates to every child guard subprocess this orchestrator spawns, so the
+	// orchestrator and its gate checks agree on this lane's phase. Sequential loop
+	// (EVOLVE_FLEET unset) keeps the host-global singleton, byte-identical. Cleared
+	// on exit for hygiene (each fleet lane is its own process, but a reused process
+	// must not leak a stale override to a later cycle).
+	if os.Getenv(ipcenv.FleetKey) != "" && cs.WorkspacePath != "" {
+		if err := os.Setenv(ipcenv.CycleStateFileKey, filepath.Join(cs.WorkspacePath, CycleStateFile)); err != nil {
+			// Loud, not silent: a failed Setenv leaves this lane on the shared
+			// host singleton → the clobber-before-audit stall recurs. Abort the
+			// cycle rather than run a lane that will lose its work.
+			failClean()
+			return cycleInit{}, nil, fmt.Errorf("fleet cycle-state isolation: set %s: %w", ipcenv.CycleStateFileKey, err)
+		}
+		stack = append(stack, func(_, _ bool) { _ = os.Unsetenv(ipcenv.CycleStateFileKey) })
+	}
 	// Guard against workspace pollution from a prior killed attempt at
 	// the same cycle number. If `<workspace>/` exists and has files,
 	// rename to `<workspace>.polluted-<UTCnano>/` BEFORE any phase runs.

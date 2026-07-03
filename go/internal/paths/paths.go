@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // Layout is the resolved set of .evolve/* paths for a single command
@@ -118,12 +120,22 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		ledgerFile = filepath.Join(evolveDir, "ledger.jsonl")
 	}
 
+	// Fleet per-run cycle-state override: under the fleet supervisor each lane
+	// sets ipcenv.CycleStateFileKey to its own per-run file so two lanes never
+	// share the host-global singleton (the clobber that stalled a lane's phase
+	// gate before audit). A consumer reading Layout.CycleStateFile directly then
+	// still gets THIS lane's file. Unset ⇒ <evolveDir>/cycle-state.json.
+	cycleStateFile := lookupEnv(ipcenv.CycleStateFileKey)
+	if cycleStateFile == "" {
+		cycleStateFile = filepath.Join(evolveDir, "cycle-state.json")
+	}
+
 	return Layout{
 		ProjectRoot:    projectRoot,
 		PluginRoot:     pluginRoot,
 		EvolveDir:      evolveDir,
 		StateFile:      filepath.Join(evolveDir, "state.json"),
-		CycleStateFile: filepath.Join(evolveDir, "cycle-state.json"),
+		CycleStateFile: cycleStateFile,
 		LedgerFile:     ledgerFile,
 		ProfilesDir:    profilesDir,
 		AdaptersDir:    adaptersDir,

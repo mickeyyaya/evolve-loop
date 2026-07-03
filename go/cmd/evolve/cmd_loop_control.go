@@ -275,7 +275,7 @@ type quotaPause struct {
 // JSON, wrong reason, or checkpoint disabled) — quota-pause is an
 // opt-in signal, not an error condition.
 func detectQuotaPause(evolveDir string) (quotaPause, bool) {
-	path := filepath.Join(evolveDir, "cycle-state.json")
+	path := core.ResolveCycleStatePath(evolveDir) // fleet per-run override when set
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return quotaPause{}, false

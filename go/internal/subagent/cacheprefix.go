@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // CachePrefixRequest is the typed input to WriteCachePrefix. Workspace is the
@@ -163,7 +165,12 @@ func defaultReadOrchestratorPrompt(workspace string) (string, error) {
 }
 
 func defaultReadCycleState(projectRoot string) (string, error) {
-	body, err := os.ReadFile(filepath.Join(projectRoot, ".evolve", "cycle-state.json"))
+	// DispatchParallel runs this inside the fleet lane, so it MUST resolve THIS
+	// lane's per-run cycle-state (core.ResolveCycleStatePath honors the fleet
+	// override) — reading the host-global singleton would build a cache prefix
+	// from whichever peer lane wrote last, feeding the fan-out workers another
+	// lane's phase summary. Unset ⇒ host-global default (sequential unchanged).
+	body, err := os.ReadFile(core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve")))
 	if err != nil {
 		return "", err
 	}

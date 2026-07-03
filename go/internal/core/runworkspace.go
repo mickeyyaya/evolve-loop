@@ -1,9 +1,30 @@
 package core
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
+
+// ResolveCycleStatePath returns the absolute cycle-state file path THIS process
+// must read/write. Under the fleet supervisor each concurrent lane sets
+// ipcenv.CycleStateFileKey to its OWN per-run file (runs/cycle-N/cycle-state.json)
+// so two lockstep lanes never share the host-global singleton — the Phase/CycleID
+// clobber that made a lane's phase-gate (guards.Phase reads cycle state) see the
+// wrong phase and stall before audit. Unset ⇒ <evolveDir>/cycle-state.json,
+// byte-identical to the sequential loop.
+//
+// This is the SINGLE resolver every cycle-state reader/writer MUST call
+// (storage, checkpoint, resume, reset, quota-pause) so no path re-derives the
+// location with a raw filepath.Join and silently reopens the isolation hole.
+func ResolveCycleStatePath(evolveDir string) string {
+	if p := os.Getenv(ipcenv.CycleStateFileKey); p != "" {
+		return p
+	}
+	return filepath.Join(evolveDir, CycleStateFile)
+}
 
 // RunStateFile is the per-run mirror of cycle-state.json inside the run
 // workspace (CB.4, concurrency campaign). The storage adapter dual-writes
