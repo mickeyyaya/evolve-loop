@@ -398,11 +398,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// WARNs and falls through to that unchanged sequential path for this
 		// iteration instead of silently consuming it.
 		if shouldRunWave(fleetCfg) {
-			// FLEET-AS-POLICY S3(b): quota-aware capacity — active clihealth
-			// benches shrink this wave's lane count (copy; min 1). Shrinking
-			// to a single lane un-gates shouldRunWave inside dispatchIteration
-			// and this iteration falls through to the sequential path below.
-			waveCfg := quotaAwareWaveConfig(fleetCfg, cfg.ProjectRoot, stderr)
+			// FLEET-AS-POLICY S3(b) + Q4 budget: quota-aware capacity — active
+			// clihealth benches shrink this wave's lane count (copy; min 1), and
+			// when a fleet.budget block is present the (fail-open) live quota +
+			// pace measurement sizes it further via fleetbudget.Plan (shadow
+			// logs, enforce applies + paces). Shrinking to a single lane un-gates
+			// shouldRunWave inside dispatchIteration and this iteration falls
+			// through to the sequential path below.
+			waveCfg, wavePace := budgetAwareWaveConfig(ctx, fleetCfg, cfg.ProjectRoot, cfg.EvolveDir, deps.Storage, stderr)
 			launcher := productionWaveLauncher(waveCfg, waveBinPath, cfg.ProjectRoot, stdout, stderr)
 			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage), launcher, i)
 			switch {
@@ -416,6 +419,9 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					}
 				}
 				fmt.Fprintf(stderr, "[loop] wave %d: %d/%d lanes ok\n", i, len(results)-failedLanes, len(results))
+				// Enforce-mode budget pacing: idle the affordable inter-wave gap
+				// before the next wave (0 in shadow / no floor pressure).
+				paceBeforeNextWave(ctx, wavePace, stderr)
 				continue
 			default:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan or quota-shrunk to a single lane), falling back to sequential\n", i)

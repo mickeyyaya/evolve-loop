@@ -872,6 +872,55 @@ type FleetPolicy struct {
 	// per the goal spec — and the getter surfaces a warning rather than
 	// logging it, keeping this package I/O-free.
 	PlanSource string `json:"plan_source,omitempty"`
+	// Budget is the OPT-IN quota-driven lane-sizing block (Q4 of the quota
+	// budgeting campaign). Absent ⇒ FleetConfig.Budget is nil and the wave
+	// never probes quota — zero added latency, byte-identical lanes. Present
+	// ⇒ the wave measures each family's quota + the pipeline's pace and sizes
+	// against real headroom (fleetbudget.Plan), applied only when
+	// Stage=="enforce".
+	Budget *FleetBudgetPolicy `json:"budget,omitempty"`
+}
+
+// FleetBudgetPolicy is the .evolve/policy.json "fleet.budget" block: the
+// operator's opt-in tunables for quota-driven lane sizing. The sizing is in
+// each CLI's NATIVE units (remaining fraction + reset time), never dollars.
+type FleetBudgetPolicy struct {
+	// Stage selects shadow (compute + log the decision, do NOT resize) vs
+	// enforce (apply the computed lane count + pacing). Empty/absent ⇒
+	// "shadow"; an unknown value fails safe to "shadow" plus a surfaced
+	// warning. Mirrors SwarmPolicy.Stage's shadow-first idiom — a config-
+	// selected Strategy, not a feature flag.
+	Stage string `json:"stage,omitempty"`
+	// CapacityCycles models how many cycles a 100%-quota window affords; with
+	// SafetyFraction it is the precondition for the budget-sizing branch
+	// (fleetbudget only sizes when both are set). Zero/absent ⇒ no sizing
+	// (reset-pace / floor fallback), so a present block with no tunables is a
+	// legible reset-pace soak.
+	CapacityCycles float64 `json:"capacity_cycles,omitempty"`
+	// SafetyFraction is the headroom fraction in (0,1] the budget keeps in
+	// reserve. Validity is the fleetbudget allocator's SSOT (it sizes only for
+	// 0<safety≤1); this block carries the raw value without duplicating that
+	// check.
+	SafetyFraction float64 `json:"safety_fraction,omitempty"`
+	// HistoryWindow is the number of most-recent cycles rolled up for the pace
+	// estimate. Zero/absent ⇒ the built-in default.
+	HistoryWindow int `json:"history_window,omitempty"`
+}
+
+// defaultFleetBudgetHistoryWindow is the pace-rollup window used when a present
+// fleet.budget block omits history_window: enough recent cycles for a stable
+// median without reaching back into stale pace regimes.
+const defaultFleetBudgetHistoryWindow = 10
+
+// FleetBudgetConfig is the resolved fleet.budget block. It is non-nil on
+// FleetConfig only when the operator supplied the block — the caller reads a
+// nil Budget as "quota budgeting off, do not probe".
+type FleetBudgetConfig struct {
+	// Stage is "shadow" (compute + log, never resize) or "enforce" (apply).
+	Stage          string
+	CapacityCycles float64
+	Safety         float64
+	HistoryWindow  int
 }
 
 // FleetConfig is the resolved fleet configuration with defaults applied.
@@ -885,7 +934,10 @@ type FleetConfig struct {
 	// budget survives a transient CLI-family bench.
 	MinLanes   int
 	PlanSource string
-	Warnings   []string
+	// Budget is the resolved quota-budgeting block, or nil when the operator
+	// supplied no fleet.budget block (the default — quota budgeting off).
+	Budget   *FleetBudgetConfig
+	Warnings []string
 }
 
 // FleetConfig returns fleet configuration with built-in defaults resolved.
@@ -924,6 +976,28 @@ func (p Policy) FleetConfig() FleetConfig {
 	default:
 		c.PlanSource = "manual"
 		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.plan_source: unknown value %q, falling back to \"manual\"", p.Fleet.PlanSource))
+	}
+	if p.Fleet.Budget != nil {
+		b := &FleetBudgetConfig{
+			Stage:          "shadow",
+			CapacityCycles: p.Fleet.Budget.CapacityCycles,
+			Safety:         p.Fleet.Budget.SafetyFraction,
+			HistoryWindow:  defaultFleetBudgetHistoryWindow,
+		}
+		switch p.Fleet.Budget.Stage {
+		case "enforce":
+			b.Stage = "enforce"
+		case "", "shadow":
+			// b.Stage already defaults to "shadow".
+		default:
+			// Unknown value fails safe to the "shadow" default (already set) plus a
+			// surfaced warning naming the rejected value.
+			c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.budget.stage: unknown value %q, falling back to \"shadow\"", p.Fleet.Budget.Stage))
+		}
+		if p.Fleet.Budget.HistoryWindow > 0 {
+			b.HistoryWindow = p.Fleet.Budget.HistoryWindow
+		}
+		c.Budget = b
 	}
 	return c
 }

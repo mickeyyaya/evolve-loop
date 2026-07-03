@@ -38,16 +38,24 @@ func runUsageProbe(projectRoot, evolveDir string, env map[string]string, stderr 
 	factory := bridge.NewControllerFactory(projectRoot, filepath.Join(evolveDir, "usage-probe"), "usage-probe", bridge.Deps{})
 	p := &usageprobe.Prober{
 		Families: families,
-		Probe: func(ctx context.Context, family string) (string, error) {
-			resp, err := factory.For(family).Do(ctx, family, clicontrol.EventUsage)
-			return resp.Pane, err
-		},
+		Probe:    bridgeUsageProbe(factory),
 		Classify: bridge.ClassifyExhausted,
 		Store:    clihealth.NewStore(projectRoot, nil),
 		Log:      stderr,
 	}
 	fmt.Fprintf(stderr, "[loop] usage-probe: checking %v for quota caps before dispatch\n", families)
 	p.Run(context.Background())
+}
+
+// bridgeUsageProbe adapts a per-family controller factory into the (ctx, family)
+// → captured-pane probe seam shared by the boolean usage probe (usageprobe.
+// Prober) and the budget quota probe (usageprobe.ProbeQuota) — the single way to
+// send a family's usage command over the bridge and read its pane.
+func bridgeUsageProbe(factory *bridge.ControllerFactory) func(ctx context.Context, family string) (string, error) {
+	return func(ctx context.Context, family string) (string, error) {
+		resp, err := factory.For(family).Do(ctx, family, clicontrol.EventUsage)
+		return resp.Pane, err
+	}
 }
 
 // usageProbeEnabled reports whether the proactive probe should run: the
