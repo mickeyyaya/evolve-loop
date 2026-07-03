@@ -789,6 +789,13 @@ func writeRecallMemory(b *strings.Builder, in router.RouteInput) {
 
 const maxCarryoverTodosInPrompt = 20
 
+// maxCarryoverTodoActionRunesInPrompt bounds each rendered todo Action at the
+// sole prompt-injection site (defense-in-depth). It guards the 54 oversized
+// entries already on disk — which the creation-time caps in failure_learning.go
+// cannot retroactively shrink — plus any future creation path this cycle does
+// not touch.
+const maxCarryoverTodoActionRunesInPrompt = 600
+
 func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 	if len(todos) == 0 {
 		return
@@ -798,7 +805,7 @@ func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 	for i := 0; i < limit; i++ {
 		t := todos[i]
 		fmt.Fprintf(b, "- [%s] %s: %s (first_seen_cycle=%d, cycles_unpicked=%d)\n",
-			t.Priority, t.ID, t.Action, t.FirstSeenCycle, t.CyclesUnpicked)
+			t.Priority, t.ID, capRunes(t.Action, maxCarryoverTodoActionRunesInPrompt), t.FirstSeenCycle, t.CyclesUnpicked)
 	}
 	if len(todos) > limit {
 		fmt.Fprintf(b, "- ... %d more carryover todo(s) omitted from prompt\n", len(todos)-limit)

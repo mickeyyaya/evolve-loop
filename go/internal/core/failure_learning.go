@@ -242,8 +242,12 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	todoID := fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
 	if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
 		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
-			ID:             todoID,
-			Action:         "Review the failed cycle learning and fix before retrying: " + summary,
+			ID: todoID,
+			// The router prompt's own "## Carryover todos" section header already
+			// says these are prior-cycle failures to consider before retrying, so
+			// the summary (which carries cycle/phase/error-class) stands alone —
+			// no fixed boilerplate prefix repeated per todo.
+			Action:         summary,
 			Priority:       "P0",
 			FirstSeenCycle: fl.Cycle,
 			CyclesUnpicked: 0,
@@ -395,6 +399,17 @@ const (
 	maxAdoptedDefectRunes = 500 // runes per adopted entry (mirrors faillearn's summary cap)
 )
 
+// capRunes truncates s to at most maxRunes runes, appending an ellipsis marker
+// when truncation occurred. Single source for the rune-cap applied at every
+// state.json write boundary that renders into a router/advisor prompt (adopted
+// defect lists via capStrings, promoted-defect todos, carryover-todo render).
+func capRunes(s string, maxRunes int) string {
+	if r := []rune(s); len(r) > maxRunes {
+		return string(r[:maxRunes]) + "…"
+	}
+	return s
+}
+
 // capStrings bounds an agent-written string list at the adoption boundary.
 func capStrings(in []string, maxEntries, maxRunes int) []string {
 	if len(in) > maxEntries {
@@ -402,10 +417,7 @@ func capStrings(in []string, maxEntries, maxRunes int) []string {
 	}
 	out := make([]string, len(in))
 	for i, s := range in {
-		if r := []rune(s); len(r) > maxRunes {
-			s = string(r[:maxRunes]) + "…"
-		}
-		out[i] = s
+		out[i] = capRunes(s, maxRunes)
 	}
 	return out
 }
@@ -542,8 +554,12 @@ func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
 		n++
 		if !carryoverTodoExists(state.CarryoverTodos, id) {
 			state.CarryoverTodos = append(state.CarryoverTodos, CarryoverTodo{
-				ID:             id,
-				Action:         "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + defect,
+				ID: id,
+				// Bound the defect text with the SAME cap failureLearningSummary /
+				// adoptStructuredFailure already apply, so an unbounded audit-gate
+				// diagnostic (e.g. a long strings.Join(offenders, "; ")) can't inject
+				// an arbitrarily large Action that bloats every future router prompt.
+				Action:         "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + capRunes(defect, maxAdoptedDefectRunes),
 				Priority:       "P0",
 				FirstSeenCycle: record.Cycle,
 				CyclesUnpicked: 0,
