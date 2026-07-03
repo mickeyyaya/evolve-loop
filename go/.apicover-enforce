@@ -143,6 +143,7 @@
 # uses EventCircuitBreakerTripped); those were DELETED (YAGNI) rather than pinned
 # with a meaningless test.
 ./internal/adapters/sandbox
+./internal/budgethistory
 ./internal/checkpoint
 ./internal/clihealth
 ./internal/consensusdispatch
