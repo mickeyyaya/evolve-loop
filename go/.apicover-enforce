@@ -122,6 +122,7 @@
 ./internal/cyclesimulator
 ./internal/doctor
 ./internal/fleet
+./internal/fleetbudget
 ./internal/log
 ./internal/marketplacepoll
 ./internal/modelcatalog
