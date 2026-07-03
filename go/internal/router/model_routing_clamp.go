@@ -7,6 +7,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
+// universalTierFloor is the compiled-default model-tier envelope applied when a
+// profile declares no explicit model_tier_envelope (cycle-480,
+// universal-envelope-floor). 72/91 profiles omit an envelope; without a default
+// those phases skipped the clamp-up gate entirely and a below-floor advisor tier
+// proposal fell through to policy.ValidatePin as a mere PREFERENCE (B2), never
+// clamped. Single-sourcing the floor HERE — rather than editing every profile
+// JSON — guarantees a below-floor tier is clamped UP to "balanced" for EVERY
+// phase, while any profile that DOES declare an envelope still wins (its explicit
+// Min is used verbatim). Min is the only field the clamp-up gate consults; Max
+// documents the intended ceiling for parity with declared envelopes (there is no
+// clamp-DOWN today).
+var universalTierFloor = &profiles.ModelTierEnvelope{Min: "balanced", Max: "deep"}
+
 // ClampPlanModelRouting is the cycle-436 MR2 guardrail: it re-validates every
 // plan entry's advisor-proposed {CLI,Tier} against the phase's OWN profile
 // guardrails (allowed_clis + model_tier_envelope, via the EXISTING
@@ -44,22 +57,28 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 		}
 		prof := profileFor(e.Phase)
 
-		// Operator low-model floor (cycle-463 T4): a tier proposal BELOW the
-		// phase's envelope minimum clamps UP to the floor rather than emptying
-		// the whole proposal — the CLI is left untouched since only the tier
-		// violated a bound. TierRank returns 0 for an unclassifiable string, so
-		// this only fires when both ranks are real.
-		if prof != nil && e.Tier != "" && prof.ModelTierEnvelope != nil {
+		// Operator low-model floor (cycle-463 T4; universalized cycle-480): a tier
+		// proposal BELOW the phase's envelope minimum clamps UP to the floor rather
+		// than emptying the whole proposal — the CLI is left untouched since only
+		// the tier violated a bound. When the profile declares no envelope, the
+		// compiled universalTierFloor is substituted so the floor is UNIVERSAL
+		// across every phase (72/91 profiles omit an envelope). TierRank returns 0
+		// for an unclassifiable string, so this only fires when both ranks are real.
+		if prof != nil && e.Tier != "" {
+			env := prof.ModelTierEnvelope
+			if env == nil {
+				env = universalTierFloor
+			}
 			tierRank := policy.TierRank(e.Tier)
-			minRank := policy.TierRank(prof.ModelTierEnvelope.Min)
+			minRank := policy.TierRank(env.Min)
 			if tierRank > 0 && minRank > 0 && tierRank < minRank {
 				clamps = append(clamps, Clamp{
 					Phase:    e.Phase,
 					Rule:     "model-routing-guardrail",
 					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
-					Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (clamped up to envelope floor)", e.Phase, e.CLI, prof.ModelTierEnvelope.Min),
+					Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (clamped up to envelope floor)", e.Phase, e.CLI, env.Min),
 				})
-				e.Tier = prof.ModelTierEnvelope.Min
+				e.Tier = env.Min
 				continue
 			}
 		}
