@@ -292,6 +292,12 @@ type Orchestrator struct {
 	// workflowConfig is resolved once from policy.json at the composition root.
 	workflowConfig policy.WorkflowConfig
 
+	// maxPhaseIterations bounds RunCycle's dispatch loop (the transition-table
+	// cycle guard). 0 ⇒ defaultMaxPhaseIterations. Injected via
+	// WithMaxPhaseIterations; tests set it low to exercise the C1
+	// chokepoint-escape guard deterministically.
+	maxPhaseIterations int
+
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
 	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
@@ -408,6 +414,18 @@ func WithRetryConfig(cfg policy.RetryConfig) Option {
 // WithWorkflowConfig injects the resolved workflow policy.
 func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
 	return func(o *Orchestrator) { o.workflowConfig = cfg }
+}
+
+// WithMaxPhaseIterations overrides the dispatch-loop iteration bound (the
+// transition-table cycle guard). n<=0 is ignored so the defaultMaxPhaseIterations
+// safety oracle stands; tests set it low to drive RunCycle into the C1
+// chokepoint-escape path deterministically.
+func WithMaxPhaseIterations(n int) Option {
+	return func(o *Orchestrator) {
+		if n > 0 {
+			o.maxPhaseIterations = n
+		}
+	}
 }
 
 // WithWorktreeProvisioner injects a worktree provisioner. Tests pass a fake to
@@ -674,12 +692,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		}
 	}
 
-	// Bounded loop guards against any transition-table cycle bug.
+	// Bounded loop guards against any transition-table cycle bug. The bound is
+	// injectable (WithMaxPhaseIterations) but defaults to the safety oracle.
 	// Labeled so the extracted sub-methods can signal loop termination
 	// (loopBreak → `break OuterLoop`) from inside the switch ladder below —
 	// a bare `break` there would exit the switch, not the loop (H15).
+	maxIter := o.maxPhaseIterations
+	if maxIter <= 0 {
+		maxIter = defaultMaxPhaseIterations
+	}
 OuterLoop:
-	for safety := 0; safety < 32; safety++ {
+	for safety := 0; safety < maxIter; safety++ {
 		// Static transition + dynamic-routing override + spine-integrity gate +
 		// PhaseEnd termination → selectNext.
 		next, act, serr := cr.selectNext()
@@ -687,6 +710,7 @@ OuterLoop:
 		case loopAbort:
 			return cr.result, serr
 		case loopBreak:
+			cr.reachedPhaseEnd = true
 			break OuterLoop
 		}
 
@@ -728,6 +752,7 @@ OuterLoop:
 		case loopAbort:
 			return cr.result, berr
 		case loopBreak:
+			cr.reachedPhaseEnd = true
 			break OuterLoop
 		}
 
@@ -740,6 +765,20 @@ OuterLoop:
 		if next == PhaseScout {
 			cr.postScoutReplan()
 		}
+	}
+
+	// ADR-0044 C1 chokepoint-escape guard: the bounded loop can exit by
+	// exhausting its iteration budget (a transition-table cycle) instead of
+	// reaching PhaseEnd. That exit recorded no terminal outcome, so
+	// cyclehealth.ClassifyOutcome would page the cycle FAILED_UNEXPLAINED — the
+	// alarm bucket (the cycle-492 escape). Record an explicit abort so the escape
+	// is FAILED_EXPLAINED and diagnosable: it names the phase the cursor stalled
+	// on. Runs BEFORE finalizeCycle so the recorded FAIL preserves the worktree
+	// for salvage.
+	if !cr.reachedPhaseEnd {
+		cr.recordChokepointEscape(fmt.Sprintf(
+			"transition-table cycle guard: dispatch loop ran %d iterations without reaching PhaseEnd (cursor stalled at phase %q) — a transition cycle prevented termination; ADR-0044 C1 chokepoint escape",
+			maxIter, cr.current))
 	}
 
 	// Post-loop finalization (verdict reclassification, silent-no-ship warn,
