@@ -563,6 +563,10 @@ func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
 				Priority:       "P0",
 				FirstSeenCycle: record.Cycle,
 				CyclesUnpicked: 0,
+				// Inherit the record's TTL stamp (never recompute) so the two
+				// arrays' TTL logic stays single-sourced. A record with no
+				// ExpiresAt leaves the todo unstamped ⇒ the prune keeps it.
+				ExpiresAt: record.ExpiresAt,
 			})
 		}
 	}

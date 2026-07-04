@@ -181,6 +181,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		} else if pr.Removed > 0 {
 			fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired failedApproaches (%d→%d)\n", pr.Removed, pr.Before, pr.After)
 		}
+		// Same TTL prune for the structurally-parallel carryoverTodos array,
+		// which otherwise grows unboundedly (no removal path pre-cycle-507).
+		// Untimestamped legacy entries are kept (age unknown); fail-open.
+		if pr, err := failurelog.PruneExpiredCarryoverTodos(statePath, time.Now().UTC()); err != nil {
+			fmt.Fprintf(stderr, "[loop] auto-prune: carryover: %v\n", err)
+		} else if pr.Removed > 0 {
+			fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired carryoverTodos (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+		}
 	}
 
 	// Gap #5: --reset operator unblock. Prunes the three classifications
@@ -259,6 +267,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		lr.emit(stdout)
 		return 0
 	}
+
+	// Boot-time self-heal (cycle 507 F1 wiring): quarantine leaked tracked-source
+	// dirt, auto-seal a stranded dead-owner cycle marker, and flag a ship-binary
+	// SHA mismatch — BEFORE the unfinished-cycle guard and readiness gate, so a
+	// dirty/stranded tree heals rather than wedging the first cycle's tree-diff
+	// guard. Fail-open: a recovery error WARNs but never halts the batch.
+	bootRecoverFn(ctx, cfg, deps.Ledger, stderr)
 
 	// Unfinished-cycle guard (fresh runs only — resume returned above). A
 	// stuck cycle whose number is ahead of lastCycleNumber must not be

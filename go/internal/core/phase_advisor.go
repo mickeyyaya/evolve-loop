@@ -796,19 +796,52 @@ const maxCarryoverTodosInPrompt = 20
 // not touch.
 const maxCarryoverTodoActionRunesInPrompt = 600
 
+// carryoverPriorityRank maps a Priority string to a severity rank (higher =
+// more severe). An unknown/malformed priority ranks lowest (0) so it sorts to
+// the bottom without dropping the entry — the renderer stays total.
+func carryoverPriorityRank(p string) int {
+	switch strings.ToUpper(strings.TrimSpace(p)) {
+	case "P0":
+		return 6
+	case "P1", "H", "HIGH":
+		return 5
+	case "P2":
+		return 4
+	case "P3", "M", "MED", "MEDIUM":
+		return 3
+	case "L", "LOW":
+		return 1
+	default:
+		return 0
+	}
+}
+
 func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 	if len(todos) == 0 {
 		return
 	}
 	b.WriteString("\n## Carryover todos from previous cycles (consider when selecting phases)\n")
-	limit := min(len(todos), maxCarryoverTodosInPrompt)
+	// When the array exceeds the count cap, render the HIGHEST-PRIORITY /
+	// MOST-RECENT entries rather than a naive insertion-order (oldest-first)
+	// prefix — the old todos[:20] silently hid the newest, most severe items
+	// (e.g. cycle-505's leak) behind "N omitted". Sort a COPY (stable, so ties
+	// keep on-disk order) — never mutate the caller's slice.
+	ordered := append([]router.CarryoverTodo(nil), todos...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		ri, rj := carryoverPriorityRank(ordered[i].Priority), carryoverPriorityRank(ordered[j].Priority)
+		if ri != rj {
+			return ri > rj
+		}
+		return ordered[i].FirstSeenCycle > ordered[j].FirstSeenCycle
+	})
+	limit := min(len(ordered), maxCarryoverTodosInPrompt)
 	for i := 0; i < limit; i++ {
-		t := todos[i]
+		t := ordered[i]
 		fmt.Fprintf(b, "- [%s] %s: %s (first_seen_cycle=%d, cycles_unpicked=%d)\n",
 			t.Priority, t.ID, capRunes(t.Action, maxCarryoverTodoActionRunesInPrompt), t.FirstSeenCycle, t.CyclesUnpicked)
 	}
-	if len(todos) > limit {
-		fmt.Fprintf(b, "- ... %d more carryover todo(s) omitted from prompt\n", len(todos)-limit)
+	if len(ordered) > limit {
+		fmt.Fprintf(b, "- ... %d more carryover todo(s) omitted from prompt\n", len(ordered)-limit)
 	}
 }
 

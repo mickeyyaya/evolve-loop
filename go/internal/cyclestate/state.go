@@ -84,6 +84,11 @@ type CarryoverTodo struct {
 	Priority       string `json:"priority"`
 	FirstSeenCycle int    `json:"first_seen_cycle"`
 	CyclesUnpicked int    `json:"cycles_unpicked"`
+	// ExpiresAt (RFC3339) is the TTL stamp inherited from the FailedRecord that
+	// created this todo, mirroring failedApproaches. It lets the loop-start prune
+	// (failurelog.PruneExpiredCarryoverTodos) age the array out instead of letting
+	// it grow unboundedly. Empty ⇒ legacy/untimestamped ⇒ never auto-pruned.
+	ExpiresAt string `json:"expiresAt,omitempty"`
 }
 
 // CycleState mirrors .evolve/cycle-state.json (transient per-cycle).
