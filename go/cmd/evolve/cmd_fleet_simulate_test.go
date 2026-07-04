@@ -25,11 +25,11 @@ func TestSimulatePhases_CoversCanonicalOrder(t *testing.T) {
 
 // TestCycleRunArgs_Simulate threads -simulate through to each fleet cycle.
 func TestCycleRunArgs_Simulate(t *testing.T) {
-	base := cycleRunArgs("abc123", "", false, "")
+	base := cycleRunArgs("abc123", "", "", false, "")
 	if got := join(base); got != "cycle run --goal-hash abc123" {
 		t.Errorf("non-simulate args = %q", got)
 	}
-	sim := cycleRunArgs("abc123", "", true, "")
+	sim := cycleRunArgs("abc123", "", "", true, "")
 	if got := join(sim); got != "cycle run --goal-hash abc123 -simulate" {
 		t.Errorf("simulate args = %q, want trailing -simulate", got)
 	}
@@ -41,10 +41,10 @@ func TestCycleRunArgs_Simulate(t *testing.T) {
 // omits --goal (back-compat: a goal-hash-only cycle keeps the generic goal).
 func TestCycleRunArgs_ThreadsOutputContractAsGoal(t *testing.T) {
 	contract := "Delete the 5 dead flags; FlagCeiling toward 35. No new env reads."
-	if got, want := join(cycleRunArgs("abc123", contract, false, "")), "cycle run --goal-hash abc123 --goal "+contract; got != want {
+	if got, want := join(cycleRunArgs("abc123", contract, "", false, "")), "cycle run --goal-hash abc123 --goal "+contract; got != want {
 		t.Errorf("output-contract threading:\n got %q\nwant %q", got, want)
 	}
-	if g := join(cycleRunArgs("abc123", "", false, "")); g != "cycle run --goal-hash abc123" {
+	if g := join(cycleRunArgs("abc123", "", "", false, "")); g != "cycle run --goal-hash abc123" {
 		t.Errorf("empty contract must omit --goal, got %q", g)
 	}
 }

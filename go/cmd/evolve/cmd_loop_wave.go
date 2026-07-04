@@ -111,10 +111,10 @@ func loadFleetConfig(evolveDir string) policy.FleetConfig {
 // lanes inherit EVOLVE_FLEET=1 + EVOLVE_FLEET_SCOPE exactly like
 // `evolve fleet --plan` lanes (scoped lane triage already exists at
 // internal/core/cyclerun.go:443).
-func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash string, stdout, stderr io.Writer) *fleet.Supervisor {
+func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) *fleet.Supervisor {
 	return &fleet.Supervisor{
 		Concurrency: fc.Concurrency,
-		Launch:      execCycleLaunch(binPath, false, projectRoot, goalHash, stdout, stderr),
+		Launch:      execCycleLaunch(binPath, false, projectRoot, goalHash, goalText, stdout, stderr),
 	}
 }
 

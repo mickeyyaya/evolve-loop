@@ -88,7 +88,7 @@ func TestCampaignLoadVerifiedPlanPropagatesVerifyError(t *testing.T) {
 func TestCampaignLocalizedRetrySucceeds(t *testing.T) {
 	planPath := writeCampaignTestPlan(t)
 	attempts := 0
-	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			attempts++
 			if attempts == 1 {
@@ -110,7 +110,7 @@ func TestCampaignLocalizedRetrySucceeds(t *testing.T) {
 func TestCampaignLocalizedRetryFails(t *testing.T) {
 	planPath := writeCampaignTestPlan(t)
 	attempts := 0
-	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			attempts++
 			return 1, nil
@@ -129,7 +129,7 @@ func TestCampaignLocalizedRetryFails(t *testing.T) {
 func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 	planPath := writeCampaignTestPlanCount(t, 2)
 	var active, maxActive int32
-	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			current := atomic.AddInt32(&active, 1)
 			for {
@@ -155,7 +155,7 @@ func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 
 func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
 	root := t.TempDir()
-	got := strings.Join(cycleRunArgs("abc123", "", false, root), " ")
+	got := strings.Join(cycleRunArgs("abc123", "", "", false, root), " ")
 	want := "cycle run --goal-hash abc123 --project-root " + root
 	if got != want {
 		t.Fatalf("cycleRunArgs = %q, want %q", got, want)
@@ -163,14 +163,14 @@ func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
 }
 
 func TestCycleRunArgs_EmptyRootOmitsFlag(t *testing.T) {
-	if got := strings.Join(cycleRunArgs("abc123", "", false, ""), " "); strings.Contains(got, "project-root") {
+	if got := strings.Join(cycleRunArgs("abc123", "", "", false, ""), " "); strings.Contains(got, "project-root") {
 		t.Fatalf("cycleRunArgs empty root = %q, want project-root omitted", got)
 	}
 }
 
 func withCampaignLaunchFactory(
 	t *testing.T,
-	factory func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn,
+	factory func(string, bool, string, string, string, io.Writer, io.Writer) fleet.LaunchFn,
 ) {
 	t.Helper()
 	previous := campaignLaunchFactory

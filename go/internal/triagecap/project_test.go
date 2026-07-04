@@ -141,6 +141,64 @@ func TestProjectDecisionJSON_SkipsMalformedIDs(t *testing.T) {
 	}
 }
 
+// TestProjectDecisionJSON_EmptySectionsYieldEmptyArraysNotNull pins the JSON
+// contract: an artifact whose top_n/deferred/dropped sections are all present
+// but carry zero list items must still marshal each field as [], never null.
+// project.go:66-72's projectedDecision struct fields start as nil Go slices
+// and are only appended to when parseItems finds a real item — a report with
+// nothing to project today leaves all three nil, and json.MarshalIndent
+// serializes a nil slice as null. The consumer (ship/postship.go:169) reads
+// this companion; a null top_n is a live regression once disjoint packing
+// (triage-fleet-width-disjoint-topn) can legitimately narrow top_n to zero.
+func TestProjectDecisionJSON_EmptySectionsYieldEmptyArraysNotNull(t *testing.T) {
+	report := `# Triage Decision — Cycle 9
+
+## top_n (commit to THIS cycle)
+
+## deferred
+
+## dropped
+`
+	body, err := ProjectDecisionJSON(report, 9)
+	if err != nil {
+		t.Fatalf("ProjectDecisionJSON error: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, body)
+	}
+	for _, field := range []string{"top_n", "deferred", "dropped"} {
+		v, ok := raw[field]
+		if !ok {
+			t.Fatalf("%s field missing from projected JSON entirely", field)
+		}
+		if string(v) != "[]" {
+			t.Errorf("%s = %s, want [] for an artifact whose section has no items — nil Go slices must be initialized before marshalling, never left to serialize as null", field, v)
+		}
+	}
+}
+
+// TestProjectDecisionJSON_SectionsEntirelyAbsent_StillYieldEmptyArrays covers
+// the OTHER null-producing path (section headings absent altogether, not just
+// empty) — sectionBody returns ok=false and the field is never touched, same
+// nil-slice-to-null failure mode as the present-but-empty case above.
+func TestProjectDecisionJSON_SectionsEntirelyAbsent_StillYieldEmptyArrays(t *testing.T) {
+	report := "# Triage Decision — Cycle 9\n\nNo top_n/deferred/dropped sections at all.\n"
+	body, err := ProjectDecisionJSON(report, 9)
+	if err != nil {
+		t.Fatalf("ProjectDecisionJSON error: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, body)
+	}
+	for _, field := range []string{"top_n", "deferred", "dropped"} {
+		if v := string(raw[field]); v == "null" {
+			t.Errorf("%s = null, want [] even when the section heading is entirely absent from the artifact", field)
+		}
+	}
+}
+
 // TestProjectDecisionJSON_FloorFieldsOmitted pins that the projection never
 // emits committed_floors/deferred_floors — their absence is what makes the
 // floor readers fall back to the prose counter, keeping gate behaviour

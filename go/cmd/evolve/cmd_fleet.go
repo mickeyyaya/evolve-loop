@@ -78,7 +78,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	sup := &fleet.Supervisor{
 		Concurrency: concurrency,
-		Launch:      execCycleLaunch(binPath, simulate, "", goalHash, stdout, stderr),
+		Launch:      execCycleLaunch(binPath, simulate, "", goalHash, "", stdout, stderr),
 	}
 	if err := sup.Validate(); err != nil {
 		fmt.Fprintf(stderr, "evolve fleet: %v\n", err)
@@ -138,7 +138,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // per-spec overlay (which already forced EVOLVE_FLEET=1).
 // cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
 // testable; --simulate threads the no-LLM -simulate flag through.
-func cycleRunArgs(goalHash, outputContract string, simulate bool, projectRoot string) []string {
+func cycleRunArgs(goalHash, outputContract, goalText string, simulate bool, projectRoot string) []string {
 	args := []string{"cycle", "run", "--goal-hash", goalHash}
 	// The plan's per-cycle output contract is the cycle's BINDING goal: threaded
 	// as --goal it reaches the scout (Context["goal"]) so the cycle executes the
@@ -151,6 +151,11 @@ func cycleRunArgs(goalHash, outputContract string, simulate bool, projectRoot st
 	// task, not a weakened constraint.
 	if outputContract != "" {
 		args = append(args, "--goal", outputContract)
+	} else if goalText != "" {
+		// No per-todo contract: fall back to the operator's loop-level
+		// --goal-text so a wave lane no longer silently drops it. The contract
+		// (above) always wins — this only fills the gap when the lane has none.
+		args = append(args, "--goal", goalText)
 	}
 	if simulate {
 		args = append(args, "-simulate")
@@ -174,14 +179,14 @@ func laneGoalHash(specGoalHash, fallback string) string {
 	return fallback
 }
 
-func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash string, stdout, stderr io.Writer) fleet.LaunchFn {
+func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) fleet.LaunchFn {
 	var logMu sync.Mutex // serializes interleaved output across concurrent cycles
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
 		prefix := "[" + cycleLogTag(spec) + "] "
 		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
 		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
-		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, simulate, projectRoot)...)
+		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, goalText, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew

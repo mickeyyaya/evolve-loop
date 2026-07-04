@@ -76,7 +76,17 @@ type projectedDecision struct {
 // section yields an empty slice (the loop is no worse off than with no
 // companion at all).
 func ProjectDecisionJSON(artifact string, cycle int) ([]byte, error) {
-	d := projectedDecision{Cycle: cycle, Projected: true}
+	// Initialize the three slice fields to empty (not nil) so an artifact with
+	// empty/absent sections marshals each as [] rather than null. The consumer
+	// (ship/postship.go) and any JSON reader expect arrays; a null top_n is a
+	// live regression once disjoint packing can legitimately narrow it to zero.
+	d := projectedDecision{
+		Cycle:     cycle,
+		Projected: true,
+		TopN:      []projTopN{},
+		Deferred:  []projID{},
+		Dropped:   []projDropped{},
+	}
 	if body, ok := sectionBody(artifact, topNHeadingRE); ok {
 		for _, it := range parseItems(body) {
 			d.TopN = append(d.TopN, projTopN{ID: it.id, Action: actionOf(it.rest)})
