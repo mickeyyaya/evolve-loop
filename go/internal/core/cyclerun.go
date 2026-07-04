@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +30,14 @@ const (
 	loopBreak                      // terminate the loop → fall to finalizeCycle (PhaseEnd, retro→End, debugger→End)
 	loopAbort                      // `return cr.result, err` immediately
 )
+
+// defaultMaxPhaseIterations bounds RunCycle's dispatch loop against a
+// transition-table cycle (a phase order that keeps re-selecting phases and never
+// reaches PhaseEnd). It is a genuine safety oracle (ADR-0044 C1) — it must exist
+// even when config is absent. WithMaxPhaseIterations overrides it; tests set it
+// low to drive RunCycle into the chokepoint-escape guard deterministically. 0 ⇒
+// this default.
+const defaultMaxPhaseIterations = 32
 
 // cycleRun is the method object (Replace Method with Method Object) for
 // RunCycle's dispatch loop. ONE addressable struct; every sub-method takes a
@@ -70,6 +79,7 @@ type cycleRun struct {
 	// late-visibility exit-defer flags (R2 contract; highest hazard)
 	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
 	cycleCompletedNormally bool // set true only post-loop; read by the same cleanup defer at exit
+	reachedPhaseEnd        bool // set at a loopBreak (PhaseEnd) exit; false post-loop ⇒ the bounded-iteration guard tripped (transition-table cycle) → C1 chokepoint-escape record
 }
 
 // dispatchResult carries the per-phase locals dispatch produces and
@@ -103,6 +113,21 @@ func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt i
 		Result:       &cr.result,
 		Timings:      &cr.phaseTimings,
 	})
+}
+
+// recordChokepointEscape closes the ADR-0044 C1 invariant on RunCycle's
+// bounded-loop exit. If the dispatch loop exhausts its iteration budget without
+// reaching PhaseEnd (a transition-table cycle), no phase recorded a terminal
+// outcome, so cyclehealth.ClassifyOutcome would page the cycle FAILED_UNEXPLAINED
+// — the alarm bucket (the cycle-492 escape). Recording an explicit abort here
+// routes the escape through the C1 chokepoint (recordPhaseOutcome) so the outcome
+// is FAILED_EXPLAINED and names the phase the cursor stalled on, and feeds
+// failure-learning so the loop's retro sees a real, diagnosable failure.
+func (cr *cycleRun) recordChokepointEscape(reason string) {
+	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath,
+		phaseOutcomeFrom(cr.current, PhaseResponse{Phase: string(cr.current)}, 0, reason, ""))
+	cr.recordFailureLearning(cr.current, errors.New(reason), 0)
+	cr.result.FinalVerdict = VerdictFAIL
 }
 
 // cyclerun.go — methods extracted from the RunCycle engine (orchestrator.go) to
