@@ -8,10 +8,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
@@ -197,20 +199,87 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 // thin. The threaded ctx (PR #298 reviewer note) reaches the storage read,
 // so loop shutdown cancels the plan path too. Deferred: a dedicated
 // single-writer triage-only runner.
-func productionWavePlanFn(cfg loopConfig, storage core.Storage) wavePlanFn {
+func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int) wavePlanFn {
 	return func(ctx context.Context, waveIndex int) ([]byte, []string, error) {
-		lastCycle, err := readLastCycleNumber(ctx, storage)
-		if err != nil {
-			return nil, nil, fmt.Errorf("read last cycle number: %w", err)
+		// Preferred source: the immediately-prior cycle's single-writer triage
+		// decision — partition the work it already selected.
+		if lastCycle, err := readLastCycleNumber(ctx, storage); err == nil && lastCycle > 0 {
+			companion := filepath.Join(cycleWorkspace(cfg.ProjectRoot, lastCycle), triagecap.TriageDecisionName())
+			if data, rerr := os.ReadFile(companion); rerr == nil {
+				return data, nil, nil
+			}
+			// Prior decision absent (fresh start, `evolve cycle reset` sealed the
+			// run dir, or the prior cycle failed before triage) — fall through to
+			// the inbox seed instead of erroring the wave into a sequential
+			// fallback. This is what keeps fleet 2-wide from failing to start on
+			// the first cycle / after any reset (the sequential fallback is also
+			// the ONLY path that can leak into the main tree, so avoiding it here
+			// is doubly load-bearing).
 		}
-		if lastCycle <= 0 {
-			return nil, nil, fmt.Errorf("no prior cycle to source a triage plan from (wave %d)", waveIndex)
-		}
-		companion := filepath.Join(cycleWorkspace(cfg.ProjectRoot, lastCycle), triagecap.TriageDecisionName())
-		data, err := os.ReadFile(companion)
+		// Seed from the durable inbox backlog so 2-wide starts on the FIRST cycle
+		// without a prior cycle's on-disk decision.
+		data, err := seedWavePlanFromInbox(cfg.EvolveDir, count)
 		if err != nil {
-			return nil, nil, fmt.Errorf("read %s: %w", companion, err)
+			return nil, nil, fmt.Errorf("wave %d: no prior triage decision and %w", waveIndex, err)
 		}
 		return data, nil, nil
 	}
+}
+
+// seedWavePlanFromInbox synthesizes a triage-decision.json (top_n[].id) from the
+// top-`count` inbox todos (by weight) so the wave planner (fleet.PlanFromTriage)
+// can partition them into disjoint lanes without a prior cycle's decision. count
+// is the caller's already-resolved wave width (clamped to >= 2 here); requires
+// >= 2 todos to fill >= 2 lanes — fewer returns an error so the caller falls back
+// to sequential (one item cannot run 2-wide anyway).
+func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
+	if count < 2 {
+		count = 2
+	}
+	ids := topInboxTaskIDs(evolveDir, count)
+	if len(ids) < 2 {
+		return nil, fmt.Errorf("inbox seed: %d todo(s) — need >= 2 inbox todos to fill a wave", len(ids))
+	}
+	topN := make([]map[string]string, 0, len(ids))
+	for _, id := range ids {
+		topN = append(topN, map[string]string{"id": id})
+	}
+	return json.Marshal(map[string]any{"top_n": topN})
+}
+
+// topInboxTaskIDs returns up to `count` inbox todo IDs, highest weight first
+// (filename tie-break for determinism). Scans <evolveDir>/inbox/*.json only (not
+// the consumed/ or processing/ subdirs); skips unreadable/malformed files and
+// empty IDs. Best-effort: a bad inbox never breaks dispatch.
+func topInboxTaskIDs(evolveDir string, count int) []string {
+	entries, _ := filepath.Glob(filepath.Join(evolveDir, "inbox", "*.json"))
+	sort.Strings(entries)
+	type item struct {
+		id     string
+		weight float64
+	}
+	items := make([]item, 0, len(entries))
+	for _, p := range entries {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var doc struct {
+			ID     string  `json:"id"`
+			Weight float64 `json:"weight"`
+		}
+		if json.Unmarshal(raw, &doc) != nil || doc.ID == "" {
+			continue
+		}
+		items = append(items, item{id: doc.ID, weight: doc.Weight})
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].weight > items[j].weight })
+	if count > len(items) {
+		count = len(items)
+	}
+	ids := make([]string, count)
+	for i, it := range items[:count] {
+		ids[i] = it.id
+	}
+	return ids
 }

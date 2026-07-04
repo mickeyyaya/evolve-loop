@@ -407,7 +407,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			// through to the sequential path below.
 			waveCfg, wavePace := budgetAwareWaveConfig(ctx, fleetCfg, cfg.ProjectRoot, cfg.EvolveDir, deps.Storage, stderr)
 			launcher := productionWaveLauncher(waveCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, stdout, stderr)
-			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage), launcher, i)
+			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, waveCfg.Count), launcher, i)
 			switch {
 			case werr != nil:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", i, werr)
