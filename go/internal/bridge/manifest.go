@@ -220,9 +220,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 // translateV1TierAliases maps the legacy Anthropic-named tier keys to the
 // canonical abstract vocabulary. Non-standard keys (e.g. operator-custom
 // "large") pass through verbatim. Delegates per-key translation to
-// translateV1TierKey so the 3-entry mapping is the single source of truth
+// translateV1TierKey so the alias mapping is the single source of truth
 // (also called from realizer.go's intent-vocabulary fallback ladder —
-// keeping it canonical here avoids silent drift if a fourth legacy alias
+// keeping it canonical here avoids silent drift if another legacy alias
 // is ever added).
 func translateV1TierAliases(v1 map[string]string) map[string]string {
 	out := make(map[string]string, len(v1))
@@ -232,9 +232,10 @@ func translateV1TierAliases(v1 map[string]string) map[string]string {
 	return out
 }
 
-// translateV1TierKey is the canonical 3-entry haiku/sonnet/opus →
-// fast/balanced/deep mapping. Pass-through for anything else (so custom
-// operator tiers survive the migration unchanged). Pure function exported
+// translateV1TierKey is the canonical haiku/sonnet/opus → fast/balanced/deep
+// mapping, plus the "high"→"deep" input alias. Pass-through for anything else
+// (so custom operator tiers — and the frontier "top" tier — survive the
+// migration unchanged). Pure function exported
 // at package scope so both the parse-time shim (translateV1TierAliases)
 // and the realize-time fallback ladder (realizer.legacyTierAlias)
 // reference the same table.
@@ -245,6 +246,10 @@ func translateV1TierKey(k string) string {
 	case "sonnet":
 		return "balanced"
 	case "opus":
+		return "deep"
+	case "high":
+		// "high" is an input alias of "deep" (latest-model-preference TIER
+		// VOCABULARY). It is NOT the frontier "top" tier — that stays distinct.
 		return "deep"
 	default:
 		return k

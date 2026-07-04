@@ -3,9 +3,11 @@ package modelcatalog
 import "time"
 
 // CanonicalTiers are the abstract model tiers a catalog entry may carry, in
-// fast→deep order. A snapshot's tier keys outside this set are dropped so the
-// catalog never carries a tier dispatch can't ask for.
-var CanonicalTiers = []string{"fast", "balanced", "deep"}
+// fast→top order. A snapshot's tier keys outside this set are dropped so the
+// catalog never carries a tier dispatch can't ask for. "top" is the frontier
+// tier (default when a profile/advisor is silent); "high" is an input alias of
+// "deep" (see bridge.translateV1TierKey), not a canonical tier of its own.
+var CanonicalTiers = []string{"fast", "balanced", "deep", "top"}
 
 // CLISnapshot is the minimal per-CLI input BuildFromSnapshots needs. It is
 // deliberately decoupled from setup.CLIStatus so this package stays a leaf
