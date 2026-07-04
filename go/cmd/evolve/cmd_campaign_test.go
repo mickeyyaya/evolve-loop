@@ -88,7 +88,7 @@ func TestCampaignLoadVerifiedPlanPropagatesVerifyError(t *testing.T) {
 func TestCampaignLocalizedRetrySucceeds(t *testing.T) {
 	planPath := writeCampaignTestPlan(t)
 	attempts := 0
-	withCampaignLaunchFactory(t, func(string, bool, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			attempts++
 			if attempts == 1 {
@@ -110,7 +110,7 @@ func TestCampaignLocalizedRetrySucceeds(t *testing.T) {
 func TestCampaignLocalizedRetryFails(t *testing.T) {
 	planPath := writeCampaignTestPlan(t)
 	attempts := 0
-	withCampaignLaunchFactory(t, func(string, bool, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			attempts++
 			return 1, nil
@@ -129,7 +129,7 @@ func TestCampaignLocalizedRetryFails(t *testing.T) {
 func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 	planPath := writeCampaignTestPlanCount(t, 2)
 	var active, maxActive int32
-	withCampaignLaunchFactory(t, func(string, bool, string, io.Writer, io.Writer) fleet.LaunchFn {
+	withCampaignLaunchFactory(t, func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn {
 		return func(context.Context, fleet.CycleSpec) (int, error) {
 			current := atomic.AddInt32(&active, 1)
 			for {
@@ -170,13 +170,11 @@ func TestCycleRunArgs_EmptyRootOmitsFlag(t *testing.T) {
 
 func withCampaignLaunchFactory(
 	t *testing.T,
-	factory func(string, bool, string, io.Writer, io.Writer) fleet.LaunchFn,
+	factory func(string, bool, string, string, io.Writer, io.Writer) fleet.LaunchFn,
 ) {
 	t.Helper()
 	previous := campaignLaunchFactory
-	campaignLaunchFactory = func(path string, simulate bool, projectRoot string, stdout, stderr io.Writer) fleet.LaunchFn {
-		return factory(path, simulate, projectRoot, stdout, stderr)
-	}
+	campaignLaunchFactory = factory
 	t.Cleanup(func() { campaignLaunchFactory = previous })
 }
 
