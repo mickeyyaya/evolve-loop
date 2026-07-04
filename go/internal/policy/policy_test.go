@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -320,5 +321,55 @@ func TestRetryConfig(t *testing.T) {
 	disabled := loaded.RetryConfig()
 	if disabled.RetryBackoffBaseS != 0 || disabled.ContractCorrectionRetries != 0 {
 		t.Fatalf("RetryConfig() explicit zero = %+v", disabled)
+	}
+}
+
+// TestCatalogConfig_AllowedFamilies pins D7 (FAMILY CONSTRAINT) of the
+// latest-model-preference feature at the policy layer: `.evolve/policy.json`
+// `catalog.allowed_families` (per-CLI family allow-list, e.g. agy:[gemini])
+// round-trips through CatalogConfig(), and an absent/unconfigured block
+// resolves to a nil map — "no constraint", byte-identical to today's shipped
+// behavior (every existing cycle without this key must be unaffected). RED
+// today: CatalogPolicy has no AllowedFamilies field (compile failure).
+func TestCatalogConfig_AllowedFamilies(t *testing.T) {
+	// Absent Catalog block entirely.
+	if got := (Policy{}).CatalogConfig(); got.AllowedFamilies != nil {
+		t.Errorf("absent catalog policy must yield nil AllowedFamilies (no constraint), got %+v", got.AllowedFamilies)
+	}
+
+	// Catalog block present but AllowedFamilies unset.
+	if got := (Policy{Catalog: &CatalogPolicy{}}).CatalogConfig(); got.AllowedFamilies != nil {
+		t.Errorf("catalog policy with no allowed_families must yield nil (no constraint), got %+v", got.AllowedFamilies)
+	}
+
+	want := map[string][]string{"agy": {"gemini"}, "claude": {"claude"}}
+	got := (Policy{Catalog: &CatalogPolicy{AllowedFamilies: want}}).CatalogConfig()
+	if !reflect.DeepEqual(got.AllowedFamilies, want) {
+		t.Errorf("CatalogConfig().AllowedFamilies = %+v, want %+v", got.AllowedFamilies, want)
+	}
+}
+
+// TestLoad_ParsesCatalogAllowedFamilies pins the JSON schema round-trip: the
+// `catalog.allowed_families` key in `.evolve/policy.json` must parse into
+// Policy.Catalog.AllowedFamilies via the ordinary Load() path (no bespoke
+// parser) — the live-evidence scenario is "agy must not have Claude models",
+// i.e. a per-CLI family allow-list, not a single global list. RED today: the
+// field does not exist, so this key is silently dropped by json.Unmarshal
+// (compile failure once the assertion below references the field).
+func TestLoad_ParsesCatalogAllowedFamilies(t *testing.T) {
+	dir := t.TempDir()
+	path := writePolicy(t, dir, `{
+		"catalog": { "allowed_families": { "agy": ["gemini"], "codex": ["gpt"] } }
+	}`)
+	p, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := p.CatalogConfig().AllowedFamilies
+	if !reflect.DeepEqual(got["agy"], []string{"gemini"}) {
+		t.Errorf("agy allowed_families = %v, want [gemini]", got["agy"])
+	}
+	if !reflect.DeepEqual(got["codex"], []string{"gpt"}) {
+		t.Errorf("codex allowed_families = %v, want [gpt]", got["codex"])
 	}
 }

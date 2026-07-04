@@ -1299,6 +1299,14 @@ type CatalogPolicy struct {
 	// runs. Nil/absent ⇒ true (opt-out semantics: default on, set false to
 	// disable). Replaces EVOLVE_MODELCATALOG_AUTOREFRESH=0.
 	AutoRefresh *bool `json:"auto_refresh,omitempty"`
+
+	// AllowedFamilies is a per-CLI model-family allow-list (e.g. agy:[gemini]).
+	// A CLI's live-queried candidate ids are filtered to these families BEFORE
+	// classification (modelquery.RefreshDeps threads this through FilterByFamily),
+	// so a cross-family id can never reach the classifier (D7: "agy must not have
+	// Claude models"). Nil/absent ⇒ no constraint — byte-identical to today for
+	// every CLI that does not opt in.
+	AllowedFamilies map[string][]string `json:"allowed_families,omitempty"`
 }
 
 // CatalogConfig returns the catalog configuration with defaults resolved.
@@ -1312,6 +1320,9 @@ func (p Policy) CatalogConfig() CatalogPolicy {
 	if p.Catalog.AutoRefresh != nil {
 		out.AutoRefresh = p.Catalog.AutoRefresh
 	}
+	// Pass AllowedFamilies through unchanged — nil stays nil ("no constraint");
+	// never default to an empty map (callers/tests distinguish nil from empty).
+	out.AllowedFamilies = p.Catalog.AllowedFamilies
 	return out
 }
 

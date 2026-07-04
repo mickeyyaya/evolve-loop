@@ -173,6 +173,85 @@ func TestRefreshDefaultClockWhenNowNil(t *testing.T) {
 	}
 }
 
+// recordingClassifier wraps fakeClassifier and records the exact id slice it
+// was invoked with per CLI, so a test can assert on what actually reached
+// classification (the judgment step) rather than inferring it indirectly from
+// the resulting catalog.
+type recordingClassifier struct {
+	fakeClassifier
+	received map[string][]string
+}
+
+func (r *recordingClassifier) Classify(ctx context.Context, cli string, ids []string) (map[string]string, error) {
+	if r.received == nil {
+		r.received = map[string][]string{}
+	}
+	r.received[cli] = append([]string(nil), ids...)
+	return r.fakeClassifier.Classify(ctx, cli, ids)
+}
+
+// TestRefreshFamilyFilterAppliedBeforeClassify pins the D7 (FAMILY CONSTRAINT)
+// production wiring of latest-model-preference: RefreshDeps.AllowedFamilies
+// must filter each CLI's live-queried id list down to its allowed families
+// BEFORE the ids reach the Classifier — the exact live-evidence incident (agy
+// classifier flapped an identical list Sonnet-4.6->GPT-OSS-120B because
+// cross-family ids reached classification at all). A no-op wiring (Classify
+// still sees the raw list) fails this assertion even if the final catalog
+// happens to look right by luck. RED today: RefreshDeps has no
+// AllowedFamilies field (compile failure).
+func TestRefreshFamilyFilterAppliedBeforeClassify(t *testing.T) {
+	rc := &recordingClassifier{}
+	deps := RefreshDeps{
+		CLIs:            []string{"agy"},
+		Lister:          fakeLister{ids: map[string][]string{"agy": {"claude-opus-4-8", "gemini-x", "gpt-oss-120b"}}},
+		Classifier:      rc,
+		AllowedFamilies: map[string][]string{"agy": {"gemini"}},
+		Now:             fixedNow,
+	}
+	if _, err := Refresh(context.Background(), deps); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	want := []string{"gemini-x"}
+	if got := rc.received["agy"]; !equalStrings(got, want) {
+		t.Errorf("classifier received ids=%v, want %v (claude/gpt ids must be filtered out before classification)", got, want)
+	}
+}
+
+// TestRefreshNoAllowedFamiliesIsPassthrough is the regression pin for D7's
+// wiring: a CLI with no AllowedFamilies entry (the default — every cycle
+// before this feature, and every CLI that opts out) must be byte-identical to
+// today — every listed id reaches the classifier unfiltered. RED today:
+// RefreshDeps has no AllowedFamilies field (compile failure).
+func TestRefreshNoAllowedFamiliesIsPassthrough(t *testing.T) {
+	rc := &recordingClassifier{}
+	deps := RefreshDeps{
+		CLIs:       []string{"codex"},
+		Lister:     fakeLister{ids: map[string][]string{"codex": {"gpt-5.4-mini", "gpt-5.4", "gpt-5.5"}}},
+		Classifier: rc,
+		Now:        fixedNow,
+		// AllowedFamilies intentionally left nil.
+	}
+	if _, err := Refresh(context.Background(), deps); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	want := []string{"gpt-5.4-mini", "gpt-5.4", "gpt-5.5"}
+	if got := rc.received["codex"]; !equalStrings(got, want) {
+		t.Errorf("classifier received ids=%v, want %v unfiltered (no AllowedFamilies configured for codex)", got, want)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestRouterRoutes(t *testing.T) {
 	ollama := fakeLister{ids: map[string][]string{"ollama": {"phi4"}}}
 	deflt := fakeLister{ids: map[string][]string{"codex": {"gpt-5.5"}}}

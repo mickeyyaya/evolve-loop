@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
@@ -148,13 +149,22 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, workspace string, 
 		Default: modelquery.RecipeLister{Capturer: capturer},
 	}
 	dispatcher := bridgePromptDispatcher{workspace: workspace, projectRoot: workspace}
+	// D7 family gate: read policy.json catalog.allowed_families so each CLI's
+	// live candidates are family-filtered before classification. Load is
+	// nil-safe — an absent/malformed policy yields a nil map (no constraint),
+	// byte-identical to today for every deployment that hasn't opted in.
+	var allowedFamilies map[string][]string
+	if pol, perr := policy.Load(filepath.Join(workspace, ".evolve", "policy.json")); perr == nil {
+		allowedFamilies = pol.CatalogConfig().AllowedFamilies
+	}
 	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
-		CLIs:       readyCLIs,
-		Lister:     router,
-		Classifier: modelquery.CLIClassifier{CLI: classifierCLI, Dispatcher: dispatcher},
-		Fallback:   fallback,
-		Now:        time.Now,
-		Log:        log,
+		CLIs:            readyCLIs,
+		Lister:          router,
+		Classifier:      modelquery.CLIClassifier{CLI: classifierCLI, Dispatcher: dispatcher},
+		Fallback:        fallback,
+		AllowedFamilies: allowedFamilies,
+		Now:             time.Now,
+		Log:             log,
 	})
 }
 

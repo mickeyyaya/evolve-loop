@@ -50,6 +50,12 @@ type RefreshDeps struct {
 	// path fails for that CLI. Optional; a CLI with neither live data nor a
 	// fallback is skipped.
 	Fallback map[string]map[string]string
+	// AllowedFamilies is a per-CLI model-family allow-list (from policy.json
+	// catalog.allowed_families). A CLI's live-queried ids are filtered to its
+	// allowed families (via FilterByFamily) BEFORE reaching Classify, so a
+	// cross-family id never reaches classification. A CLI with no entry (nil
+	// slice) is unconstrained — every listed id passes through unfiltered.
+	AllowedFamilies map[string][]string
 	// Now stamps the catalog's FetchedAt; defaults to time.Now.
 	Now func() time.Time
 	// Log is the WARN sink; defaults to io.Discard.
@@ -110,6 +116,16 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer)
 	if len(ids) == 0 {
 		fmt.Fprintf(log, "[modelquery] WARN %s: CLI offered no models\n", cli)
 		return nil, nil
+	}
+	// Family gate: restrict candidates to this CLI's allowed families BEFORE
+	// classification (D7). A nil/absent allow-list is "no constraint" and
+	// FilterByFamily returns ids unchanged, preserving today's behavior exactly.
+	if allowed := deps.AllowedFamilies[cli]; len(allowed) > 0 {
+		ids = FilterByFamily(ids, allowed...)
+		if len(ids) == 0 {
+			fmt.Fprintf(log, "[modelquery] WARN %s: no models in allowed families %v; skipping\n", cli, allowed)
+			return nil, nil
+		}
 	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
 	if err != nil {
