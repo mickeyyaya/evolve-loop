@@ -78,7 +78,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	sup := &fleet.Supervisor{
 		Concurrency: concurrency,
-		Launch:      execCycleLaunch(binPath, simulate, "", stdout, stderr),
+		Launch:      execCycleLaunch(binPath, simulate, "", goalHash, stdout, stderr),
 	}
 	if err := sup.Validate(); err != nil {
 		fmt.Fprintf(stderr, "evolve fleet: %v\n", err)
@@ -161,14 +161,27 @@ func cycleRunArgs(goalHash, outputContract string, simulate bool, projectRoot st
 	return args
 }
 
-func execCycleLaunch(binPath string, simulate bool, projectRoot string, stdout, stderr io.Writer) fleet.LaunchFn {
+// laneGoalHash resolves the goal-hash for a lane's `evolve cycle run`: the
+// spec's own GoalHash when a planner set it, else the wave/campaign-level
+// goalHash the launcher was built with. Fixes the fleet-lane defect where the
+// wave planners (PlanFromTriage/PlanCycles) build scoped specs WITHOUT a
+// GoalHash, so every lane died on "evolve cycle run: --goal-hash is required"
+// and the wave fell back to sequential.
+func laneGoalHash(specGoalHash, fallback string) string {
+	if specGoalHash != "" {
+		return specGoalHash
+	}
+	return fallback
+}
+
+func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash string, stdout, stderr io.Writer) fleet.LaunchFn {
 	var logMu sync.Mutex // serializes interleaved output across concurrent cycles
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
 		prefix := "[" + cycleLogTag(spec) + "] "
 		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
 		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
-		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(spec.GoalHash, spec.OutputContract, simulate, projectRoot)...)
+		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew

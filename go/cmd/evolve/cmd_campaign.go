@@ -192,7 +192,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	supervisor := &fleet.Supervisor{
 		Concurrency:  *concurrency,
 		CycleTimeout: *cycleTimeout,
-		Launch:       campaignLaunchFactory(binPath, *simulate, *projectRoot, stdout, stderr),
+		Launch:       campaignLaunchFactory(binPath, *simulate, *projectRoot, goalHash, stdout, stderr),
 	}
 	runner := func(rctx context.Context, wave []fleet.CycleSpec) []fleet.Result {
 		fmt.Fprintf(stderr, "[campaign] running wave: %d cycle(s)\n", len(wave))

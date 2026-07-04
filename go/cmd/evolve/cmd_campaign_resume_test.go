@@ -51,7 +51,7 @@ func TestCampaignRun_AutoResumeSkipsCompletedWaves(t *testing.T) {
 	var mu sync.Mutex
 	var launched [][]string
 	orig := campaignLaunchFactory
-	campaignLaunchFactory = func(_ string, _ bool, _ string, _, _ io.Writer) fleet.LaunchFn {
+	campaignLaunchFactory = func(_ string, _ bool, _ string, _ string, _, _ io.Writer) fleet.LaunchFn {
 		return func(_ context.Context, spec fleet.CycleSpec) (int, error) {
 			mu.Lock()
 			launched = append(launched, spec.Scope)
