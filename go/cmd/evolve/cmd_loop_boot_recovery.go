@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
 // cmd_loop_boot_recovery.go — WIRING of the boot-time recovery primitives into
@@ -27,12 +30,33 @@ import (
 type bootRecoveryResult struct {
 	Quarantined bool // leaked tracked-source dirt was stashed
 	Sealed      bool // a stranded dead-owner marker was auto-sealed
-	SHAMismatch bool // the ship binary's SHA != expected_ship_sha
+	SHAMismatch bool // the ship binary's SHA != expected_ship_sha (still unhealed)
+	Healed      bool // a provenance-verified SHA mismatch was auto-repinned at boot
 }
 
 // bootRecoverFn is the boot-recovery seam runLoop calls before the readiness
 // gate. Overridable in tests (spy the call); production = defaultBootRecovery.
 var bootRecoverFn = defaultBootRecovery
+
+// shipRepinProvenanceFn resolves the running binary's build-commit and the
+// provenance predicate used to authorize a boot-time auto-repin. A package-var
+// seam (mirrors bootRecoverFn) so boot recovery stays git-free — hence
+// deterministic — under test. Production = defaultShipRepinProvenance.
+var shipRepinProvenanceFn = defaultShipRepinProvenance
+
+// defaultShipRepinProvenance mirrors runResetSHA (cmd_resetsha.go): the running
+// binary's embedded build-commit, plus a closure asserting that commit is an
+// ancestor of HEAD (`git merge-base --is-ancestor`). An empty commit is
+// unverifiable (returns false), so a stripped/tampered binary can never
+// self-authorize a re-pin.
+func defaultShipRepinProvenance(projectRoot string) (string, phaseintegrity.ProvenanceVerified) {
+	return version.Commit(), func(c string) bool {
+		if c == "" {
+			return false
+		}
+		return exec.Command("git", "-C", projectRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
+	}
+}
 
 // defaultBootRecovery self-heals a dirty/stranded/tampered tree at boot so the
 // first cycle's tree-diff guard runs against a clean baseline. Every step is
@@ -43,8 +67,18 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 	// 1. Detect a ship-binary SHA mismatch FIRST — before quarantine, which would
 	//    otherwise stash an untracked ship binary out from under the SHA read (the
 	//    498/500/502 SELF_SHA_TAMPERED cascade, caught at boot).
-	if detectShipSHAMismatch(cfg, stderr) {
+	if mismatch, actual := detectShipSHAMismatch(cfg, stderr); mismatch {
 		res.SHAMismatch = true
+		// Auto-heal the 508-513 cascade: a legitimately-rebuilt binary (its
+		// build-commit is an ancestor of HEAD — provenance-verified) is re-pinned
+		// in place, the unattended-boot successor to `evolve reset-sha`, so the
+		// ship gate stops falsely blocking every cycle. NEVER operatorAuthorized
+		// from an unattended boot: an unverifiable binary (possible tampering) is
+		// refused and stays flagged (res.SHAMismatch) so the gate still blocks.
+		if attemptBootRepin(cfg, actual, stderr) {
+			res.Healed = true
+			res.SHAMismatch = false // re-pinned in place; the ship gate now passes
+		}
 	}
 
 	// 2. Auto-seal a stranded cycle-state marker whose owner PID is dead, so a
@@ -78,30 +112,50 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 }
 
 // detectShipSHAMismatch compares the on-disk ship binary against
-// state.json:expected_ship_sha. Absent state / binary / expectation ⇒ nothing to
-// check (false, never a panic).
-func detectShipSHAMismatch(cfg loopConfig, stderr io.Writer) bool {
+// state.json:expected_ship_sha, returning (mismatch, on-disk-sha). Absent state
+// / binary / expectation ⇒ nothing to check (false, "", never a panic). It
+// short-circuits before touching the binary when no pin exists, so a fresh
+// project reaches neither the hash nor the downstream provenance/git path.
+func detectShipSHAMismatch(cfg loopConfig, stderr io.Writer) (bool, string) {
 	raw, err := os.ReadFile(filepath.Join(cfg.EvolveDir, "state.json"))
 	if err != nil {
-		return false
+		return false, ""
 	}
 	var st map[string]any
 	if json.Unmarshal(raw, &st) != nil {
-		return false
+		return false, ""
 	}
 	expected, _ := st["expected_ship_sha"].(string)
 	if expected == "" {
-		return false
+		return false, ""
 	}
 	binPath := filepath.Join(cfg.ProjectRoot, "go", "bin", "evolve")
 	mismatch, actual, err := core.ShipSHAMismatch(binPath, expected)
 	if err != nil {
-		return false // no binary to compare ⇒ not a mismatch signal
+		return false, "" // no binary to compare ⇒ not a mismatch signal
 	}
 	if mismatch {
-		fmt.Fprintf(stderr, "[loop] boot-recovery: ship binary SHA mismatch (expected %s, on-disk %s) — rebuild + reset-sha before shipping\n", expected, actual)
+		fmt.Fprintf(stderr, "[loop] boot-recovery: ship binary SHA mismatch (expected %s, on-disk %s) — attempting provenance-gated auto-repin\n", expected, actual)
 	}
-	return mismatch
+	return mismatch, actual
+}
+
+// attemptBootRepin re-pins expected_ship_sha to the on-disk ship binary via the
+// provenance-gated phaseintegrity.RepinShipSHA — the exact primitive `evolve
+// reset-sha` uses. operatorAuthorized is always false here: an unattended boot
+// must never let a tampered binary bypass the anti-tamper gate, so the re-pin
+// fires only on verified provenance. Returns true iff the re-pin fired. Fail-open:
+// a refusal/error WARNs and returns false, leaving the mismatch flagged.
+func attemptBootRepin(cfg loopConfig, actualSHA string, stderr io.Writer) bool {
+	commit, prov := shipRepinProvenanceFn(cfg.ProjectRoot)
+	statePath := filepath.Join(cfg.EvolveDir, "state.json")
+	res, err := phaseintegrity.RepinShipSHA(statePath, actualSHA, commit, "", prov, false)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] boot-recovery: ship-SHA auto-repin declined (%v) — rebuild from committed source then `evolve reset-sha` to authorize, or investigate tampering\n", err)
+		return false
+	}
+	fmt.Fprintf(stderr, "[loop] boot-recovery: auto-repinned expected_ship_sha %.12s -> %.12s (authorized: %s) — legitimate rebuild self-healed at boot\n", res.OldSHA, res.NewSHA, res.Authorized)
+	return true
 }
 
 // pidAlive reports whether a process is alive via kill -0 (signal 0) semantics.

@@ -38,7 +38,12 @@ func classifyDirtyPaths(paths []string) (quarantine, ignored []string) {
 // churn is normal cycle activity, not a leak to quarantine.
 func isLoopManagedPath(p string) bool {
 	p = strings.TrimPrefix(p, "./")
-	return strings.HasPrefix(p, ".evolve/") || strings.HasPrefix(p, "knowledge-base/")
+	// The ship binary is verified (ShipSHAMismatch) and re-pinned (boot auto-repin)
+	// within the same boot-recovery pass; quarantining it here would stash the
+	// rebuilt binary away and revert on-disk to the old committed one, re-opening
+	// the very SHA mismatch the repin just healed. It is loop-managed, never dirt.
+	return p == "go/bin/evolve" ||
+		strings.HasPrefix(p, ".evolve/") || strings.HasPrefix(p, "knowledge-base/")
 }
 
 // QuarantineDirtyTree stashes leaked tracked-source dirt so `git status
@@ -56,7 +61,13 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 	if len(quarantine) == 0 {
 		return false, nil
 	}
+	// Defend the ship binary at the stash chokepoint: when a quarantine path is a
+	// collapsed untracked parent dir (e.g. git reports "go/" rather than the file),
+	// an exact-path classify exclusion can't catch it, so exclude go/bin/evolve
+	// from the stash pathspec too — boot recovery re-pins it in this same pass and
+	// must never stash the rebuilt binary away.
 	args := append([]string{"stash", "push", "--include-untracked", "-m", label, "--"}, quarantine...)
+	args = append(args, ":(exclude)go/bin/evolve")
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {

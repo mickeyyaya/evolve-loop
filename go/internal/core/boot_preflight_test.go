@@ -57,6 +57,20 @@ func TestClassifyDirtyPaths_IgnoresLoopManaged(t *testing.T) {
 	}
 }
 
+// AC2b (regression, cycle 514): the ship binary go/bin/evolve is verified and
+// re-pinned by the SAME boot-recovery pass, so quarantine must NEVER stash it —
+// stashing a rebuilt binary would revert on-disk to the old committed one and
+// re-open the SELF_SHA mismatch the auto-repin just healed (the 508-513 cascade).
+func TestClassifyDirtyPaths_ExcludesShipBinary(t *testing.T) {
+	quarantine, ignored := classifyDirtyPaths([]string{"go/bin/evolve"})
+	if len(quarantine) != 0 {
+		t.Fatalf("the ship binary go/bin/evolve must NOT be quarantined (boot re-pins it in the same pass); got %v", quarantine)
+	}
+	if len(ignored) != 1 || ignored[0] != "go/bin/evolve" {
+		t.Errorf("go/bin/evolve must be reported as ignored/loop-managed; got %v", ignored)
+	}
+}
+
 // AC3 (clean case): a clean tree yields no quarantine action and no noise — the
 // preflight must not misfire on the common case.
 func TestClassifyDirtyPaths_CleanTreeNoAction(t *testing.T) {
