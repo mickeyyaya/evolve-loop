@@ -27,29 +27,6 @@ func writeInboxItem(t *testing.T, inbox, name, id string, weight float64) {
 	}
 }
 
-func TestTopInboxTaskIDs_HighestWeightFirst_SkipsMalformedAndEmptyID(t *testing.T) {
-	dir := t.TempDir()
-	inbox := filepath.Join(dir, "inbox")
-	if err := os.MkdirAll(inbox, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeInboxItem(t, inbox, "a.json", "low", 0.30)
-	writeInboxItem(t, inbox, "b.json", "high", 0.98)
-	writeInboxItem(t, inbox, "c.json", "mid", 0.70)
-	// Malformed JSON and an empty-id item (even at higher weight) must be skipped.
-	if err := os.WriteFile(filepath.Join(inbox, "bad.json"), []byte("{not json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(inbox, "noid.json"), []byte(`{"weight":0.99}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	got := topInboxTaskIDs(dir, 2)
-	if len(got) != 2 || got[0] != "high" || got[1] != "mid" {
-		t.Errorf("topInboxTaskIDs = %v, want [high mid] (highest weight first; malformed + empty-id skipped)", got)
-	}
-}
-
 func TestSeedWavePlanFromInbox_SynthesizesTopNDecision(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")

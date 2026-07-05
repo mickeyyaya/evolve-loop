@@ -189,6 +189,24 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		} else if pr.Removed > 0 {
 			fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired carryoverTodos (%d→%d)\n", pr.Removed, pr.Before, pr.After)
 		}
+		// One-time backfill: stamp a conservative TTL on legacy (untimestamped)
+		// carryoverTodos so the prune above can converge them instead of keeping
+		// them forever (the cycle-360 manual-wipe failure mode). Idempotent —
+		// already-stamped entries are skipped. Ordered prune → backfill.
+		if stamped, err := failurelog.BackfillLegacyCarryoverExpiry(statePath, failurelog.DefaultCarryoverBackfillTTL, time.Now().UTC()); err != nil {
+			fmt.Fprintf(stderr, "[loop] auto-prune: carryover backfill: %v\n", err)
+		} else if stamped > 0 {
+			fmt.Fprintf(stderr, "[loop] auto-prune: backfilled expiresAt on %d legacy carryoverTodos\n", stamped)
+		}
+		// Bump cycles_unpicked on every carryover todo that survived to this boot
+		// so the advisor's staleness signal is real. Ordered LAST (prune →
+		// backfill → increment) so a todo removed this boot isn't counted, and a
+		// fresh todo recordFailureLearning writes later this cycle starts at 0.
+		if inc, err := failurelog.IncrementCarryoverUnpicked(statePath); err != nil {
+			fmt.Fprintf(stderr, "[loop] auto-prune: carryover unpicked: %v\n", err)
+		} else if inc > 0 {
+			fmt.Fprintf(stderr, "[loop] auto-prune: incremented cycles_unpicked on %d carryoverTodos\n", inc)
+		}
 	}
 
 	// Gap #5: --reset operator unblock. Prunes the three classifications

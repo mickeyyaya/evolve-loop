@@ -13,7 +13,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
@@ -236,50 +235,18 @@ func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 	if count < 2 {
 		count = 2
 	}
-	ids := topInboxTaskIDs(evolveDir, count)
-	if len(ids) < 2 {
-		return nil, fmt.Errorf("inbox seed: %d todo(s) — need >= 2 inbox todos to fill a wave", len(ids))
+	// SelectWaveSeedTopN packs the inbox backlog into up to `count` mutually
+	// file-disjoint lane reps (highest weight first) — replacing the raw
+	// weight-sorted top-N, which could seed two lanes that collide on a shared
+	// file. The seam is single-sourced in triagecap (also the SelectFleetWidthTopN
+	// home) so this caller stays a thin adapter to the top_n decision shape.
+	reps := triagecap.SelectWaveSeedTopN(evolveDir, count)
+	if len(reps) < 2 {
+		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(reps))
 	}
-	topN := make([]map[string]string, 0, len(ids))
-	for _, id := range ids {
-		topN = append(topN, map[string]string{"id": id})
+	topN := make([]map[string]string, 0, len(reps))
+	for _, r := range reps {
+		topN = append(topN, map[string]string{"id": r.ID})
 	}
 	return json.Marshal(map[string]any{"top_n": topN})
-}
-
-// topInboxTaskIDs returns up to `count` inbox todo IDs, highest weight first
-// (filename tie-break for determinism). Scans <evolveDir>/inbox/*.json only (not
-// the consumed/ or processing/ subdirs); skips unreadable/malformed files and
-// empty IDs. Best-effort: a bad inbox never breaks dispatch.
-func topInboxTaskIDs(evolveDir string, count int) []string {
-	entries, _ := filepath.Glob(filepath.Join(evolveDir, "inbox", "*.json"))
-	sort.Strings(entries)
-	type item struct {
-		id     string
-		weight float64
-	}
-	items := make([]item, 0, len(entries))
-	for _, p := range entries {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		var doc struct {
-			ID     string  `json:"id"`
-			Weight float64 `json:"weight"`
-		}
-		if json.Unmarshal(raw, &doc) != nil || doc.ID == "" {
-			continue
-		}
-		items = append(items, item{id: doc.ID, weight: doc.Weight})
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].weight > items[j].weight })
-	if count > len(items) {
-		count = len(items)
-	}
-	ids := make([]string, count)
-	for i, it := range items[:count] {
-		ids[i] = it.id
-	}
-	return ids
 }
