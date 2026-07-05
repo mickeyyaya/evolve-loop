@@ -58,7 +58,7 @@ func capManifest(base string) string {
 // pipeline: profile model_tier_default, profile model_tier_envelope, the
 // model_tier_map keys in each manifest, and resolvellm sentinel defaults.
 // One source of truth, no cross-pollination.
-var abstractTiers = []string{"fast", "balanced", "deep"}
+var abstractTiers = []string{"fast", "balanced", "deep", "top"}
 
 // familyDriverManifest maps a base CLI family to the bridge manifest that
 // carries its model_tier_map (the interactive -tmux drivers are the multi-
@@ -75,7 +75,7 @@ func familyDriverManifest(base string) string {
 	return base
 }
 
-// tierModelsFor resolves the abstract {fast,balanced,deep} tiers → this CLI's
+// tierModelsFor resolves the abstract {fast,balanced,deep,top} tiers → this CLI's
 // NATIVE model identifier via the bridge manifest's model_tier_map (the
 // single source of truth — e.g. agy deep→Gemini 3.1 Pro (High), codex deep→
 // gpt-5.5, claude balanced→sonnet). When the manifest declares no entry

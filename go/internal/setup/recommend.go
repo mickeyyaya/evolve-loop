@@ -38,7 +38,7 @@ type RecommendReport struct {
 }
 
 // canonTier maps any tier spelling (canonical, legacy alias, or native model id)
-// to the canonical fast|balanced|deep, or "" when unclassifiable.
+// to the canonical fast|balanced|deep|top, or "" when unclassifiable.
 func canonTier(s string) string {
 	return tierFromRank(policy.TierRank(s))
 }
@@ -51,6 +51,8 @@ func tierFromRank(r int) string {
 		return "balanced"
 	case 3:
 		return "deep"
+	case 4:
+		return "top"
 	}
 	return ""
 }
@@ -157,7 +159,7 @@ func biasTier(bias, defaultTier string, env Envelope) string {
 		return tierFromRank(r)
 	case "up":
 		r := policy.TierRank(base)
-		if r < 3 {
+		if r < 4 {
 			r++
 		}
 		return tierFromRank(r)
