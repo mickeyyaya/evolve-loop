@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
@@ -100,8 +101,13 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 	// 3. Quarantine leaked tracked-source dirt (non-destructive stash) LAST so the
 	//    tree-diff guard doesn't attribute pre-existing dirt to this batch's first
 	//    phase and wedge the loop. Runs after the SHA read so it never stashes the
-	//    binary being verified.
-	if stashed, err := core.QuarantineDirtyTree(ctx, cfg.ProjectRoot, "boot-quarantine"); err != nil {
+	//    binary being verified. The label keeps the recognisable "boot-quarantine"
+	//    prefix but carries a UTC RFC3339 timestamp so successive boot quarantines
+	//    stay individually identifiable/recoverable (an operator can tell which
+	//    stash came from which boot instead of every quarantine collapsing under one
+	//    ambiguous fixed name).
+	quarantineLabel := fmt.Sprintf("boot-quarantine-%s", time.Now().UTC().Format(time.RFC3339))
+	if stashed, err := core.QuarantineDirtyTree(ctx, cfg.ProjectRoot, quarantineLabel); err != nil {
 		fmt.Fprintf(stderr, "[loop] boot-recovery: quarantine: %v\n", err)
 	} else if stashed {
 		res.Quarantined = true
