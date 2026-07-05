@@ -19,10 +19,18 @@
 //
 //  1. A minted phase that writes a NEW source file into the MAIN tree (the
 //     exact cycle-270 shape: untracked, so the porcelain — not diff-HEAD —
-//     path must catch it) aborts the cycle with the leaked path named.
+//     path must catch it) is AUTO-RECOVERED: leak-recovery (cycle-528/529)
+//     relocates the leaked file into the phase's real worktree, stages it, and
+//     restores the main tree clean, so the cycle completes and ships with the
+//     work still visible to the auditor's `git diff HEAD`. This preserves
+//     cycle-270's true guarantee — leaked work must never be invisible to audit
+//     — via the newer non-aborting mechanism (the file lands in the worktree,
+//     not silently in main). Recovery needs a REAL git worktree to `git add`
+//     into: the earlier fake non-git t.TempDir() made that add fail, aborting
+//     the cycle via the wrong path (cycle-535 CI-red root cause).
 //  2. The same minted phase writing inside its provisioned worktree is clean:
 //     the cycle continues to ship. The discriminator that keeps the guard
-//     honest — isolation is the contract, not "minted phases always abort".
+//     honest — isolation is the contract, not "minted phases always recover".
 package core
 
 import (
@@ -97,11 +105,41 @@ func initInsertedLeakRepo(t *testing.T) string {
 	return root
 }
 
+// realLeakWorktree is a WorktreeProvisioner that provisions a REAL `git worktree
+// add` off the cycle's projectRoot, OUTSIDE the repo (so worktree writes can
+// never appear in the main porcelain — the Test 2 discriminator's invariant).
+// It replaces the former fakeWorktree{path: t.TempDir()}: that fake was a plain
+// non-git dir, so recoverBuildLeak's `git add -f` of a relocated leak failed
+// with "not a git repository" (rc=128), recovery reported failure, and the
+// cycle aborted via the "recovery failed" path instead of auto-healing — the
+// cycle-535 CI-red root cause. Cleanup is a deliberate no-op so a shipped
+// cycle's worktree survives for post-run `git diff HEAD` inspection; t.TempDir
+// handles the filesystem teardown. Mirrors buildleak_recover_test.go's
+// realWorktree() production topology.
+type realLeakWorktree struct {
+	t    *testing.T
+	path string
+}
+
+func (w *realLeakWorktree) Create(projectRoot string, _ int) (string, error) {
+	if w.path != "" {
+		return w.path, nil // idempotent: reuse the cycle's worktree
+	}
+	wt := filepath.Join(w.t.TempDir(), "wt")
+	gitInRepo(w.t, projectRoot, "worktree", "add", "--detach", "-q", wt, "HEAD")
+	w.path = wt
+	return wt, nil
+}
+
+func (w *realLeakWorktree) Cleanup(_, _ string) error { return nil }
+
 // insertedLeakOrchestrator wires the full advisory-mint path: routing at
 // Advisory+DynamicLLM, a fixedPlanner serving the parsed cycle-270-shaped
-// plan, and the leakMinter as registrar. The worktree is a real directory
-// OUTSIDE the repo so worktree writes can never appear in the main porcelain.
-func insertedLeakOrchestrator(t *testing.T, planJSON string, onRun func(PhaseRequest)) (*Orchestrator, *fakeWorktree) {
+// plan, and the leakMinter as registrar. It provisions a REAL git worktree off
+// the CycleRequest.ProjectRoot (via realLeakWorktree) so recoverBuildLeak has a
+// genuine worktree to relocate + stage a leaked path into. The returned
+// provisioner's .path is populated once the cycle provisions the worktree.
+func insertedLeakOrchestrator(t *testing.T, planJSON string, onRun func(PhaseRequest)) (*Orchestrator, *realLeakWorktree) {
 	t.Helper()
 	plan, err := parsePhasePlan(planJSON)
 	if err != nil {
@@ -111,7 +149,7 @@ func insertedLeakOrchestrator(t *testing.T, planJSON string, onRun func(PhaseReq
 	cfg.Mode = config.ModeDynamicLLM
 	cfg.Order = []string{"scout", "triage", "tdd", "build-planner", "build", "audit", "ship"}
 
-	wt := &fakeWorktree{path: t.TempDir()}
+	wt := &realLeakWorktree{t: t}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
 		WithRouting(cfg, router.StaticPreset{}),
 		WithPlanner(&fixedPlanner{plan: plan}),
@@ -120,10 +158,17 @@ func insertedLeakOrchestrator(t *testing.T, planJSON string, onRun func(PhaseReq
 	return o, wt
 }
 
-// TestInsertedPhaseMainTreeLeakAborts — inbox acceptance #1: an advisor-
-// inserted (minted) phase writing outside its worktree FAILs the cycle at the
-// phase boundary with the leaked path named. The cycle-270 replay.
-func TestInsertedPhaseMainTreeLeakAborts(t *testing.T) {
+// TestInsertedPhaseMainTreeLeakRecovers — inbox acceptance #1, on the newer
+// leak-recovery contract (cycle-528/529): an advisor-inserted (minted) phase
+// that leaks a NEW untracked source file into the MAIN tree is AUTO-RECOVERED
+// at the phase boundary — recoverBuildLeak relocates the file into the phase's
+// real worktree, stages it, and restores the main tree clean — so the cycle
+// completes and ships with the work still visible to the auditor's
+// `git diff HEAD`. This preserves cycle-270's guarantee (leaked work must never
+// be invisible to audit) via the non-aborting mechanism. Renamed from
+// ...Aborts: the guard no longer aborts this shape, it heals it, and a test
+// named "Aborts" asserting "ships" would be a maintenance landmine.
+func TestInsertedPhaseMainTreeLeakRecovers(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -132,7 +177,7 @@ func TestInsertedPhaseMainTreeLeakAborts(t *testing.T) {
 	// goroutine inside RunCycle (no per-phase goroutine), so there is no race.
 	// If the dispatch loop ever goes concurrent, -race will surface this.
 	mintRan := false
-	o, _ := insertedLeakOrchestrator(t, insertedLeakPlanJSON, func(req PhaseRequest) {
+	o, wt := insertedLeakOrchestrator(t, insertedLeakPlanJSON, func(req PhaseRequest) {
 		mintRan = true
 		// The leak: a new source file in the MAIN tree, not the worktree.
 		// Fatalf (not Errorf): a half-executed leak setup must abort the
@@ -154,14 +199,33 @@ func TestInsertedPhaseMainTreeLeakAborts(t *testing.T) {
 	if !mintRan {
 		t.Fatalf("precondition: minted phase never dispatched (phases=%v) — the replay did not reach the seam under test", res.PhasesRun)
 	}
-	if err == nil {
-		t.Fatalf("RED (cycle-270): inserted phase wrote %s into the MAIN tree and the cycle completed as clean (phases=%v) — the tree-diff guard must abort at the phase boundary", insertedLeakRelPath, res.PhasesRun)
+	// Auto-heal, not abort: the leaked untracked file is relocated into the
+	// worktree and the cycle runs to completion.
+	if err != nil {
+		t.Fatalf("leak-recovery must auto-heal the main-tree leak and let the cycle complete; got abort: %v", err)
 	}
-	if !strings.Contains(err.Error(), "tree-diff") {
-		t.Errorf("abort must come from the tree-diff guard; got: %v", err)
+	if !slices.Contains(res.PhasesRun, PhaseShip) {
+		t.Errorf("ship never ran — cycle did not complete after recovery (phases=%v)", res.PhasesRun)
 	}
-	if !strings.Contains(err.Error(), insertedLeakRelPath) {
-		t.Errorf("abort must NAME the leaked path %s; got: %v", insertedLeakRelPath, err)
+	// The leak is no longer in the main tree. Assert the SPECIFIC leaked path is
+	// gone (both on disk and to git) — not a blanket "porcelain empty", since a
+	// full RunCycle legitimately writes .evolve/runs/ + knowledge-base/cycles/
+	// runtime residue into the main tree (isLegitimateMainTreePath state).
+	if _, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(insertedLeakRelPath))); !os.IsNotExist(statErr) {
+		t.Errorf("leaked file must be removed from the main tree; stat err=%v", statErr)
+	}
+	if st := gitInRepo(t, root, "status", "--porcelain", "-uall"); strings.Contains(st, insertedLeakRelPath) {
+		t.Errorf("leaked path %s must not remain in the main tree porcelain; got:\n%s", insertedLeakRelPath, st)
+	}
+	// Relocated + staged into the worktree, so it is visible to audit's git diff HEAD.
+	if wt.path == "" {
+		t.Fatal("worktree was never provisioned — recovery had nowhere to relocate the leak")
+	}
+	if _, err := os.Stat(filepath.Join(wt.path, filepath.FromSlash(insertedLeakRelPath))); err != nil {
+		t.Errorf("leaked file must be relocated into the worktree: %v", err)
+	}
+	if diff := gitInRepo(t, wt.path, "diff", "HEAD", "--name-only"); !strings.Contains(diff, insertedLeakRelPath) {
+		t.Errorf("relocated file must be staged/visible to `git diff HEAD` in the worktree; got %q", diff)
 	}
 }
 
