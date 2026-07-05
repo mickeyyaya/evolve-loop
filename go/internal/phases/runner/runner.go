@@ -708,6 +708,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	return resp, nil
 }
 
+// cycleContextBoundary is the single canonical marker that separates a phase
+// prompt's cache-stable static prefix (persona/rules/agent-doc body) from its
+// per-cycle dynamic tail. BaseCycleContext writes it and StaticPrefix splits on
+// it — one literal, so the two can never drift apart and silently bust the
+// provider prompt-cache.
+const cycleContextBoundary = "\n\n## Cycle Context\n"
+
 // BaseCycleContext returns the canonical "## Cycle Context" block shared by
 // every phase that uses BaseRunner. It writes body, then the four mandatory
 // fields (cycle, goal_hash, project_root, workspace). Phase-specific extras
@@ -716,10 +723,33 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 func BaseCycleContext(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
+	b.WriteString(cycleContextBoundary)
 	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
 	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
 	return b.String()
+}
+
+// StaticPrefix returns the cache-stable prefix of a composed phase prompt:
+// everything before the canonical "## Cycle Context" boundary that
+// BaseCycleContext emits. Provider prompt-caches key on this byte-identical
+// prefix, so isolating it lets callers verify (and pin, via the cache-stable
+// audit) that no per-cycle dynamic value — cycle number, goal_hash, workspace —
+// drifts above the boundary. When the boundary is absent the whole prompt is
+// the prefix.
+func StaticPrefix(prompt string) string {
+	if i := strings.Index(prompt, cycleContextBoundary); i >= 0 {
+		return prompt[:i]
+	}
+	return prompt
+}
+
+// ComposePrompt exposes the phase's prompt assembly (Hooks.ComposePrompt) as a
+// public seam on BaseRunner so a caller can compose a prompt without launching
+// the bridge — used by the cache-stable-prefix audit to inspect the static
+// prefix for every BaseRunner-based phase. Run uses the same hook internally
+// (see below); this method adds reach, not behavior.
+func (b *BaseRunner) ComposePrompt(body string, req core.PhaseRequest) string {
+	return b.hooks.ComposePrompt(body, req)
 }

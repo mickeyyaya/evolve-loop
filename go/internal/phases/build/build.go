@@ -77,9 +77,13 @@ type Config struct {
 	CompactPrompts bool
 }
 
-// Phase wraps a core.PhaseRunner so callers still get a concrete
-// *Phase return from New (preserves the public API).
-type Phase struct{ core.PhaseRunner }
+// Phase is the build phase, a runner.BaseRunner specialized with the
+// build-specific hooks. It embeds *runner.BaseRunner concretely (like every
+// other BaseRunner-based phase) so BaseRunner's public seams — including
+// ComposePrompt, which the cache-stable-prefix audit relies on — promote onto
+// *Phase. (Previously it embedded the core.PhaseRunner interface, which hid
+// those seams behind the two-method contract.)
+type Phase struct{ *runner.BaseRunner }
 
 // New constructs the build phase from the BaseRunner.
 func New(c Config) *Phase {
@@ -91,7 +95,7 @@ func New(c Config) *Phase {
 		PhaseIO:        c.PhaseIO,
 		CompactPrompts: c.CompactPrompts,
 	})
-	return &Phase{PhaseRunner: base}
+	return &Phase{BaseRunner: base}
 }
 
 // init registers the build phase factory at package load time.
