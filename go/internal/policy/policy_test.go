@@ -86,6 +86,10 @@ func TestTierRank(t *testing.T) {
 		{"fast", 1},
 		{"balanced", 2},
 		{"deep", 3},
+		// cycle-516: "top" is the 4th canonical tier (modelcatalog.CanonicalTiers),
+		// must rank strictly above deep/opus (3) so an envelope ceiling of "deep"
+		// still excludes it.
+		{"top", 4},
 		// legacy aliases
 		{"haiku", 1},
 		{"sonnet", 2},
@@ -203,6 +207,20 @@ func TestValidatePin_UnclassifiableModelSkipsEnvelope(t *testing.T) {
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
 	if err := ValidatePin("audit", Pin{Model: "gpt-5.5"}, prof); err != nil {
 		t.Errorf("unclassifiable model must skip envelope check, got %v", err)
+	}
+}
+
+// TestValidatePin_TopTierOutsideDeepEnvelope pins the cycle-516 wiring
+// contract: once "top" ranks above "deep" (4 > 3), a profile whose ceiling is
+// still the pre-4-tier "deep" must keep rejecting a "top" pin. Before TierRank
+// learns "top", it classifies as rank 0 (unclassifiable) and
+// TestValidatePin_UnclassifiableModelSkipsEnvelope's own rule silently exempts
+// it from the envelope check — the vocabulary addition must not leave a
+// deep-ceilinged profile suddenly wide open to the frontier tier.
+func TestValidatePin_TopTierOutsideDeepEnvelope(t *testing.T) {
+	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
+	if err := ValidatePin("audit", Pin{Model: "top"}, prof); err == nil {
+		t.Error("top pin must be rejected when envelope max=deep")
 	}
 }
 

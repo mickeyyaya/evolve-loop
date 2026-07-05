@@ -240,26 +240,14 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	summary := failureLearningSummary(fl.Cycle, fl.Failed, fl.Err)
 	todoID := fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
-	if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
-		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
-			ID: todoID,
-			// The router prompt's own "## Carryover todos" section header already
-			// says these are prior-cycle failures to consider before retrying, so
-			// the summary (which carries cycle/phase/error-class) stands alone —
-			// no fixed boilerplate prefix repeated per todo.
-			Action:         summary,
-			Priority:       "P0",
-			FirstSeenCycle: fl.Cycle,
-			CyclesUnpicked: 0,
-		})
-	}
-	now := o.now().UTC().Format(time.RFC3339)
+	now := o.now().UTC()
+	nowTS := now.Format(time.RFC3339)
 	record := FailedRecord{
-		TS:             now,
+		TS:             nowTS,
 		Cycle:          fl.Cycle,
 		Verdict:        VerdictFAIL,
 		Classification: "cycle-mid-execution-fail",
-		RecordedAt:     now,
+		RecordedAt:     nowTS,
 		Summary:        summary,
 		Defects:        []string{summary},
 		Retrospected:   true,
@@ -275,6 +263,27 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		if len(structured.Defects) > 0 {
 			record.Defects = structured.Defects
 		}
+	}
+	// Stamp the TTL from the FINAL classification (state.go:87-91 / record.go
+	// contract): without this the field is never populated, so the loop-start
+	// failurelog.PruneExpiredCarryoverTodos pass keeps every entry forever and
+	// the array grows unboundedly. Compute once and share so the todo inherits
+	// the record's stamp rather than re-deriving it (single-sourced TTL logic).
+	record.ExpiresAt = failurelog.ComputeExpiresAt(
+		failurelog.NormalizeLegacy(record.Classification), now)
+	if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
+		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
+			ID: todoID,
+			// The router prompt's own "## Carryover todos" section header already
+			// says these are prior-cycle failures to consider before retrying, so
+			// the summary (which carries cycle/phase/error-class) stands alone —
+			// no fixed boilerplate prefix repeated per todo.
+			Action:         summary,
+			Priority:       "P0",
+			FirstSeenCycle: fl.Cycle,
+			CyclesUnpicked: 0,
+			ExpiresAt:      record.ExpiresAt,
+		})
 	}
 	fl.State.FailedAt = append(fl.State.FailedAt, record)
 	fl.State.LastCycleNumber = fl.Cycle

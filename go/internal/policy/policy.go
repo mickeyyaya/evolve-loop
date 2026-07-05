@@ -357,9 +357,11 @@ func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {
 
 // --- canonical tier/CLI vocabulary (mirror of setup.go; see package doc) ---
 
-// TierRank maps a canonical tier (fast/balanced/deep), a legacy alias
-// (haiku/sonnet/opus), or an exact model identifier to 1/2/3; 0 =
-// unclassifiable (the envelope check is skipped for rank 0). Exported so
+// TierRank maps a canonical tier (fast/balanced/deep/top), a legacy alias
+// (haiku/sonnet/opus), or an exact model identifier to 1/2/3/4; 0 =
+// unclassifiable (the envelope check is skipped for rank 0). "top" is the
+// frontier tier (modelcatalog.CanonicalTiers) and outranks deep/opus, so an
+// envelope ceiling of "deep" still excludes it. Exported so
 // callers that must REJECT (not exempt) an unclassifiable tier — e.g. the
 // phase registrar clamping a minted phase — can detect rank 0 themselves.
 func TierRank(s string) int {
@@ -370,6 +372,8 @@ func TierRank(s string) int {
 		return 2
 	case "deep", "opus":
 		return 3
+	case "top":
+		return 4
 	}
 	l := strings.ToLower(s)
 	switch {

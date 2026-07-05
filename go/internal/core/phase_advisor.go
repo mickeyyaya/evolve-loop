@@ -910,7 +910,9 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 }
 
 // sanitizeAdvisorTier confines the advisor's OWN emitted tier to the strict
-// canonical vocabulary (driver_agnostic_model_routing invariant): the advisor
+// canonical vocabulary — fast/balanced/deep/top, mirroring
+// modelcatalog.CanonicalTiers ("top" = the frontier tier) — enforcing the
+// driver_agnostic_model_routing invariant: the advisor
 // proposes an ABSTRACT tier, never a raw or legacy model alias. Unlike
 // policy.TierRank (which accepts "opus"/"sonnet"/"haiku" for an OPERATOR
 // pin), an advisor-emitted alias or garbage value is dropped outright rather
@@ -918,7 +920,7 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 // re-validating it. Empty stays empty (the common no-op case).
 func sanitizeAdvisorTier(tier string) string {
 	switch tier {
-	case "fast", "balanced", "deep":
+	case "fast", "balanced", "deep", "top":
 		return tier
 	default:
 		return ""

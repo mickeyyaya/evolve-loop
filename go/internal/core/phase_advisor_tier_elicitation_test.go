@@ -187,21 +187,27 @@ func TestParsePhasePlan_AbsentCLITierFieldsStayEmpty(t *testing.T) {
 	}
 }
 
-// TestSanitizeAdvisorTier_RejectsHighTopAndRawModel (T1 AC5, EDGE — tier
-// vocabulary confinement): an advisor response entry proposing "high", "top",
-// or a raw model name must never propagate past sanitizeAdvisorTier — only
-// fast/balanced/deep survive. Expected pre-existing GREEN: sanitizeAdvisorTier
-// (phase_advisor.go:857-864) already confines to the exact three literals;
-// this test locks that contract in as the T1 tier-confinement evidence so a
-// future change cannot silently widen the vocabulary.
-func TestSanitizeAdvisorTier_RejectsHighTopAndRawModel(t *testing.T) {
+// TestSanitizeAdvisorTier_RejectsHighAndRawModel (T1 AC5, EDGE — tier
+// vocabulary confinement): an advisor response entry proposing "high" or a
+// raw model name must never propagate past sanitizeAdvisorTier — only the
+// canonical tier vocabulary survives. Originally named
+// TestSanitizeAdvisorTier_RejectsHighTopAndRawModel and asserted "top" was
+// rejected too, back when fast/balanced/deep were the only three canonical
+// tiers (phase_advisor.go:857-864 era). cycle-516 (task
+// advisor-tier-vocab-add-top) intentionally widens the vocabulary to
+// fast/balanced/deep/top — modelcatalog.CanonicalTiers already treats "top"
+// as canonical — so "top" moves to the ACCEPTED table in
+// TestSanitizeAdvisorTier (phase_advisor_tier_test.go). This test keeps
+// confining every OTHER non-canonical string, so a future change still
+// can't silently widen the vocabulary further than intended.
+func TestSanitizeAdvisorTier_RejectsHighAndRawModel(t *testing.T) {
 	t.Parallel()
-	for _, bad := range []string{"high", "top", "claude-fable-5", "opus", "HIGH", ""} {
+	for _, bad := range []string{"high", "claude-fable-5", "opus", "HIGH", ""} {
 		if got := sanitizeAdvisorTier(bad); got != "" {
-			t.Errorf("sanitizeAdvisorTier(%q) = %q, want \"\" (only fast/balanced/deep survive)", bad, got)
+			t.Errorf("sanitizeAdvisorTier(%q) = %q, want \"\" (only fast/balanced/deep/top survive)", bad, got)
 		}
 	}
-	for _, good := range []string{"fast", "balanced", "deep"} {
+	for _, good := range []string{"fast", "balanced", "deep", "top"} {
 		if got := sanitizeAdvisorTier(good); got != good {
 			t.Errorf("sanitizeAdvisorTier(%q) = %q, want unchanged", good, got)
 		}
