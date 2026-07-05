@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 // orchestrator_guard_test.go — cycle-274 G task: inserted-phase tree-diff guard gap.
@@ -367,5 +369,107 @@ func TestIsScoutEvalMaterialization(t *testing.T) {
 		if got := isScoutEvalMaterialization(tc.phase, tc.path); got != tc.want {
 			t.Errorf("isScoutEvalMaterialization(%q,%q)=%v, want %v", tc.phase, tc.path, got, tc.want)
 		}
+	}
+}
+
+// --- cycle-533: fix-treediff-leak-recovery-catalog-predicate ---
+//
+// The leak-recovery gate at cyclerun_review.go:263 invokes recoverBuildLeak
+// only when `WorktreePhase(next)` is true — the catalog-BLIND two-literal set
+// {tdd, build}. Every other phase, INCLUDING advisor-minted / catalog phases the
+// catalog marks writes_source:true (bug-reproduction, coverage-gate), gets ZERO
+// recovery: any source file it leaks into the main tree goes straight to the
+// tree-diff guard, which hard-aborts the cycle. That is the confirmed,
+// repeating root cause of the 10 recorded "tree-diff guard: phase wrote to the
+// main tree" aborts (cycles 390..529). The catalog-aware verdict already exists
+// on the Orchestrator — (*Orchestrator).worktreePhase(next) — and `cr.o` (the
+// *Orchestrator holding the catalog) is already in scope at this exact call
+// site, so the fix is a one-line swap to the method form. No new field is
+// needed here (contrast the role-gate half, which is control-plane-protected —
+// see the cycle-533 test-report AC-Materialization section).
+//
+// Both cases use a REAL git repo + the real gitWorktree provisioner (mirroring
+// TestTDDLeakRecover / TestOrchestrator_AuditLeakRecover) so the production
+// recovery + tree-diff guard paths run end-to-end — not a stubbed classifier.
+
+// TestGuardRecoversCatalogWritesSourcePhaseLeak is the cycle-533 RED proof. A
+// spine phase that is NOT a WorktreePhase literal (scout) is marked a catalog
+// source-writer via WithCatalog and leaks a tracked-file edit into the main
+// tree. With the bug, WorktreePhase(scout)==false skips recovery and the
+// tree-diff guard aborts the cycle. With the fix, o.worktreePhase(scout)==true
+// (catalog), recoverBuildLeak relocates the leak into the worktree, main is
+// restored to HEAD, and the cycle proceeds to ship.
+func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	root := initAuditLeakRepo(t)
+	runners := buildRunners(nil)
+	// scout leaks a modification to the tracked docs/note.md in the MAIN tree.
+	runners[PhaseScout] = &auditLeakRunner{name: string(PhaseScout), onRun: func() {
+		if err := os.WriteFile(filepath.Join(root, "docs", "note.md"), []byte(auditLeakChurn), 0o644); err != nil {
+			t.Errorf("scout leak write: %v", err)
+		}
+	}}
+	// Mark scout a catalog source-writer. o.worktreePhase(scout) returns true
+	// ONLY when the recovery gate consults the catalog (the fix); the hardcoded
+	// WorktreePhase(scout) stays false. A string-match fake keyed on "scout"
+	// would also have to special-case every future minted phase — defeated by
+	// the negative case below, which shares this same catalog.
+	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "scout", WritesSource: true}})
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorktreeProvisioner(gitWorktree{}),
+		WithCatalog(cat),
+	)
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+	if err != nil {
+		t.Fatalf("catalog source-writer (scout, writes_source:true) leak must be recovered, not aborted; got: %v", err)
+	}
+	// Recovery relocated the leak into the worktree and restored main to HEAD.
+	if got := auditLeakReadFile(t, filepath.Join(root, "docs", "note.md")); got != auditLeakNoteV1 {
+		t.Errorf("docs/note.md in main = %q, want committed %q (leak must be relocated, main restored)", got, auditLeakNoteV1)
+	}
+	// The cycle proceeded past the scout guard all the way to ship.
+	shipRan := false
+	for _, p := range res.PhasesRun {
+		if p == PhaseShip {
+			shipRan = true
+		}
+	}
+	if !shipRan {
+		t.Errorf("ship never ran — cycle aborted at the scout leak instead of recovering (phases=%v)", res.PhasesRun)
+	}
+}
+
+// TestGuardStillAbortsNonSourcePhaseLeak is the paired anti-over-broadening
+// guard: the catalog-aware gate must NOT make recovery unconditional. A phase
+// that is NOT a declared source-writer (audit — absent from the injected
+// catalog, so o.worktreePhase(audit)==false) leaking a source file into the
+// main tree must STILL hard-abort via the tree-diff guard. Shares the positive
+// case's catalog (scout=source-writer) to prove the gate keys off the per-phase
+// verdict, not a blanket allow. Passes before AND after the fix (a
+// pre-existing-green regression pin; RED status noted in the cycle-533 report).
+func TestGuardStillAbortsNonSourcePhaseLeak(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	root := initAuditLeakRepo(t)
+	runners := buildRunners(nil)
+	runners[PhaseAudit] = &auditLeakRunner{name: string(PhaseAudit), onRun: func() {
+		if err := os.WriteFile(filepath.Join(root, "docs", "note.md"), []byte(auditLeakChurn), 0o644); err != nil {
+			t.Errorf("audit leak write: %v", err)
+		}
+	}}
+	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "scout", WritesSource: true}})
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorktreeProvisioner(gitWorktree{}),
+		WithCatalog(cat),
+	)
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+	if err == nil {
+		t.Fatalf("non-source phase (audit, writes_source:false) source leak must abort; got nil (phases=%v)", res.PhasesRun)
+	}
+	if !strings.Contains(err.Error(), "tree-diff") {
+		t.Errorf("abort must come from the tree-diff guard; got: %v", err)
 	}
 }
