@@ -79,7 +79,8 @@
   "model_tier_map": {
     "fast": "gpt-5.4-mini",
     "balanced": "gpt-5.4",
-    "deep": "gpt-5.5"
+    "deep": "gpt-5.5",
+    "top": "gpt-5.5"
   },
   "chatgpt_safe_models": ["gpt-5.5", "gpt-5.4-mini"],
   "chatgpt_default_model": "gpt-5.5",
