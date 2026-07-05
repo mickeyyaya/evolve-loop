@@ -165,6 +165,12 @@ type Policy struct {
 	// concurrency, and the todo-source strategy. Absent ⇒ Count=1 —
 	// byte-identical to today's single-cycle sequential execution.
 	Fleet *FleetPolicy `json:"fleet,omitempty"`
+	// ObservationMask configures the deterministic observation-masking window
+	// (research-backed #1 token lever): tool observations older than a rolling
+	// window of N turns have their bulky payload replaced by a placeholder in
+	// downstream phase-agent context. Absent ⇒ WindowTurns=10 (the paper's
+	// optimum). No new env flag — config-only.
+	ObservationMask *ObservationMaskPolicy `json:"observation_mask,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
@@ -1002,6 +1008,35 @@ func (p Policy) FleetConfig() FleetConfig {
 			b.HistoryWindow = p.Fleet.Budget.HistoryWindow
 		}
 		c.Budget = b
+	}
+	return c
+}
+
+// defaultObservationMaskWindow is the rolling window (in evictable tool
+// observations) kept unmasked by default — the empirical optimum (M=10) from
+// the "Complexity Trap" observation-masking result (arXiv 2508.21433).
+const defaultObservationMaskWindow = 10
+
+// ObservationMaskPolicy is the .evolve/policy.json "observation_mask" block and
+// its own resolved-config type (mirrors the RouterPolicy raw==resolved idiom):
+// a single WindowTurns knob. It also serves as ObservationMaskConfig's return
+// value with defaults applied.
+type ObservationMaskPolicy struct {
+	// WindowTurns is how many of the newest evictable tool observations stay
+	// unmasked. Zero/negative/absent ⇒ defaultObservationMaskWindow (10). A
+	// resolved WindowTurns<=0 is never produced by the getter; when a caller
+	// passes it straight to phasestream.MaskStaleObservations, <=0 means
+	// "feature off" (byte-identical passthrough).
+	WindowTurns int `json:"window_turns,omitempty"`
+}
+
+// ObservationMaskConfig returns the observation-mask window with the built-in
+// default resolved. An absent block, or a non-positive window_turns override,
+// yields WindowTurns=10; a positive override passes through. No I/O, no env.
+func (p Policy) ObservationMaskConfig() ObservationMaskPolicy {
+	c := ObservationMaskPolicy{WindowTurns: defaultObservationMaskWindow}
+	if p.ObservationMask != nil && p.ObservationMask.WindowTurns > 0 {
+		c.WindowTurns = p.ObservationMask.WindowTurns
 	}
 	return c
 }
