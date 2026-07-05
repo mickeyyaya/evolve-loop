@@ -15,6 +15,12 @@ type triageDecision struct {
 	CommittedFloors []string `json:"committed_floors"`
 	TopN            []struct {
 		ID string `json:"id"`
+		// Files is the card's declared repo footprint. When present it
+		// populates the todo's Files so fleet.Partition clusters cards that
+		// share a real file into ONE lane (safe: one cycle, one worktree)
+		// instead of fabricating fictional-disjoint concurrent lanes off the
+		// id-as-file placeholder. Absent → falls back to the id island.
+		Files []string `json:"files"`
 	} `json:"top_n"`
 }
 
@@ -35,6 +41,14 @@ type triageDecision struct {
 // package). Malformed decisionJSON returns an explicit error and zero specs —
 // callers must WARN and fall back to the sequential path rather than guess an
 // unscoped launch.
+//
+// A todo's Files carries its real repo footprint when the source declares one:
+// top_n[] cards may declare files[], which populate Todo.Files so cards sharing
+// a file collapse into ONE partition lane while disjoint cards still spread to
+// `count`. committed_floors / cardPackages are bare string sources (a package
+// path IS its footprint), so they keep the id-as-file island. Every source
+// falls back to []string{id} when no files are declared — file-less work stays
+// an independent island, preserving today's spread for those inputs exactly.
 func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int) ([]CycleSpec, error) {
 	var decision triageDecision
 	if len(decisionJSON) > 0 {
@@ -42,25 +56,42 @@ func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int) ([]Cy
 			return nil, fmt.Errorf("fleet: parse triage-decision.json: %w", err)
 		}
 	}
-	ids := decision.CommittedFloors
-	if len(ids) == 0 {
-		ids = cardPackages
+	// sources preserves the historic precedence (committed_floors, then
+	// cardPackages, then top_n cards) while letting a source carry declared
+	// files. Only top_n cards can declare files; the string sources stay islands.
+	type todoSource struct {
+		id    string
+		files []string
 	}
-	if len(ids) == 0 {
+	var sources []todoSource
+	switch {
+	case len(decision.CommittedFloors) > 0:
+		for _, id := range decision.CommittedFloors {
+			sources = append(sources, todoSource{id: id})
+		}
+	case len(cardPackages) > 0:
+		for _, id := range cardPackages {
+			sources = append(sources, todoSource{id: id})
+		}
+	default:
 		for _, card := range decision.TopN {
 			if card.ID != "" {
-				ids = append(ids, card.ID)
+				sources = append(sources, todoSource{id: card.ID, files: card.Files})
 			}
 		}
 	}
-	seen := make(map[string]bool, len(ids))
-	todos := make([]Todo, 0, len(ids))
-	for _, id := range ids {
-		if id == "" || seen[id] {
+	seen := make(map[string]bool, len(sources))
+	todos := make([]Todo, 0, len(sources))
+	for _, src := range sources {
+		if src.id == "" || seen[src.id] {
 			continue
 		}
-		seen[id] = true
-		todos = append(todos, Todo{ID: id, Files: []string{id}})
+		seen[src.id] = true
+		files := src.files
+		if len(files) == 0 {
+			files = []string{src.id}
+		}
+		todos = append(todos, Todo{ID: src.id, Files: files})
 	}
 	specs, _ := PlanCycles(todos, count)
 	return specs, nil

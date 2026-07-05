@@ -205,3 +205,84 @@ func TestPartition_NLessThanOne_DefaultsToOne(t *testing.T) {
 		t.Errorf("n=0 must default to 1 bucket holding the todo; got buckets=%v deferred=%v", buckets, deferred)
 	}
 }
+
+// laneOwning returns the index of the single spec whose Scope owns id, or -1.
+func laneOwning(specs []CycleSpec, id string) int {
+	for i, s := range specs {
+		for _, x := range s.Scope {
+			if x == id {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane pins the cycle-523
+// fix: two top_n cards declaring the SAME file must land in ONE lane. Before the
+// fix PlanFromTriage set Todo{Files: []string{id}}, so distinct ids were trivially
+// file-disjoint and spread to two colliding lanes (the fictional-disjoint defect
+// inbox item wave-seed-partitions-on-id-not-real-files, weight 0.92).
+func TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane(t *testing.T) {
+	decision := []byte(`{"top_n":[
+		{"id":"alpha","files":["go/internal/fleet/triageplan.go"]},
+		{"id":"beta","files":["go/internal/fleet/triageplan.go"]}
+	]}`)
+	specs, err := PlanFromTriage(decision, nil, 2)
+	if err != nil {
+		t.Fatalf("PlanFromTriage: %v", err)
+	}
+	if len(specs) != 1 {
+		t.Fatalf("two cards sharing a declared file must collapse to 1 lane, got %d", len(specs))
+	}
+	if a, b := laneOwning(specs, "alpha"), laneOwning(specs, "beta"); a != b || a < 0 {
+		t.Errorf("alpha (lane %d) and beta (lane %d) share a file but are not co-located", a, b)
+	}
+}
+
+// TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes is the baseline the
+// fix must not over-collapse: cards touching disjoint files still spread to
+// `count` lanes.
+func TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
+	decision := []byte(`{"top_n":[
+		{"id":"alpha","files":["go/internal/fleet/a.go"]},
+		{"id":"beta","files":["go/internal/fleet/b.go"]}
+	]}`)
+	specs, err := PlanFromTriage(decision, nil, 2)
+	if err != nil {
+		t.Fatalf("PlanFromTriage: %v", err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("disjoint cards at count=2 must spread to 2 lanes, got %d", len(specs))
+	}
+	if a, b := laneOwning(specs, "alpha"), laneOwning(specs, "beta"); a == b {
+		t.Errorf("disjoint alpha and beta collapsed into the same lane %d", a)
+	}
+}
+
+// TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland pins the fallback: a card
+// with no files[] stays an id-island, so file-less cards remain independent.
+func TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
+	decision := []byte(`{"top_n":[{"id":"gamma"},{"id":"delta"}]}`)
+	specs, err := PlanFromTriage(decision, nil, 2)
+	if err != nil {
+		t.Fatalf("PlanFromTriage: %v", err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("two file-less cards must fall back to id-islands and spread to 2 lanes, got %d", len(specs))
+	}
+}
+
+// TestPlanFromTriage_CommittedFloorsKeepIdIsland pins that bare string sources
+// (committed_floors) are unaffected by the files change — each floor's id is its
+// own footprint, so distinct floors still spread.
+func TestPlanFromTriage_CommittedFloorsKeepIdIsland(t *testing.T) {
+	decision := []byte(`{"committed_floors":["pkg/one","pkg/two"]}`)
+	specs, err := PlanFromTriage(decision, nil, 2)
+	if err != nil {
+		t.Fatalf("PlanFromTriage: %v", err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("two distinct committed floors at count=2 must spread to 2 lanes, got %d", len(specs))
+	}
+}
