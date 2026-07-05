@@ -104,7 +104,8 @@
   "model_tier_map": {
     "fast": "Gemini 3.5 Flash (Low)",
     "balanced": "Gemini 3.5 Flash (High)",
-    "deep": "Gemini 3.1 Pro (High)"
+    "deep": "Gemini 3.1 Pro (High)",
+    "top": "Gemini 3.1 Pro (High)"
   },
   "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=flag via --model (probed live 2026-07-02, agy 1.0.15: `agy --model \"Claude Opus 4.6 (Thinking)\"` boots the REPL in ~2s with the model in banner+footer; `agy models` lists the selectable tokens, which are display names with spaces/parens \u2014 launchCmdLine shell-quotes every realized flag token). `-m` remains UNDEFINED ('flags provided but not defined: -m'), so the cycle-154 incident claim about -m still holds; agy 1.0.3 had no model flag at all and channel was noop 2026-05-31..2026-07-02 (docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md). model_tier_map holds offline defaults only; the LIVE model catalog overlays real per-tier picks at LoadManifest (catalog_overlay.go). See docs/architecture/cli-capability-matrix.md."
 }
