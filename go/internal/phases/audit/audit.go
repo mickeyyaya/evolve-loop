@@ -143,7 +143,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}
 	}
 
-	redCount, acsErr := readRedCount(verdictPath)
+	redCount, shipEligible, acsErr := readACSVerdict(verdictPath)
 	if acsErr != nil {
 		diags = append(diags, core.Diagnostic{
 			Severity: "error",
@@ -154,6 +154,20 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		diags = append(diags, core.Diagnostic{
 			Severity: "error",
 			Message:  fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount),
+		})
+		verdict = core.VerdictFAIL
+	} else if shipEligible != nil && !*shipEligible {
+		// The authoritative acssuite SSOT (ship_eligible) can say do-not-ship even
+		// when red_count happens to be 0 (a pre-staged/agent-written verdict, or a
+		// future acssuite that gates on more than the red count). red_count alone is
+		// a proxy; ship_eligible is the ground truth — a narrative PASS must never
+		// out-vote it. A verdict that OMITS the field (every verdict written before
+		// this cycle, shipEligible==nil) is untouched: back-compat, never a
+		// spurious FAIL. This gate is symmetric to the timeout-reconcile path — both
+		// route through this same Classify block, no duplicate branch.
+		diags = append(diags, core.Diagnostic{
+			Severity: "error",
+			Message:  "EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it",
 		})
 		verdict = core.VerdictFAIL
 	}
@@ -286,18 +300,23 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 	return "", false
 }
 
-func readRedCount(path string) (int, error) {
+// readACSVerdict reads the EGPS gate fields from acs-verdict.json. shipEligible
+// is a *bool so the caller can distinguish "field absent" (nil — legacy verdicts
+// written before ship_eligible existed) from an explicit false (do-not-ship). A
+// read/parse error is returned so the missing/malformed-file FAIL floor holds.
+func readACSVerdict(path string) (redCount int, shipEligible *bool, err error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("read: %w", err)
+		return 0, nil, fmt.Errorf("read: %w", err)
 	}
 	var v struct {
-		RedCount int `json:"red_count"`
+		RedCount     int   `json:"red_count"`
+		ShipEligible *bool `json:"ship_eligible"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return 0, fmt.Errorf("parse: %w", err)
+		return 0, nil, fmt.Errorf("parse: %w", err)
 	}
-	return v.RedCount, nil
+	return v.RedCount, v.ShipEligible, nil
 }
 
 type Config struct {
