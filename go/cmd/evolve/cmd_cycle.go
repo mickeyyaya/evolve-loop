@@ -399,11 +399,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
-	// Register a spec-driven runner for each valid user phase. ValidateUserSpec
-	// is not called again here — ApplyUserRouting already enforced the floor and
-	// emitted warnings for any invalid spec above.
+	// Register a spec-driven runner for each valid user phase. This MUST use the
+	// same catalog-aware validator as ApplyUserRouting above (line ~399): the
+	// bare ValidateUserSpec re-imposes the two-tier single-word naming floor that
+	// ValidateUserSpecWithCatalog exempts for optional built-ins (e.g. "memo"),
+	// so routing would nominate the phase while dispatch silently dropped it —
+	// the cycle-563 memo-dispatch bug. Keep these two call sites in lockstep.
 	for _, s := range catalog.UserPhases() {
-		if len(phasespec.ValidateUserSpec(s)) > 0 {
+		if len(phasespec.ValidateUserSpecWithCatalog(s, builtinCat)) > 0 {
 			continue // ApplyUserRouting already warned + skipped it; no dead runner
 		}
 		if _, exists := runners[core.Phase(s.Name)]; !exists {

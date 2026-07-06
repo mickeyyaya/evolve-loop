@@ -536,6 +536,16 @@ func WithGitDirtyPaths(fn func(ctx context.Context, repoRoot string) ([]string, 
 
 // NewOrchestrator wires the orchestrator with its dependencies. Routing stays
 // off unless a WithRouting option supplies an enabled-stage config.
+// HasRunner reports whether a PhaseRunner is registered for p. It is the
+// composition-root's read seam: a phase the router can nominate but that has
+// no runner is silently skipped by cyclerun_dispatch's missing-runner escape
+// hatch (the cycle-563 memo-dispatch bug), so tests assert on this to prove the
+// routing→dispatch handoff is actually wired, not just that Route() names it.
+func (o *Orchestrator) HasRunner(p Phase) bool {
+	_, ok := o.runners[p]
+	return ok
+}
+
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
 		storage:        storage,

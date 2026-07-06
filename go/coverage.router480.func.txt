@@ -49,7 +49,7 @@ github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:383:			FailureIns
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:397:			applyLearningRichness	100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:422:			walk			96.7%
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:466:			psmasSkipSet		100.0%
-github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:483:			shouldRun		91.3%
+github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:483:			shouldRun		95.7%
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:545:			triggerFires		85.7%
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:562:			applyProposal		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/router/router.go:580:			enableOf		100.0%
@@ -74,4 +74,4 @@ github.com/mickeyyaya/evolve-loop/go/internal/router/strategy.go:99:			Select			
 github.com/mickeyyaya/evolve-loop/go/internal/router/validate.go:27:			ValidatePlan		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/router/validate.go:67:			PlanMismatch		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/router/validate.go:84:			knownPhaseSet		86.7%
-total:											(statements)		94.7%
+total:											(statements)		94.9%
