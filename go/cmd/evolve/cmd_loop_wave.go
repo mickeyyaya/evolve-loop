@@ -205,7 +205,12 @@ func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int) waveP
 		if lastCycle, err := readLastCycleNumber(ctx, storage); err == nil && lastCycle > 0 {
 			companion := filepath.Join(cycleWorkspace(cfg.ProjectRoot, lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
-				return data, nil, nil
+				// A present-but-NARROW prior decision (fewer than `count`
+				// file-disjoint top_n items) would collapse the fleet to a single
+				// lane. Widen it from the durable inbox backlog before partitioning
+				// so the primary path un-starves too — not just the absent-decision
+				// fallback below (cycle-503 starvation on the primary path).
+				return widenNarrowDecision(data, cfg.EvolveDir, count), nil, nil
 			}
 			// Prior decision absent (fresh start, `evolve cycle reset` sealed the
 			// run dir, or the prior cycle failed before triage) — fall through to
@@ -249,4 +254,53 @@ func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 		topN = append(topN, map[string]string{"id": r.ID})
 	}
 	return json.Marshal(map[string]any{"top_n": topN})
+}
+
+// widenNarrowDecision is the thin main-package adapter that turns a present-but-
+// narrow prior triage-decision.json into a fleet-width one. It parses the
+// decision's top_n[] into triagecap.FleetCandidate (id + declared files), calls
+// the single-sourced triagecap.WidenTopNToFleetWidth seam to backfill it from
+// the inbox backlog up to `count` mutually file-disjoint lanes, and re-marshals
+// the widened top_n (files preserved so fleet.PlanFromTriage stays disjoint-
+// aware). Best-effort: any parse/marshal failure returns the original bytes
+// unchanged — widening is an optimization, never a correctness dependency.
+func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
+	if count < 2 {
+		return data
+	}
+	var decision struct {
+		TopN []struct {
+			ID    string   `json:"id"`
+			Files []string `json:"files"`
+		} `json:"top_n"`
+	}
+	if json.Unmarshal(data, &decision) != nil || len(decision.TopN) == 0 {
+		return data
+	}
+	committed := make([]triagecap.FleetCandidate, 0, len(decision.TopN))
+	for _, c := range decision.TopN {
+		if c.ID != "" {
+			committed = append(committed, triagecap.FleetCandidate{ID: c.ID, Files: c.Files})
+		}
+	}
+	if len(committed) >= count {
+		return data // already fleet-width — no inbox read, no re-marshal.
+	}
+	widened := triagecap.WidenTopNToFleetWidth(committed, triagecap.ReadInboxBacklog(evolveDir), count)
+	if len(widened) <= len(committed) {
+		return data // nothing disjoint to add — leave the decision as-is.
+	}
+	topN := make([]map[string]any, 0, len(widened))
+	for _, w := range widened {
+		card := map[string]any{"id": w.ID}
+		if len(w.Files) > 0 {
+			card["files"] = w.Files
+		}
+		topN = append(topN, card)
+	}
+	out, err := json.Marshal(map[string]any{"top_n": topN})
+	if err != nil {
+		return data
+	}
+	return out
 }

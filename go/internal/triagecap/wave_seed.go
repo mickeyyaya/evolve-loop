@@ -24,6 +24,17 @@ import (
 // a bad inbox never breaks dispatch (best-effort). Files are read in filename
 // order so equal-weight ties are deterministic.
 func SelectWaveSeedTopN(evolveDir string, count int) []FleetCandidate {
+	return SelectFleetWidthTopN(ReadInboxBacklog(evolveDir), count)
+}
+
+// ReadInboxBacklog reads every <evolveDir>/inbox/*.json todo into an unpacked
+// []FleetCandidate (id + weight + declared files), in filename order so
+// equal-weight ties stay deterministic. Unreadable / malformed files and
+// empty-id todos are skipped (best-effort — a bad inbox never breaks dispatch).
+// It is the single source for "inbox backlog as fleet candidates," shared by the
+// wave-seed fallback (SelectWaveSeedTopN) and the widen-narrow-decision seam
+// (WidenTopNToFleetWidth's caller).
+func ReadInboxBacklog(evolveDir string) []FleetCandidate {
 	entries, _ := filepath.Glob(filepath.Join(evolveDir, "inbox", "*.json"))
 	sort.Strings(entries)
 	candidates := make([]FleetCandidate, 0, len(entries))
@@ -42,5 +53,5 @@ func SelectWaveSeedTopN(evolveDir string, count int) []FleetCandidate {
 		}
 		candidates = append(candidates, FleetCandidate{ID: doc.ID, Weight: doc.Weight, Files: doc.Files})
 	}
-	return SelectFleetWidthTopN(candidates, count)
+	return candidates
 }

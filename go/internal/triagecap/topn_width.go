@@ -1,6 +1,7 @@
 package triagecap
 
 import (
+	"path/filepath"
 	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -66,4 +67,76 @@ func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandida
 		out = append(out, byID[b[0].ID])
 	}
 	return out
+}
+
+// WidenTopNToFleetWidth backfills an already-committed (but NARROW) top_n
+// selection up to `count` mutually file-disjoint lanes from the inbox backlog.
+// It is the seam that un-starves the wave planner when the prior cycle's
+// triage-decision.json is present but committed fewer than `fleet.count`
+// disjoint items (the primary path — SelectWaveSeedTopN already covers the
+// absent-decision fallback): productionWavePlanFn calls this before
+// fleet.PlanFromTriage partitions the decision, so a 1-item prior decision
+// becomes a `count`-wide disjoint set instead of collapsing the fleet to 1 lane.
+//
+// Contract:
+//   - Every committed candidate is preserved verbatim (already-selected work is
+//     never dropped, never reordered) — even if committed items overlap each
+//     other; committed intent is authoritative.
+//   - count<2 returns committed unchanged (legacy single-focus — no widening).
+//   - Otherwise backfill from backlog, highest-weight first, skipping any
+//     duplicate ID and any candidate whose files overlap a file already claimed
+//     by the running selection, until the selection reaches `count` or the
+//     backlog is exhausted. An overlapping candidate is NEVER added to pad to
+//     `count` — two lanes sharing a file cannot run concurrently.
+//   - The backfilled tail is always mutually file-disjoint and len(out) <= count.
+func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []FleetCandidate {
+	if count < 2 {
+		return committed
+	}
+	out := make([]FleetCandidate, len(committed))
+	copy(out, committed)
+
+	claimed := map[string]bool{} // normalized file -> already owned by the selection
+	seenID := make(map[string]bool, len(committed))
+	for _, c := range committed {
+		seenID[c.ID] = true
+		for _, f := range c.Files {
+			claimed[filepath.Clean(f)] = true
+		}
+	}
+	if len(out) >= count {
+		return out
+	}
+
+	sorted := make([]FleetCandidate, len(backlog))
+	copy(sorted, backlog)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Weight > sorted[j].Weight })
+
+	for _, c := range sorted {
+		if len(out) >= count {
+			break
+		}
+		if seenID[c.ID] || overlapsClaimed(c.Files, claimed) {
+			continue
+		}
+		out = append(out, c)
+		seenID[c.ID] = true
+		for _, f := range c.Files {
+			claimed[filepath.Clean(f)] = true
+		}
+	}
+	return out
+}
+
+// overlapsClaimed reports whether any of files is already claimed by the
+// selection. filepath.Clean mirrors fleet.normalizeFiles so "./a.go" and "a.go"
+// collide identically to fleet.Partition (that helper is unexported, and reusing
+// fleet.Partition here would violate the preserve-every-committed contract).
+func overlapsClaimed(files []string, claimed map[string]bool) bool {
+	for _, f := range files {
+		if claimed[filepath.Clean(f)] {
+			return true
+		}
+	}
+	return false
 }
