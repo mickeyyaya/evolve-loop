@@ -1,0 +1,108 @@
+# 2026/07/07 05:46:24.681219 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw n: 10
+# 2026/07/07 05:46:24.681221 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz0-900: true
+# 2026/07/07 05:46:24.681223 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz0-900: true
+# 2026/07/07 05:46:24.681224 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz0-900: false
+# 2026/07/07 05:46:24.681225 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz0-900: 37
+# 2026/07/07 05:46:24.681280 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz1-901: false
+# 2026/07/07 05:46:24.681281 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz1-901: true
+# 2026/07/07 05:46:24.681281 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz1-901: false
+# 2026/07/07 05:46:24.681281 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz1-901: 1269
+# 2026/07/07 05:46:24.681333 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz2-902: true
+# 2026/07/07 05:46:24.681333 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz2-902: false
+# 2026/07/07 05:46:24.681333 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz2-902: true
+# 2026/07/07 05:46:24.681334 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz2-902: 3
+# 2026/07/07 05:46:24.681583 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz3-903: false
+# 2026/07/07 05:46:24.681583 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz3-903: true
+# 2026/07/07 05:46:24.681584 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz3-903: false
+# 2026/07/07 05:46:24.681584 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz3-903: 31
+# 2026/07/07 05:46:24.681635 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz4-904: false
+# 2026/07/07 05:46:24.681635 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz4-904: false
+# 2026/07/07 05:46:24.681636 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz4-904: false
+# 2026/07/07 05:46:24.681636 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz4-904: 52
+# 2026/07/07 05:46:24.681690 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz5-905: false
+# 2026/07/07 05:46:24.681690 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz5-905: true
+# 2026/07/07 05:46:24.681691 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz5-905: false
+# 2026/07/07 05:46:24.681691 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz5-905: 1
+# 2026/07/07 05:46:24.681743 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz6-906: false
+# 2026/07/07 05:46:24.681743 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz6-906: true
+# 2026/07/07 05:46:24.681743 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz6-906: true
+# 2026/07/07 05:46:24.681745 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz6-906: 3
+# 2026/07/07 05:46:24.681950 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz7-907: false
+# 2026/07/07 05:46:24.681950 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz7-907: false
+# 2026/07/07 05:46:24.681951 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz7-907: true
+# 2026/07/07 05:46:24.681951 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz7-907: 2
+# 2026/07/07 05:46:24.682167 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz8-908: true
+# 2026/07/07 05:46:24.682167 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz8-908: false
+# 2026/07/07 05:46:24.682167 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz8-908: true
+# 2026/07/07 05:46:24.682167 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz8-908: 1
+# 2026/07/07 05:46:24.682350 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw merged-cycle-fuzz9-909: false
+# 2026/07/07 05:46:24.682351 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw dirty-cycle-fuzz9-909: true
+# 2026/07/07 05:46:24.682351 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw live-cycle-fuzz9-909: false
+# 2026/07/07 05:46:24.682351 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] [rapid] draw age-cycle-fuzz9-909: 13
+# 2026/07/07 05:46:24.682744 [TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property] unmerged path /var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property113593885/003/.evolve/worktrees/cycle-fuzz4-904 must never be acted on (got remove)
+# 
+v0.4.8#16936587884962913971
+0x19f8b28fa77abf
+0x1f705a04c69afa
+0xffffffffffffffff
+0x1
+0x1
+0x0
+0x17b348acb0cd76
+0x1c430eeb2975e5
+0x66a
+0x24
+0x0
+0x1
+0x0
+0x7b64120686f50
+0x19d4ec59586469
+0x4f4
+0x1
+0x0
+0x1
+0x1e71fb92e151fc
+0x5ee2c4d2d1fa6
+0x2
+0x0
+0x1
+0x0
+0x15d06a30f9fb9a
+0x110e3bd3292711
+0x1e
+0x0
+0x0
+0x0
+0x1c046160ee028d
+0xfcf53b8ff15cc
+0x33
+0x0
+0x1
+0x0
+0x12f63148745444
+0x1d8b6d5c9e0e0
+0x0
+0x0
+0x1
+0x1
+0x58c3e1e9770a8
+0xa6be0c80bbe26
+0x2
+0x0
+0x0
+0x1
+0x2eb1effbac4fb
+0x21ff2e4642f27
+0x1
+0x1
+0x0
+0x1
+0x1b710565393a71
+0x38ac362c2e4b8
+0x0
+0x0
+0x1
+0x0
+0x306a0a11afefd
+0xc1987a284c742
+0xc
