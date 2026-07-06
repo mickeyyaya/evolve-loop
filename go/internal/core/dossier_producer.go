@@ -56,7 +56,7 @@ func writeCycleDossier(projectRoot, workspacePath string, cycle int, goal, runID
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("dossier dir: %w", err)
 	}
-	if err := dossier.Write(d, dir, false); err != nil {
+	if err := dossier.Write(d, dir, true); err != nil {
 		return fmt.Errorf("write dossier: %w", err)
 	}
 	return nil
