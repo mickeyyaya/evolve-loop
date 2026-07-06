@@ -82,6 +82,10 @@ func initAuditLeakRepo(t *testing.T) string {
 		}
 	}
 	git("init", "-q")
+	// In-repo identity so the orchestrator's own git children (dossier
+	// closeout) work on identity-less CI runners — see initLeakRecoverRepo.
+	git("config", "user.name", "t")
+	git("config", "user.email", "t@t")
 	write("go/evolve", auditLeakBinV1)
 	write("docs/note.md", auditLeakNoteV1)
 	git("add", ".")
