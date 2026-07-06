@@ -237,6 +237,42 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	return offenderLines(strings.TrimSpace(out + "\n" + errOut)), nil // non-zero → FAIL
 }
 
+// apicoverNewPackageGraduationDefault flags changed go/internal/<pkg> packages
+// that are NEW this cycle and absent from .apicover-enforce — the blind spot
+// apicoverEnforceChangedDefault's IntersectEnforced silently drops (a package
+// new this cycle cannot yet be in the enforce list, so the touched∩enforced
+// scoping never inspects it). This is the deterministic, fail-fast half of the
+// recurring warnship_apicover_ci_gap: each ungraduated package must gain an
+// .apicover-enforce entry + an apicover_named_test.go before audit can PASS.
+// Mirrors apicoverEnforceChangedDefault's own resolution (worktree dir, changed
+// packages, enforce list); a no-op (nil,nil) when there is no module, no enforce
+// list, or nothing ungraduated. go/cmd/... changes are never flagged (out of
+// apicover's scope).
+func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error) {
+	dir := moduleDirForReq(req)
+	if dir == "" {
+		return nil, nil
+	}
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	changed := changedPackagesForAudit(root, req.Cycle)
+	enforceBytes, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
+	if err != nil {
+		return nil, nil // no enforce list → nothing to graduate against
+	}
+	ungraduated := ciparity.NewUngraduatedPackages(changed, enforceBytes)
+	if len(ungraduated) == 0 {
+		return nil, nil
+	}
+	offenders := make([]string, 0, len(ungraduated))
+	for _, pkg := range ungraduated {
+		offenders = append(offenders, fmt.Sprintf("%s: new package absent from go/.apicover-enforce — add it + an apicover_named_test.go", pkg))
+	}
+	return offenders, nil
+}
+
 // changedPackagesForAudit locates this cycle's changed-package set from the
 // build handoff (same locator the EGPS suite uses). Best-effort: nil when no
 // handoff is found, which makes the apicover gate a no-op (fail-open).

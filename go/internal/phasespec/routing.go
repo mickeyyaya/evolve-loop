@@ -11,14 +11,17 @@ import (
 // its After anchor, or just before "audit" by default), its insert_when
 // triggers are registered, and it is marked content-routed (EnableContent).
 //
-// Invalid specs (per ValidateUserSpec — e.g. not optional) are SKIPPED with a
-// warning and never routed: the safety floor is enforced at the wiring seam, so
-// a malformed user phase can never enter the kernel's candidate set. Returns
-// the skip warnings.
-func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec) []string {
+// Invalid specs (per ValidateUserSpecWithCatalog — e.g. not optional) are
+// SKIPPED with a warning and never routed: the safety floor is enforced at the
+// wiring seam, so a malformed user phase can never enter the kernel's candidate
+// set. Returns the skip warnings. The builtin catalog exempts activation
+// overlays for already-optional built-in phases from the single-word naming
+// floor (see ValidateUserSpecWithCatalog) — pass an empty Catalog{} for no
+// exemption.
+func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Catalog) []string {
 	var warnings []string
 	for _, s := range specs {
-		if v := ValidateUserSpec(s); len(v) > 0 {
+		if v := ValidateUserSpecWithCatalog(s, builtin); len(v) > 0 {
 			warnings = append(warnings, "phase "+s.Name+" not routed (invalid): "+strings.Join(v, "; "))
 			continue
 		}

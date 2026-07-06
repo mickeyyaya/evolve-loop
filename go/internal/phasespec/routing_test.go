@@ -19,7 +19,7 @@ func TestApplyUserRouting_SplicesValidPhase(t *testing.T) {
 		After:    "build",
 		Routing:  &config.RoutingBlock{InsertWhen: []config.Condition{{Field: "build.files_touched", Op: "gt", Value: 0}}},
 	}}
-	warns := ApplyUserRouting(&cfg, specs)
+	warns := ApplyUserRouting(&cfg, specs, Catalog{})
 	if len(warns) != 0 {
 		t.Fatalf("unexpected warnings: %v", warns)
 	}
@@ -37,7 +37,7 @@ func TestApplyUserRouting_SplicesValidPhase(t *testing.T) {
 
 func TestApplyUserRouting_DefaultsBeforeAudit(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "build", "audit", "ship"}}
-	ApplyUserRouting(&cfg, []PhaseSpec{{Name: "x-check", Optional: true}}) // no After
+	ApplyUserRouting(&cfg, []PhaseSpec{{Name: "x-check", Optional: true}}, Catalog{}) // no After
 	want := []string{"scout", "build", "x-check", "audit", "ship"}
 	if !reflect.DeepEqual(cfg.Order, want) {
 		t.Errorf("Order = %v, want x-check before audit %v", cfg.Order, want)
@@ -47,7 +47,7 @@ func TestApplyUserRouting_DefaultsBeforeAudit(t *testing.T) {
 func TestApplyUserRouting_SkipsInvalid(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "build", "audit", "ship"}}
 	// not optional → floor violation → must NOT be spliced/routed
-	warns := ApplyUserRouting(&cfg, []PhaseSpec{{Name: "bad", Optional: false}})
+	warns := ApplyUserRouting(&cfg, []PhaseSpec{{Name: "bad", Optional: false}}, Catalog{})
 	if len(warns) != 1 {
 		t.Fatalf("warnings = %v, want 1 (invalid skipped)", warns)
 	}

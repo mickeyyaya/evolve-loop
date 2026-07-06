@@ -92,6 +92,14 @@ type hooks struct {
 	goVetCheck           func(req core.PhaseRequest) ([]string, error)
 	acsDurableCheck      func(req core.PhaseRequest) ([]string, error)
 	apicoverEnforceCheck func(req core.PhaseRequest) ([]string, error)
+	// apicoverNewPkgGraduationCheck reports changed go/internal/<pkg> packages
+	// that are new this cycle and absent from .apicover-enforce — the blind spot
+	// IntersectEnforced silently drops (a new package cannot yet be in the
+	// enforce list, so the touched∩enforced scoping never inspects it). Any such
+	// ungraduated package FAILs audit fail-fast, closing the recurring
+	// warnship_apicover_ci_gap. nil = no gate. NewDefaultWithStageCompact wires
+	// apicoverNewPackageGraduationDefault.
+	apicoverNewPkgGraduationCheck func(req core.PhaseRequest) ([]string, error)
 	// phaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
 	// §3.10 Slice 5). At >= StageEnforce the evolve-verdict sentinel is mandatory —
 	// the legacy prose/regex fallbacks are gated off. Zero value (StageOff) keeps
@@ -223,6 +231,8 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		"acs-durable (-tags acs) FAILED %d check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: %s")
 	applyCIGate(h.apicoverEnforceCheck, "apicover-enforce gate",
 		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
+	applyCIGate(h.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
+		"%d new go/internal/<pkg>(s) changed this cycle are absent from .apicover-enforce — the apicover -enforce gate silently skips them (new-package blind spot). Add each to go/.apicover-enforce + an apicover_named_test.go before ship. Offenders: %s")
 
 	if verdict == core.VerdictWARN && policy.StrictAuditFor(req.ProjectRoot) {
 		verdict = core.VerdictFAIL
@@ -315,6 +325,12 @@ type Config struct {
 	CheckGoVet           func(req core.PhaseRequest) ([]string, error)
 	CheckACSDurable      func(req core.PhaseRequest) ([]string, error)
 	CheckApicoverEnforce func(req core.PhaseRequest) ([]string, error)
+	// CheckApicoverNewPkgGraduation is the new-package graduation gate: it FAILs
+	// audit when a changed go/internal/<pkg> is new this cycle and absent from
+	// .apicover-enforce (the blind spot apicover -enforce's touched∩enforced
+	// scoping drops). nil = no gate. NewDefaultWithStageCompact wires
+	// apicoverNewPackageGraduationDefault.
+	CheckApicoverNewPkgGraduation func(req core.PhaseRequest) ([]string, error)
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050
 	// §3.10 Slice 5). Zero value (StageOff) = byte-identical (prose fallbacks active).
 	PhaseIO config.Stage
@@ -330,13 +346,14 @@ func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
 			Hooks: hooks{
-				genVerdict:           c.GenerateVerdict,
-				gofmtCheck:           c.CheckGofmt,
-				skillsDriftCheck:     c.CheckSkillsDrift,
-				goVetCheck:           c.CheckGoVet,
-				acsDurableCheck:      c.CheckACSDurable,
-				apicoverEnforceCheck: c.CheckApicoverEnforce,
-				phaseIO:              c.PhaseIO,
+				genVerdict:                    c.GenerateVerdict,
+				gofmtCheck:                    c.CheckGofmt,
+				skillsDriftCheck:              c.CheckSkillsDrift,
+				goVetCheck:                    c.CheckGoVet,
+				acsDurableCheck:               c.CheckACSDurable,
+				apicoverEnforceCheck:          c.CheckApicoverEnforce,
+				apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
+				phaseIO:                       c.PhaseIO,
 			},
 			Bridge:         c.Bridge,
 			Prompts:        c.Prompts,
@@ -372,16 +389,17 @@ func NewDefaultWithStage(br core.Bridge, prm *prompts.Loader, stage config.Stage
 // the reference tail is stripped before dispatch when the policy default is on.
 func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool) *Phase {
 	return New(Config{
-		Bridge:               br,
-		Prompts:              prm,
-		GenerateVerdict:      generateACSVerdict,
-		CheckGofmt:           gofmtCheckDefault,
-		CheckSkillsDrift:     skillsDriftCheckDefault,
-		CheckGoVet:           goVetCheckDefault,
-		CheckACSDurable:      acsDurableCheckDefault,
-		CheckApicoverEnforce: apicoverEnforceChangedDefault,
-		PhaseIO:              stage,
-		CompactPrompts:       compact,
+		Bridge:                        br,
+		Prompts:                       prm,
+		GenerateVerdict:               generateACSVerdict,
+		CheckGofmt:                    gofmtCheckDefault,
+		CheckSkillsDrift:              skillsDriftCheckDefault,
+		CheckGoVet:                    goVetCheckDefault,
+		CheckACSDurable:               acsDurableCheckDefault,
+		CheckApicoverEnforce:          apicoverEnforceChangedDefault,
+		CheckApicoverNewPkgGraduation: apicoverNewPackageGraduationDefault,
+		PhaseIO:                       stage,
+		CompactPrompts:                compact,
 	})
 }
 

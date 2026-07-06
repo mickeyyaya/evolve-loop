@@ -159,7 +159,7 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q: %s\n", spec.Name, w)
 		}
 		o.catalog = merged
-		for _, w := range phasespec.ApplyUserRouting(&o.cfg, []phasespec.PhaseSpec{spec}) {
+		for _, w := range phasespec.ApplyUserRouting(&o.cfg, []phasespec.PhaseSpec{spec}, o.catalog) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q routing: %s\n", spec.Name, w)
 		}
 		o.runners[p] = runner

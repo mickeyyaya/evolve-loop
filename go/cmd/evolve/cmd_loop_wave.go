@@ -94,6 +94,43 @@ func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight fun
 	return true, specs, results, nil
 }
 
+// forceOneLaneDispatch is the min-width repair seam (cycle-547,
+// fleet-min-width-lane-fallback): when a wave-sized Count shrank to <=1 (a quota
+// bench or a budget resize) but the operator's fleet.count wanted >1 lanes, the
+// batch loop reaches dispatchIteration's ran=false path and would otherwise drop
+// to the legacy sequential orch.RunCycle body — the ONLY execution mode that
+// runs unisolated in the main-tree process cwd (cmd_loop_wave.go's doc: "the
+// ONLY path that can leak into the main tree"), giving the operator width ZERO
+// instead of width 1. forceOneLaneDispatch drives up to ONE disjoint candidate
+// through the SAME isolated-worktree launcher path dispatchIteration uses,
+// capped at a single lane, WITHOUT the shouldRunWave(Count>1) gate (the caller
+// already knows the original config wanted a fleet and only reached here because
+// the wave-sized Count shrank — this is the shrink-repair path, not the general
+// multi-lane entry point). Every safety contract dispatchIteration has is
+// preserved: a preflight refusal surfaces wrapped (errors.Is-matchable) with
+// ran=false and NEITHER planFn NOR launcher invoked; a genuinely empty adapted
+// plan reports ran=false, err=nil so the caller falls back to TRUE sequential —
+// now the only case sequential is reserved for.
+func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
+	if err := preflight(); err != nil {
+		return false, nil, nil, fmt.Errorf("wave %d: control-plane preflight: %w", waveIndex, err)
+	}
+	decisionJSON, cardPackages, err := planFn(ctx, waveIndex)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("wave %d: triage plan: %w", waveIndex, err)
+	}
+	// Cap at a single lane: this is the shrink-repair path, not a fan-out.
+	specs, err = fleet.PlanFromTriage(decisionJSON, cardPackages, 1)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("wave %d: adapt triage plan: %w", waveIndex, err)
+	}
+	if len(specs) == 0 {
+		return false, nil, nil, nil // genuinely empty backlog → true sequential fallback
+	}
+	results = launcher.Run(ctx, specs)
+	return true, specs, results, nil
+}
+
 // loadFleetConfig loads .evolve/policy.json and returns the resolved fleet
 // configuration. Absent or malformed policy falls back to built-in defaults
 // (Count=1 — the existing sequential path), mirroring loadWorkflowConfig.

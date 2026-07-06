@@ -59,13 +59,42 @@ func UnknownCategories(s PhaseSpec) []string {
 // they MUST be optional (a user phase can never displace or satisfy the
 // build→audit→ship spine), and only kind:"llm" is executable today.
 func ValidateUserSpec(s PhaseSpec) []string {
+	return validateUserSpec(s, false)
+}
+
+// ValidateUserSpecWithCatalog behaves exactly like ValidateUserSpec, except it
+// exempts the two-tier single-word naming floor when s.Name matches an existing
+// built-in catalog entry whose Optional field is true. This lets an operator
+// author an *activation overlay* for an already-optional built-in phase (e.g.
+// the single-word "memo" phase, declared optional in the built-in registry but
+// carrying its routing only in the overlay) — the squatting concern the floor
+// guards against does not apply, because the name is already reserved by the
+// built-in. The exemption consults the BUILT-IN's Optional flag, not the
+// overlay's, so an operator can never hijack a mandatory spine phase's name by
+// marking their own overlay optional:true. Every other floor check still runs.
+func ValidateUserSpecWithCatalog(s PhaseSpec, builtin Catalog) []string {
+	return validateUserSpec(s, isOptionalBuiltinName(s.Name, builtin))
+}
+
+// isOptionalBuiltinName reports whether name matches a built-in catalog entry
+// that is itself optional:true — the only case in which the two-tier single-word
+// naming floor is exempted (see ValidateUserSpecWithCatalog).
+func isOptionalBuiltinName(name string, builtin Catalog) bool {
+	spec, ok := builtin.Get(name)
+	return ok && spec.Optional
+}
+
+// validateUserSpec is the shared implementation. When exemptSingleWordFloor is
+// true, the twoTierNameRE (single-word) check is skipped; all other floor checks
+// still apply.
+func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	var v []string
 
 	if s.Name == "" {
 		v = append(v, "name is required")
 	} else if !nameRE.MatchString(s.Name) {
 		v = append(v, fmt.Sprintf("name %q must be lowercase kebab-case (^[a-z][a-z0-9-]*$)", s.Name))
-	} else if !twoTierNameRE.MatchString(s.Name) {
+	} else if !exemptSingleWordFloor && !twoTierNameRE.MatchString(s.Name) {
 		v = append(v, fmt.Sprintf("name %q must be multi-word kebab-case for user/optional phases (e.g. my-check); single-word names are reserved for built-in phases", s.Name))
 	}
 

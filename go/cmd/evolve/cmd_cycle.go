@@ -391,7 +391,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// sentinel; default (off) leaves the dispatched prompt byte-identical.
 	br.SetPhaseIOStage(cfg.PhaseIO)
 	br.SetRecoveryStage(cfg.PhaseRecovery.String())
-	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs) {
+	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
 	// Register a spec-driven runner for each valid user phase. ValidateUserSpec

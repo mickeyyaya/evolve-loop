@@ -483,7 +483,35 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				paceBeforeNextWave(ctx, wavePace, stderr)
 				continue
 			default:
-				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan or quota-shrunk to a single lane), falling back to sequential\n", i)
+				// Min-width repair (cycle-547, fleet-min-width-lane-fallback): the
+				// wave shrank below shouldRunWave's Count>1 gate (quota bench /
+				// budget) so dispatchIteration reported ran=false — but the operator's
+				// fleet.count wanted >1 lanes. Rather than drop to width ZERO (the
+				// leak-prone process-cwd sequential path), drive up to ONE disjoint
+				// candidate through the SAME isolated-worktree launcher, capped at a
+				// single lane. Only a genuinely empty backlog still falls back to true
+				// sequential.
+				if fleetCfg.Count > 1 && waveCfg.Count <= 1 {
+					oneLauncher := productionWaveLauncher(fleetCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
+					ran1, _, results1, oerr := forceOneLaneDispatch(ctx, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, fleetCfg.Count), oneLauncher, i)
+					switch {
+					case oerr != nil:
+						fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d min-width repair failed, falling back to sequential: %v\n", i, oerr)
+					case ran1:
+						failedLanes := 0
+						for _, r := range results1 {
+							if r.Err != nil || r.ExitCode != 0 {
+								failedLanes++
+							}
+						}
+						fmt.Fprintf(stderr, "[loop] wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)\n", i, len(results1)-failedLanes, len(results1), fleetCfg.Count, waveCfg.Count)
+						continue
+					default:
+						fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty backlog), falling back to sequential\n", i)
+					}
+				} else {
+					fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan), falling back to sequential\n", i)
+				}
 			}
 		}
 

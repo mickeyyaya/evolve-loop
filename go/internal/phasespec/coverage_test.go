@@ -126,7 +126,7 @@ func TestApplyUserRouting_InitsNilTriggers(t *testing.T) {
 		Routing:  &config.RoutingBlock{InsertWhen: []config.Condition{{Field: "build.files_touched", Op: "gt", Value: 0}}},
 	}}
 
-	warns := ApplyUserRouting(&cfg, specs)
+	warns := ApplyUserRouting(&cfg, specs, Catalog{})
 
 	if len(warns) != 0 {
 		t.Fatalf("unexpected warnings: %v", warns)

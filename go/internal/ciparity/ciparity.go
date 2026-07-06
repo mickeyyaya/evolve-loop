@@ -66,6 +66,48 @@ func normalizePattern(p string) string {
 	return strings.TrimSuffix(strings.TrimSpace(p), "/...")
 }
 
+// NewUngraduatedPackages returns the changed package patterns that live under
+// ./internal/ but are NOT yet listed in the go/.apicover-enforce file — exactly
+// the set IntersectEnforced silently drops (a package new this cycle cannot yet
+// be in the enforce list, so the touched∩enforced intersection excludes it and
+// the unnamed-export gate never inspects it — the recurring
+// warnship_apicover_ci_gap blind spot).
+//
+// Scope mirrors apicover's own: only ./internal/ packages are apicover-scoped,
+// so ./cmd/... entrypoints are never flagged. Normalizes the same way
+// IntersectEnforced does (strips a trailing "/..."), dedupes, and returns a
+// sorted slice (nil when nothing is ungraduated). Pure; no I/O.
+func NewUngraduatedPackages(changed []string, enforceBytes []byte) []string {
+	if len(changed) == 0 {
+		return nil
+	}
+	enforced := make(map[string]bool)
+	sc := bufio.NewScanner(bytes.NewReader(enforceBytes))
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		enforced[line] = true
+	}
+
+	seen := make(map[string]bool)
+	var out []string
+	for _, c := range changed {
+		c = normalizePattern(c)
+		if c == "" || !strings.HasPrefix(c, "./internal/") {
+			continue // out of apicover's scope (e.g. ./cmd/...)
+		}
+		if enforced[c] || seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // CoverageTags is the SSOT build-tag set matching .github/workflows/go.yml's
 // tagged coverage step ("-tags integration"). Every scoped coverage-measuring
 // call site MUST build its `go test` args through CoverageTestArgs so it reads
