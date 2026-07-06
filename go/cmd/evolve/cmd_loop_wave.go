@@ -49,8 +49,13 @@ type wavePlanFn func(ctx context.Context, waveIndex int) (decisionJSON []byte, c
 // vocab fallback for an unknown plan_source). This is the ONLY seam that
 // decides sequential-vs-wave; keeping it a small pure function makes the
 // golden (absent-block ⇒ sequential) regression trivial to pin.
+//
+// Scheduling=="pool" is EXCLUDED here (routed to shouldRunPool /
+// dispatchPoolIteration instead): the two dispatch gates are mutually exclusive
+// so a single iteration never fires both a wave AND a pool (no double-dispatch).
+// The default/absent Scheduling ("") keeps the shipped wave path unchanged.
 func shouldRunWave(fc policy.FleetConfig) bool {
-	return fc.Count > 1 && fc.PlanSource == "triage"
+	return fc.Count > 1 && fc.PlanSource == "triage" && fc.Scheduling != "pool"
 }
 
 // dispatchIteration runs one batch iteration's wave path when shouldRunWave

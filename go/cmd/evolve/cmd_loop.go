@@ -393,11 +393,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: %s\n", w)
 	}
 	var waveBinPath string
-	if shouldRunWave(fleetCfg) {
+	if shouldRunWave(fleetCfg) || shouldRunPool(fleetCfg) {
 		if bp, err := os.Executable(); err == nil {
 			waveBinPath = bp
 		} else {
-			fmt.Fprintf(stderr, "[loop] WARN: fleet: cannot resolve binary for wave dispatch, staying sequential: %v\n", err)
+			fmt.Fprintf(stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
 			fleetCfg.Count = 1
 		}
 	}
@@ -437,6 +437,34 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// triage plan that committed zero lanes (D1: empty-plan guard),
 		// WARNs and falls through to that unchanged sequential path for this
 		// iteration instead of silently consuming it.
+		// FLEET-AS-POLICY L5 rolling-pool path (cycle-553): when the operator opted
+		// into policy.fleet.scheduling=="pool", this iteration rolls the backlog
+		// through fleet.RunPool (backfills a replacement lane the instant one exits)
+		// instead of the wave barrier. Same isolated launch seam (execCycleLaunch)
+		// and S3 preflight as the wave path; an empty backlog (or a control-plane
+		// refusal) falls through to the sequential path below unchanged. Mutually
+		// exclusive with shouldRunWave, so this branch and the wave branch never
+		// both fire for one iteration.
+		if shouldRunPool(fleetCfg) {
+			poolLaunch := execCycleLaunch(waveBinPath, false, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
+			ran, _, results, perr := dispatchPoolIteration(ctx, fleetCfg, productionWavePreflight(cfg.ProjectRoot), productionPoolPlanFn(cfg, deps.Storage, fleetCfg.Count), poolLaunch, i)
+			switch {
+			case perr != nil:
+				fmt.Fprintf(stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", i, perr)
+			case ran:
+				failedLanes := 0
+				for _, r := range results {
+					if r.Err != nil || r.ExitCode != 0 {
+						failedLanes++
+					}
+				}
+				fmt.Fprintf(stderr, "[loop] pool %d: %d/%d lanes ok (rolling, target=%d)\n", i, len(results)-failedLanes, len(results), fleetCfg.Count)
+				continue
+			default:
+				fmt.Fprintf(stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", i)
+			}
+		}
+
 		if shouldRunWave(fleetCfg) {
 			// FLEET-AS-POLICY S3(b) + Q4 budget: quota-aware capacity — active
 			// clihealth benches shrink this wave's lane count (copy; min 1), and

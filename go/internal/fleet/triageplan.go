@@ -50,6 +50,20 @@ type triageDecision struct {
 // falls back to []string{id} when no files are declared — file-less work stays
 // an independent island, preserving today's spread for those inputs exactly.
 func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int) ([]CycleSpec, error) {
+	todos, err := TodosFromTriage(decisionJSON, cardPackages)
+	if err != nil {
+		return nil, err
+	}
+	specs, _ := PlanCycles(todos, count)
+	return specs, nil
+}
+
+// TodosFromTriage parses a triage-decision.json (+ optional cardPackages
+// fallback) into the disjoint-aware Todo backlog PlanFromTriage partitions.
+// Exported so the rolling-pool dispatch path (cmd_loop_pool.go) rolls the SAME
+// backlog through fleet.RunPool that the wave path partitions statically —
+// single-sourcing the decision→todos parse across both schedulers.
+func TodosFromTriage(decisionJSON []byte, cardPackages []string) ([]Todo, error) {
 	var decision triageDecision
 	if len(decisionJSON) > 0 {
 		if err := json.Unmarshal(decisionJSON, &decision); err != nil {
@@ -93,6 +107,5 @@ func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int) ([]Cy
 		}
 		todos = append(todos, Todo{ID: src.id, Files: files})
 	}
-	specs, _ := PlanCycles(todos, count)
-	return specs, nil
+	return todos, nil
 }
