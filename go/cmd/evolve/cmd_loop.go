@@ -35,6 +35,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -401,6 +402,12 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
+	// Fleet work-supply-starvation observer (L3 leg of the
+	// fleet-concurrency-respect architecture): ONE tracker held across the batch
+	// loop so a starved streak spans waves. It advances only on the wave-ran path
+	// below; a sequential (Count==1) batch never touches it.
+	var starvationTracker fleet.StarvationTracker
+
 	for i := 0; i < effectiveMax; i++ {
 		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
 		if ctx.Err() != nil {
@@ -452,6 +459,25 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					}
 				}
 				fmt.Fprintf(stderr, "[loop] wave %d: %d/%d lanes ok\n", i, len(results)-failedLanes, len(results))
+				// Work-supply-starvation observation: DesiredLanes is the
+				// operator-asserted fleetCfg.Count (NOT the quota-shrunk
+				// waveCfg.Count); QuotaShrunk distinguishes a benched-family
+				// capacity shrink from a dry work supply. On the K-th consecutive
+				// starved wave, self-file one weighted inbox todo naming the cause
+				// (best-effort: a write failure WARNs and never breaks dispatch).
+				obs := fleet.WaveObservation{
+					DesiredLanes:  fleetCfg.Count,
+					RealizedLanes: len(results),
+					QuotaShrunk:   waveCfg.Count < fleetCfg.Count,
+				}
+				if starvationTracker.Observe(obs, fleetCfg.StarvationK) {
+					item := fleet.BuildStarvationItem(obs, fleetCfg.StarvationK, fleetCfg.StarvationWeight, i, time.Now().UTC().Format(time.RFC3339))
+					if p, werr := item.WriteTo(cfg.EvolveDir); werr != nil {
+						fmt.Fprintf(stderr, "[loop] WARN: fleet: could not self-file starvation todo: %v\n", werr)
+					} else {
+						fmt.Fprintf(stderr, "[loop] fleet: work-supply starvation after %d waves — self-filed %s\n", fleetCfg.StarvationK, p)
+					}
+				}
 				// Enforce-mode budget pacing: idle the affordable inter-wave gap
 				// before the next wave (0 in shadow / no floor pressure).
 				paceBeforeNextWave(ctx, wavePace, stderr)

@@ -65,3 +65,24 @@ func IntersectEnforced(changed []string, enforceBytes []byte) []string {
 func normalizePattern(p string) string {
 	return strings.TrimSuffix(strings.TrimSpace(p), "/...")
 }
+
+// CoverageTags is the SSOT build-tag set matching .github/workflows/go.yml's
+// tagged coverage step ("-tags integration"). Every scoped coverage-measuring
+// call site MUST build its `go test` args through CoverageTestArgs so it reads
+// the SAME (tagged) coverage number CI does. An untagged run under-reports a
+// tag-gated package's real coverage by up to 43 points (R1:
+// knowledge-base/research/test-coverage-audit-2026-07.md — internal/phases/ship
+// measured 47.0% plain vs 90.6% tagged), which would let a gate ship on a wrong
+// number. This is the same defect class ADR-0069 fixed once for vet/apicover,
+// now for the coverage dimension.
+const CoverageTags = "integration"
+
+// CoverageTestArgs returns tag-parity-correct `go test` args for a scoped
+// coverage-profile run: ["test", "-tags", CoverageTags, "-coverprofile="+
+// coverProfile, pkgs...]. The package list is preserved verbatim and in order
+// as trailing args so `go test` measures exactly the scoped set (dropping it
+// would silently fall back to the whole module). Pure; no I/O.
+func CoverageTestArgs(coverProfile string, pkgs []string) []string {
+	args := []string{"test", "-tags", CoverageTags, "-coverprofile=" + coverProfile}
+	return append(args, pkgs...)
+}

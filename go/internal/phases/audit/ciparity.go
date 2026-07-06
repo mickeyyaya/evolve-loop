@@ -202,7 +202,10 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	}
 	covPath := filepath.Join(dir, "bin", "ciparity-cover.txt")
 	defer func() { _ = os.Remove(covPath) }() // scratch profile — don't accumulate on a persistent worktree
-	testArgs := append([]string{"test", "-coverprofile=" + covPath}, touched...)
+	// Tag-parity: build the scoped coverage args through the ciparity SSOT so
+	// the gate measures the SAME (tagged) coverage number CI does — an untagged
+	// run under-reports a tag-gated package by up to 43 points (R1).
+	testArgs := ciparity.CoverageTestArgs(covPath, touched)
 	if _, err := sysexec.Output(ctx, run, dir, "go", testArgs...); err != nil {
 		return nil, fmt.Errorf("apicover gate: scoped coverage run: %w", err)
 	}

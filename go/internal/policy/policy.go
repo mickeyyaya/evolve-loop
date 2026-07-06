@@ -889,6 +889,15 @@ type FleetPolicy struct {
 	// against real headroom (fleetbudget.Plan), applied only when
 	// Stage=="enforce".
 	Budget *FleetBudgetPolicy `json:"budget,omitempty"`
+	// StarvationK is the number of consecutive work-supply-starved waves
+	// (realized lanes < configured, not a quota shrink) after which the loop
+	// self-files a weighted inbox todo naming the starvation cause. Zero/absent
+	// ⇒ 3. A positive value overrides.
+	StarvationK int `json:"starvation_k,omitempty"`
+	// StarvationWeight is the weight of that self-filed todo. Zero/absent ⇒ 0.9;
+	// a positive value below the 0.9 floor clamps UP (a starvation signal is
+	// never a low-weight afterthought).
+	StarvationWeight float64 `json:"starvation_weight,omitempty"`
 }
 
 // FleetBudgetPolicy is the .evolve/policy.json "fleet.budget" block: the
@@ -946,9 +955,22 @@ type FleetConfig struct {
 	PlanSource string
 	// Budget is the resolved quota-budgeting block, or nil when the operator
 	// supplied no fleet.budget block (the default — quota budgeting off).
-	Budget   *FleetBudgetConfig
-	Warnings []string
+	Budget *FleetBudgetConfig
+	// StarvationK is the resolved consecutive-starved-wave fire threshold (≥1,
+	// default 3). StarvationWeight is the resolved self-filed-todo weight
+	// (≥0.9, default 0.9).
+	StarvationK      int
+	StarvationWeight float64
+	Warnings         []string
 }
+
+// defaultStarvationK / defaultStarvationWeight are the compiled fleet-starvation
+// defaults, surfaced even on the p.Fleet==nil path (the cycle-542 C542_005
+// lesson: seed struct-literal defaults BEFORE the nil early return).
+const (
+	defaultStarvationK      = 3
+	defaultStarvationWeight = 0.9
+)
 
 // FleetConfig returns fleet configuration with built-in defaults resolved.
 // Count defaults to 1 and clamps any non-positive override back to 1 — a
@@ -958,7 +980,8 @@ type FleetConfig struct {
 // unknown value fails safe to "manual" plus a surfaced warning naming the
 // rejected value.
 func (p Policy) FleetConfig() FleetConfig {
-	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage"}
+	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage",
+		StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
 	if p.Fleet == nil {
 		return c
 	}
@@ -1008,6 +1031,18 @@ func (p Policy) FleetConfig() FleetConfig {
 			b.HistoryWindow = p.Fleet.Budget.HistoryWindow
 		}
 		c.Budget = b
+	}
+	// Starvation-observer tunables: a positive starvation_k overrides the
+	// default fire threshold; a positive starvation_weight overrides but clamps
+	// UP to the 0.9 floor (never silently under-weighted).
+	if p.Fleet.StarvationK > 0 {
+		c.StarvationK = p.Fleet.StarvationK
+	}
+	if p.Fleet.StarvationWeight > 0 {
+		c.StarvationWeight = p.Fleet.StarvationWeight
+		if c.StarvationWeight < defaultStarvationWeight {
+			c.StarvationWeight = defaultStarvationWeight
+		}
 	}
 	return c
 }
