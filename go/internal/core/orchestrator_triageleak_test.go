@@ -66,6 +66,13 @@ func initLeakRecoverRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	git("init", "-q")
+	// Identity must live IN the repo, not in the helper's env: RunCycle's own
+	// git children (the dossier-closeout commit) don't inherit these env vars,
+	// and CI's ubuntu runners have no ambient identity git can auto-detect —
+	// the commit fails there, leaving staged dossier files that broke the
+	// clean-tree assertion below (ubuntu-only red, 2026-07-06).
+	git("config", "user.name", "t")
+	git("config", "user.email", "t@t")
 	git("add", ".")
 	git("commit", "-q", "-m", "init")
 	return root
