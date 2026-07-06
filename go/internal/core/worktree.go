@@ -196,3 +196,24 @@ func deleteCycleBranch(projectRoot, worktree string) {
 func WorktreePhase(p Phase) bool {
 	return p == PhaseTDD || p == PhaseBuild
 }
+
+// LeakRecoverablePhase reports whether a phase runs with an active cycle
+// worktree and therefore must be ELIGIBLE FOR LEAK RECOVERY — a DISTINCT axis
+// from WorktreePhase (role-gate write-permission). The worktree is provisioned
+// once at cycle start for every phase, so triage, audit, scout, and
+// bug-reproduction all get one even though they are not source-writers; an
+// unexpected write from any of them into the main tree must be RELOCATED into
+// the worktree, not hard-abort the cycle via the tree-diff guard. Gating
+// recovery on WorktreePhase (tdd/build only) is exactly the cycle-564 gap
+// behind 9 recorded tree-diff-leak failures (390/399/491/496/501/538/540/556)
+// spanning precisely these non-source-writing phases. This is a SEPARATE
+// predicate — widening WorktreePhase in place would be a write-permission
+// escalation masquerading as a recovery fix.
+func LeakRecoverablePhase(p Phase) bool {
+	switch p {
+	case PhaseTriage, PhaseAudit, PhaseScout, PhaseTDD, PhaseBuild, Phase("bug-reproduction"):
+		return true
+	default:
+		return false
+	}
+}

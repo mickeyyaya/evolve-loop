@@ -32,7 +32,21 @@ func isEvolveDeliverablePath(p string) bool {
 	return false
 }
 
-func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baseline map[string]bool) bool {
+// recoverBuildLeak relocates/discards a main-tree leak from a phase that runs
+// with an active worktree, so the cycle continues instead of hard-aborting on
+// the tree-diff guard. sourceWriter distinguishes the two recovery regimes:
+//   - true  (tdd/build): full recovery — relocate AND stage untracked + tracked
+//     edits into the worktree so the auditor's `git diff HEAD` sees builder work.
+//   - false (triage/audit/scout/bug-reproduction, added cycle-564 via
+//     LeakRecoverablePhase): SAFE SUBSET only — relocate genuine untracked junk
+//     out of main (no staging: an artifact leak is not source, and the worktree
+//     may not be a git tree for those phases). Evolve deliverables (scout eval
+//     materialization) and tracked edits are left UNTOUCHED so the tree-diff
+//     guard's own carve-out / abort (with forensics preserved) still governs
+//     them. This keeps recovery from becoming a write-permission hole for
+//     non-source-writer phases while still clearing the untracked-temp leaks
+//     behind the 9 recorded tree-diff-leak failures.
+func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baseline map[string]bool, sourceWriter bool) bool {
 	if worktree == "" {
 		return true // no worktree to relocate into → degrade (caller guards this anyway)
 	}
@@ -65,7 +79,14 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 		}
 		xy := line[:2]
 		switch {
-		case strings.Contains(xy, "?"): // untracked file → relocate into the worktree
+		case strings.Contains(xy, "?"): // untracked file → relocate out of the main tree
+			// A non-source-writer phase that leaks an evolve DELIVERABLE (e.g.
+			// scout's eval materialization to .evolve/evals/) must keep it in
+			// main — the tree-diff guard's own carve-out (isScoutEvalMaterialization)
+			// governs that, not recovery. Only genuine junk leaks relocate.
+			if !sourceWriter && isEvolveDeliverablePath(p) {
+				continue
+			}
 			src := filepath.Join(projectRoot, p)
 			dst := filepath.Join(worktree, p)
 			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
@@ -76,8 +97,13 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
 				return false
 			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s into worktree\n", p)
-			relocated = append(relocated, p)
+			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s out of main tree\n", p)
+			// Stage into the worktree ONLY for source writers, so the auditor's
+			// `git diff HEAD` sees builder SOURCE. A non-source artifact leak
+			// just needs to vacate main; staging it as source would be wrong.
+			if sourceWriter {
+				relocated = append(relocated, p)
+			}
 		case buildArtifacts[p]: // rebuilt release binary leaked → always discard
 			// go/evolve is the marketplace-tracked binary, re-committed ONLY by the
 			// release pipeline (releasepipeline.go) and reset to HEAD by the ship phase
@@ -90,6 +116,12 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked rebuilt artifact %s\n", p)
 		case strings.Contains(xy, "M"): // modified tracked file (exists at HEAD)
+			if !sourceWriter {
+				// A non-source-writer phase must not edit tracked source at all;
+				// leave the modification untouched (content preserved for
+				// forensics) and let the tree-diff guard abort with its message.
+				continue
+			}
 			// A non-Claude builder may edit an EXISTING tracked source file in the
 			// MAIN tree instead of its worktree (cycle-162: orchestrator.go). That is
 			// real builder work — preserve it by relocating the leaked content into the
@@ -111,12 +143,18 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 				fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s (worktree diverged)\n", p)
 			}
 		case strings.ContainsAny(xy, "AD"): // added-not-at-HEAD / deleted tracked → discard (rare; conservative)
+			if !sourceWriter {
+				continue // leave for the tree-diff guard (non-source phase)
+			}
 			if err := discardMainLeak(ctx, projectRoot, p); err != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
 				return false
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s\n", p)
 		default: // rename/copy/unknown — not safe to auto-recover
+			if !sourceWriter {
+				continue // leave for the tree-diff guard (non-source phase)
+			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
 			return false
 		}

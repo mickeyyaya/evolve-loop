@@ -206,6 +206,16 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 	return false
 }
 
+// leakRecoverablePhase reports whether next is eligible for main-tree leak
+// recovery. It is the UNION of the fixed active-worktree set (LeakRecoverablePhase
+// — triage/audit/scout/bug-reproduction/tdd/build) with worktreePhase, so a user
+// phase that opts into source writes via its spec (writes_source) keeps the
+// recovery it had before cycle-564 while the four non-source-writing built-ins
+// gain it. Distinct from worktreePhase (write PERMISSION) by design.
+func (o *Orchestrator) leakRecoverablePhase(p Phase) bool {
+	return LeakRecoverablePhase(p) || o.worktreePhase(p)
+}
+
 // phaseFromRouter denormalizes a router phase string back to a core.Phase.
 // The router speaks canonical "retrospective"/"end"; core uses "retro"/
 // PhaseEnd. An unknown string yields "" so enforceNext declines it.

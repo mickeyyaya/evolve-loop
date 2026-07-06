@@ -260,8 +260,8 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	// pure-untracked leaks. On recovery FAILURE we abort explicitly — the
 	// tree-diff guard only backstops tracked leaks, so a failed recovery
 	// of an untracked leak must not slip past into audit.
-	if cr.o.worktreePhase(next) && cr.cs.ActiveWorktree != "" {
-		if !recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline) {
+	if cr.o.leakRecoverablePhase(next) && cr.cs.ActiveWorktree != "" {
+		if !recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline, cr.o.worktreePhase(next)) {
 			phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
 			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 			cr.recordFailureLearning(next, phaseErr, 1)
