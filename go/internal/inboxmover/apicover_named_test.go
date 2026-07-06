@@ -67,6 +67,48 @@ func TestPromoteResult_NamesNoOpWhenMissing(t *testing.T) {
 	}
 }
 
+// TestSupersededInboxIDs_NamesDedupAndTolerance names SupersededInboxIDs and
+// pins that it dedups/order-preserves the top-level "superseded" array and
+// returns empty (never panics) on an absent field or invalid JSON.
+func TestSupersededInboxIDs_NamesDedupAndTolerance(t *testing.T) {
+	got := SupersededInboxIDs([]byte(`{"superseded":["a","b","a"]}`))
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("SupersededInboxIDs=%v, want [a b] (deduped, order-preserving)", got)
+	}
+	if n := len(SupersededInboxIDs([]byte(`{"top_n":[]}`))); n != 0 {
+		t.Errorf("absent field: got %d ids, want 0", n)
+	}
+	if n := len(SupersededInboxIDs([]byte(`}{not json`))); n != 0 {
+		t.Errorf("invalid JSON: got %d ids, want 0 (must tolerate, never panic)", n)
+	}
+}
+
+// TestReconcileSuperseded_NamesRetireByIDAndNoOp names ReconcileSuperseded and
+// pins its two load-bearing properties: a present id is retired by id alone
+// (file leaves the inbox root), and an absent id is a clean idempotent no-op.
+func TestReconcileSuperseded_NamesRetireByIDAndNoOp(t *testing.T) {
+	root, inboxDir := seedInbox(t, "orphan-x")
+
+	retired, err := ReconcileSuperseded(Options{ProjectRoot: root}, []string{"orphan-x"}, "processed", PromoteOpts{Cycle: "9"})
+	if err != nil {
+		t.Fatalf("ReconcileSuperseded: %v", err)
+	}
+	if len(retired) != 1 || retired[0] != "orphan-x" {
+		t.Fatalf("retired=%v, want [orphan-x]", retired)
+	}
+	if _, statErr := os.Stat(filepath.Join(inboxDir, "orphan-x.json")); !os.IsNotExist(statErr) {
+		t.Errorf("retired item must leave the inbox root; stat err=%v", statErr)
+	}
+
+	noop, err := ReconcileSuperseded(Options{ProjectRoot: root}, []string{"never-here"}, "processed", PromoteOpts{Cycle: "9"})
+	if err != nil {
+		t.Fatalf("absent id must be a clean no-op, got err=%v", err)
+	}
+	if len(noop) != 0 {
+		t.Errorf("absent id retired %v, want none", noop)
+	}
+}
+
 // TestRecoverResult_NamesAndCountsOrphans names RecoverResult and pins that an
 // orphan under an inactive cycle is recovered back to the inbox root and counted.
 func TestRecoverResult_NamesAndCountsOrphans(t *testing.T) {

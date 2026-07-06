@@ -31,6 +31,47 @@ phase_skip: []
 Single coverage floor this cycle for package variety.
 `
 
+// TestProjectDecisionJSON_ParsesSupersededSection pins that a `## superseded`
+// section projects into the top-level "superseded" array (deduped, order-
+// preserving) which ship's inboxmover.ReconcileSuperseded consumes, and that an
+// absent section yields an empty (never null) array.
+func TestProjectDecisionJSON_ParsesSupersededSection(t *testing.T) {
+	report := realReport + `
+## superseded (retire an inbox item by id)
+- loop-self-prioritize-unmet-fleet-concurrency: shipped as recover-ship-fleet-starvation-observer in cycle 544
+- other-orphan: shipped as x in cycle 500
+- loop-self-prioritize-unmet-fleet-concurrency: dup line, must be dropped
+`
+	body, err := ProjectDecisionJSON(report, 548)
+	if err != nil {
+		t.Fatalf("ProjectDecisionJSON error: %v", err)
+	}
+	var got projectedDecision
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("projected JSON invalid: %v\n%s", err, body)
+	}
+	want := []string{"loop-self-prioritize-unmet-fleet-concurrency", "other-orphan"}
+	if len(got.Superseded) != len(want) {
+		t.Fatalf("Superseded=%v, want %v (deduped, order-preserving)", got.Superseded, want)
+	}
+	for i := range want {
+		if got.Superseded[i] != want[i] {
+			t.Fatalf("Superseded[%d]=%q, want %q", i, got.Superseded[i], want[i])
+		}
+	}
+
+	// Absent section → empty array, never null (consumer expects an array).
+	base, _ := ProjectDecisionJSON(realReport, 322)
+	var noSec projectedDecision
+	_ = json.Unmarshal(base, &noSec)
+	if noSec.Superseded == nil {
+		t.Errorf("absent superseded section marshaled to null, want []")
+	}
+	if len(noSec.Superseded) != 0 {
+		t.Errorf("absent superseded section = %v, want empty", noSec.Superseded)
+	}
+}
+
 func TestProjectDecisionJSON_ParsesAllSections(t *testing.T) {
 	body, err := ProjectDecisionJSON(realReport, 322)
 	if err != nil {

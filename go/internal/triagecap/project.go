@@ -41,9 +41,10 @@ var idSlugRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 // deferred.go deliberately matches deferred-OR-dropped as one set; the
 // projection must keep the two sections distinct).
 var (
-	deferredSectionRE = regexp.MustCompile(`(?m)^## deferred\b`)
-	droppedSectionRE  = regexp.MustCompile(`(?m)^## dropped\b`)
-	dropReasonRE      = regexp.MustCompile(`reason=(.*)$`)
+	deferredSectionRE   = regexp.MustCompile(`(?m)^## deferred\b`)
+	droppedSectionRE    = regexp.MustCompile(`(?m)^## dropped\b`)
+	supersededSectionRE = regexp.MustCompile(`(?m)^## superseded\b`)
+	dropReasonRE        = regexp.MustCompile(`reason=(.*)$`)
 )
 
 type projTopN struct {
@@ -64,11 +65,12 @@ type projDropped struct {
 // orchestrator marks it as a deterministic projection (vs an agent-authored
 // companion) for forensics; unknown to the consumers' structs, so harmless.
 type projectedDecision struct {
-	Cycle     int           `json:"cycle"`
-	TopN      []projTopN    `json:"top_n"`
-	Deferred  []projID      `json:"deferred"`
-	Dropped   []projDropped `json:"dropped"`
-	Projected bool          `json:"projected_by_orchestrator"`
+	Cycle      int           `json:"cycle"`
+	TopN       []projTopN    `json:"top_n"`
+	Deferred   []projID      `json:"deferred"`
+	Dropped    []projDropped `json:"dropped"`
+	Superseded []string      `json:"superseded"`
+	Projected  bool          `json:"projected_by_orchestrator"`
 }
 
 // ProjectDecisionJSON parses a triage-report.md body and returns the projected
@@ -81,11 +83,12 @@ func ProjectDecisionJSON(artifact string, cycle int) ([]byte, error) {
 	// (ship/postship.go) and any JSON reader expect arrays; a null top_n is a
 	// live regression once disjoint packing can legitimately narrow it to zero.
 	d := projectedDecision{
-		Cycle:     cycle,
-		Projected: true,
-		TopN:      []projTopN{},
-		Deferred:  []projID{},
-		Dropped:   []projDropped{},
+		Cycle:      cycle,
+		Projected:  true,
+		TopN:       []projTopN{},
+		Deferred:   []projID{},
+		Dropped:    []projDropped{},
+		Superseded: []string{},
 	}
 	if body, ok := sectionBody(artifact, topNHeadingRE); ok {
 		for _, it := range parseItems(body) {
@@ -100,6 +103,20 @@ func ProjectDecisionJSON(artifact string, cycle int) ([]byte, error) {
 	if body, ok := sectionBody(artifact, droppedSectionRE); ok {
 		for _, it := range parseItems(body) {
 			d.Dropped = append(d.Dropped, projDropped{ID: it.id, Reason: reasonOf(it.rest)})
+		}
+	}
+	// superseded[] names inbox ids whose work already shipped under a different
+	// id — retired by id ALONE at ship (inboxmover.ReconcileSuperseded), the
+	// durable close of the cycle-544..548 orphan gap. Deduped here so the ship
+	// hook receives a clean list even if the report repeats an id.
+	if body, ok := sectionBody(artifact, supersededSectionRE); ok {
+		seen := map[string]struct{}{}
+		for _, it := range parseItems(body) {
+			if _, dup := seen[it.id]; dup {
+				continue
+			}
+			seen[it.id] = struct{}{}
+			d.Superseded = append(d.Superseded, it.id)
 		}
 	}
 	return json.MarshalIndent(d, "", "  ")

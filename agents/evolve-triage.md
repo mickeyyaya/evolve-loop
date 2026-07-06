@@ -134,6 +134,16 @@ phase_skip: []
 - {id}: {action} — reason={duplicate|stale|out-of-scope|requires-split|...}
 - ...
 
+## superseded (retire an inbox item by id — work already shipped under another id)
+- {inbox-id}: shipped as {other-id} in cycle {N} — {1-sentence proof it landed}
+- ...
+<!-- OPTIONAL. List an inbox item ONLY when its underlying work is already on HEAD
+     but it was retired under a DIFFERENT id (so top_n/skip_shipped never matched
+     it), leaving it orphaned in the inbox root across cycles. Ship retires each id
+     listed here BY ID ALONE (inboxmover.ReconcileSuperseded). Omit the section
+     entirely when there is nothing to reconcile — an empty/absent section is a
+     clean no-op. Do NOT list a normal deferred/dropped item here. -->
+
 ## carryoverTodos warnings (if any)
 - {id}: defer_count={N}; recommend operator review
 - ...

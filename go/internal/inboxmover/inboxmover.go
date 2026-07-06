@@ -281,6 +281,69 @@ func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, st
 	return "", ""
 }
 
+// --- Reconciliation: retire-by-id (superseded) ----------------------------
+
+// SupersededInboxIDs extracts the top-level "superseded" string array from a
+// triage-decision.json body: deduped, order-preserving. Returns nil on an
+// absent field or invalid JSON — never panics.
+//
+// This is the data-driven declaration that feeds ReconcileSuperseded at ship,
+// replacing the prose-only "verify vs HEAD, move to consumed" carryover
+// instruction that silently lapsed for cycles 544..548. It names inbox items
+// whose underlying work already shipped under a DIFFERENT id (e.g. cycle 544
+// shipped the fleet-starvation observer as "recover-ship-fleet-starvation-
+// observer", stranding its originating request "loop-self-prioritize-unmet-
+// fleet-concurrency" in the inbox root).
+func SupersededInboxIDs(triageDecisionJSON []byte) []string {
+	var doc struct {
+		Superseded []string `json:"superseded"`
+	}
+	if err := json.Unmarshal(triageDecisionJSON, &doc); err != nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]struct{}{}
+	for _, id := range doc.Superseded {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+// ReconcileSuperseded retires (promotes → newState) each live inbox item whose
+// .id appears in supersededIDs, keyed by id ALONE — independent of the shipping
+// cycle's committed top_n/skip_shipped set. This closes the inbox-lifecycle gap
+// where an item shipped under a synthesized id strands its originating request
+// in the inbox root, so scout/triage keep re-selecting already-completed work.
+//
+// It is selective (only declared ids move — Promote matches a single id and
+// leaves every other item in place) and idempotent (an id not present in the
+// inbox is a clean no-op via Promote's ship.sh-compat NoOp, never an error).
+// Returns the ids actually retired, in declared order. Best-effort like the
+// rest of the lifecycle: never blocks ship.
+func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, p PromoteOpts) ([]string, error) {
+	var retired []string
+	for _, id := range supersededIDs {
+		if id == "" {
+			continue
+		}
+		res, err := Promote(opts, id, newState, p)
+		if err != nil {
+			return retired, fmt.Errorf("reconcile-superseded: promote %q → %s: %w", id, newState, err)
+		}
+		if !res.NoOp {
+			retired = append(retired, id)
+		}
+	}
+	return retired, nil
+}
+
 // --- Subcommand: recover-orphans ------------------------------------------
 
 // RecoverResult counts how many files were moved back to inbox/.

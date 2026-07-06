@@ -125,6 +125,19 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 				CommitSHA: commitShort,
 			})
 		}
+		// Reconcile superseded[] — inbox items whose work shipped under a
+		// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
+		// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
+		// extractIDs only walks top_n/skip_shipped, so these orphans were never
+		// retired; ReconcileSuperseded retires them by id alone. Best-effort.
+		if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, inboxmover.SupersededInboxIDs(body), "processed", inboxmover.PromoteOpts{
+			Cycle:     fmt.Sprintf("%d", cid),
+			CommitSHA: commitShort,
+		}); rErr != nil {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: superseded reconcile for cycle %d: %v", cid, rErr))
+		} else if len(retired) > 0 {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
+		}
 	}
 
 	// ALWAYS drain residual claims: every item still in processing/cycle-<cid>/
