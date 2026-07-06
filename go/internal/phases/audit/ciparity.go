@@ -273,9 +273,12 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	return offenders, nil
 }
 
-// changedPackagesForAudit locates this cycle's changed-package set from the
-// build handoff (same locator the EGPS suite uses). Best-effort: nil when no
-// handoff is found, which makes the apicover gate a no-op (fail-open).
+// changedPackagesForAudit locates this cycle's changed-package set. It prefers
+// the build handoff when present (same locator the EGPS suite uses), then falls
+// back to a deterministic git derivation (changedpkgs.FromGit vs HEAD). The
+// handoff has been extinct since ~cycle 215, so the git fallback is what keeps
+// the apicover gate live: previously an absent handoff returned nil and made the
+// gate a silent no-op (fail-open, standing memory warnship_apicover_ci_gap).
 func changedPackagesForAudit(projectRoot string, cycle int) []string {
 	if projectRoot == "" {
 		return nil
@@ -286,5 +289,5 @@ func changedPackagesForAudit(projectRoot string, cycle int) []string {
 			return pkgs
 		}
 	}
-	return nil
+	return changedpkgs.FromGit(projectRoot, "HEAD")
 }

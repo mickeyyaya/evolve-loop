@@ -124,7 +124,7 @@
   "parallel_eligible": false,
   "schema_filter_enabled": true,
   "model_tier_envelope": {
-    "min": "balanced",
+    "min": "fast",
     "default": "balanced",
     "max": "balanced"
   },

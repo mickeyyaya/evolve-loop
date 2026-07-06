@@ -96,13 +96,28 @@ func commitPairGit(g gitexec.Git, base string) error {
 		}
 		lastErr = commitFailure(base, code, stderr, err)
 		if !isTransientGitLock(stderr) {
-			return lastErr // permanent error → don't burn the retry budget on an unwinnable failure
+			// Permanent error → don't burn the retry budget, but unstage the pair
+			// we `git add`ed so it can't survive into the next cycle's tree-diff
+			// guard as a phantom staged change. The original error surfaces verbatim.
+			unstagePair(ctx, g, jsonName, mdName)
+			return lastErr
 		}
 		if attempt < commitMaxAttempts {
 			time.Sleep(time.Duration(attempt) * commitBackoffBase)
 		}
 	}
+	// Retry budget exhausted on a stuck lock: same rollback so a failed commit
+	// never leaves the pair staged, regardless of failure class.
+	unstagePair(ctx, g, jsonName, mdName)
 	return fmt.Errorf("dossier: commit %s: giving up after %d attempts: %w", base, commitMaxAttempts, lastErr)
+}
+
+// unstagePair removes the just-added dossier pair from the index after a failed
+// commit, so the staged files never pollute the next cycle's tree-diff guard.
+// Best-effort: the caller returns the original commit error regardless of
+// whether the reset itself succeeds.
+func unstagePair(ctx context.Context, g gitexec.Git, jsonName, mdName string) {
+	_ = g.Run(ctx, "reset", "--", jsonName, mdName)
 }
 
 // commitFailure renders a commit failure, carrying the underlying git stderr so

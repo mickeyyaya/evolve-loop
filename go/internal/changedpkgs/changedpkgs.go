@@ -12,11 +12,14 @@
 package changedpkgs
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // FileToPackage maps a repo path to its go-module-relative test pattern
@@ -81,6 +84,49 @@ func ChangedPackages(handoffPath string) []string {
 	for _, th := range d.Thrusts {
 		add(th.FilesModified)
 		add(th.FilesNew)
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for p := range set {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// FromGit derives the changed-package set deterministically from git — the
+// Rule-5 replacement for the LLM-emitted handoff-build.json, which has been
+// extinct since ~cycle 215 and left the apicover CI-parity gate silently
+// fail-open on every real cycle. It returns the sorted, deduped go test patterns
+// for .go files that differ between baseRef and the working tree: tracked
+// modifications (`git diff --name-only <baseRef>`) plus untracked new files
+// (`git ls-files --others --exclude-standard`), each mapped through
+// FileToPackage. Best-effort like the rest of this package: any git error yields
+// an empty list (the caller falls back), never a panic.
+func FromGit(repoRoot, baseRef string) []string {
+	if repoRoot == "" || baseRef == "" {
+		return nil
+	}
+	g := gitexec.Default(repoRoot)
+	ctx := context.Background()
+	set := map[string]struct{}{}
+	add := func(out string) {
+		for _, f := range strings.Split(out, "\n") {
+			if f = strings.TrimSpace(f); f == "" {
+				continue
+			}
+			if pkg, ok := FileToPackage(f); ok {
+				set[pkg] = struct{}{}
+			}
+		}
+	}
+	if out, err := g.Output(ctx, "diff", "--name-only", baseRef); err == nil {
+		add(out)
+	}
+	if out, err := g.Output(ctx, "ls-files", "--others", "--exclude-standard"); err == nil {
+		add(out)
 	}
 	if len(set) == 0 {
 		return nil
