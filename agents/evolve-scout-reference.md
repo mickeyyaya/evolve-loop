@@ -186,6 +186,15 @@ Loaded when writing scout-report.md. Not needed when the common-path report stru
 # Cycle {N} Scout Report
 <!-- challenge-token: {challengeToken} -->
 
+## Handoff Summary
+<!-- Never-evict digest for triage/build (cycle-565 S1). Size-budgeted (~2K
+tokens): decisions, selected-task acceptance criteria, open questions, verdict
+HERE; long detail goes in the evictable sections below. -->
+- **Decisions:** <selection rationale, 1-3 bullets>
+- **Acceptance criteria:** <per selected task, one line>
+- **Open questions:** <for triage/build, or "none">
+- **Verdict:** PASS / FAIL / WARN
+
 ## Discovery Summary
 - Scan mode: full / incremental / convergence-confirmation
 - Files analyzed: X | Research: performed / skipped | Instincts applied: X

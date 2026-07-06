@@ -509,8 +509,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	if cfg.ContractGate != config.StageOff {
 		// Catalog-aware so user/minted phases get spec-derived contracts (WS-A):
 		// the host gate enforces the SAME well-formedness the agent's
-		// `evolve phase verify` self-check derives from the phase.json.
-		reviewers = append(reviewers, deliverable.NewReviewerWithCatalogStage(cfg.ContractGate, catalog, cfg.PhaseIO))
+		// `evolve phase verify` self-check derives from the phase.json. The
+		// report-size gate (cycle-565 S1) rides the same reviewer as its own
+		// dial: default shadow (observe-only) so it is byte-identical until an
+		// operator promotes gates.report_size_gate to enforce.
+		reviewers = append(reviewers, deliverable.NewReviewerWithCatalogStageReportSize(
+			cfg.ContractGate, catalog, cfg.PhaseIO,
+			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens))
 	}
 	if cfg.TriageCapGate != config.StageOff {
 		// R9.2 triage capacity clamp (internal/triagecap): committed coverage

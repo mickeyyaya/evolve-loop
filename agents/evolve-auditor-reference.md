@@ -111,6 +111,16 @@ audit_bound_tree_sha: {TREE_SHA}
 <!-- ANCHOR:verdict -->
 ## Verdict: PASS / WARN / FAIL
 
+## Handoff Summary
+<!-- Never-evict digest for the next cycle (cycle-565 S1). Size-budgeted (~2K
+tokens): the verdict, the acceptance-criteria adjudication, and any open
+questions/carryover HERE; detailed evidence stays in the evictable sections
+below. -->
+- **Decisions:** <verdict rationale, 1-3 bullets>
+- **Acceptance criteria:** <met / not-met per criterion>
+- **Open questions:** <carryover for next cycle, or "none">
+- **Verdict:** PASS / WARN / FAIL
+
 ## Code Quality
 ```tsv
 Check	Status	Details

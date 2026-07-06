@@ -119,13 +119,13 @@ var contracts = map[string]Contract{
 	// enforce).
 	"build": {
 		Phase: "build", AgentName: "builder", ArtifactName: "build-report.md",
-		Kind: KindMarkdown, Sections: Build.Sections, Verdicts: nil,
+		Kind: KindMarkdown, Sections: alwaysOn(Build.Sections), Verdicts: nil,
 		WriteTarget: TargetWorkspace, RequireChallengeToken: true,
 		RequireFailureContextPhaseIO: true,
 	},
 	"scout": {
 		Phase: "scout", AgentName: "scout", ArtifactName: "scout-report.md",
-		Kind: KindMarkdown, Sections: Scout.Sections, Verdicts: nil,
+		Kind: KindMarkdown, Sections: alwaysOn(Scout.Sections), Verdicts: nil,
 		WriteTarget: TargetWorkspace, RequireFailureContextPhaseIO: true,
 	},
 	"tdd": {
@@ -135,7 +135,7 @@ var contracts = map[string]Contract{
 	},
 	"audit": {
 		Phase: "audit", AgentName: "auditor", ArtifactName: "audit-report.md",
-		Kind: KindMarkdown, Sections: Audit.Sections, Verdicts: verdictsPassFailWarnSkp,
+		Kind: KindMarkdown, Sections: alwaysOn(Audit.Sections), Verdicts: verdictsPassFailWarnSkp,
 		WriteTarget: TargetWorkspace, RequireFailureContext: true,
 	},
 	"intent": {
@@ -175,6 +175,35 @@ var contracts = map[string]Contract{
 		Phase: "ship", AgentName: "ship", ArtifactName: "",
 		NoArtifact: true, // no file deliverable → WriteTarget is irrelevant (verifier short-circuits)
 	},
+}
+
+// stagedSections are declared contract sections whose ENFORCEMENT rolls out
+// through a dedicated gate rather than the always-on contract gate — so the
+// always-on gate stays byte-identical until that gate graduates (the same
+// off→shadow→enforce staging every other gate in this repo uses). HandoffSummary
+// (cycle-565 Slice S1) is declared on the build/scout/audit Report contracts —
+// producers MUST document it (contract_test.go) and each report SHOULD carry it —
+// but its presence/size is observed via the report-size gate
+// (deliverable.VerifyWithReportSize), which defaults to shadow per the S1
+// "shadow/warn first" spec. Keeping it out of the always-on enforced set means
+// the new section cannot false-block a report before the report-size gate is
+// deliberately promoted, and keeps it decoupled from unrelated contract checks
+// (challenge-token, failure-context, circuit-breaker).
+var stagedSections = map[string]bool{HandoffSummary.Canonical: true}
+
+// alwaysOn returns the sections the always-on contract gate hard-requires:
+// every declared section except those in stagedSections. It derives from the
+// Report vars (single-sourced — headings are never re-typed here), so a heading
+// change in contract.go still propagates to the registry.
+func alwaysOn(sections []Section) []Section {
+	out := make([]Section, 0, len(sections))
+	for _, s := range sections {
+		if stagedSections[s.Canonical] {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // aliases maps human-facing names to the canonical wire identity used as the

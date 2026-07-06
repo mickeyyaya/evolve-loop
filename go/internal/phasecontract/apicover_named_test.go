@@ -181,10 +181,14 @@ func TestVerdictSentinel_ProducedAndParsed(t *testing.T) {
 
 // TestBuiltinReportVars_WiredIntoRegistry — Audit/Build/Intent/Scout/Triage are
 // the builtin phase Report values; the registry contract for each phase wires its
-// Sections from the matching var (contract_registry.go: Sections: Build.Sections,
-// etc.). Asserting For(phase).Sections is the SAME slice the var declares proves
-// the var is the live single source consumed by the registry — and pins each
-// var's Phase field as load-bearing.
+// Sections from the matching var (contract_registry.go: Sections: alwaysOn(Build.Sections),
+// etc.). Asserting For(phase).Sections equals alwaysOn(var.Sections) proves the
+// var is the live single source consumed by the registry — and pins each var's
+// Phase field as load-bearing. The always-on registry set is the DECLARED set
+// minus stagedSections (cycle-565 S1: HandoffSummary is declared on the Report
+// var but its enforcement rolls out through the report-size gate, so it is
+// deliberately absent from the always-on enforced set — see contract_registry.go
+// stagedSections/alwaysOn).
 func TestBuiltinReportVars_WiredIntoRegistry(t *testing.T) {
 	cases := []struct {
 		phase  string
@@ -204,9 +208,9 @@ func TestBuiltinReportVars_WiredIntoRegistry(t *testing.T) {
 		if len(tc.report.Sections) == 0 {
 			t.Errorf("%s var declares no sections", tc.phase)
 		}
-		if !reflect.DeepEqual(c.Sections, tc.report.Sections) {
-			t.Errorf("%s: registry Contract.Sections not wired from the %s var\n contract: %+v\n var:      %+v",
-				tc.phase, tc.phase, c.Sections, tc.report.Sections)
+		if want := alwaysOn(tc.report.Sections); !reflect.DeepEqual(c.Sections, want) {
+			t.Errorf("%s: registry Contract.Sections not wired from alwaysOn(%s var)\n contract: %+v\n want:     %+v",
+				tc.phase, tc.phase, c.Sections, want)
 		}
 	}
 }

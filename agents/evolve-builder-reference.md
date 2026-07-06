@@ -324,6 +324,16 @@ Loaded when authoring `workspace/build-report.md` (the primary build output) and
 - **Instincts applied:** <list or "none">
 - **instinctsApplied:** [inst IDs that influenced decisions]
 
+## Handoff Summary
+<!-- Never-evict digest for the next phase (cycle-565 S1). Keep it tight: this
+section is size-budgeted (~2K tokens). Put decisions, acceptance-criteria
+outcomes, open questions, and the verdict HERE; move long detail into the
+sections below (they are evictable / path-referenced). -->
+- **Decisions:** <what you decided and why, 1-3 bullets>
+- **Acceptance criteria:** <met / not-met per criterion>
+- **Open questions:** <for the auditor / next cycle, or "none">
+- **Verdict:** PASS / FAIL / WARN
+
 ## Worktree
 - **Branch:** <from `git branch --show-current`>
 - **Commit:** <SHA from `git rev-parse HEAD`>

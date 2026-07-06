@@ -57,17 +57,34 @@ type Report struct {
 	Producers []string
 }
 
-// Complete reports whether every section is present in content. A Report with
-// no sections is trivially complete (no structural requirement). Callers handle
-// the empty-artifact case separately (it is a distinct FAIL reason).
+// Complete reports whether every always-on required section is present in
+// content. Sections whose enforcement is staged behind a dedicated gate
+// (stagedSections — HandoffSummary rolls out via the report-size gate, cycle-565
+// S1) are skipped here, so the always-on completeness check every classifier
+// runs stays byte-identical until that gate graduates. A Report with no always-on
+// sections is trivially complete. Callers handle the empty-artifact case
+// separately (it is a distinct FAIL reason).
 func (r Report) Complete(content string) bool {
 	for _, s := range r.Sections {
+		if stagedSections[s.Canonical] {
+			continue
+		}
 		if !s.Present(content) {
 			return false
 		}
 	}
 	return true
 }
+
+// HandoffSummary is the never-evict summary section (cycle-565 Slice S1 of
+// report-size-contracts-jit-artifacts): a canonical region carrying the
+// decisions, acceptance criteria, open questions, and verdicts a downstream
+// phase must always see, so it can be separately size-budgeted (see
+// deliverable.CheckHandoffBudget) while the rest of a report becomes evictable
+// detail. Required on the build/scout/audit contracts only this slice — tdd/
+// intent/triage stay untouched (S2/S3 territory). No legacy Accepted variants:
+// it is a new heading, so the canonical string is the only accepted form.
+var HandoffSummary = Section{Canonical: "## Handoff Summary", Accepted: []string{"## Handoff Summary"}}
 
 // The six built-in phase report contracts. Heading strings and producer files
 // were verified against agents/*.md at v16.2.0 (see contract_test.go, which
@@ -76,17 +93,25 @@ func (r Report) Complete(content string) bool {
 // Build — a complete build-report declares a changed-files section. The heading
 // drifted "## Files Modified" → "## Files Changed" → the current "## Changes"
 // (declared in evolve-builder-reference.md). Classifier: any-accepted (OR).
+// Plus the never-evict HandoffSummary (S1).
 var Build = Report{
-	Phase:     "build",
-	Sections:  []Section{{Canonical: "## Changes", Accepted: []string{"## Changes", "## Files Changed", "## Files Modified"}}},
+	Phase: "build",
+	Sections: []Section{
+		{Canonical: "## Changes", Accepted: []string{"## Changes", "## Files Changed", "## Files Modified"}},
+		HandoffSummary,
+	},
 	Producers: []string{"evolve-builder-reference"},
 }
 
 // Scout — a non-empty backlog under the tasks heading. Drifted "## Proposed
 // Tasks" → "## Selected Tasks". The "≥1 task item" check stays in scout.go.
+// Plus the never-evict HandoffSummary (S1).
 var Scout = Report{
-	Phase:     "scout",
-	Sections:  []Section{{Canonical: "## Selected Tasks", Accepted: []string{"## Selected Tasks", "## Proposed Tasks"}}},
+	Phase: "scout",
+	Sections: []Section{
+		{Canonical: "## Selected Tasks", Accepted: []string{"## Selected Tasks", "## Proposed Tasks"}},
+		HandoffSummary,
+	},
 	Producers: []string{"evolve-scout", "evolve-scout-reference"},
 }
 
@@ -106,8 +131,11 @@ var TDD = Report{
 // WARN/SKIPPED token (verdictCanonicalRE/verdictInlineRE in audit.go). Producer
 // declares "## Verdict:" in evolve-auditor-reference.md.
 var Audit = Report{
-	Phase:     "audit",
-	Sections:  []Section{{Canonical: "## Verdict", Accepted: []string{"## Verdict", "Verdict:"}}},
+	Phase: "audit",
+	Sections: []Section{
+		{Canonical: "## Verdict", Accepted: []string{"## Verdict", "Verdict:"}},
+		HandoffSummary,
+	},
 	Producers: []string{"evolve-auditor-reference"},
 }
 

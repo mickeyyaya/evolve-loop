@@ -121,6 +121,9 @@ type Policy struct {
 	// Router configures advisor routing behavior and per-decision model
 	// overrides. Absent ⇒ built-in defaults apply.
 	Router *RouterPolicy `json:"router,omitempty"`
+	// ReportBudget configures the report-size gate's per-artifact token budgets
+	// (cycle-565 Slice S1). Absent ⇒ built-in defaults apply (HandoffTokens=2000).
+	ReportBudget *ReportBudgetPolicy `json:"report_budget,omitempty"`
 	// MergeGate configures the merge-to-main gate: its rollout stage and the
 	// cadence-scaling thresholds the advisor reads to decide when a completed
 	// milestone is promoted to main. Absent ⇒ built-in defaults apply
@@ -1139,23 +1142,30 @@ type GatesPolicy struct {
 	EvalGate      string `json:"eval_gate,omitempty"`
 	TriageCapGate string `json:"triage_cap_gate,omitempty"`
 	ReviewGate    string `json:"review_gate,omitempty"`
+	// ReportSizeGate is the report-size (handoff-summary token budget) gate's own
+	// rollout dial (cycle-565 Slice S1). Unlike the other gates it defaults to
+	// "shadow", not "enforce": the inbox spec calls for shadow/warn BEFORE
+	// enforce so the budget is observed before it can block a cycle.
+	ReportSizeGate string `json:"report_size_gate,omitempty"`
 }
 
 // GatesConfig is the resolved gate configuration with defaults applied.
 type GatesConfig struct {
-	ContractGate  string
-	EvalGate      string
-	TriageCapGate string
-	ReviewGate    string
+	ContractGate   string
+	EvalGate       string
+	TriageCapGate  string
+	ReviewGate     string
+	ReportSizeGate string
 }
 
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
 func (p Policy) GatesConfig() GatesConfig {
 	c := GatesConfig{
-		ContractGate:  "enforce",
-		EvalGate:      "enforce",
-		TriageCapGate: "enforce",
-		ReviewGate:    "off",
+		ContractGate:   "enforce",
+		EvalGate:       "enforce",
+		TriageCapGate:  "enforce",
+		ReviewGate:     "off",
+		ReportSizeGate: "shadow", // shadow/warn first, per the Slice S1 inbox spec
 	}
 	if p.Gates == nil {
 		return c
@@ -1171,6 +1181,38 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ReviewGate != "" {
 		c.ReviewGate = p.Gates.ReviewGate
+	}
+	if p.Gates.ReportSizeGate != "" {
+		c.ReportSizeGate = p.Gates.ReportSizeGate
+	}
+	return c
+}
+
+// ReportBudgetPolicy is the .evolve/policy.json "report_budget" block: the
+// per-artifact token budgets the report-size gate enforces (cycle-565 Slice S1).
+// Separate from GatesPolicy so the budget VALUE and the gate STAGE are dialed
+// independently. Absent ⇒ built-in defaults apply.
+type ReportBudgetPolicy struct {
+	HandoffTokens int `json:"handoff_tokens,omitempty"`
+}
+
+// ReportBudgetConfig is the resolved report-budget configuration with defaults
+// applied. HandoffTokens is the ~2K default token budget for the never-evict
+// "## Handoff Summary" section (policy-sourced per phase_settings_from_config_not_code).
+type ReportBudgetConfig struct {
+	HandoffTokens int
+}
+
+// ReportBudgetConfig returns the report-size token budgets with built-in
+// defaults resolved. An absent or empty report_budget block resolves the 2000
+// default; an explicit positive value overrides it.
+func (p Policy) ReportBudgetConfig() ReportBudgetConfig {
+	c := ReportBudgetConfig{HandoffTokens: 2000}
+	if p.ReportBudget == nil {
+		return c
+	}
+	if p.ReportBudget.HandoffTokens > 0 {
+		c.HandoffTokens = p.ReportBudget.HandoffTokens
 	}
 	return c
 }

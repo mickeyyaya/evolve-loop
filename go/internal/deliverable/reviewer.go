@@ -33,12 +33,18 @@ const defaultBreakerThreshold = 3
 // Reviewer is the deliverable-contract gate. Construct with NewReviewer; tests
 // override breakerPath/threshold/logf directly.
 type Reviewer struct {
-	stage       config.Stage
-	phaseIO     config.Stage // EVOLVE_PHASE_IO rollout stage; gates the RequireFailureContextPhaseIO check (ADR-0050 §3.8). Default StageOff → byte-identical.
-	threshold   int
-	breakerPath string // override for the consecutive-block counter file (tests); "" → derive under .evolve
-	logf        func(format string, args ...any)
-	resolver    phasecontract.Resolver // built-in only by default; catalog-aware via NewReviewerWithCatalog
+	stage   config.Stage
+	phaseIO config.Stage // EVOLVE_PHASE_IO rollout stage; gates the RequireFailureContextPhaseIO check (ADR-0050 §3.8). Default StageOff → byte-identical.
+	// reportSizeGate gates the Handoff Summary token-budget check (cycle-565
+	// Slice S1), independent of the ContractGate stage: blocks only at
+	// StageEnforce. reportSizeBudgetTokens is the budget it enforces. Zero-value
+	// (StageOff/0) ⇒ byte-identical to pre-S1 behavior.
+	reportSizeGate         config.Stage
+	reportSizeBudgetTokens int
+	threshold              int
+	breakerPath            string // override for the consecutive-block counter file (tests); "" → derive under .evolve
+	logf                   func(format string, args ...any)
+	resolver               phasecontract.Resolver // built-in only by default; catalog-aware via NewReviewerWithCatalog
 }
 
 // breakerFile is the default persistent counter location.
@@ -69,6 +75,19 @@ func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phas
 	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
 }
 
+// NewReviewerWithCatalogStageReportSize is NewReviewerWithCatalogStage plus the
+// report-size gate (cycle-565 Slice S1). reportSizeGate gates the Handoff
+// Summary token-budget check — INDEPENDENT of the ContractGate stage, blocking
+// only at StageEnforce; budgetTokens is the budget it enforces. Zero-value
+// (StageOff/0) ⇒ byte-identical to NewReviewerWithCatalogStage, so wiring it in
+// changes nothing until the report-size gate is deliberately promoted.
+func NewReviewerWithCatalogStageReportSize(stage config.Stage, cat phasespec.Catalog, phaseIO, reportSizeGate config.Stage, budgetTokens int) core.DeliverableReviewer {
+	r := newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
+	r.reportSizeGate = reportSizeGate
+	r.reportSizeBudgetTokens = budgetTokens
+	return r
+}
+
 func newReviewer(stage config.Stage, resolver phasecontract.Resolver, phaseIO config.Stage) *Reviewer {
 	return &Reviewer{
 		stage:     stage,
@@ -88,7 +107,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	// r.resolver is always set by newReviewer (the single construction point):
 	// BuiltinResolver for NewReviewer, a CatalogResolver for
 	// NewReviewerWithCatalog. No nil guard needed.
-	res, err := VerifyWithStage(in.Phase, roots, r.resolver, r.phaseIO)
+	res, err := VerifyWithReportSize(in.Phase, roots, r.resolver, r.phaseIO, r.reportSizeGate, r.reportSizeBudgetTokens)
 	if err != nil {
 		// Ambiguity / infra — fail OPEN (never brick the loop on the gate's own
 		// inability to decide). Does not touch the breaker.
