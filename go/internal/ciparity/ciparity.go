@@ -108,16 +108,19 @@ func NewUngraduatedPackages(changed []string, enforceBytes []byte) []string {
 	return out
 }
 
-// CoverageTags is the SSOT build-tag set matching .github/workflows/go.yml's
-// tagged coverage step ("-tags integration"). Every scoped coverage-measuring
+// CoverageTags is the SSOT build-tag set covering BOTH tiers the repo gates real
+// coverage behind: //go:build integration (real-FS/git/tmux) AND //go:build acs
+// (in-package acs suites in internal/core, internal/acssuite,
+// internal/phases/audit, internal/evalgate). Every scoped coverage-measuring
 // call site MUST build its `go test` args through CoverageTestArgs so it reads
 // the SAME (tagged) coverage number CI does. An untagged run under-reports a
 // tag-gated package's real coverage by up to 43 points (R1:
 // knowledge-base/research/test-coverage-audit-2026-07.md — internal/phases/ship
 // measured 47.0% plain vs 90.6% tagged), which would let a gate ship on a wrong
-// number. This is the same defect class ADR-0069 fixed once for vet/apicover,
-// now for the coverage dimension.
-const CoverageTags = "integration"
+// number; measuring the integration tier alone still under-counts the acs-gated
+// in-package suites. This is the same defect class ADR-0069 fixed once for
+// vet/apicover, now for the coverage dimension.
+const CoverageTags = "integration acs"
 
 // CoverageTestArgs returns tag-parity-correct `go test` args for a scoped
 // coverage-profile run: ["test", "-tags", CoverageTags, "-coverprofile="+
