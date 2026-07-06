@@ -1,6 +1,7 @@
 {
   "name": "tdd-engineer",
   "role": "tdd-engineer",
+  "effort_level": "medium",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
   "model_tier_overrides": {

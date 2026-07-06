@@ -133,6 +133,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		ModelTier:   effectiveModel,
 		Permission:  permissionIntent(permMode),
 		SessionMode: sessionMode,
+		Effort:      prof.EffortLevel,
 		RawByCLI:    prof.ExtraFlagsByCLI,
 	}
 

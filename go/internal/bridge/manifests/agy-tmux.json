@@ -27,6 +27,9 @@
       "flag": "--model",
       "from": "model_tier_map"
     },
+    "effort": {
+      "channel": "noop"
+    },
     "permission": {
       "channel": "flag",
       "values": {

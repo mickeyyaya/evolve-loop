@@ -81,6 +81,10 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
+	// effort → each CLI's native reasoning-effort dial (claude --effort, codex
+	// model_reasoning_effort); manifests without an effort param (or marked
+	// noop) emit nothing, so an unsupported CLI can never abort on it.
+	realizeScalar(&r, m, "effort", intent.Effort)
 
 	// session_mode → controller lifecycle (never a CLI flag for a REPL).
 	if spec, ok := m.Params["session_mode"]; ok && spec.Channel == "controller" && intent.SessionMode != "" {

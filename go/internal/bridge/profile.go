@@ -18,6 +18,10 @@ type Profile struct {
 	StreamOutput   bool
 	SessionName    string
 	Sandbox        *ProfileSandbox
+	// EffortLevel is the abstract reasoning-effort dial (low | medium | high)
+	// carried from the profile JSON's effort_level and realized per-CLI at the
+	// launch seam via LaunchIntent.Effort. Empty = unset (additive no-op).
+	EffortLevel string
 	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch (ADR-0022). Flags
 	// are keyed by the CLI they belong to ("claude-tmux": [...]) and realized
 	// ONLY for the matching CLI, so a claude-origin profile switched to
@@ -63,6 +67,7 @@ type profileWire struct {
 	StreamOutput    *bool               `json:"stream_output"`
 	SessionName     string              `json:"session_name"`
 	Sandbox         *ProfileSandbox     `json:"sandbox"`
+	EffortLevel     string              `json:"effort_level"`
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
@@ -111,6 +116,7 @@ func LoadProfile(path string) (Profile, error) {
 		PermissionMode:  w.PermissionMode,
 		SessionName:     w.SessionName,
 		Sandbox:         w.Sandbox,
+		EffortLevel:     w.EffortLevel,
 		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {

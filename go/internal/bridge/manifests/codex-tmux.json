@@ -27,6 +27,14 @@
       "flag": "-m",
       "from": "model_tier_map"
     },
+    "effort": {
+      "channel": "flag",
+      "values": {
+        "low": ["-c", "model_reasoning_effort=low"],
+        "medium": ["-c", "model_reasoning_effort=medium"],
+        "high": ["-c", "model_reasoning_effort=high"]
+      }
+    },
     "permission": {
       "channel": "controller"
     },

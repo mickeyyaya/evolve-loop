@@ -60,6 +60,10 @@
       "flag": "--model",
       "from": "model_tier_map"
     },
+    "effort": {
+      "channel": "flag",
+      "flag": "--effort"
+    },
     "settings_scope": {
       "channel": "flag",
       "values": {

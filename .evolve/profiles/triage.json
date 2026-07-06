@@ -81,7 +81,7 @@
   "max_budget_usd": 0.75,
   "max_turns": 18,
   "turn_budget_hint": 12,
-  "effort_level": "medium",
+  "effort_level": "low",
   "output_artifact": ".evolve/runs/cycle-{cycle}/triage-report.md",
   "challenge_token_required": true,
   "extra_flags_by_cli": {

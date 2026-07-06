@@ -25,6 +25,9 @@
     "model_tier": {
       "channel": "noop"
     },
+    "effort": {
+      "channel": "noop"
+    },
     "permission": {
       "channel": "noop"
     },
