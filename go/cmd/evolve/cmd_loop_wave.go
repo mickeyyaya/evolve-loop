@@ -131,6 +131,53 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 	return true, specs, results, nil
 }
 
+// minWidthRepair is the extracted, independently-testable call-site wiring for
+// the cycle-547 min-width fleet-dispatch repair. RunLoop's batch loop reaches
+// it on dispatchIteration's default (ran=false, err=nil) case: the wave-sized
+// Count shrank below shouldRunWave's Count>1 gate (a quota bench / budget
+// resize) but the operator's fleet.count wanted >1 lanes. Rather than drop to
+// width ZERO (the leak-prone sequential path), when eligible it drives up to
+// ONE disjoint candidate through the SAME isolated-worktree launcher via
+// forceOneLaneDispatch (capped at a single lane); the caller `continue`s the
+// batch iteration when handled=true. Previously this switch lived inline in
+// RunLoop and nothing exercised the guard / WARN-vs-dispatch branching — the
+// wiring could silently regress (inverted guard, deleted call site) uncaught.
+// The four stderr messages and the control flow are byte-identical to the
+// inline switch they replace:
+//   - guard not met (fleetCfg.Count<=1 || waveCfg.Count>1): WARN "empty triage
+//     plan", handled=false, forceOneLaneDispatch (and thus preflight/planFn/
+//     launcher) never invoked.
+//   - guard met, a candidate dispatched: log "min-width repair dispatched",
+//     handled=true (caller must continue).
+//   - guard met, genuinely empty backlog: WARN "empty backlog", handled=false
+//     (the only case true sequential fallback stays reserved for).
+//   - guard met, forceOneLaneDispatch errored: WARN "min-width repair failed"
+//     with the wrapped error surfaced, handled=false — never silently swallowed.
+func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int, stderr io.Writer) (handled bool) {
+	if !(fleetCfg.Count > 1 && waveCfg.Count <= 1) {
+		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan), falling back to sequential\n", waveIndex)
+		return false
+	}
+	ran1, _, results1, oerr := forceOneLaneDispatch(ctx, preflight, planFn, launcher, waveIndex)
+	switch {
+	case oerr != nil:
+		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d min-width repair failed, falling back to sequential: %v\n", waveIndex, oerr)
+		return false
+	case ran1:
+		failedLanes := 0
+		for _, r := range results1 {
+			if r.Err != nil || r.ExitCode != 0 {
+				failedLanes++
+			}
+		}
+		fmt.Fprintf(stderr, "[loop] wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)\n", waveIndex, len(results1)-failedLanes, len(results1), fleetCfg.Count, waveCfg.Count)
+		return true
+	default:
+		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty backlog), falling back to sequential\n", waveIndex)
+		return false
+	}
+}
+
 // loadFleetConfig loads .evolve/policy.json and returns the resolved fleet
 // configuration. Absent or malformed policy falls back to built-in defaults
 // (Count=1 — the existing sequential path), mirroring loadWorkflowConfig.
