@@ -149,9 +149,11 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 // wiring could silently regress (inverted guard, deleted call site) uncaught.
 // The four stderr messages and the control flow are byte-identical to the
 // inline switch they replace:
-//   - guard not met (fleetCfg.Count<=1 || waveCfg.Count>1): WARN "empty triage
-//     plan", handled=false, forceOneLaneDispatch (and thus preflight/planFn/
-//     launcher) never invoked.
+//   - guard not met (fleetCfg.Count<=1 — the operator wanted a single lane):
+//     WARN "empty triage plan", handled=false, forceOneLaneDispatch (and thus
+//     preflight/planFn/launcher) never invoked. The empty-plan-at-full-capacity
+//     shape (waveCfg.Count>1, zero planned lanes) is now IN-guard: it repairs to
+//     one isolated lane instead of leaking to sequential.
 //   - guard met, a candidate dispatched: log "min-width repair dispatched",
 //     handled=true (caller must continue).
 //   - guard met, genuinely empty backlog: WARN "empty backlog", handled=false
@@ -159,7 +161,13 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 //   - guard met, forceOneLaneDispatch errored: WARN "min-width repair failed"
 //     with the wrapped error surfaced, handled=false — never silently swallowed.
 func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int, stderr io.Writer) (handled bool) {
-	if !(fleetCfg.Count > 1 && waveCfg.Count <= 1) {
+	// Eligibility is the operator-asserted width alone: fleetCfg.Count>1 means
+	// the operator wanted a fleet, so BOTH the quota-shrunk shape (waveCfg.Count
+	// <=1) AND the empty-plan-at-full-capacity shape (waveCfg.Count>1 yet
+	// dispatchIteration planned zero lanes) route through the isolated one-lane
+	// repair rather than the leak-prone sequential fallthrough. True sequential
+	// stays reserved for fleetCfg.Count<=1 only (the operator wanted one lane).
+	if fleetCfg.Count <= 1 {
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan), falling back to sequential\n", waveIndex)
 		return false
 	}
@@ -363,7 +371,12 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 			Files []string `json:"files"`
 		} `json:"top_n"`
 	}
-	if json.Unmarshal(data, &decision) != nil || len(decision.TopN) == 0 {
+	// Only an unparseable decision returns unchanged. An EMPTY top_n is NOT a
+	// no-op: it is the observed empty/narrow-decision starvation shape (cycle-554)
+	// — fall through with an empty `committed` and widen fully from the inbox
+	// backlog, exactly as if no lanes had been committed, so the wave plans
+	// fleet-width lanes instead of returning the empty decision unchanged.
+	if json.Unmarshal(data, &decision) != nil {
 		return data
 	}
 	committed := make([]triagecap.FleetCandidate, 0, len(decision.TopN))

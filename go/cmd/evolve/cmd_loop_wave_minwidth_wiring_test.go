@@ -27,9 +27,10 @@ package main
 //	switch (byte-identical stderr messages + control flow) so the guard
 //	condition and WARN-vs-dispatch branching are independently testable
 //	without a real fleet-lane subprocess:
-//	  - guard not met (fleetCfg.Count<=1 or waveCfg.Count>1): WARNs "planned
-//	    zero lanes (empty triage plan)", returns handled=false, NEVER calls
-//	    preflight/planFn/launcher.
+//	  - guard not met (fleetCfg.Count<=1 — the operator wanted one lane): WARNs
+//	    "planned zero lanes (empty triage plan)", returns handled=false, NEVER
+//	    calls preflight/planFn/launcher. (cycle-557: the empty-plan-at-full-
+//	    capacity shape, waveCfg.Count>1 with zero planned lanes, is now IN-guard.)
 //	  - guard met, forceOneLaneDispatch dispatches a candidate: WARNs/logs
 //	    "min-width repair dispatched N/M isolated lane (fleet.count=X shrank
 //	    to Y)", returns handled=true (caller must `continue`).
@@ -46,9 +47,10 @@ package main
 //
 // ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
 //   - Negative (the critical anti-gaming case): TestMinWidthRepair_GuardNotMetNeverInvokesLauncher
-//     — a fleetCfg.Count<=1 (or waveCfg.Count>1) config must leave the
-//     launcher UNTOUCHED; an inverted/loosened guard is the exact wiring
-//     regression this task exists to catch.
+//     — a fleetCfg.Count<=1 config must leave the launcher UNTOUCHED; an
+//     inverted/loosened guard is the exact wiring regression this task exists
+//     to catch. (cycle-557 widened eligibility: waveCfg.Count>1 no longer
+//     excludes the repair — see cmd_loop_wave_starvation_test.go.)
 //   - Positive: TestMinWidthRepair_GuardMetDispatchesOneIsolatedLaneAndSignalsContinue
 //   - Edge (empty backlog): TestMinWidthRepair_EligibleButEmptyBacklogFallsBackToSequential
 //   - Edge (error surfaced, never swallowed): TestMinWidthRepair_ForceDispatchErrorSurfacesAndFallsBack
