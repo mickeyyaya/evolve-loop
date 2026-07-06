@@ -124,3 +124,25 @@ func Fresh(l Lease, now time.Time, ttl time.Duration) bool {
 	}
 	return now.Sub(hb) < ttl
 }
+
+// OwnerLive reports whether the lease's owner is genuinely live: the heartbeat
+// is Fresh AND the owning process is still running. It adds a pid-liveness
+// probe on top of Fresh so a crashed owner whose heartbeat has not yet aged
+// past the TTL (the common 2-6min post-crash window) no longer reads as "live"
+// and no longer blocks a seal — while a running owner (fresh heartbeat, alive
+// pid) still does, unchanged.
+//
+// The probe is consulted ONLY as an additional way to prove DEADness; a stale
+// heartbeat is never live regardless of pid state (guards pid reuse). When
+// alive is nil or OwnerPID is 0 (a lease written before pid tracking, or a
+// caller that never sets it), OwnerLive falls back to freshness-only — the
+// probe is not called — preserving the pre-pid behavior for un-migrated callers.
+func OwnerLive(l Lease, now time.Time, ttl time.Duration, alive func(int) bool) bool {
+	if !Fresh(l, now, ttl) {
+		return false
+	}
+	if l.OwnerPID == 0 || alive == nil {
+		return true
+	}
+	return alive(l.OwnerPID)
+}

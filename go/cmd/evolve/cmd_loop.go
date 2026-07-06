@@ -308,13 +308,15 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// swallowed parse error would yield a zero CycleState that the
 		// predicate treats as "no cycle", letting the fresh run clobber it.
 		if csErr != nil || unfinishedCycle(cs, last) {
-			// F1-sibling: if the unfinished cycle's run lease is still FRESH, a
-			// LIVE loop owns it — steer to attach/wait, never to `evolve cycle
-			// reset` (sealing a running cycle is the cycle-395 race; reset would
-			// refuse anyway). A stale/absent lease falls through to the normal
-			// resume-or-seal guidance below.
+			// F1-sibling: if the unfinished cycle's run owner is still LIVE (fresh
+			// lease AND alive pid), a running loop owns it — steer to attach/wait,
+			// never to `evolve cycle reset` (sealing a running cycle is the
+			// cycle-395 race; reset would refuse anyway). A dead owner with a still-
+			// fresh heartbeat, or a stale/absent lease, falls through to the normal
+			// resume-or-seal guidance below rather than wedging the operator at
+			// owned_by_live_run against a run that will never come back.
 			if csErr == nil && cs.WorkspacePath != "" {
-				if lease, ok, _ := runlease.Read(cs.WorkspacePath); ok && runlease.Fresh(lease, time.Now(), 0) {
+				if lease, ok, _ := runlease.Read(cs.WorkspacePath); ok && runlease.OwnerLive(lease, time.Now(), 0, pidAlive) {
 					fmt.Fprintf(stderr, "[loop] cycle %d is owned by a LIVE run (pid %d, lease heartbeat fresh) — another evolve loop is already running it.\n", cs.CycleID, lease.OwnerPID)
 					fmt.Fprintln(stderr, "[loop]   • continue/attach:  evolve loop --resume")
 					fmt.Fprintln(stderr, "[loop]   • or let it finish — do NOT `evolve cycle reset` or `pkill` a live run (Ctrl-C lets it checkpoint).")

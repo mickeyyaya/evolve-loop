@@ -64,6 +64,12 @@ type SealOptions struct {
 	Force bool
 	// LeaseTTL overrides the liveness-fence freshness window; 0 = runlease.DefaultTTL.
 	LeaseTTL time.Duration
+	// PidAlive probes whether the lease's owner process is still running. When
+	// set, the F1 fence uses runlease.OwnerLive (fresh heartbeat AND alive pid)
+	// instead of freshness alone: a crashed owner whose heartbeat is still fresh
+	// (the 2-6min post-crash window) now seals WITHOUT --force. nil preserves the
+	// old freshness-only fence for un-migrated callers (back-compat).
+	PidAlive func(pid int) bool
 }
 
 // SealResult reports what was (or, in dry-run, would be) sealed.
@@ -132,13 +138,15 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		DryRun:        opts.DryRun,
 	}
 
-	// F1 — liveness fence: refuse to seal a cycle whose run owner is still alive
-	// (a fresh .lease heartbeat). runlease is the SSOT for liveness (heartbeat
-	// freshness, NOT pid — a recycled pid must never read as alive). A
-	// stale/missing/unparsable lease ⇒ the owner is gone ⇒ safe to seal. Dry-run
+	// F1 — liveness fence: refuse to seal a cycle whose run owner is still alive.
+	// runlease is the SSOT for liveness: a fresh heartbeat AND (when PidAlive is
+	// wired) a running owner pid. A stale heartbeat is never live regardless of
+	// pid state (guards pid reuse); a dead owner with a still-fresh heartbeat —
+	// the batch-boundary case that used to force `--force` — now seals freely.
+	// A stale/missing/unparsable lease ⇒ the owner is gone ⇒ safe to seal. Dry-run
 	// is a read-only preview and never blocks; Force overrides a live owner
 	// (loud, operator-attested) and is recorded in ForcedOverLiveOwner.
-	if lease, ok, _ := runlease.Read(workspace); ok && runlease.Fresh(lease, t, opts.LeaseTTL) {
+	if lease, ok, _ := runlease.Read(workspace); ok && runlease.OwnerLive(lease, t, opts.LeaseTTL, opts.PidAlive) {
 		res.LeaseOwnerPID = lease.OwnerPID
 		if hb, perr := time.Parse(time.RFC3339Nano, lease.HeartbeatAt); perr == nil {
 			res.LeaseHeartbeatAge = t.Sub(hb)

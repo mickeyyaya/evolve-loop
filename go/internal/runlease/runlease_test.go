@@ -87,6 +87,66 @@ func TestFresh_UnparsableTimestampNeverFresh(t *testing.T) {
 	}
 }
 
+// TestOwnerLive_* — cycle-554 workspace-hygiene-s1 RED contract. Today
+// liveness is freshness-only (10min lease TTL), so a crashed owner with a
+// still-fresh heartbeat (the common 2-6min post-crash window) reads as "live"
+// and blocks SealCycle/the loop guard, forcing `evolve cycle reset --force` at
+// every batch boundary (plan docs/plans/workspace-hygiene-2026-07.md §S1).
+// OwnerLive adds a pid-liveness probe on top of Fresh: dead pid + fresh
+// heartbeat ⇒ not live (the fix); live pid + fresh heartbeat ⇒ still live (the
+// invariant the fence exists for, unchanged).
+
+func TestOwnerLive_DeadPidFreshHeartbeatNotLive(t *testing.T) {
+	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
+	alive := func(pid int) bool { return false } // owner process is gone
+	if OwnerLive(l, t0, 0, alive) {
+		t.Error("fresh heartbeat with a dead owner pid must NOT be live")
+	}
+}
+
+func TestOwnerLive_FreshAliveOwnerIsLive(t *testing.T) {
+	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
+	alive := func(pid int) bool { return pid == 4242 }
+	if !OwnerLive(l, t0, 0, alive) {
+		t.Error("fresh heartbeat with a genuinely live owner pid must be live (safety invariant unchanged)")
+	}
+}
+
+func TestOwnerLive_StaleAliveOwnerNotLive(t *testing.T) {
+	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
+	alive := func(pid int) bool { return true }
+	if OwnerLive(l, t0.Add(20*time.Minute), 0, alive) {
+		t.Error("a stale heartbeat must never be live, even when the pid happens to be alive (pid reuse case)")
+	}
+}
+
+// TestOwnerLive_NilAlive — EDGE/back-compat: a caller that passes no probe
+// keeps the old freshness-only behavior; no probe call, no panic.
+func TestOwnerLive_NilAlive(t *testing.T) {
+	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
+	if !OwnerLive(l, t0, 0, nil) {
+		t.Error("nil alive probe must fall back to freshness-only: fresh heartbeat must be live")
+	}
+	if OwnerLive(l, t0.Add(20*time.Minute), 0, nil) {
+		t.Error("nil alive probe must fall back to freshness-only: stale heartbeat must not be live")
+	}
+}
+
+// TestOwnerLive_Pid0 — EDGE/back-compat: leases written before pid tracking
+// existed (or by a caller that never sets OwnerPID) must resolve via Fresh
+// alone; the probe must not even be consulted.
+func TestOwnerLive_Pid0(t *testing.T) {
+	l := Lease{OwnerPID: 0, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
+	called := false
+	alive := func(int) bool { called = true; return false }
+	if !OwnerLive(l, t0, 0, alive) {
+		t.Error("OwnerPID==0 must fall back to freshness-only regardless of what alive would report")
+	}
+	if called {
+		t.Error("alive must not be consulted when OwnerPID==0")
+	}
+}
+
 func TestWrite_RefreshesHeartbeat(t *testing.T) {
 	dir := t.TempDir()
 	if err := Write(dir, Lease{RunID: "r"}, t0); err != nil {

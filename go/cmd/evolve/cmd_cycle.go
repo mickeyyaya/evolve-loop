@@ -116,6 +116,11 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		Reason:      reason,
 		DryRun:      dryRun,
 		Force:       force,
+		// PID-aware liveness (cycle-554): a crashed owner whose heartbeat has not
+		// yet aged past the TTL (the 2-6min post-crash window) is no longer "live",
+		// so a plain `evolve cycle reset` seals it WITHOUT --force. A genuinely
+		// running owner (alive pid) still refuses. Same probe boot recovery uses.
+		PidAlive: pidAlive,
 	})
 	if err != nil {
 		switch {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,10 +42,17 @@ func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace str
 }
 
 func TestRunCycleReset_LeaseFencing(t *testing.T) {
-	t.Run("fresh lease refuses with owner message", func(t *testing.T) {
+	// A genuinely-alive owner pid: cycle-554's PID-aware fence (runlease.OwnerLive,
+	// wired via SealOptions.PidAlive) now demands BOTH a fresh heartbeat AND a
+	// live process to treat a cycle as owned. This test process's own pid is a
+	// guaranteed-live owner; an arbitrary pid (84055) is almost certainly dead
+	// and would now correctly seal — see the dead-owner subtest below.
+	livePID := os.Getpid()
+
+	t.Run("fresh lease with a live owner refuses with owner message", func(t *testing.T) {
 		root := t.TempDir()
 		ev, ws := seedReset(t, root, 395)
-		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: 84055}, time.Now()); err != nil {
+		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: livePID}, time.Now()); err != nil {
 			t.Fatalf("write lease: %v", err)
 		}
 		var out, errB bytes.Buffer
@@ -53,7 +61,7 @@ func TestRunCycleReset_LeaseFencing(t *testing.T) {
 			t.Fatalf("rc=%d, want 1 (refuse live owner); stderr=%s", rc, errB.String())
 		}
 		s := errB.String()
-		for _, want := range []string{"LIVE", "84055", "evolve loop --resume"} {
+		for _, want := range []string{"LIVE", strconv.Itoa(livePID), "evolve loop --resume"} {
 			if !strings.Contains(s, want) {
 				t.Errorf("stderr missing %q; got:\n%s", want, s)
 			}
@@ -63,10 +71,31 @@ func TestRunCycleReset_LeaseFencing(t *testing.T) {
 		}
 	})
 
-	t.Run("--force overrides a fresh lease with a loud WARN", func(t *testing.T) {
+	t.Run("dead owner with a fresh lease seals WITHOUT --force", func(t *testing.T) {
+		// The cycle-554 fix's payoff at the CLI level: a crashed owner whose
+		// heartbeat is still fresh (the 2-6min post-crash window) used to force
+		// `evolve cycle reset --force` at every batch boundary; now a plain reset
+		// seals it because the owning pid is dead. Exercises the cmd_cycle.go
+		// PidAlive wiring end to end.
 		root := t.TempDir()
 		ev, ws := seedReset(t, root, 395)
-		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: 84055}, time.Now()); err != nil {
+		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: 999999}, time.Now()); err != nil {
+			t.Fatalf("write lease: %v", err)
+		}
+		var out, errB bytes.Buffer
+		rc := runCycleReset([]string{"--project-root", root, "--evolve-dir", ev}, &out, &errB)
+		if rc != 0 {
+			t.Fatalf("rc=%d, want 0 (dead-owner fresh lease seals without --force); stderr=%s", rc, errB.String())
+		}
+		if !strings.Contains(out.String(), "sealed cycle 395") {
+			t.Errorf("expected seal confirmation on stdout; got:\n%s", out.String())
+		}
+	})
+
+	t.Run("--force overrides a live-owner fresh lease with a loud WARN", func(t *testing.T) {
+		root := t.TempDir()
+		ev, ws := seedReset(t, root, 395)
+		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: livePID}, time.Now()); err != nil {
 			t.Fatalf("write lease: %v", err)
 		}
 		var out, errB bytes.Buffer

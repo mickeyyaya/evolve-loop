@@ -55,9 +55,9 @@ func TestCatalog_Merge(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	user := []PhaseSpec{
-		{Name: "security-scan", Optional: true}, // clashes with fixture builtin → dropped
-		{Name: "lint-pass", Optional: true},     // new → added
-		{Name: ""},                              // empty → skipped
+		{Name: "scout", Optional: true},     // clashes with a NON-optional builtin → dropped
+		{Name: "lint-pass", Optional: true}, // new → added
+		{Name: ""},                          // empty → skipped
 	}
 	merged, warnings := builtin.Merge(user)
 

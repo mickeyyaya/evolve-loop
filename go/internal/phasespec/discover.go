@@ -112,6 +112,21 @@ func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 			continue
 		}
 		if _, isBuiltin := c.byName[s.Name]; isBuiltin {
+			// An overlay whose name matches an OPTIONAL built-in (e.g. `memo`,
+			// whose routing lives only in the operator overlay) is ADOPTED, not
+			// dropped — completing cycle-547's exemption (already wired into
+			// ValidateUserSpecWithCatalog/ApplyUserRouting via isOptionalBuiltinName)
+			// at this last unqualified call site. The name already sits in
+			// merged.order via the built-in, so replace the stub in place — no
+			// reorder. A NON-optional (mandatory spine) built-in still drops with
+			// the clash warning, so an operator can never hijack a spine phase's
+			// slot (the anti-hijack floor is the built-in's Optional flag, not the
+			// overlay's own).
+			if isOptionalBuiltinName(s.Name, c) {
+				merged.byName[s.Name] = s
+				merged.userNames[s.Name] = true
+				continue
+			}
 			warnings = append(warnings, "user phase "+s.Name+" clashes with a built-in — built-in kept, user definition ignored")
 			continue
 		}

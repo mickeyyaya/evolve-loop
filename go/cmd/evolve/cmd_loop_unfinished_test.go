@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,8 +28,13 @@ func TestRunLoop_UnfinishedCycle_FreshLeaseHaltsWithLiveOwnerMsg(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"dispatch":{"policy":"off"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Fresh lease ⇒ a live loop owns cycle 395.
-	if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN", OwnerPID: 84055}, time.Now()); err != nil {
+	// Fresh lease AND a genuinely-alive owner pid ⇒ a live loop owns cycle 395.
+	// Use this test process's own pid so the production pid-aware liveness fence
+	// (runlease.OwnerLive, cycle-554) sees a real live owner — a fresh heartbeat
+	// alone is no longer sufficient (a crashed owner's stale-but-fresh lease now
+	// correctly falls through to the resume|reset guidance instead).
+	livePID := os.Getpid()
+	if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN", OwnerPID: livePID}, time.Now()); err != nil {
 		t.Fatalf("write lease: %v", err)
 	}
 
@@ -51,7 +57,7 @@ func TestRunLoop_UnfinishedCycle_FreshLeaseHaltsWithLiveOwnerMsg(t *testing.T) {
 		t.Fatalf("rc=%d, want 2 (halt on a live-owned unfinished cycle); stderr=%s", rc, stderr.String())
 	}
 	s := stderr.String()
-	for _, want := range []string{"owned by a LIVE run", "84055", "evolve loop --resume"} {
+	for _, want := range []string{"owned by a LIVE run", strconv.Itoa(livePID), "evolve loop --resume"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("expected live-owner halt message containing %q; got:\n%s", want, s)
 		}
