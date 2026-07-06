@@ -882,6 +882,15 @@ type FleetPolicy struct {
 	// per the goal spec — and the getter surfaces a warning rather than
 	// logging it, keeping this package I/O-free.
 	PlanSource string `json:"plan_source,omitempty"`
+	// Scheduling selects the lane-dispatch strategy: "wave" (the wave-barrier
+	// Supervisor.Run — today's behaviour) or "pool" (fleet.RunPool, the rolling
+	// lane pool that backfills a replacement on any lane exit instead of waiting
+	// for the wave barrier). Empty/absent ⇒ "wave". Unlike PlanSource, an UNKNOWN
+	// value fails safe to "wave" (NOT the new mode) plus a surfaced warning — an
+	// operator typo must never silently escalate into the unsoaked pool scheduler.
+	// Mirrors SwarmPolicy.Stage / FleetBudgetPolicy.Stage's shadow-first, config-
+	// selected Strategy idiom — not a feature flag.
+	Scheduling string `json:"scheduling,omitempty"`
 	// Budget is the OPT-IN quota-driven lane-sizing block (Q4 of the quota
 	// budgeting campaign). Absent ⇒ FleetConfig.Budget is nil and the wave
 	// never probes quota — zero added latency, byte-identical lanes. Present
@@ -953,6 +962,10 @@ type FleetConfig struct {
 	// budget survives a transient CLI-family bench.
 	MinLanes   int
 	PlanSource string
+	// Scheduling is the resolved lane-dispatch strategy: "wave" (default,
+	// wave-barrier) or "pool" (rolling lane pool). An unknown raw value resolves
+	// to "wave" with a surfaced warning — the new mode is never silently entered.
+	Scheduling string
 	// Budget is the resolved quota-budgeting block, or nil when the operator
 	// supplied no fleet.budget block (the default — quota budgeting off).
 	Budget *FleetBudgetConfig
@@ -981,7 +994,7 @@ const (
 // rejected value.
 func (p Policy) FleetConfig() FleetConfig {
 	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage",
-		StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
+		Scheduling: "wave", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
 	if p.Fleet == nil {
 		return c
 	}
@@ -1009,6 +1022,17 @@ func (p Policy) FleetConfig() FleetConfig {
 	default:
 		c.PlanSource = "manual"
 		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.plan_source: unknown value %q, falling back to \"manual\"", p.Fleet.PlanSource))
+	}
+	// Scheduling: closed vocab, fail-safe to "wave" (NOT the new "pool" mode) —
+	// a typo must never silently opt an operator into the unsoaked pool scheduler.
+	switch p.Fleet.Scheduling {
+	case "", "wave":
+		c.Scheduling = "wave"
+	case "pool":
+		c.Scheduling = "pool"
+	default:
+		c.Scheduling = "wave"
+		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.scheduling: unknown value %q, falling back to \"wave\"", p.Fleet.Scheduling))
 	}
 	if p.Fleet.Budget != nil {
 		b := &FleetBudgetConfig{
