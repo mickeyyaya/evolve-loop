@@ -37,6 +37,50 @@ func TestCleanup_RoutesGitWorktreeRemoveThroughSeam(t *testing.T) {
 	}
 }
 
+// TestCleanup_RoutesGitBranchDeleteThroughSeam (S3, workspace-hygiene plan):
+// Cleanup must run `git branch -d <leaf>` in projectRoot AFTER the worktree
+// remove, through the same injectable seam — the FakeExec fast-tier mirror of
+// TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch's real-git assertion.
+func TestCleanup_RoutesGitBranchDeleteThroughSeam(t *testing.T) {
+	fake := &fixtures.FakeExec{}
+	p := fakeProvisioner(fake, "")
+
+	const worktree = "/base/cycle-9-w0"
+	if err := p.Cleanup(context.Background(), "/repo", worktree); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if keys := fake.CallKeys(); !reflect.DeepEqual(keys, []string{"git worktree", "git branch"}) {
+		t.Fatalf("calls = %v, want [git worktree, git branch] (remove THEN branch delete)", keys)
+	}
+	del := fake.Calls[1]
+	if del.Dir != "/repo" {
+		t.Errorf("branch delete dir = %q, want projectRoot %q", del.Dir, "/repo")
+	}
+	wantArgs := []string{"branch", "-d", "cycle-9-w0"}
+	if !reflect.DeepEqual(del.Args, wantArgs) {
+		t.Errorf("branch delete args = %v, want %v", del.Args, wantArgs)
+	}
+}
+
+// TestCleanup_UnmergedBranch_NeverForceDeletes (S3): a scripted `branch -d`
+// refusal (rc=1, the unmerged case) must NOT be escalated to `-D`, and
+// Cleanup must still return nil (best-effort).
+func TestCleanup_UnmergedBranch_NeverForceDeletes(t *testing.T) {
+	fake := &fixtures.FakeExec{Scripts: map[string]fixtures.ExecResponse{
+		"git branch": {ExitCode: 1, Stderr: "error: the branch is not fully merged"},
+	}}
+	p := fakeProvisioner(fake, "")
+
+	if err := p.Cleanup(context.Background(), "/repo", "/base/cycle-9-w1"); err != nil {
+		t.Fatalf("Cleanup: %v, want nil — a refused branch delete is best-effort", err)
+	}
+	for _, c := range fake.Calls {
+		if c.Key == "git branch" && len(c.Args) > 1 && c.Args[1] == "-D" {
+			t.Fatalf("Cleanup escalated to force delete (-D) after -d refused, args=%v", c.Args)
+		}
+	}
+}
+
 func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	base := t.TempDir()
 	fake := &fixtures.FakeExec{}

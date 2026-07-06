@@ -133,6 +133,88 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	}
 }
 
+// branchExistsSwarm lists local branches matching name — the real-git ground
+// truth mirror of core's branchExists, for the S3 (workspace-hygiene plan)
+// branch-delete-on-Cleanup guard swarm must carry too.
+func branchExistsSwarm(t *testing.T, root, name string) bool {
+	t.Helper()
+	out, err := exec.Command("git", "-C", root, "branch", "--list", name).Output()
+	if err != nil {
+		t.Fatalf("git branch --list %s: %v", name, err)
+	}
+	return strings.TrimSpace(string(out)) != ""
+}
+
+// TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch (S3): a worker branch
+// that never diverged from the integration branch's base is trivially merged
+// into main, so Cleanup must delete it — mirroring core.gitWorktree.Cleanup's
+// same guard (this package cannot depend on core, so the logic is
+// independently mirrored per the plan's stated design).
+func TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch(t *testing.T) {
+	root := gitInit(t)
+	ctx := context.Background()
+	p := NewGitWorkerProvisioner(nil, "")
+	integBranch := integBranchFor(root, 21)
+	if _, err := p.CreateIntegration(ctx, root, 21); err != nil {
+		t.Fatal(err)
+	}
+	w0, err := p.CreateWorker(ctx, root, 21, "w0", integBranch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workerBranch := workerBranchFor(root, 21, "w0")
+	if !branchExistsSwarm(t, root, workerBranch) {
+		t.Fatalf("setup: branch %s should exist right after CreateWorker", workerBranch)
+	}
+
+	if err := p.Cleanup(ctx, root, w0); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if branchExistsSwarm(t, root, workerBranch) {
+		t.Errorf("branch %s still exists after Cleanup of a merged worker branch — should have been deleted", workerBranch)
+	}
+}
+
+// TestGitWorkerProvisioner_Cleanup_UnmergedBranchSurvives (S3): a worker
+// branch carrying a commit never merged back to main must survive Cleanup —
+// git's own `branch -d` merge-check is the safety net, never escalated to `-D`.
+func TestGitWorkerProvisioner_Cleanup_UnmergedBranchSurvives(t *testing.T) {
+	root := gitInit(t)
+	ctx := context.Background()
+	p := NewGitWorkerProvisioner(nil, "")
+	integBranch := integBranchFor(root, 22)
+	if _, err := p.CreateIntegration(ctx, root, 22); err != nil {
+		t.Fatal(err)
+	}
+	w0, err := p.CreateWorker(ctx, root, 22, "w0", integBranch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workerBranch := workerBranchFor(root, 22, "w0")
+
+	if err := os.WriteFile(filepath.Join(w0, "unshipped.txt"), []byte("wip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	add := exec.Command("git", "-C", w0, "add", ".")
+	if out, err := add.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+	commit := exec.Command("git", "-C", w0, "commit", "-q", "-m", "unshipped work")
+	commit.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	if out, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v\n%s", err, out)
+	}
+
+	if err := p.Cleanup(ctx, root, w0); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if !branchExistsSwarm(t, root, workerBranch) {
+		t.Errorf("branch %s was deleted despite carrying an unmerged commit — evidence of unshipped work lost", workerBranch)
+	}
+}
+
 // TestWorktreeBase_AbsoluteOverride covers the policy.json worktree.base override
 // path. An absolute override is honored verbatim with no error.
 func TestWorktreeBase_AbsoluteOverride(t *testing.T) {

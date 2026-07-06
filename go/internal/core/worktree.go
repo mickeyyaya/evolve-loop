@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
@@ -155,7 +156,28 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 		fmt.Fprintf(os.Stderr, "[worktree] WARN remove %s failed (rc=%d): %v: %s\n", worktree, code, err, stderr)
 	}
 	_ = os.RemoveAll(worktree) // clear any leftover stub git left behind
+	deleteCycleBranch(projectRoot, worktree)
 	return nil
+}
+
+// deleteCycleBranch deletes the cycle's own branch (the worktree's leaf name)
+// AFTER its worktree is gone, via non-force `git branch -d` — git's own
+// merged-check is the only safety net, never escalated to `-D` (S3,
+// workspace-hygiene-2026-07 plan: the 106 never-deleted `cycle-*` branches
+// this closes). Gated on the "cycle-" leaf prefix so Cleanup never attempts a
+// branch delete for a path this provisioner didn't create — every worktree
+// gitWorktree.Create mints is runscope-named "cycle-<lane>-<N>".
+func deleteCycleBranch(projectRoot, worktree string) {
+	branch := filepath.Base(worktree)
+	if !strings.HasPrefix(branch, "cycle-") {
+		return
+	}
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "branch", "-d", branch)
+	if err != nil || code != 0 {
+		// Best-effort: an unmerged branch is expected to refuse (rc=1,
+		// "not fully merged") — left in place, not force-deleted.
+		fmt.Fprintf(os.Stderr, "[worktree] WARN branch -d %s failed (rc=%d, likely unmerged — left in place): %v: %s\n", branch, code, err, stderr)
+	}
 }
 
 // WorktreePhase reports whether a phase writes source into the cycle worktree

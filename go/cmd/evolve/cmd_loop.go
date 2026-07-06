@@ -283,6 +283,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.emitFatal(stdout, stderr, cfg, result.Cycle)
 			return 2
 		}
+		finalizeCompletedCycle(cfg, stderr)
 		lr.emit(stdout)
 		return 0
 	}
@@ -781,6 +782,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		lr.emitFatal(stdout, stderr, cfg, lastCycleIn(lr))
 		return 2
 	}
+	finalizeCompletedCycle(cfg, stderr)
 	lr.emit(stdout)
 	// E1 exit-code contract: when any cycle in the batch hit a
 	// recoverable failure (verify-fail + classify → recoverable) OR a
@@ -809,6 +811,25 @@ func readCarryoverCount(statePath string) (count int, ok bool) {
 		return 0, false
 	}
 	return len(s.CarryoverTodos), true
+}
+
+// finalizeCompletedCycle clears a completed cycle's on-disk cycle-state.json
+// marker at a clean batch-exit boundary (S2, workspace-hygiene-2026-07 plan),
+// so the operator no longer has to run `evolve cycle reset --force` before
+// every relaunch. It is the clean-exit counterpart to SealCycle: SILENT on a
+// no-op (nothing completed, still in progress, or a live owner) and
+// best-effort on error — a finalize failure only WARNs, matching every other
+// post-batch cleanup call site in this file, and never turns a clean exit
+// into a failed one.
+func finalizeCompletedCycle(cfg loopConfig, stderr io.Writer) {
+	cleared, err := core.ClearCompletedCycleMarker(cfg.EvolveDir, core.FinalizeOptions{Now: time.Now, PidAlive: pidAlive})
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] finalize: %v\n", err)
+		return
+	}
+	if cleared {
+		fmt.Fprintf(stderr, "[loop] cleared completed cycle-state.json marker (clean exit) — no `evolve cycle reset` needed before the next launch\n")
+	}
 }
 
 // wireOrchestratorDepsFn is the test seam for runLoop. Tests

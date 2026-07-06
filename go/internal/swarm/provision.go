@@ -166,5 +166,24 @@ func (g gitWorkerProvisioner) Cleanup(ctx context.Context, projectRoot, worktree
 		fmt.Fprintf(os.Stderr, "[swarm] WARN worktree remove %s failed: %s: %s\n", worktree, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	_ = os.RemoveAll(worktree)
+	g.deleteBranch(ctx, projectRoot, worktree)
 	return nil
+}
+
+// deleteBranch mirrors core.gitWorktree's deleteCycleBranch: deletes the
+// worktree's leaf-named branch AFTER removal, via non-force `git branch -d`
+// (git's merged-check is the only safety net, never escalated to `-D`). This
+// package cannot depend on core (import direction), so the guard is
+// independently mirrored per the plan's stated design (S3,
+// workspace-hygiene-2026-07). Gated on the "cycle-" leaf prefix — every
+// worktree this provisioner mints (integration + worker) is runscope-named
+// "cycle-<lane>-<N>[-integration|-<workerID>]".
+func (g gitWorkerProvisioner) deleteBranch(ctx context.Context, projectRoot, worktree string) {
+	branch := filepath.Base(worktree)
+	if !strings.HasPrefix(branch, "cycle-") {
+		return
+	}
+	if _, stderr, code, err := g.git(projectRoot).Capture(ctx, "branch", "-d", branch); err != nil || code != 0 {
+		fmt.Fprintf(os.Stderr, "[swarm] WARN branch -d %s failed (likely unmerged — left in place): %s: %s\n", branch, gitFailReason(code, err), strings.TrimSpace(stderr))
+	}
 }
