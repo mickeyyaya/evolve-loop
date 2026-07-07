@@ -98,18 +98,39 @@ func SummarizeCycle(workspace string, cycle int) (Summary, error) {
 	if err != nil {
 		return Summary{Cycle: cycle}, fmt.Errorf("glob: %w", err)
 	}
-	if len(logs) == 0 {
-		return Summary{Cycle: cycle}, ErrNoLogs
-	}
 	sort.Strings(logs) // deterministic phase order across runs
 
+	sidecars := sidecarPhaseCosts(workspace)
+	if len(logs) == 0 && len(sidecars) == 0 {
+		return Summary{Cycle: cycle}, ErrNoLogs
+	}
+
 	summary := Summary{Cycle: cycle}
+	fromEvents := map[string]bool{}
 	for _, log := range logs {
 		pc, ok := parseEventsLog(log)
 		if !ok {
 			continue
 		}
 		summary.Phases = append(summary.Phases, pc)
+		fromEvents[pc.Phase] = true
+	}
+
+	// S7 (token-telemetry): the per-phase usage sidecar (ADR-0044 C1,
+	// core.recordPhaseOutcome) is written at the single C1 recording
+	// chokepoint, so it survives abort paths that never reach the
+	// tmux-driver's events.ndjson normalizer. It fills in phases missing
+	// an events.ndjson entirely (the abort case); a phase that DOES have
+	// an events.ndjson keeps that value — events.ndjson is the richer,
+	// per-line-verified source when both exist.
+	for _, pc := range sidecars {
+		if fromEvents[pc.Phase] {
+			continue
+		}
+		summary.Phases = append(summary.Phases, pc)
+	}
+	sort.Slice(summary.Phases, func(i, j int) bool { return summary.Phases[i].Phase < summary.Phases[j].Phase })
+	for _, pc := range summary.Phases {
 		summary.Total.CostUSD += pc.CostUSD
 		summary.Total.CacheReadInputTokens += pc.CacheReadInputTokens
 		summary.Total.CacheCreationInputTokens += pc.CacheCreationInputTokens
@@ -210,5 +231,80 @@ func parseEventsLog(logPath string) (PhaseCost, bool) {
 		CacheCreationInputTokens: last.Data.Tokens.CacheC,
 		OutputTokens:             last.Data.Tokens.Out,
 		InputTokens:              last.Data.Tokens.In,
+	}, true
+}
+
+// usageSidecarSuffix is the per-phase filename suffix core.recordPhaseOutcome
+// writes at the ADR-0044 C1 chokepoint ("<phase>-usage.json").
+const usageSidecarSuffix = "-usage.json"
+
+// tokenUsageSidecarName is bridge's global peak-token snapshot
+// ("token-usage.json", written by writeTokenUsage). It matches the
+// "*-usage.json" glob but carries a different, non-per-phase shape
+// ({"peak_tokens":N}) — explicitly excluded so it never masquerades as a
+// phase named "token".
+const tokenUsageSidecarName = "token-usage.json"
+
+// usageSidecar is the subset of core's phaseUsageSidecar shape this package
+// needs to recover a PhaseCost: phase name, cost, and the terminal token
+// usage (cyclestate.TokenUsage's json shape, duplicated here rather than
+// imported to keep cyclecost a leaf package with no core dependency).
+type usageSidecar struct {
+	Phase   string  `json:"phase"`
+	CostUSD float64 `json:"cost_usd"`
+	Tokens  struct {
+		Input      int64 `json:"input"`
+		Output     int64 `json:"output"`
+		CacheRead  int64 `json:"cache_read"`
+		CacheWrite int64 `json:"cache_write"`
+	} `json:"tokens"`
+}
+
+// sidecarPhaseCosts reads every <workspace>/*-usage.json sidecar into a
+// PhaseCost, skipping the unrelated token-usage.json global snapshot and any
+// file that fails to parse. Returns nil when no usable sidecar exists.
+func sidecarPhaseCosts(workspace string) []PhaseCost {
+	matches, err := globFn(filepath.Join(workspace, "*"+usageSidecarSuffix))
+	if err != nil || len(matches) == 0 {
+		return nil
+	}
+	sort.Strings(matches) // deterministic order
+	var out []PhaseCost
+	for _, m := range matches {
+		if filepath.Base(m) == tokenUsageSidecarName {
+			continue
+		}
+		pc, ok := parseUsageSidecar(m)
+		if !ok {
+			continue
+		}
+		out = append(out, pc)
+	}
+	return out
+}
+
+// parseUsageSidecar reads one <phase>-usage.json sidecar into a PhaseCost.
+// The phase name is taken from the sidecar's own "phase" field (recorded by
+// core.recordPhaseOutcome) rather than the filename, since that field is the
+// authoritative phase identifier the rest of the pipeline uses.
+func parseUsageSidecar(path string) (PhaseCost, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return PhaseCost{}, false
+	}
+	var s usageSidecar
+	if err := json.Unmarshal(data, &s); err != nil {
+		return PhaseCost{}, false
+	}
+	if s.Phase == "" {
+		return PhaseCost{}, false
+	}
+	return PhaseCost{
+		Phase:                    s.Phase,
+		CostUSD:                  s.CostUSD,
+		CacheReadInputTokens:     s.Tokens.CacheRead,
+		CacheCreationInputTokens: s.Tokens.CacheWrite,
+		OutputTokens:             s.Tokens.Output,
+		InputTokens:              s.Tokens.Input,
 	}, true
 }

@@ -62,6 +62,75 @@ func textEnvelope(text string) string {
 	return string(b)
 }
 
+// writeUsageSidecar seeds a <phase>-usage.json sidecar in workspace, matching
+// the shape core.recordPhaseOutcome writes at the ADR-0044 C1 chokepoint.
+func writeUsageSidecar(t *testing.T, workspace, phase string, cost float64, in, out, cacheR, cacheW int64) {
+	t.Helper()
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	b, err := json.Marshal(map[string]any{
+		"phase":    phase,
+		"cost_usd": cost,
+		"tokens": map[string]any{
+			"input":       in,
+			"output":      out,
+			"cache_read":  cacheR,
+			"cache_write": cacheW,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal sidecar: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, phase+"-usage.json"), b, 0o644); err != nil {
+		t.Fatalf("write sidecar: %v", err)
+	}
+}
+
+// TestCycleCost_PrefersSidecarOverEvents is the S7 RED test: the usage
+// sidecar (ADR-0044 C1) is written at the recording chokepoint and survives
+// abort paths that never reach the tmux normalizer, so it must recover a
+// phase whose events.ndjson is entirely missing. A phase that DOES have an
+// events.ndjson keeps that value (the richer, per-line-verified source) —
+// the sidecar only fills gaps, never overrides an existing events log. The
+// bridge's unrelated token-usage.json global snapshot must not be mistaken
+// for a phase named "token".
+func TestCycleCost_PrefersSidecarOverEvents(t *testing.T) {
+	t.Parallel()
+	ws := filepath.Join(t.TempDir(), "cycle-11")
+	// "scout" has both sources — events.ndjson must win.
+	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.99, 900, 90, 9, 9))
+	writeUsageSidecar(t, ws, "scout", 0.05, 100, 20, 3, 4)
+	// "build" aborted before the tmux normalizer ran — sidecar-only evidence.
+	writeUsageSidecar(t, ws, "build", 0.30, 500, 60, 7, 8)
+	if err := os.WriteFile(filepath.Join(ws, "token-usage.json"), []byte(`{"peak_tokens":12345}`), 0o644); err != nil {
+		t.Fatalf("write token-usage.json: %v", err)
+	}
+
+	s, err := SummarizeCycle(ws, 11)
+	if err != nil {
+		t.Fatalf("SummarizeCycle: %v", err)
+	}
+	if len(s.Phases) != 2 {
+		t.Fatalf("phases=%d want 2 (token-usage.json must not appear as a phase): %+v", len(s.Phases), s.Phases)
+	}
+	wantScout := PhaseCost{Phase: "scout", CostUSD: 0.99, InputTokens: 900, OutputTokens: 90, CacheReadInputTokens: 9, CacheCreationInputTokens: 9}
+	wantBuild := PhaseCost{Phase: "build", CostUSD: 0.30, InputTokens: 500, OutputTokens: 60, CacheReadInputTokens: 7, CacheCreationInputTokens: 8}
+	byPhase := map[string]PhaseCost{}
+	for _, pc := range s.Phases {
+		byPhase[pc.Phase] = pc
+	}
+	if byPhase["scout"] != wantScout {
+		t.Fatalf("scout: got %+v want %+v (events.ndjson must win when both sources exist)", byPhase["scout"], wantScout)
+	}
+	if byPhase["build"] != wantBuild {
+		t.Fatalf("build: got %+v want %+v (sidecar recovers a phase with no events.ndjson)", byPhase["build"], wantBuild)
+	}
+	if got, want := s.Total.CostUSD, 1.29; diffAbs(got, want) > 1e-9 {
+		t.Fatalf("total cost=%v want %v", got, want)
+	}
+}
+
 func TestSummarizeCycle_Empty(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-1")
