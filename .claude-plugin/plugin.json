@@ -45,6 +45,7 @@
     "./skills/adversarial-testing/",
     "./skills/code-review-simplify/",
     "./skills/commit/",
+    "./skills/engineering-craft/",
     "./skills/evaluator/",
     "./skills/fable-mode/",
     "./skills/golang-test-review/",
