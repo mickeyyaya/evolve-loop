@@ -119,24 +119,46 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		if len(res.CommitSHA) >= 8 {
 			commitShort = res.CommitSHA[:8]
 		}
-		for _, id := range extractIDs(body) {
-			_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
+		// Landing gate (cycle-598 regression, inbox-promotion-requires-landed-ship):
+		// promote to processed/ ONLY when the ship commit actually reached durable
+		// history (ancestor of HEAD or origin/<branch>). Cycle 598's push was
+		// rejected (origin diverged), the recovery reclassified to needs-reaudit,
+		// yet promoteInbox promoted the item anyway because its only gate was
+		// "triage-decision.json present". The landing check is the single source of
+		// truth, independent of any verdict/outcome label. An unlanded commit leaves
+		// items in processing/ — the residual drain below releases them for the next
+		// cycle's triage to re-scan, so nothing is silently lost.
+		//
+		// Fail-open when res.CommitSHA is empty: the gate catches a commit that
+		// EXISTS but failed to reach durable history (the cycle-598 shape). An
+		// absent SHA is a different, pre-existing state (no commit recorded) with
+		// no signal to gate on — promoting it preserves the cycle-308 residual-drain
+		// contract rather than newly stranding correctly-shipped work.
+		if res.CommitSHA != "" && !isLanded(ctx, opts, res.CommitSHA) {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
+		} else {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
+			for _, id := range extractIDs(body) {
+				_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
+					Cycle:     fmt.Sprintf("%d", cid),
+					CommitSHA: commitShort,
+				})
+			}
+			// Reconcile superseded[] — inbox items whose work shipped under a
+			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
+			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
+			// extractIDs only walks top_n/skip_shipped, so these orphans were never
+			// retired; ReconcileSuperseded retires them by id alone. Best-effort.
+			// Gated by the same landing check — an unlanded commit must not retire a
+			// superseded id either (scout Beyond-the-Ask Hypothesis 2).
+			if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, inboxmover.SupersededInboxIDs(body), "processed", inboxmover.PromoteOpts{
 				Cycle:     fmt.Sprintf("%d", cid),
 				CommitSHA: commitShort,
-			})
-		}
-		// Reconcile superseded[] — inbox items whose work shipped under a
-		// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
-		// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
-		// extractIDs only walks top_n/skip_shipped, so these orphans were never
-		// retired; ReconcileSuperseded retires them by id alone. Best-effort.
-		if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, inboxmover.SupersededInboxIDs(body), "processed", inboxmover.PromoteOpts{
-			Cycle:     fmt.Sprintf("%d", cid),
-			CommitSHA: commitShort,
-		}); rErr != nil {
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: superseded reconcile for cycle %d: %v", cid, rErr))
-		} else if len(retired) > 0 {
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
+			}); rErr != nil {
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: superseded reconcile for cycle %d: %v", cid, rErr))
+			} else if len(retired) > 0 {
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
+			}
 		}
 	}
 
@@ -151,6 +173,26 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	return nil
+}
+
+// isLanded reports whether the ship commit sha actually reached durable
+// history — an ancestor of local HEAD, or of origin/<branch>. Reuses the
+// existing isAncestor helper (repair.go, git merge-base --is-ancestor) rather
+// than duplicating an ancestry probe. An empty sha is never landed (nothing to
+// verify). See promoteInbox's landing gate for the cycle-598 regression this
+// guards against.
+func isLanded(ctx context.Context, opts *Options, sha string) bool {
+	if strings.TrimSpace(sha) == "" {
+		return false
+	}
+	if isAncestor(ctx, opts, sha, "HEAD") {
+		return true
+	}
+	branch, _ := currentBranch(ctx, opts)
+	if branch == "" {
+		return false // detached HEAD / unknown branch — HEAD ancestry was the only probe
+	}
+	return isAncestor(ctx, opts, sha, "origin/"+branch)
 }
 
 // triageDecisionBytes returns the cycle's triage-decision.json bytes for

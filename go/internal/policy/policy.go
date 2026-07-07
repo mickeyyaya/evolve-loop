@@ -174,6 +174,12 @@ type Policy struct {
 	// downstream phase-agent context. Absent ⇒ WindowTurns=10 (the paper's
 	// optimum). No new env flag — config-only.
 	ObservationMask *ObservationMaskPolicy `json:"observation_mask,omitempty"`
+	// Overlays configures skill-overlay injection: per-dispatch (phase/cli/model/
+	// tier) skill bodies composed into an agent prompt above the cycle-context
+	// boundary. Absent (nil) ⇒ the compiled default applies ({tiers:[deep,top]}
+	// -> [fable-mode]); a non-nil block with an empty Rules slice is an explicit
+	// operator opt-out (no overlays at all). Schema + resolver: overlays.go.
+	Overlays *OverlaysPolicy `json:"overlays,omitempty"`
 }
 
 // FailureFloor configures the failure-learning policy surface.
