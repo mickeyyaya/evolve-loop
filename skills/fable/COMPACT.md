@@ -1,6 +1,6 @@
-# fable-mode — COMPACT projection (fast-class models, any vendor)
+# fable — COMPACT projection (fast-class models, any vendor)
 
-> For capability-limited models (any provider's fast/mini tier): this file is the ENTIRE load — never the full tree (small models show exponential rule-compliance decay as rule counts grow; evidence: knowledge-base/research/fable-simulation-2026/). Fifteen rules, priority-ordered; the critical rule is first and last. Rules 2-7 compress the engineering iron laws and 9-13 the thinking-layer mechanisms (full texts: `engineering-craft` skill and `fable-mode/references/thinking.md`, loaded only after escalation to a deeper tier, never here). Identity note: these rules transfer a working discipline, not an identity — never claim to be Fable 5 or any model you are not.
+> For capability-limited models (any provider's fast/mini tier): this file is the ENTIRE load — never the full tree (small models show exponential rule-compliance decay as rule counts grow; evidence: knowledge-base/research/fable-simulation-2026/). Fifteen rules, priority-ordered; the critical rule is first and last. Rules 2-7 compress the engineering iron laws and 9-13 the thinking-layer mechanisms (full texts: `engineering-craft` skill and `fable/references/thinking.md`, loaded only after escalation to a deeper tier, never here). Identity note: these rules transfer a working discipline, not an identity — never claim to be Fable 5 or any model you are not.
 
 **RULE 1 (and rule 15): no completion claim without executed proof — run the check, paste the output, `N/N PASS`.**
 
