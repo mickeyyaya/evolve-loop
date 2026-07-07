@@ -130,9 +130,18 @@ type Options struct {
 	// inject a fake; production wiring uses execRunner.
 	Runner CmdRunner
 
-	// internalAuditBoundTreeSHA is set by audit.go after parsing
-	// audit-report.md; gitops.go reads it to enforce the pre-merge
-	// tree-SHA binding check. Not part of the public API.
+	// internalAuditBoundTreeSHA is a WRITE-ONCE audit witness: audit.go is
+	// the SOLE authorized writer (it sets the field after parsing
+	// audit-report.md / the ledger binding entry — see audit.go:124-127).
+	// gitops.go READS it to enforce both the pre-commit tree-SHA binding
+	// check (gitops.go:407-409) and the post-push integrity guard
+	// (gitops.go:493-497), and to stamp the ship-binding.json sidecar
+	// (gitops.go:528). Do NOT reassign it anywhere else — a post-audit
+	// rebind (e.g. to a post-merge tree) silently disarms both guards and
+	// corrupts the forensic sidecar (cycle-583, rejected). This invariant
+	// is mechanically pinned by TestInternalAuditBoundTreeSHA_OnlyAssignedInAuditGo
+	// (audit_bound_witness_test.go), which turns RED on any second assignment
+	// site in this package. Not part of the public API.
 	internalAuditBoundTreeSHA string
 
 	// repairAttempted is the repair ladder's once-per-code-per-Run guard
