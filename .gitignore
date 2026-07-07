@@ -157,3 +157,9 @@ campaign.log
 
 # goreleaser local snapshot output (release runs in CI)
 /dist/
+
+# Stray compiled `evolve` executables an ACS predicate's `go build <main pkg>`
+# left in its package dir (tracked-binary-in-acs-dir: an 18MB go/acs/cycle536/evolve
+# was committed this way). The build predicates now use `-o os.DevNull`; this is
+# belt-and-suspenders so a regression can never be `git add`ed again.
+go/acs/**/evolve

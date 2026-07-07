@@ -404,8 +404,12 @@ func TestC536_009_TouchedPackagesBuildAndVetClean(t *testing.T) {
 	triagecapPkg := filepath.Join(root, "go", "internal", "triagecap")
 	cmdPkg := filepath.Join(root, "go", "cmd", "evolve")
 
+	// `-o os.DevNull` discards the compiled artifact. Without it, `go build <pkg>`
+	// of a main package (cmd/evolve) writes an `evolve` executable into the test's
+	// CWD (this package dir), which is how the 18MB go/acs/cycle536/evolve binary
+	// got committed (tracked-binary-in-acs-dir). Root-cause fix, not a cleanup.
 	for _, pkg := range []string{failurelogPkg, triagecapPkg, cmdPkg} {
-		_, stderr, code, err := acsassert.SubprocessOutput("go", "build", pkg)
+		_, stderr, code, err := acsassert.SubprocessOutput("go", "build", "-o", os.DevNull, pkg)
 		if err != nil {
 			t.Fatalf("failed to launch go build %s: %v", pkg, err)
 		}

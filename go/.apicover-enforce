@@ -28,6 +28,7 @@
 ./internal/atomicwrite
 ./internal/backfill
 ./internal/bedrock
+./internal/binaryguard
 ./internal/bridge/keyspec
 ./internal/bridge/panestream
 ./internal/changedpkgs
