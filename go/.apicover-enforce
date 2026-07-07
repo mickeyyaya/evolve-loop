@@ -375,3 +375,15 @@
 # release-flow hardening (2026-06-24): releasetargets parses .goreleaser.yml (the
 # SSOT for the release matrix) for the release-verify-binaries gate.
 ./internal/releasetargets
+
+# token-telemetry campaign S1 (2026-07-07): tokenusage is the zero-wiring leaf
+# that scans Claude Code transcript JSONL to recover a launch's real token
+# usage (cwd-exact + content-verified attribution, streamed-delta dedup,
+# best-effort SourceNone on a missing transcript). Every export
+# (Source/SourceNone/SourceTranscript, Window, Result, ScanConfigRoot) is
+# named+exercised by scanner_test.go and apicover_named_test.go.
+./internal/tokenusage
+
+# cycle-593 ACS predicate package (2026-07-07): token-telemetry-s1-transcript-scanner.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle593
