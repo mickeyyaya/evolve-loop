@@ -243,6 +243,11 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		// AFTER the review gate: a review-rejected ship abort must still
 		// preserve the worktree for triage (ADR-0039 §8 / D10).
 		cr.preserveWorktree = false
+		// Latch ship success so a subsequent post-ship observer failure
+		// (memo / post-ship-monitor) degrades to WARN rather than turning a
+		// shipped cycle abnormal — read by postShipObserverSkip on the dispatch
+		// abort path (cycle-574 memo-phase-tier-envelope).
+		cr.shipped = true
 	}
 
 	// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger

@@ -77,6 +77,7 @@ type cycleRun struct {
 	replanDepth   int    // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
 
 	// late-visibility exit-defer flags (R2 contract; highest hazard)
+	shipped                bool // latched true when ship records PASS this cycle; read by the dispatch abort path (postShipObserverSkip) so a post-ship observer failure stays non-fatal
 	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
 	cycleCompletedNormally bool // set true only post-loop; read by the same cleanup defer at exit
 	reachedPhaseEnd        bool // set at a loopBreak (PhaseEnd) exit; false post-loop ⇒ the bounded-iteration guard tripped (transition-table cycle) → C1 chokepoint-escape record

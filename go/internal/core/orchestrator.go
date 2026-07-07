@@ -68,6 +68,44 @@ func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	return true
 }
 
+// postShipObserverSkip classifies a POST-ship best-effort observer failure as
+// non-fatal (cycle-574, inbox memo-phase-tier-envelope). A RoleControl observer
+// phase that runs after a healthy ship (memo, post-ship-monitor) must never turn
+// an already-shipped cycle abnormal: its failure degrades to a WARN diagnostic
+// and the cycle keeps its shipped/PASS outcome. This is a sibling to
+// optionalInfraSkip — same floor/mandatory guards, but keyed on ship-having-
+// -landed rather than an infra-shaped error, so it also covers a memo policy or
+// logic error (the exact tier-envelope shape that reddened healthy cycles).
+// True iff ALL hold: (1) ship already recorded PASS this cycle (shipped) — a
+// failure BEFORE ship is never swallowed; (2) p is a catalog-Optional RoleControl
+// observer and NOT ship itself; (3) p is not configured-mandatory and sits
+// outside the resolved ship floor — the skip can never weaken the integrity floor.
+func (o *Orchestrator) postShipObserverSkip(p Phase, shipped bool) bool {
+	if !shipped {
+		return false
+	}
+	if p == PhaseShip {
+		return false
+	}
+	if isConfiguredMandatory(o.cfg, string(p)) {
+		return false
+	}
+	spec, ok := o.catalog.Get(string(p))
+	if !ok || !spec.Optional {
+		return false
+	}
+	if spec.RoleOrDefault() != phasespec.RoleControl {
+		return false
+	}
+	name := string(p)
+	for _, f := range o.resolvedShipFloor() {
+		if name == f {
+			return false
+		}
+	}
+	return true
+}
+
 // specFor resolves a phase's descriptor, canonicalizing the name first
 // (PhaseRetro→"retrospective") so the lookup cannot silently miss on the
 // core↔router skew. The registry is the SSOT and wins; on a registry miss it
