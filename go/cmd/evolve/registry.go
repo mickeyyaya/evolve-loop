@@ -70,6 +70,7 @@ var commands = []subcommand{
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
 	{Name: "reset-sha", Summary: "Re-pin the ship-gate binary SHA to the running binary (provenance-gated; --operator to override)", Run: runResetSHA},
+	{Name: "sync-main", Summary: "Reconcile a locally-diverged main with origin via merge only (never rebase/force-push/push); refuses on live lease or dirty tree", Run: runSyncMain},
 	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: guardcmd.RunCommitGate},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 

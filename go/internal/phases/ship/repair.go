@@ -461,7 +461,7 @@ func repairPushRace(ctx context.Context, opts *Options, res *RunResult, branch s
 	// base — the local commit is preserved for a cheap re-land.
 	res.RepairOutcome = "needs-reaudit"
 	return shipErr(core.CodeGitPushRejected, core.ShipClassPrecondition, core.StageAtomicShip,
-		fmt.Sprintf("ship: push rejected and origin/%s diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved)", branch),
+		fmt.Sprintf("ship: push rejected and origin/%s diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved). Reconcile at a batch boundary with `evolve sync-main`.", branch),
 		"branch", branch, "origin_ref", originRef, "head", head,
 		"repair_attempted", string(core.CodeGitPushRejected), "repair_outcome", "needs-reaudit")
 }
