@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 // SSOT IPC-protocol-allowed: bridge engine -> REPL subprocess pidfile handoff,
@@ -152,6 +154,16 @@ type Deps struct {
 	// (its call count is observable) — a bypassed center could satisfy the former
 	// by coincidence but never the latter.
 	LivenessCenter *panestream.SignalCenter
+	// TokenResolver recovers the token usage for a completed Launch window
+	// (token-telemetry S3). nil disables telemetry entirely: Tokens stays zero
+	// and no llm-calls.ndjson record is appended. A resolver error is fail-open —
+	// WARNed to Stderr, and a telemetry failure NEVER fails the Launch. It is a
+	// DI seam, not a policy toggle (matching the no-feature-flags rule): the
+	// orchestrator building the bridge Deps wires this to the shipped
+	// tokenusage.Chain(TranscriptCollector/EventsResultCollector/ScrollbackPeakCollector);
+	// tests inject a scriptable stub, and withDefaults leaves it nil (telemetry
+	// off) so a Launch never depends on transcript discovery to succeed.
+	TokenResolver func(tokenusage.Window) (tokenusage.Result, error)
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision — the bridge
@@ -424,8 +436,13 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	defer func() { e.deps.OnBoot = prevOnBoot }()
 
 	var stderrBuf bytes.Buffer
+	start := e.deps.Now()
 	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
 	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
+	// Token-telemetry S3: attribute this Launch's token cost on every exit path
+	// (before the ExitOK branch), so a failed attempt is still accounted. Runs
+	// once per Launch call → one llm-calls.ndjson record per fallback attempt.
+	e.recordTokenUsage(req, model, code, start, &resp)
 	// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
 	// the consecutive-strike counter so non-adjacent failures never bench.
 	if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(code) {
@@ -477,6 +494,82 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
 	return resp, errors.New(msg)
+}
+
+// llmCallLog is the on-disk llm-calls.ndjson record shape (token-telemetry S3),
+// one JSON object per line. Field order/tags are pinned by the S3 inbox item so
+// downstream rollups (S6) and the tokens-report CLI (S7) can decode it without a
+// schema migration: ts, agent, phase, cli, model, attempt, tokens, source,
+// duration_ms, exit_code.
+type llmCallLog struct {
+	TS         string          `json:"ts"`
+	Agent      string          `json:"agent"`
+	Phase      string          `json:"phase"`
+	CLI        string          `json:"cli"`
+	Model      string          `json:"model"`
+	Attempt    int             `json:"attempt"`
+	Tokens     core.TokenUsage `json:"tokens"`
+	Source     string          `json:"source"`
+	DurationMS int64           `json:"duration_ms"`
+	ExitCode   int             `json:"exit_code"`
+}
+
+// recordTokenUsage attributes a completed Launch's token cost (token-telemetry
+// S3). It is fail-open by contract: a nil resolver disables telemetry (no-op),
+// and a resolver error is WARNed to Stderr and leaves resp.Tokens at its zero
+// value — a telemetry failure must NEVER turn an otherwise-successful Launch
+// into an error, so this helper returns nothing and never touches resp.ExitCode
+// or the Launch error path. On success it populates resp.Tokens and appends one
+// llm-calls.ndjson record; it is called once per Launch call, so each fallback
+// attempt (a distinct Launch on a different CLI) gets its own record rather than
+// overwriting a shared one — the point that makes double-dispatch waste visible.
+func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
+	if e.deps.TokenResolver == nil {
+		return
+	}
+	end := e.deps.Now()
+	result, err := e.deps.TokenResolver(tokenusage.Window{
+		Worktree:     req.Worktree,
+		ArtifactPath: req.ArtifactPath,
+		Start:        start,
+		End:          end,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token resolver failed: %v\n", err)
+		return
+	}
+	resp.Tokens = core.TokenUsage(result.Usage)
+	attempt := req.Attempt
+	if attempt <= 0 {
+		attempt = 1
+	}
+	rec := llmCallLog{
+		TS:         end.UTC().Format(time.RFC3339),
+		Agent:      req.Agent,
+		Phase:      req.Agent, // the agent role label already IS the phase name
+		CLI:        req.CLI,
+		Model:      model,
+		Attempt:    attempt,
+		Tokens:     core.TokenUsage(result.Usage),
+		Source:     string(result.Source),
+		DurationMS: end.Sub(start).Milliseconds(),
+		ExitCode:   code,
+	}
+	line, err := json.Marshal(rec)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record marshal failed: %v\n", err)
+		return
+	}
+	path := filepath.Join(req.Workspace, "llm-calls.ndjson")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record open failed: %v\n", err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.Write(append(line, '\n')); err != nil {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record write failed: %v\n", err)
+	}
 }
 
 // firstDiagnosticLine picks the one-line cause threaded into the launch

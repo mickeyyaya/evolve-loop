@@ -249,9 +249,15 @@ type BridgeRequest struct {
 	// "artifact" = poll the artifact file (default); "stdout" = complete on
 	// REPL-idle for agents that print their answer and write no file (the
 	// router/advisor). Only the *-tmux drivers honor it; others ignore it.
-	Completion string            `json:"completion,omitempty"`
-	Agent      string            `json:"agent,omitempty"` // role label
-	Cycle      int               `json:"cycle,omitempty"`
+	Completion string `json:"completion,omitempty"`
+	Agent      string `json:"agent,omitempty"` // role label
+	Cycle      int    `json:"cycle,omitempty"`
+	// Attempt is the 1-based fallback-retry ordinal for this Launch (token-
+	// telemetry S3): the caller's fallback loop calls Launch once per CLI
+	// candidate, and Attempt lets each call's llm-calls.ndjson record be
+	// distinguished so the double-dispatch waste class is measurable. Zero
+	// (unset, existing callers) is treated as attempt 1.
+	Attempt    int               `json:"attempt,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
 	ExtraFlags []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
 	// PermissionMode is the resolved per-phase permission mode (the
