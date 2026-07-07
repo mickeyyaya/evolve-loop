@@ -160,6 +160,12 @@ type Options struct {
 	// captureVersionInventory. Tests inject a deterministic map closure to avoid
 	// shelling out to real CLIs.
 	VersionInventory func() map[string]string
+
+	// PhaseRoutingWarnings returns the warnings phasespec produced while merging
+	// user phases into the built-in catalog (dropped hijack overlays, malformed
+	// phase.json, non-optional overrides). Default: phasespec.MergedCatalog with
+	// a swallowed load error (fail-open). Tests inject a deterministic closure.
+	PhaseRoutingWarnings func() []string
 }
 
 // resolved is Options with every seam and default filled in.
@@ -193,6 +199,8 @@ type resolved struct {
 	cliHealthActive    func() []clihealth.Entry
 
 	versionInventory func() map[string]string
+
+	phaseRoutingWarnings func() []string
 }
 
 // DefaultBootBudget is the per-driver REPL boot deadline (mirrors the
@@ -231,6 +239,8 @@ func resolve(opts Options) (resolved, error) {
 		cliHealthActive:    opts.CLIHealthActive,
 
 		versionInventory: opts.VersionInventory,
+
+		phaseRoutingWarnings: opts.PhaseRoutingWarnings,
 	}
 	if o.stderr == nil {
 		o.stderr = io.Discard
@@ -298,6 +308,9 @@ func resolve(opts Options) (resolved, error) {
 	if o.cliHealthActive == nil {
 		o.cliHealthActive = defaultCLIHealthActive(o.projectRoot)
 	}
+	if o.phaseRoutingWarnings == nil {
+		o.phaseRoutingWarnings = defaultPhaseRoutingWarnings(o.projectRoot)
+	}
 	if o.versionInventory == nil {
 		// Capture versions lazily so the closure sees the final resolved state.
 		lister, getter := o.profileLister, o.profileGetter
@@ -335,6 +348,7 @@ func Run(opts Options) (Result, error) {
 		checkCLIVersionDrift(o),
 		checkBridgeBoot(o),
 		checkSandboxNestedFallback(o),
+		checkPhaseRoutingWarnings(o),
 	}
 	r := finalize(checks, o.now())
 	r.CLIVersions = o.versionInventory()
