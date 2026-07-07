@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -262,39 +263,51 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		}
 	}
 
-	// 3b. Record the operator-reset in state.json:failedApproaches via the
-	// single canonical appender. ORDERING IS LOAD-BEARING: Record runs
-	// BEFORE the seal's own read-modify-write below, so the seal's write
-	// (which re-reads the file, picking up the new entry) stays the final
-	// authority on lastCycleNumber / currentBatch / lastUpdated. A missing
-	// state.json is soft-skipped (preflight owns creating it; the seal's
-	// own write below will create it fresh).
+	// 3b+4. Mutate state.json under the SAME "<state.json>.lock" sidecar that
+	// storage.UpdateState holds for its whole RMW (flock.PathLock — the single
+	// documented single-writer contract). Both the failedApproaches record and
+	// the lastCycleNumber/batch RMW below were previously unlocked, so in fleet
+	// mode (2+ concurrent lanes are the live operating mode) a concurrent locked
+	// UpdateState could read stale state and clobber this seal's writes — the
+	// cycle-616 lost-update fix. flock is blocking and per-open-file-description;
+	// neither failurelog.Record nor readJSONMapFile/writeJSONMapFileAtomic locks
+	// internally, so wrapping them here is not re-entrant. ORDERING IS
+	// LOAD-BEARING: Record runs BEFORE the seal's own read-modify-write, so the
+	// seal's write (which re-reads the file, picking up the new entry) stays the
+	// final authority on lastCycleNumber / currentBatch / lastUpdated. A missing
+	// state.json is soft-skipped (preflight owns creating it; the seal's own
+	// write below creates it fresh).
 	statePath := filepath.Join(opts.EvolveDir, "state.json")
-	if _, recErr := failurelog.Record(statePath, "", failurelog.RecordRequest{
-		Cycle:          cycleID,
-		Classification: string(failurelog.OperatorReset),
-		Summary:        ev.Summary,
-		Now:            t,
-	}); recErr != nil && !errors.Is(recErr, failurelog.ErrStateMissing) {
-		return SealResult{}, fmt.Errorf("reset: record failed approach: %w", recErr)
-	}
+	if err := flock.WithPathLock(statePath, func() error {
+		if _, recErr := failurelog.Record(statePath, "", failurelog.RecordRequest{
+			Cycle:          cycleID,
+			Classification: string(failurelog.OperatorReset),
+			Summary:        ev.Summary,
+			Now:            t,
+		}); recErr != nil && !errors.Is(recErr, failurelog.ErrStateMissing) {
+			return fmt.Errorf("reset: record failed approach: %w", recErr)
+		}
 
-	// 4. Advance lastCycleNumber (number never reused) + zero the batch accrual,
-	//    via a full-fidelity map so unmodelled fields survive.
-	sm, err := readJSONMapFile(statePath)
-	if err != nil {
-		return SealResult{}, fmt.Errorf("reset: read state.json: %w", err)
-	}
-	sm["lastCycleNumber"] = cycleID
-	cb, _ := sm["currentBatch"].(map[string]any)
-	if cb == nil {
-		cb = map[string]any{}
-	}
-	cb["cycleAccruedCostUSD"] = 0
-	sm["currentBatch"] = cb
-	sm["lastUpdated"] = rfc
-	if err := writeJSONMapFileAtomic(statePath, sm); err != nil {
-		return SealResult{}, fmt.Errorf("reset: write state.json: %w", err)
+		// Advance lastCycleNumber (number never reused) + zero the batch accrual,
+		// via a full-fidelity map so unmodelled fields survive.
+		sm, err := readJSONMapFile(statePath)
+		if err != nil {
+			return fmt.Errorf("reset: read state.json: %w", err)
+		}
+		sm["lastCycleNumber"] = cycleID
+		cb, _ := sm["currentBatch"].(map[string]any)
+		if cb == nil {
+			cb = map[string]any{}
+		}
+		cb["cycleAccruedCostUSD"] = 0
+		sm["currentBatch"] = cb
+		sm["lastUpdated"] = rfc
+		if err := writeJSONMapFileAtomic(statePath, sm); err != nil {
+			return fmt.Errorf("reset: write state.json: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return SealResult{}, err
 	}
 
 	// 5. Remove cycle-state.json — the abandon commit point.

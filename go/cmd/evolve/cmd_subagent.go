@@ -87,6 +87,24 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
+// resolveWorkspaceArg absolutizes a relative <workspace_path> CLI argument
+// against projectRoot (EVOLVE_PROJECT_ROOT / layout.ProjectRoot), NOT the
+// ambient process cwd. The workspace value is LLM-typed at the bridge boundary;
+// a raw relative value would otherwise resolve against whatever cwd the process
+// happens to have, scattering run artifacts (.bridge-inbox/, session records,
+// prompt/stdout/stderr logs) into that cwd — the untracked-tree-drift the
+// tree-diff cycle-killer reacts to (cycle-616 subagent-workspace-absolutize
+// fix). An already-absolute value passes through unchanged; an empty value or
+// empty projectRoot is left untouched (no base to anchor against). This is the
+// single ingestion point every subagent subcommand routes its workspace arg
+// through.
+func resolveWorkspaceArg(workspace, projectRoot string) string {
+	if workspace == "" || projectRoot == "" || filepath.IsAbs(workspace) {
+		return workspace
+	}
+	return filepath.Join(projectRoot, workspace)
+}
+
 func runSubagentCachePrefix(args []string, stdout, stderr io.Writer) int {
 	var (
 		cycleStr, agent, workspace, out, projectRoot string
@@ -129,6 +147,7 @@ func runSubagentCachePrefix(args []string, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		projectRoot = envOrCwd("EVOLVE_PROJECT_ROOT")
 	}
+	workspace = resolveWorkspaceArg(workspace, projectRoot)
 	if err := subagent.WriteCachePrefix(subagent.CachePrefixRequest{
 		Cycle:       cycle,
 		Agent:       agent,
@@ -327,6 +346,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	workspace := args[2]
 
 	layout := paths.ResolveFromEnv()
+	workspace = resolveWorkspaceArg(workspace, layout.ProjectRoot)
 
 	var promptReader io.Reader
 	if override := os.Getenv("PROMPT_FILE_OVERRIDE"); override != "" {
@@ -404,6 +424,7 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	workspace := args[2]
 
 	layout := paths.ResolveFromEnv()
+	workspace = resolveWorkspaceArg(workspace, layout.ProjectRoot)
 
 	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
 	if err != nil {
