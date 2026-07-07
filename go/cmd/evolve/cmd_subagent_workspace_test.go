@@ -322,6 +322,63 @@ func TestRunSubagentRun_DeeplyNestedRelativeWorkspaceResolvesAgainstProjectRoot(
 	}
 }
 
+// TestRunSubagentRun_WorkspaceOutsideProjectRootRejected is the cycle-619
+// containment slice of subagent-workspace-absolutize. Cycle 616 landed
+// absolutization (a relative arg resolves against project root, not cwd) but
+// left the ".." escape unhandled — a relative workspace like "../sibling"
+// still resolves to a real directory OUTSIDE the project root and then gets
+// os.Stat'd + MkdirAll'd (workers/, logs), scattering run artifacts into an
+// arbitrary sibling tree. That is the same untracked-tree-drift class the
+// absolutization fixed for cwd, just relocated. The resolver must now REJECT a
+// relative workspace whose cleaned join escapes the project root, loudly and
+// with no MkdirAll side effect. (Absolute args keep their documented
+// passthrough contract — the real loop hands absolute worktree/runs paths.)
+func TestRunSubagentRun_WorkspaceOutsideProjectRootRejected(t *testing.T) {
+	parent := t.TempDir()
+	projectRoot := filepath.Join(parent, "proj")
+	sibling := filepath.Join(parent, "sibling")
+	for _, d := range []string{projectRoot, sibling} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("seed %s: %v", d, err)
+		}
+	}
+	cwd := t.TempDir()
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
+
+	promptFile := filepath.Join(projectRoot, "prompt.txt")
+	if err := os.WriteFile(promptFile, []byte("prompt\n"), 0o644); err != nil {
+		t.Fatalf("write prompt fixture: %v", err)
+	}
+	t.Setenv("PROMPT_FILE_OVERRIDE", promptFile)
+
+	const rel = "../sibling"
+	var stdout, stderr bytes.Buffer
+	rc := runSubagentRun([]string{"builder", "9", rel}, &stdout, &stderr)
+
+	if rc == 0 {
+		t.Errorf("a relative workspace escaping the project root must be rejected; rc=0 stdout=%q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "project root") {
+		t.Errorf("rejection must name the containment violation; got stderr=%q", stderr.String())
+	}
+	// No MkdirAll side effect: the escaped sibling tree must gain no artifacts.
+	entries, err := os.ReadDir(sibling)
+	if err != nil {
+		t.Fatalf("readdir sibling: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("a rejected out-of-root workspace must not create artifacts under it; found: %v", entries)
+	}
+}
+
 // TestRunSubagentRun_ParentTraversalRelativeWorkspaceDoesNotPolluteCwd probes
 // the traversal edge case: a relative workspace containing ".." components
 // (escaping the project root's own subtree, e.g. into a sibling directory).

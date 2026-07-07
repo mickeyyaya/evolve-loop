@@ -98,11 +98,23 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // empty projectRoot is left untouched (no base to anchor against). This is the
 // single ingestion point every subagent subcommand routes its workspace arg
 // through.
-func resolveWorkspaceArg(workspace, projectRoot string) string {
+//
+// Containment (cycle-619): a relative arg whose cleaned join escapes the
+// project root (via ".." traversal) is REJECTED with an error rather than
+// silently resolving into an arbitrary sibling tree — otherwise the same
+// artifact-scatter the absolutization prevents for cwd just relocates outside
+// the root. Absolute args keep their passthrough contract: the real loop hands
+// absolute worktree/runs paths that legitimately live outside project root.
+func resolveWorkspaceArg(workspace, projectRoot string) (string, error) {
 	if workspace == "" || projectRoot == "" || filepath.IsAbs(workspace) {
-		return workspace
+		return workspace, nil
 	}
-	return filepath.Join(projectRoot, workspace)
+	resolved := filepath.Join(projectRoot, workspace)
+	rel, err := filepath.Rel(projectRoot, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("workspace %q escapes project root %q", workspace, projectRoot)
+	}
+	return resolved, nil
 }
 
 func runSubagentCachePrefix(args []string, stdout, stderr io.Writer) int {
@@ -147,7 +159,11 @@ func runSubagentCachePrefix(args []string, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		projectRoot = envOrCwd("EVOLVE_PROJECT_ROOT")
 	}
-	workspace = resolveWorkspaceArg(workspace, projectRoot)
+	workspace, err = resolveWorkspaceArg(workspace, projectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve subagent cache-prefix: %v\n", err)
+		return 2
+	}
 	if err := subagent.WriteCachePrefix(subagent.CachePrefixRequest{
 		Cycle:       cycle,
 		Agent:       agent,
@@ -346,7 +362,11 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	workspace := args[2]
 
 	layout := paths.ResolveFromEnv()
-	workspace = resolveWorkspaceArg(workspace, layout.ProjectRoot)
+	workspace, err = resolveWorkspaceArg(workspace, layout.ProjectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve subagent run: %v\n", err)
+		return 2
+	}
 
 	var promptReader io.Reader
 	if override := os.Getenv("PROMPT_FILE_OVERRIDE"); override != "" {
@@ -424,7 +444,11 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	workspace := args[2]
 
 	layout := paths.ResolveFromEnv()
-	workspace = resolveWorkspaceArg(workspace, layout.ProjectRoot)
+	workspace, err = resolveWorkspaceArg(workspace, layout.ProjectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve subagent dispatch-parallel: %v\n", err)
+		return 2
+	}
 
 	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
 	if err != nil {
