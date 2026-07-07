@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
@@ -64,6 +65,11 @@ type PhaseRecord struct {
 	// a legacy timing log written before this field existed.
 	ModelSource   string `json:"model_source,omitempty"`
 	ResolvedModel string `json:"resolved_model,omitempty"`
+	// Tokens (S6, token-telemetry) projects the per-phase terminal token usage
+	// ingested from phase-timing.json (Entry.Tokens, S4) so the durable dossier
+	// record carries counts beside DurationMS. Zero (omitempty ⇒ absent) on a
+	// legacy timing log written before the field existed — never fabricated.
+	Tokens cyclestate.TokenUsage `json:"tokens,omitempty"`
 }
 
 // Defect is one audit finding (the H1/H2 taxonomy) — preserved so a failed cycle

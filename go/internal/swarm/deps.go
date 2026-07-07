@@ -1,6 +1,10 @@
 package swarm
 
-import "context"
+import (
+	"context"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+)
 
 // Launcher is the narrow seam the dispatcher needs from the bridge: launch one
 // worker and report its exit/cost/session-identity. It mirrors core.Bridge.Launch
@@ -35,6 +39,10 @@ type LaunchRequest struct {
 type LaunchResult struct {
 	ExitCode int
 	CostUSD  float64
+	// Tokens (S5, token-telemetry) is the per-worker LLM token usage, carried
+	// alongside CostUSD so the swarm merge can sum counts, not just dollars. The
+	// composition root maps it from core.BridgeResponse.Tokens.
+	Tokens cyclestate.TokenUsage
 	// PGID is the launched process group (0 if the launcher can't report one);
 	// the dispatcher records it so the reaper can group-kill.
 	PGID int

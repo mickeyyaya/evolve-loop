@@ -26,6 +26,7 @@ func timingRecords(workspace string) ([]PhaseRecord, *phasetiming.Summary, bool)
 			Archetype:     e.Archetype,
 			ModelSource:   e.ModelSource,
 			ResolvedModel: e.ResolvedModel,
+			Tokens:        e.Tokens,
 		})
 	}
 	summary := phasetiming.Rollup(entries)

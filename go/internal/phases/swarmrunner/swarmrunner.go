@@ -140,6 +140,7 @@ func (d *Decorator) enforce(ctx context.Context, req core.PhaseRequest, plan swa
 		Phase:   d.inner.Name(),
 		Verdict: core.VerdictPASS,
 		CostUSD: sr.TotalCostUSD(),
+		Tokens:  sr.TotalTokens(),
 		Signals: map[string]any{},
 	}
 	annotate(&resp, plan, sr, derr, "enforce")
@@ -263,7 +264,7 @@ func (l bridgeLauncher) Launch(ctx context.Context, r swarm.LaunchRequest) (swar
 	if err != nil {
 		return swarm.LaunchResult{}, err
 	}
-	return swarm.LaunchResult{ExitCode: resp.ExitCode, CostUSD: resp.CostUSD}, nil
+	return swarm.LaunchResult{ExitCode: resp.ExitCode, CostUSD: resp.CostUSD, Tokens: resp.Tokens}, nil
 }
 
 // mergeEnv overlays per-worker env over the shared phase env (overlay wins),

@@ -18,6 +18,8 @@
 //     wastes tokens, never corrupts). Fan-in is summary synthesis (no git).
 package swarm
 
+import "github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+
 // Mode distinguishes the two swarm postures. It is the single switch that
 // selects strict-disjoint (writer) vs lenient-overlap (reader) validation and
 // merge-train vs synthesis fan-in.
@@ -96,7 +98,11 @@ type WorkerResult struct {
 	ArtifactPath string
 	ExitCode     int
 	CostUSD      float64
-	Err          error // non-nil = launch/transport failure (vs a clean non-zero exit)
+	// Tokens (S5, token-telemetry) is this worker's LLM token usage, folded into
+	// the swarm-level sum by TotalTokens so the aggregated ledger entry carries
+	// counts, not just cost.
+	Tokens cyclestate.TokenUsage
+	Err    error // non-nil = launch/transport failure (vs a clean non-zero exit)
 }
 
 // OK reports a successful worker run (no transport error, zero exit code).
@@ -130,6 +136,21 @@ func (s SwarmResult) TotalCostUSD() float64 {
 	var sum float64
 	for _, w := range s.Workers {
 		sum += w.CostUSD
+	}
+	return sum
+}
+
+// TotalTokens sums per-worker token usage (field-wise) for the single aggregated
+// ledger entry — the token twin of TotalCostUSD (S5, token-telemetry). Without
+// this, per-worker token counts were dropped at the N→1 merge and only cost
+// survived.
+func (s SwarmResult) TotalTokens() cyclestate.TokenUsage {
+	var sum cyclestate.TokenUsage
+	for _, w := range s.Workers {
+		sum.Input += w.Tokens.Input
+		sum.Output += w.Tokens.Output
+		sum.CacheRead += w.Tokens.CacheRead
+		sum.CacheWrite += w.Tokens.CacheWrite
 	}
 	return sum
 }

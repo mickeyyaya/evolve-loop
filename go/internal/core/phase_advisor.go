@@ -296,7 +296,7 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 	// WS3-S1/S3: capture the redacted prompt+response and the decision span
 	// BEFORE the caller parses, so the decision is debuggable + replayable.
 	// Fail-open — never block the path.
-	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS, replanDepth)
+	p.captureRedacted(in.Workspace, kind, prompt, resp.Stdout, resp.DurationMS, replanDepth, resp.Tokens)
 	return resp, nil
 }
 
@@ -334,6 +334,11 @@ type AdvisorSpan struct {
 	ResponseSHA string `json:"response_sha"`
 	DurationMS  int64  `json:"duration_ms"`
 	ReplanDepth int    `json:"replan_depth"`
+	// Tokens (S5, token-telemetry) records the advisor call's LLM token usage —
+	// non-phase burn that was previously dropped on the floor (only CostUSD was
+	// captured elsewhere, never the advisor's own tokens). Always emitted: a
+	// zero value is a meaningful "no telemetry resolved", not fabricated absence.
+	Tokens TokenUsage `json:"tokens"`
 }
 
 // captureRedacted persists the secret-redacted prompt and response plus the
@@ -344,7 +349,7 @@ type AdvisorSpan struct {
 // PERSISTED COPY is redacted; the live prompt the advisor reasoned over is
 // untouched. The response is redacted but not otherwise transformed, so WS3-S5
 // can reparse it to the same plan.
-func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string, durationMS int64, replanDepth int) {
+func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string, durationMS int64, replanDepth int, tokens TokenUsage) {
 	if p.writeArtifact == nil || workspace == "" || !isSafeArtifactKind(kind) {
 		return
 	}
@@ -359,6 +364,7 @@ func (p *PhaseAdvisor) captureRedacted(workspace, kind, prompt, response string,
 		ResponseSHA: sha256OfString(rr),
 		DurationMS:  durationMS,
 		ReplanDepth: replanDepth,
+		Tokens:      tokens,
 	}); err == nil {
 		_ = p.writeArtifact(filepath.Join(workspace, "advisor-span-"+kind+".json"), buf)
 	}

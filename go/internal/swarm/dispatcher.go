@@ -203,6 +203,7 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	}
 	wr.ExitCode = lr.ExitCode
 	wr.CostUSD = lr.CostUSD
+	wr.Tokens = lr.Tokens
 	return wr
 }
 

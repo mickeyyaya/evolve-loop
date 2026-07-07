@@ -87,12 +87,26 @@ type Summary struct {
 	LongestPhase string           `json:"longest_phase"`
 	LongestMS    int64            `json:"longest_ms"`
 	ByArchetype  map[string]int64 `json:"by_archetype_ms"` // archetype -> summed duration_ms
+	// Token rollups (S6, token-telemetry): the cycle-level twin of the duration
+	// rollup. TotalTokens sums every entry's terminal token usage;
+	// TokensByArchetype buckets it the same way ByArchetype buckets duration;
+	// WastedTokens is the usage spent by FAIL-verdict entries (work that did not
+	// ship); CacheHitRatio is cache_read/(input+cache_read) over the whole cycle
+	// (0 when there was no input at all). All zero on a legacy log with no token
+	// fields — degrades to "absent", never a fabricated count.
+	TotalTokens       cyclestate.TokenUsage            `json:"total_tokens"`
+	TokensByArchetype map[string]cyclestate.TokenUsage `json:"tokens_by_archetype"`
+	WastedTokens      cyclestate.TokenUsage            `json:"wasted_tokens"`
+	CacheHitRatio     float64                          `json:"cache_hit_ratio"`
 }
 
 // Rollup aggregates entries into a Summary. Archetype-less entries (legacy logs
 // written before the field existed) bucket under "unknown" so totals still sum.
 func Rollup(entries []Entry) Summary {
-	s := Summary{ByArchetype: map[string]int64{}}
+	s := Summary{
+		ByArchetype:       map[string]int64{},
+		TokensByArchetype: map[string]cyclestate.TokenUsage{},
+	}
 	for _, e := range entries {
 		s.TotalMS += e.DurationMS
 		s.PhaseCount++
@@ -108,8 +122,26 @@ func Rollup(entries []Entry) Summary {
 			arch = "unknown"
 		}
 		s.ByArchetype[arch] += e.DurationMS
+		s.TotalTokens = addTokens(s.TotalTokens, e.Tokens)
+		s.TokensByArchetype[arch] = addTokens(s.TokensByArchetype[arch], e.Tokens)
+		if e.Verdict == "FAIL" {
+			s.WastedTokens = addTokens(s.WastedTokens, e.Tokens)
+		}
+	}
+	if denom := s.TotalTokens.Input + s.TotalTokens.CacheRead; denom > 0 {
+		s.CacheHitRatio = float64(s.TotalTokens.CacheRead) / float64(denom)
 	}
 	return s
+}
+
+// addTokens sums two TokenUsage values field-wise — the shared accumulator for
+// the cycle-level and per-archetype token rollups.
+func addTokens(a, b cyclestate.TokenUsage) cyclestate.TokenUsage {
+	a.Input += b.Input
+	a.Output += b.Output
+	a.CacheRead += b.CacheRead
+	a.CacheWrite += b.CacheWrite
+	return a
 }
 
 // ArchetypePercent is the share (0–100) of total wall-clock in an archetype.
