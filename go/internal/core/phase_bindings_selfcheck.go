@@ -175,11 +175,15 @@ func writeBuildSelfCheckArtifact(worktree string, fails []selfCheckFailure) {
 	dir := filepath.Join(worktree, ".evolve")
 	dst := filepath.Join(dir, "build-selfcheck.json")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not persist build-selfcheck artifact %s: %v\n", dst, err)
 		return
 	}
 	data, err := json.MarshalIndent(fails, "", "  ")
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not encode build-selfcheck artifact %s: %v\n", dst, err)
 		return
 	}
-	_ = os.WriteFile(dst, append(data, '\n'), 0o644)
+	if err := os.WriteFile(dst, append(data, '\n'), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not write build-selfcheck artifact %s: %v\n", dst, err)
+	}
 }

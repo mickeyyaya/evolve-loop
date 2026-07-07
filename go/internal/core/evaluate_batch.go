@@ -97,6 +97,19 @@ func (cr *cycleRun) dispatchRunnerWithRetry(phase Phase, req PhaseRequest) (Phas
 		}
 		if err != nil {
 			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
+				// Dispatch parity with the sequential loop (cyclerun_dispatch.go):
+				// a catalog-Optional off-floor phase whose exhaustion is
+				// infra-shaped, or a best-effort post-ship Control observer,
+				// degrades to WARN+advance instead of aborting the whole batch.
+				// Both predicates are pure reads (o.cfg/o.catalog) — safe in this
+				// concurrent path. Keeps `ship ⇒ build ∧ audit ∧ tdd` intact:
+				// mandatory/floor phases never match, so their errors still
+				// propagate. The ledger/failure-learning side effects the
+				// sequential path emits are recorded by the batch merge, not here
+				// (this helper mutates nothing, per its concurrency contract).
+				if cr.o.optionalInfraSkip(phase, err) || cr.o.postShipObserverSkip(phase, cr.shipped) {
+					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, attempt, nil
+				}
 				return resp, attempt, err
 			}
 		} else if attempt >= maxAttempts { // err==nil but non-canonical verdict

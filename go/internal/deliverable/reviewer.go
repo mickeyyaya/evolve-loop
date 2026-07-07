@@ -180,8 +180,12 @@ func writeBreaker(path string, n int) {
 	}
 	data, _ := json.Marshal(breakerState{Consecutive: n})
 	tmp := path + ".tmp"
-	if os.WriteFile(tmp, data, 0o644) == nil {
-		_ = os.Rename(tmp, path) // atomic
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[contract-gate] WARN could not persist breaker state %s: %v\n", path, err)
+		return
+	}
+	if err := os.Rename(tmp, path); err != nil { // atomic
+		fmt.Fprintf(os.Stderr, "[contract-gate] WARN could not commit breaker state %s: %v\n", path, err)
 	}
 }
 

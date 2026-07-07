@@ -178,15 +178,28 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 			// raise to 10s to cover the worst legitimate case.
 			done := make(chan struct{})
 			go func() { wg.Wait(); close(done) }()
-			select {
-			case <-done:
-			case <-time.After(10 * time.Second):
+			if !closeSinkAfterWait(done, 10*time.Second, sinkCloser) {
 				fmt.Fprintf(os.Stderr, "[observer] WARN watcher for phase=%s didn't exit within 10s; leaking goroutine (cycle should still complete)\n", phase)
 			}
-			if sinkCloser != nil {
-				_ = sinkCloser.Close()
-			}
 		})
+	}
+}
+
+// closeSinkAfterWait waits up to timeout for done to close, then closes closer
+// ONLY if done fired within the window — never on the timeout arm, so a
+// still-running leaked watcher goroutine's sink is never closed out from under
+// it (the use-after-close race the 10s bound describes). A nil closer is a
+// no-op, preserving Start's `if sinkCloser != nil` contract. Returns true iff
+// done fired within timeout (false → the caller may WARN about the leak).
+func closeSinkAfterWait(done <-chan struct{}, timeout time.Duration, closer io.Closer) bool {
+	select {
+	case <-done:
+		if closer != nil {
+			_ = closer.Close()
+		}
+		return true
+	case <-time.After(timeout):
+		return false
 	}
 }
 
