@@ -37,6 +37,9 @@ type phaseUsageSidecar struct {
 	Archetype string `json:"archetype,omitempty"`
 	// AbortReason mirrors phaseTimingEntry.AbortReason (ADR-0044 C1).
 	AbortReason string `json:"abort_reason,omitempty"`
+	// Tokens (S4) mirrors phaseTimingEntry.Tokens — the terminal attempt's
+	// token usage, beside CostUSD. Legacy sidecars without it parse to zero.
+	Tokens TokenUsage `json:"tokens,omitempty"`
 }
 
 type failureLearningRequest struct {
@@ -75,6 +78,7 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 		AbortReason:   abortReason,
 		ModelSource:   resp.ModelSource,
 		ResolvedModel: resp.ResolvedModel,
+		Tokens:        resp.Tokens,
 	}
 }
 
@@ -110,6 +114,7 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		AbortReason:   out.AbortReason,
 		ModelSource:   out.ModelSource,
 		ResolvedModel: out.ResolvedModel,
+		Tokens:        out.Tokens,
 	})
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
@@ -139,6 +144,7 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		EndedAt:      out.EndedAt,
 		Archetype:    out.Archetype,
 		AbortReason:  out.AbortReason,
+		Tokens:       out.Tokens,
 	}
 	data, err := json.MarshalIndent(sidecar, "", "  ")
 	if err != nil {

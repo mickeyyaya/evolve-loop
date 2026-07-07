@@ -4,7 +4,8 @@
 // writes Entry values (core aliases its phaseTimingEntry to Entry, so the
 // schema is defined once); the dossier producer and the `evolve cycle timing`
 // CLI read them back and Rollup() them into a cycle-level summary. Leaf package:
-// stdlib only, importable by core, dossier, and cmd without cycles.
+// stdlib plus the zero-dependency cyclestate value types (TokenUsage) —
+// importable by core, dossier, and cmd without cycles.
 package phasetiming
 
 import (
@@ -13,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // FileName is the per-cycle timing log written under the cycle workspace.
@@ -48,6 +51,13 @@ type Entry struct {
 	// change; that degrades to "absent", never a fabricated claim.
 	ModelSource   string `json:"model_source,omitempty"`
 	ResolvedModel string `json:"resolved_model,omitempty"`
+	// Tokens (S4, token-telemetry) is the TERMINAL attempt's LLM token usage,
+	// projected here beside CostUSD so the durable per-phase record carries
+	// counts, not just dollars. Per-attempt detail already lives in
+	// llm-calls.ndjson (S3); this is the single terminal number the dossier
+	// rolls up. A legacy log written before this field parses to a zero value
+	// (never an error) — that degrades to "absent", never a fabricated count.
+	Tokens cyclestate.TokenUsage `json:"tokens,omitempty"`
 }
 
 // Path is the timing-log path for a cycle workspace.

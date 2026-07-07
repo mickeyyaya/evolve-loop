@@ -26,6 +26,11 @@
 // package carries no verdict constants to drift.
 package recovery
 
+// cyclestate is a zero-dependency leaf (the foundation everything imports); it
+// is neither core nor phases/runner nor bridge, so importing its TokenUsage
+// value type keeps recovery importable by both without a cycle.
+import "github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+
 // PhaseOutcome is the single-source record of one phase dispatch's terminal
 // disposition (ADR-0044 C1). The orchestrator funnels every terminal path —
 // success, exhausted retries, review-gate reject, worktree-leak recovery
@@ -76,4 +81,10 @@ type PhaseOutcome struct {
 	// the concrete resolved model/tier.
 	ModelSource   string
 	ResolvedModel string
+	// Tokens (S4, token-telemetry) is the TERMINAL attempt's LLM token usage,
+	// carried through the C1 chokepoint beside CostUSD so the durable per-phase
+	// record (phase-timing.json, <phase>-usage.json) accounts tokens, not just
+	// dollars. Per-attempt detail already lives in llm-calls.ndjson (S3); this
+	// package only relays what the caller's PhaseResponse reported.
+	Tokens cyclestate.TokenUsage
 }
