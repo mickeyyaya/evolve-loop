@@ -125,6 +125,9 @@ The sections above are the always-on digest. Each reference below expands one di
 | [references/orchestration.md](references/orchestration.md) | parallel work, subagent delegation — the subagent contract, fan-out patterns, boundary routines, working-while-waiting |
 | [references/judgment.md](references/judgment.md) | proceed-vs-stop calls, fix-forward vs route, live-state changes — blast-radius questions, cost-aware path selection, corrections-as-standing-rules |
 | [references/verification.md](references/verification.md) | writing tests, claiming done — TDD mechanics, regression twins, gate parity, completion-claim format, non-code claim proof |
+| [references/thinking.md](references/thinking.md) | any non-trivial task on deep/standard-class models — the DECISION FUNCTIONS behind the disciplines: hypothesis ledger, claim ledger, probe economics, goal arbitration, delegation calculus, working-set compression, stop conditions. NOT in the fast-class load set (flash-class uses its compact projection only) |
+
+**Per-model adaptations** ([adaptations/](adaptations/)): evidence-cited modulations for the running model's class — `opus.md` (deep: anti-literalism, anti-self-filter), `gpt.md` (codex: anti-decay re-injection, evidence gates, no plan-first), `flash.md` (fast: ≤15-rule compact budget, no self-critique, escalation rule). Load the one matching your model alongside the core; the design lives at `docs/plans/fable-simulation-2026-07.md`.
 
 (Flat-namespace installs — e.g. the codex target — project only SKILL.md; the reference files are absent.)
 
