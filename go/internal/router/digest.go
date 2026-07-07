@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -44,6 +45,8 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			raw = unwrapPayload(raw)
 			sig.Build = extractBuild(raw)
 			sig.foldGeneric("build", raw)
+		} else {
+			sig.Build = buildFromGitFallback(workspace, &sig.DigestDegraded)
 		}
 	}
 	if done["audit"] {
@@ -153,6 +156,53 @@ func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]b
 		}
 	}
 	return nil, false
+}
+
+// buildFromGitFallback derives BuildSignals from git when neither
+// handoff-build.json nor handoff-builder.json is present on disk — both have
+// been extinct since ~cycle 215 (warnship_apicover_ci_gap, 3rd recurrence),
+// which otherwise leaves sig.Build silently zero-value on every real cycle.
+// It reuses changedpkgs.FromGitChecked — the same helper
+// internal/phases/audit.changedPackagesForAudit already uses — rather than
+// re-implementing git-diff logic. A git-underivable tree (no repo, git
+// failure) degrades LOUDLY via DigestDegraded instead of silently returning
+// Present:false with no trace, mirroring the read-miss vs genuine-gap
+// distinction readFirstTracked already applies to handoff read errors.
+func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
+	root, ok := projectRootFromWorkspace(workspace)
+	if !ok {
+		*degraded = append(*degraded, "build: workspace path not in <root>/.evolve/runs/cycle-<N> form, cannot derive git fallback")
+		return BuildSignals{}
+	}
+	pkgs, derivable := changedpkgs.FromGitChecked(root, "HEAD")
+	if !derivable {
+		*degraded = append(*degraded, "build: handoff absent and git-derived changed-package set is underivable (no repo / git failure)")
+		return BuildSignals{}
+	}
+	// pkgs are deduped package patterns, not raw file paths (FromGitChecked's
+	// contract), so FilesTouched here is a package-count floor rather than the
+	// handoff's exact file tally — still non-zero on any real change, which is
+	// what closes the silent-gap hole this fallback exists for.
+	return BuildSignals{Present: true, FilesTouched: len(pkgs)}
+}
+
+// projectRootFromWorkspace inverts core.RunWorkspacePath's
+// <root>/.evolve/runs/cycle-<N> layout without importing internal/core (router
+// is a leaf package by design — see this file's package doc).
+func projectRootFromWorkspace(workspace string) (string, bool) {
+	dir := filepath.Clean(workspace)
+	if !strings.HasPrefix(filepath.Base(dir), "cycle-") {
+		return "", false
+	}
+	runsDir := filepath.Dir(dir)
+	if filepath.Base(runsDir) != "runs" {
+		return "", false
+	}
+	evolveDir := filepath.Dir(runsDir)
+	if filepath.Base(evolveDir) != ".evolve" {
+		return "", false
+	}
+	return filepath.Dir(evolveDir), true
 }
 
 func extractScout(raw []byte) ScoutSignals {
