@@ -140,7 +140,8 @@ func cycleTouchedGo(req core.PhaseRequest) bool {
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	return len(changedPackagesForAudit(root, req.Cycle)) > 0
+	pkgs, _ := changedPackagesForAudit(root, req.Cycle)
+	return len(pkgs) > 0
 }
 
 // goVetCheckDefault runs `go vet ./...` (CI go.yml "vet + fmt" step / `make
@@ -180,10 +181,17 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	changed := changedPackagesForAudit(root, req.Cycle)
+	changed, derivable := changedPackagesForAudit(root, req.Cycle)
 	enforceBytes, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
 	if err != nil {
 		return nil, nil // no enforce list → nothing to enforce
+	}
+	if !derivable {
+		// Underivable changed-set on a cycle WITH an enforce list: git failed
+		// (no repo, bad baseRef, fleet .git/index.lock race), so we cannot prove
+		// the touched∩enforced set is empty. FAIL loud (err==nil) instead of the
+		// silent (nil,nil) no-op that shipped an uncovered export (cycle-581 D1).
+		return []string{"changed-package set is underivable this cycle (git diff failed) — apicover -enforce gate cannot verify coverage; treat as FAIL, do not ship"}, nil
 	}
 	touched := ciparity.IntersectEnforced(changed, enforceBytes)
 	if len(touched) == 0 {
@@ -257,10 +265,16 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	changed := changedPackagesForAudit(root, req.Cycle)
+	changed, derivable := changedPackagesForAudit(root, req.Cycle)
 	enforceBytes, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
 	if err != nil {
 		return nil, nil // no enforce list → nothing to graduate against
+	}
+	if !derivable {
+		// Same fail-loud reasoning as apicoverEnforceChangedDefault: an
+		// underivable changed-set means we cannot prove no new package is
+		// ungraduated, so FAIL loud rather than silently no-op (cycle-581 D2).
+		return []string{"changed-package set is underivable this cycle (git diff failed) — apicover graduation gate cannot verify new packages; treat as FAIL, do not ship"}, nil
 	}
 	ungraduated := ciparity.NewUngraduatedPackages(changed, enforceBytes)
 	if len(ungraduated) == 0 {
@@ -273,21 +287,25 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	return offenders, nil
 }
 
-// changedPackagesForAudit locates this cycle's changed-package set. It prefers
-// the build handoff when present (same locator the EGPS suite uses), then falls
-// back to a deterministic git derivation (changedpkgs.FromGit vs HEAD). The
-// handoff has been extinct since ~cycle 215, so the git fallback is what keeps
-// the apicover gate live: previously an absent handoff returned nil and made the
-// gate a silent no-op (fail-open, standing memory warnship_apicover_ci_gap).
-func changedPackagesForAudit(projectRoot string, cycle int) []string {
+// changedPackagesForAudit locates this cycle's changed-package set and reports
+// whether it is derivable. It prefers the build handoff when present (same
+// locator the EGPS suite uses; a handoff yielding >=1 pkg is derivable), then
+// falls back to a deterministic git derivation (changedpkgs.FromGitChecked vs
+// HEAD). The handoff has been extinct since ~cycle 215, so the git fallback is
+// what keeps the apicover gate live. The derivable flag closes the last
+// fail-open hole: previously the git fallback returned nil identically whether
+// the tree was git-clean (nothing changed) or the set was underivable (git
+// failed), letting an underivable cycle ship with a silent PASS (cycle-581
+// D1/D2, standing memory warnship_apicover_ci_gap).
+func changedPackagesForAudit(projectRoot string, cycle int) ([]string, bool) {
 	if projectRoot == "" {
-		return nil
+		return nil, false
 	}
 	dir := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 	for _, name := range []string{"handoff-build.json", "handoff-builder.json"} {
 		if pkgs := changedpkgs.ChangedPackages(filepath.Join(dir, name)); len(pkgs) > 0 {
-			return pkgs
+			return pkgs, true // handoff present and non-empty → derivable
 		}
 	}
-	return changedpkgs.FromGit(projectRoot, "HEAD")
+	return changedpkgs.FromGitChecked(projectRoot, "HEAD")
 }

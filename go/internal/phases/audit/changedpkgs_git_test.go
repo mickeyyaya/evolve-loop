@@ -55,7 +55,7 @@ func TestChangedPackagesForAudit_GitDerivedNoHandoff(t *testing.T) {
 	// handoff-build.json / handoff-builder.json in .evolve/runs/cycle-573.
 	writeAuditFile(t, root, "go/internal/foo/foo.go", "package foo\n\nfunc New() {}\n")
 
-	got := changedPackagesForAudit(root, 573)
+	got, _ := changedPackagesForAudit(root, 573)
 
 	found := false
 	for _, p := range got {

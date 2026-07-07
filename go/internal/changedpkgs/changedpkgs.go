@@ -104,10 +104,28 @@ func ChangedPackages(handoffPath string) []string {
 // modifications (`git diff --name-only <baseRef>`) plus untracked new files
 // (`git ls-files --others --exclude-standard`), each mapped through
 // FileToPackage. Best-effort like the rest of this package: any git error yields
-// an empty list (the caller falls back), never a panic.
+// an empty list (the caller falls back), never a panic. Callers that must
+// distinguish "0 files changed" from "git failed" should use FromGitChecked.
 func FromGit(repoRoot, baseRef string) []string {
+	pkgs, _ := FromGitChecked(repoRoot, baseRef)
+	return pkgs
+}
+
+// FromGitChecked is FromGit plus a derivability signal: it returns
+// (pkgs, derivable) where derivable is false whenever the changed-package set
+// could NOT be trusted — an empty repoRoot/baseRef (a config error, not a
+// verified-clean tree) or ANY git invocation failing (no repo, bad baseRef, a
+// concurrent-fleet `.git/index.lock` race). A clean tree that git reports
+// successfully is (nil, true): genuinely nothing changed, NOT underivable.
+//
+// FromGit's swallow-every-error behavior conflates those two cases, which makes
+// the apicover CI-parity gate fail-open on the very cycle that most needs it
+// (cycle-581 audit D1/D2, warnship_apicover_ci_gap 3rd recurrence). A gate that
+// must FAIL loud on an underivable set uses this; the CHANGED_PACKAGES predicate
+// path keeps FromGit's best-effort empty-on-error contract.
+func FromGitChecked(repoRoot, baseRef string) ([]string, bool) {
 	if repoRoot == "" || baseRef == "" {
-		return nil
+		return nil, false
 	}
 	g := gitexec.Default(repoRoot)
 	ctx := context.Background()
@@ -122,19 +140,23 @@ func FromGit(repoRoot, baseRef string) []string {
 			}
 		}
 	}
-	if out, err := g.Output(ctx, "diff", "--name-only", baseRef); err == nil {
-		add(out)
+	out, err := g.Output(ctx, "diff", "--name-only", baseRef)
+	if err != nil {
+		return nil, false // git failed → underivable, not "nothing changed"
 	}
-	if out, err := g.Output(ctx, "ls-files", "--others", "--exclude-standard"); err == nil {
-		add(out)
+	add(out)
+	out, err = g.Output(ctx, "ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, false
 	}
+	add(out)
 	if len(set) == 0 {
-		return nil
+		return nil, true // git succeeded, tree genuinely clean
 	}
-	out := make([]string, 0, len(set))
+	res := make([]string, 0, len(set))
 	for p := range set {
-		out = append(out, p)
+		res = append(res, p)
 	}
-	sort.Strings(out)
-	return out
+	sort.Strings(res)
+	return res, true
 }
