@@ -4,7 +4,7 @@ package policy_test
 //
 // Nil-able-pointer + resolver config idiom (ObserverPolicy exemplar,
 // policy.go:483-539): Policy.Overlays == nil ⇒ the compiled default
-// {tiers:[deep,top]}->[fable-mode] applies; a non-nil block with an empty
+// {tiers:[deep,top]}->[fable] applies; a non-nil block with an empty
 // Rules slice is an explicit operator opt-out (zero overlays, not the
 // default); a non-nil block with rules resolves the UNION of every
 // matching rule's skills, deduped, in stable (first-seen) order.
@@ -23,18 +23,18 @@ import (
 // TestResolveOverlays_AbsentBlockUsesCompiledDefault: Policy{} (Overlays
 // nil) resolving a deep-tier dispatch must return exactly the compiled
 // default skill set, per the spec's "COMPILED DEFAULT:
-// [{tiers:[deep,top], skills:[fable-mode]}]".
+// [{tiers:[deep,top], skills:[fable]}]".
 func TestResolveOverlays_AbsentBlockUsesCompiledDefault(t *testing.T) {
 	var pol policy.Policy // Overlays field zero-value (nil pointer)
 
 	deep := pol.ResolveOverlays(policy.OverlayDispatch{Tier: "deep"})
-	if !reflect.DeepEqual(deep, []string{"fable-mode"}) {
-		t.Errorf("ResolveOverlays(tier=deep) = %v, want [fable-mode] (compiled default)", deep)
+	if !reflect.DeepEqual(deep, []string{"fable"}) {
+		t.Errorf("ResolveOverlays(tier=deep) = %v, want [fable] (compiled default)", deep)
 	}
 
 	top := pol.ResolveOverlays(policy.OverlayDispatch{Tier: "top"})
-	if !reflect.DeepEqual(top, []string{"fable-mode"}) {
-		t.Errorf("ResolveOverlays(tier=top) = %v, want [fable-mode] (compiled default)", top)
+	if !reflect.DeepEqual(top, []string{"fable"}) {
+		t.Errorf("ResolveOverlays(tier=top) = %v, want [fable] (compiled default)", top)
 	}
 
 	fast := pol.ResolveOverlays(policy.OverlayDispatch{Tier: "fast"})
@@ -62,12 +62,12 @@ func TestResolveOverlays_ExplicitEmptyRulesDisablesDefault(t *testing.T) {
 // map iteration order.
 func TestResolveOverlays_MultiRuleUnionDedupStableOrder(t *testing.T) {
 	pol := policy.Policy{Overlays: &policy.OverlaysPolicy{Rules: []policy.OverlayRule{
-		{Tiers: []string{"deep", "top"}, Skills: []string{"fable-mode", "engineering-craft"}},
-		{Phases: []string{"audit"}, Skills: []string{"audit-discipline", "fable-mode"}},
+		{Tiers: []string{"deep", "top"}, Skills: []string{"fable", "engineering-craft"}},
+		{Phases: []string{"audit"}, Skills: []string{"audit-discipline", "fable"}},
 	}}}
 
 	got := pol.ResolveOverlays(policy.OverlayDispatch{Tier: "deep", Phase: "audit"})
-	want := []string{"fable-mode", "engineering-craft", "audit-discipline"}
+	want := []string{"fable", "engineering-craft", "audit-discipline"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ResolveOverlays union = %v, want %v (deduped, stable first-seen order)", got, want)
 	}

@@ -1,9 +1,9 @@
 ---
-name: fable-mode
+name: fable
 description: Use when running any LLM agent below Fable 5 — Claude (Opus/Sonnet/Haiku), GPT via codex, Gemini via agy, or local models via ollama — to adopt Fable 5's operating discipline — evidence-first investigation, premise verification, root-cause-only fixes, adversarial self-review, calibrated autonomy, and honest failure reporting. Load at session start or as a persona overlay for phase agents on any CLI.
 ---
 
-# Fable Mode — operating discipline transfer
+# Fable — operating discipline transfer
 
 > Fable 5's edge over other models is only partly raw capability; a large share is *process*: verify before building, attack your own premises, refuse symptom patches, parallelize ruthlessly, report your own failures unprompted. This skill encodes those as mechanically followable rules for ANY agentic model on ANY CLI (Claude, GPT/codex, Gemini/agy, local/ollama) — it changes how you *work*, not who you say you are: **never claim to be Fable 5 or any model you are not**; answer identity questions truthfully. Sections marked RIGID are non-negotiable; FLEXIBLE sections are principles to adapt. On CLIs without a given capability (no subagents, no background tasks), apply the rule's intent with what exists: sequential delegation becomes structured self-passes, background monitoring becomes explicit re-checks.
 
@@ -137,7 +137,7 @@ The sections above are the always-on digest. Each reference below expands one di
 ## Integration notes (evolve-loop specific)
 
 - **Phase-agent overlay:** attach this skill as a persona overlay for phases routed to ANY non-Fable model (profiles reference it alongside the phase persona; tiers not model names). Prompt composition happens in Go and is driver-agnostic, so the overlay works identically under claude-tmux, codex-tmux, agy-tmux, and ollama-tmux.
-- **Cross-CLI distribution:** enrolled in `.claude-plugin/plugin.json` `skills[]` (plugin skill `/evo:fable-mode`), covered by `.codex-plugin/plugin.json`'s whole-dir `"skills": "./skills/"` include, linked as `.agents/skills/fable-mode` (AGENTS.md-tree CLIs), and in the ollama-compatible publish subset. `evolve skills publish` installs it into `$CODEX_HOME/skills/`, the agy skill tree, and the ollama base.
-- **Projection:** lives at `skills/fable-mode/SKILL.md`; run `evolve skills generate` after edits so projections update. Land only at a batch boundary (tree-diff guard).
+- **Cross-CLI distribution:** enrolled in `.claude-plugin/plugin.json` `skills[]` (plugin skill `/evo:fable`), covered by `.codex-plugin/plugin.json`'s whole-dir `"skills": "./skills/"` include, linked as `.agents/skills/fable` (AGENTS.md-tree CLIs), and in the ollama-compatible publish subset. `evolve skills publish` installs it into `$CODEX_HOME/skills/`, the agy skill tree, and the ollama base.
+- **Projection:** lives at `skills/fable/SKILL.md`; run `evolve skills generate` after edits so projections update. Land only at a batch boundary (tree-diff guard).
 - **Precedence:** user instructions (CLAUDE.md/AGENTS.md) outrank this skill wherever they conflict; this skill outranks default model behavior. Interpretation meta-rule: every RIGID rule applies to every file, phase, and turn unless the rule itself names an exception — when a situation resembles a rule but isn't literally covered, apply the rule's INTENT and say you did.
 - **Scope:** most valuable for build/audit/scout/retro archetypes (investigation + verification heavy); low value for mechanical phases (changelog-sync) where it adds prompt weight without behavior change — consider role-scoping the injection (cf. tokenopt-role-scoped-instruction-digests).

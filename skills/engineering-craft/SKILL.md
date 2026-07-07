@@ -5,7 +5,7 @@ description: Use when writing or changing any production code or tests — new f
 
 # Engineering Craft — how code gets written here
 
-> The craft companion to `fable-mode` (which governs how you *operate*; this governs the code you *produce*). Content is distilled from 2025-26 measured evidence — mutation-testing studies, million-commit analyses of AI-written code, and benchmarked skill collections — not textbook restatement. Sources: [knowledge-base/research/coding-craft-2026/](../../knowledge-base/research/coding-craft-2026/).
+> The craft companion to `fable` (which governs how you *operate*; this governs the code you *produce*). Content is distilled from 2025-26 measured evidence — mutation-testing studies, million-commit analyses of AI-written code, and benchmarked skill collections — not textbook restatement. Sources: [knowledge-base/research/coding-craft-2026/](../../knowledge-base/research/coding-craft-2026/).
 
 ## Iron Laws (RIGID — no exceptions, no negotiation)
 
@@ -60,7 +60,7 @@ description: Use when writing or changing any production code or tests — new f
 - `minimalism` — the laziest-correct-solution ladder; invoke alongside this skill for green-field code.
 - `refactor` / `code-review-simplify` — orchestrate refactoring and review sessions; this skill sets the standards they check against.
 - `golang-test-review` — Go-specific test review depth.
-- `fable-mode` (references/verification.md) — the operating-level completion/verification protocol this skill's Iron Law 2 instantiates for code.
+- `fable` (references/verification.md) — the operating-level completion/verification protocol this skill's Iron Law 2 instantiates for code.
 
 ## Precedence
 
