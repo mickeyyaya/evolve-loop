@@ -179,6 +179,66 @@ func TestRun_NonTimeoutError_StaysFail_Unchanged(t *testing.T) {
 	}
 }
 
+// noisyStdoutBridge simulates a non-timeout completion (err=nil) where the
+// agent wrote a well-formed deliverable to disk but the captured stdout
+// scrollback is noisy — e.g. it contains the Deliverable Contract's own
+// prompt-echoed PASS/FAIL example sentinel lines. This is the cycle-603
+// failure mode: NOT a timeout, so the existing reconcile fallback (gated on
+// ErrArtifactTimeout, runner.go:585) never engages, and classification falls
+// straight through to raw bres.Stdout (runner.go:655-662).
+type noisyStdoutBridge struct {
+	fileContent string
+	stdout      string
+}
+
+func (b *noisyStdoutBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	if req.ArtifactPath != "" {
+		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
+		_ = os.WriteFile(req.ArtifactPath, []byte(b.fileContent), 0o644)
+	}
+	return core.BridgeResponse{Stdout: b.stdout}, nil
+}
+
+func (b *noisyStdoutBridge) Probe(_ context.Context) (core.BridgeProbe, error) {
+	return core.BridgeProbe{}, nil
+}
+
+// TestRun_NonTimeout_WellFormedDeliverable_PrefersFileOverNoisyStdout —
+// cycle-603: a non-timeout completion whose captured stdout contains BOTH a
+// PASS-example and a FAIL-example contract-style sentinel line (the
+// Deliverable Contract's own printed examples, not the agent's real verdict)
+// must not classify off that noise. When the on-disk deliverable exists and
+// verifies well-formed (OK), the runner must prefer the file — generalizing
+// the already-tested timeout-reconcile pattern to every completion path, not
+// just ErrArtifactTimeout.
+func TestRun_NonTimeout_WellFormedDeliverable_PrefersFileOverNoisyStdout(t *testing.T) {
+	genuine := "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
+	noisyStdout := "Deliverable Contract example (PASS):\n" +
+		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n" +
+		"Deliverable Contract example (FAIL):\n" +
+		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n" +
+		"(these are prompt-echoed examples, not the agent's real report)\n"
+	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
+	nb := &noisyStdoutBridge{fileContent: genuine, stdout: noisyStdout}
+	r := New(Options{
+		Hooks:    hooks,
+		Bridge:   nb,
+		Prompts:  fakePromptsFS("evolve-auditor", "x"),
+		VerifyFn: verifyReturns(deliverable.Result{OK: true}, nil),
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if hooks.gotArtifact != genuine {
+		t.Errorf("Classify received noisy stdout instead of the well-formed deliverable file;\n got %q\nwant %q", hooks.gotArtifact, genuine)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("verdict=%q, want PASS", resp.Verdict)
+	}
+}
+
 func hasWarningDiag(diags []core.Diagnostic) bool {
 	for _, d := range diags {
 		if d.Severity == "warning" {

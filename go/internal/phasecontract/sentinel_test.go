@@ -112,6 +112,47 @@ func TestReadFailureBlock_FallsThroughCandidates(t *testing.T) {
 	}
 }
 
+// TestParseVerdictSentinelFull_RejectsPlaceholderEcho — cycle-603: a captured
+// scrollback can contain the Deliverable Contract's own printed FAIL-example
+// sentinel, still carrying literal placeholder tokens in its failure block
+// (never genuine agent output). That must be rejected (ok=false) so it can
+// never win verdict classification — even a scrollback-sourced parse.
+func TestParseVerdictSentinelFull_RejectsPlaceholderEcho(t *testing.T) {
+	placeholderLine := `<!-- evolve-verdict: {"phase":"audit","verdict":"FAIL","schema_version":2,"failure":{"class":"code-audit-fail","defects":["<one line per defect>"],"evidence_paths":["<artifact path>"]}} -->`
+	if _, ok := ParseVerdictSentinelFull(placeholderLine); ok {
+		t.Fatal("placeholder-echo sentinel (contract example) must yield ok=false")
+	}
+}
+
+// TestParseVerdictSentinelFull_RejectsPlaceholderEcho_EvidenceOnly — the
+// placeholder token can appear in either field independently; both must be
+// guarded (defects-only placeholder covered above).
+func TestParseVerdictSentinelFull_RejectsPlaceholderEcho_EvidenceOnly(t *testing.T) {
+	line := `<!-- evolve-verdict: {"phase":"audit","verdict":"FAIL","schema_version":2,"failure":{"class":"code-audit-fail","defects":["real nil deref in walk()"],"evidence_paths":["<artifact path>"]}} -->`
+	if _, ok := ParseVerdictSentinelFull(line); ok {
+		t.Fatal("placeholder-echo evidence_paths must yield ok=false even with a real-looking defect")
+	}
+}
+
+// TestParseVerdictSentinelFull_RealFailureBlock_StillParses — the guard must
+// not false-positive-reject a genuine failure block: real defect/evidence
+// strings (no angle-bracket placeholder tokens) must still parse ok=true.
+func TestParseVerdictSentinelFull_RealFailureBlock_StillParses(t *testing.T) {
+	f := &FailureBlock{
+		Class:         "code-build-fail",
+		Defects:       []string{"build failed: import cycle"},
+		EvidencePaths: []string{"build-report.md"},
+	}
+	line := RenderVerdictSentinelWithFailure("build", "FAIL", f)
+	s, ok := ParseVerdictSentinelFull(line)
+	if !ok {
+		t.Fatalf("real failure block must still parse ok=true; line=%q", line)
+	}
+	if s.Verdict != "FAIL" || s.Failure == nil || s.Failure.Defects[0] != "build failed: import cycle" {
+		t.Errorf("parsed sentinel = %+v", s)
+	}
+}
+
 func mustWrite(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {

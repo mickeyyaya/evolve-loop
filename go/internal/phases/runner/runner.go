@@ -653,9 +653,27 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	artifact := bres.Stdout
-	// On a reconciled timeout bres.Stdout may be partial — force the file read so
-	// Classify sees the deliverable Verify already proved well-formed.
-	if reconciled || artifact == "" {
+	// Prefer the on-disk deliverable over captured stdout whenever it exists and
+	// verifies well-formed. bres.Stdout is bridge scrollback that can contain the
+	// Deliverable Contract's own prompt-echoed example verdict sentinels — a real
+	// PASS report was recorded as FAIL this way (cycle-603) when the agent wrote a
+	// good deliverable then idled without a clean signal (a non-timeout completion,
+	// so the reconcile-on-timeout fallback above never engaged). The agent's real
+	// report is the file. This never downgrades: if the file is absent/malformed,
+	// fall back to stdout exactly as before (fail-open preserved, no verdict gets
+	// easier to game). On a reconciled timeout the file was already proven
+	// well-formed above, so read it unconditionally.
+	preferFile := reconciled || artifact == ""
+	if !preferFile {
+		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
+		if req.ProjectRoot != "" {
+			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
+		}
+		if res, verr := b.verifyFn(phase, roots); verr == nil && res.OK {
+			preferFile = true
+		}
+	}
+	if preferFile {
 		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
 			artifact = string(data)
 		}

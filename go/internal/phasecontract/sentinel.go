@@ -49,6 +49,30 @@ type VerdictSentinel struct {
 // payload is matched non-greedily so a line with trailing content still parses.
 var sentinelRE = regexp.MustCompile(`<!--\s*evolve-verdict:\s*(\{.*?\})\s*-->`)
 
+// placeholderRE matches a failure-block entry that is wholly an angle-bracket
+// placeholder token (e.g. `<one line per defect>`, `<artifact path>`). Such a
+// value is never genuine agent output — only the Deliverable Contract's own
+// printed example echoed into captured scrollback (cycle-603). A real defect
+// string is prose and never wholly bracketed, so this is a precise guard with
+// no false positives against real failure blocks.
+var placeholderRE = regexp.MustCompile(`^\s*<[^<>]+>\s*$`)
+
+// isPlaceholderEcho reports whether the failure block carries a contract-example
+// placeholder token in any Defects/EvidencePaths entry.
+func isPlaceholderEcho(f *FailureBlock) bool {
+	if f == nil {
+		return false
+	}
+	for _, entries := range [][]string{f.Defects, f.EvidencePaths} {
+		for _, e := range entries {
+			if placeholderRE.MatchString(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ParseVerdictSentinelFull returns the complete sentinel payload and whether a
 // well-formed one was found. v1 and v2 lines both parse (an absent failure
 // block is legal); a missing/malformed/verdict-less sentinel yields ok=false
@@ -63,6 +87,14 @@ func ParseVerdictSentinelFull(content string) (VerdictSentinel, bool) {
 		return VerdictSentinel{}, false
 	}
 	if s.Verdict == "" {
+		return VerdictSentinel{}, false
+	}
+	// Reject a prompt-echoed contract example: a sentinel whose failure block
+	// still carries literal placeholder tokens can only be the Deliverable
+	// Contract's own printed example captured from scrollback, never a real
+	// agent verdict (cycle-603). Falling through to ok=false means the caller's
+	// legacy parser runs instead of silently misclassifying off the example.
+	if isPlaceholderEcho(s.Failure) {
 		return VerdictSentinel{}, false
 	}
 	return s, true
