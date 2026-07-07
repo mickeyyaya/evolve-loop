@@ -119,6 +119,16 @@ func SummarizeCycle(workspace string, cycle int) (Summary, error) {
 	return summary, nil
 }
 
+// ParseEventsLog is the exported entrypoint to the single canonical
+// *-events.ndjson result-envelope extraction. token-telemetry S2's eventsResult
+// collector (internal/tokenusage) reuses this exact parser so its recovered
+// token counts agree with cyclecost by construction — there is one parser, not a
+// forked copy (docs/plans/token-telemetry-2026-07.md S2, "no duplication").
+// Returns ok=false when the log carries no usable result envelope.
+func ParseEventsLog(logPath string) (PhaseCost, bool) {
+	return parseEventsLog(logPath)
+}
+
 // eventEnvelope matches the subset of a phasestream envelope cyclecost
 // needs: the kind discriminator plus the result event's cost + token
 // payload (data.cost_usd, data.tokens.{in,out,cache_r,cache_c}).

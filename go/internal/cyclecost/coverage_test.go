@@ -11,6 +11,25 @@ import (
 // globFn / lstatFn seams would be cleaner, but tests can drive the
 // remaining branches via filesystem manipulation alone.
 
+// TestParseEventsLog_ExportedDelegatesToCanonical pins the exported
+// ParseEventsLog (token-telemetry S2 reuse seam) and asserts it returns the same
+// result the unexported canonical parser does — one parser, not a forked copy.
+func TestParseEventsLog_ExportedDelegatesToCanonical(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scout-events.ndjson")
+	if err := os.WriteFile(path, []byte(`{"kind":"result","data":{"tokens":{"in":11,"out":22,"cache_r":3,"cache_c":4}}}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	exported, okE := ParseEventsLog(path)
+	internal, okI := parseEventsLog(path)
+	if okE != okI || exported != internal {
+		t.Fatalf("ParseEventsLog must delegate to the canonical parser: exported=(%+v,%v) internal=(%+v,%v)", exported, okE, internal, okI)
+	}
+	if exported.InputTokens != 11 || exported.OutputTokens != 22 {
+		t.Errorf("token counts not recovered: got %+v", exported)
+	}
+}
+
 // TestSummarizeCycle_StatPermissionError covers the os.Stat non-
 // NotExist error branch. Achieved by chmod 000 on the workspace's
 // parent directory so Stat returns EACCES.
