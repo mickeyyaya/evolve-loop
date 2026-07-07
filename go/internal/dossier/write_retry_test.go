@@ -111,3 +111,11 @@ func TestCommitPairGit_NonTransientErrorFailsFast(t *testing.T) {
 		t.Errorf("commit attempts = %d, want exactly 1 (non-transient errors must not be retried)", got)
 	}
 }
+
+// NOTE (dossier-commit-rollback-on-failure, this cycle's scout selection):
+// the rollback regression is already covered by
+// TestCommitPairGit_RollsBackStagedOnPermanentFailure in rollback_test.go
+// (authored cycle-573, still green here) — a real-git integration test
+// asserting `git diff --cached --name-only` is empty after a forced
+// identity-less commit failure. No additional seam-level duplicate added
+// here; see test-report.md's coverage map for the pre-existing-GREEN note.

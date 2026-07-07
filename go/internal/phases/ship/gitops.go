@@ -217,6 +217,15 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 	}
 
+	// Backstop against accidental compiled-binary commits (tracked-binary-in-
+	// acs-dir): after staging, before the commit, refuse any staged oversized
+	// executable outside the go/bin//go/evolve allowlist.
+	if !opts.DryRun {
+		if err := stageBinaryGuard(ctx, opts); err != nil {
+			return err
+		}
+	}
+
 	// Check for staged changes. git diff --cached --quiet exits 0 if no
 	// diff, 1 if diff. (We use io.Discard for stdout — there's no output.)
 	exit, err := opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)

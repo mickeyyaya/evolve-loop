@@ -19,6 +19,7 @@
 package inboxmover
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // Sentinel errors.
@@ -55,6 +58,14 @@ type Options struct {
 
 	// Test seam for cycle-state.json resolution (recover-orphans).
 	ActiveCycleFn func() (string, error)
+
+	// IsLandedFn is the delivery-evidence seam for processed-promotion. When
+	// nil it defaults to a real `git merge-base --is-ancestor <sha> main`
+	// check rooted at ProjectRoot; it is fail-open (treats the SHA as landed)
+	// on any exec/seam error or non-git ProjectRoot, so a non-repo dir never
+	// regresses existing Promote behavior. Consulted ONLY when a
+	// processed-promotion carries a non-empty CommitSHA.
+	IsLandedFn func(sha string) (bool, error)
 }
 
 // LedgerEntry is the NDJSON line written for each lifecycle transition.
@@ -88,6 +99,33 @@ func (o *Options) resolveOpts() {
 		o.ActiveCycleFn = func() (string, error) {
 			return readActiveCycle(filepath.Join(o.ProjectRoot, ".evolve", "cycle-state.json"))
 		}
+	}
+	if o.IsLandedFn == nil {
+		root := o.ProjectRoot
+		o.IsLandedFn = func(sha string) (bool, error) {
+			return shaLandedOnMain(root, sha)
+		}
+	}
+}
+
+// shaLandedOnMain reports whether sha is an ancestor of main via
+// `git merge-base --is-ancestor <sha> main`. Exit 0 = ancestor (landed),
+// exit 1 = cleanly-not-an-ancestor (unlanded). Any other exit (128 = non-git
+// dir / unknown rev) or seam error is fail-open (treated as landed) so a
+// non-repo ProjectRoot never blocks a promotion — delivery evidence gates,
+// it never manufactures a false negative from missing git.
+func shaLandedOnMain(root, sha string) (bool, error) {
+	_, _, code, err := gitexec.Default(root).Capture(context.Background(), "merge-base", "--is-ancestor", sha, "main")
+	if err != nil {
+		return true, nil
+	}
+	switch code {
+	case 0:
+		return true, nil
+	case 1:
+		return false, nil
+	default:
+		return true, nil
 	}
 }
 
@@ -199,6 +237,27 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 		return res, nil // ship.sh compat: NoOp success
 	}
 
+	// Delivery-evidence gate (inbox-promotion-requires-landed-ship): a
+	// processed-promotion carrying a ship SHA must be backed by that commit
+	// actually landing on main. Historically Promote keyed on the caller's
+	// PASS verdict alone, so a push-rejected ship whose recovery still
+	// reported PASS could bury a directive in processed/ under a SHA
+	// git log --all never contained. An unlanded SHA reroutes to retry/
+	// instead. Empty SHA (legacy/ship.sh-compat) and non-processed states
+	// skip the check entirely.
+	reroutedUnlanded := false
+	if newState == "processed" && p.CommitSHA != "" {
+		landed, err := opts.IsLandedFn(p.CommitSHA)
+		if err != nil {
+			landed = true // fail-open: never block a promotion on a gate error
+		}
+		if !landed {
+			newState = "retry"
+			reroutedUnlanded = true
+			opts.logf("WARN: ", "promote: ship SHA %s for '%s' not landed on main — rerouting to retry/ instead of processed/", p.CommitSHA, taskID)
+		}
+	}
+
 	base := filepath.Base(src)
 	destDir, dest := promoteDestPath(opts.InboxDir, base, newState, p)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
@@ -233,6 +292,10 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 	res.SrcPath = src
 	res.DestPath = dest
 	opts.logf("", "promoted: %s → %s/", base, newState)
+	reason := "ship-promote-" + newState
+	if reroutedUnlanded {
+		reason = "ship-promote-retry-unlanded-sha"
+	}
 	writeLedger(opts, LedgerEntry{
 		Action: "promote",
 		TaskID: taskID,
@@ -240,7 +303,7 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 		To:     dest,
 		Cycle:  intPtr(p.Cycle),
 		GitSHA: strPtr(p.CommitSHA),
-		Reason: "ship-promote-" + newState,
+		Reason: reason,
 	})
 	return res, nil
 }

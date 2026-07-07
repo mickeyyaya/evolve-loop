@@ -180,6 +180,107 @@ func TestPromote_NotFound_NoOp(t *testing.T) {
 	}
 }
 
+// === Promote: ancestry-gated delivery evidence (cycle-598 incident) =======
+//
+// Root cause (inbox item inbox-promotion-requires-landed-ship): Promote used
+// to key promotion on the caller-supplied newState alone (a proxy for "cycle
+// verdict PASS"), never checking whether the ship commit actually landed on
+// main. A push-rejected ship whose recovery path still reported PASS could
+// promote to processed/ with a commit that git log --all never contained,
+// silently dropping the directive while reporting it done.
+//
+// The fix under test: Options gains an IsLandedFn seam (nil defaults to a
+// real `git merge-base --is-ancestor <sha> main` check against ProjectRoot,
+// fail-open on a seam/exec error so a non-git ProjectRoot — as used by every
+// pre-existing Promote test above — never regresses). When newState ==
+// "processed" and PromoteOpts.CommitSHA is set, Promote consults IsLandedFn:
+// landed=false reroutes the item to retry/ (never processed/) and the ledger
+// records why; landed=true promotes normally.
+
+// TestPromote_ProcessedRefusedWhenNotLanded is the RED anchor: an unlanded
+// SHA must never reach processed/, regardless of the caller's PASS verdict.
+func TestPromote_ProcessedRefusedWhenNotLanded(t *testing.T) {
+	repo := makeRepo(t)
+	dropProcessingFile(t, repo, "598", "task-1.json", "task-1")
+	opts := Options{
+		ProjectRoot: repo,
+		IsLandedFn: func(sha string) (bool, error) {
+			if sha != "deadbeef00" {
+				t.Errorf("IsLandedFn sha = %q, want deadbeef00", sha)
+			}
+			return false, nil
+		},
+	}
+	res, err := Promote(opts, "task-1", "processed", PromoteOpts{Cycle: "598", CommitSHA: "deadbeef00"})
+	if err != nil {
+		t.Fatalf("err = %v (want nil — ship.sh compat, refusal is not a hard failure)", err)
+	}
+	if strings.Contains(res.DestPath, "processed") {
+		t.Errorf("DestPath = %q, must NOT land in processed/ for an unlanded SHA", res.DestPath)
+	}
+	if !strings.Contains(res.DestPath, "retry") {
+		t.Errorf("DestPath = %q, want rerouted to retry/", res.DestPath)
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".evolve", "inbox", "processed", "cycle-598", "task-1.json")); err == nil {
+		t.Error("task-1.json must not exist under processed/cycle-598/")
+	}
+	body, err := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
+	if err != nil {
+		t.Fatalf("read ledger: %v", err)
+	}
+	if !strings.Contains(string(body), "unlanded") {
+		t.Errorf("ledger should record the unlanded-SHA refusal reason: %s", body)
+	}
+}
+
+// TestPromote_ProcessedPromotesWhenLanded is the twin GREEN case: a SHA the
+// ancestry check confirms landed promotes exactly as before.
+func TestPromote_ProcessedPromotesWhenLanded(t *testing.T) {
+	repo := makeRepo(t)
+	dropProcessingFile(t, repo, "598", "task-2.json", "task-2")
+	opts := Options{
+		ProjectRoot: repo,
+		IsLandedFn: func(sha string) (bool, error) {
+			return true, nil
+		},
+	}
+	res, err := Promote(opts, "task-2", "processed", PromoteOpts{Cycle: "598", CommitSHA: "cafef00dab"})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(res.DestPath, "processed/cycle-598/") {
+		t.Errorf("DestPath = %q, want processed/cycle-598/ for a landed SHA", res.DestPath)
+	}
+}
+
+// TestPromote_ProcessedNoSHASkipsAncestryCheck: when the caller supplies no
+// CommitSHA at all (legacy callers, or the ship.sh-compat empty-SHA path),
+// there is nothing to check ancestry of — Promote must not invoke IsLandedFn
+// and must promote exactly as the pre-existing TestPromote_ProcessedNoSHA
+// case does.
+func TestPromote_ProcessedNoSHASkipsAncestryCheck(t *testing.T) {
+	repo := makeRepo(t)
+	dropProcessingFile(t, repo, "5", "task-3.json", "task-3")
+	called := false
+	opts := Options{
+		ProjectRoot: repo,
+		IsLandedFn: func(sha string) (bool, error) {
+			called = true
+			return false, nil
+		},
+	}
+	res, err := Promote(opts, "task-3", "processed", PromoteOpts{Cycle: "5"})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if called {
+		t.Error("IsLandedFn must not be called when CommitSHA is empty")
+	}
+	if !strings.Contains(res.DestPath, "processed/cycle-5/task-3.json") {
+		t.Errorf("DestPath = %q", res.DestPath)
+	}
+}
+
 // === Promote: invalid state → ErrBadState =================================
 func TestPromote_BadState(t *testing.T) {
 	repo := makeRepo(t)
