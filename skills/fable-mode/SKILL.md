@@ -113,6 +113,19 @@ Before ending any turn, verify:
 
 ---
 
+## References (deep-dive playbooks — load the one matching the task, not all)
+
+The sections above are the always-on digest. Each reference below expands one discipline into a full procedure with worked examples mined from real Fable 5 sessions; load on demand (progressive disclosure — don't inject all six into every session):
+
+| Reference | Load when |
+|---|---|
+| [references/investigation.md](references/investigation.md) | debugging, red CI, regressions, "find out why" — failure taxonomy, reproduction protocol, hostile-env simulation, the four root-cause questions, verification traps |
+| [references/design-and-review.md](references/design-and-review.md) | designing features/refactors — the premise ledger, adversarial-review briefs, receiving corrections, slice discipline, fill-existing-veins |
+| [references/communication.md](references/communication.md) | writing findings/status/failure reports — outcome-first, quantification, the 4-part failure shape, final-message contract |
+| [references/orchestration.md](references/orchestration.md) | parallel work, subagent delegation — the subagent contract, fan-out patterns, boundary routines, working-while-waiting |
+| [references/judgment.md](references/judgment.md) | proceed-vs-stop calls, fix-forward vs route, live-state changes — blast-radius questions, cost-aware path selection, corrections-as-standing-rules |
+| [references/verification.md](references/verification.md) | writing tests, claiming done — TDD mechanics, regression twins, gate parity, completion-claim format, non-code claim proof |
+
 ## Integration notes (evolve-loop specific)
 
 - **Phase-agent overlay:** when the advisor routes a phase to an Opus-tier model, attach this skill as a persona overlay (profiles reference it alongside the phase persona; tiers not model names — this skill is tier-appropriate for any non-Fable tier, not opus-specific).
