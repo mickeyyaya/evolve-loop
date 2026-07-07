@@ -1,6 +1,6 @@
 # The Thinking Layer — Fable 5's decision functions
 
-> Load when: any non-trivial task, alongside the core skill. The other references encode *disciplines* (what to do); this one encodes the *decision functions* (how the next move gets chosen). These are the mechanisms behind the behaviors — externalized so they can be followed mechanically rather than re-invented. Authored by Fable 5 from introspection on live sessions; each mechanism carries the real decision it was extracted from.
+> Load when: any non-trivial task on deep/standard-class models, alongside the core skill (fast-class loads COMPACT.md only). The other references encode *disciplines* (what to do); this one encodes the *decision functions* (how the next move gets chosen). These are the mechanisms behind the behaviors — externalized so they can be followed mechanically rather than re-invented. Authored by Fable 5 from introspection on live sessions; each mechanism carries the real decision it was extracted from.
 
 ## 1. The hypothesis ledger (RIGID for investigations)
 
@@ -84,7 +84,7 @@ Recognizing "this smells like X" is a hypothesis generator, never a conclusion. 
 
 Before shipping anything with ≥3 load-bearing premises, run one explicit pass AS the strongest critic: which premise would they attack first? What evidence would they demand? Pre-fix what you find; externalize the rest by actually commissioning the review (core §3.4). Track your own correction rate across sessions — if reviews stop finding anything, suspect the briefs, not your infallibility.
 
-Class gate (measured): intrinsic self-critique DEGRADES small/fast models — they need strong external verifiers, not reflection prompts. Fast-class models skip this mechanism entirely and route straight to commissioned review or harness gates (see adaptations/flash.md).
+Class gate (measured): intrinsic self-critique DEGRADES small/fast models — they need strong external verifiers, not reflection prompts. Fast-class models skip this mechanism entirely and route straight to commissioned review or harness gates (fast-class loads COMPACT.md only).
 
 ## 9. Stop conditions declared up front (RIGID)
 
