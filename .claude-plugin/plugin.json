@@ -46,6 +46,7 @@
     "./skills/code-review-simplify/",
     "./skills/commit/",
     "./skills/evaluator/",
+    "./skills/fable-mode/",
     "./skills/golang-test-review/",
     "./skills/inspirer/",
     "./skills/minimalism/",
