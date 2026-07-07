@@ -13,7 +13,7 @@
 
 - **Regression test**: a test that fails on the pre-fix code, reproducing the bug exactly (same failure mode, not just same area). If you can't make it fail pre-fix, you haven't captured the bug.
 - **Preservation tests**: identify the blast radius (what the fix must NOT change) and pin it with tests that pass BOTH pre- and post-fix. Agents measurably over-add guard clauses (~2× humans) — preservation tests are what catch a "fix" that quietly narrows behavior.
-- Both directions of a changed predicate get pinned: the case that now passes AND the neighboring case that must still refuse (one-sided tests invite the inverse regression). Terminology note: `fable-mode/references/verification.md` calls this both-directions pair "regression twins" — same rule, different label; this file reserves "twin protocol" for the regression+preservation pairing above.
+- Both directions of a changed predicate get pinned: the case that now passes AND the neighboring case that must still refuse (one-sided tests invite the inverse regression). Terminology note: `fable/references/verification.md` calls this both-directions pair "regression twins" — same rule, different label; this file reserves "twin protocol" for the regression+preservation pairing above.
 
 ## Test quality over coverage (RIGID mindset, FLEXIBLE tooling)
 
@@ -32,7 +32,7 @@
 
 ## Hermeticity (RIGID)
 
-Principle in `fable-mode/references/verification.md` §Hermetic tests; the Go-concrete mechanics: repos created by tests get their own `git config user.name/user.email` (subprocess git never inherits your test-process env identity); env vars are set or explicitly UNSET per test (`t.Setenv`, `env -u` semantics — set-but-empty behaves differently from unset); a test that passes on your machine and fails on a runner is a hermeticity bug in the test, not "flaky CI".
+Principle in `fable/references/verification.md` §Hermetic tests; the Go-concrete mechanics: repos created by tests get their own `git config user.name/user.email` (subprocess git never inherits your test-process env identity); env vars are set or explicitly UNSET per test (`t.Setenv`, `env -u` semantics — set-but-empty behaves differently from unset); a test that passes on your machine and fails on a runner is a hermeticity bug in the test, not "flaky CI".
 
 ## What NOT to write
 

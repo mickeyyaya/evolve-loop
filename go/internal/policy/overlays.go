@@ -80,7 +80,7 @@ type OverlayDispatch struct {
 // rules ⇒ opt out).
 func compiledDefaultOverlays() []OverlayRule {
 	return []OverlayRule{
-		{Tiers: []string{"deep", "top"}, Skills: []string{"fable-mode"}},
+		{Tiers: []string{"deep", "top"}, Skills: []string{"fable"}},
 	}
 }
 

@@ -177,7 +177,7 @@ type Policy struct {
 	// Overlays configures skill-overlay injection: per-dispatch (phase/cli/model/
 	// tier) skill bodies composed into an agent prompt above the cycle-context
 	// boundary. Absent (nil) ⇒ the compiled default applies ({tiers:[deep,top]}
-	// -> [fable-mode]); a non-nil block with an empty Rules slice is an explicit
+	// -> [fable]); a non-nil block with an empty Rules slice is an explicit
 	// operator opt-out (no overlays at all). Schema + resolver: overlays.go.
 	Overlays *OverlaysPolicy `json:"overlays,omitempty"`
 }
