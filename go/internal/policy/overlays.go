@@ -18,12 +18,40 @@
 // build-report.md § Deferred.
 package policy
 
-import "path"
+import (
+	"os"
+	"path"
+	"path/filepath"
+)
 
 // OverlaysPolicy is the operator-configurable skill-overlay block. Rules are
 // evaluated in order; a dispatch may match several (their skills union).
 type OverlaysPolicy struct {
 	Rules []OverlayRule `json:"rules,omitempty"`
+	// Advisor bounds what the advisor may PROPOSE per dispatch (allow/deny list,
+	// per-dispatch cap). nil ⇒ compiled defaults (unbounded allow, empty deny,
+	// max_skills_per_dispatch=2). Advisory adds; the clamp never widens policy.
+	Advisor *AdvisorOverlayPolicy `json:"advisor,omitempty"`
+}
+
+// AdvisorOverlayPolicy is the operator's clamp on advisor-proposed skills.
+type AdvisorOverlayPolicy struct {
+	AllowList            []string `json:"allow_list,omitempty"`
+	DenyList             []string `json:"deny_list,omitempty"`
+	MaxSkillsPerDispatch int      `json:"max_skills_per_dispatch,omitempty"`
+}
+
+// defaultMaxSkillsPerDispatch is the compiled cap applied when the operator
+// leaves overlays.advisor (or its max) unset.
+const defaultMaxSkillsPerDispatch = 2
+
+// AdvisorSkillRejection records one clamped-out advisor proposal. Reason is one
+// of the literal strings "not-in-registry", "denylisted",
+// "over-max-skills-per-dispatch" — logged to advisor-rejections.json, never a
+// silent drop.
+type AdvisorSkillRejection struct {
+	Skill  string `json:"skill"`
+	Reason string `json:"reason"`
 }
 
 // OverlayRule matches a dispatch when EVERY non-empty selector dimension
@@ -81,6 +109,118 @@ func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 		}
 	}
 	return out
+}
+
+// SkillRegistryFromFS reads the skill registry from the filesystem: every
+// immediate subdirectory of skillsDir that contains a SKILL.md is a skill, its
+// directory name the registry entry. A directory without SKILL.md is not a
+// skill and is excluded. An empty (or SKILL.md-less) skillsDir is a valid,
+// degenerate registry — it returns an empty list, not an error — so every
+// proposal clamps to nothing rather than the loader failing on a legitimate
+// empty state. This is the single source of the advisor's allowed skill names;
+// no hand-maintained list exists (drift-proof, AC5).
+func SkillRegistryFromFS(skillsDir string) ([]string, error) {
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(skillsDir, e.Name(), "SKILL.md")); err != nil {
+			continue // no SKILL.md ⇒ not a skill
+		}
+		out = append(out, e.Name())
+	}
+	return out, nil
+}
+
+// ClampAdvisorSkills disposes of an advisor's proposed skill set against the
+// filesystem registry and the operator's overlays.advisor block: "advisor
+// proposes, kernel disposes". Accepted skills keep the advisor's proposal order
+// (its own priority ordering — never re-sorted). Every clamped-out skill yields
+// exactly one AdvisorSkillRejection with a literal reason, so nothing is
+// silently dropped. Membership is verbatim string equality against the
+// registry, so a proposal containing a path separator (or any string not a
+// registry entry) never resolves — the clamp never joins/normalizes a proposal
+// against the skills root before comparing (AC3 injection guard).
+func (p Policy) ClampAdvisorSkills(proposed, registry []string) (accepted []string, rejections []AdvisorSkillRejection) {
+	inRegistry := make(map[string]struct{}, len(registry))
+	for _, s := range registry {
+		inRegistry[s] = struct{}{}
+	}
+	var allow, deny map[string]struct{}
+	maxSkills := defaultMaxSkillsPerDispatch
+	if p.Overlays != nil && p.Overlays.Advisor != nil {
+		a := p.Overlays.Advisor
+		if a.MaxSkillsPerDispatch > 0 {
+			maxSkills = a.MaxSkillsPerDispatch
+		}
+		if len(a.AllowList) > 0 {
+			allow = toSet(a.AllowList)
+		}
+		if len(a.DenyList) > 0 {
+			deny = toSet(a.DenyList)
+		}
+	}
+	for _, s := range proposed {
+		if _, ok := inRegistry[s]; !ok {
+			rejections = append(rejections, AdvisorSkillRejection{Skill: s, Reason: "not-in-registry"})
+			continue
+		}
+		if allow != nil {
+			if _, ok := allow[s]; !ok {
+				rejections = append(rejections, AdvisorSkillRejection{Skill: s, Reason: "not-allowlisted"})
+				continue
+			}
+		}
+		if _, ok := deny[s]; ok {
+			rejections = append(rejections, AdvisorSkillRejection{Skill: s, Reason: "denylisted"})
+			continue
+		}
+		if len(accepted) >= maxSkills {
+			rejections = append(rejections, AdvisorSkillRejection{Skill: s, Reason: "over-max-skills-per-dispatch"})
+			continue
+		}
+		accepted = append(accepted, s)
+	}
+	return accepted, rejections
+}
+
+// ResolveOverlaysWithAdvisor returns the additive union of the static overlay
+// rules (ResolveOverlays) and the already-clamped advisor skills, deduped in
+// stable static-first order. A nil/empty advisor proposal is byte-identical to
+// ResolveOverlays — advisory adds, never replaces policy (AC1). Callers MUST
+// pass skills already run through ClampAdvisorSkills; this merge does not
+// re-validate them against the registry.
+func (p Policy) ResolveOverlaysWithAdvisor(d OverlayDispatch, clampedAdvisorSkills []string) []string {
+	out := p.ResolveOverlays(d)
+	if len(clampedAdvisorSkills) == 0 {
+		return out
+	}
+	seen := toSet(out)
+	for _, s := range clampedAdvisorSkills {
+		if s == "" {
+			continue
+		}
+		if _, dup := seen[s]; dup {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
+
+// toSet builds a membership set from a string slice.
+func toSet(ss []string) map[string]struct{} {
+	m := make(map[string]struct{}, len(ss))
+	for _, s := range ss {
+		m[s] = struct{}{}
+	}
+	return m
 }
 
 // matches reports whether every non-empty selector dimension of the rule is
