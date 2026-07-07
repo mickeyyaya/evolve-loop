@@ -320,6 +320,13 @@ func NewEngine(deps Deps) *Engine {
 	return &Engine{deps: deps.withDefaults()}
 }
 
+// HasTokenResolver reports whether this Engine was wired with a non-nil
+// TokenResolver — the seam production composition roots (adapters/bridge,
+// subagent) use to prove their DI wiring reached the constructed Engine.
+func (e *Engine) HasTokenResolver() bool {
+	return e.deps.TokenResolver != nil
+}
+
 // Launch satisfies core.Bridge: the in-process entry the M7 adapter
 // cutover routes to. It maps a BridgeRequest onto the LaunchArgs pipeline
 // (materializing req.Prompt to a file, mirroring the bash bridge's

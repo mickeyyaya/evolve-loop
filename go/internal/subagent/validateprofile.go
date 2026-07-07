@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 // ValidateProfileRequest captures every input cmd_validate_profile reads
@@ -324,6 +325,25 @@ func defaultAdapterExists(path string) bool {
 // whole function), but the default no longer reads the .sh file — it reads
 // RESOLVED_CLI from env and projects it onto a registered driver via
 // bridge.DriverFor.
+// execAdapterDeps builds the gobridge.Deps for the subagent composition
+// root, wiring TokenResolver via tokenusage.DefaultResolver against the
+// env's HOME — the same configRoot-resolution convention as
+// internal/adapters/bridge's productionEngineDeps (env["HOME"] falling back
+// to os.Getenv("HOME"), joined with ".claude"). The two production
+// composition roots (adapters/bridge, this package) share the single
+// tokenusage.DefaultResolver helper, each resolving configRoot identically.
+func execAdapterDeps(env map[string]string) gobridge.Deps {
+	home := env["HOME"]
+	if home == "" {
+		home = os.Getenv("HOME")
+	}
+	configRoot := filepath.Join(home, ".claude")
+	return gobridge.Deps{
+		Env:           env,
+		TokenResolver: tokenusage.DefaultResolver(configRoot),
+	}
+}
+
 func defaultExecAdapter(ctx context.Context, _ string, env map[string]string) (int, error) {
 	cli := gobridge.DriverFor(env["RESOLVED_CLI"])
 	prompt := ""
@@ -344,7 +364,7 @@ func defaultExecAdapter(ctx context.Context, _ string, env map[string]string) (i
 	if prompt == "" {
 		prompt = "(validate-only: no prompt)"
 	}
-	eng := gobridge.NewEngine(gobridge.Deps{Env: env})
+	eng := gobridge.NewEngine(execAdapterDeps(env))
 	resp, err := eng.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
 		Profile:      env["PROFILE_PATH"],

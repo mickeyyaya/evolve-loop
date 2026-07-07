@@ -12,6 +12,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -21,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 // Interactive policy values for the typed profile policy and the per-agent
@@ -111,16 +113,39 @@ func NewDefault(projectRoot string) *Adapter {
 	}
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
-		return gobridge.NewEngine(gobridge.Deps{
-			Env:                env,
-			BootTimeoutStore:   a.bootTimeoutStore,
-			BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
-			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
-			ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
-			ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
-		})
+		return gobridge.NewEngine(a.productionEngineDeps(env))
 	}
 	return a
+}
+
+// productionEngineDeps builds the gobridge.Deps shared by every production
+// composition path in this Adapter (NewDefault's engineFactory and the
+// onStopReview branch of Launch) so they cannot drift apart. Wires
+// TokenResolver via tokenusage.DefaultResolver against the env's HOME (see
+// configRoot) — the fix for the confirmed cycle-612+ bug where production
+// launches got silent zero token telemetry.
+func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
+	return gobridge.Deps{
+		Env:                env,
+		BootTimeoutStore:   a.bootTimeoutStore,
+		BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
+		ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
+		ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
+		ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
+		TokenResolver:      tokenusage.DefaultResolver(configRoot(env)),
+	}
+}
+
+// configRoot resolves the Claude config directory from a request-local env
+// overlay, falling back to the process environment — same precedent as
+// internal/bridge/doctor.go's doctorHome() + ".claude" (see
+// internal/bridge/billing.go:47 for the exact join).
+func configRoot(env map[string]string) string {
+	home := env["HOME"]
+	if home == "" {
+		home = os.Getenv("HOME")
+	}
+	return filepath.Join(home, ".claude")
 }
 
 // BootTimeoutStoreWired reports whether the Adapter has a non-nil boot-timeout
@@ -191,16 +216,10 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		cycle := req.Cycle
 		cb := a.onStopReview
 		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
-		return gobridge.NewEngine(gobridge.Deps{
-			Env:                req.Env,
-			RecoveryStage:      a.recoveryStage,
-			OnStopReview:       onSR,
-			BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
-			ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
-			ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
-			ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
-			BootTimeoutStore:   a.bootTimeoutStore,
-		}).Launch(ctx, inproc)
+		deps := a.productionEngineDeps(req.Env)
+		deps.RecoveryStage = a.recoveryStage
+		deps.OnStopReview = onSR
+		return gobridge.NewEngine(deps).Launch(ctx, inproc)
 	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
 }
