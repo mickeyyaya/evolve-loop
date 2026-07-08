@@ -638,11 +638,6 @@
       "proof": "Run Claude, Gemini, and Codex side by side and route the strongest model to each role. Switch whenever you like; your process never depends on one vendor."
     }
   ],
-  "incident": {
-    "kicker": "Self-healing, for real",
-    "heading": "The system caught its own mistakes.",
-    "body": "An experiment with a new model slipped several regressions into a single run. Not one reached a human — the pipeline's own reviews caught every one, recovered, and within two days turned each into a permanent safeguard. That's the whole idea: runs can fail, but failures become fixes that stick."
-  },
   "comparison": {
     "kicker": "How it compares",
     "heading": "When to reach for it.",
@@ -684,42 +679,6 @@
       ]
     ],
     "note": "Think of the agent as the developer, and Evolve Loop as the team and process around it — the planning, the review, and the discipline that make the output safe to ship."
-  },
-  "quickstart": {
-    "kicker": "Quick start",
-    "heading": "Your first cycle is one command away.",
-    "install": [
-      {
-        "step": "Install (one line)",
-        "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
-      },
-      {
-        "step": "Run a goal",
-        "command": "/evo:loop \"add dark mode\""
-      }
-    ],
-    "presets": [
-      {
-        "label": "innovate",
-        "command": "/evo:loop innovate \"explore concurrency\"",
-        "blurb": "new features"
-      },
-      {
-        "label": "harden",
-        "command": "/evo:loop harden",
-        "blurb": "stability + tests"
-      },
-      {
-        "label": "repair",
-        "command": "/evo:loop repair \"fix auth bug\"",
-        "blurb": "smallest-change bug fix"
-      },
-      {
-        "label": "pin cycles",
-        "command": "/evo:loop --cycles 3 \"add dark mode\"",
-        "blurb": "optional hard bound"
-      }
-    ]
   },
   "examples": {
     "kicker": "Usage",
@@ -1020,7 +979,7 @@
     "note": "These are compiled Go defaults, not config you can forget to set. The floor holds even when every prompt in the pipeline is written by a model."
   },
   "recoveryLab": {
-    "kicker": "Self-healing",
+    "kicker": "When things fail",
     "heading": "Failure is routed, not fatal.",
     "sub": "Every abnormal exit is classified and routed by a failure adapter: retry, re-route to another provider, re-pin, or reconcile. The queue survives, the evidence stays honest, and the loop continues.",
     "events": [
@@ -1084,7 +1043,8 @@
         ],
         "outcome": "Recovered evidence is re-audited evidence."
       }
-    ]
+    ],
+    "proof": "This is not hypothetical: an experiment with a new model once slipped several regressions into a single run. Not one reached a human — the pipeline's own reviews caught every one, recovered, and within two days turned each into a permanent safeguard. Runs can fail; failures become fixes that stick."
   },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",

@@ -57,6 +57,9 @@ func TestLoad_RealContentHasRecoveryLab(t *testing.T) {
 	if site.RecoveryLab.Heading == "" {
 		t.Error("RecoveryLab.Heading is empty")
 	}
+	if site.RecoveryLab.Proof == "" {
+		t.Error("RecoveryLab.Proof is empty — the merged real-incident story is part of the section contract")
+	}
 	if len(site.RecoveryLab.Events) < 4 {
 		t.Errorf("len(RecoveryLab.Events) = %d, want >= 4", len(site.RecoveryLab.Events))
 	}

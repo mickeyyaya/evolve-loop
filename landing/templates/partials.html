@@ -1255,6 +1255,8 @@
   .rcl-out.show{opacity:1}
   .rcl-out .pulse{width:9px;height:9px;border-radius:50%;background:var(--r-ok);animation:rcl-pulse 1.6s ease-in-out infinite}
   @keyframes rcl-pulse{50%{box-shadow:0 0 0 6px var(--r-ok-soft)}}
+  .rcl-proof{margin:22px auto 0;max-width:74ch;font-size:clamp(.92rem,1.3vw,1.05rem);line-height:1.65;color:var(--r-mut);border-left:3px solid var(--r-ok);padding:4px 0 4px 18px}
+  .rcl-proof b{color:var(--r-ink);font-weight:600}
 </style>
 <section class="rcl" id="recoverylab">
   <p class="rcl-kicker">{{.Site.RecoveryLab.Kicker}}</p>
@@ -1271,6 +1273,7 @@
       <div class="rcl-out"><span class="pulse"></span><span class="txt"></span></div>
     </div>
   </div>
+  <p class="rcl-proof"><b>Caught in production:</b> {{.Site.RecoveryLab.Proof}}</p>
 </section>
 {{end}}
 
