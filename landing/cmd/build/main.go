@@ -24,7 +24,7 @@ func config() buildsite.Config {
 		Gallery:      "gallery",
 		// Serve the one-line installer at /install.sh (single source of truth:
 		// the repo-root install.sh; build runs from landing/, so ../ reaches it).
-		RootFiles: []buildsite.RootFile{{Src: "../install.sh", Dst: "install.sh"}},
+		RootFiles: []buildsite.RootFile{{Src: "../install.sh", Dst: "install.sh"}, {Src: "shared/llms.txt", Dst: "llms.txt"}},
 		Versions: []buildsite.Version{
 			{Slug: "luminous", Title: "Luminous Minimal", Tagline: "Light, Apple-white, calm authority.", Template: "luminous"},
 			{Slug: "noir", Title: "Keynote Noir", Tagline: "Dark, cinematic spotlight.", Template: "noir"},

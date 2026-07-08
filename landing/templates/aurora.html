@@ -207,26 +207,6 @@
   tbody td:last-child{color:var(--ink); background:var(--accent-soft); font-weight:500}
   .note{margin-top:24px; color:var(--faint); font-size:.92rem; max-width:74ch; line-height:1.62}
 
-  /* ---- incident ---- */
-  .incident{padding:clamp(34px,5vw,58px)}
-  .incident h3{font-family:var(--display); font-weight:600; font-size:clamp(1.7rem,3.2vw,2.4rem); margin-top:14px; max-width:22ch; letter-spacing:-.025em}
-  .incident p{color:var(--muted); margin-top:20px; max-width:70ch; font-size:1.05rem; line-height:1.68}
-
-  /* ---- quickstart ---- */
-  .steps{display:flex; flex-direction:column; gap:12px; margin-top:40px}
-  .step{display:flex; align-items:center; gap:18px;
-    background:rgba(255,255,255,.5); backdrop-filter:blur(12px);
-    -webkit-backdrop-filter:blur(12px);
-    border:1px solid var(--glass-line); border-top-color:var(--glass-edge);
-    border-radius:14px; padding:15px 18px; box-shadow:var(--shadow-soft)}
-  .step .si{font-family:var(--mono); color:var(--accent); font-size:.85rem; width:24px; flex:0 0 auto}
-  .step .sl{color:var(--muted); font-size:.9rem; width:158px; flex:0 0 auto}
-  .step code{font-family:var(--mono); color:var(--ink); font-size:.9rem; flex:1; min-width:0; overflow-x:auto}
-  @media(max-width:640px){.step{flex-wrap:wrap; gap:8px} .step .sl{width:auto}}
-  .presets{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px}
-  .preset{font-family:var(--mono); font-size:.8rem; color:var(--muted); border:1px solid var(--glass-line-strong); border-radius:999px; padding:8px 15px; background:rgba(255,255,255,.45)}
-  .preset b{color:var(--accent); font-weight:500}
-
   /* ---- final cta ---- */
   .final .card{text-align:center; padding:clamp(54px,8vw,96px) clamp(30px,5vw,68px); overflow:hidden}
   .final .card::after{content:""; position:absolute; inset:0; border-radius:inherit; z-index:0; pointer-events:none;
@@ -334,6 +314,9 @@
 </section>
 
 {{template "pipelinedemo" .}}
+{{template "gatelab" .}}
+{{template "recoverylab" .}}
+{{template "inboxlab" .}}
 {{template "concurrency" .}}
 {{template "examples" .}}
 
@@ -369,32 +352,7 @@
   </div>
 </section>
 
-<section class="band">
-  <div class="wrap">
-    <div class="glass card incident" data-reveal>
-      <p class="kicker">{{.Site.Incident.Kicker}}</p>
-      <h3>{{.Site.Incident.Heading}}</h3>
-      <p>{{.Site.Incident.Body}}</p>
-    </div>
-  </div>
-</section>
-
-<section class="band">
-  <div class="wrap">
-    <div class="glass card">
-      <p class="kicker" data-reveal>{{.Site.Quickstart.Kicker}}</p>
-      <h2 data-reveal data-d="1">{{.Site.Quickstart.Heading}}</h2>
-      <div class="steps">
-        {{range $i,$s := .Site.Quickstart.Install}}
-        <div class="step" data-reveal data-d="{{inc $i}}"><span class="si">0{{inc $i}}</span><span class="sl">{{$s.Step}}</span><code>{{$s.Command}}</code><button class="copy" data-copy="{{$s.Command}}">Copy</button></div>
-        {{end}}
-      </div>
-      <div class="presets" data-reveal data-d="2">
-        {{range .Site.Quickstart.Presets}}<span class="preset"><b>{{.Label}}</b> · {{.Blurb}}</span>{{end}}
-      </div>
-    </div>
-  </div>
-</section>
+{{template "tryit" .}}
 
 <section class="final band">
   <div class="wrap">
@@ -425,6 +383,9 @@
 {{template "verdictjs"}}
 {{template "pipelinejs"}}
 {{template "concurrencyjs"}}
+{{template "inboxlabjs"}}
+{{template "gatelabjs"}}
+{{template "recoverylabjs"}}
 </body>
 </html>
 {{end}}
