@@ -16,7 +16,13 @@ set -eu
 
 # ---- Config (env-overridable so CI/tests can redirect) ---------------------
 REPO="mickeyyaya/evolve-loop"
-RELEASE_BASE="${EVO_RELEASE_BASE:-https://github.com/${REPO}/releases/latest/download}"
+# Pin a release:  EVO_VERSION=v22.0.1 curl ... | sh    (default: latest, via the
+# releases/latest/download redirect — no GitHub API call, no rate limit).
+if [ -n "${EVO_VERSION:-}" ]; then
+	RELEASE_BASE="${EVO_RELEASE_BASE:-https://github.com/${REPO}/releases/download/${EVO_VERSION}}"
+else
+	RELEASE_BASE="${EVO_RELEASE_BASE:-https://github.com/${REPO}/releases/latest/download}"
+fi
 ASSET_BASE="${EVO_ASSET_BASE:-$RELEASE_BASE}"            # point at a 404 to force the build path
 SOURCE_TARBALL="${EVO_SOURCE_TARBALL:-https://github.com/${REPO}/archive/refs/heads/main.tar.gz}"
 INSTALL_LIB="${EVO_INSTALL_LIB:-$HOME/.evolve-loop}"     # binary + skill payload live here
@@ -72,6 +78,15 @@ detect_platform() {
 		s390x)                   ARCH=s390x ;;
 		*) ARCH="" ;; # unknown arch — build from source
 	esac
+	# Rosetta 2 makes uname -m report x86_64 on Apple Silicon; prefer the native
+	# arm64 binary (rustup's hw.optional.arm64 probe — also catches x86_64 shells
+	# on arm64 kernels, unlike proc_translated).
+	if [ "$OS" = darwin ] && [ "$ARCH" = amd64 ]; then
+		if (sysctl -n hw.optional.arm64 2>/dev/null || true) | grep -q '^1$'; then
+			log "Rosetta 2 detected — installing native arm64 binary"
+			ARCH=arm64
+		fi
+	fi
 	if [ -z "$OS" ] || [ -z "$ARCH" ]; then
 		warn "no prebuilt binary for $uname_s/$uname_m — building from source"
 		FORCE_BUILD=1
@@ -153,7 +168,20 @@ detect_llm_cli() {
 # ---- 4. Download + verify --------------------------------------------------
 fetch() {  # fetch <url> <dest>  (curl or wget; non-zero on HTTP error)
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL --retry 3 -o "$2" "$1"
+		# Pin the transport (rustup's flags), feature-detected ONCE so ancient
+		# curls degrade with a warning instead of failing every fetch.
+		if [ -z "${CURL_TLS_CHECKED:-}" ]; then
+			CURL_TLS_CHECKED=1
+			if curl --proto =https --tlsv1.2 --version >/dev/null 2>&1; then
+				CURL_TLS="--proto =https --tlsv1.2"
+			else
+				CURL_TLS=""
+				warn "curl lacks --proto/--tlsv1.2 — not enforcing TLS 1.2 (old curl)"
+			fi
+		fi
+		# $CURL_TLS is deliberately unquoted: word-splitting yields the two flags.
+		# shellcheck disable=SC2086
+		curl -fsSL $CURL_TLS --retry 3 -o "$2" "$1"
 	elif command -v wget >/dev/null 2>&1; then
 		wget -qO "$2" "$1"
 	else
@@ -166,6 +194,8 @@ verify_checksum() {  # verify_checksum <file> <name-in-sums> <checksums.txt>
 		got="$(sha256sum "$1" | awk '{print $1}')"
 	elif command -v shasum >/dev/null 2>&1; then
 		got="$(shasum -a 256 "$1" | awk '{print $1}')"
+	elif command -v openssl >/dev/null 2>&1; then
+		got="$(openssl dgst -sha256 "$1" | awk '{print $NF}')"
 	else
 		warn "no sha256 tool; skipping integrity check"
 		return 0
@@ -248,10 +278,43 @@ place_on_path() {
 	EVO_BIN="$bindir/evolve"
 	case ":$PATH:" in
 		*":$bindir:"*) : ;;
-		*) warn "$bindir is not on your PATH. Add to your shell profile:"
-		   warn "  export PATH=\"$bindir:\$PATH\"" ;;
+		*) add_to_shell_rc "$bindir" ;;
 	esac
 	log "linked evolve → $EVO_BIN"
+}
+
+# add_to_shell_rc <bindir> — append an idempotent, marked PATH line to the
+# user's shell rc (bun-style $SHELL switch). Writes $HOME as a literal so the
+# rc file stays machine-portable. Opt out: EVO_NO_MODIFY_PATH=1.
+add_to_shell_rc() {
+	# Portable $HOME-literal form when bindir lives under $HOME.
+	case "$1" in
+		"$HOME"/*) path_line="export PATH=\"\$HOME${1#"$HOME"}:\$PATH\" # evolve-loop" ;;
+		*)         path_line="export PATH=\"$1:\$PATH\" # evolve-loop" ;;
+	esac
+	if [ "${EVO_NO_MODIFY_PATH:-0}" = 1 ]; then
+		warn "$1 is not on your PATH (EVO_NO_MODIFY_PATH=1 — not touching shell config)."
+		warn "  add manually:  $path_line"
+		return 0
+	fi
+	case "$(basename "${SHELL:-sh}")" in
+		zsh)  rc="${ZDOTDIR:-$HOME}/.zshrc" ;;
+		bash) rc="$HOME/.bashrc"; [ -f "$HOME/.bash_profile" ] && rc="$HOME/.bash_profile" ;;
+		fish) rc="$HOME/.config/fish/conf.d/evolve.fish"
+		      mkdir -p "$(dirname "$rc")" 2>/dev/null || true
+		      path_line="fish_add_path '$1' # evolve-loop" ;;
+		*)    rc="$HOME/.profile" ;;
+	esac
+	if [ -f "$rc" ] && grep -F "# evolve-loop" "$rc" >/dev/null 2>&1; then
+		: # already added by a previous run
+	elif printf '\n%s\n' "$path_line" >> "$rc" 2>/dev/null; then
+		log "added $1 to PATH in $rc"
+	else
+		warn "$1 is not on your PATH and $rc is not writable."
+		warn "  add manually:  $path_line"
+		return 0
+	fi
+	warn "restart your shell, or run now:  export PATH=\"$1:\$PATH\""
 }
 
 # ---- 7. Install skills + verify --------------------------------------------
@@ -263,9 +326,17 @@ run_evolve_install() {
 }
 
 final_checks() {
-	"$EVO_BIN" version >/dev/null 2>&1 || warn "evolve did not report a version"
+	# Actually executing the binary catches wrong-arch downloads, quarantine,
+	# and corrupt extractions that a mere existence check misses.
+	ver="$("$EVO_BIN" version 2>/dev/null || true)"
+	[ -n "$ver" ] || warn "evolve did not report a version"
 	"$EVO_BIN" doctor probe tmux >/dev/null 2>&1 || warn "tmux probe failed (run 'evolve doctor' to diagnose)"
-	log "done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
+	log "installed: ${ver:-evolve} → $EVO_BIN"
+	if command -v evolve >/dev/null 2>&1; then
+		log "done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
+	else
+		log "done. Next (new shells will just say 'evolve'): $EVO_BIN doctor"
+	fi
 	log "uninstall: evolve uninstall   (and: rm -rf $INSTALL_LIB)"
 }
 

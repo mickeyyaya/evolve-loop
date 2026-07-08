@@ -914,3 +914,468 @@
 })();
 </script>
 {{end}}
+
+{{define "inboxlab"}}
+<style>
+  .ixl{--x-acc:var(--accent,#0071e3);--x-acc-soft:var(--accent-soft,color-mix(in srgb,var(--x-acc) 14%,transparent));--x-ink:var(--ink,#161616);--x-mut:var(--muted,#7a7a7a);--x-bg:var(--surface,var(--bg,#fff));--x-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--x-disp:var(--serif,var(--display,inherit));--x-line:color-mix(in srgb,var(--x-ink) 14%,transparent);--x-line2:color-mix(in srgb,var(--x-ink) 26%,transparent);--x-surf:color-mix(in srgb,var(--x-ink) 3%,transparent);--x-ok:var(--ok,#16996a);--x-ok-soft:var(--ok-soft,color-mix(in srgb,var(--x-ok) 13%,transparent));max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .ixl-kicker{font-family:var(--x-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--x-acc);margin:0}
+  .ixl-h{font-family:var(--x-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--x-ink)}
+  .ixl-sub{color:var(--x-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
+  .ixl-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr);gap:18px;margin-top:30px}
+  @media (max-width:840px){.ixl-grid{grid-template-columns:1fr}}
+  .ixl-panel{border:1px solid var(--x-line);border-radius:16px;background:var(--x-surf);padding:18px;min-width:0}
+  .ixl-ph{font-family:var(--x-mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--x-mut);margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ixl-ph code{color:var(--x-acc);background:var(--x-acc-soft);border-radius:5px;padding:1px 6px;letter-spacing:0}
+  .ixl-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .ixl-tab{font-family:var(--x-mono);font-size:.68rem;letter-spacing:.06em;border:1px solid var(--x-line2);border-radius:999px;background:transparent;color:var(--x-mut);padding:6px 13px;cursor:pointer;transition:all .25s}
+  .ixl-tab.on{border-color:var(--x-acc);color:var(--x-acc);background:var(--x-acc-soft)}
+  .ixl-json{font-family:var(--x-mono);font-size:.72rem;line-height:1.55;background:color-mix(in srgb,var(--x-ink) 5%,var(--x-bg));border:1px solid var(--x-line);border-radius:10px;padding:13px;margin:0;overflow-x:auto;color:var(--x-ink);white-space:pre}
+  .ixl-json .k{color:var(--x-mut)}.ixl-json .v{color:var(--x-acc)}.ixl-json .w{color:var(--x-ok);font-weight:700}
+  .ixl-wrow{display:flex;align-items:center;gap:11px;margin:13px 0;font-family:var(--x-mono);font-size:.68rem;color:var(--x-mut)}
+  .ixl-wrow input{flex:1 1 auto;accent-color:var(--x-acc)}
+  .ixl-wval{color:var(--x-ok);font-weight:700;min-width:38px;text-align:right}
+  .ixl-inject{font-family:var(--x-mono);font-size:.74rem;letter-spacing:.08em;border:1px solid var(--x-acc);border-radius:9px;background:var(--x-acc);color:#fff;padding:10px 18px;cursor:pointer;width:100%;transition:transform .15s,box-shadow .25s}
+  .ixl-inject:hover{box-shadow:0 0 18px var(--x-acc-soft)}
+  .ixl-inject:active{transform:scale(.98)}
+  .ixl-inject[disabled]{opacity:.45;cursor:default}
+  .ixl-q{list-style:none;margin:0;padding:0;min-height:120px}
+  .ixl-q li{display:flex;align-items:center;gap:9px;font-family:var(--x-mono);font-size:.7rem;border:1px solid var(--x-line);border-radius:9px;background:var(--x-bg);padding:8px 11px;margin:0 0 7px;transition:transform .4s cubic-bezier(.2,.85,.25,1),opacity .4s,border-color .3s,box-shadow .3s}
+  .ixl-q li.new{animation:ixl-drop .45s cubic-bezier(.2,.85,.25,1)}
+  @keyframes ixl-drop{from{transform:translateY(-14px);opacity:0}}
+  .ixl-q li.pick{border-color:var(--x-acc);box-shadow:0 0 0 1px var(--x-acc),0 0 16px var(--x-acc-soft)}
+  .ixl-q li.gone{opacity:0;transform:translateX(26px)}
+  .ixl-w{color:var(--x-ok);font-weight:700;min-width:34px}
+  .ixl-id{color:var(--x-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
+  .ixl-kind{font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--x-line2);border-radius:5px;padding:2px 6px;color:var(--x-mut);flex:0 0 auto}
+  .ixl-age{font-size:.56rem;color:var(--x-mut);flex:0 0 auto;opacity:.85}
+  .ixl-run{font-family:var(--x-mono);font-size:.7rem;letter-spacing:.08em;border:1px solid var(--x-line2);border-radius:9px;background:transparent;color:var(--x-ink);padding:9px 15px;cursor:pointer;margin-top:11px;width:100%;transition:border-color .25s,color .25s}
+  .ixl-run:hover{border-color:var(--x-acc);color:var(--x-acc)}
+  .ixl-run[disabled]{opacity:.45;cursor:default}
+  .ixl-strip{display:flex;align-items:center;gap:6px;font-family:var(--x-mono);font-size:.6rem;color:var(--x-mut);margin-top:13px;min-height:26px;flex-wrap:wrap}
+  .ixl-strip .ph{border:1px solid var(--x-line2);border-radius:6px;padding:4px 8px;transition:all .25s}
+  .ixl-strip .ph.on{border-color:var(--x-acc);color:var(--x-acc);background:var(--x-acc-soft)}
+  .ixl-strip .ph.done{border-color:var(--x-ok);color:var(--x-ok);background:var(--x-ok-soft)}
+  .ixl-strip .vd{margin-left:auto;font-weight:700;letter-spacing:.14em;color:var(--x-ok);opacity:0;transition:opacity .4s}
+  .ixl-strip .vd.show{opacity:1}
+  .ixl-done{list-style:none;margin:11px 0 0;padding:11px 0 0;border-top:1px dashed var(--x-line2);min-height:20px}
+  .ixl-done li{display:flex;gap:9px;align-items:center;font-family:var(--x-mono);font-size:.62rem;color:var(--x-mut);padding:3px 0}
+  .ixl-done .ok{color:var(--x-ok);font-weight:700}
+  .ixl-note{font-family:var(--x-mono);font-size:.62rem;color:var(--x-mut);margin-top:14px}
+</style>
+<section class="ixl" id="inboxlab">
+  <p class="ixl-kicker">{{.Site.InboxLab.Kicker}}</p>
+  <h2 class="ixl-h">{{.Site.InboxLab.Heading}}</h2>
+  <p class="ixl-sub">{{.Site.InboxLab.Sub}}</p>
+  <script type="application/json" class="ixl-data">{{json .Site.InboxLab}}</script>
+  <div class="ixl-grid">
+    <div class="ixl-panel">
+      <p class="ixl-ph">compose a todo → <code>.evolve/inbox/&lt;ts&gt;-&lt;id&gt;.json</code></p>
+      <div class="ixl-tabs" role="tablist">
+        {{range $i, $p := .Site.InboxLab.Presets}}<button class="ixl-tab{{if eq $i 0}} on{{end}}" type="button" data-idx="{{$i}}">{{$p.Label}}</button>{{end}}
+      </div>
+      <pre class="ixl-json" aria-live="polite"></pre>
+      <div class="ixl-wrow"><span>weight</span><input class="ixl-slider" type="range" min="50" max="100" step="1" aria-label="todo weight"><span class="ixl-wval">0.00</span></div>
+      <button class="ixl-inject" type="button">Inject into .evolve/inbox/</button>
+      <p class="ixl-note">{{.Site.InboxLab.Note}}</p>
+    </div>
+    <div class="ixl-panel">
+      <p class="ixl-ph">the queue — triage picks by weight, every cycle</p>
+      <ul class="ixl-q">
+        {{range .Site.InboxLab.Seed}}<li data-id="{{.ID}}" data-w="{{.Weight}}"><span class="ixl-w">{{.Weight}}</span><span class="ixl-id">{{.ID}}</span><span class="ixl-kind">{{.Kind}}</span><span class="ixl-age"></span></li>{{end}}
+      </ul>
+      <button class="ixl-run" type="button">Run next cycle ▸</button>
+      <div class="ixl-strip" aria-live="polite"></div>
+      <ul class="ixl-done"></ul>
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{define "inboxlabjs"}}
+<script>
+(function () {
+  var root = document.getElementById('inboxlab');
+  if (!root) { return; }
+  var data = JSON.parse(root.querySelector('.ixl-data').textContent);
+  var presets = data.presets || [];
+  if (!presets.length) { return; }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tabs = [].slice.call(root.querySelectorAll('.ixl-tab')),
+      jsonEl = root.querySelector('.ixl-json'),
+      slider = root.querySelector('.ixl-slider'),
+      wval = root.querySelector('.ixl-wval'),
+      inject = root.querySelector('.ixl-inject'),
+      queue = root.querySelector('.ixl-q'),
+      run = root.querySelector('.ixl-run'),
+      strip = root.querySelector('.ixl-strip'),
+      done = root.querySelector('.ixl-done');
+  var PHASES = ['scout', 'tdd', 'build', 'audit', 'ship'];
+  var cur = 0, weight = presets[0].weight, cycle = 1, running = false;
+
+  function esc(s) { var d = document.createElement('i'); d.textContent = s; return d.innerHTML; }
+  function renderJSON() {
+    var p = presets[cur];
+    jsonEl.innerHTML = '{\n' +
+      '  <span class="k">"id"</span>: <span class="v">"' + esc(p.id) + '"</span>,\n' +
+      '  <span class="k">"weight"</span>: <span class="w">' + weight.toFixed(2) + '</span>,\n' +
+      '  <span class="k">"title"</span>: <span class="v">"' + esc(p.title) + '"</span>,\n' +
+      '  <span class="k">"kind"</span>: <span class="v">"' + esc(p.kind) + '"</span>,\n' +
+      '  <span class="k">"fix"</span>: <span class="v">"' + esc(p.fix) + '"</span>\n}';
+    wval.textContent = weight.toFixed(2);
+    slider.value = Math.round(weight * 100);
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (o) { o.classList.remove('on'); });
+      t.classList.add('on'); cur = i; weight = presets[i].weight; renderJSON();
+    });
+  });
+  slider.addEventListener('input', function () { weight = slider.value / 100; renderJSON(); });
+
+  function sortQueue() {
+    [].slice.call(queue.children)
+      .sort(function (a, b) { return parseFloat(b.dataset.w) - parseFloat(a.dataset.w); })
+      .forEach(function (li) { queue.appendChild(li); });
+  }
+  inject.addEventListener('click', function () {
+    var p = presets[cur];
+    if (queue.querySelector('[data-id="' + p.id + '"]')) { return; }
+    var li = document.createElement('li');
+    li.dataset.id = p.id; li.dataset.w = weight.toFixed(2);
+    li.className = reduce ? '' : 'new';
+    li.innerHTML = '<span class="ixl-w">' + weight.toFixed(2) + '</span><span class="ixl-id">' + esc(p.id) + '</span><span class="ixl-kind">' + esc(p.kind) + '</span><span class="ixl-age"></span>';
+    queue.appendChild(li); sortQueue();
+  });
+
+  function step(fn, ms) { if (reduce) { fn(); } else { timers.push(setTimeout(fn, ms)); } }
+  var timers = [];
+  run.addEventListener('click', function () {
+    if (running) { return; }
+    timers.forEach(clearTimeout); timers = [];
+    if (!queue.children.length) { return; }
+    running = true; run.disabled = true; inject.disabled = true;
+    sortQueue();
+    var pick = queue.children[0];
+    pick.classList.add('pick');
+    strip.innerHTML = PHASES.map(function (p) { return '<span class="ph" data-ph="' + p + '">' + p + '</span>'; }).join('') + '<span class="vd">PASS ▸ processed/</span>';
+    var phEls = [].slice.call(strip.querySelectorAll('.ph'));
+    phEls.forEach(function (el, i) {
+      step(function () {
+        if (i > 0) { phEls[i - 1].classList.remove('on'); phEls[i - 1].classList.add('done'); }
+        el.classList.add('on');
+      }, 500 + i * 520);
+    });
+    step(function () {
+      phEls[phEls.length - 1].classList.remove('on'); phEls[phEls.length - 1].classList.add('done');
+      strip.querySelector('.vd').classList.add('show');
+      pick.classList.add('gone');
+    }, 500 + phEls.length * 520);
+    step(function () {
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="ok">✓ cycle ' + cycle + '</span><span>' + esc(pick.dataset.id) + '</span><span>→ processed/cycle-' + cycle + '/</span>';
+      done.insertBefore(li, done.firstChild);
+      queue.removeChild(pick);
+      [].slice.call(queue.children).forEach(function (o) {
+        o.dataset.age = (parseInt(o.dataset.age || '0', 10) + 1);
+        o.querySelector('.ixl-age').textContent = 'unpicked ×' + o.dataset.age;
+      });
+      cycle += 1; running = false; run.disabled = false; inject.disabled = false;
+    }, 1100 + phEls.length * 520);
+  });
+  renderJSON(); sortQueue();
+})();
+</script>
+{{end}}
+
+{{define "gatelab"}}
+<style>
+  .gtl{--g-acc:var(--accent,#0071e3);--g-acc-soft:var(--accent-soft,color-mix(in srgb,var(--g-acc) 14%,transparent));--g-ink:var(--ink,#161616);--g-mut:var(--muted,#7a7a7a);--g-bg:var(--surface,var(--bg,#fff));--g-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--g-disp:var(--serif,var(--display,inherit));--g-line:color-mix(in srgb,var(--g-ink) 14%,transparent);--g-line2:color-mix(in srgb,var(--g-ink) 26%,transparent);--g-surf:color-mix(in srgb,var(--g-ink) 3%,transparent);--g-ok:var(--ok,#16996a);--g-ok-soft:var(--ok-soft,color-mix(in srgb,var(--g-ok) 13%,transparent));--g-no:#d64545;--g-no-soft:color-mix(in srgb,var(--g-no) 13%,transparent);max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .gtl-kicker{font-family:var(--g-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--g-acc);margin:0}
+  .gtl-h{font-family:var(--g-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--g-ink)}
+  .gtl-sub{color:var(--g-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
+  .gtl-rule{font-family:var(--g-mono);font-size:clamp(.85rem,1.8vw,1.1rem);border:1px solid var(--g-line);border-radius:12px;background:var(--g-surf);padding:14px 18px;margin-top:28px;text-align:center;color:var(--g-mut)}
+  .gtl-rule b{font-weight:700;transition:color .3s}
+  .gtl-rule b.ok{color:var(--g-ok)}
+  .gtl-rule b.no{color:var(--g-no)}
+  .gtl-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;margin-top:18px}
+  @media (max-width:840px){.gtl-grid{grid-template-columns:1fr}}
+  .gtl-checks{border:1px solid var(--g-line);border-radius:16px;background:var(--g-surf);padding:8px 14px}
+  .gtl-row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--g-line)}
+  .gtl-row:last-child{border-bottom:0}
+  .gtl-sw{flex:0 0 auto;width:38px;height:22px;border-radius:999px;border:1px solid var(--g-line2);background:transparent;position:relative;cursor:pointer;transition:background .25s,border-color .25s;padding:0}
+  .gtl-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--g-mut);transition:transform .25s,background .25s}
+  .gtl-sw[aria-pressed="true"]{background:var(--g-ok-soft);border-color:var(--g-ok)}
+  .gtl-sw[aria-pressed="true"]::after{transform:translateX(16px);background:var(--g-ok)}
+  .gtl-lbl{min-width:0}
+  .gtl-lbl b{display:block;font-size:.82rem;font-weight:600;color:var(--g-ink);line-height:1.25}
+  .gtl-lbl span{display:block;font-family:var(--g-mono);font-size:.6rem;color:var(--g-mut);margin-top:2px}
+  .gtl-side{display:flex;flex-direction:column;gap:13px}
+  .gtl-lamp{border:1px solid var(--g-line);border-radius:16px;padding:22px 18px;text-align:center;font-family:var(--g-mono);transition:background .35s,border-color .35s}
+  .gtl-lamp .big{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:700;letter-spacing:.12em}
+  .gtl-lamp .why{font-size:.66rem;margin-top:9px;color:var(--g-mut);min-height:2.2em}
+  .gtl-lamp.ship{background:var(--g-ok-soft);border-color:var(--g-ok)}
+  .gtl-lamp.ship .big{color:var(--g-ok)}
+  .gtl-lamp.blocked{background:var(--g-no-soft);border-color:var(--g-no)}
+  .gtl-lamp.blocked .big{color:var(--g-no)}
+  .gtl-sch{font-family:var(--g-mono);font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--g-mut);margin:2px 0 0}
+  .gtl-scen{display:flex;flex-wrap:wrap;gap:7px}
+  .gtl-sc{font-family:var(--g-mono);font-size:.66rem;border:1px solid var(--g-line2);border-radius:999px;background:transparent;color:var(--g-mut);padding:6px 12px;cursor:pointer;transition:all .25s}
+  .gtl-sc:hover{border-color:var(--g-acc);color:var(--g-acc)}
+  .gtl-note{font-family:var(--g-mono);font-size:.62rem;color:var(--g-mut);margin:4px 0 0;line-height:1.6}
+</style>
+<section class="gtl" id="gatelab">
+  <p class="gtl-kicker">{{.Site.GateLab.Kicker}}</p>
+  <h2 class="gtl-h">{{.Site.GateLab.Heading}}</h2>
+  <p class="gtl-sub">{{.Site.GateLab.Sub}}</p>
+  <p class="gtl-rule" role="img" aria-label="{{.Site.GateLab.Rule}}">ship ⇒ <b data-rulerole="build">build</b> ∧ <b data-rulerole="audit">audit</b> ∧ ( <b data-rulerole="tdd">tdd</b> ∨ <b data-rulerole="trivial">trivial</b> ) ∧ <b data-rulerole="and">gates</b></p>
+  <div class="gtl-grid">
+    <div class="gtl-checks">
+      {{range .Site.GateLab.Checks}}
+      <div class="gtl-row">
+        <button class="gtl-sw" type="button" role="switch" aria-pressed="{{if .On}}true{{else}}false{{end}}" data-key="{{.Key}}" data-role="{{.Role}}" aria-label="{{.Label}}"></button>
+        <div class="gtl-lbl"><b>{{.Label}}</b><span>{{.Evidence}}</span></div>
+      </div>
+      {{end}}
+    </div>
+    <div class="gtl-side">
+      <div class="gtl-lamp" aria-live="polite"><div class="big"></div><div class="why"></div></div>
+      <p class="gtl-sch">try a cycle</p>
+      <div class="gtl-scen">
+        {{range .Site.GateLab.Scenarios}}{{- /* NOTE: html/template treats data-on* attribute names as JS event-handler
+             context and JS-string-quotes every value; data-checks avoids that. */ -}}
+        <button class="gtl-sc" type="button" data-checks="{{range $i, $k := .On}}{{if $i}},{{end}}{{$k}}{{end}}">{{.Label}}</button>{{end}}
+      </div>
+      <p class="gtl-note">{{.Site.GateLab.Note}}</p>
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{define "gatelabjs"}}
+<script>
+(function () {
+  var root = document.getElementById('gatelab');
+  if (!root) { return; }
+  var switches = [].slice.call(root.querySelectorAll('.gtl-sw')),
+      lamp = root.querySelector('.gtl-lamp'),
+      big = lamp.querySelector('.big'),
+      why = lamp.querySelector('.why'),
+      ruleTokens = [].slice.call(root.querySelectorAll('[data-rulerole]'));
+  if (!switches.length) { return; }
+
+  function state() {
+    // Roles flow from content.json via data attributes; the predicate below is
+    // pure structure: conjunction of role groups, with the waivable group being
+    // an OR. No check key is named here.
+    var groups = {};
+    switches.forEach(function (sw) {
+      var role = sw.dataset.role, on = sw.getAttribute('aria-pressed') === 'true';
+      (groups[role] = groups[role] || []).push({ on: on, label: sw.getAttribute('aria-label') });
+    });
+    return groups;
+  }
+  function groupOK(g) { return (g || []).every(function (c) { return c.on; }); }
+  function firstOff(g) {
+    for (var i = 0; i < (g || []).length; i++) { if (!g[i].on) { return g[i].label; } }
+    return '';
+  }
+  function evaluate() {
+    var g = state();
+    var waiverOK = groupOK(g.tdd) || (g.trivial || []).some(function (c) { return c.on; });
+    var parts = [
+      { role: 'build', ok: groupOK(g.build), miss: firstOff(g.build) },
+      { role: 'audit', ok: groupOK(g.audit), miss: firstOff(g.audit) },
+      { role: 'tdd', ok: waiverOK, miss: firstOff(g.tdd) + ' (and no trivial waiver)' },
+      { role: 'and', ok: groupOK(g.and), miss: firstOff(g.and) }
+    ];
+    var ship = parts.every(function (p) { return p.ok; });
+    ruleTokens.forEach(function (tok) {
+      var role = tok.dataset.rulerole;
+      var ok = (role === 'trivial' || role === 'tdd') ? waiverOK
+             : (parts.filter(function (p) { return p.role === role; })[0] || { ok: true }).ok;
+      tok.classList.toggle('ok', ok);
+      tok.classList.toggle('no', !ok);
+    });
+    lamp.classList.toggle('ship', ship);
+    lamp.classList.toggle('blocked', !ship);
+    big.textContent = ship ? 'SHIP' : 'BLOCKED';
+    if (ship) {
+      why.textContent = 'Every conjunct holds — the cycle may ship.';
+    } else {
+      var fail = parts.filter(function (p) { return !p.ok; })[0];
+      why.textContent = 'Failing conjunct: ' + fail.miss;
+    }
+  }
+  switches.forEach(function (sw) {
+    sw.addEventListener('click', function () {
+      sw.setAttribute('aria-pressed', sw.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      evaluate();
+    });
+  });
+  [].slice.call(root.querySelectorAll('.gtl-sc')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var on = (btn.dataset.checks || '').split(',');
+      switches.forEach(function (sw) {
+        sw.setAttribute('aria-pressed', on.indexOf(sw.dataset.key) >= 0 ? 'true' : 'false');
+      });
+      evaluate();
+    });
+  });
+  evaluate();
+})();
+</script>
+{{end}}
+
+{{define "recoverylab"}}
+<style>
+  .rcl{--r-acc:var(--accent,#0071e3);--r-acc-soft:var(--accent-soft,color-mix(in srgb,var(--r-acc) 14%,transparent));--r-ink:var(--ink,#161616);--r-mut:var(--muted,#7a7a7a);--r-bg:var(--surface,var(--bg,#fff));--r-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--r-disp:var(--serif,var(--display,inherit));--r-line:color-mix(in srgb,var(--r-ink) 14%,transparent);--r-line2:color-mix(in srgb,var(--r-ink) 26%,transparent);--r-surf:color-mix(in srgb,var(--r-ink) 3%,transparent);--r-ok:var(--ok,#16996a);--r-ok-soft:var(--ok-soft,color-mix(in srgb,var(--r-ok) 13%,transparent));--r-warn:#d69a2d;--r-warn-soft:color-mix(in srgb,var(--r-warn) 14%,transparent);--r-no:#d64545;--r-no-soft:color-mix(in srgb,var(--r-no) 13%,transparent);max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .rcl-kicker{font-family:var(--r-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--r-acc);margin:0}
+  .rcl-h{font-family:var(--r-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--r-ink)}
+  .rcl-sub{color:var(--r-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
+  .rcl-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:18px;margin-top:30px}
+  @media (max-width:840px){.rcl-grid{grid-template-columns:1fr}}
+  .rcl-events{display:flex;flex-direction:column;gap:8px}
+  .rcl-ev{display:flex;align-items:center;gap:10px;font-family:var(--r-mono);font-size:.72rem;text-align:left;border:1px solid var(--r-line2);border-radius:10px;background:transparent;color:var(--r-ink);padding:11px 13px;cursor:pointer;transition:all .25s}
+  .rcl-ev:hover{border-color:var(--r-acc)}
+  .rcl-ev.on{border-color:var(--r-acc);background:var(--r-acc-soft);box-shadow:0 0 14px var(--r-acc-soft)}
+  .rcl-ev .code{margin-left:auto;font-size:.56rem;letter-spacing:.06em;border:1px solid var(--r-line2);border-radius:5px;padding:2px 6px;color:var(--r-mut);flex:0 0 auto}
+  .rcl-stage{border:1px solid var(--r-line);border-radius:16px;background:var(--r-surf);padding:18px;min-height:280px;display:flex;flex-direction:column}
+  .rcl-vrow{display:flex;align-items:center;gap:10px;font-family:var(--r-mono);padding-bottom:13px;border-bottom:1px solid var(--r-line)}
+  .rcl-vlabel{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--r-mut)}
+  .rcl-verdict{font-size:.74rem;font-weight:700;letter-spacing:.14em;border-radius:7px;padding:4px 11px;transition:all .3s}
+  .rcl-verdict.RETRY{color:var(--r-warn);background:var(--r-warn-soft);border:1px solid var(--r-warn)}
+  .rcl-verdict.BLOCK{color:var(--r-no);background:var(--r-no-soft);border:1px solid var(--r-no)}
+  .rcl-verdict.PROCEED{color:var(--r-ok);background:var(--r-ok-soft);border:1px solid var(--r-ok)}
+  .rcl-steps{list-style:none;margin:0;padding:13px 0 0;flex:1 1 auto}
+  .rcl-steps li{display:flex;gap:10px;align-items:flex-start;font-family:var(--r-mono);font-size:.72rem;line-height:1.5;color:var(--r-ink);padding:6px 0;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+  .rcl-steps li.show{opacity:1;transform:none}
+  .rcl-steps .n{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:1px solid var(--r-line2);display:grid;place-items:center;font-size:.52rem;color:var(--r-mut);margin-top:1px;transition:all .3s}
+  .rcl-steps li.show .n{border-color:var(--r-acc);color:var(--r-acc)}
+  .rcl-out{font-family:var(--r-mono);font-size:.74rem;color:var(--r-ok);border-top:1px dashed var(--r-line2);padding-top:13px;display:flex;align-items:center;gap:9px;opacity:0;transition:opacity .4s}
+  .rcl-out.show{opacity:1}
+  .rcl-out .pulse{width:9px;height:9px;border-radius:50%;background:var(--r-ok);animation:rcl-pulse 1.6s ease-in-out infinite}
+  @keyframes rcl-pulse{50%{box-shadow:0 0 0 6px var(--r-ok-soft)}}
+</style>
+<section class="rcl" id="recoverylab">
+  <p class="rcl-kicker">{{.Site.RecoveryLab.Kicker}}</p>
+  <h2 class="rcl-h">{{.Site.RecoveryLab.Heading}}</h2>
+  <p class="rcl-sub">{{.Site.RecoveryLab.Sub}}</p>
+  <script type="application/json" class="rcl-data">{{json .Site.RecoveryLab}}</script>
+  <div class="rcl-grid">
+    <div class="rcl-events" role="tablist">
+      {{range $i, $e := .Site.RecoveryLab.Events}}<button class="rcl-ev{{if eq $i 0}} on{{end}}" type="button" data-idx="{{$i}}">{{$e.Label}}<span class="code">{{$e.Code}}</span></button>{{end}}
+    </div>
+    <div class="rcl-stage" aria-live="polite">
+      <div class="rcl-vrow"><span class="rcl-vlabel">failure adapter verdict</span><span class="rcl-verdict"></span></div>
+      <ol class="rcl-steps"></ol>
+      <div class="rcl-out"><span class="pulse"></span><span class="txt"></span></div>
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{define "recoverylabjs"}}
+<script>
+(function () {
+  var root = document.getElementById('recoverylab');
+  if (!root) { return; }
+  var data = JSON.parse(root.querySelector('.rcl-data').textContent);
+  var events = data.events || [];
+  if (!events.length) { return; }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var btns = [].slice.call(root.querySelectorAll('.rcl-ev')),
+      verdict = root.querySelector('.rcl-verdict'),
+      steps = root.querySelector('.rcl-steps'),
+      out = root.querySelector('.rcl-out'),
+      outTxt = out.querySelector('.txt');
+  var timers = [];
+
+  function esc(s) { var d = document.createElement('i'); d.textContent = s; return d.innerHTML; }
+  function play(i) {
+    timers.forEach(clearTimeout); timers = [];
+    btns.forEach(function (b, j) { b.classList.toggle('on', j === i); });
+    var e = events[i];
+    verdict.className = 'rcl-verdict ' + e.verdict;
+    verdict.textContent = e.verdict;
+    out.classList.remove('show');
+    outTxt.textContent = e.outcome + ' The loop continues.';
+    steps.innerHTML = e.steps.map(function (s, j) {
+      return '<li><span class="n">' + (j + 1) + '</span><span>' + esc(s) + '</span></li>';
+    }).join('');
+    var lis = [].slice.call(steps.children);
+    lis.forEach(function (li, j) {
+      if (reduce) { li.classList.add('show'); }
+      else { timers.push(setTimeout(function () { li.classList.add('show'); }, 250 + j * 480)); }
+    });
+    if (reduce) { out.classList.add('show'); }
+    else { timers.push(setTimeout(function () { out.classList.add('show'); }, 250 + lis.length * 480 + 200)); }
+  }
+  btns.forEach(function (b, i) { b.addEventListener('click', function () { play(i); }); });
+  play(0);
+})();
+</script>
+{{end}}
+
+{{define "tryit"}}
+<style>
+  .tri{--t-acc:var(--accent,#0071e3);--t-acc-soft:var(--accent-soft,color-mix(in srgb,var(--t-acc) 14%,transparent));--t-ink:var(--ink,#161616);--t-mut:var(--muted,#7a7a7a);--t-bg:var(--surface,var(--bg,#fff));--t-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--t-disp:var(--serif,var(--display,inherit));--t-line:color-mix(in srgb,var(--t-ink) 14%,transparent);--t-line2:color-mix(in srgb,var(--t-ink) 26%,transparent);--t-surf:color-mix(in srgb,var(--t-ink) 3%,transparent);--t-ok:var(--ok,#16996a);max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .tri-kicker{font-family:var(--t-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--t-acc);margin:0}
+  .tri-h{font-family:var(--t-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--t-ink)}
+  .tri-sub{color:var(--t-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
+  .tri-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:30px;align-items:start}
+  @media (max-width:840px){.tri-grid{grid-template-columns:1fr}}
+  .tri-install{border:1px solid var(--t-line);border-radius:16px;background:var(--t-surf);padding:18px}
+  .tri-vh{font-family:var(--t-mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--t-mut);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .tri-vh b{color:var(--t-acc)}
+  .tri-cmd{display:flex;align-items:center;gap:10px;border:1px solid var(--t-line2);border-radius:10px;background:color-mix(in srgb,var(--t-ink) 5%,var(--t-bg));padding:12px 13px}
+  .tri-cmd code{font-family:var(--t-mono);font-size:.72rem;color:var(--t-ink);overflow-x:auto;white-space:nowrap;flex:1 1 auto;scrollbar-width:none}
+  .tri-copy{font-family:var(--t-mono);font-size:.62rem;letter-spacing:.06em;border:1px solid var(--t-acc);border-radius:7px;background:var(--t-acc);color:#fff;padding:7px 12px;cursor:pointer;flex:0 0 auto;transition:box-shadow .25s}
+  .tri-copy:hover{box-shadow:0 0 14px var(--t-acc-soft)}
+  .tri-copy.is-copied{background:var(--t-ok);border-color:var(--t-ok)}
+  .tri-plat{font-family:var(--t-mono);font-size:.6rem;color:var(--t-mut);margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tri-plat .ok{color:var(--t-ok);font-weight:700}
+  .tri-next{margin:16px 0 0;padding:14px 0 0;border-top:1px dashed var(--t-line2)}
+  .tri-next p{font-family:var(--t-mono);font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--t-mut);margin:0 0 9px}
+  .tri-step{display:flex;align-items:baseline;gap:10px;font-family:var(--t-mono);font-size:.7rem;padding:4px 0}
+  .tri-step .lb{color:var(--t-mut);flex:0 0 auto}
+  .tri-step code{color:var(--t-acc);background:var(--t-acc-soft);border-radius:5px;padding:2px 7px}
+  .tri-trust{margin:16px 0 0;padding:13px 0 0;border-top:1px dashed var(--t-line2);display:flex;flex-direction:column;gap:6px}
+  .tri-trust a{font-family:var(--t-mono);font-size:.64rem;color:var(--t-mut);text-decoration:none;transition:color .2s}
+  .tri-trust a:hover{color:var(--t-acc)}
+  .tri-trust a::before{content:"↗ ";color:var(--t-acc)}
+  .tri-esc{font-family:var(--t-mono);font-size:.58rem;color:var(--t-mut);margin:12px 0 0;opacity:.85}
+  .tri-term{border:1px solid color-mix(in srgb,#0a0a0a 70%,var(--t-line));border-radius:14px;background:#101014;padding:0;overflow:hidden;box-shadow:0 18px 40px -22px rgba(0,0,0,.5)}
+  .tri-tbar{display:flex;align-items:center;gap:6px;padding:10px 13px;background:#17171c;border-bottom:1px solid #26262c}
+  .tri-tbar i{width:10px;height:10px;border-radius:50%;background:#3a3a42}
+  .tri-tbar i:first-child{background:#e0605e}.tri-tbar i:nth-child(2){background:#e0b757}.tri-tbar i:nth-child(3){background:#69c46d}
+  .tri-tbar span{font-family:var(--t-mono);font-size:.58rem;letter-spacing:.12em;color:#8b8b95;margin-left:8px;text-transform:uppercase}
+  .tri-tout{font-family:var(--t-mono);font-size:.7rem;line-height:1.75;color:#c9c9d2;padding:15px 16px;margin:0;overflow-x:auto;white-space:pre}
+  .tri-tout .p{color:#7ee2a8}
+  .tri-tout .d{color:#8b8b95}
+</style>
+<section class="tri" id="tryit">
+  <p class="tri-kicker">{{.Site.TryIt.Kicker}}</p>
+  <h2 class="tri-h">{{.Site.TryIt.Heading}}</h2>
+  <p class="tri-sub">{{.Site.TryIt.Sub}}</p>
+  <div class="tri-grid">
+    <div class="tri-install">
+      <p class="tri-vh"><span>Install <b>{{.Site.Product.Name}} {{.Site.Product.Version}}</b></span><span>{{.Site.TryIt.Platforms}}</span></p>
+      <div class="tri-cmd"><code>{{.Site.TryIt.Command}}</code><button class="tri-copy" type="button" data-copy="{{.Site.TryIt.Command}}">Copy</button></div>
+      <p class="tri-plat"><span class="ok">✓</span><span>{{.Site.TryIt.Verified}}</span></p>
+      <div class="tri-next">
+        <p>then, in your AI CLI</p>
+        {{range .Site.TryIt.NextSteps}}<div class="tri-step"><span class="lb">{{.Label}}</span><code>{{.Command}}</code></div>{{end}}
+      </div>
+      <div class="tri-trust">
+        {{range .Site.TryIt.Trust}}<a href="{{.Href}}" rel="noopener">{{.Label}}</a>{{end}}
+      </div>
+      <p class="tri-esc">{{.Site.TryIt.NoAccount}}</p>
+    </div>
+    <div class="tri-term" aria-label="what you will see after running the installer">
+      <div class="tri-tbar"><i></i><i></i><i></i><span>what you'll see</span></div>
+      <pre class="tri-tout">{{range $i, $l := .Site.TryIt.Terminal}}{{if $i}}
+{{end}}{{$l}}{{end}}</pre>
+    </div>
+  </div>
+</section>
+{{end}}
