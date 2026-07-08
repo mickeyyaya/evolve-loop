@@ -18,17 +18,15 @@ type Site struct {
 	TheTurn      Section      `json:"theTurn"`
 	PhaseSpine   []Phase      `json:"phaseSpine"`
 	PipelineDemo PipelineDemo `json:"pipelineDemo"`
-	PillarsIntro Section      `json:"pillarsIntro"`
-	Pillars      []Pillar     `json:"pillars"`
-	Incident     Incident     `json:"incident"`
-	Comparison   Comparison   `json:"comparison"`
-	Quickstart   Quickstart   `json:"quickstart"`
-	Examples     Examples     `json:"examples"`
-	Concurrency  Concurrency  `json:"concurrency"`
-	TryIt        TryIt        `json:"tryIt"`
-	InboxLab     InboxLab     `json:"inboxLab"`
 	GateLab      GateLab      `json:"gateLab"`
 	RecoveryLab  RecoveryLab  `json:"recoveryLab"`
+	InboxLab     InboxLab     `json:"inboxLab"`
+	Concurrency  Concurrency  `json:"concurrency"`
+	Examples     Examples     `json:"examples"`
+	PillarsIntro Section      `json:"pillarsIntro"`
+	Pillars      []Pillar     `json:"pillars"`
+	Comparison   Comparison   `json:"comparison"`
+	TryIt        TryIt        `json:"tryIt"`
 	FinalCTA     FinalCTA     `json:"finalCta"`
 	Footer       Footer       `json:"footer"`
 }
@@ -129,36 +127,12 @@ type Pillar struct {
 	Proof string `json:"proof"`
 }
 
-type Incident struct {
-	Kicker  string `json:"kicker"`
-	Heading string `json:"heading"`
-	Body    string `json:"body"`
-}
-
 type Comparison struct {
 	Kicker  string     `json:"kicker"`
 	Heading string     `json:"heading"`
 	Columns []string   `json:"columns"`
 	Rows    [][]string `json:"rows"`
 	Note    string     `json:"note"`
-}
-
-type InstallStep struct {
-	Step    string `json:"step"`
-	Command string `json:"command"`
-}
-
-type Preset struct {
-	Label   string `json:"label"`
-	Command string `json:"command"`
-	Blurb   string `json:"blurb"`
-}
-
-type Quickstart struct {
-	Kicker  string        `json:"kicker"`
-	Heading string        `json:"heading"`
-	Install []InstallStep `json:"install"`
-	Presets []Preset      `json:"presets"`
 }
 
 // Examples powers the "from one command to full control" usage ladder: a
@@ -310,6 +284,9 @@ type RecoveryLab struct {
 	Heading string          `json:"heading"`
 	Sub     string          `json:"sub"`
 	Events  []RecoveryEvent `json:"events"`
+	// Proof is the real-incident story that closes the section — the merged
+	// former standalone "incident" band, kept as evidence beside the demo.
+	Proof string `json:"proof"`
 }
 
 // RecoveryEvent is one failure and its routed recovery. Verdict uses the real
@@ -392,6 +369,7 @@ func (s *Site) Validate() error {
 		{"gateLab.scenarios (>=3)", len(s.GateLab.Scenarios) < 3},
 		{"recoveryLab.heading", s.RecoveryLab.Heading == ""},
 		{"recoveryLab.events (>=4)", len(s.RecoveryLab.Events) < 4},
+		{"recoveryLab.proof", s.RecoveryLab.Proof == ""},
 		{"pillars (>=3)", len(s.Pillars) < 3},
 		{"comparison.rows", len(s.Comparison.Rows) == 0},
 		{"footer.links", len(s.Footer.Links) == 0},

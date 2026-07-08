@@ -74,9 +74,6 @@ func TestContent_AllCopyIsCentralized(t *testing.T) {
 	if site.Comparison.Kicker == "" {
 		t.Error("Comparison.Kicker missing")
 	}
-	if site.Quickstart.Kicker == "" {
-		t.Error("Quickstart.Kicker missing")
-	}
 }
 
 // The live pipeline demo is content-driven: its scenarios (and the shape each
@@ -231,22 +228,6 @@ func TestValidate_RequiresExamples(t *testing.T) {
 	site.Examples = Examples{}
 	if err := site.Validate(); err == nil {
 		t.Error("Validate() accepted an empty examples block; want a loud failure")
-	}
-}
-
-// Quickstart install-step LABELS must stay short. A long label is a sentence,
-// and a flex step label that won't shrink overflows narrow (≤360px) screens —
-// the descriptive detail belongs in the examples ladder, not the step label.
-func TestQuickstartStepLabelsStayShort(t *testing.T) {
-	site, err := Load("../../shared/content.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	const maxLabel = 24
-	for _, s := range site.Quickstart.Install {
-		if len(s.Step) > maxLabel {
-			t.Errorf("quickstart install step label %q is %d chars (> %d); keep step labels short so they don't overflow on mobile", s.Step, len(s.Step), maxLabel)
-		}
 	}
 }
 

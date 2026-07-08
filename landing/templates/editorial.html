@@ -195,28 +195,6 @@
   .note{margin-top:24px; color:var(--muted); font-family:var(--serif); font-style:italic;
     font-size:1.02rem; line-height:1.6; max-width:68ch}
 
-  /* incident — sidebar dispatch */
-  .incident{border-left:3px solid var(--accent); padding:6px 0 6px 30px; max-width:760px}
-  .incident h3{font-family:var(--serif); font-weight:500; font-size:clamp(1.6rem,3.2vw,2.3rem);
-    line-height:1.12; margin-top:12px; max-width:20ch}
-  .incident p{color:var(--ink); font-family:var(--serif); margin-top:20px; max-width:66ch;
-    font-size:1.12rem; line-height:1.66}
-
-  /* quickstart steps */
-  .steps{margin-top:40px; border-top:1px solid var(--rule)}
-  .step{display:grid; grid-template-columns:54px 190px 1fr auto; gap:20px; align-items:center;
-    padding:16px 0; border-bottom:1px solid var(--rule)}
-  .step .si{font-family:var(--serif); font-style:italic; font-size:1.05rem; color:var(--accent)}
-  .step .sl{color:var(--ink); font-weight:500; font-size:.96rem}
-  .step code{font-family:var(--sans); color:var(--muted); font-size:.9rem;
-    overflow-x:auto; white-space:nowrap}
-  @media(max-width:720px){.step{grid-template-columns:40px 1fr; gap:8px}
-    .step code{grid-column:1/-1} .step .copy{grid-column:2; justify-self:start}}
-  .presets{display:flex; flex-wrap:wrap; gap:14px; margin-top:24px}
-  .preset{font-family:var(--sans); font-size:.85rem; color:var(--muted);
-    border:1px solid var(--rule); border-radius:2px; padding:8px 14px; background:var(--surface)}
-  .preset b{color:var(--accent); font-weight:600}
-
   /* final cta — colophon */
   .final{text-align:center; padding:clamp(80px,11vw,150px) 0}
   .final h2{font-family:var(--serif); font-weight:500; font-size:clamp(2.1rem,4.8vw,3.4rem);
@@ -343,12 +321,11 @@
 </section>
 
 {{template "pipelinedemo" .}}
-{{template "concurrency" .}}
-{{template "examples" .}}
-{{template "tryit" .}}
-{{template "inboxlab" .}}
 {{template "gatelab" .}}
 {{template "recoverylab" .}}
+{{template "inboxlab" .}}
+{{template "concurrency" .}}
+{{template "examples" .}}
 
 <section class="band">
   <div class="wrap">
@@ -396,49 +373,7 @@
   </div>
 </section>
 
-<section class="band">
-  <div class="wrap">
-    <div class="head">
-      <span class="num">№ 05</span>
-      <div>
-        <span class="label">From the field</span>
-        <h2 data-reveal>A dispatch from the loop.</h2>
-      </div>
-    </div>
-    <div class="prose">
-      <div class="incident" data-reveal>
-        <span class="label">{{.Site.Incident.Kicker}}</span>
-        <h3 class="serif">{{.Site.Incident.Heading}}</h3>
-        <p>{{.Site.Incident.Body}}</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="band band--alt">
-  <div class="wrap">
-    <div class="head">
-      <span class="num">№ 06</span>
-      <div>
-        <span class="label">{{.Site.Quickstart.Kicker}}</span>
-        <h2 data-reveal>{{.Site.Quickstart.Heading}}</h2>
-      </div>
-    </div>
-    <div class="steps">
-      {{range $i,$s := .Site.Quickstart.Install}}
-      <div class="step" data-reveal data-d="{{inc $i}}">
-        <span class="si">{{if lt $i 9}}0{{end}}{{inc $i}}</span>
-        <span class="sl">{{$s.Step}}</span>
-        <code>{{$s.Command}}</code>
-        <button class="copy" data-copy="{{$s.Command}}">Copy</button>
-      </div>
-      {{end}}
-    </div>
-    <div class="presets" data-reveal>
-      {{range .Site.Quickstart.Presets}}<span class="preset"><b>{{.Label}}</b> · {{.Blurb}}</span>{{end}}
-    </div>
-  </div>
-</section>
+{{template "tryit" .}}
 
 <section class="final band">
   <div class="wrap">
