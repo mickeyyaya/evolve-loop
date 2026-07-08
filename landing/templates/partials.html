@@ -1011,6 +1011,7 @@
       done = root.querySelector('.ixl-done');
   var PHASES = ['scout', 'tdd', 'build', 'audit', 'ship'];
   var cur = 0, weight = presets[0].weight, cycle = 1, running = false;
+  var userDriving = false, autoTimer = null;
 
   function esc(s) { var d = document.createElement('i'); d.textContent = s; return d.innerHTML; }
   function renderJSON() {
@@ -1024,20 +1025,21 @@
     wval.textContent = weight.toFixed(2);
     slider.value = Math.round(weight * 100);
   }
+  function selectPreset(i) {
+    tabs.forEach(function (o, j) { o.classList.toggle('on', j === i); });
+    cur = i; weight = presets[i].weight; renderJSON();
+  }
   tabs.forEach(function (t, i) {
-    t.addEventListener('click', function () {
-      tabs.forEach(function (o) { o.classList.remove('on'); });
-      t.classList.add('on'); cur = i; weight = presets[i].weight; renderJSON();
-    });
+    t.addEventListener('click', function () { userDriving = true; clearTimeout(autoTimer); selectPreset(i); });
   });
-  slider.addEventListener('input', function () { weight = slider.value / 100; renderJSON(); });
+  slider.addEventListener('input', function () { userDriving = true; clearTimeout(autoTimer); weight = slider.value / 100; renderJSON(); });
 
   function sortQueue() {
     [].slice.call(queue.children)
       .sort(function (a, b) { return parseFloat(b.dataset.w) - parseFloat(a.dataset.w); })
       .forEach(function (li) { queue.appendChild(li); });
   }
-  inject.addEventListener('click', function () {
+  function injectCurrent() {
     var p = presets[cur];
     if (queue.querySelector('[data-id="' + p.id + '"]')) { return; }
     var li = document.createElement('li');
@@ -1045,11 +1047,12 @@
     li.className = reduce ? '' : 'new';
     li.innerHTML = '<span class="ixl-w">' + weight.toFixed(2) + '</span><span class="ixl-id">' + esc(p.id) + '</span><span class="ixl-kind">' + esc(p.kind) + '</span><span class="ixl-age"></span>';
     queue.appendChild(li); sortQueue();
-  });
+  }
+  inject.addEventListener('click', function () { userDriving = true; clearTimeout(autoTimer); injectCurrent(); });
 
   function step(fn, ms) { if (reduce) { fn(); } else { timers.push(setTimeout(fn, ms)); } }
   var timers = [];
-  run.addEventListener('click', function () {
+  function runCycle() {
     if (running) { return; }
     timers.forEach(clearTimeout); timers = [];
     if (!queue.children.length) { return; }
@@ -1081,8 +1084,39 @@
       });
       cycle += 1; running = false; run.disabled = false; inject.disabled = false;
     }, 1100 + phEls.length * 520);
-  });
+  }
+  run.addEventListener('click', function () { userDriving = true; clearTimeout(autoTimer); runCycle(); });
   renderJSON(); sortQueue();
+
+  // Auto-play (pipelinedemo idiom): once scrolled into view, demo the full
+  // inject→triage→processed loop across the presets. Any real interaction
+  // (userDriving) hands control to the visitor permanently. autoTimer lives
+  // OUTSIDE `timers` so runCycle's own cleanup never breaks the chain.
+  function autoLoop(i) {
+    if (userDriving) { return; }
+    if (running) { autoTimer = setTimeout(function () { autoLoop(i); }, 1200); return; }
+    selectPreset(i);
+    autoTimer = setTimeout(function () {
+      if (userDriving) { return; }
+      injectCurrent();
+      autoTimer = setTimeout(function () {
+        if (userDriving) { return; }
+        runCycle();
+        // Delay derives from runCycle's own animation budget (1100 + N*520)
+        // plus a viewing pause, so a PHASES change can never outrun it.
+        autoTimer = setTimeout(function () { autoLoop((i + 1) % presets.length); }, 1100 + PHASES.length * 520 + 2100);
+      }, 900);
+    }, 900);
+  }
+  if ('IntersectionObserver' in window && !reduce) {
+    var autoStarted = false;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && !autoStarted) { autoStarted = true; io.disconnect(); autoLoop(0); }
+      });
+    }, { threshold: 0.25 });
+    io.observe(root);
+  }
 })();
 </script>
 {{end}}
@@ -1121,6 +1155,7 @@
   .gtl-scen{display:flex;flex-wrap:wrap;gap:7px}
   .gtl-sc{font-family:var(--g-mono);font-size:.66rem;border:1px solid var(--g-line2);border-radius:999px;background:transparent;color:var(--g-mut);padding:6px 12px;cursor:pointer;transition:all .25s}
   .gtl-sc:hover{border-color:var(--g-acc);color:var(--g-acc)}
+  .gtl-sc.on{border-color:var(--g-acc);color:var(--g-acc);background:var(--g-acc-soft)}
   .gtl-note{font-family:var(--g-mono);font-size:.62rem;color:var(--g-mut);margin:4px 0 0;line-height:1.6}
 </style>
 <section class="gtl" id="gatelab">
@@ -1156,6 +1191,7 @@
 (function () {
   var root = document.getElementById('gatelab');
   if (!root) { return; }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var switches = [].slice.call(root.querySelectorAll('.gtl-sw')),
       lamp = root.querySelector('.gtl-lamp'),
       big = lamp.querySelector('.big'),
@@ -1206,22 +1242,45 @@
       why.textContent = 'Failing conjunct: ' + fail.miss;
     }
   }
+  var scBtns = [].slice.call(root.querySelectorAll('.gtl-sc'));
+  var userDriving = false, autoTimer = null;
+  function applyScenario(btn) {
+    var on = (btn.dataset.checks || '').split(',');
+    switches.forEach(function (sw) {
+      sw.setAttribute('aria-pressed', on.indexOf(sw.dataset.key) >= 0 ? 'true' : 'false');
+    });
+    scBtns.forEach(function (b) { b.classList.toggle('on', b === btn); });
+    evaluate();
+  }
   switches.forEach(function (sw) {
     sw.addEventListener('click', function () {
+      userDriving = true; clearTimeout(autoTimer);
+      scBtns.forEach(function (b) { b.classList.remove('on'); });
       sw.setAttribute('aria-pressed', sw.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
       evaluate();
     });
   });
-  [].slice.call(root.querySelectorAll('.gtl-sc')).forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var on = (btn.dataset.checks || '').split(',');
-      switches.forEach(function (sw) {
-        sw.setAttribute('aria-pressed', on.indexOf(sw.dataset.key) >= 0 ? 'true' : 'false');
-      });
-      evaluate();
-    });
+  scBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () { userDriving = true; clearTimeout(autoTimer); applyScenario(btn); });
   });
   evaluate();
+
+  // Auto-play: cycle the scenario presets so the lamp tells its story unaided;
+  // first real interaction hands over.
+  function autoCycle(i) {
+    if (userDriving || !scBtns.length) { return; }
+    applyScenario(scBtns[i]);
+    autoTimer = setTimeout(function () { autoCycle((i + 1) % scBtns.length); }, 3600);
+  }
+  if ('IntersectionObserver' in window && !reduce) {
+    var autoStarted = false;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && !autoStarted) { autoStarted = true; io.disconnect(); autoCycle(0); }
+      });
+    }, { threshold: 0.25 });
+    io.observe(root);
+  }
 })();
 </script>
 {{end}}
@@ -1291,7 +1350,7 @@
       steps = root.querySelector('.rcl-steps'),
       out = root.querySelector('.rcl-out'),
       outTxt = out.querySelector('.txt');
-  var timers = [];
+  var timers = [], userDriving = false;
 
   function esc(s) { var d = document.createElement('i'); d.textContent = s; return d.innerHTML; }
   function play(i) {
@@ -1313,8 +1372,26 @@
     if (reduce) { out.classList.add('show'); }
     else { timers.push(setTimeout(function () { out.classList.add('show'); }, 250 + lis.length * 480 + 200)); }
   }
-  btns.forEach(function (b, i) { b.addEventListener('click', function () { play(i); }); });
+  btns.forEach(function (b, i) { b.addEventListener('click', function () { userDriving = true; play(i); }); });
   play(0);
+
+  // Auto-play: advance through the failure events once visible (play() clears
+  // `timers`, so a manual click also cancels any pending advance); first real
+  // interaction hands over.
+  function autoAdvance(i) {
+    if (userDriving) { return; }
+    play(i);
+    timers.push(setTimeout(function () { autoAdvance((i + 1) % events.length); }, 250 + events[i].steps.length * 480 + 2800));
+  }
+  if ('IntersectionObserver' in window && !reduce) {
+    var autoStarted = false;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && !autoStarted) { autoStarted = true; io.disconnect(); autoAdvance(1); }
+      });
+    }, { threshold: 0.25 });
+    io.observe(root);
+  }
 })();
 </script>
 {{end}}
