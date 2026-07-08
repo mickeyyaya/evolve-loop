@@ -54,3 +54,7 @@ Reconcile diverged local main (quiet tree: clear stray `.tmp.37299` from index â
 ## Verification
 - Per slice: `go test -race` on touched pkgs + repo-wide vet/gofmt + apicover -enforce (CI-parity); loop's own gates apply.
 - End-to-end acceptance (after S7 soaks one batch): `evolve tokens report --last 8` shows non-zero per-phase tokens with source=transcript for claude-tmux phases, advisor calls attributed, per-attempt waste visible for any fallback chain, cache-hit ratio computed; dossiers carry token blocks; then phase-2 optimization items get their baseline weights re-ranked by MEASURED top consumers.
+
+## First measurement outcome (2026-07-08)
+
+Batch bkm5wr3ey (cycles 612-619, first full S1-S7 binary): report structure correct, **all token counts zero** â€” root cause: `Deps.TokenResolver` was wired at no composition root (`withDefaults` leaves nil = silently disabled; fail-open masked it). Full post-mortem + diagnostic recipe: [knowledge-base/research/code-audit-2026-07/token-telemetry-zero-postmortem.md](../../knowledge-base/research/code-audit-2026-07/token-telemetry-zero-postmortem.md). Fix queued as inbox item `token-resolver-production-wiring` (0.96). Acceptance for the NEXT boundary: non-zero `source=transcript` tokens per phase.
