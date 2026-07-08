@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v20.4",
+    "version": "v22.0.1",
     "mentalModel": "CI/CD for AI-written code",
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
@@ -21,20 +21,40 @@
       "An independent reviewer that won't rubber-stamp your AI.",
       "CI/CD for AI-written code."
     ],
-    "subhead": "Evolve Loop wraps your AI coder in a structured, self-healing pipeline: it plans the work, an independent reviewer challenges it, only safe changes merge — and every run makes the next one smarter.",
-    "ctaPrimary": { "label": "Get started", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
-    "ctaSecondary": { "label": "Star on GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
+    "subhead": "Evolve Loop wraps your AI coder in a structured, self-healing pipeline: it plans the work, an independent reviewer challenges it, only safe changes merge — and every run makes the next one smarter. Nothing ships unless a test failed first.",
+    "ctaPrimary": {
+      "label": "Get started",
+      "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
+    },
+    "ctaSecondary": {
+      "label": "Star on GitHub",
+      "href": "https://github.com/mickeyyaya/evolve-loop"
+    },
     "verdictAnimation": {
       "file": "pre-merge review",
-      "checks": ["Intent met", "Tests green", "Independently reviewed", "No regressions"],
+      "checks": [
+        "Intent met",
+        "Tests green",
+        "Independently reviewed",
+        "No regressions"
+      ],
       "result": "0 blocking issues",
       "outcome": "SHIP"
     }
   },
   "proofBar": [
-    { "value": "367+", "label": "cycles run" },
-    { "value": "61", "label": "lessons learned" },
-    { "value": "Apache-2.0", "label": "open source" }
+    {
+      "value": "620+",
+      "label": "autonomous cycles shipped"
+    },
+    {
+      "value": "3 CLIs",
+      "label": "Claude Code · Codex · Gemini"
+    },
+    {
+      "value": "Apache-2.0",
+      "label": "open source"
+    }
   ],
   "problem": {
     "kicker": "The bottleneck moved",
@@ -53,125 +73,531 @@
     ]
   },
   "phaseSpine": [
-    { "phase": "Intent", "artifact": "a clear goal", "blurb": "Turns a vague ask into a goal everyone agrees on — with the risky assumptions named up front." },
-    { "phase": "Scout", "artifact": "a researched plan", "blurb": "Explores the code and past lessons, then proposes what's actually worth doing." },
-    { "phase": "Triage", "artifact": "a bounded scope", "blurb": "Decides what makes this cycle and what waits — so scope never sprawls." },
-    { "phase": "Build", "artifact": "working changes", "blurb": "Implements the change in isolation, with tests written right alongside it." },
-    { "phase": "Audit", "artifact": "an independent verdict", "blurb": "A different reviewer challenges the work and decides whether it holds up." },
-    { "phase": "Ship", "artifact": "a safe merge", "blurb": "Merges only what passed — cleanly, and on the record." },
-    { "phase": "Learn", "artifact": "a lesson kept", "blurb": "Turns the outcome into a durable lesson the next cycle starts with." }
+    {
+      "phase": "Intent",
+      "artifact": "a clear goal",
+      "blurb": "Turns a vague ask into a goal everyone agrees on — with the risky assumptions named up front."
+    },
+    {
+      "phase": "Scout",
+      "artifact": "a researched plan",
+      "blurb": "Explores the code and past lessons, then proposes what's actually worth doing."
+    },
+    {
+      "phase": "Triage",
+      "artifact": "a bounded scope",
+      "blurb": "Decides what makes this cycle and what waits — so scope never sprawls."
+    },
+    {
+      "phase": "Build",
+      "artifact": "working changes",
+      "blurb": "Implements the change in isolation, with tests written right alongside it."
+    },
+    {
+      "phase": "Audit",
+      "artifact": "an independent verdict",
+      "blurb": "A different reviewer challenges the work and decides whether it holds up."
+    },
+    {
+      "phase": "Ship",
+      "artifact": "a safe merge",
+      "blurb": "Merges only what passed — cleanly, and on the record."
+    },
+    {
+      "phase": "Learn",
+      "artifact": "a lesson kept",
+      "blurb": "Turns the outcome into a durable lesson the next cycle starts with."
+    }
   ],
   "pipelineDemo": {
     "kicker": "AI-composed pipeline",
     "heading": "The model composes its own pipeline.",
     "sub": "Give it a goal. The advisor runs the mandated fundamentals, picks from the common phases, and writes brand-new ones when the goal needs them — then routes each phase to the right LLM and model: Claude Code, Codex, or Gemini, per policy. The combinations are unlimited; nothing here is pre-scripted.",
-    "floor": ["Build", "Audit", "Ship"],
-    "providers": ["Claude", "Codex", "Gemini"],
+    "floor": [
+      "Build",
+      "Audit",
+      "Ship"
+    ],
+    "providers": [
+      "Claude",
+      "Codex",
+      "Gemini"
+    ],
     "cases": [
       {
         "goal": "Build a `<canvas>` Snake game web page",
         "scope": "greenfield feature",
         "phases": [
-          { "phase": "Intent", "use": true, "cli": "Claude", "model": "Opus", "why": "a vague one-liner — pin scope before any code" },
-          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "no game code yet — fast survey of the stack, pick canvas" },
-          { "phase": "Triage", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "split board · snake · food · loop · score" },
-          { "phase": "Plan-Review", "use": true, "cli": "Claude", "model": "Opus", "why": "a new UI surface — Design + Eng lenses weigh in" },
-          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "encode the rules: growth, collision, wrap, lose" },
-          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — implement loop + input + render" },
-          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family than the builder, so the review stays honest" },
-          { "phase": "Playtest", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "no phase judges whether the controls feel right — so the advisor writes one" },
-          { "phase": "Benchmark", "use": false, "why": "60fps is trivial here — perf isn't the goal" },
-          { "phase": "Security", "use": false, "why": "no auth, no input, no data — zero surface" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit once the evals are green" },
-          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the canvas game-loop pattern" }
+          {
+            "phase": "Intent",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "a vague one-liner — pin scope before any code"
+          },
+          {
+            "phase": "Scout",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "no game code yet — fast survey of the stack, pick canvas"
+          },
+          {
+            "phase": "Triage",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "split board · snake · food · loop · score"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "a new UI surface — Design + Eng lenses weigh in"
+          },
+          {
+            "phase": "TDD",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "encode the rules: growth, collision, wrap, lose"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Codex",
+            "model": "GPT-5.5",
+            "why": "fundamental — implement loop + input + render"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "fundamental — a different family than the builder, so the review stays honest"
+          },
+          {
+            "phase": "Playtest",
+            "use": true,
+            "mint": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "no phase judges whether the controls feel right — so the advisor writes one"
+          },
+          {
+            "phase": "Benchmark",
+            "use": false,
+            "why": "60fps is trivial here — perf isn't the goal"
+          },
+          {
+            "phase": "Security",
+            "use": false,
+            "why": "no auth, no input, no data — zero surface"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — gated commit once the evals are green"
+          },
+          {
+            "phase": "Learn",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "PASS → memo the canvas game-loop pattern"
+          }
         ]
       },
       {
         "goal": "Rename `usr` → `currentUser` in the auth module",
         "scope": "mechanical rename",
         "phases": [
-          { "phase": "Intent", "use": false, "why": "the goal is exact — nothing to clarify" },
-          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "find every reference so the rename is total" },
-          { "phase": "Triage", "use": false, "why": "one mechanical change — nothing to defer" },
-          { "phase": "Plan-Review", "use": false, "why": "a pure rename — no design surface" },
-          { "phase": "TDD", "use": false, "why": "behavior is unchanged — existing tests pin it" },
-          { "phase": "Build", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — apply it; the compiler finds stragglers" },
-          { "phase": "Audit", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — a second family runs the suite, proving nothing moved" },
-          { "phase": "Benchmark", "use": false, "why": "identical runtime behavior" },
-          { "phase": "Security", "use": false, "why": "no security surface touched" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
-          { "phase": "Learn", "use": false, "why": "trivial — no lesson worth keeping" }
+          {
+            "phase": "Intent",
+            "use": false,
+            "why": "the goal is exact — nothing to clarify"
+          },
+          {
+            "phase": "Scout",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "find every reference so the rename is total"
+          },
+          {
+            "phase": "Triage",
+            "use": false,
+            "why": "one mechanical change — nothing to defer"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": false,
+            "why": "a pure rename — no design surface"
+          },
+          {
+            "phase": "TDD",
+            "use": false,
+            "why": "behavior is unchanged — existing tests pin it"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — apply it; the compiler finds stragglers"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Codex",
+            "model": "GPT-5.5",
+            "why": "fundamental — a second family runs the suite, proving nothing moved"
+          },
+          {
+            "phase": "Benchmark",
+            "use": false,
+            "why": "identical runtime behavior"
+          },
+          {
+            "phase": "Security",
+            "use": false,
+            "why": "no security surface touched"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — gated commit + push"
+          },
+          {
+            "phase": "Learn",
+            "use": false,
+            "why": "trivial — no lesson worth keeping"
+          }
         ]
       },
       {
         "goal": "Fix the off-by-one crashing the last page of results",
         "scope": "bug fix",
         "phases": [
-          { "phase": "Intent", "use": false, "why": "the bug report is concrete — the goal is clear" },
-          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "find where the page boundary is computed" },
-          { "phase": "Fault-Localize", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "the advisor writes a phase to pin the exact off-by-one before any fix" },
-          { "phase": "Triage", "use": false, "why": "a single defect — nothing to split" },
-          { "phase": "Plan-Review", "use": false, "why": "no new design — behavior already specified" },
-          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "write a test that crashes on the last page first" },
-          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — fix the index math → GREEN" },
-          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family replays the repro + full regression" },
-          { "phase": "Benchmark", "use": false, "why": "the fix is O(1) — no perf impact" },
-          { "phase": "Security", "use": false, "why": "no security surface in pagination math" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
-          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the boundary-test pattern" }
+          {
+            "phase": "Intent",
+            "use": false,
+            "why": "the bug report is concrete — the goal is clear"
+          },
+          {
+            "phase": "Scout",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "find where the page boundary is computed"
+          },
+          {
+            "phase": "Fault-Localize",
+            "use": true,
+            "mint": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "the advisor writes a phase to pin the exact off-by-one before any fix"
+          },
+          {
+            "phase": "Triage",
+            "use": false,
+            "why": "a single defect — nothing to split"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": false,
+            "why": "no new design — behavior already specified"
+          },
+          {
+            "phase": "TDD",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "write a test that crashes on the last page first"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Codex",
+            "model": "GPT-5.5",
+            "why": "fundamental — fix the index math → GREEN"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "fundamental — a different family replays the repro + full regression"
+          },
+          {
+            "phase": "Benchmark",
+            "use": false,
+            "why": "the fix is O(1) — no perf impact"
+          },
+          {
+            "phase": "Security",
+            "use": false,
+            "why": "no security surface in pagination math"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — gated commit + push"
+          },
+          {
+            "phase": "Learn",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "PASS → memo the boundary-test pattern"
+          }
         ]
       },
       {
         "goal": "Add email + password login with Stripe checkout",
         "scope": "auth + payments",
         "phases": [
-          { "phase": "Intent", "use": true, "cli": "Claude", "model": "Opus", "why": "auth + payments — pin the flows + failure modes" },
-          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "survey session + DB layer; check the Stripe SDK" },
-          { "phase": "Triage", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "sequence: auth → checkout → webhooks" },
-          { "phase": "Plan-Review", "use": true, "cli": "Claude", "model": "Opus", "why": "all four lenses — the Security lens is mandatory" },
-          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Opus", "why": "encode success + every rejection path as RED" },
-          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — implement auth + checkout → GREEN" },
-          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family than the builder audits the code" },
-          { "phase": "Security", "use": true, "cli": "Claude", "model": "Opus", "why": "scored: hashing, authz, secrets, webhook sigs" },
-          { "phase": "Webhook-Replay-Guard", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "payments need an idempotency/replay guard no common phase covers — minted" },
-          { "phase": "Benchmark", "use": false, "why": "correctness over latency at this stage" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Sonnet", "why": "fundamental — gated commit once the security score clears" },
-          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the auth + webhook pattern" }
+          {
+            "phase": "Intent",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "auth + payments — pin the flows + failure modes"
+          },
+          {
+            "phase": "Scout",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "survey session + DB layer; check the Stripe SDK"
+          },
+          {
+            "phase": "Triage",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "sequence: auth → checkout → webhooks"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "all four lenses — the Security lens is mandatory"
+          },
+          {
+            "phase": "TDD",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "encode success + every rejection path as RED"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Codex",
+            "model": "GPT-5.5",
+            "why": "fundamental — implement auth + checkout → GREEN"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "fundamental — a different family than the builder audits the code"
+          },
+          {
+            "phase": "Security",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "scored: hashing, authz, secrets, webhook sigs"
+          },
+          {
+            "phase": "Webhook-Replay-Guard",
+            "use": true,
+            "mint": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "payments need an idempotency/replay guard no common phase covers — minted"
+          },
+          {
+            "phase": "Benchmark",
+            "use": false,
+            "why": "correctness over latency at this stage"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Sonnet",
+            "why": "fundamental — gated commit once the security score clears"
+          },
+          {
+            "phase": "Learn",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "PASS → memo the auth + webhook pattern"
+          }
         ]
       },
       {
         "goal": "Update the README install section for the new installer",
         "scope": "docs",
         "phases": [
-          { "phase": "Intent", "use": false, "why": "a doc change — the scope is obvious" },
-          { "phase": "Scout", "use": false, "why": "the change is the prose itself — no code to map" },
-          { "phase": "Triage", "use": false, "why": "a single doc edit" },
-          { "phase": "Plan-Review", "use": false, "why": "prose, not architecture" },
-          { "phase": "TDD", "use": false, "why": "no code — nothing to test" },
-          { "phase": "Build", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "fundamental — rewrite the section; verify the command runs" },
-          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — doc-lint + link-check" },
-          { "phase": "Benchmark", "use": false, "why": "no runtime path" },
-          { "phase": "Security", "use": false, "why": "no security surface" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit + push" },
-          { "phase": "Learn", "use": false, "why": "no engineering lesson" }
+          {
+            "phase": "Intent",
+            "use": false,
+            "why": "a doc change — the scope is obvious"
+          },
+          {
+            "phase": "Scout",
+            "use": false,
+            "why": "the change is the prose itself — no code to map"
+          },
+          {
+            "phase": "Triage",
+            "use": false,
+            "why": "a single doc edit"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": false,
+            "why": "prose, not architecture"
+          },
+          {
+            "phase": "TDD",
+            "use": false,
+            "why": "no code — nothing to test"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "fundamental — rewrite the section; verify the command runs"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — doc-lint + link-check"
+          },
+          {
+            "phase": "Benchmark",
+            "use": false,
+            "why": "no runtime path"
+          },
+          {
+            "phase": "Security",
+            "use": false,
+            "why": "no security surface"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — gated commit + push"
+          },
+          {
+            "phase": "Learn",
+            "use": false,
+            "why": "no engineering lesson"
+          }
         ]
       },
       {
         "goal": "Speed up the dashboard query that times out on big tenants",
         "scope": "performance",
         "phases": [
-          { "phase": "Intent", "use": false, "why": "the target is measurable — make it fast" },
-          { "phase": "Scout", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "profile the slow path — find the N+1 / missing index" },
-          { "phase": "Triage", "use": false, "why": "a single hotspot" },
-          { "phase": "Plan-Review", "use": false, "why": "no behavior change — just faster" },
-          { "phase": "TDD", "use": true, "cli": "Claude", "model": "Sonnet", "why": "characterization tests — the output must not change" },
-          { "phase": "Build", "use": true, "cli": "Codex", "model": "GPT-5.5", "why": "fundamental — add the index / batch the query" },
-          { "phase": "Audit", "use": true, "cli": "Claude", "model": "Opus", "why": "fundamental — a different family checks outputs are identical" },
-          { "phase": "Query-Plan-Diff", "use": true, "mint": true, "cli": "Claude", "model": "Opus", "why": "the advisor writes a phase to diff the SQL plan before vs after" },
-          { "phase": "Benchmark", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "measure before/after — prove + guard the speedup" },
-          { "phase": "Security", "use": false, "why": "query shape unchanged — no new exposure" },
-          { "phase": "Ship", "use": true, "cli": "Claude", "model": "Haiku", "why": "fundamental — gated commit once the benchmark clears" },
-          { "phase": "Learn", "use": true, "cli": "Gemini", "model": "Gemini-3.5-Flash", "why": "PASS → memo the indexing fix" }
+          {
+            "phase": "Intent",
+            "use": false,
+            "why": "the target is measurable — make it fast"
+          },
+          {
+            "phase": "Scout",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "profile the slow path — find the N+1 / missing index"
+          },
+          {
+            "phase": "Triage",
+            "use": false,
+            "why": "a single hotspot"
+          },
+          {
+            "phase": "Plan-Review",
+            "use": false,
+            "why": "no behavior change — just faster"
+          },
+          {
+            "phase": "TDD",
+            "use": true,
+            "cli": "Claude",
+            "model": "Sonnet",
+            "why": "characterization tests — the output must not change"
+          },
+          {
+            "phase": "Build",
+            "use": true,
+            "cli": "Codex",
+            "model": "GPT-5.5",
+            "why": "fundamental — add the index / batch the query"
+          },
+          {
+            "phase": "Audit",
+            "use": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "fundamental — a different family checks outputs are identical"
+          },
+          {
+            "phase": "Query-Plan-Diff",
+            "use": true,
+            "mint": true,
+            "cli": "Claude",
+            "model": "Opus",
+            "why": "the advisor writes a phase to diff the SQL plan before vs after"
+          },
+          {
+            "phase": "Benchmark",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "measure before/after — prove + guard the speedup"
+          },
+          {
+            "phase": "Security",
+            "use": false,
+            "why": "query shape unchanged — no new exposure"
+          },
+          {
+            "phase": "Ship",
+            "use": true,
+            "cli": "Claude",
+            "model": "Haiku",
+            "why": "fundamental — gated commit once the benchmark clears"
+          },
+          {
+            "phase": "Learn",
+            "use": true,
+            "cli": "Gemini",
+            "model": "Gemini-3.5-Flash",
+            "why": "PASS → memo the indexing fix"
+          }
         ]
       }
     ]
@@ -220,14 +646,42 @@
   "comparison": {
     "kicker": "How it compares",
     "heading": "When to reach for it.",
-    "columns": ["", "A single-LLM loop", "Evolve Loop"],
+    "columns": [
+      "",
+      "A single-LLM loop",
+      "Evolve Loop"
+    ],
     "rows": [
-      ["Decides what to build", "You spell out every step", "It plans and scopes the work"],
-      ["Quality gate", "An AI says \"looks good\"", "An independent review has to pass"],
-      ["When something breaks", "Start over", "Self-heals, recovers, and learns"],
-      ["Memory", "Forgets between runs", "Compounds — every run teaches the next"],
-      ["Models", "One vendor, one model", "Any model — the best one per job"],
-      ["Best for", "Quick throwaway edits", "Work you actually have to merge"]
+      [
+        "Decides what to build",
+        "You spell out every step",
+        "It plans and scopes the work"
+      ],
+      [
+        "Quality gate",
+        "An AI says \"looks good\"",
+        "An independent review has to pass"
+      ],
+      [
+        "When something breaks",
+        "Start over",
+        "Self-heals, recovers, and learns"
+      ],
+      [
+        "Memory",
+        "Forgets between runs",
+        "Compounds — every run teaches the next"
+      ],
+      [
+        "Models",
+        "One vendor, one model",
+        "Any model — the best one per job"
+      ],
+      [
+        "Best for",
+        "Quick throwaway edits",
+        "Work you actually have to merge"
+      ]
     ],
     "note": "Think of the agent as the developer, and Evolve Loop as the team and process around it — the planning, the review, and the discipline that make the output safe to ship."
   },
@@ -235,14 +689,36 @@
     "kicker": "Quick start",
     "heading": "Your first cycle is one command away.",
     "install": [
-      { "step": "Install (one line)", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
-      { "step": "Run a goal", "command": "/evo:loop \"add dark mode\"" }
+      {
+        "step": "Install (one line)",
+        "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
+      },
+      {
+        "step": "Run a goal",
+        "command": "/evo:loop \"add dark mode\""
+      }
     ],
     "presets": [
-      { "label": "innovate", "command": "/evo:loop innovate \"explore concurrency\"", "blurb": "new features" },
-      { "label": "harden", "command": "/evo:loop harden", "blurb": "stability + tests" },
-      { "label": "repair", "command": "/evo:loop repair \"fix auth bug\"", "blurb": "smallest-change bug fix" },
-      { "label": "pin cycles", "command": "/evo:loop --cycles 3 \"add dark mode\"", "blurb": "optional hard bound" }
+      {
+        "label": "innovate",
+        "command": "/evo:loop innovate \"explore concurrency\"",
+        "blurb": "new features"
+      },
+      {
+        "label": "harden",
+        "command": "/evo:loop harden",
+        "blurb": "stability + tests"
+      },
+      {
+        "label": "repair",
+        "command": "/evo:loop repair \"fix auth bug\"",
+        "blurb": "smallest-change bug fix"
+      },
+      {
+        "label": "pin cycles",
+        "command": "/evo:loop --cycles 3 \"add dark mode\"",
+        "blurb": "optional hard bound"
+      }
     ]
   },
   "examples": {
@@ -250,17 +726,46 @@
     "heading": "From one command to full control.",
     "sub": "Start with a goal. Add a flag only when you want more — here's what each does behind the scenes.",
     "items": [
-      { "n": "1", "label": "Just a goal", "command": "/evo:loop \"add dark mode\"", "note": "The advisor composes the whole pipeline — which phases run, which LLM runs each, and how many cycles. It stops when the work is done." },
-      { "n": "2", "label": "Steer the approach", "command": "/evo:loop harden", "note": "A strategy (harden · repair · innovate · balanced) shifts scope and strictness — same phase spine, different posture." },
-      { "n": "3", "label": "Bound the cycles", "command": "/evo:loop --cycles 3 \"add dark mode\"", "note": "--cycles N is a hard contract: exactly N cycles, never early-stopped." },
-      { "n": "4", "label": "Stack the levers", "command": "/evo:loop --cycles 3 harden \"tighten input validation\"", "note": "Compose them — a strategy, a hard cycle bound, and a goal in one command. This is the full-control end of the spectrum." },
-      { "n": "5", "label": "Resume", "command": "/evo:loop --resume", "note": "Picks a checkpointed run up exactly where it stopped — worktree and state intact, no work lost." }
+      {
+        "n": "1",
+        "label": "Just a goal",
+        "command": "/evo:loop \"add dark mode\"",
+        "note": "The advisor composes the whole pipeline — which phases run, which LLM runs each, and how many cycles. It stops when the work is done."
+      },
+      {
+        "n": "2",
+        "label": "Steer the approach",
+        "command": "/evo:loop harden",
+        "note": "A strategy (harden · repair · innovate · balanced) shifts scope and strictness — same phase spine, different posture."
+      },
+      {
+        "n": "3",
+        "label": "Bound the cycles",
+        "command": "/evo:loop --cycles 3 \"add dark mode\"",
+        "note": "--cycles N is a hard contract: exactly N cycles, never early-stopped."
+      },
+      {
+        "n": "4",
+        "label": "Stack the levers",
+        "command": "/evo:loop --cycles 3 harden \"tighten input validation\"",
+        "note": "Compose them — a strategy, a hard cycle bound, and a goal in one command. This is the full-control end of the spectrum."
+      },
+      {
+        "n": "5",
+        "label": "Resume",
+        "command": "/evo:loop --resume",
+        "note": "Picks a checkpointed run up exactly where it stopped — worktree and state intact, no work lost."
+      }
     ],
     "setup": {
       "heading": "Setup is one command — and optional",
       "command": "/evo:setup",
       "note": "Run once: it detects your installed LLM CLIs and offers three presets. One choice writes per-phase model routing to .evolve/policy.json. Skip it entirely and the loop runs with sensible all-Claude defaults — most people never open the file.",
-      "presets": ["Recommended", "Economy", "Max-quality"]
+      "presets": [
+        "Recommended",
+        "Economy",
+        "Max-quality"
+      ]
     }
   },
   "concurrency": {
@@ -268,28 +773,349 @@
     "heading": "Run several loops at once.",
     "sub": "Give each feature its own loop and they run side by side — each in its own git worktree and branch, each on its own LLM, each composing the pipeline its goal needs. They never step on each other, and only green changes merge to main, one at a time.",
     "lanes": [
-      { "goal": "add dark mode", "cli": "Claude", "branch": "cycle-darkmode", "phases": ["Intent", "Scout", "TDD", "Build", "Audit", "Ship"] },
-      { "goal": "harden the auth flow", "cli": "Codex", "branch": "cycle-auth", "phases": ["Plan", "Build", "Audit", "Security", "Ship"] },
-      { "goal": "speed up the dashboard", "cli": "Gemini", "branch": "cycle-perf", "phases": ["Scout", "Build", "Benchmark", "Ship"] }
+      {
+        "goal": "add dark mode",
+        "cli": "Claude",
+        "branch": "cycle-darkmode",
+        "phases": [
+          "Intent",
+          "Scout",
+          "TDD",
+          "Build",
+          "Audit",
+          "Ship"
+        ]
+      },
+      {
+        "goal": "harden the auth flow",
+        "cli": "Codex",
+        "branch": "cycle-auth",
+        "phases": [
+          "Plan",
+          "Build",
+          "Audit",
+          "Security",
+          "Ship"
+        ]
+      },
+      {
+        "goal": "speed up the dashboard",
+        "cli": "Gemini",
+        "branch": "cycle-perf",
+        "phases": [
+          "Scout",
+          "Build",
+          "Benchmark",
+          "Ship"
+        ]
+      }
     ],
     "scenarios": [
-      { "title": "Many features at once", "note": "Point a loop at each goal; they advance in parallel, not in a queue." },
-      { "title": "Isolated by design", "note": "Each loop owns a worktree + branch — no crossed wires, no half-merges." },
-      { "title": "Safe, serialized merges", "note": "Only green work reaches main, one merge at a time." }
+      {
+        "title": "Many features at once",
+        "note": "Point a loop at each goal; they advance in parallel, not in a queue."
+      },
+      {
+        "title": "Isolated by design",
+        "note": "Each loop owns a worktree + branch — no crossed wires, no half-merges."
+      },
+      {
+        "title": "Safe, serialized merges",
+        "note": "Only green work reaches main, one merge at a time."
+      }
+    ]
+  },
+  "tryIt": {
+    "kicker": "Try it in 90 seconds",
+    "heading": "One line. Watch what you get.",
+    "sub": "No account. No telemetry. One static binary — the installer verifies its checksum, sets up your PATH, and wires the skills into whichever AI CLI you already use.",
+    "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh",
+    "platforms": "macOS & Linux · Apple Silicon + x64 · Windows via WSL2",
+    "verified": "verified end-to-end on macOS, Debian, and Alpine",
+    "terminal": [
+      "$ curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh",
+      "evolve-install: trying prebuilt: …/evolve_darwin_arm64.tar.gz",
+      "evolve-install: checksum verified",
+      "evolve-install: detected AI CLI(s): claude codex",
+      "Installation complete!",
+      "evolve-install: installed: evolve 22.0.1 → ~/.local/bin/evolve",
+      "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
+    ],
+    "nextSteps": [
+      {
+        "label": "Check your setup",
+        "command": "evolve doctor"
+      },
+      {
+        "label": "Run your first cycle",
+        "command": "/evo:loop --cycles 3 \"add dark mode\""
+      }
+    ],
+    "trust": [
+      {
+        "label": "Read install.sh before you run it",
+        "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/install.sh"
+      },
+      {
+        "label": "Releases + SHA-256 checksums",
+        "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
+      },
+      {
+        "label": "Prefer manual? Download the binary",
+        "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
+      }
+    ],
+    "noAccount": "Pin a version: EVO_VERSION=v22.0.1 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+  },
+  "inboxLab": {
+    "kicker": "Continuous development",
+    "heading": "You never stop the loop. You feed it.",
+    "sub": "The queue is the steering wheel. While the loop runs, you drop a weighted JSON file into .evolve/inbox/ — triage reads the weights every cycle, picks the top of the queue, and everything else ages forward. No restart, no lost work, no waiting for a gap.",
+    "note": "Real schema, abbreviated: id, weight, title, kind, fix — plus acceptance[] criteria the auditor enforces.",
+    "presets": [
+      {
+        "label": "Bug",
+        "id": "observer-sink-close-race",
+        "title": "Events sink closed while a timed-out watcher can still write",
+        "kind": "bug",
+        "weight": 0.92,
+        "fix": "Close the sink only after the watcher exits; accept the fd leak on timeout."
+      },
+      {
+        "label": "Feature",
+        "id": "tokens-report-cli",
+        "title": "evolve tokens report — per-phase usage table",
+        "kind": "feature",
+        "weight": 0.84,
+        "fix": "Walk the last N cycles; rank phases by input tokens; show cache-hit ratio."
+      },
+      {
+        "label": "Refactor",
+        "id": "ledger-single-writer",
+        "title": "Four ledger writers, one lock — consolidate to a single Append",
+        "kind": "refactor",
+        "weight": 0.95,
+        "fix": "One typed writer behind a port; delete the three hand-rolled copies."
+      },
+      {
+        "label": "Security",
+        "id": "guards-role-hermetic-home",
+        "title": "Guard test silently passes for the wrong reason when HOME is unset",
+        "kind": "security",
+        "weight": 0.9,
+        "fix": "Inject the home dir; pin deny+alarm with HOME isolated."
+      }
+    ],
+    "seed": [
+      {
+        "id": "repo-map-artifact",
+        "kind": "feature",
+        "weight": 0.72
+      },
+      {
+        "id": "artifact-log-compression",
+        "kind": "feature",
+        "weight": 0.61
+      },
+      {
+        "id": "flaky-rerun-scan",
+        "kind": "bug",
+        "weight": 0.55
+      }
+    ]
+  },
+  "gateLab": {
+    "kicker": "The integrity floor",
+    "heading": "Autonomy without shortcuts.",
+    "sub": "Bypass mode means “don’t ask the operator” — never “skip the checks”. A compiled-in floor evaluates every cycle before anything ships. Flip the evidence and watch the verdict change.",
+    "rule": "ship ⇒ build ∧ audit ∧ (tdd ∨ trivial)",
+    "checks": [
+      {
+        "key": "build-evidence",
+        "role": "build",
+        "label": "Build evidence exists",
+        "evidence": "build-report.md written by the builder",
+        "on": true
+      },
+      {
+        "key": "audit-pass",
+        "role": "audit",
+        "label": "Independent audit says PASS",
+        "evidence": "audit-report.md · adversarial reviewer on a stronger model",
+        "on": true
+      },
+      {
+        "key": "tdd-red-first",
+        "role": "tdd",
+        "label": "Tests written first — red observed",
+        "evidence": "test-report.md · failing run captured before the fix",
+        "on": true
+      },
+      {
+        "key": "trivial-change",
+        "role": "trivial",
+        "label": "Change classified trivial (docs/config)",
+        "evidence": "cycle classifier — waives the tdd conjunct only",
+        "on": false
+      },
+      {
+        "key": "eval-quality",
+        "role": "and",
+        "label": "Eval quality gate",
+        "evidence": "evolve eval quality-check — no tautological predicates",
+        "on": true
+      },
+      {
+        "key": "tree-attested",
+        "role": "and",
+        "label": "Tree state attested",
+        "evidence": "tree-diff guard · SHA binding from audit to ship",
+        "on": true
+      }
+    ],
+    "scenarios": [
+      {
+        "label": "Green cycle",
+        "on": [
+          "build-evidence",
+          "audit-pass",
+          "tdd-red-first",
+          "eval-quality",
+          "tree-attested"
+        ],
+        "expect": "ship"
+      },
+      {
+        "label": "Tests written after",
+        "on": [
+          "build-evidence",
+          "audit-pass",
+          "eval-quality",
+          "tree-attested"
+        ],
+        "expect": "blocked"
+      },
+      {
+        "label": "Docs-only change",
+        "on": [
+          "build-evidence",
+          "audit-pass",
+          "trivial-change",
+          "eval-quality",
+          "tree-attested"
+        ],
+        "expect": "ship"
+      },
+      {
+        "label": "Auditor said no",
+        "on": [
+          "build-evidence",
+          "tdd-red-first",
+          "eval-quality",
+          "tree-attested"
+        ],
+        "expect": "blocked"
+      }
+    ],
+    "note": "These are compiled Go defaults, not config you can forget to set. The floor holds even when every prompt in the pipeline is written by a model."
+  },
+  "recoveryLab": {
+    "kicker": "Self-healing",
+    "heading": "Failure is routed, not fatal.",
+    "sub": "Every abnormal exit is classified and routed by a failure adapter: retry, re-route to another provider, re-pin, or reconcile. The queue survives, the evidence stays honest, and the loop continues.",
+    "events": [
+      {
+        "label": "Provider quota exhausted",
+        "code": "rc=85",
+        "verdict": "RETRY",
+        "steps": [
+          "Signal center classifies exit 85 as quota exhaustion",
+          "Provider benched for its reset window — fast-fail, no zombie waits",
+          "Fallback chain re-dispatches the phase on the next provider",
+          "Phase completes on the fallback"
+        ],
+        "outcome": "The provider is benched. The loop is not."
+      },
+      {
+        "label": "REPL boot timeout",
+        "code": "rc=81",
+        "verdict": "RETRY",
+        "steps": [
+          "Liveness probe sees no pane output before the deadline",
+          "A boot strike is recorded against this CLI",
+          "Relaunch with backoff; repeated strikes bench the CLI",
+          "Phase completes on retry"
+        ],
+        "outcome": "Transient boot failures cost seconds, not cycles."
+      },
+      {
+        "label": "Ship binary tampered",
+        "code": "SELF_SHA_TAMPERED",
+        "verdict": "BLOCK",
+        "steps": [
+          "Ship refuses: running binary ≠ pinned SHA",
+          "Provenance check — was it rebuilt from source this loop shipped?",
+          "Provenance-gated auto-repin updates the pin at boot",
+          "Next cycle ships clean"
+        ],
+        "outcome": "Blocked ship, self-healed pin — trust is verified, never assumed."
+      },
+      {
+        "label": "Push rejected — origin moved",
+        "code": "GIT_PUSH_REJECTED",
+        "verdict": "RETRY",
+        "steps": [
+          "Ship detects the diverged origin",
+          "Cycle work stays safe on its lane branch",
+          "At the batch boundary, sync-main reconciles — merge only, nothing forced",
+          "The next ship fast-forwards"
+        ],
+        "outcome": "Divergence becomes a boundary chore, not a lost cycle."
+      },
+      {
+        "label": "Phase artifact missing",
+        "code": "ArtifactTimeout",
+        "verdict": "PROCEED",
+        "steps": [
+          "Runner: no report artifact within the deadline",
+          "Transient bridge error? One retry",
+          "Still missing — backfill the report from the session transcript",
+          "Audit re-verifies the backfilled artifact before anything ships"
+        ],
+        "outcome": "Recovered evidence is re-audited evidence."
+      }
     ]
   },
   "finalCta": {
     "heading": "Stop reading diffs you didn't write.",
     "subhead": "Open source. Apache-2.0. Works with Claude, Gemini, and Codex.",
-    "primary": { "label": "Get started", "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh" },
-    "secondary": { "label": "Read the docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" }
+    "primary": {
+      "label": "Get started",
+      "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
+    },
+    "secondary": {
+      "label": "Read the docs",
+      "href": "https://github.com/mickeyyaya/evolve-loop#readme"
+    }
   },
   "footer": {
     "links": [
-      { "label": "GitHub", "href": "https://github.com/mickeyyaya/evolve-loop" },
-      { "label": "Docs", "href": "https://github.com/mickeyyaya/evolve-loop#readme" },
-      { "label": "Changelog", "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/CHANGELOG.md" },
-      { "label": "License — Apache-2.0", "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/LICENSE" }
+      {
+        "label": "GitHub",
+        "href": "https://github.com/mickeyyaya/evolve-loop"
+      },
+      {
+        "label": "Docs",
+        "href": "https://github.com/mickeyyaya/evolve-loop#readme"
+      },
+      {
+        "label": "Changelog",
+        "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/CHANGELOG.md"
+      },
+      {
+        "label": "License — Apache-2.0",
+        "href": "https://github.com/mickeyyaya/evolve-loop/blob/main/LICENSE"
+      }
     ],
     "tagline": "CI/CD for AI-written code.",
     "grounding": "Grounded in reflective self-improvement and double-loop learning."

@@ -25,6 +25,10 @@ type Site struct {
 	Quickstart   Quickstart   `json:"quickstart"`
 	Examples     Examples     `json:"examples"`
 	Concurrency  Concurrency  `json:"concurrency"`
+	TryIt        TryIt        `json:"tryIt"`
+	InboxLab     InboxLab     `json:"inboxLab"`
+	GateLab      GateLab      `json:"gateLab"`
+	RecoveryLab  RecoveryLab  `json:"recoveryLab"`
 	FinalCTA     FinalCTA     `json:"finalCta"`
 	Footer       Footer       `json:"footer"`
 }
@@ -213,6 +217,111 @@ type Scenario struct {
 	Note  string `json:"note"`
 }
 
+// TryIt powers the conversion spine: the versioned install one-liner with a
+// copy button, the AUTHENTIC post-paste terminal output (so first success is
+// recognizable), the next two commands, and the curl|sh trust rail. Copy
+// follows the 2026 dev-landing evidence: version-stamped install header,
+// what-you-will-see output, view-the-script affordance, alternatives inline.
+type TryIt struct {
+	Kicker    string   `json:"kicker"`
+	Heading   string   `json:"heading"`
+	Sub       string   `json:"sub"`
+	Command   string   `json:"command"`
+	Platforms string   `json:"platforms"`
+	Verified  string   `json:"verified"`
+	Terminal  []string `json:"terminal"`
+	NextSteps []CTA    `json:"nextSteps"`
+	Trust     []Link   `json:"trust"`
+	NoAccount string   `json:"noAccount"`
+}
+
+// InboxLab powers the interactive "feed the loop" section: visitors compose a
+// weighted todo from real-item presets, inject it into a simulated
+// .evolve/inbox queue, and run a triage cycle to watch weight-ordered pickup,
+// the phase strip, and carryover aging — the daily control surface for
+// continuous development, animated.
+type InboxLab struct {
+	Kicker  string        `json:"kicker"`
+	Heading string        `json:"heading"`
+	Sub     string        `json:"sub"`
+	Note    string        `json:"note"`
+	Presets []InboxPreset `json:"presets"`
+	Seed    []InboxSeed   `json:"seed"`
+}
+
+// InboxPreset is one ready-to-inject todo. The fields mirror the real inbox
+// JSON schema (id, weight, title, kind, fix) so the JSON the visitor sees in
+// the composer is the JSON an operator would actually write.
+type InboxPreset struct {
+	Label  string  `json:"label"`
+	ID     string  `json:"id"`
+	Title  string  `json:"title"`
+	Kind   string  `json:"kind"`
+	Weight float64 `json:"weight"`
+	Fix    string  `json:"fix"`
+}
+
+// InboxSeed is an item already waiting in the demo queue, so triage has
+// competition to rank against.
+type InboxSeed struct {
+	ID     string  `json:"id"`
+	Kind   string  `json:"kind"`
+	Weight float64 `json:"weight"`
+}
+
+// GateLab powers the integrity-floor playground: evidence toggles feed the ship
+// predicate and a verdict lamp shows SHIP or BLOCKED with the failing gate
+// named. Role semantics (which toggle is the build evidence, which waives tdd)
+// flow through data attributes rendered from this model — client JS never
+// hardcodes a check key.
+type GateLab struct {
+	Kicker    string         `json:"kicker"`
+	Heading   string         `json:"heading"`
+	Sub       string         `json:"sub"`
+	Rule      string         `json:"rule"`
+	Checks    []GateCheck    `json:"checks"`
+	Scenarios []GateScenario `json:"scenarios"`
+	Note      string         `json:"note"`
+}
+
+// GateCheck is one evidence toggle. Role wires it into the floor predicate:
+// "build" | "audit" | "tdd" | "trivial" | "and" (an unconditioned conjunct).
+type GateCheck struct {
+	Key      string `json:"key"`
+	Role     string `json:"role"`
+	Label    string `json:"label"`
+	Evidence string `json:"evidence"`
+	On       bool   `json:"on"`
+}
+
+// GateScenario is one preset button: the named checks are switched on, all
+// others off, and the lamp must land on Expect ("ship" or "blocked").
+type GateScenario struct {
+	Label  string   `json:"label"`
+	On     []string `json:"on"`
+	Expect string   `json:"expect"`
+}
+
+// RecoveryLab powers the failure-routing explorer: pick a real failure event
+// and watch the failure adapter's verdict route it — retry, re-route to another
+// provider, re-pin, reconcile — until the loop continues.
+type RecoveryLab struct {
+	Kicker  string          `json:"kicker"`
+	Heading string          `json:"heading"`
+	Sub     string          `json:"sub"`
+	Events  []RecoveryEvent `json:"events"`
+}
+
+// RecoveryEvent is one failure and its routed recovery. Verdict uses the real
+// failure-adapter vocabulary: PROCEED, RETRY, or BLOCK.
+type RecoveryEvent struct {
+	Label   string   `json:"label"`
+	Code    string   `json:"code"`
+	Verdict string   `json:"verdict"`
+	Steps   []string `json:"steps"`
+	Outcome string   `json:"outcome"`
+}
+
 type FinalCTA struct {
 	Heading   string `json:"heading"`
 	Subhead   string `json:"subhead"`
@@ -269,6 +378,20 @@ func (s *Site) Validate() error {
 		{"examples.items (>=5)", len(s.Examples.Items) < 5},
 		{"concurrency.heading", s.Concurrency.Heading == ""},
 		{"concurrency.lanes (>=2)", len(s.Concurrency.Lanes) < 2},
+		{"tryIt.heading", s.TryIt.Heading == ""},
+		{"tryIt.command", s.TryIt.Command == ""},
+		{"tryIt.terminal (>=4)", len(s.TryIt.Terminal) < 4},
+		{"tryIt.trust (>=2)", len(s.TryIt.Trust) < 2},
+		{"tryIt.nextSteps (>=2)", len(s.TryIt.NextSteps) < 2},
+		{"inboxLab.heading", s.InboxLab.Heading == ""},
+		{"inboxLab.presets (>=3)", len(s.InboxLab.Presets) < 3},
+		{"inboxLab.seed (>=2)", len(s.InboxLab.Seed) < 2},
+		{"gateLab.heading", s.GateLab.Heading == ""},
+		{"gateLab.rule", s.GateLab.Rule == ""},
+		{"gateLab.checks (>=4)", len(s.GateLab.Checks) < 4},
+		{"gateLab.scenarios (>=3)", len(s.GateLab.Scenarios) < 3},
+		{"recoveryLab.heading", s.RecoveryLab.Heading == ""},
+		{"recoveryLab.events (>=4)", len(s.RecoveryLab.Events) < 4},
 		{"pillars (>=3)", len(s.Pillars) < 3},
 		{"comparison.rows", len(s.Comparison.Rows) == 0},
 		{"footer.links", len(s.Footer.Links) == 0},
@@ -299,6 +422,33 @@ func (s *Site) Validate() error {
 	for i, l := range s.Concurrency.Lanes {
 		if len(l.Phases) < 2 {
 			return fmt.Errorf("invalid content: concurrency.lanes[%d] (%q) needs its own phases (>=2)", i, l.Goal)
+		}
+	}
+	// Gate-lab coherence: every scenario key must name a declared check (a typo
+	// would render a preset that silently does nothing), and expect must be one
+	// of the two verdicts the lamp can show.
+	gateKeys := make(map[string]bool, len(s.GateLab.Checks))
+	for _, c := range s.GateLab.Checks {
+		gateKeys[c.Key] = true
+	}
+	for i, sc := range s.GateLab.Scenarios {
+		if sc.Expect != "ship" && sc.Expect != "blocked" {
+			return fmt.Errorf("invalid content: gateLab.scenarios[%d] (%q) expect %q, want ship|blocked", i, sc.Label, sc.Expect)
+		}
+		for _, k := range sc.On {
+			if !gateKeys[k] {
+				return fmt.Errorf("invalid content: gateLab.scenarios[%d] (%q) references unknown check %q", i, sc.Label, k)
+			}
+		}
+	}
+	// Recovery events must use the real failure-adapter vocabulary and carry a
+	// visible routing (>=2 steps) — a single-step "recovery" teaches nothing.
+	for i, e := range s.RecoveryLab.Events {
+		if e.Verdict != "PROCEED" && e.Verdict != "RETRY" && e.Verdict != "BLOCK" {
+			return fmt.Errorf("invalid content: recoveryLab.events[%d] (%q) verdict %q, want PROCEED|RETRY|BLOCK", i, e.Label, e.Verdict)
+		}
+		if len(e.Steps) < 2 {
+			return fmt.Errorf("invalid content: recoveryLab.events[%d] (%q) needs >= 2 steps", i, e.Label)
 		}
 	}
 	return nil

@@ -1,0 +1,49 @@
+# Evolve Loop — briefing for AI coding agents
+
+> You are likely an AI agent setting up Evolve Loop for a developer. This page
+> is the plain-text mental model plus the exact commands. Everything here is
+> also true for humans.
+
+## What it is
+
+Evolve Loop is an autonomous, self-healing development pipeline that drives
+the AI CLI you already run (Claude Code, Codex, Gemini). Each cycle it plans
+the work (scout), writes a failing test first (tdd), implements (build), has
+an independent adversarial reviewer audit the diff (audit), and only then
+ships. The invariant: nothing ships unless a test failed first — the floor
+`ship ⇒ build ∧ audit ∧ (tdd ∨ trivial)` is compiled in, not configurable away.
+
+## Install (one line, macOS & Linux, Windows via WSL2)
+
+    curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
+
+- Verifies the release checksum, installs a static Go binary to ~/.local/bin,
+  adds an idempotent PATH line to the shell rc, and projects the /evo:* skills
+  into every detected AI CLI. No account. No telemetry. Safe to re-run.
+- Pin a version:            EVO_VERSION=v22.0.1 curl … | sh
+- Don't touch shell config: EVO_NO_MODIFY_PATH=1 curl … | sh
+- Read the script first:    https://github.com/mickeyyaya/evolve-loop/blob/main/install.sh
+
+## First commands
+
+    evolve doctor                          # verify tmux + CLI wiring
+    /evo:loop --cycles 3 "your goal"       # run inside your AI CLI
+
+## Continuous development (the operating model)
+
+You never stop a running loop to steer it. You drop a weighted JSON todo into
+`.evolve/inbox/` and triage picks it up by weight on the next cycle:
+
+    {"id": "fix-auth-bug", "weight": 0.9, "title": "…", "kind": "bug",
+     "fix": "…", "acceptance": ["regression test red-first", "…"]}
+
+Failures are routed, not fatal: provider quota exhaustion benches the provider
+and re-dispatches on a fallback CLI; a tampered binary blocks the ship and
+self-heals the pin; a diverged origin waits for a boundary `evolve sync-main`.
+
+## Links
+
+- Repo:      https://github.com/mickeyyaya/evolve-loop
+- Releases:  https://github.com/mickeyyaya/evolve-loop/releases/latest
+- Site:      https://mickeyyaya.github.io/evolve-loop/
+- License:   Apache-2.0
