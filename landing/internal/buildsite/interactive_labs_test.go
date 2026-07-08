@@ -120,3 +120,23 @@ func extractDefine(t *testing.T, src, name string) string {
 	}
 	return src[start : start+end]
 }
+
+// Each lab must auto-play once scrolled into view (the pipelinedemo idiom:
+// IntersectionObserver → start loop, skipped under prefers-reduced-motion) and
+// must hand control to the user permanently on real interaction. These pins
+// keep a future edit from silently reverting a lab to click-to-start.
+func TestLabScripts_AutoPlayOnScrollWithUserHandoff(t *testing.T) {
+	src, err := os.ReadFile("../../templates/partials.html")
+	if err != nil {
+		t.Fatalf("read partials.html: %v", err)
+	}
+	for _, name := range []string{"inboxlabjs", "gatelabjs", "recoverylabjs"} {
+		js := extractDefine(t, string(src), name)
+		if !strings.Contains(js, "IntersectionObserver") {
+			t.Errorf("%s: no IntersectionObserver — lab will not auto-play on scroll", name)
+		}
+		if !strings.Contains(js, "userDriving") {
+			t.Errorf("%s: no userDriving handoff — auto-play would fight the user", name)
+		}
+	}
+}
