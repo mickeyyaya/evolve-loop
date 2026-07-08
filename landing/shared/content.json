@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v22.0.1",
+    "version": "v22.1.0",
     "mentalModel": "CI/CD for AI-written code",
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
@@ -797,7 +797,7 @@
       "evolve-install: checksum verified",
       "evolve-install: detected AI CLI(s): claude codex",
       "Installation complete!",
-      "evolve-install: installed: evolve 22.0.1 → ~/.local/bin/evolve",
+      "evolve-install: installed: evolve 22.1.0 → ~/.local/bin/evolve",
       "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
     ],
     "nextSteps": [
@@ -824,7 +824,7 @@
         "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
       }
     ],
-    "noAccount": "Pin a version: EVO_VERSION=v22.0.1 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+    "noAccount": "Pin a version: EVO_VERSION=v22.1.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
   },
   "inboxLab": {
     "kicker": "Continuous development",
