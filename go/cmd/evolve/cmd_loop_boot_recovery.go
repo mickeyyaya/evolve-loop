@@ -68,7 +68,7 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 	// 1. Detect a ship-binary SHA mismatch FIRST — before quarantine, which would
 	//    otherwise stash an untracked ship binary out from under the SHA read (the
 	//    498/500/502 SELF_SHA_TAMPERED cascade, caught at boot).
-	if mismatch, actual := detectShipSHAMismatch(cfg, stderr); mismatch {
+	if mismatch, _ := detectShipSHAMismatch(cfg, stderr); mismatch {
 		res.SHAMismatch = true
 		// Auto-heal the 508-513 cascade: a legitimately-rebuilt binary (its
 		// build-commit is an ancestor of HEAD — provenance-verified) is re-pinned
@@ -76,7 +76,7 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 		// ship gate stops falsely blocking every cycle. NEVER operatorAuthorized
 		// from an unattended boot: an unverifiable binary (possible tampering) is
 		// refused and stays flagged (res.SHAMismatch) so the gate still blocks.
-		if attemptBootRepin(cfg, actual, stderr) {
+		if attemptBootRepin(cfg, stderr) {
 			res.Healed = true
 			res.SHAMismatch = false // re-pinned in place; the ship gate now passes
 		}
@@ -147,18 +147,24 @@ func detectShipSHAMismatch(cfg loopConfig, stderr io.Writer) (bool, string) {
 }
 
 // attemptBootRepin re-pins expected_ship_sha to the on-disk ship binary via the
-// provenance-gated phaseintegrity.RepinShipSHA — the exact primitive `evolve
-// reset-sha` uses. operatorAuthorized is always false here: an unattended boot
-// must never let a tampered binary bypass the anti-tamper gate, so the re-pin
-// fires only on verified provenance. Returns true iff the re-pin fired. Fail-open:
-// a refusal/error WARNs and returns false, leaving the mismatch flagged.
-func attemptBootRepin(cfg loopConfig, actualSHA string, stderr io.Writer) bool {
+// shared, provenance-gated phaseintegrity.RepinIfDrifted — the SAME primitive the
+// post-build repin (core.repinShipSHAAfterBuild) uses, so boot and post-build can
+// never diverge (cycle 636, "never duplicate, centralize"). operatorAuthorized is
+// always false here: an unattended boot must never let a tampered binary bypass
+// the anti-tamper gate, so the re-pin fires only on verified provenance. Returns
+// true iff the re-pin fired. Fail-open: a refusal/error WARNs and returns false,
+// leaving the mismatch flagged.
+func attemptBootRepin(cfg loopConfig, stderr io.Writer) bool {
 	commit, prov := shipRepinProvenanceFn(cfg.ProjectRoot)
 	statePath := filepath.Join(cfg.EvolveDir, "state.json")
-	res, err := phaseintegrity.RepinShipSHA(statePath, actualSHA, commit, "", prov, false)
+	binPath := filepath.Join(cfg.ProjectRoot, "go", "bin", "evolve")
+	res, err := phaseintegrity.RepinIfDrifted(statePath, binPath, commit, "", prov)
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] boot-recovery: ship-SHA auto-repin declined (%v) — rebuild from committed source then `evolve reset-sha` to authorize, or investigate tampering\n", err)
 		return false
+	}
+	if !res.Repinned {
+		return false // no drift after all (nothing to heal) — leave the flag as-is
 	}
 	fmt.Fprintf(stderr, "[loop] boot-recovery: auto-repinned expected_ship_sha %.12s -> %.12s (authorized: %s) — legitimate rebuild self-healed at boot\n", res.OldSHA, res.NewSHA, res.Authorized)
 	return true

@@ -46,6 +46,16 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// non-committing builders. See the cycle-156 incident doc.
 	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs)
 
+	// Cycle-636 (ship-sha-repin-after-build): close the frozen-pin
+	// SELF_SHA_TAMPERED cascade (denied ship on 625->634). A legitimate in-version
+	// rebuild replaces go/bin/evolve, but the cycle-514 boot healer only re-pins at
+	// boot — so re-pin here too, immediately after a successful build, through the
+	// SAME provenance-gated primitive (phaseintegrity.RepinIfDrifted) the boot path
+	// uses. Fail-open: refusal/error WARNs; the ship gate stays the backstop.
+	if next == PhaseBuild {
+		repinShipSHAAfterBuild(cr.req.ProjectRoot)
+	}
+
 	cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)

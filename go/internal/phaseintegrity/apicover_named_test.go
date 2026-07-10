@@ -33,3 +33,11 @@ func TestNamePublicAPI_Repin(t *testing.T) {
 	}
 	// RepinShipSHA itself is exercised across repin_test.go.
 }
+
+// TestNamePublicAPI_RepinIfDrifted names the shared detect-drift-and-provenance-
+// gated-repin primitive (cycle 636) for the apicover public-API gate; behavior is
+// exercised in repin_ifdrifted_test.go. RepinIfDrifted is the single path invoked
+// by BOTH boot recovery and the post-build repin, so the two never diverge.
+func TestNamePublicAPI_RepinIfDrifted(t *testing.T) {
+	var _ func(statePath, binPath, runningCommit, pluginVer string, prov ProvenanceVerified) (RepinResult, error) = RepinIfDrifted
+}
