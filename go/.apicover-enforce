@@ -404,3 +404,15 @@
 # cycle-659 ACS predicate package (2026-07-10): statefile-rmw-flock-single-source.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle659
+
+# recurrence ledger (cycle-661, new-package graduation): the deterministic leaf
+# that counts lesson `pattern:` recurrences and escalates the linked open inbox
+# item's weight (idempotent per cycle) or hands an orphan pattern to the autofile
+# seam exactly once. Entry/Ledger/InboxItem/Escalator/Autofiler/EscalationPolicy +
+# NewLedger/Load/Save/Count/Patterns/RecordClosure/Target are named+exercised by
+# ledger_test.go + apicover_named_test.go. Imports only stdlib + atomicwrite + flock.
+./internal/recurrence
+
+# cycle-661 ACS predicate package (2026-07-11): recurrence-ledger-weight-escalation.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle661

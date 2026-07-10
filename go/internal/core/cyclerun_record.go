@@ -106,6 +106,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		for k, v := range extraEnv {
 			cr.envSnap[k] = v
 		}
+		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
 		cr.result.RetroDecision = reason
 		if branch == PhaseEnd {
 			return loopBreak, nil

@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -382,3 +384,40 @@ func bindArtifactSHA(path string) string {
 // gate (SpineSatisfiedUpTo). Otherwise the static successor stands. This is
 // the non-bypassable "kernel disposes" floor for Enforce mode — neither
 // Strategy can reach Ship without a real PASS/WARN audit artifact.
+
+// escalateRetroReason upgrades a deterministic "proceed:" retro reason to an
+// "adapt:"-with-escalation reason when the failing lesson pattern has recurred
+// (recurrence ledger count>=2). A repeat pattern must never emit a bare
+// "proceed" — the ledger consult is what gives noticing write access to the
+// decision. A nil ledger or non-proceed reason passes through unchanged.
+func escalateRetroReason(reason, pattern string, led *recurrence.Ledger) string {
+	if led == nil || !strings.HasPrefix(reason, "proceed:") {
+		return reason
+	}
+	if n := led.Count(pattern); n >= 2 {
+		return fmt.Sprintf("adapt: escalated %s to Nth-occurrence (count=%d); %s",
+			pattern, n, strings.TrimPrefix(reason, "proceed: "))
+	}
+	return reason
+}
+
+// escalateRetroReasonForHistory loads the recurrence ledger at projectRoot and
+// applies escalateRetroReason to the most-recent failing lesson pattern. It is
+// the live-loop consult site: RetroDecision routes its reason through here so a
+// count>=2 pattern cannot be recorded as a bare "proceed". Best-effort — an
+// empty root, non-proceed reason, empty history, or unreadable ledger returns
+// reason unchanged (the deterministic branch still stands).
+func (o *Orchestrator) escalateRetroReasonForHistory(projectRoot, reason string, history []FailedRecord) string {
+	if projectRoot == "" || len(history) == 0 || !strings.HasPrefix(reason, "proceed:") {
+		return reason
+	}
+	pattern := history[len(history)-1].Classification
+	if pattern == "" {
+		return reason
+	}
+	led, err := recurrence.Load(filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json"))
+	if err != nil {
+		return reason
+	}
+	return escalateRetroReason(reason, pattern, led)
+}
