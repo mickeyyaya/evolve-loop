@@ -1,0 +1,34 @@
+{
+  "cycle": 649,
+  "run_id": "01KX5G8DWY733SRJGRNPQ0C0XW",
+  "goal": "Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 649",
+      "priority": "high"
+    }
+  ]
+}
