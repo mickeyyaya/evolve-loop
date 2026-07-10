@@ -176,6 +176,12 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// `evolve cycle reset` / `evolve loop --resume` reclaim them explicitly.
 	preserveWorktree = preserveOnVerdict(result.FinalVerdict)
 
+	// chronicle-s4: close the PASS-branch learning orphan. evolve-memo and the
+	// retro path both write <workspace>/carryover-todos.json but nothing read it;
+	// merge those queued follow-up todos into state before it persists here, so
+	// they reach the next cycle's planner through the same serialized RMW.
+	MergeWorkspaceCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
+
 	state.LastCycleNumber = cycle
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {
 		return preserveWorktree, fmt.Errorf("write state: %w", perr)
