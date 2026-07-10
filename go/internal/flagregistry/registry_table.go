@@ -32,4 +32,5 @@ var All = []Flag{
 	{Name: "EVOLVE_SANDBOX", Status: StatusActive, Cluster: "Sandbox Cluster", Doc: "Enable outer sandbox-exec/bwrap wrapper"},
 	{Name: "EVOLVE_TMUX_SOCKET", Status: StatusInternal, Cluster: "Bridge Cluster", Doc: "IPC channel (F6, not an operator dial): the loop exports the per-run bridge tmux socket name (evolve-bridge-p<looppid>) so its bridge subprocesses, the reaper, and the orphan GC all target the same isolated socket — so an external `tmux kill-server` on one run's socket can't tear down another. Unset ⇒ the shared `evolve-bridge` default. Set by the loop (cmd_loop), never by the operator."},
 	{Name: "EVOLVE_USE_PHASE_REGISTRY", Status: StatusActive, Cluster: "Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off)", Doc: "Set `0` to skip reading `phase-registry.json` (built-in defaults only)"},
+	{Name: "EVOLVE_WORKTREE_PATH", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 }
