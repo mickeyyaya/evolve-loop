@@ -293,7 +293,15 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// SHA mismatch — BEFORE the unfinished-cycle guard and readiness gate, so a
 	// dirty/stranded tree heals rather than wedging the first cycle's tree-diff
 	// guard. Fail-open: a recovery error WARNs but never halts the batch.
-	bootRecoverFn(ctx, cfg, deps.Ledger, stderr)
+	// A WITHIN-version ship-SHA mismatch is SELF_SHA_TAMPERED (verifySelfSHA's
+	// terminal-gate verdict) — boot-knowable and cycle-fatal. HALT here, pre-scout,
+	// so no cycle spends a ~32-40 min lane + LLM budget on a ship doomed from boot
+	// (8 cycles wasted, 625-634). The operator recipe already reached stderr.
+	if br := bootRecoverFn(ctx, cfg, deps.Ledger, stderr); br.HaltSelfSHA {
+		lr.StopReason = "self_sha_boot_halt"
+		lr.emit(stdout)
+		return 2
+	}
 
 	// Unfinished-cycle guard (fresh runs only — resume returned above). A
 	// stuck cycle whose number is ahead of lastCycleNumber must not be

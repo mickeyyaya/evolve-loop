@@ -113,6 +113,14 @@ func stateInt(m map[string]any, key string) (int, bool) {
 	return 0, false
 }
 
+// PluginVersion reads .claude-plugin/plugin.json:version — the SAME resolver
+// verifySelfSHA uses to classify a ship-SHA mismatch as within-version
+// (tampering) vs across-version (a legit bump). Exported so the boot-time
+// self-SHA gate (cmd/evolve) classifies mismatches byte-identically to the
+// terminal ship gate instead of duplicating the read (single source of truth).
+// Empty when the file/key is missing — normal in test repos.
+func PluginVersion(pluginRoot string) string { return pluginVersion(pluginRoot) }
+
 // pluginVersion reads .claude-plugin/plugin.json:version. Empty when
 // the file/key is missing — this is normal in test repos.
 func pluginVersion(pluginRoot string) string {
