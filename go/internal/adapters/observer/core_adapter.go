@@ -179,7 +179,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 			done := make(chan struct{})
 			go func() { wg.Wait(); close(done) }()
 			if !closeSinkAfterWait(done, 10*time.Second, sinkCloser) {
-				fmt.Fprintf(os.Stderr, "[observer] WARN watcher for phase=%s didn't exit within 10s; leaking goroutine (cycle should still complete)\n", phase)
+				fmt.Fprintf(os.Stderr, "[observer] WARN watcher for phase=%s didn't exit within 10s; leaking goroutine and leaving its events-sink fd open on purpose — closing it would race the watcher's writes; the OS reclaims it at process exit (cycle should still complete)\n", phase)
 			}
 		})
 	}
