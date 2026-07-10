@@ -1148,6 +1148,10 @@ type GatesPolicy struct {
 	EvalGate      string `json:"eval_gate,omitempty"`
 	TriageCapGate string `json:"triage_cap_gate,omitempty"`
 	ReviewGate    string `json:"review_gate,omitempty"`
+	// TopNGate is the build->audit top_n task-binding gate's rollout dial
+	// (internal/topngate). Default "enforce": a build report whose ## Task:
+	// slug falls outside triage ## top_n aborts before audit.
+	TopNGate string `json:"topn_gate,omitempty"`
 	// ReportSizeGate is the report-size (handoff-summary token budget) gate's own
 	// rollout dial (cycle-565 Slice S1). Unlike the other gates it defaults to
 	// "shadow", not "enforce": the inbox spec calls for shadow/warn BEFORE
@@ -1162,6 +1166,7 @@ type GatesConfig struct {
 	TriageCapGate  string
 	ReviewGate     string
 	ReportSizeGate string
+	TopNGate       string
 }
 
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
@@ -1172,6 +1177,7 @@ func (p Policy) GatesConfig() GatesConfig {
 		TriageCapGate:  "enforce",
 		ReviewGate:     "off",
 		ReportSizeGate: "shadow", // shadow/warn first, per the Slice S1 inbox spec
+		TopNGate:       "enforce",
 	}
 	if p.Gates == nil {
 		return c
@@ -1190,6 +1196,9 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ReportSizeGate != "" {
 		c.ReportSizeGate = p.Gates.ReportSizeGate
+	}
+	if p.Gates.TopNGate != "" {
+		c.TopNGate = p.Gates.TopNGate
 	}
 	return c
 }

@@ -67,6 +67,7 @@
 ./internal/sysexec
 ./internal/systemprompt
 ./internal/textutil
+./internal/topngate
 ./internal/triagecap
 
 # Phase 5 godoc batch (2026-06-16)

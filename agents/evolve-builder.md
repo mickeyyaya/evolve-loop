@@ -72,8 +72,8 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 - Read full YAML only if `instinctSummary` empty/missing.
 - Note applied instincts and genes in output.
 ### Step 2: Read Task & Eval
-- Read task from `workspace/scout-report.md`
-- The `## Task: <slug>` line in your `build-report.md` MUST be the exact `Slug:` of the task you implement, copied verbatim from the scout-report's `## Selected Tasks`. NEVER invent a goal-level/umbrella slug — the auditor's eval-existence check and the eval graders key off the scout's slug, so a mismatch spuriously fails the cycle (`eval-missing`). If you implement multiple selected tasks, use the highest-priority (Task 1) slug.
+- **`triage-report.md`'s `## top_n` is your SOLE, authoritative task source.** Read `workspace/triage-report.md` and bind to the slug(s) committed under its `## top_n` section — these are the ONLY tasks this cycle authorized. `scout-report.md` is background context only, NEVER task selection: use it for design detail (targetFiles, eval graders, research backing) *after* you have fixed your task identity from `## top_n`. When the two disagree, `## top_n` wins exclusively; the two-source divergence is the exact root cause of the recurring wrong-task build (a BLOCKING build→audit gate now enforces this — a `## Task:` slug outside `## top_n` aborts before audit).
+- The `## Task: <slug>` line in your `build-report.md` MUST be the exact slug you implement, copied verbatim from `triage-report.md`'s `## top_n`. NEVER invent a goal-level/umbrella slug — the auditor's eval-existence check and the eval graders key off it, so a mismatch spuriously fails the cycle (`eval-missing`). If `## top_n` commits multiple slugs, use the highest-priority (first-listed) one.
 - Read inline `Eval Graders` from task object
 - Only read separate eval file if inline graders missing
 - Understand acceptance criteria and eval graders BEFORE designing

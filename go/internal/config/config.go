@@ -187,6 +187,15 @@ type RolloutStages struct {
 	// coverage cycles burned on the same overpacked shape). Fails OPEN on
 	// any ambiguity. Configured through policy.GatesConfig; default StageEnforce.
 	TriageCapGate Stage
+	// TopNGate is the build->audit top_n task-binding gate rollout stage
+	// (internal/topngate): StageOff — no gate (noopReviewer; byte-identical);
+	// StageShadow — an out-of-lane build (a build-report ## Task: slug outside
+	// triage ## top_n) is logged but approved; StageEnforce — a CERTAIN
+	// out-of-lane build aborts the cycle at the build->audit transition before
+	// audit/ship spend (inbox builder-task-binding-topn-gate, 8th recurrence).
+	// Fails OPEN on ambiguity (missing report, empty top_n). Configured through
+	// policy.GatesConfig; default StageEnforce.
+	TopNGate Stage
 	// SandboxMode controls OS-level sandbox wrapping for source-writing phases
 	// (Workstream B — cycle-119 cross-CLI trust bypass). Values:
 	//   "auto" (default) — wrap when nested-claude is NOT detected and the
@@ -498,7 +507,7 @@ func defaults() RoutingConfig {
 		// cycle-108.
 		Stage:          StageAdvisory,
 		Mode:           ModeDynamicLLM,
-		RolloutStages:  RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
+		RolloutStages:  RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, TopNGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
 		CompactPrompts: true, // default ON: strips ~23 KB/cycle of on-demand reference tails
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via

@@ -49,6 +49,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/topngate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -335,6 +336,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	cfg.ContractGate = parseGateStage(gatesCfg.ContractGate)
 	cfg.EvalGate = parseGateStage(gatesCfg.EvalGate)
 	cfg.TriageCapGate = parseGateStage(gatesCfg.TriageCapGate)
+	cfg.TopNGate = parseGateStage(gatesCfg.TopNGate)
 	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
 	cfg.PhaseRecovery = parseGateStage(recoveryCfg.PhaseRecovery)
 	cfg.RouterReplan = parseRouterStage(routerCfg.RouterReplan)
@@ -524,6 +526,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// Chained AFTER the contract gate: well-formedness first, capacity
 		// second. Fails open on ambiguity.
 		reviewers = append(reviewers, triagecap.NewReviewer(cfg.TriageCapGate))
+	}
+	if cfg.TopNGate != config.StageOff {
+		// build->audit task-binding clamp (internal/topngate): a build report
+		// whose ## Task: slug falls outside triage ## top_n is a CERTAIN
+		// wrong-task build; enforce aborts it before audit/ship spend (inbox
+		// builder-task-binding-topn-gate, 8th recurrence). Chained after the
+		// contract gate: well-formedness first, task-identity binding second.
+		// Fails open on ambiguity (missing report, empty top_n).
+		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
