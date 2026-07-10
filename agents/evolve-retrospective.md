@@ -102,7 +102,47 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 - <action 1: typically a new test, gate check, or process change>
 - <action 2>
 - ...
+
+<!-- machine-readable autofiler block: see "### Machine-readable preventive_actions" below the template -->
 ```
+
+### Machine-readable preventive_actions block (autofiler contract)
+
+When one or more preventive actions are *deferrable, scope-able work units*,
+ALSO emit them as a structured `preventive_actions` array in a fenced json
+block immediately under the "## Recommended preventive actions" heading. The
+deterministic post-retro autofiler (`internal/retrofile`) parses this block and
+files each entry as a weighted `.evolve/inbox/auto-retro-<cycle>-<slug>.json`
+todo (deduplicated by `id` against open and already-processed items, so a
+recurrence files once). This is the FORMAT the injector reads — the prose
+bullets are for humans; the JSON is what closes the learning→action loop.
+
+Schema (one object per action):
+
+```json
+[
+  {
+    "id": "<stable-kebab-slug>",
+    "title": "<imperative one-line instruction>",
+    "weight_hint": 0.92,
+    "files": ["go/internal/<pkg>"],
+    "evidence": "audit-report.md#D1",
+    "recurrence": 7
+  }
+]
+```
+
+Field contract:
+- `id` — stable slug; REUSE the same id across cycles for a recurring action so
+  the autofiler deduplicates instead of spamming (defer/recurrence is tracked).
+- `title` — imperative instruction a fresh agent could act on.
+- `weight_hint` *(optional)* — when a recurrence justifies escalation, set a
+  weight above the policy default (`retro_autofile.default_weight`, 0.75); omit
+  or set 0 to inherit the default. This is the recurrence-escalation lever.
+- `files` *(optional)* — target path hints for the next Scout/Builder.
+- `evidence` *(optional)* — pointer to the artifact proving the failure.
+- `recurrence` *(optional)* — count of prior occurrences (advisory; surfaced in
+  the filed item so Triage can prioritize).
 
 ### 5. Write the lesson YAML(s)
 

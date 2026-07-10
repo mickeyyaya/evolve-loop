@@ -207,6 +207,11 @@
 ./internal/recovery
 ./internal/reflection
 
+# retro→inbox preventive-actions autofiler (cycle-657, new-package graduation):
+# stdlib-only leaf; ParsePreventiveActions/FileActions/PreventiveAction all
+# asserted by the white-box suite at internal/retrofile/retrofile_test.go.
+./internal/retrofile
+
 # Phase 5 gap=5-7 tail batch (2026-06-16): 5 packages (5-7 unnamed exports
 # each, all >=95% cover). phaseobserver: Scope enum + DefaultProcessAlive (live
 # pgid probe) + ExitFatal exit-code-vocabulary contract. deliverable: 4 Verify

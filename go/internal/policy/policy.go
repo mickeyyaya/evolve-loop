@@ -124,6 +124,10 @@ type Policy struct {
 	// ReportBudget configures the report-size gate's per-artifact token budgets
 	// (cycle-565 Slice S1). Absent ⇒ built-in defaults apply (HandoffTokens=2000).
 	ReportBudget *ReportBudgetPolicy `json:"report_budget,omitempty"`
+	// RetroAutofile configures the retro→inbox preventive-actions autofiler
+	// (internal/retrofile, cycle-657). Absent ⇒ built-in safe default applies
+	// (DefaultWeight=0.75).
+	RetroAutofile *RetroAutofilePolicy `json:"retro_autofile,omitempty"`
 	// MergeGate configures the merge-to-main gate: its rollout stage and the
 	// cadence-scaling thresholds the advisor reads to decide when a completed
 	// milestone is promoted to main. Absent ⇒ built-in defaults apply
@@ -1230,6 +1234,27 @@ func (p Policy) ReportBudgetConfig() ReportBudgetConfig {
 		c.HandoffTokens = p.ReportBudget.HandoffTokens
 	}
 	return c
+}
+
+// RetroAutofilePolicy is the .evolve/policy.json "retro_autofile" block. It
+// tunes the retro→inbox preventive-actions autofiler (internal/retrofile):
+// DefaultWeight is the weight applied to a filed preventive-action item that
+// carries no per-action weight_hint. Absent ⇒ the compiled-in safe default.
+type RetroAutofilePolicy struct {
+	DefaultWeight float64 `json:"default_weight,omitempty"`
+}
+
+// RetroAutofileDefaultWeight returns the default weight for auto-filed retro
+// preventive-action inbox items. Absent/non-positive block ⇒ 0.75 (the
+// compiled-in safe default); a present positive DefaultWeight overrides it.
+// Sourced from policy, never a Go literal at the call site
+// (feedback_phase_settings_from_config_not_code).
+func (p Policy) RetroAutofileDefaultWeight() float64 {
+	const safeDefault = 0.75
+	if p.RetroAutofile == nil || p.RetroAutofile.DefaultWeight <= 0 {
+		return safeDefault
+	}
+	return p.RetroAutofile.DefaultWeight
 }
 
 // SandboxPolicy is the .evolve/policy.json "sandbox" block. NestedFallback
