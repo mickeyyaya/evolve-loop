@@ -411,6 +411,9 @@
 # seam exactly once. Entry/Ledger/InboxItem/Escalator/Autofiler/EscalationPolicy +
 # NewLedger/Load/Save/Count/Patterns/RecordClosure/Target are named+exercised by
 # ledger_test.go + apicover_named_test.go. Imports only stdlib + atomicwrite + flock.
+# cycle-662 (chronicle-s1-recurrence-index) graduates BackfillFromLessons (historical
+# backfill over lessons/*.yaml), IsGeneric + Ledger.IsGenericPattern (classification
+# de-noise), exercised by backfill_c662_test.go + generic_c662_test.go.
 ./internal/recurrence
 
 # cycle-661 ACS predicate package (2026-07-11): recurrence-ledger-weight-escalation.

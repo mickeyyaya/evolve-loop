@@ -394,6 +394,11 @@ func escalateRetroReason(reason, pattern string, led *recurrence.Ledger) string 
 	if led == nil || !strings.HasPrefix(reason, "proceed:") {
 		return reason
 	}
+	// Generic classification noise (operator-reset/loop-fatal echo) must never
+	// force-escalate — its count is a corpus artifact, not a recurring defect.
+	if led.IsGenericPattern(pattern) {
+		return reason
+	}
 	if n := led.Count(pattern); n >= 2 {
 		return fmt.Sprintf("adapt: escalated %s to Nth-occurrence (count=%d); %s",
 			pattern, n, strings.TrimPrefix(reason, "proceed: "))

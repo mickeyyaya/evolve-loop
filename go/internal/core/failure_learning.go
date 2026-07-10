@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
 // phaseTimingEntry is an alias for the single-source schema in internal/
@@ -387,6 +388,34 @@ func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, sum
 	lessonsDir := filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "instincts", "lessons")
 	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: deterministic fallback write: %v\n", err)
+	}
+	o.recordRecurrenceClosure(fl.CycleRequest.ProjectRoot, ev.Classification, fl.Cycle)
+}
+
+// recordRecurrenceClosure is gap-G1 production wiring (cycle-662): the
+// deterministic retro-closeout seam upserts the failing lesson pattern into the
+// recurrence ledger keyed by the failing cycle, so Count() finally reflects real
+// history instead of staying 0 forever. Escalator/Autofiler are nil here —
+// escalation APPLY stays boundary-only (the live consult site
+// escalateRetroReasonForHistory reads the ledger; it must not race
+// inboxmover.Claim from the mid-cycle closeout). Best-effort: a ledger failure
+// must never mask the original phase failure.
+func (o *Orchestrator) recordRecurrenceClosure(projectRoot, pattern string, cycle int) {
+	if projectRoot == "" || strings.TrimSpace(pattern) == "" {
+		return
+	}
+	path := filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json")
+	led, err := recurrence.Load(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: load ledger: %v\n", err)
+		return
+	}
+	if err := led.RecordClosure(pattern, cycle, nil, nil, recurrence.DefaultEscalationPolicy()); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: record closure: %v\n", err)
+		return
+	}
+	if err := led.Save(path); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: save ledger: %v\n", err)
 	}
 }
 

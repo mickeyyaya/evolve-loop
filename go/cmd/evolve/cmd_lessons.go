@@ -54,6 +54,9 @@ func renderRecurrenceReport(w io.Writer, led *recurrence.Ledger) {
 	}
 	fmt.Fprintln(w, "COUNT  PATTERN  FIX")
 	for _, e := range pats {
+		if e.Generic {
+			continue // classification noise — de-noised out of the operator report
+		}
 		fix := "none"
 		if e.FixItemID != "" {
 			fix = e.FixItemID

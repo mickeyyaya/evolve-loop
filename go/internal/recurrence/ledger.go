@@ -45,6 +45,11 @@ type Entry struct {
 	// Autofiled is true once the pattern has been handed to the autofile seam,
 	// so an orphan pattern (no open item) is filed exactly once while open.
 	Autofiled bool `json:"autofiled,omitempty"`
+	// Generic is true when the pattern is classification-vocabulary noise
+	// (denylist or pattern==errorCategory echo), set during backfill via
+	// IsGeneric. Consumers exclude generic patterns from escalation and the CLI
+	// report so noise never drowns the specific-defect signal.
+	Generic bool `json:"generic,omitempty"`
 }
 
 // Ledger is the pattern→Entry recurrence map, persisted to
