@@ -114,6 +114,12 @@ func (d *recipeSessionDriver) Capture(ctx context.Context) (string, error) {
 // any transport error so the engine surfaces a dead session immediately
 // instead of waiting out the step's full timeout.
 func (d *recipeSessionDriver) SendCommand(ctx context.Context, body string) error {
+	// Echo-veto (cycle-672): the recipe path has no single resolved prompt
+	// file — every body we inject is prompt text the pane may echo back, so
+	// accumulate it for tick()'s stripPromptEchoLines exhaustion guard.
+	if d.ar != nil {
+		d.ar.injectedPrompt += body + "\n"
+	}
 	return injectText(ctx, d.cfg, d.deps, d.session, body)
 }
 

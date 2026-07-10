@@ -227,7 +227,7 @@ func TestRun_InvokesEventsProducer(t *testing.T) {
 	var gotCycle, calls int
 	r := New(Options{
 		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x"),
-		EventsProducer: func(workspace, phase, cli string, cycle int) error {
+		EventsProducer: func(workspace, phase, cli string, cycle int, prompt string) error {
 			calls++
 			gotWS, gotPhase, gotCLI, gotCycle = workspace, phase, cli, cycle
 			return nil
@@ -258,7 +258,7 @@ func TestRun_EventsProducer_RunsOnBridgeError(t *testing.T) {
 	var calls int
 	r := New(Options{
 		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x"),
-		EventsProducer: func(_, _, _ string, _ int) error { calls++; return nil },
+		EventsProducer: func(_, _, _ string, _ int, _ string) error { calls++; return nil },
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
@@ -281,7 +281,7 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "x"}
 	r := New(Options{
 		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-scout", "x"),
-		EventsProducer: func(_, _, _ string, _ int) error { return errors.New("disk full") },
+		EventsProducer: func(_, _, _ string, _ int, _ string) error { return errors.New("disk full") },
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),

@@ -127,8 +127,11 @@ type Options struct {
 	// EventsProducer is the seam for the post-phase <phase>-events.ndjson
 	// writer (ADR-0020). When nil, defaults to phasestream.Produce. Unlike
 	// StdoutFilter this is load-bearing: cyclecost + cycleclassify read the
-	// events stream, so it is always-on (no disable flag).
-	EventsProducer func(workspace, phase, cli string, cycle int) error
+	// events stream, so it is always-on (no disable flag). prompt is the
+	// composed phase prompt, threaded to the Classifier's echo-veto
+	// (ProduceConfig.InjectedPrompt, cycle-672) so agent-quoted prompt text
+	// never classifies infra_failure.
+	EventsProducer func(workspace, phase, cli string, cycle int, prompt string) error
 	// Optional marks this phase as non-essential to the cycle. When true, a
 	// bridge ErrArtifactTimeout degrades to a WARN that lets the cycle
 	// advance (the state machine's successor is verdict-unconditional for
@@ -176,7 +179,7 @@ type BaseRunner struct {
 	nowFn               func() time.Time
 	resolveLLM          func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
 	stdoutFilter        func(workspace, phase string) error
-	eventsProducer      func(workspace, phase, cli string, cycle int) error
+	eventsProducer      func(workspace, phase, cli string, cycle int, prompt string) error
 	optional            bool
 	verifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
 	compactPrompts      bool
@@ -204,9 +207,10 @@ func New(opts Options) *BaseRunner {
 	}
 	eventsProducer := opts.EventsProducer
 	if eventsProducer == nil {
-		eventsProducer = func(workspace, phase, cli string, cycle int) error {
+		eventsProducer = func(workspace, phase, cli string, cycle int, prompt string) error {
 			return phasestream.Produce(phasestream.ProduceConfig{
 				Workspace: workspace, Phase: phase, CLI: cli, Cycle: cycle,
+				InjectedPrompt: prompt,
 			})
 		}
 	}
@@ -548,7 +552,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// Normalize per attempt so the final events file reflects the
 		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
 		// and we want it to describe what actually happened last.
-		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle); err != nil {
+		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))

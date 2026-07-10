@@ -130,12 +130,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	// Boot smoke-test (lp.bootOnly) skips prompt prep entirely — it never
 	// delivers a task, so there is no prompt to resolve/write.
-	var resolvedPromptFile string
+	var resolvedPromptFile, resolvedPrompt string
 	if !lp.bootOnly {
 		prompt, err := preparePrompt(cfg, deps)
 		if err != nil {
 			return ExitBadFlags, err
 		}
+		resolvedPrompt = prompt
 		resolvedPromptFile = filepath.Join(cfg.Workspace, "resolved-prompt.txt")
 		if err := os.WriteFile(resolvedPromptFile, []byte(prompt+"\n"), 0o644); err != nil {
 			return ExitBadFlags, fmt.Errorf("%s write resolved prompt: %w", pfx, err)
@@ -159,6 +160,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
 	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human, lp.bootScrollback)
+	// Echo-veto (cycle-672): tick() strips pane lines that verbatim-echo this
+	// session's own delivered prompt before its exhaustion/escalation scans.
+	ar.injectedPrompt = resolvedPrompt
 
 	// ADR-0045 I1: interaction telemetry — every injection this launch fires
 	// (auto-respond sends, the one-shot nudge) records a typed outcome in

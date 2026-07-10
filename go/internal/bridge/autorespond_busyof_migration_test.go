@@ -92,7 +92,7 @@ func autorespondTickRegionSource(t *testing.T) string {
 		if start == -1 && strings.Contains(ln, "prevCounts := make(map[string]int, len(ar.counts))") {
 			start = i
 		}
-		if start != -1 && strings.Contains(ln, "action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)") {
+		if start != -1 && strings.Contains(ln, "action, rc := decideAutoRespond(scanPane, ar.prompts, ar.counts, paneBusy)") {
 			end = i
 			break
 		}

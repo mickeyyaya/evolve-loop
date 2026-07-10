@@ -190,6 +190,13 @@ type autoResponder struct {
 	// fast-poll path that fast-fails an exhausted phase without waiting for the
 	// 300s stop-review checkpoint's Observe.
 	exhaustedRegex string
+	// injectedPrompt is the resolved prompt text delivered to this session.
+	// tick() strips pane lines that are a verbatim echo of it before the
+	// prompt-match and exhaustion scans (stripPromptEchoLines, cycle-654
+	// helper wired cycle-672), so the agent quoting its OWN instructions —
+	// e.g. an echoed "...reached your usage limit..." Deliverable-Contract
+	// line — never escalates rc 85. Empty strips nothing (fail-open).
+	injectedPrompt string
 	workspace      string
 	cli            string
 	counts         map[string]int
@@ -319,14 +326,19 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// Deps-injected test seam — needs no guard here, and this tick's read
 	// can never pollute the checkpoint's own Observe/Aggregate baseline.
 	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
-	action, rc := decideAutoRespond(pane, ar.prompts, ar.counts, paneBusy)
+	// scanPane: prompt-echo lines removed (stripPromptEchoLines, cycle-654
+	// helper wired cycle-672) so neither the prompt-match nor the exhaustion
+	// scan below fires on the agent quoting its OWN instructions. pane stays
+	// raw for forensics (writeEscalation), the busy probe, and tryKernelAnswer.
+	scanPane := stripPromptEchoLines(pane, ar.injectedPrompt)
+	action, rc := decideAutoRespond(scanPane, ar.prompts, ar.counts, paneBusy)
 	// Exhaustion override (reuses THIS tick's capture — no extra CapturePane, so no
 	// paneSeq churn): a quota/rate-limit wall escalates (rc 85), ungated by paneBusy
 	// (a wall blocks regardless of the spinner) and overriding a lesser verdict —
 	// the artifact will never come. Detected via the SignalCenter (ExhaustedOf, the
 	// fast-poll twin of BusyOf); the rc==85 arm below then writes the escalation
 	// report exactly as for any escalate, so the fallback fires within one poll.
-	if rc != 85 && ar.exhaustedRegex != "" && ar.deps.LivenessCenter.ExhaustedOf(pane, panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex}) {
+	if rc != 85 && ar.exhaustedRegex != "" && ar.deps.LivenessCenter.ExhaustedOf(scanPane, panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex}) {
 		action, rc = "escalate:exhausted", 85
 	}
 	switch rc {

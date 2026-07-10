@@ -17,7 +17,11 @@ type ProduceConfig struct {
 	Phase     string // file stem + envelope agent/phase
 	CLI       string
 	Cycle     int
-	Now       func() time.Time // defaults to time.Now
+	// InjectedPrompt is the phase's composed prompt text. When set, the
+	// Classifier suppresses infra-marker lines that are a verbatim echo of it
+	// (cycle-641/642 lesson; wired cycle-672). Empty = no suppression.
+	InjectedPrompt string
+	Now            func() time.Time // defaults to time.Now
 }
 
 // produceScanBufBytes caps a raw log line; a result envelope can embed a
@@ -58,6 +62,7 @@ func Produce(cfg ProduceConfig) error {
 		Phase:    cfg.Phase,
 		Agent:    cfg.Phase,
 	}, fmt.Sprintf("cycle-%d-%s", cfg.Cycle, cfg.Phase), now)
+	clf.SetInjectedPrompt(cfg.InjectedPrompt)
 
 	var envs []Envelope
 	stdoutEnvs, err := classifyLines(stdoutPath, clf.Line)
