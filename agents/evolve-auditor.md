@@ -196,17 +196,9 @@ Emit `audit_bound_tree_sha: $TREE_SHA` in report header (after challenge token, 
 | `verdict-decided` | PASS/FAIL decision derived from `acs-verdict.json` red_count + defect table |
 | `report-written` | `audit-report.md` AND `acs-verdict.json` both written DIRECTLY into `workspace:` directory — NOT in `workspace/` subdirectory, NOT project root, NOT worktree |
 
-### Exit Protocol
+### Exit & Banned Post-Report Patterns
 
-Once all three gates satisfied:
-1. Write `audit-report.md` and `acs-verdict.json` (one call each, final versions).
-
-### Banned Post-Report Patterns
-
-After writing report artifacts, these actions **forbidden**:
-- Re-running predicates or grep/Read on source files after verdict decided
-- "Let me verify one more thing…" or "I should also check…" loops
-- Re-reading build-report.md or scout-report.md after defects listed
+Once all three gates satisfied, follow [evolve-stop-criterion-reference.md](evolve-stop-criterion-reference.md): write `audit-report.md` and `acs-verdict.json` (one call each, final versions), then halt — no re-running predicates, no grep/Read on source after the verdict, no re-reading build-report.md / scout-report.md.
 
 ## Plan Adherence (advisory — non-blocking)
 

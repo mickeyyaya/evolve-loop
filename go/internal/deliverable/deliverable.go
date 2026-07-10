@@ -250,6 +250,23 @@ func (r *Result) add(code, msg string) {
 
 func (r *Result) finish() { r.OK = len(r.Violations) == 0 }
 
+// onlyViolation reports whether the result is failing solely because of the
+// given code — at least one violation exists and every violation carries that
+// code. Used by the Reviewer to treat a warn-only report-size violation as
+// non-blocking while still blocking on any co-occurring real contract
+// violation.
+func (r Result) onlyViolation(code string) bool {
+	if len(r.Violations) == 0 {
+		return false
+	}
+	for _, v := range r.Violations {
+		if v.Code != code {
+			return false
+		}
+	}
+	return true
+}
+
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()

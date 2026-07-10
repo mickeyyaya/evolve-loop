@@ -83,10 +83,14 @@ func VerifyWithReportSize(phase string, roots phasecontract.Roots, resolver phas
 	if err != nil {
 		return res, err
 	}
-	// Off/shadow: observe-only. Leave Violations byte-identical to
+	// Off/shadow: fully dormant. Leave Violations byte-identical to
 	// VerifyWithStage so wiring the layer in cannot change existing behavior for
-	// any cycle that has not opted the gate up to enforce.
-	if reportSizeGate < config.StageEnforce {
+	// any cycle that has not opted the gate above shadow. Advisory is the WARN
+	// rung (cycle-646): it RECORDS CodeHandoffBudgetExceeded so the host-side
+	// Reviewer can log a would-block warning, but the Reviewer keeps it
+	// non-blocking until reportSizeGate==enforce — the size dial's own staged
+	// rollout, independent of the ContractGate stage.
+	if reportSizeGate < config.StageAdvisory {
 		return res, nil
 	}
 	data, readErr := os.ReadFile(res.ArtifactPath)

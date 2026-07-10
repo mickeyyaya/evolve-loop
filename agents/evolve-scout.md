@@ -182,9 +182,7 @@ Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
 | 5 | `research-cache-section` | `## Research Cache` present; each carryoverTodo noted HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED |
 | 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). A selected task with no eval file = incomplete scout → blocks the cycle. |
 
-**Exit:** 1. Write `scout-report.md` (one call, final version). 2. Stop — no reads, searches, or tool calls after Write.
-
-**Banned post-report:** "Let me also check…" reads, additional WebSearch/WebFetch, re-reads, opportunistic Bash.
+**Exit & banned-post-report:** follow [evolve-stop-criterion-reference.md](evolve-stop-criterion-reference.md) — write `scout-report.md` once (final version), then stop; no reads, searches, or tool calls after Write.
 
 ## Hypothesis falsification carryover
 

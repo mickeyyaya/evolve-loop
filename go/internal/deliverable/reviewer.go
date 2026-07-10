@@ -124,6 +124,18 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	}
 
 	reason := summarize(in.Phase, res)
+
+	// Report-size handoff-budget is warn-only below its own enforce dial
+	// (cycle-646): at advisory VerifyWithReportSize records the violation so we
+	// log a would-block WARN here, but the size gate must never block a cycle
+	// until reportSizeGate==enforce — independent of the ContractGate stage. If
+	// the ONLY reason to block is that warn-only size violation, approve. Any
+	// co-occurring real contract violation still falls through to the block path.
+	if r.reportSizeGate < config.StageEnforce && res.onlyViolation(CodeHandoffBudgetExceeded) {
+		r.logf("[contract-gate] %s: %s (reportSizeGate=%s, would-block, WARN)", in.Phase, reason, r.reportSizeGate)
+		return core.ReviewResult{Approve: true}
+	}
+
 	if r.stage != config.StageEnforce {
 		// Shadow/advisory: log the would-block and approve.
 		r.logf("[contract-gate] %s: %s (stage=%s, would-block)", in.Phase, reason, r.stage)
