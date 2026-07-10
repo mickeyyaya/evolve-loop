@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -289,8 +290,12 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		}
 
 		// Advance lastCycleNumber (number never reused) + zero the batch accrual,
-		// via a full-fidelity map so unmodelled fields survive.
-		sm, err := readJSONMapFile(statePath)
+		// via a full-fidelity map so unmodelled fields survive. statemap owns the
+		// single-source read/write primitives; we call the UNLOCKED read+write
+		// here because the enclosing WithPathLock already holds the sidecar lock
+		// across Record + this RMW (calling statemap.UpdateStateMap would re-lock
+		// and deadlock).
+		sm, err := statemap.ReadStateMap(statePath)
 		if err != nil {
 			return fmt.Errorf("reset: read state.json: %w", err)
 		}
@@ -302,7 +307,7 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		cb["cycleAccruedCostUSD"] = 0
 		sm["currentBatch"] = cb
 		sm["lastUpdated"] = rfc
-		if err := writeJSONMapFileAtomic(statePath, sm); err != nil {
+		if err := statemap.WriteStateMap(statePath, sm); err != nil {
 			return fmt.Errorf("reset: write state.json: %w", err)
 		}
 		return nil
@@ -329,64 +334,4 @@ func pathWithin(target, root string) bool {
 		return false
 	}
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
-}
-
-// readJSONMapFile parses path as a JSON object. Missing/empty → empty map.
-// Full-fidelity counterpart to the typed storage adapter (preserves unmodelled
-// fields like expected_ship_sha); mirrors ship/statefile.go:readStateMap.
-func readJSONMapFile(path string) (map[string]any, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return map[string]any{}, nil
-		}
-		return nil, err
-	}
-	if len(raw) == 0 {
-		return map[string]any{}, nil
-	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, err
-	}
-	if m == nil {
-		m = map[string]any{}
-	}
-	return m, nil
-}
-
-// writeJSONMapFileAtomic writes m as indented JSON to path via tmp + rename.
-func writeJSONMapFileAtomic(path string, m map[string]any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	buf, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	buf = append(buf, '\n')
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(buf); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return nil
 }

@@ -12,73 +12,26 @@ package ship
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
 // readStateMap parses path as JSON into a map. Missing/empty → empty map.
+// Thin projection of the single-source statemap.ReadStateMap (cycle-659); the
+// ship package keeps the short name its many call sites already use.
 func readStateMap(path string) (map[string]any, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return map[string]any{}, nil
-		}
-		return nil, fmt.Errorf("read %s: %w", path, err)
-	}
-	if len(raw) == 0 {
-		return map[string]any{}, nil
-	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if m == nil {
-		m = map[string]any{}
-	}
-	return m, nil
+	return statemap.ReadStateMap(path)
 }
 
-// writeStateMap atomically replaces path with the JSON of m. 2-space
-// indent matches `jq` default output so diffs against bash-written
-// state.json files are minimal.
+// writeStateMap atomically replaces path with the JSON of m via the
+// single-source statemap.WriteStateMap (cycle-659). Callers hold withStateLock
+// around read+write themselves, so this stays the UNLOCKED primitive.
 func writeStateMap(path string, m map[string]any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
-	}
-	buf, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	buf = append(buf, '\n')
-
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("tmp: %w", err)
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(buf); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("write tmp: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("sync tmp: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("close tmp: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("rename: %w", err)
-	}
-	return nil
+	return statemap.WriteStateMap(path, m)
 }
 
 // stateString reads a string field from a map. Missing/non-string → "".

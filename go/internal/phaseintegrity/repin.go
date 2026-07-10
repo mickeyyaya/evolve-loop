@@ -1,12 +1,11 @@
 package phaseintegrity
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
 // ProvenanceVerified reports whether a binary build-commit is trustworthy —
@@ -57,36 +56,25 @@ func RepinShipSHA(statePath, runningSHA, runningCommit, pluginVer string, prov P
 			runningCommit)
 	}
 
+	// Re-pin updates an EXISTING pin; refuse to CREATE state.json (a missing
+	// file means there is nothing to re-pin). statemap.UpdateStateMap tolerates a
+	// missing file by design, so guard existence explicitly before the RMW.
+	if _, err := os.Stat(statePath); err != nil {
+		return RepinResult{}, fmt.Errorf("phaseintegrity: re-pin: read state: %w", err)
+	}
+
+	// Route the read-modify-write through the single-source statemap adapter
+	// (cycle-659): it holds the shared "<state.json>.lock" sidecar across the
+	// whole RMW, so this is safe against concurrent resume/fleet writers and
+	// preserves every unmodelled key. A malformed file aborts before the write.
 	res := RepinResult{NewSHA: runningSHA, Authorized: authorized}
-	err := flock.WithPathLock(statePath, func() error {
-		b, err := os.ReadFile(statePath)
-		if err != nil {
-			return fmt.Errorf("read state: %w", err)
-		}
-		var state map[string]any
-		if err := json.Unmarshal(b, &state); err != nil {
-			return fmt.Errorf("parse state: %w", err)
-		}
+	if err := statemap.UpdateStateMap(statePath, func(state map[string]any) {
 		res.OldSHA, _ = state["expected_ship_sha"].(string)
 		state["expected_ship_sha"] = runningSHA
 		if pluginVer != "" {
 			state["expected_ship_version"] = pluginVer
 		}
-		out, err := json.MarshalIndent(state, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshal state: %w", err)
-		}
-		tmp := statePath + ".repin.tmp"
-		if err := os.WriteFile(tmp, append(out, '\n'), 0o644); err != nil {
-			return fmt.Errorf("write tmp: %w", err)
-		}
-		if err := os.Rename(tmp, statePath); err != nil {
-			_ = os.Remove(tmp)
-			return fmt.Errorf("rename: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return RepinResult{}, fmt.Errorf("phaseintegrity: re-pin: %w", err)
 	}
 	res.Repinned = true

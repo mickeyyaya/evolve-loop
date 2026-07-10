@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 )
@@ -169,24 +170,24 @@ func TestResetJSONAndOptionCoverage(t *testing.T) {
 		t.Fatal("pathWithin boundary mismatch")
 	}
 	missing := filepath.Join(root, "missing.json")
-	if got, err := readJSONMapFile(missing); err != nil || len(got) != 0 {
+	if got, err := statemap.ReadStateMap(missing); err != nil || len(got) != 0 {
 		t.Fatalf("missing JSON map = %+v err=%v", got, err)
 	}
 	empty := filepath.Join(root, "empty.json")
 	if err := os.WriteFile(empty, nil, 0o644); err != nil {
 		t.Fatalf("write empty: %v", err)
 	}
-	if got, err := readJSONMapFile(empty); err != nil || len(got) != 0 {
+	if got, err := statemap.ReadStateMap(empty); err != nil || len(got) != 0 {
 		t.Fatalf("empty JSON map = %+v err=%v", got, err)
 	}
 	path := filepath.Join(root, "nested", "state.json")
 	want := map[string]any{"expected_ship_sha": "abc", "n": float64(2)}
-	if err := writeJSONMapFileAtomic(path, want); err != nil {
-		t.Fatalf("writeJSONMapFileAtomic: %v", err)
+	if err := statemap.WriteStateMap(path, want); err != nil {
+		t.Fatalf("statemap.WriteStateMap: %v", err)
 	}
-	got, err := readJSONMapFile(path)
+	got, err := statemap.ReadStateMap(path)
 	if err != nil {
-		t.Fatalf("readJSONMapFile: %v", err)
+		t.Fatalf("statemap.ReadStateMap: %v", err)
 	}
 	if got["expected_ship_sha"] != "abc" || got["n"] != float64(2) {
 		t.Fatalf("JSON round trip = %+v", got)
@@ -195,10 +196,10 @@ func TestResetJSONAndOptionCoverage(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("{"), 0o644); err != nil {
 		t.Fatalf("write bad: %v", err)
 	}
-	if _, err := readJSONMapFile(bad); err == nil {
+	if _, err := statemap.ReadStateMap(bad); err == nil {
 		t.Fatal("invalid JSON should fail")
 	}
-	if err := writeJSONMapFileAtomic(filepath.Join(root, "bad-marshal.json"), map[string]any{"bad": func() {}}); err == nil {
+	if err := statemap.WriteStateMap(filepath.Join(root, "bad-marshal.json"), map[string]any{"bad": func() {}}); err == nil {
 		t.Fatal("unmarshalable map should fail")
 	}
 	o := NewOrchestrator(nil, nil, nil, WithKB(coverageKB{}), WithKB(nil))

@@ -393,3 +393,14 @@
 # cycle-593 ACS predicate package (2026-07-07): token-telemetry-s1-transcript-scanner.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle593
+
+# statefile RMW single-source (cycle-659, new-package graduation): statemap is
+# the lock-owning leaf that consolidates the three duplicate state.json
+# read-modify-write copies (ship/reset/repin) into one implementation importing
+# only internal/adapters/flock + stdlib. ReadStateMap/WriteStateMap/
+# UpdateStateMap are named+exercised by statemap_test.go + statemap_extra_test.go.
+./internal/adapters/statemap
+
+# cycle-659 ACS predicate package (2026-07-10): statefile-rmw-flock-single-source.
+# Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
+./acs/cycle659
