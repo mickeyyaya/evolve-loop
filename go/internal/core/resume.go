@@ -231,7 +231,11 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			next = scheduledNext
 			scheduledNext = ""
 		default:
-			n, err := o.sm.Next(current, lastVerdict)
+			// Cycle-637: rehydrate the transition kernel from the run's own plan
+			// so a resumed cycle can transition OUT of an advisor-inserted phase
+			// (invalid on the static spine) instead of dying "invalid phase".
+			// Spine-valid phases keep o.sm.Next byte-identically.
+			n, err := o.resolveResumeNext(cs, current, lastVerdict)
 			if err != nil {
 				return result, fmt.Errorf("transition from %s: %w", current, err)
 			}
@@ -243,7 +247,15 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 
 		runner, ok := o.runners[next]
 		if !ok {
-			return result, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
+			// ADR-0044 C1 (cycle-637): a stranded successor on RESUME is a
+			// terminal disposition that must funnel through the recording
+			// chokepoint — the cycle-635 resume died FAILED_UNEXPLAINED precisely
+			// because this bare error escaped it. Record a synthetic outcome
+			// carrying the abort_reason so the outcome is FAILED_EXPLAINED.
+			noRunnerErr := fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
+				phaseOutcomeFrom(next, PhaseResponse{}, 0, noRunnerErr.Error(), ""))
+			return result, noRunnerErr
 		}
 
 		cs.Phase = string(next)
