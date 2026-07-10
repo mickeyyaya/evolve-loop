@@ -47,3 +47,22 @@ func TestClassifier_Emit_MonotonicSeqAndSource(t *testing.T) {
 		t.Errorf("Emit seq = (%d,%d), want (1,2) — must be monotonic gap-free", first.Seq, second.Seq)
 	}
 }
+
+// TestClassifier_SetInjectedPrompt names and covers Classifier.SetInjectedPrompt
+// — the cycle-641/642 fix-of-record seam that threads the phase's own prompt
+// text into the Classifier so an infra-marker line that merely echoes it (the
+// agent quoting its OWN instructions) is suppressed rather than emitted as a
+// runtime infra_failure. Pins the contract: an echoed prompt substring emits
+// nothing; a genuine runtime line absent from the prompt still emits.
+func TestClassifier_SetInjectedPrompt(t *testing.T) {
+	const prompt = "Adversarial Reviewer checklist: TOCTOU / race windows; missing rate limits."
+	c := NewClassifier(Source{Producer: "normalizer", Phase: "adversarial-review"}, "trace-cover", nil)
+	c.SetInjectedPrompt(prompt)
+
+	if hasInfraFailure(c.Stderr([]byte("missing rate limits."))) {
+		t.Errorf("SetInjectedPrompt failed to suppress a verbatim prompt echo")
+	}
+	if !hasInfraFailure(c.Stderr([]byte("Error: 429 Too Many Requests (rate limit hit)"))) {
+		t.Errorf("SetInjectedPrompt wrongly suppressed a genuine runtime infra signal")
+	}
+}

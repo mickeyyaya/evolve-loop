@@ -383,11 +383,17 @@ var globFn = filepath.Glob
 var maxScannerBufBytes = 1 << 24 // 16MB
 
 // infraEventEnvelope is the subset of a phasestream envelope this scan
-// needs: the kind discriminator plus the marker the normalizer recorded.
+// needs: the kind discriminator, the emitting phase, plus the marker and the
+// raw excerpt the normalizer recorded. Excerpt + phase drive the cycle-641/642
+// prompt-echo veto (isPromptEchoSelfReport).
 type infraEventEnvelope struct {
-	Kind string `json:"kind"`
+	Kind   string `json:"kind"`
+	Source struct {
+		Phase string `json:"phase"`
+	} `json:"source"`
 	Data struct {
-		Marker string `json:"marker"`
+		Marker  string `json:"marker"`
+		Excerpt string `json:"excerpt"`
 	} `json:"data"`
 }
 
@@ -404,18 +410,86 @@ func scanEventsForInfra(workspace string) (source, marker string, ok bool) {
 	}
 	sort.Strings(logs) // deterministic Source when two files both carry infra
 	for _, log := range logs {
-		if m, found := firstInfraMarker(log); found {
+		if m, found := firstInfraMarker(workspace, log); found {
 			return filepath.Base(log), m, true
 		}
 	}
 	return "", "", false
 }
 
+// isPromptEchoSelfReport reports whether an infra_failure event for phase is a
+// self-echo of that phase's OWN prompt on an otherwise-successful phase, and so
+// must NOT drive an infrastructure verdict (cycle-641/642 fix-of-record; retro
+// recommendation #2 — deliverable-PASS + clean-exit are source-of-truth, a bare
+// keyword echo cannot override them). All three must hold:
+//
+//  1. the event excerpt is a verbatim substring of <phase>-prompt.txt — the
+//     agent quoting its own instruction text (e.g. an Adversarial Reviewer's
+//     exploit checklist "...missing rate limits."), not a runtime banner;
+//  2. the phase's deliverable <phase>-report.md carries a PASS verdict sentinel;
+//  3. the phase's driver exited 0 in llm-calls.ndjson.
+//
+// Any missing/unreadable artifact fails the check CLOSED (no veto), so a genuine
+// runtime infra signal — non-zero exit, or an excerpt absent from the prompt —
+// still classifies as infrastructure. An empty phase or excerpt never vetoes.
+func isPromptEchoSelfReport(workspace, phase, excerpt string) bool {
+	excerpt = strings.TrimSpace(excerpt)
+	if phase == "" || excerpt == "" {
+		return false
+	}
+	// (1) excerpt echoes the injected prompt text.
+	prompt, err := os.ReadFile(filepath.Join(workspace, phase+"-prompt.txt"))
+	if err != nil || !strings.Contains(string(prompt), excerpt) {
+		return false
+	}
+	// (2) deliverable declares PASS.
+	report, err := os.ReadFile(filepath.Join(workspace, phase+"-report.md"))
+	if err != nil {
+		return false
+	}
+	if s, ok := phasecontract.ParseVerdictSentinelFull(string(report)); !ok || s.Verdict != "PASS" {
+		return false
+	}
+	// (3) driver exited 0.
+	return driverExitedZero(workspace, phase)
+}
+
+// driverExitedZero reports whether phase recorded a zero exit_code in
+// llm-calls.ndjson. The LAST matching record wins (a retry's final attempt is
+// authoritative). Missing file / no record / absent exit_code ⇒ false (a clean
+// exit is unproven, so never veto). Malformed lines are skipped.
+func driverExitedZero(workspace, phase string) bool {
+	f, err := os.Open(filepath.Join(workspace, "llm-calls.ndjson"))
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	found, zero := false, false
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
+	for scanner.Scan() {
+		var rec struct {
+			Phase    string `json:"phase"`
+			ExitCode *int   `json:"exit_code"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
+			continue
+		}
+		if rec.Phase != phase || rec.ExitCode == nil {
+			continue
+		}
+		found, zero = true, *rec.ExitCode == 0
+	}
+	return found && zero
+}
+
 // firstInfraMarker returns the marker of the first kind==infra_failure
-// envelope in logPath, or ok=false when none is found / the file can't be
+// envelope in logPath that is NOT a prompt-echo self-report (see
+// isPromptEchoSelfReport), or ok=false when none is found / the file can't be
 // read. A cheap substring pre-check skips the JSON parse for the common
-// non-infra lines.
-func firstInfraMarker(logPath string) (marker string, ok bool) {
+// non-infra lines. workspace is needed to resolve the per-phase artifacts the
+// echo veto reads.
+func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 	f, err := os.Open(logPath)
 	if err != nil {
 		return "", false
@@ -433,9 +507,13 @@ func firstInfraMarker(logPath string) (marker string, ok bool) {
 		if err := json.Unmarshal(line, &ev); err != nil {
 			continue
 		}
-		if ev.Kind == "infra_failure" {
-			return ev.Data.Marker, true
+		if ev.Kind != "infra_failure" {
+			continue
 		}
+		if isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
+			continue // agent quoting its own prompt on a PASS/exit-0 phase — not a runtime infra signal
+		}
+		return ev.Data.Marker, true
 	}
 	// Mirror cyclecost.parseEventsLog: a scan error (e.g. a line exceeding
 	// maxScannerBufBytes) yields no infra signal rather than a partial one.

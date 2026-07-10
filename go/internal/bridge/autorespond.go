@@ -68,6 +68,32 @@ func stripAgentDiffLines(pane string) string {
 	return strings.Join(kept, "\n")
 }
 
+// stripPromptEchoLines removes captured-pane lines that are a verbatim echo of
+// the injected prompt, so the exhaustion / escalation scan never fires on the
+// agent's OWN instruction text. Mirrors stripAgentDiffLines, but keyed off the
+// prompt rather than diff-prefixing: cycle-641/642 — an echoed Deliverable-
+// Contract line ("...reached your usage limit...") or a Reviewer exploit
+// checklist benched a PASSING phase because the matcher saw the prompt the
+// agent was quoting, not a CLI wall. A line is dropped when its trimmed form is
+// a substring of the prompt; the CLI's real banners — absent from the prompt —
+// pass through unchanged. An empty prompt strips nothing (fail-open: never
+// suppress a genuine signal on missing context).
+func stripPromptEchoLines(pane, injectedPrompt string) string {
+	if strings.TrimSpace(injectedPrompt) == "" {
+		return pane
+	}
+	lines := strings.Split(pane, "\n")
+	kept := lines[:0]
+	for _, ln := range lines {
+		trimmed := strings.TrimSpace(ln)
+		if trimmed != "" && strings.Contains(injectedPrompt, trimmed) {
+			continue
+		}
+		kept = append(kept, ln)
+	}
+	return strings.Join(kept, "\n")
+}
+
 // decideAutoRespond is the pure decision: first interactive_prompts regex
 // to match the pane wins; counts tracks per-pattern match frequency for
 // the loop guard. Mirrors auto_respond_decide. Agent edit-diff lines are

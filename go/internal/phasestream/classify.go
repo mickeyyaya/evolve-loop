@@ -33,6 +33,37 @@ type Classifier struct {
 	cumOutputTokens int64
 	lastFlush       time.Time
 	corr            *correlator
+
+	// injectedPrompt is the phase's own prompt/instruction text. When set,
+	// an infra-marker line that is a verbatim substring of it is a self-echo
+	// of the agent's OWN prompt (e.g. an Adversarial Reviewer's exploit
+	// checklist "...missing rate limits.") — not a runtime infra signal — and
+	// is NOT emitted as infra_failure (cycle-641/642 lesson). Empty = no
+	// suppression (every marker emits, the pre-fix behaviour).
+	injectedPrompt string
+}
+
+// SetInjectedPrompt threads the phase's prompt/instruction text into the
+// Classifier so infra-marker lines that merely echo it are recognized as the
+// agent quoting its own prompt and suppressed (cycle-641/642 fix-of-record). A
+// no-op when prompt is empty. Not concurrency-safe — set once before feeding
+// lines (the normalizer owns one Classifier per phase, single goroutine).
+func (c *Classifier) SetInjectedPrompt(prompt string) {
+	c.injectedPrompt = prompt
+}
+
+// isPromptEcho reports whether line is a verbatim echo of the injected prompt:
+// its trimmed form is a substring of the prompt text. False when no prompt is
+// set (no suppression) or the line is blank.
+func (c *Classifier) isPromptEcho(line string) bool {
+	if c.injectedPrompt == "" {
+		return false
+	}
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return false
+	}
+	return strings.Contains(c.injectedPrompt, trimmed)
 }
 
 // NewClassifier builds a Classifier. now defaults to time.Now.
@@ -110,6 +141,9 @@ func (c *Classifier) Stderr(raw []byte) []Envelope {
 		return out
 	}
 	if marker := detectInfraMarker(line); marker != "" {
+		if c.isPromptEcho(line) {
+			return nil // agent echoing its own prompt — not a runtime infra signal
+		}
 		return []Envelope{c.infraEnvelope(marker, "stderr", line)}
 	}
 	return nil
@@ -348,7 +382,7 @@ func (c *Classifier) classifyPlain(line string) []Envelope {
 	// Plaintext infra markers (CLI error lines, tmux scrollback) surface as
 	// infra_failure, symmetric with Stderr — the legacy cycleclassify
 	// scanned *-stdout.log too (cycle-61 memo-stdout.log 529).
-	if marker := detectInfraMarker(line); marker != "" {
+	if marker := detectInfraMarker(line); marker != "" && !c.isPromptEcho(line) {
 		return []Envelope{c.infraEnvelope(marker, "stdout", line)}
 	}
 	return []Envelope{c.newEnvelope(KindAssistantText, SeverityInfo, map[string]any{"text": line})}
