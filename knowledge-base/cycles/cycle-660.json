@@ -1,0 +1,34 @@
+{
+  "cycle": 660,
+  "run_id": "01KX6D8JQ8GVF62SPVC1DC93F8",
+  "goal": "Work the weighted .evolve/inbox backlog top-down: for each cycle, implement the fleet-assigned inbox item (triage top_n is the sole task authority; scout scopes discovery to that item, never proposes alternative tasks). Highest-weight items first: builder-task-binding-topn-gate, retro-preventive-actions-autofile-inbox, infra-classifier-echo-veto, statefile-rmw-flock-single-source (re-scoped: leaf package internal/adapters/statemap). Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 660",
+      "priority": "high"
+    }
+  ]
+}
