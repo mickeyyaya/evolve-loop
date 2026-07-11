@@ -113,6 +113,12 @@ func smInitRepoWithRemote(t *testing.T) (string, string) {
 	smGit(t, t.TempDir(), "init", "-q", "--bare", bare)
 	smGit(t, repo, "remote", "add", "origin", bare)
 	smGit(t, repo, "push", "-q", "origin", "main")
+	// `init --bare` leaves the bare's HEAD at the host default branch name
+	// (master on unconfigured CI runners); a clone of it then checks out an
+	// UNBORN branch named by the CLONER's own default, so smRemoteCommit's
+	// `push origin main` dies with "src refspec main does not match any".
+	// Pin the bare's HEAD so clones are hermetic regardless of git defaults.
+	smGit(t, bare, "symbolic-ref", "HEAD", "refs/heads/main")
 	return repo, bare
 }
 
@@ -123,6 +129,10 @@ func smRemoteCommit(t *testing.T, bare, filename, content string) {
 	t.Helper()
 	clone := t.TempDir()
 	smGit(t, t.TempDir(), "clone", "-q", bare, clone)
+	// Hermetic identity: do not rely on the host's global git config
+	// (reviewer finding — a runner without user.email would fail the commit).
+	smGit(t, clone, "config", "user.email", "ci@example.com")
+	smGit(t, clone, "config", "user.name", "ci")
 	if err := os.WriteFile(filepath.Join(clone, filename), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
