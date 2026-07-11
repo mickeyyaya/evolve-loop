@@ -54,6 +54,21 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// uses. Fail-open: refusal/error WARNs; the ship gate stays the backstop.
 	if next == PhaseBuild {
 		repinShipSHAAfterBuild(cr.req.ProjectRoot)
+
+		// Cycle-675 (new-package-graduation-buildentry-gate, 3rd recurrence):
+		// a go/internal package NEW this cycle and absent from
+		// go/.apicover-enforce fails the build phase HERE, with an explicit
+		// abort_reason — after the worktree normalize (so a committing
+		// builder's work is pending again) and before the phase is marked
+		// completed. Deliberately abort-capable, unlike the WARN-only
+		// buildSelfCheck: graduation is the builder's own obligation, and the
+		// audit-side twin (apicoverNewPackageGraduationDefault) firing two
+		// attempts later is exactly the recurrence this closes.
+		if reason := buildGraduationCheck(cr.ctx, cr.cs.ActiveWorktree); reason != "" {
+			gerr := fmt.Errorf("build graduation guard: %s", reason)
+			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, gerr.Error(), cr.cs.PhaseStartedAt))
+			return loopAbort, gerr
+		}
 	}
 
 	cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
