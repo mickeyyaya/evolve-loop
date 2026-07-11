@@ -345,6 +345,10 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			"colliders", strings.Join(colliders, ","))
 	}
 
+	// Ship-bind manifest reconciliation (cycle-653 second seam, shadow):
+	// report any path about to be bound that no phase report declared.
+	reconcileManifestShadow(ctx, opts, res, worktree, branch, cycleBranch)
+
 	if !opts.DryRun {
 		_ = discardBinaryChurn(ctx, opts, worktree)
 		exit, err := opts.run(ctx, "git", []string{"-C", worktree, "add", "-A"}, io.Discard, opts.Stderr)

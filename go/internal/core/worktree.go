@@ -74,6 +74,14 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		valid := gitexec.Git{Dir: wt, Exec: gitRunner}.Run(context.Background(), "rev-parse", "--git-dir") == nil
 		if valid {
+			// Clean-HEAD assertion (cycle-653 / cycle-584 gate): a reused
+			// worktree may carry a prior failed attempt's uncommitted dirt,
+			// which ship would bind into this cycle's tree. Quarantine the
+			// dirt (preserved for salvage) and reset to HEAD; fail loudly
+			// rather than hand a dirty worktree to the cycle.
+			if _, cerr := ensureCleanWorktree(context.Background(), wt, projectRoot, cycle); cerr != nil {
+				return "", fmt.Errorf("worktree reuse (cycle %d): %w", cycle, cerr)
+			}
 			linkGuardDeps(wt, projectRoot, cycle)
 			return wt, nil
 		}
