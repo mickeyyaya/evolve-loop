@@ -22,6 +22,8 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // ——— mergetrain.go interface seams ———
@@ -274,5 +276,23 @@ func TestSessionRegistry_TypeNamedAndExercised(t *testing.T) {
 	_ = reg.Register(handle("w1"))
 	if got := reg.Live(); len(got) != 2 {
 		t.Errorf("SessionRegistry.Live must return both registered sessions, got %d", len(got))
+	}
+}
+
+// TestSwarmResult_TotalTokens names SwarmResult.TotalTokens and pins its
+// contract: the field-wise sum of per-worker token usage — the token twin of
+// TotalCostUSD, so per-worker counts survive the N→1 merge into the ledger.
+func TestSwarmResult_TotalTokens(t *testing.T) {
+	s := SwarmResult{Workers: []WorkerResult{
+		{Tokens: cyclestate.TokenUsage{Input: 10, Output: 3, CacheRead: 7, CacheWrite: 2}},
+		{Tokens: cyclestate.TokenUsage{Input: 5, Output: 4, CacheRead: 1, CacheWrite: 0}},
+	}}
+	got := s.TotalTokens()
+	want := cyclestate.TokenUsage{Input: 15, Output: 7, CacheRead: 8, CacheWrite: 2}
+	if got != want {
+		t.Errorf("SwarmResult.TotalTokens = %+v, want %+v (field-wise sum across workers)", got, want)
+	}
+	if zero := (SwarmResult{}).TotalTokens(); zero != (cyclestate.TokenUsage{}) {
+		t.Errorf("SwarmResult.TotalTokens on zero workers = %+v, want zero usage", zero)
 	}
 }
