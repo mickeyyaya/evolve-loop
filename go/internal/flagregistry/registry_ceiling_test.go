@@ -45,7 +45,11 @@ import "testing"
 // 2026-06-24: -1 — EVOLVE_WORKTREE_BASE legitimately removed (policy.json
 // worktree.base + WithWorktreeBase DI to all 3 readers; ADR-0064). StatusActive,
 // so LiveFeatureFlagCeiling also drops by 1.
-const FlagCeiling = 24
+// 24 -> 25 (2026-07-11): EVOLVE_WORKTREE_PATH re-registered by cycle 664 to
+// re-green the FORBIDDEN-REPEAT guard acs/cycle29 TestC29_007 (cycles 17/18
+// fail history pins that row's registry membership). StatusInternal row, not
+// an operator dial - LiveFeatureFlagCeiling (the real ratchet) is unchanged.
+const FlagCeiling = 25
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //
