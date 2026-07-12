@@ -103,6 +103,11 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		d.Phases = records
 		d.Timing = summary
 	}
+	// Ingest the post-push CI-watch verdict when the workspace recorded one
+	// (ci-watch-verdict.json). Absent artifact ⇒ nil — never fabricated.
+	if rec, ok := ciWatchRecord(opts.WorkspacePath); ok {
+		d.CIWatch = rec
+	}
 	// A FAIL cycle must record BOTH why it failed and the fix work (Validate
 	// enforces >=1 defect + >=1 carryover). Without a ledger walk we synthesize a
 	// minimal, truthful pair that points at the audit artifacts rather than

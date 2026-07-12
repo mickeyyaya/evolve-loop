@@ -354,6 +354,10 @@
 # Cycle Dossier (ADR-0055): durable per-cycle history record.
 ./internal/dossier
 
+# Post-push GitHub CI watch (cycle-748 push-ci-watch-remote-parity): Watch +
+# GHFetcher named+exercised by ciwatch_test.go through faked fetcher/exec seams.
+./internal/ciwatch
+
 # Cycle Dossier ACS gate (ADR-0055 D3); rehomed from cycle2 (v20 collision).
 ./acs/cycle6
 # ADR-0054 campaign planner: deterministic plan verification/rendering and the

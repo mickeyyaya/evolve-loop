@@ -44,6 +44,10 @@ type Dossier struct {
 	// Timing is the cycle-level latency roll-up (where the wall-clock went),
 	// ingested from phase-timing.json. Nil when the cycle wrote no timing log.
 	Timing *phasetiming.Summary `json:"timing,omitempty"`
+	// CIWatch is the remote GitHub CI verdict for the cycle's pushed commit,
+	// ingested from ci-watch-verdict.json (cycle-748). Nil when the cycle
+	// recorded no watch verdict — never fabricated.
+	CIWatch *CIWatchRecord `json:"ci_watch,omitempty"`
 }
 
 // PhaseRecord is one phase's outcome within the cycle (mirrors a ledger entry +

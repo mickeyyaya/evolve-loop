@@ -64,6 +64,11 @@ type Options struct {
 	PluginJSONPath string
 	LedgerPath     string
 
+	// AllowRedCI is the explicit operator override (--allow-red-ci) for the
+	// release-commit CI hard-gate. It never silences the gate: an overridden
+	// red CI is logged loudly and recorded in Result.CIOverridden.
+	AllowRedCI bool
+
 	// Seams.
 	Now              func() time.Time
 	GitClean         func(repoRoot string) (bool, error)                   // step 1
@@ -71,6 +76,16 @@ type Options struct {
 	GateTestRunner   func(repoRoot string, suite string) error             // step 5
 	NameGuard        func(repoRoot string) ([]naminguard.Violation, error) // step 5 sub-check
 	SimulationRunner func(repoRoot string) error                           // advisory step (post-step-5)
+	CIConclusion     func(repoRoot string) (CIRunStatus, error)            // release-commit CI hard-gate
+}
+
+// CIRunStatus is the remote GitHub CI verdict for the release commit (HEAD at
+// preflight time). Conclusion "" means the verdict is unavailable (no git
+// repo, gh missing/unauthenticated, or no run visible) — advisory-skipped
+// like auditVerdictNone; "pending" means a run exists but has not completed.
+type CIRunStatus struct {
+	Conclusion string
+	RunURL     string
 }
 
 // Result captures what happened; populated even on failure for diagnostics.
@@ -89,6 +104,12 @@ type Result struct {
 	// SkipTests); &true = passed; &false = failed-but-advisory (logged as
 	// WARN but does not block release). Promotes to hard requirement in v12.2.0.
 	SimulationAdvisoryOK *bool
+
+	// CIConclusion is the remote CI verdict observed for the release commit
+	// ("" = unavailable/advisory-skipped). CIOverridden records that a
+	// non-success verdict was allowed through via Options.AllowRedCI.
+	CIConclusion string
+	CIOverridden bool
 }
 
 // DefaultGateTestSuites are the trust-boundary Go test packages run as the
@@ -242,6 +263,39 @@ func defaultSimulationRunner(repoRoot string) error {
 		return fmt.Errorf("auto-respond regression tests failed: %w (output: %s)", err, out)
 	}
 	return nil
+}
+
+// defaultCIConclusion resolves HEAD and asks gh for the newest workflow run
+// on that commit. Every lookup failure (not a git repo, gh missing or
+// unauthenticated, unparsable output) degrades to the unavailable sentinel
+// (Conclusion "") rather than an error — the gate must never block a release
+// on absent tooling, only on a PRESENT non-green verdict. A visible run that
+// has not completed reads as "pending" (hard-fails: wait for CI or override).
+func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
+	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return CIRunStatus{}, nil
+	}
+	sha := strings.TrimSpace(string(head))
+	cmd := exec.Command("gh", "run", "list", "--commit", sha, "--limit", "1",
+		"--json", "status,conclusion,url")
+	cmd.Dir = repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return CIRunStatus{}, nil
+	}
+	var runs []struct {
+		Status     string `json:"status"`
+		Conclusion string `json:"conclusion"`
+		URL        string `json:"url"`
+	}
+	if json.Unmarshal(out, &runs) != nil || len(runs) == 0 {
+		return CIRunStatus{}, nil
+	}
+	if runs[0].Status != "completed" {
+		return CIRunStatus{Conclusion: "pending", RunURL: runs[0].URL}, nil
+	}
+	return CIRunStatus{Conclusion: runs[0].Conclusion, RunURL: runs[0].URL}, nil
 }
 
 // Run executes all 5 preflight steps in order. Returns ErrCheckFailed
@@ -410,6 +464,42 @@ func Run(opts Options) (Result, error) {
 		// Step 5 counts as passed only here — after BOTH the gate-test suites
 		// (above) and this naming scan come back clean.
 		res.StepsPassed++
+	}
+
+	// Release-commit CI hard-gate (cycle-748, push-ci-watch-remote-parity):
+	// the remote go CI run for HEAD must be conclusion=success before tagging
+	// (v22.0.0 was cut on red CI). Does NOT count toward StepsPassed/StepsTotal
+	// (back-compat with the 5-step contract). An UNAVAILABLE verdict (no repo,
+	// gh missing, no run visible) is advisory-skipped — same determinism rule
+	// as auditVerdictNone — but a present non-success verdict hard-fails
+	// unless Options.AllowRedCI is explicitly set, and an override is always
+	// logged loudly and recorded in Result.CIOverridden.
+	logf("release-commit CI conclusion green?")
+	if opts.DryRun {
+		logf("DRY-RUN: would check the remote CI conclusion for HEAD")
+	} else {
+		ciFn := opts.CIConclusion
+		if ciFn == nil {
+			ciFn = defaultCIConclusion
+		}
+		ci, err := ciFn(opts.RepoRoot)
+		if err != nil {
+			return res, fmt.Errorf("%w: release-commit CI check error: %v", ErrCheckFailed, err)
+		}
+		res.CIConclusion = ci.Conclusion
+		switch {
+		case ci.Conclusion == "":
+			logf("advisory: remote CI conclusion unavailable (no run visible / gh unavailable) — /publish's CI-green check remains authoritative")
+		case ci.Conclusion == "success":
+			logf("OK: release-commit CI conclusion=success %s", ci.RunURL)
+		case opts.AllowRedCI:
+			res.CIOverridden = true
+			logf("OVERRIDE: release-commit CI conclusion is %q (run %s) — NOT green", ci.Conclusion, ci.RunURL)
+			logf("OVERRIDE: proceeding ONLY because --allow-red-ci was explicitly passed; this release ships without a green remote CI verdict")
+		default:
+			return res, fmt.Errorf("%w: release-commit CI conclusion is %q, not success (run %s) — fix CI or pass --allow-red-ci to override",
+				ErrCheckFailed, ci.Conclusion, ci.RunURL)
+		}
 	}
 
 	// Advisory step (v12.1.5+): auto-respond simulation suite. Does NOT count

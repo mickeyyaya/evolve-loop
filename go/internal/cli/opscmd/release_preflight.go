@@ -23,13 +23,16 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		dryRun     bool
 		skipTests  bool
 		strictPass bool
+		allowRedCI bool
 	)
 	for _, a := range args {
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass]")
+			fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass] [--allow-red-ci]")
 			fmt.Fprintln(stdout, "5-step gate: clean tree | branch attached | semver bump | recent audit PASS | gate-tests green.")
-			fmt.Fprintln(stdout, "  --strict-pass  reject WARN verdicts (treat WARN as FAIL)")
+			fmt.Fprintln(stdout, "Plus the release-commit CI hard-gate: the remote go CI run for HEAD must be conclusion=success.")
+			fmt.Fprintln(stdout, "  --strict-pass   reject WARN verdicts (treat WARN as FAIL)")
+			fmt.Fprintln(stdout, "  --allow-red-ci  explicit override: proceed on a non-green release-commit CI (logged loudly)")
 			return 0
 		case a == "--dry-run":
 			dryRun = true
@@ -37,6 +40,8 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 			skipTests = true
 		case a == "--strict-pass": // flag "strict-pass": reject WARN verdicts
 			strictPass = true
+		case a == "--allow-red-ci": // explicit red-CI override (never silent)
+			allowRedCI = true
 		case len(a) >= 2 && a[:2] == "--":
 			fmt.Fprintf(stderr, "[preflight] unknown flag: %s\n", a)
 			return 10
@@ -62,6 +67,7 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		DryRun:     dryRun,
 		SkipTests:  skipTests,
 		StrictPass: strictPass,
+		AllowRedCI: allowRedCI,
 		Stderr:     stderr,
 	}
 	_, err := releasepreflight.Run(opts)

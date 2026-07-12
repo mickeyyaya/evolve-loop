@@ -75,6 +75,9 @@
       "items": {
         "$ref": "#/definitions/Carryover"
       }
+    },
+    "ci_watch": {
+      "$ref": "#/definitions/CIWatchRecord"
     }
   },
   "definitions": {
@@ -119,6 +122,19 @@
         "id": {"type": "string", "minLength": 1},
         "action": {"type": "string", "minLength": 1},
         "priority": {"type": "string"}
+      }
+    },
+    "CIWatchRecord": {
+      "type": "object",
+      "required": ["sha", "conclusion"],
+      "additionalProperties": false,
+      "description": "Remote GitHub CI verdict for the cycle's pushed commit, ingested from ci-watch-verdict.json (cycle-748 push-ci-watch-remote-parity). Absent when no watch verdict was recorded — never fabricated.",
+      "properties": {
+        "sha": {"type": "string", "minLength": 1},
+        "conclusion": {"type": "string", "minLength": 1},
+        "run_url": {"type": "string"},
+        "failing_test": {"type": "string"},
+        "checked_at": {"type": "string"}
       }
     }
   }

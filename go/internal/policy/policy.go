@@ -93,6 +93,10 @@ type Policy struct {
 	// Observer configures phase liveness observation and watchdog behavior.
 	// Absent ⇒ built-in defaults apply.
 	Observer *ObserverPolicy `json:"observer,omitempty"`
+	// CIWatch configures the post-push GitHub CI watch and the release
+	// preflight CI hard-gate. Absent ⇒ built-in defaults apply (enabled,
+	// 900s timeout, 30s poll). See policy_ciwatch.go.
+	CIWatch *CIWatchPolicy `json:"ci_watch,omitempty"`
 	// Bridge configures operator-writable bridge override directories.
 	// Absent ⇒ each bridge subsystem uses its built-in .evolve directory.
 	Bridge *BridgePolicy `json:"bridge,omitempty"`
