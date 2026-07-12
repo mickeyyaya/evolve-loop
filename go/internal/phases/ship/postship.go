@@ -114,6 +114,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	cycleDir := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid))
 	body, logLine := triageDecisionBytes(cycleDir, cid)
 	res.Logs = append(res.Logs, logLine)
+	unlandedShip := false
 	if body != nil {
 		commitShort := ""
 		if len(res.CommitSHA) >= 8 {
@@ -135,6 +136,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		// no signal to gate on — promoting it preserves the cycle-308 residual-drain
 		// contract rather than newly stranding correctly-shipped work.
 		if res.CommitSHA != "" && !isLanded(ctx, opts, res.CommitSHA) {
+			unlandedShip = true
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
@@ -168,7 +170,17 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	// triage-decision.json is absent — the early-return that used to skip it
 	// stranded EVERY claimed item invisibly (inbox-promote-on-ship-missing;
 	// orphans across cycles 124/265/294/295/308).
-	if _, releaseErr := inboxmover.ReleaseCycleProcessing(mvOpts, cid); releaseErr != nil {
+	//
+	// When the landing gate above refused promotion (unlanded ship commit),
+	// the drain is a delivery-failure retry, not an ordinary residual drain —
+	// the ledger reason carries "unlanded" so triage/operators can tell them
+	// apart without hand forensics (cycle-598, inbox-promotion-requires-
+	// landed-ship). A landed cycle's residuals keep the generic reason.
+	releaseReason := ""
+	if unlandedShip {
+		releaseReason = "cycle-release-unlanded-ship-retry"
+	}
+	if _, releaseErr := inboxmover.ReleaseCycleProcessingWithReason(mvOpts, cid, releaseReason); releaseErr != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: residual claim release for cycle %d: %v", cid, releaseErr))
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))

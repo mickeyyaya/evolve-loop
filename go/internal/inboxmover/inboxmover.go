@@ -483,6 +483,19 @@ func RecoverOrphans(opts Options) (RecoverResult, error) {
 // basename already exists at the inbox root (double-move race) is warned and
 // skipped — the existing inbox-root copy is never clobbered.
 func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
+	return ReleaseCycleProcessingWithReason(opts, cycle, "")
+}
+
+// ReleaseCycleProcessingWithReason is ReleaseCycleProcessing with an explicit
+// ledger reason for each released item. An empty reason keeps the generic
+// "cycle-release". Callers that drain because delivery failed (e.g. an
+// unlanded ship commit, cycle-598 shape) pass a reason carrying "unlanded" so
+// the ledger durably distinguishes a delivery-failure retry from an ordinary
+// residual drain (inbox-promotion-requires-landed-ship).
+func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (RecoverResult, error) {
+	if reason == "" {
+		reason = "cycle-release"
+	}
 	opts.resolveOpts()
 	res := RecoverResult{Paths: []string{}}
 
@@ -528,7 +541,7 @@ func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
 			From:   fmt.Sprintf(".evolve/inbox/processing/cycle-%d/%s", cycle, base),
 			To:     ".evolve/inbox/" + base,
 			Cycle:  intPtr(fmt.Sprintf("%d", cycle)),
-			Reason: "cycle-release",
+			Reason: reason,
 		})
 		res.Recovered++
 		res.Paths = append(res.Paths, dest)
