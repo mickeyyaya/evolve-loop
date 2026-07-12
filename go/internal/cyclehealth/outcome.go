@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Outcome is the cycle-ending taxonomy. Batch targets: SHIPPED ≥ 60%;
@@ -32,7 +33,17 @@ const (
 	OutcomeFailedExplained Outcome = "FAILED_EXPLAINED"
 	// OutcomeFailedUnexplained: nothing above matched. The alarm bucket.
 	OutcomeFailedUnexplained Outcome = "FAILED_UNEXPLAINED"
+	// OutcomeDeferred: the dispatch seam detected all-CLI-families quota
+	// exhaustion (every attempt exit=85, cycle-656), wrote a quota-likely
+	// checkpoint, and aborted resumable. Not a failure of the change under
+	// test — the work is preserved for `evolve loop --resume`.
+	OutcomeDeferred Outcome = "DEFERRED"
 )
+
+// abortReasonDeferredPrefix mirrors core's abortReasonAllFamiliesExhausted via
+// the C1 JSON record (the cross-package contract — cyclehealth must not import
+// core).
+const abortReasonDeferredPrefix = "all-families-exhausted"
 
 // outcomeTimingEntry mirrors core.phaseTimingEntry's JSON (the C1 record);
 // only the fields the classifier reads. Kept local: cyclehealth must not
@@ -80,6 +91,15 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 			r.ByRung["salvage"] > 0 && r.ByResult["artifact_appeared"] > 0 {
 			return OutcomeSalvaged, fmt.Sprintf("correction-ladder salvage produced the artifact (salvage=%d, artifact_appeared=%d)",
 				r.ByRung["salvage"], r.ByResult["artifact_appeared"])
+		}
+	}
+
+	// DEFERRED: the abort reason carries the all-families quota-exhaustion
+	// prefix (cycle-656) — checked BEFORE the generic explained-failure arm
+	// so a quota defer is never paged as a failed cycle.
+	for _, e := range timing {
+		if strings.HasPrefix(e.AbortReason, abortReasonDeferredPrefix) {
+			return OutcomeDeferred, e.AbortReason
 		}
 	}
 

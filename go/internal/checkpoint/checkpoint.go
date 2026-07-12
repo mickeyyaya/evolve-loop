@@ -183,6 +183,21 @@ func applyWithHooks(h hooks, path string, cp Checkpoint) error {
 }
 
 func init() {
+	// Cycle-656: the mid-cycle all-families-exhausted detector needs to write
+	// a quota-likely checkpoint from inside core's dispatch seam. quota-likely
+	// IS an escalation reason, so unlike the phase-complete hook below it
+	// writes unconditionally (still carrying the recorded integrity chain and
+	// holding the same sidecar lock). detectQuotaPause / `evolve loop --resume`
+	// consume it. minimal: QuotaResetAt left empty — the resume path treats a
+	// missing wake-at as "operator decides"; wiring usageprobe.ParseResetHint
+	// here is the upgrade path.
+	core.QuotaBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
+		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
+		return flock.WithPathLock(cycleStatePath, func() error {
+			existing := readExistingIntegrity(cycleStatePath)
+			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing))
+		})
+	}
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		// Under fleet each lane's resume/checkpoint block must land in the SAME
 		// per-run cycle-state file the orchestrator's WriteCycleState uses, else

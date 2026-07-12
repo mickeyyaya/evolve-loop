@@ -36,6 +36,14 @@ var (
 	// driver returns exit 80, 85, or 86, which represent transient infra issues.
 	ErrTransientBridgeFailure = errors.New("core: transient bridge failure")
 
+	// ErrAllFamiliesExhausted marks the quota-terminal exhaustion case
+	// (cycle-656): every retry attempt for a phase returned exit=85, meaning
+	// every CLI family in the fallback chain is quota-drained. The dispatch
+	// seam writes a quota-likely checkpoint before aborting with this, so the
+	// batch stops resumable (`evolve loop --resume`) instead of failing
+	// forward into the same wall.
+	ErrAllFamiliesExhausted = errors.New("core: all CLI families quota-exhausted (exit=85)")
+
 	// ErrPhaseInvalid means the supplied Phase value isn't a member of
 	// the enum.
 	ErrPhaseInvalid = errors.New("core: invalid phase")

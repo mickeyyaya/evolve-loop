@@ -583,6 +583,23 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				}, result.Cycle); relErr != nil {
 					fmt.Fprintf(stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, relErr)
 				}
+				// All-families quota exhaustion (cycle-656): the dispatch seam
+				// wrote a quota-likely checkpoint before aborting. Continuing
+				// the batch would burn the next cycle (and its failure retro)
+				// into the same drained quota — stop with the same rc=5
+				// resumable contract as the post-cycle detector below.
+				if errors.Is(err, core.ErrAllFamiliesExhausted) {
+					if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
+						fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d (all CLI families exhausted mid-cycle)\n",
+							qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
+					} else {
+						fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d (all CLI families exhausted mid-cycle; checkpoint block missing — resume re-runs from last boundary)\n", result.Cycle)
+					}
+					fmt.Fprintln(stderr, "[loop]   resume when quota resets: evolve loop --resume")
+					lr.StopReason = "quota-pause"
+					lr.emit(stdout)
+					return 5
+				}
 				continue
 			}
 			lr.StopReason = "error"

@@ -161,6 +161,11 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	shipRecovered := false
 	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	var attemptCount int
+	// attemptExits collects each failed attempt's bridge exit code so the
+	// exhaustion arm can recognize the all-families quota-terminal signature
+	// (every attempt exit=85 — cycle-656) and checkpoint-and-defer instead of
+	// failing forward.
+	var attemptExits []int
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
 		obsCancel := cr.o.observer.Start(cr.ctx, string(next), phaseReq)
@@ -188,7 +193,48 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			break
 		}
 		if err != nil {
+			attemptExits = append(attemptExits, bridgeExitCode(err))
 			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
+				// All-families quota exhaustion (cycle-656 D2): every attempt
+				// returned exit=85, so the cross-family failover (cycle-393)
+				// has no remaining target — quota is a resource that resets in
+				// hours, not a per-attempt transient. Spending more attempts
+				// (or degrading an optional phase to WARN and advancing the
+				// next LLM phase into the same wall) guarantees a FAIL plus a
+				// quota-consuming retro. Instead: write a quota-likely
+				// checkpoint (resumeFromPhase = this phase, completed phases +
+				// worktree preserved) and abort with the typed sentinel so the
+				// loop stops resumable (rc=5) and classification is DEFERRED,
+				// not FAILED. Checked FIRST in the arm — before backfill
+				// (disjoint: exit-81-only) and before optionalInfraSkip, which
+				// would otherwise fail forward. Single-family 85 with a healthy
+				// sibling never reaches here all-85 (the sibling attempt's exit
+				// differs), so normal failover is unchanged.
+				if allFamiliesQuotaExhausted(attemptExits) {
+					phaseErr := fmt.Errorf("phase %s: %w: every family in the fallback chain returned exit=85 across %d attempts; checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt)
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN %v\n", phaseErr)
+					if QuotaBoundaryCheckpointer != nil {
+						if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
+							fmt.Fprintf(os.Stderr, "[orchestrator] WARN quota-boundary checkpoint write failed: %v (defer still recorded; resume may re-run completed phases)\n", cperr)
+						}
+					}
+					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
+						TS:       cr.o.now().UTC().Format(time.RFC3339),
+						Cycle:    cr.cycle,
+						Role:     string(next),
+						Kind:     "all_families_exhausted",
+						ExitCode: 85,
+					}); lerr != nil {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN all_families_exhausted ledger append: %v\n", lerr)
+					}
+					// ADR-0044 C1: record the abort reason with the DEFERRED
+					// prefix so cyclehealth classifies the cycle DEFERRED.
+					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt,
+						fmt.Sprintf("%s: %s", abortReasonAllFamiliesExhausted, phaseErr.Error()), cr.cs.PhaseStartedAt))
+					writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt, cr.o.now)
+					cr.recordFailureLearning(next, phaseErr, attempt)
+					return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
+				}
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.
 				// Default-on; policy.json can disable artifact backfill for the cycle.

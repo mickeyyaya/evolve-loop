@@ -26,6 +26,13 @@ import (
 // at phase boundaries, set by the checkpoint package to avoid circular imports.
 var PhaseBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
 
+// QuotaBoundaryCheckpointer is a package-level hook to write a quota-likely
+// checkpoint block when the dispatch seam detects all-families exit=85
+// exhaustion (cycle-656). Set by the checkpoint package to avoid circular
+// imports; it preserves completed phases + the worktree so `evolve loop
+// --resume` re-enters at the deferred phase after the quota resets.
+var QuotaBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
+
 func wrapCycleLevelError(phase Phase, err error) error {
 	if err == nil {
 		return nil
