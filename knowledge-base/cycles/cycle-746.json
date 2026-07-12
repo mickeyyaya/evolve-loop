@@ -1,0 +1,19 @@
+{
+  "cycle": 746,
+  "run_id": "01KXBQVAHDVMNFJ23141Z6WSTF",
+  "goal": "6588b51f58ccef5d0649a40b8bcae2d25a69cccf3c2aac59f4d1dd8ca5fdaf20",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "PASS",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ]
+}
