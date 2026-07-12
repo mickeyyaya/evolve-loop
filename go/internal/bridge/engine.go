@@ -317,7 +317,13 @@ type Engine struct {
 // with only the fields you need to override (typically just Runner +
 // Now + Env in tests).
 func NewEngine(deps Deps) *Engine {
-	return &Engine{deps: deps.withDefaults()}
+	d := deps.withDefaults()
+	if d.TokenResolver == nil {
+		// Fail-open must be loud: a nil resolver silently zeroes token
+		// telemetry (resolveTokens no-ops), so name the seam once at boot.
+		_, _ = fmt.Fprintf(d.Stderr, "[engine] WARN: Deps.TokenResolver is nil — token telemetry disabled (fail-open); wire tokenusage.DefaultResolver at the composition root\n")
+	}
+	return &Engine{deps: d}
 }
 
 // HasTokenResolver reports whether this Engine was wired with a non-nil
