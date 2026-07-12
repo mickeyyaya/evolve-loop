@@ -1,0 +1,20 @@
+{
+  "id": "fleet-config-hot-reload-wave-boundary",
+  "title": "Fleet: re-read policy fleet block (count/min_lanes) at every wave boundary instead of batch-start snapshot",
+  "weight": 0.92,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "fleet-width-2026-07",
+  "summary": "Live incident 2026-07-12 (~20:17): operator committed fleet.min_lanes 3->10 mid-batch (sanctioned ship a33ffd6a) to hold width 10 under a codex quota bench, but wave 1 still dispatched 'wave count 10 -> 9 (min 3)' — the supervisor snapshots the fleet policy block at batch start and never re-reads it, so a committed control-plane change requires a full supervisor bounce (kills in-flight lanes) to take effect. This is asymmetric: the control-plane preflight already re-validates policy.json CLEANLINESS per wave (it refuses dirty control-plane files at every dispatch), yet dispatch consumes stale VALUES. Fix the class: at each wave boundary, before QuotaAwareCount, re-resolve the fleet block (count, min_lanes, plan_source) from the committed policy.json — single resolution point, same loader as batch start; log '[loop] fleet config reloaded: count=N min_lanes=M' when values changed. Operator width directives (user standing rule: 10 lanes ALL THE TIME) must take effect at the next wave without killing lanes.",
+  "acceptance": [
+    "RED: TestFleetDispatch_ReloadsMinLanesAtWaveBoundary (commit min_lanes change between waves; wave N+1 uses new floor)",
+    "RED: TestFleetDispatch_ReloadsCountAtWaveBoundary",
+    "RED: TestFleetDispatch_UnchangedPolicyByteIdenticalDispatch (regression pin: no policy change => identical wave config)",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/fleet/", "go/internal/core/", "go/internal/policy/policy.go"],
+  "deps": [],
+  "connects_to": ["fleet-lane-provisioning-split"],
+  "source": "operator incident 2026-07-12 width-10 directive",
+  "created_at": "2026-07-12T12:25:00Z"
+}

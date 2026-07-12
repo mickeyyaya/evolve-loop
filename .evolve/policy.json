@@ -28,8 +28,8 @@
     }
   },
   "fleet": {
-    "count": 10,
+    "count": 3,
     "plan_source": "triage",
-    "min_lanes": 10
+    "min_lanes": 3
   }
 }
