@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-session-resume-on-retry",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.79,
+  "title": "Token-opt: phase retry resumes the SAME CLI session (claude --resume) instead of fresh-booting — a retry today re-pays system prompt + instructions + exploration",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Orchestrator retry loop (cyclerun_dispatch.go:164-171) re-dispatches fresh; with the session id captured by S1/S3 telemetry, retries of the same phase resume the prior session (its context is already cache-read). Fall back to fresh boot when the session is stale past the 5-min cache TTL (a stale resume is a FULL cache miss — worse than fresh; papers 2.7). GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (oss.md 15, papers.md 2.7).",
+  "acceptance": ["Retry dispatches carry --resume with the prior session id when within TTL; fresh boot beyond TTL (test both)", "measured input tokens on retried phases drop vs baseline"],
+  "files": ["go/internal/bridge/ (driver launch args)", "go/internal/core/cyclerun_dispatch.go"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

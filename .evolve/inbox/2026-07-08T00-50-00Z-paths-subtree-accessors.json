@@ -1,0 +1,18 @@
+{
+  "id": "paths-subtree-accessors",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.78,
+  "title": ".evolve/ subtree paths (runs/cycle-N, worktrees, inbox, instincts) hand-built by raw filepath.Join in ~10 production sites — internal/paths models only top-level files, so the layout cannot evolve in one place",
+  "kind": "refactor",
+  "priority": "medium",
+  "summary": "paths.Layout is the documented layout SSOT but only for top-level files (StateFile, LedgerFile, ...). The runs/cycle-N form alone is derived in ≥6 sites: core/runworkspace.go:49, runscope/runscope.go:133 ('Mirrors core.RunWorkspacePath' comment admits it), budgethistory/budgethistory.go:58, acssuite/acssuite.go:560, cmd_loop_control.go:183; plus worktrees/inbox/instincts variants (core/worktree.go:51, cmd_loop_outcome.go:226, bridge/driver_tmux_repl.go:455, bridge/interaction_rules.go:48, swarm/provision.go:101, pruneephemeral.go:61,65). The runscope comment carries a load-bearing invariant (no lane embedding) that other sites cannot see. Same wound class that forced core.ResolveCycleStatePath SSOT after a fleet isolation hole.",
+  "root_cause": "Layout knowledge duplicated per consumer because paths never grew subtree accessors; invariants live in comments at one of many sites.",
+  "fix": "Extend paths.Layout with pure projection methods: RunsDir(), RunWorkspace(cycle int), WorktreesDir(), InboxDir(), InstinctsDir(name). core.RunWorkspacePath and runscope.WorkspacePath become one-line delegators (signatures preserved — zero caller churn pass 1); remaining literal sites switch to the accessors in the same cycle (grep-verified zero remaining '.evolve','runs' joins outside paths). A future per-lane layout change then happens in ONE method.",
+  "acceptance": [
+    "RED: TestLayout_RunWorkspaceProjection — accessor equals today's literal form byte-for-byte (compat pin), and delegators route through it",
+    "grep gate: no filepath.Join(..., \".evolve\", \"runs\"...) outside internal/paths (add to the item's audit script)",
+    "go vet, -race, apicover -enforce green; behavior-neutral (paths byte-identical)"
+  ],
+  "files": ["go/internal/paths/paths.go", "go/internal/core/runworkspace.go", "go/internal/runscope/runscope.go", "go/internal/budgethistory/budgethistory.go", "go/internal/acssuite/acssuite.go", "go/cmd/evolve/cmd_loop_control.go", "go/internal/pruneephemeral/pruneephemeral.go", "go/internal/swarm/provision.go"],
+  "connects_to": ["fleet_cyclestate_isolation (the precedent wound: ResolveCycleStatePath)", "subagent-workspace-absolutize (same layer)"]
+}

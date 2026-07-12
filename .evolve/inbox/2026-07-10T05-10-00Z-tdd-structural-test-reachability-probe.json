@@ -1,0 +1,18 @@
+{
+  "id": "tdd-structural-test-reachability-probe",
+  "title": "TDD must compiler-probe structural grep tests before freezing (unsatisfiable-acceptance family: cycles 282, 283, 644)",
+  "weight": 0.88,
+  "kind": "feature",
+  "root_cause": "A doNotModifyTests:true structural test that greps production source for a package-qualified call site (pkgX.Foo( inside a pkgB file) is an ARCHITECTURE CLAIM - it asserts pkgB may import pkgX. TDD freezes such claims without checking the import graph, so a forbidden import direction becomes a permanently-RED acceptance criterion that dooms the whole cycle: cycle 644 froze 'storage.UpdateStateMap(' inside core/reset.go while storage already imports core (compiler-proven cycle). Same disease as cycles 282/283 (structurally unreachable coverage floors): acceptance criteria are not reachability-checked before freezing.",
+  "evidence": ".evolve/runs/cycle-644/retrospective-report.md (D2 + root cause synthesis); .evolve/instincts/lessons/cycle-644-tdd-frozen-structural-test-pins-unbuildable-import-cycle.yaml; go build ./internal/core/ => 'import cycle not allowed' reproduced by Builder AND Auditor independently.",
+  "fix": "Config-driven TDD-phase guardrail (phase behavior = config/agent-doc change per phases_are_config_only, plus a small deterministic check if a code seam exists): before freezing any structural test that pins a package-qualified symbol in another package's file, TDD MUST build a throwaway probe wiring that call site and confirm go build ./... exits 0. On 'import cycle not allowed', the test target is wrong - pick an acyclic home (leaf package) BEFORE freezing. Encode in the tdd-engineer agent doc + deliverable contract; optionally add a deterministic post-tdd validation that extracts pinned pkg.Symbol references from frozen tests and asserts import-graph reachability (go list -deps based, no LLM judgment - deterministic work belongs in code).",
+  "acceptance": [
+    "tdd-engineer agent doc + contract name the reachability-probe obligation with the cycle-644 example",
+    "Deterministic check (if implemented): a fixture frozen test pinning an import-cycle-closing call site is flagged BEFORE build phase starts (regression test reproduces the 644 shape)",
+    "A reachable pinned call site passes the check unchanged (no false positives - table-driven)",
+    "go test -race on touched packages PASS; apicover clean"
+  ],
+  "connects_to": ["statefile-rmw-flock-single-source", "retro-preventive-actions-autofile-inbox"],
+  "source": "operator-injection from cycle-644 retrospective preventive actions",
+  "created_at": "2026-07-10T05:10:00Z"
+}

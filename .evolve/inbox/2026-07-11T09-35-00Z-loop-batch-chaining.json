@@ -1,0 +1,19 @@
+{
+  "id": "loop-batch-chaining",
+  "title": "Loop self-chains batches: --until-inbox-empty mode so 3-wide operation persists without an operator relaunching at every boundary",
+  "weight": 0.88,
+  "kind": "feature",
+  "priority": "high",
+  "summary": "Today each batch exits at max_cycles and a human/operator session must relaunch (rebuild, reset-sha, evolve loop ...) - width and drain stop whenever no operator is watching. Standing directive: 3 concurrent lanes at all times until the inbox is empty. Add a batch-chaining mode (policy-driven, e.g. loop.chain=until_inbox_empty with max_batches safety cap; CLI param --until-inbox-empty as the explicit opt-in per cli_params_over_env_flags): at the batch boundary the loop itself runs the boundary sequence - self-rebuild is ALREADY solved (provenance-gated boot auto-repin, 6ae52d16), workspace GC exists, seal checks exist - then starts the next batch with the same goal, WITHOUT operator involvement. Stop conditions: inbox empty (clean exit), all-CLI-families quota exhaustion (defer + write quota-boundary checkpoint with reset-time hint instead of spinning - coordinate with all-families-exhausted-checkpoint-defer), max_batches cap, or operator stop file.",
+  "acceptance": [
+    "Regression test: with chain mode on and a seeded inbox, batch N exiting max_cycles starts batch N+1 without external invocation (fake-runner seam); inbox-empty exits cleanly with a chain summary",
+    "Quota wall: all-families-exhausted evidence at a boundary defers (writes checkpoint + next-reset hint) instead of relaunching into guaranteed 85s",
+    "Safety: max_batches cap enforced; a .evolve/loop-stop marker halts chaining at the next boundary (operator brake)",
+    "Fleet width preserved across chained batches (min_lanes floor respected in every batch); go test -race PASS; apicover clean"
+  ],
+  "files": ["go/cmd/evolve/cmd_loop.go", "go/internal/policy (chain block)", "go/internal/core (boundary sequence reuse)"],
+  "deps": [],
+  "connects_to": ["all-families-exhausted-checkpoint-defer", "workspace-hygiene-s5", "loop-self-sha-autorepin (landed 6ae52d16)"],
+  "source": "operator directive 2026-07-11: keep 3 concurrent loops running all the time",
+  "created_at": "2026-07-11T09:35:00Z"
+}

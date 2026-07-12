@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-tool-call-memoization",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.72,
+  "title": "Token-opt: deterministic tool-call memoization keyed (cmd, args, tree-SHA) across phases and lanes — repeated identical calls cost zero",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "CrewAI/DSPy pattern: cycle-scoped memo of deterministic command results (go list, go test on unchanged tree, git status snapshots) shared across phases and sibling lanes via workspace artifacts; also disk-cache advisor/router verdicts keyed on input hash across cycles. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (oss.md 7, 14; papers.md 5.1).",
+  "acceptance": ["Second identical (cmd,args,tree-SHA) call within a cycle served from memo (test)", "advisor verdict cache hit on identical input hash", "memo invalidated on tree-SHA change"],
+  "files": ["go/internal/ (memo pkg)", "go/internal/core/phase_advisor.go (verdict cache)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

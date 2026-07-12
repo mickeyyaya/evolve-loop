@@ -1,0 +1,19 @@
+{
+  "id": "required-roles-ssot",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.89,
+  "title": "requiredRoles [scout builder auditor] declared independently in 3 integrity packages with LIVE semantic drift: cyclehealth only counts kind==agent_subprocess ledger entries, so Go-native cycles (which emit kind==phase) fail its completeness check while passing ledgerverify",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "Three sites: ledgerverify/verify.go:53 (var, plus canonicalRole mapping build→builder/audit→auditor, accepts agent_subprocess AND phase kinds), cyclehealth/cyclehealth.go:203 (var, agent_subprocess ONLY — diverged), redteamcheck/redteamcheck.go:108 (inline literal, oldest). The same predicate — 'did all required roles run?' — evaluates differently per package TODAY: a Go-orchestrator cycle satisfies ledgerverify but fails cyclehealth.checkLedgerCompleteness. Adding a mandatory role (e.g. tdd-engineer) to one site silently isn't enforced by the others.",
+  "root_cause": "Role vocabulary + dual-kind ledger semantics were copy-declared per consumer instead of exported from one source, violating single-source-with-projection.",
+  "fix": "Export RequiredRoles + the canonicalRole mapping + the accepted-kinds predicate from ONE home (ledgerverify is the natural owner, or a slim internal/cyclecontracts if import direction demands). cyclehealth and redteamcheck import it; cyclehealth adopts the dual-kind acceptance so Go-native cycles evaluate identically everywhere. Pin the set against phasecontract.Contracts() (phases with AgentName != \"\") so registry evolution can't silently diverge from the role set.",
+  "acceptance": [
+    "RED: TestCycleHealth_GoNativePhaseKindEntriesSatisfyCompleteness — fixture ledger with kind==phase entries for scout/builder/auditor passes cyclehealth (fails today)",
+    "RED: cross-package pin — RequiredRoles == roles derived from phasecontract.Contracts(); single declaration site (grep proves the other two literals deleted)",
+    "Twin: legacy agent_subprocess-only ledger still passes both packages",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/ledgerverify/verify.go", "go/internal/cyclehealth/cyclehealth.go", "go/internal/redteamcheck/redteamcheck.go", "go/internal/phasecontract/"],
+  "connects_to": ["artifact-name-ssot-retro-backfill (same SSOT family, same phasecontract anchor)", "ledger-single-writer-consolidation (kind vocabulary owner)"]
+}

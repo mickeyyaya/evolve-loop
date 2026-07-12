@@ -1,0 +1,28 @@
+{
+  "id": "artifact-log-compression",
+  "created_at": "2026-07-06T02:15:00Z",
+  "weight": 0.80,
+  "title": "Deterministic compression of bulky low-density artifact sections (test logs, build output, diffs) before prompt injection - LLMLingua-2 finding applied as a Go-native filter at conservative 2-4x (dedup repeated stack frames, collapse pass-noise, keep failures verbatim)",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Research honorable-mention (knowledge-base/research/token-optimization-2026/README.md; part1 finding #1): LLMLingua-2 achieves 2-5x prompt compression with minimal quality loss, with 4-10x as the practical ceiling; production guidance is conservative 2-4x for bulky LOW-DENSITY content only (logs, repeated stack traces, verbose build output) - never for dense contract-bearing markdown. Rather than deploying the trained compressor model, the same win is available as a DETERMINISTIC Go filter (Rule 5: deterministic work belongs in code, not LLM calls): test/build logs are extremely low-entropy (repeated PASS lines, duplicate stack frames, progress spinners) and compress heavily with rules alone. SWE-Pruner (arXiv 2601.16746) validates the interception point: filtering tool/file output at the middleware layer cut 23-38% of tokens on SWE-bench at comparable success.",
+  "root_cause": "Raw test/build output and full diffs are injected into phase prompts and reports verbatim: a 400-line `go test ./...` output where only 6 lines matter (the failures + summary counts) costs ~65x its information content in tokens, on every injection, in every retry.",
+  "fix": "Deterministic Go filter at the artifact/tool-output injection boundary (composes with observation-masking, which handles STALE outputs; this handles CURRENT bulky ones): (1) test output -> keep failures verbatim + per-package status lines + final counts; collapse consecutive PASS/ok lines to a count; (2) stack traces -> dedup repeated frames (keep first occurrence + 'xN repeated'); (3) build output -> errors/warnings verbatim, progress noise dropped; (4) diffs -> full for small, stat+hunks-touching-flagged-files for large (threshold in policy.json); (5) NEVER compress: contract-bearing artifact sections (decisions, acceptance criteria, verdicts) - the two-tier lossless/lossy policy from the research (part1 finding #3). All thresholds policy-configured.",
+  "acceptance": [
+    "Golden tests: representative go-test/build/diff outputs -> filtered versions preserve ALL failure lines + counts byte-exact while cutting >=50% of tokens on the bulky fixtures.",
+    "Contract-bearing sections provably untouched (never-compress list in policy; regression test).",
+    "Phase input-token telemetry shows reduction on test-heavy phases (tdd/build/audit) across a soak batch with no verdict change.",
+    "Thresholds/ratios in policy.json, zero Go literals.",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    "go/internal/bridge/ (tool-output/artifact injection filter)",
+    "go/internal/policy/ (thresholds + never-compress list)"
+  ],
+  "connects_to": [
+    "token-optimization research part1 findings #1/#3 + SWE-Pruner #15",
+    "observation-masking-stale-tool-eviction (sibling: stale vs bulky-current split the same problem)",
+    "report-size-contracts-jit-artifacts (compressed logs shrink the on-disk detail phases JIT-read)"
+  ],
+  "notes": "Injected 2026-07-06 completing full-report queueing. Weight 0.80: solid evidence + fully deterministic, ranked under the masking/prefix/contract levers because it overlaps their savings surface. Evidence: LLMLingua-2 (2-5x, ACL Findings 2024 + 2026 field reports), SWE-Pruner 2601.16746 (23-38% via tool-output interception), lossless meta-token compression 2506.00307 (two-tier policy)."
+}

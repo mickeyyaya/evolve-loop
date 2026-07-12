@@ -1,0 +1,25 @@
+{
+  "id": "fable-simulation-slices-f1-f5",
+  "created_at": "2026-07-07T21:00:00Z",
+  "weight": 0.88,
+  "title": "Fable-simulation mechanical slices F1-F5 per docs/plans/fable-simulation-2026-07.md \u2014 COMPACT generator, per-vendor re-render, class-keyed overlay wiring, E1-E6 bait-scenario eval harness, calibration soak",
+  "kind": "feature",
+  "priority": "high",
+  "summary": "The authored layers (thinking.md, adaptations/{opus,gpt,flash}.md, design doc, research) merged in PR #319 (81502351). Implement the mechanical slices EXACTLY per the design doc's slice table \u2014 F1 COMPACT.md generator + drift test (TestFableCompact_TracesToSSOT, TestFableCompact_Under80Lines); F2 per-vendor re-render, formatting-only (TestPublishRender_PerVendorForm, TestPublishCodex_InlinesReferenceDigest); F3 class-keyed overlay selection (TestOverlaySelect_FastClassGetsCompactOnly, TestOverlaySelect_DeepClassGetsFullTree; DEPENDS: skill-overlays-bridge-layer + advisor-skill-selection); F4 E1-E6 eval harness (code-audited ACS predicates, fable-sim-scorecard.json); F5 calibration soak. ONE SLICE PER CYCLE in F-order; read the design doc first \u2014 it contains the evidence constraints (flash never gets the full tree; d=2.47 belongs to affordance-removal; external gates are the load-bearing layer). GENERALIZED 2026-07-07T21:40Z per operator: vendor adaptation files REMOVED (universal rules folded into core; COMPACT.md = capability-class projection, any vendor; harness knobs -> driver profiles; vendor formatting -> automated F2). Design doc updated on branch feat/fable-generalize.",
+  "acceptance": [
+    "per-slice RED tests from the design doc slice table, verbatim",
+    "go vet, -race, apicover -enforce green per slice",
+    "F5 exit: fable-sim-scorecard.json shows each model class improving on E1-E6 with its adapted projection vs baseline"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_skills_publish.go",
+    "go/internal/policy/ (overlay class rules)",
+    "go/acs/ (eval predicates)",
+    "skills/fable/ (COMPACT.md generated)"
+  ],
+  "connects_to": [
+    "docs/plans/fable-simulation-2026-07.md (the authoritative spec)",
+    "skill-overlays-bridge-layer requeue + advisor-skill-selection (F3 deps)",
+    "knowledge-base/research/fable-simulation-2026/"
+  ]
+}

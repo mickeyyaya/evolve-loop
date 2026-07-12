@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-cache-discipline-audit",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.80,
+  "title": "Token-opt: cache-discipline audit — byte-stable static prefixes across all lanes/phases; cache-breakers (run-id, cycle, timestamps, dynamic tool lists) after the stable prefix",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Audit every phase prompt assembly + injected preamble for per-cycle dynamic content above the cache boundary; extend the existing cache-stable-prefix work (StaticPrefix/BaseCycleContext) to ALL injection sites; add an ACS/audit check that fails when a dynamic value appears above the boundary. Published: 41-80% cost cut; cache reads ITPM-exempt = ~5x effective quota at 80% hit. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (papers.md 2.5-2.7).",
+  "acceptance": ["No per-cycle dynamic bytes above the cycle-context boundary in any composed prompt (regression check)", "cache_hit_ratio (from S6 rollups) improves batch-over-batch"],
+  "files": ["go/internal/phases/runner/", "go/internal/bridge/ (preamble injection sites)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

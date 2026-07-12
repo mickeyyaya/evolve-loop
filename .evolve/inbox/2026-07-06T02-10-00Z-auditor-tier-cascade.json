@@ -1,0 +1,29 @@
+{
+  "id": "auditor-tier-cascade",
+  "created_at": "2026-07-06T02:10:00Z",
+  "weight": 0.84,
+  "title": "Auditor tier cascade (FrugalGPT pattern): cheap-tier first audit pass, escalate to deep-tier ONLY on uncertainty/flags - audit family is the measured token hog (~59% of agentic-SWE pipeline tokens)",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Research applicability C3 (knowledge-base/research/token-optimization-2026/README.md): FrugalGPT-style cascades match GPT-4-class accuracy at 50-98% cost reduction by running a cheap model first and escalating only when the cheap pass is uncertain or flags issues (arXiv 2305.05176, TMLR - still the 2025-26 reference). Tokenomics (arXiv 2601.14470) measured code review at 59.4% of ALL tokens in an instrumented agentic-SWE pipeline - the audit family is statistically where cascade savings concentrate. Separate-critic evidence: a different model as critic breaks shared blind spots at one extra call (matches the existing Adversarial Auditor design - this cascades the TIER, keeping the cross-model property).",
+  "root_cause": "Every audit runs at deep tier regardless of diff size/risk: a trivially-clean 5-line config diff gets the same Opus-class scrutiny as a 500-line core refactor - the single largest token line-item in the pipeline has no cheap fast-path.",
+  "fix": "Config-driven cascade in the audit phase family (profiles/policy, zero Go literals for the thresholds): (1) first pass at a cheap tier (fast/balanced); (2) deterministic escalation triggers -> re-run at deep tier: cheap pass emits FAIL/WARN, verdict confidence below threshold, diff touches high-risk paths (policy-listed: go/internal/core, guards, ship), or diff size exceeds threshold; (3) clean-and-confident cheap pass ships without the deep pass; (4) adversarial-audit cross-model property preserved (cascade changes TIER not the cross-family separation). Staged rollout: shadow (log would-have-escalated) -> enforce, consistent with repo precedent.",
+  "acceptance": [
+    "Audit runs cheap-tier first; escalation triggers (verdict, confidence, risk-paths, diff-size) are policy-configured; deep pass fires only on trigger.",
+    "Shadow stage logs cheap-vs-deep agreement rate before enforce (soak evidence in dossiers).",
+    "Escalation regression test: high-risk-path diff always escalates; trivial clean diff does not.",
+    "No reduction in caught-issue rate across a soak batch (audit quality guard).",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    ".evolve/profiles/auditor.json + audit phase contracts (tier cascade config)",
+    "go/internal/phases/audit/ (escalation trigger evaluation)",
+    "go/internal/policy/ (thresholds, risk paths)"
+  ],
+  "connects_to": [
+    "token-optimization research README applicability C3 (+ finding #9 Tokenomics 59.4%)",
+    "per-phase-effort-routing (effort dial composes: cheap pass can also be low-effort)",
+    "difficulty-conditioned-phase-budgets (same difficulty signal can gate the cascade)"
+  ],
+  "notes": "Injected 2026-07-06 completing full-report queueing (operator: 'why don't we queue all of them?'). Weight 0.84: targets the measured worst offender but touches audit-integrity surface, so shadow-first. Evidence: FrugalGPT 2305.05176 (50-98% cost cut), Tokenomics 2601.14470 (59.4% review share), RouteLLM (85% cost cut retaining 95% quality)."
+}

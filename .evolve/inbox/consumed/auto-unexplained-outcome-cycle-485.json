@@ -1,0 +1,9 @@
+{
+  "action": "Cycle 485 ended FAILED_UNEXPLAINED (no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint). Every terminal path must record a ship PASS, a salvage, or an abort_reason (ADR-0044 C1) — locate the escaping path and route it through recordPhaseOutcome.",
+  "evidence_pointer": ".evolve/runs/cycle-485/phase-timing.json",
+  "id": "unexplained-outcome-cycle-485",
+  "injected_at": "2026-07-03T20:15:43Z",
+  "injected_by": "loop-outcome-classifier",
+  "priority": "HIGH",
+  "weight": 0.8
+}

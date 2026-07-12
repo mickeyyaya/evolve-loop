@@ -1,0 +1,17 @@
+{
+  "id": "fleet-lane-provisioning-split",
+  "title": "Fleet lane identity incoherent within one run: scout scouts lane A's goal while triage is handed lane B's fleet_scope",
+  "weight": 0.9,
+  "kind": "bugfix",
+  "root_cause": "Fleet provisioning does not pin ONE lane identity for the whole run. In cycle 640 the scout that ran in the worktree scouted the token-optimization lane's goal, while triage received the statefile-rmw lane as fleet_scope (triage-report.md itself notes scout-report.md 'covers a separate token-telemetry lane'). With scout and triage disagreeing about which lane the run IS, downstream phases cannot form a coherent task identity - this is the enabler for the builder-task-binding class (7 occurrences), and it also let another lane's RED scaffolding bleed into this worktree.",
+  "evidence": ".evolve/runs/cycle-640/retrospective-report.md 'Root cause synthesis' + triage-report.md in the same run dir; preserved worktree .evolve/worktrees/cycle-21f9f7ae-640. Related prior class: cycle-59 / cycle-584 worktree-isolation lessons.",
+  "fix": "Pin lane identity at provisioning time: the fleet supervisor writes the lane's task scope (slug set + goal hash) into the run workspace BEFORE any phase runs (e.g. lane-scope.json next to run.json), and every phase runner injects THAT scope - scout scouts within it, triage selects from it, build/tdd bind to it. A run whose scout-report goal hash differs from the lane scope's goal hash should fail fast at the scout->triage transition with an explicit abort_reason instead of proceeding incoherently.",
+  "acceptance": [
+    "Regression test: two concurrent lanes with distinct scopes each see ONLY their own scope in scout/triage/build prompts (fixture asserts injected scope matches lane-scope.json)",
+    "Regression test: scout-report goal-hash mismatch vs lane-scope.json fails the scout->triage transition with abort_reason (no silent proceed)",
+    "go test -race on touched packages PASS; apicover clean"
+  ],
+  "connects_to": ["builder-task-binding-topn-gate", "fleet-width-l3-self-prioritize"],
+  "source": "operator-injection from cycle-640 retrospective (fleet-lane provisioning split enabler)",
+  "created_at": "2026-07-10T03:22:00Z"
+}

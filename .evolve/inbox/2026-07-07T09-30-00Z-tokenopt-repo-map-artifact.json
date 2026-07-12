@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-repo-map-artifact",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.77,
+  "title": "Token-opt: Go-generated repo-map artifact (hard 1-2K token budget) injected per phase — kills the 12x/cycle fresh repo re-exploration tax",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "aider-style: symbol/exports map ranked by relevance to the cycle's top_n files, packed to a hard token budget, cached keyed by tree-SHA (paid once per change, not once per session); injected into phase prompts as the exploration starting point. Scoped-context literature: up to -82 percent tokens. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (oss.md 3, papers.md 5.3/3.3).",
+  "acceptance": ["repo-map.md artifact generated at cycle start under budget (test pins budget)", "cache keyed by tree-SHA (no regen on unchanged tree)", "scout/tdd/build prompts reference it"],
+  "files": ["go/internal/ (new repomap pkg)", "go/internal/phases/runner/ (injection)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

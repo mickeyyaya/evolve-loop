@@ -1,0 +1,19 @@
+{
+  "id": "inboxmover-promote-mkdir-fail-loud",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.88,
+  "title": "inboxmover.Promote returns NoOp=true + nil error when destination mkdir FAILS — infrastructure failure reported as success, task stranded in processing/ and skipped by RecoverOrphans while its cycle is active",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "Verified at inboxmover.go:204-216: os.MkdirAll(destDir) failure → WARN to opts.Stderr (default io.Discard) + best-effort ledger line + return (PromoteResult{NoOp:true}, nil). NoOp=true/nil is the ship.sh-compat 'already done' contract — the caller proceeds as promoted. The file stays in processing/cycle-N/; RecoverOrphans skips the active cycle, so recovery happens a full cycle late at best (duplicated or delayed work).",
+  "root_cause": "The exit-0 compat contract designed for 'source not found (already moved)' was extended to a could-not-complete infrastructure failure; verdict-style success masks a non-delivery.",
+  "fix": "Promote returns (res, fmt.Errorf(\"promote: mkdir %s: %w\", destDir, err)) with res.NoOp=false on mkdir failure. Keep NoOp=true strictly for the source-already-moved case. Audit the direct callers (ship phase / cmd inbox-mover) to surface the error into the cycle outcome rather than swallowing exit codes.",
+  "acceptance": [
+    "RED: TestPromote_MkdirFailed_ReturnsError — read-only parent for destDir → err != nil, res.NoOp == false (fails today)",
+    "Twin: TestPromote_SourceAlreadyMoved_NoOpSuccess — existing compat behavior preserved",
+    "Caller check: ship-phase promotion failure appears in cycle diagnostics, not exit 0",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/inboxmover/inboxmover.go", "go/internal/phases/ship/"],
+  "connects_to": ["inbox-promotion-requires-landed-ship (pending 0.9 — same file/family; land that first or same lane to avoid conflicting edits; this item is the mkdir-failure sibling of the verdict-vs-delivery defect)"]
+}

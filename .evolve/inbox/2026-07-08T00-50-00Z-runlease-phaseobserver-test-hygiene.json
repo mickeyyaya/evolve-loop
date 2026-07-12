@@ -1,0 +1,18 @@
+{
+  "id": "runlease-phaseobserver-test-hygiene",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.74,
+  "title": "Concurrency-hygiene pair: runlease package-var seams (createTempFn/renameFn) are one t.Parallel() away from cross-test races; phaseobserver has sleep-based test sync (50-150ms), a per-select-iteration channel allocation, and split-brain locking discipline",
+  "kind": "refactor",
+  "priority": "medium",
+  "summary": "(1) runlease.go:39-43 exposes mutable package-level seams; tests at runlease_test.go:195-254 mutate+restore them while sibling tests call real Write through the same globals — safe only while nobody adds t.Parallel(). (2) phaseobserver: tests use bare time.Sleep(50-150ms) as startup barriers (phaseobserver_test.go:75,286; coverage_test.go:49) — flake source under CI contention; production Run() allocates a fresh make(chan time.Time) on EVERY select iteration via an inline func (phaseobserver.go:303-309) where the nil-channel idiom is the correct form; and locking is inconsistent — processLine/emit take obs.mu while the poll loop reads the same fields unlocked (fine single-threaded today, a trap for any future goroutine).",
+  "root_cause": "Test seams grafted onto package state instead of injected; observer written single-threaded but half-armored with a mutex, inviting wrong conclusions.",
+  "fix": "(1) Move createTempFn/renameFn into an injected writeConfig/Writer struct (constructor-default = real funcs); tests inject per-instance. (2) Hoist a nil stopCh before the loop (var stopCh <-chan time.Time; if stopTimer != nil { stopCh = stopTimer.C }); pick ONE locking story — Run is single-goroutine: remove obs.mu from processLine/emit and document 'not safe for concurrent use' (simplest), and replace test sleeps with a Ready channel / injected clock barrier.",
+  "acceptance": [
+    "RED: runlease seam-isolation test proving two Writers with different injected seams don't interfere (package-var version cannot pass this)",
+    "phaseobserver: testing.AllocsPerRun pins 0 allocs/iteration for the stop arm; all sleep barriers replaced by deterministic signals; suite stable under -race -count=5 -parallel=8",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/runlease/runlease.go", "go/internal/runlease/runlease_test.go", "go/internal/phaseobserver/phaseobserver.go", "go/internal/phaseobserver/phaseobserver_test.go", "go/internal/phaseobserver/coverage_test.go"],
+  "connects_to": ["observer-sink-close-race (adapters/observer sibling — separate item, do first)", "loop_lease_fencing family"]
+}

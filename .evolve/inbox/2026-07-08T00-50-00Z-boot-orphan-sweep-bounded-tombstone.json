@@ -1,0 +1,19 @@
+{
+  "id": "boot-orphan-sweep-bounded-tombstone",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.9,
+  "title": "Loop-boot orphan sweep re-reaps the ENTIRE run history serially with context.Background() — 4,388 recorded sessions across 304 registries re-swept on every boot (~22-44s), unbounded growth, hangs forever if tmux wedges",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "looppreflight/checks.go:152 calls sessionreaper.ReapOrphans(context.Background(), ...) on every loop boot (same at cmd_fleet_soak.go:134). sessionreaper.go:71-79 sweeps every run dir with a registry + stale lease on EVERY invocation, and swarm/reap_runsessions.go:34-54 never tombstones a fully-reaped registry — so history is re-swept forever (~7 sessions/cycle growth). The per-cycle sweep is deadline-bounded (orphanGCTimeout=15s at cmd_loop_control.go:41-44, created for exactly 'a wedged tmux'); the boot sweep is not — a wedged tmux server hangs boot silently and indefinitely.",
+  "root_cause": "ReapRunSessions has no completion marker, so idempotence is achieved by redoing all work; and the boot-path call predates the deadline discipline added to the per-cycle path.",
+  "fix": "(1) Bound: wrap the preflight reap in context.WithTimeout using the existing orphanGCTimeout (hoist the const into sessionreaper or a shared home — no new literal). (2) Tombstone: after a fully-successful ReapRunSessions, rename the registry to tmux-sessions.jsonl.reaped (or write a sibling .reaped marker atomically) and have ReapOrphans skip marked runs. Partial success leaves the registry unmarked → retried next boot. Bounded work per boot, idempotent, crash-safe.",
+  "acceptance": [
+    "RED: TestReapOrphans_SecondSweepSkipsReapedRuns — fake killer counts execs; sweep twice, second = 0 kills (fails today)",
+    "RED: TestReapOrphans_PartialFailureNotTombstoned — killer errors on one session → registry unmarked, retried",
+    "RED: TestPreflight_OrphanReapIsDeadlineBounded — killer blocks on ctx; Run returns within the deadline instead of hanging",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/looppreflight/checks.go", "go/internal/sessionreaper/sessionreaper.go", "go/internal/swarm/reap_runsessions.go", "go/cmd/evolve/cmd_loop_control.go", "go/cmd/evolve/cmd_fleet_soak.go"],
+  "connects_to": ["tmux_session_gc (#271)", "workspace-hygiene S5 (run-dir gc flips this from unbounded to bounded history)", "subagent-workspace-absolutize (registries outside runs/ are invisible to this sweep)"]
+}

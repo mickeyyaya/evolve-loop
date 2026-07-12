@@ -1,0 +1,18 @@
+{
+  "id": "minor-hardening-sweep",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.66,
+  "title": "Small-defect hardening batch (7 verified nits, one cycle): consensusdispatch -1 exit mapping, advisor capture write errors, fleet Gosched pseudo-sync, run_id wire pin, ship-regex relative-path pin, marketplacepoll/rollback ctx timeouts, staticcheck SA1012 nil Context",
+  "kind": "bug",
+  "priority": "low",
+  "summary": "(1) consensusdispatch.go:190,221: `_ = cmd.Run()`; signal-killed child → ProcessState.ExitCode()==-1 leaks upward as neither OK/FAIL/RuntimeErr. (2) core/phase_advisor.go:358-369: three `_ = p.writeArtifact(...)` — span SHA can reference files that failed to write (WS3-S2 binding silently diverges). (3) fleet/pool.go:105-109: runtime.Gosched() documented as ordering guarantee — only true at GOMAXPROCS=1; remove + fix comment (correctness already rests on the completions channel). (4) cyclestate state_test wire pin omits \"run_id\" (CA.5 correlation tag) — a camelCase tag rename would pass tests and break fleet/ledger correlation. (5) guards/ship.go:30 nativeShipRe allows path-separator-anchored '../evolve ship' — policy unpinned by any test; decide and pin. (6) marketplacepoll.go:116-117 git fetch/reset + rollback.go:323-326 gh calls via bare exec.Command with no ctx — one hung network call blocks the release pipeline forever; route through sysexec.RunFunc with deadline from remaining MaxWait. (7) staticcheck SA1012: internal/log/events.go:162 passes nil Context.",
+  "root_cause": "Accumulated small deviations from the project's own idioms (sysexec for subprocesses, fail-loud writes, wire-pin tests, no pseudo-sync).",
+  "fix": "Mechanical per-item fixes as summarized; each with its twin test where behavior is pinned (exit-code mapping table test, recording-writer WARN test, GOMAXPROCS>1 pool property test, run_id added to the wire-assertion set, ship-regex relative-path table rows, blocking-RunFunc deadline tests, context.TODO at events.go:162).",
+  "acceptance": [
+    "Each of the 7 items lands with a test naming its contract; no unrelated refactors ride along",
+    "go vet + staticcheck clean on touched packages (SA1012 resolved)",
+    "go test -race green across consensusdispatch, core, fleet, cyclestate, guards, marketplacepoll, rollback, log"
+  ],
+  "files": ["go/internal/consensusdispatch/consensusdispatch.go", "go/internal/core/phase_advisor.go", "go/internal/fleet/pool.go", "go/internal/cyclestate/state_test.go", "go/internal/guards/ship.go", "go/internal/marketplacepoll/marketplacepoll.go", "go/internal/rollback/rollback.go", "go/internal/log/events.go"],
+  "connects_to": ["campaign_provider_routing (85/81 exit-code taxonomy — the -1 mapping)", "release_hardening (unattended release pipeline robustness)"]
+}

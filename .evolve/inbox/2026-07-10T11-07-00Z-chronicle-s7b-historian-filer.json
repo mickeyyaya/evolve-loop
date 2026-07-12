@@ -1,0 +1,21 @@
+{
+  "id": "chronicle-s7b-historian-filer",
+  "title": "Chronicle S7b: deterministic historian-actions filer - the ONLY writer from historian to inbox (validated, clamped, namespaced)",
+  "weight": 0.86,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "chronicle-2026-07",
+  "summary": "Close the loop from batch review to queued work WITHOUT an unvalidated LLM->inbox channel (failure mode 5): a deterministic post-step in cmd_loop parses historian-actions.json {preventive_actions:[{id,title,weight_hint,evidence}]} with STRICT validation and files items via the existing auto-injector idiom (cmd_loop_outcome.go:225 fileUnexplainedOutcomeDefect pattern). Hard rules enforced by the filer, not the prompt: id forced into the historian- namespace; weight clamped to [0.5, 0.95]; max 3 actions per batch; evidence field REQUIRED (reject actions without artifact pointers); NEVER overwrites an existing inbox item (os.Stat dedup); strict json decode of the actions envelope. Rejected actions are logged in the historian workspace, never filed silently.",
+  "acceptance": [
+    "RED: TestParseHistorianActions_RejectsMissingEvidence",
+    "RED: TestFileHistorianActions_ClampsWeightHint (1.0 hint -> 0.95; 0.2 hint -> 0.5)",
+    "RED: TestFileHistorianActions_NamespacesIdsAndNeverOverwrites",
+    "RED: TestFileHistorianActions_CapsAtThreePerBatch",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/chronicle/historian_actions.go", "go/internal/chronicle/historian_actions_test.go", "go/cmd/evolve/cmd_loop_historian.go (filer call)"],
+  "deps": ["chronicle-s7a-historian-shadow"],
+  "connects_to": ["retro-preventive-actions-autofile-inbox", "chronicle-s6-escalation-boundary"],
+  "source": "approved plan 2026-07-10 (failure mode 5 mitigation)",
+  "created_at": "2026-07-10T11:07:00Z"
+}

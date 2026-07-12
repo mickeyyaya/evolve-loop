@@ -1,0 +1,24 @@
+{
+  "id": "token-frontier-watch",
+  "created_at": "2026-07-06T02:20:00Z",
+  "weight": 0.55,
+  "kind": "research",
+  "priority": "low",
+  "title": "Frontier watch (research task, not a build): (a) feasibility spike - soft-prompt/KV compression (500xCompressor/gist lineage) for the SELF-HOSTED ollama lane, the one fleet CLI where weight access exists; (b) re-survey latent inter-agent channels + agent-language compression for cross-CLI applicability shifts; deliverable = updated dossier in knowledge-base/research/token-optimization-2026/",
+  "summary": "The 2026-07-05 research survey classified two technique families as 'track, don't build' for a closed-CLI fleet: soft-prompt/KV compression (500xCompressor ACL 2025: 6x-480x compression storing KV values, needs model weight access; gist tokens NeurIPS 2023) and latent inter-agent channels (hidden-state exchange 2511.09149, HyLaT 2605.25421, EcoLANG 2505.06904). Two reasons to keep a live watch item rather than dropping them: (1) the fleet ALREADY includes a self-hosted CLI (ollama-tmux) where weight/serving access EXISTS - a feasibility spike could quantify whether KV-side compression pays on the local lane (reasoning/review phases); (2) the latent-channel field is moving fast and a vendor could productize compressed context handoff (Anthropic context-editing productized 2025-frontier ideas within a year) - applicability can flip.",
+  "root_cause": "N/A (research task). Gap: the survey's applicability verdicts for these two families were point-in-time (2026-07); without a scheduled re-check the pipeline will not notice when applicability flips (new ollama serving features, vendor cache/handoff APIs, mature latent-channel tooling).",
+  "fix": "Scout/research-archetype task (read-only + WebSearch; produces a dossier, no source changes): (1) ollama spike - assess whether current ollama serving exposes prompt/KV reuse hooks usable by the bridge (server API, keep_alive/context caching semantics, any gist/soft-prompt loaders in the ecosystem); estimate token/latency win for the phases routed to ollama; (2) re-survey the latent-channel + compressed-agent-language literature and vendor APIs for anything now implementable across claude/codex/agy; (3) write findings as knowledge-base/research/token-optimization-2026/frontier-watch-<date>.md with a clear BUILD/DEFER verdict per family + updated evidence; (4) if any verdict flips to BUILD, emit a new weighted inbox item for it.",
+  "acceptance": [
+    "Dossier knowledge-base/research/token-optimization-2026/frontier-watch-<date>.md exists with per-family BUILD/DEFER verdicts, citations, and quantified estimates for the ollama lane.",
+    "If a verdict is BUILD, a corresponding weighted inbox todo is emitted with concrete acceptance criteria.",
+    "No source-code changes (research-only task; docs tree only)."
+  ],
+  "files": [
+    "knowledge-base/research/token-optimization-2026/ (dossier only)"
+  ],
+  "connects_to": [
+    "token-optimization research part1 finding #2 (500xCompressor - 'watch' verdict this task operationalizes) + part2 finding #19 (latent channels)",
+    "cli_control_abstraction (ollama control surface knowledge, knowledge-base/research/ollama-control-surface-2026.md)"
+  ],
+  "notes": "Injected 2026-07-06 completing full-report queueing (operator: 'why don't we queue all of them?' - correct call: triage is the arbiter, weights encode ROI; even watch-items are queueable when framed with testable deliverables). Weight 0.55 (low): no near-term token win expected; value = not missing an applicability flip. This completes 100% queue coverage of the research report: top-10 -> 6 build items (0.93/0.91/0.89/0.88/0.87/0.85), C3 cascade -> 0.84, honorable-mention compression -> 0.80, track-don't-build -> this 0.55 research task."
+}

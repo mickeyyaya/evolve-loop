@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-role-scoped-instruction-digests",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.74,
+  "title": "Token-opt: role-scoped instruction digests — full CLAUDE.md/AGENTS.md stack injected ~24x/cycle measured at +20 percent cost in 2026 research; phases get role-scoped digests",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Evaluate per-phase instruction payloads: a scout does not need ship-gate rules; generate role-scoped digests from the SSOT (single-source-with-projection, like skills generate) and inject those; A/B one batch to verify no quality regression before default flip. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (papers.md 5.4).",
+  "acceptance": ["Digests generated from SSOT (no hand-maintained copies)", "per-phase injected instruction bytes drop >50 percent for narrow roles", "one shadow batch shows no verdict-quality regression"],
+  "files": ["skills/ generation pipeline", "go/internal/bridge/ (injection)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

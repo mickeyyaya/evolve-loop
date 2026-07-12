@@ -1,0 +1,19 @@
+{
+  "id": "state-growth-caps",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.8,
+  "title": "Three unbounded-growth surfaces outside gc's scope: guards.log (23MB/339K lines in 72 days — largest file in .evolve, no rotation), verdict-cache.json (one entry per cycle forever, O(n) full-file RMW per lookup+put), ledger seal built but never invoked (11.3MB/36K lines, no ledger-segments/ after 613 cycles)",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "(1) guardslog.Append (guardslog.go:28-45) appends forever from 4 writer families (ports.go:324, posteditvalidate.go:74-82, commitprefixgate.go:57, guardcmd/guard.go:57,89); gc's log rule covers only dispatch-logs/*.log (gc.go:191-198). ~4.7K lines/day → ~115MB/year, every hook pays open-append-close. (2) verdictcache.go:92-103 Put never evicts; Load parses the whole file on every Lookup AND Put; entries pin artifact_paths into run dirs gc will delete (permanently-stale keys can false-hit). (3) adapters/ledger/seal.go + 'evolve ledger seal --keep 500' fully built (cmd_ledger.go:69-74) but zero call sites — gc hard-protects ledger.jsonl expecting sealing to be L3.3's job; L3.3 shipped as a command nobody runs; per-cycle VerifyCycle cost grows linearly.",
+  "root_cause": "Retention was designed per-surface: run-dir gc got a policy engine, root-level append files and the seal primitive never got a scheduler.",
+  "fix": "All policy-injected, zero Go literals: (1) add guards_log_max_mb to gc.Policy (default ~10MB) — Plan emits an archive item renaming to dispatch-logs/guards-<ts>.log, which the existing logs_ttl_days rule then ages out (zero new retention machinery). (2) verdictcache.Put evicts to newest-K by CachedAt (K policy-injected, default ~50, mirroring PruneExpiredCarryoverTodos age-out idiom); optionally drop entries whose ArtifactPath is gone. (3) invoke Seal(keep from policy) from the batch-end gc hook when gc mode==enforce (report-only line in shadow) — rides workspace-hygiene S5's wiring.",
+  "acceptance": [
+    "RED: TestPlan_GuardsLogOverSizeIsArchived + twin UnderSizeUntouched; property: no in-flight line lost across rotation",
+    "RED: TestPut_EvictsOldestBeyondCap (K+1 puts → oldest gone) + TestLookup_MissAfterEviction + zero-value-policy default pin",
+    "RED: TestRunGCHook_EnforceSealsLedgerBeyondKeep (segment created, verify --deep green) + twin ShadowNeverSeals",
+    "go vet, -race, apicover -enforce green; no new env flags (policy block only)"
+  ],
+  "files": ["go/internal/guardslog/guardslog.go", "go/internal/gc/gc.go", "go/internal/verdictcache/verdictcache.go", "go/internal/adapters/ledger/seal.go", "go/internal/policy/"],
+  "connects_to": ["workspace-hygiene S5 (batch-end wiring host — sequence after it ships)", "ledger-single-writer-consolidation (same package, coordinate)", "no_feature_flags rule (policy-injected knobs)"]
+}

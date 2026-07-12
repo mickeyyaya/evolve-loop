@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-handoff-digests",
+  "created_at": "2026-07-07T09:30:00Z",
+  "weight": 0.75,
+  "title": "Token-opt: phase-boundary handoff digests — phase N+1 receives a schema-bound digest, never raw prior-phase transcripts/artifacts accumulation",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "OpenAI-SDK nest_handoff_history pattern: orchestrator assembles a compact CYCLE HISTORY block from artifacts per phase edge instead of phases re-reading full prior reports; per-edge pruning of which artifacts flow (SafeSieve: -12 to -28 percent tokens, accuracy UP). GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (oss.md 13, papers.md 1.4/5.1).",
+  "acceptance": ["Each phase prompt embeds a bounded digest (size cap tested) instead of full prior artifacts", "artifact flow per edge is explicit config, not give-everyone-everything"],
+  "files": ["go/internal/phases/runner/ (context assembly)", "go/internal/core/ (edge config)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli (baseline gate)", "knowledge-base/research/token-concurrency-2026/README.md priority translation"]
+}

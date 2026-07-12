@@ -1,0 +1,19 @@
+{
+  "id": "tracked-binary-in-acs-dir",
+  "created_at": "2026-07-07T04:40:00Z",
+  "weight": 0.82,
+  "kind": "bug",
+  "priority": "medium",
+  "title": "18MB compiled binary go/acs/cycle536/evolve is TRACKED in git and was re-committed grown to 18.4MB in ship 0405658a - remove it, gitignore compiled binaries under go/acs/**, and add a commit-time guard so no cycle ships a binary artifact again",
+  "summary": "Spotted 2026-07-07 in ship 0405658a's stat: 'go/acs/cycle536/evolve | Bin 18397266 -> 18467058 bytes'. A cycle-536-era test apparently committed a compiled evolve binary into its ACS dir; some suite rebuilds it and cycle ships keep re-committing the changed blob (~18MB per version in git history - repo bloat + a stale binary that could be mistaken for an authorized one; the ship-sha gate pins go/evolve, not this stray).",
+  "root_cause": "An ACS suite built a binary into its own package dir (instead of t.TempDir or -o /dev/null) and the cycle ship's stage-everything committed it; .gitignore covers go/bin/ and go/evolve patterns but not go/acs/**/evolve.",
+  "fix": "(1) Find the acs/cycle536 test that builds it; redirect output to t.TempDir(). (2) git rm --cached go/acs/cycle536/evolve + .gitignore entry for compiled binaries under go/acs/ (and any stray 'evolve' executable outside go/bin). (3) Guard: extend the secret-leak-scan or commit path with a binary-artifact check (size>1MB + executable + Mach-O/ELF magic) that blocks staging - fail loudly. Do NOT rewrite history (the old blobs stay; P0 rule - no history rewrites).",
+  "acceptance": [
+    "go/acs/cycle536/evolve untracked + ignored; the suite that built it uses a temp path and still passes.",
+    "A staged >1MB executable fails the guard with an actionable message (regression test).",
+    "go vet ./..., -race green."
+  ],
+  "files": ["go/acs/cycle536/", ".gitignore", "go/internal/phases/ (staging guard)"],
+  "connects_to": ["workspace-hygiene campaign (same cleanliness class)", "loop-binary-drift-self-sha (stray binaries near the authorized one)"],
+  "notes": "Weight 0.82: real repo bloat + integrity hygiene, below the width/coverage work."
+}

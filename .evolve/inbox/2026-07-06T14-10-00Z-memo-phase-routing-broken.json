@@ -1,0 +1,25 @@
+{
+  "id": "memo-phase-routing-broken",
+  "created_at": "2026-07-06T14:10:00Z",
+  "weight": 0.85,
+  "kind": "bug",
+  "priority": "high",
+  "title": "PASS-cycle learning is silently DISABLED: the memo phase (Layer P) is registered but never routed - every boot warns 'phase memo not routed (invalid): single-word names are reserved for built-in phases' + 'user phase memo clashes with a built-in'; no PASS cycle since ~392 has run memo, so carryover/observation capture on successful cycles is dead",
+  "summary": "Found 2026-07-06 while auditing the learning pipeline (operator: 'is the learn phase included in the pipeline?'). Failure-learning (retro) is healthy - fires on FAIL/WARN, 238 lessons, prompt-injected. But the PASS-cycle half (memo, v8.57+ Layer P: captures observations scout/triage saw but did not commit to top_n, emits carryover-todos.json) is broken: (a) phase-registry.json registers 'memo'; (b) the phase router REJECTS it every boot with two warnings - a user-phase definition clashes with a built-in (built-in kept) AND the name 'memo' fails the multi-word-kebab-case validation for user/optional phases; (c) verified: cycles 530/533/534/535/541 (all PASS) have zero memo phase + zero memo artifacts; newest carryover-todos.json is cycle-392-era (~2026-06-25). policy.json still pins memo to cli=agy/model=fast, so the operator config EXPECTS it to run. Net: ~150 PASS cycles produced no captured learnings - only FAILURES teach the loop right now.",
+  "root_cause": "A naming/registration conflict introduced by a phase-validation hardening: single-word phase names became reserved for built-ins, and a user-level 'memo' definition now clashes with the built-in memo, so the router drops BOTH the user definition and the routing (built-in kept but not routed into the PASS path). The warnings fire on every launch and are treated as noise (fail-open) rather than surfacing as a broken learning layer - a silent-failure class the repo's own rules forbid.",
+  "fix": "Root-cause the registration, don't rename-around: (1) determine which side is canonical (built-in memo vs user phase def in .evolve/ phase config) and remove the duplicate definition; (2) if the built-in is kept, fix its routing so PASS verdicts route ...ship -> post-ship-monitor -> memo (or the designed Layer-P slot) - config/transition-table change per phases_are_config_only; (3) if user-defined phases are the mechanism, rename per validation (multi-word kebab) AND migrate the policy.json pins key; (4) escalate the 'phase X not routed' warning class: a registered-but-unroutable phase should be a boot ERROR or a health signal, not a repeating WARN (fail loudly). Verify with a PASS cycle producing memo artifacts + carryover-todos.json again.",
+  "acceptance": [
+    "A PASS cycle runs the memo phase (completedPhases contains it) and emits its carryover/observations artifact.",
+    "Boot no longer warns 'memo clashes with a built-in' / 'memo not routed' (clean phase registration).",
+    "Registered-but-unroutable phases surface as an error/health signal, not a silent WARN (regression test with a synthetic invalid phase).",
+    "policy.json memo pin (cli=agy, model=fast) is honored by the running memo phase.",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    ".evolve/ phase catalog / user phase definitions (dedupe memo)",
+    "go/internal/phases/ (routing/validation + WARN->health escalation)",
+    "go/internal/policy/ (pin key migration if renamed)"
+  ],
+  "connects_to": ["sleep-time-kb-consolidation (0.85 - DEPENDS on a working memo/retro slot; this bug blocks its E1 warm-start brief)", "retro-preventive-actions-autofile-inbox (0.86 - the FAIL-side sibling of the learning loop)", "retro_always_on_failure (standing rule; this is its PASS-side complement)"],
+  "notes": "Injected 2026-07-06 from the operator's learning-pipeline audit. Weight 0.85: silently-disabled designed capability (Layer P) + prerequisite for the sleep-time consolidation item; the silent-WARN-instead-of-error aspect is the fail-loudly violation that let it persist ~150 cycles unnoticed."
+}

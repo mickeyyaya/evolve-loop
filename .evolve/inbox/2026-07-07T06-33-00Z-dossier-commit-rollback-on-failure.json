@@ -1,0 +1,18 @@
+{
+  "id": "dossier-commit-rollback-on-failure",
+  "created_at": "2026-07-07T06:33:00Z",
+  "weight": 0.84,
+  "title": "commitPairGit leaves the dossier pair STAGED when the commit permanently fails — polluting the next cycle's tree-diff/clean-tree checks",
+  "kind": "bug",
+  "priority": "medium",
+  "summary": "internal/dossier/write.go commitPairGit stages cycle-N.{json,md} then commits with bounded retry. On a PERMANENT failure (e.g. no committer identity — the exact mode that turned TestOrchestrator_TriageLeakRecover red on ubuntu runners) it returns an error but leaves both files staged. The best-effort caller (RunCycle) only WARNs, so the staged pair silently survives into the next cycle where the tree-diff guard / clean-tree checks attribute it to the wrong actor.",
+  "root_cause": "The stage->commit sequence has no rollback arm: failure exits with the index half-mutated, violating the guard-friendly invariant that a failed best-effort side effect leaves the tree exactly as found.",
+  "fix": "On giving up (permanent error or retry exhaustion), best-effort 'git reset -q -- cycle-N.json cycle-N.md' scoped to the pair, then return the original error (reset failure appended, never masking). Regression test: repo with commit forced to fail (identity-less env via GIT_CONFIG env override) -> commitPair returns error AND git status --porcelain is empty afterwards.",
+  "acceptance": [
+    "Failed dossier commit leaves zero staged paths (regression test asserts clean porcelain).",
+    "Original commit error is still returned (reset never masks it).",
+    "go vet, -race on internal/dossier, apicover -enforce green."
+  ],
+  "files": ["go/internal/dossier/write.go", "go/internal/dossier/write_retry_test.go (sibling)"],
+  "connects_to": ["memo-phase-tier-envelope (same post-ship robustness family)", "fix/ci-remote-parity branch (test-side hermeticity fix, operator-landed)"]
+}

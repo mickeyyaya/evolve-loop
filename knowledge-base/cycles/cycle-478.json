@@ -1,0 +1,13 @@
+{
+  "cycle": 478,
+  "run_id": "01KWK69XM7KQ9KRF59CQZ0ZR0N",
+  "goal": "testfleet2",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "PASS",
+      "key_findings": "cycle completed; ledger walk deferred to future slice"
+    }
+  ]
+}

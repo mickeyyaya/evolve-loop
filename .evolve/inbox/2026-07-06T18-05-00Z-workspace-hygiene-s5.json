@@ -1,0 +1,15 @@
+{
+  "id": "workspace-hygiene-s5-wiring-shadow-default",
+  "created_at": "2026-07-06T18:05:00Z",
+  "weight": 0.87,
+  "kind": "feature",
+  "priority": "high",
+  "title": "Workspace-hygiene S5: wiring - runGCHook += PlanWorktrees->workspace-gc-manifest.json->Apply iff enforce; gc.Mode default ''->shadow (non-mutating); batch-end invocation (finalize FIRST then hook); evolve gc cmd += workspace sweep with --dry-run parity (explicit operator run == enforce, document asymmetry)",
+  "summary": "Slice S5 of docs/plans/workspace-hygiene-2026-07.md (READ FIRST). DEPENDS ON s2 (finalize) + s4 (planner) - land ADJACENT to s4 (avoid green-unit/absent-integration, cycle-506/507 lesson). Run-dir GC is ALREADY wired at boot (runGCHook, cmd_loop_outcome.go:85-148) - dormant only via mode default off.",
+  "root_cause": "gc engine wired but mode-off; no batch-end invocation; no operator surface for the workspace sweep.",
+  "fix": "Per plan S5. RED FIRST: TestRunGCHook_ShadowWritesWorkspaceManifest, _EnforceAppliesWorktreeSweep, TestRunGCHook_DefaultModeIsShadow (the ''->shadow flip at cmd_loop_outcome.go:94-105; update the gc_test.go:563-567 zero-value pin), TestLoop_BatchEndRunsGCHook (introduce runGCHookFn seam mirroring bootRecoverFn), TestGC_DryRunPrintsWorkspacePlan/_AppliesWorkspaceSweep, ACS batch-level anti-no-op predicate (cf. acs/cycle298). Ordering: finalizeCompletedCycleMarker THEN runGCHook at batch end. Report counts + every flag-dirty/flag-unmerged path.",
+  "acceptance": ["Plan S5 acceptance; shadow default writes manifests with ZERO mutations; enforce stays policy.json-only; go vet, -race, gofmt -s, apicover green."],
+  "files": ["go/cmd/evolve/cmd_loop_outcome.go", "go/cmd/evolve/cmd_loop.go", "go/cmd/evolve/cmd_gc.go"],
+  "connects_to": ["docs/plans/workspace-hygiene-2026-07.md", "workspace-hygiene-s2 + s4 (dependencies)"],
+  "notes": "Weight 0.87. AFTER this ships: operator reviews one shadow batch's workspace-gc-manifest.json (expect ~60 removals, ~106 branch deletes, dirty flagged) then flips policy.json gc.mode to enforce - the backlog drains itself."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "llmroute-dispatch-unification",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.65,
+  "title": "INVESTIGATE-FIRST: subagent/swarm dispatch resolves CLI via bespoke resolvellm+profile-regex fallback (and a hardcoded 'claude' default) instead of the shared llmroute resolver — confirm whether subagent is ever the primary CLI chooser, then unify or explicitly demote",
+  "kind": "investigation",
+  "priority": "medium",
+  "summary": "phases/runner/cli_chain.go:5-9 documents llmroute.Resolve/Probe as THE unified CLI+model resolution (imported by runner, core, bridge, usageprobe, cmd_cycle). internal/subagent and internal/swarm do NOT import it: subagent/run.go:190 uses resolvellm.Resolve with a profile-field regex fallback (matchField, :196) and no capability-probe reordering; dispatchparallel.go:120-122 hardcodes cli=\"claude\" fallback. Consequence IF subagent ever chooses primarily: fallback-ordering/floor changes in llmroute silently don't apply on the subagent path, breaching the any_cli_any_phase_any_model invariant. Scan confidence 0.8 — the divergence may be intentional (parent runner already chose; subagent honors it).",
+  "root_cause": "Selection+fallback policy potentially implemented twice; unverified whether the second site is a chooser or a passthrough.",
+  "fix": "Phase 1 (investigation, this item): trace every subagent/swarm entry (orchestrator personas, campaign dispatch, fanout) and determine whether CLI arrives pre-resolved. Write the answer into the build report + a doc note at subagent/run.go. Phase 2 (same cycle if chooser; follow-up item if passthrough): widen RunOptions.ResolveLLM's default to route through llmroute so floor/trigger logic exists once; replace the 'claude' hardcode with the shared Plan; if passthrough, delete the local fallback resolution instead (consume the parent's choice, never re-resolve).",
+  "acceptance": [
+    "Build report answers the chooser-vs-passthrough question with call-path evidence",
+    "Whichever branch: the profile-regex fallback and hardcoded 'claude' are gone; behavior pinned by a routing test (fallback ordering honored OR parent choice consumed verbatim)",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/subagent/run.go", "go/internal/subagent/dispatchparallel.go", "go/internal/llmroute/", "go/internal/resolvellm/", "go/internal/swarm/swarmrunner.go"],
+  "connects_to": ["any_cli_any_phase_any_model_invariant (standing rule)", "advisor_owns_per_phase_cli (direction memo)", "campaign_provider_routing"]
+}

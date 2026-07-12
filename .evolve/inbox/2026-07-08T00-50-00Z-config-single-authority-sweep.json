@@ -1,0 +1,18 @@
+{
+  "id": "config-single-authority-sweep",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.72,
+  "title": "Two single-source violations in config plumbing: gate-stage defaults authored in BOTH config.DefaultRoutingConfig (dead — always clobbered from policy at cmd_cycle.go:332-338) AND policy.GatesConfig; antigravity→agy CLI alias copy-pasted in 3 subagent files with the bridge trusting all copies stay identical",
+  "kind": "refactor",
+  "priority": "medium",
+  "summary": "(1) config.go:501 hardcodes EvalGate/ContractGate/TriageCapGate = StageEnforce while policy.go:1168 GatesConfig() authors the same defaults as strings; cmd_cycle.go unconditionally overwrites config from policy, so the config literals are dead defaults — a debugging trap (editing the visible DefaultRoutingConfig does nothing) and an equivalence nothing tests. (2) `if cli == \"antigravity\" { cli = \"agy\" }` inlined at subagent/run.go:199, dispatchparallel.go:124, validateprofile.go:137; bridge/driver.go:112 documents it trusts upstream normalization — a 4th dispatch path that forgets the block fails with 'adapter not executable' three call-sites from the root cause.",
+  "root_cause": "Defaults and vocabulary normalization duplicated instead of owned: policy vs config both author gate stages; the alias lives at call sites instead of the resolver.",
+  "fix": "(1) Delete the gate-stage values from config.go:501 (fields stay, zero-valued); policy.GatesConfig remains the ONE authority projected at the composition root via parseGateStage — add one test pinning the effective default is enforce with an absent policy block. (2) Add clialias.Canonical (natural home: detectcli, which owns the antigravity/agy vocabulary at detectcli.go:61) or fold into resolvellm.Resolve's result; delete the three inline blocks; bridge comment becomes accurate-by-construction.",
+  "acceptance": [
+    "RED: TestGateDefaults_PolicyIsSingleAuthority — absent policy gates block → effective stages enforce; config literal removal is behavior-neutral (existing gate suites green)",
+    "RED: TestCanonicalCLIAlias — antigravity→agy in one place; grep proves zero inline alias blocks remain; all three dispatch paths produce agy adapters",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/config/config.go", "go/internal/policy/policy.go", "go/cmd/evolve/cmd_cycle.go", "go/internal/detectcli/detectcli.go", "go/internal/subagent/run.go", "go/internal/subagent/dispatchparallel.go", "go/internal/subagent/validateprofile.go"],
+  "connects_to": ["flag_reduction_campaign (policy-as-authority direction)", "phase_settings_from_config_not_code (standing rule)"]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chronicle-s3-digest-wiring",
+  "title": "Chronicle S3: seed digest at cycle start (newCycleRun) + inject into scout/triage prompts at enforce",
+  "weight": 0.9,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "chronicle-2026-07",
+  "summary": "Wire the S2 digest: in core/cyclerun.go newCycleRun (after workspace MkdirAll/archivePollutedWorkspace) resolve the chronicle policy stage ONCE; at shadow AND enforce collect inputs (last-N dossiers by allocated cycle number, failedApproaches already in hand from ReadState, chronicle.BuildIndex) and WriteDigest into the run workspace - BEST-EFFORT: digest failure logs WARN and never blocks the cycle. At enforce additionally set Context[\"recent_outcomes\"] = the capped content (single resolution point - hooks never re-read policy). phases/scout/scout.go:51 and phases/triage/triage.go:61 ComposePrompt emit the block when the context key is non-empty, positioned AFTER the stable prompt prefix (cache-friendly; where carryover_summary/fleet_scope already inject). Stage semantics: off=nothing; shadow=file seeded only (observable, zero prompt change); enforce=file + prompt inline. Compiled default shadow (ReportSizeGate rollout precedent); the shadow->enforce default flip is a later one-line follow-up after one observed batch.",
+  "acceptance": [
+    "RED: TestNewCycleRun_SeedsRecentOutcomesDigestAtShadow",
+    "RED: TestNewCycleRun_OffStageWritesNoDigest",
+    "RED: TestNewCycleRun_DigestFailureWarnsNotAborts",
+    "RED: TestScoutComposePrompt_InjectsRecentOutcomes + TestTriageComposePrompt_InjectsRecentOutcomes (enforce stage)",
+    "RED: TestComposePrompt_NoDigestContextKeyIsByteIdentical (regression pin: absent key => byte-identical legacy prompt)",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/core/cyclerun.go", "go/internal/phases/scout/scout.go", "go/internal/phases/triage/triage.go", "matching _test.go files"],
+  "deps": ["chronicle-s2-digest-writer"],
+  "connects_to": ["chronicle-s5-retrodecision-parity"],
+  "source": "approved plan 2026-07-10",
+  "created_at": "2026-07-10T11:03:00Z"
+}

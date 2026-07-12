@@ -1,0 +1,22 @@
+{
+  "id": "chronicle-s2-digest-writer",
+  "title": "Chronicle S2: deterministic token-capped recent-outcomes digest writer + chronicle policy block",
+  "weight": 0.91,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "chronicle-2026-07",
+  "summary": "BASE PACKAGE UPDATE 2026-07-11: implement in go/internal/recurrence (cycle 661 landed the ledger there; the planned internal/chronicle name is retired - never-duplicate). recurrence.WriteDigest(workspacePath string, in DigestInput, cfg DigestConfig) error -> recent-outcomes.md. DigestInput{Dossiers []dossier.Dossier, FailedApproaches []failureadapter.Entry, Index chronicle.Index} assembled by the CALLER (keeps WriteDigest pure). Rendering: newest-first, one line per cycle {cycle, task/goal, verdict, one-line why, carryover ids}, every line passed through a sanitizeLine (the triage.go sanitizePromptValue idiom - collapse \\n\\r\\t; lesson text is LLM-authored and enters prompts = injection channel), truncation at cfg.TokenBudget via LOCAL len/4 estimator (comment cites deliverable.charsPerToken; do NOT import deliverable - core cycle), top-K NON-generic PatternStats section, generic patterns roll up to ONE aggregate line ('158 floor lessons: operator-reset x96, loop-fatal x62'). ALSO this slice: policy.ChroniclePolicy/ChronicleConfig() in NEW FILE go/internal/policy/policy_chronicle.go (policy.go is 1522 lines) mirroring GatesPolicy: compiled defaults digest=shadow, digest_tokens=1200, digest_cycles=10, escalation=shadow, historian=off; absent block => defaults; NO feature flags. Bump step 0.03 / cap 0.99 / autofile weight 0.8 / historian cap 3 stay compiled constants.",
+  "acceptance": [
+    "RED: TestWriteDigest_NewestFirstTruncationAtTokenBudget",
+    "RED: TestWriteDigest_SanitizesLessonTextControlChars (a lesson with embedded newline/bullet forgery renders as one sanitized line)",
+    "RED: TestWriteDigest_AggregatesGenericPatternsToOneLine",
+    "RED: TestWriteDigest_EmptyHistoryWritesNothing",
+    "RED: TestChronicleConfig_CompiledDefaults + TestChronicleConfig_PolicyOverrides",
+    "go test -race PASS; apicover clean (new exported symbols named)"
+  ],
+  "files": ["go/internal/chronicle/digest.go", "go/internal/chronicle/digest_test.go", "go/internal/policy/policy_chronicle.go", "go/internal/policy/policy_chronicle_test.go"],
+  "deps": ["chronicle-s1-recurrence-index"],
+  "connects_to": ["chronicle-s3-digest-wiring"],
+  "source": "approved plan 2026-07-10",
+  "created_at": "2026-07-10T11:02:00Z"
+}

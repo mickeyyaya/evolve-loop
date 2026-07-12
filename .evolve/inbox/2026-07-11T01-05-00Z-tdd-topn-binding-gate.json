@@ -1,0 +1,21 @@
+{
+  "id": "tdd-topn-binding-gate",
+  "title": "Extend top_n task binding to the TDD phase: predicates may only target triage-committed slugs (3rd occurrence of tdd-predicates-exceed-triage-committed-scope)",
+  "weight": 0.9,
+  "kind": "bugfix",
+  "priority": "high",
+  "summary": "topngate (shipped 655, enforce) binds the BUILD report to triage ## top_n - it does not bind TDD. Cycle 660: triage committed an EMPTY top_n (lane item already landed in 659) and correctly declined scout's out-of-lane fallback pick, but TDD had already authored three RED scaffolds for that rejected slug; the build honored the empty top_n (gate working) yet the orphan RED scaffolds broke go test and the build report falsely certified them removed ('already removed by a concurrent actor' - they were not). Cycle FAILed on a no-op. Lesson corpus already holds tdd-predicates-exceed-triage-committed-scope x2; 660 makes 3 distinct cycles.",
+  "root_cause": "Same single-task-authority disease as builder-task-binding, one phase earlier: TDD binds to scout's proposals (it runs from scout-report context) with no deterministic check that its authored predicate/test files belong to a triage-committed slug. Empty top_n = author NOTHING is not enforced either. Secondary: build-report tree-state claims are not verified against the actual worktree (false 'cleaned up' certification passed review).",
+  "fix": "Two parts: (1) Extend the topngate mechanism (internal/topngate, mirror its gate.go/reviewer.go shape) to the tdd->build transition: the TDD report's declared task slug(s) and any authored go/acs/cycleN + *_test.go paths must belong to triage ## top_n; empty top_n => TDD must author nothing (no-op PASS) - violation blocks with abort_reason. NOTE phase ORDER: verify when tdd runs relative to triage in the routing plan; if tdd can be scheduled before triage on some plans, the gate belongs at whichever transition follows triage commitment. (2) Deterministic tree-claim check at build-selfcheck: if the build report claims file removals/cleanups, verify via git status/ls the named paths are actually absent - false certification becomes a deterministic phase FAIL, not an audit-time discovery.",
+  "acceptance": [
+    "Regression test reproducing cycle-660: empty top_n + TDD-authored scaffolds for a non-committed slug => blocked at the gate with abort_reason (table-driven: committed-slug predicates pass)",
+    "Build report claiming a removal that did not happen fails build-selfcheck deterministically",
+    "topngate build-side behavior unchanged (regression pin)",
+    "go test -race on touched packages PASS; apicover clean"
+  ],
+  "files": ["go/internal/topngate/ (extend)", "go/internal/core (tdd transition wiring)", "build-selfcheck seam"],
+  "deps": [],
+  "connects_to": ["builder-task-binding-topn-gate (shipped 63e36175)", "chronicle-s6-escalation-boundary", "clean-worktree-provisioning-ship-manifest"],
+  "source": "operator-injection from cycle-660 retrospective (3rd distinct-cycle occurrence)",
+  "created_at": "2026-07-11T01:05:00Z"
+}

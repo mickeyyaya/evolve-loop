@@ -1,0 +1,25 @@
+{
+  "id": "retro-preventive-actions-autofile-inbox",
+  "created_at": "2026-07-06T13:35:00Z",
+  "weight": 0.86,
+  "kind": "feature",
+  "priority": "high",
+  "title": "Close the learning->action loop: retro's 'Recommended preventive actions' auto-file as weighted inbox todos (same seam as the FAILED_UNEXPLAINED auto-injection) - today structural fixes stay as prose while only prompt-nudge instincts persist, and 3+ recurrences prove nudges alone don't close structural gaps",
+  "summary": "Audit 2026-07-06 (operator question: 'for all failed cycles, did we learn anything and translate to something actionable?'): every FAIL produces a high-quality retrospective (238 lessons in .evolve/instincts/lessons/, injected into future prompts - verified in cycle-543's scout/tdd prompts) BUT the retro's 'Recommended preventive actions' section - the STRUCTURAL fixes (gates, checks, contract changes) - never becomes queued work. Verified: zero inbox items originate from retro recommendations. The system already auto-injects inbox todos for FAILED_UNEXPLAINED outcomes (auto-unexplained-outcome-cycle-N.json, weight 0.8), so the seam exists; retro recommendations are strictly higher-value payloads for the same mechanism. Consequence of the gap: auditor-PASS-vs-EGPS-FAIL recurred 3+ times across weeks with the lesson on file each time.",
+  "root_cause": "The retro phase writes lessons (consumed by prompt injection) and prose recommendations (consumed by nobody). No component parses the recommendations into the inbox; the only auto-injection trigger is the UNEXPLAINED outcome class, which modern cycles rarely hit (C1 chokepoint fix made failures EXPLAINED).",
+  "fix": "Config-driven extension of the existing failure-learning->inbox seam: (1) retro deliverable contract gains a structured 'preventive_actions' section (id, title, weight-hint, files, evidence) alongside the existing lessons anchor - the retro agent already generates this content as prose, so it is a FORMAT change (agent doc + contract config). (2) A deterministic post-retro step (same code path as the FAILED_UNEXPLAINED injector) files each preventive action as .evolve/inbox/auto-retro-<cycle>-<slug>.json with a DEDUP guard (skip if an open/processed item with the same id exists - prevents recurrence spam from re-filing every FAIL). (3) Weight policy: default from policy.json (e.g. 0.75), retro may hint higher for recurrence>=2 items. (4) Triage remains the arbiter - auto-filed items compete by weight like everything else.",
+  "acceptance": [
+    "A FAIL cycle whose retro emits structured preventive_actions results in auto-filed inbox todos (fixture retro report -> injector -> items present with dedup).",
+    "Dedup: the same preventive action across two consecutive FAILs files exactly once while open (regression test).",
+    "Weight defaults from policy.json; recurrence-flagged items may carry the higher hint.",
+    "Retro contract/agent doc updated (config-only phase behavior change).",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    "go/internal/ (the FAILED_UNEXPLAINED auto-injector code path - extend for retro payloads)",
+    "agents/evolve-retrospective.md + retro deliverable contract (structured preventive_actions section)",
+    "go/internal/policy/ (default weight, dedup window)"
+  ],
+  "connects_to": ["auditor-egps-reconciliation-gate (0.90 - the item this mechanism would have auto-filed weeks ago)", "loop-self-prioritize-unmet-fleet-concurrency (0.90 - same self-prioritization philosophy for a different signal)", "retro_always_on_failure (standing rule this completes)"],
+  "notes": "Injected 2026-07-06. Weight 0.86: meta-fix that permanently closes the learning->action gap; ranked just below the concrete 0.90 instance it would have automated. Evidence: cycle-542 retrospective-report.md 'Recommended preventive actions' (3 structural fixes, none queued); 238 lessons vs 0 retro-originated inbox items; auto-unexplained-outcome-cycle-{485,489,490,492}.json prove the injection seam exists."
+}

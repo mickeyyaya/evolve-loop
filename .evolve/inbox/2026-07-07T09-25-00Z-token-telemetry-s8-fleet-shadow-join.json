@@ -1,0 +1,12 @@
+{
+  "id": "token-telemetry-s8-fleet-shadow-join",
+  "created_at": "2026-07-07T09:25:00Z",
+  "weight": 0.88,
+  "title": "Token-telemetry S8: budgethistory median tokens/cycle + shadow join with quotastate via fleet.budget spine (zero behavior change). DEPENDS: token-telemetry-s6 shipped",
+  "kind": "feature",
+  "priority": "high",
+  "summary": "Throughput gains MedianTokensPerCycle (native units, never dollars); quotaAwareWaveConfig logs joined burn-rate per rolling window per lane in shadow — groundwork for HiveMind-style pre-flight admission (later item), no sizing behavior change now. FULL DESIGN: docs/plans/token-telemetry-2026-07.md (read it first; RED tests named there verbatim are the acceptance contract).",
+  "acceptance": ["RED: TestCollect_MedianTokensPerCycle + fleetbudget shadow-log assertion", "plan.Lanes decisions unchanged (test pins this)", "go vet, -race, apicover -enforce green"],
+  "files": ["go/internal/budgethistory/budgethistory.go", "go/internal/fleetbudget/", "go/cmd/evolve/cli_wave_budget.go"],
+  "connects_to": ["token-telemetry-s6-rollups-dossier (hard dep)", "docs/plans/token-telemetry-2026-07.md S8", "quota_dynamic_budgeting spine"]
+}

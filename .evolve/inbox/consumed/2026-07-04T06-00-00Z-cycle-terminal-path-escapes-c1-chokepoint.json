@@ -1,0 +1,24 @@
+{
+  "id": "cycle-terminal-path-escapes-c1-chokepoint",
+  "created_at": "2026-07-04T06:00:00Z",
+  "weight": 0.98,
+  "title": "Cycles pass audit then FAILED_UNEXPLAINED: 'no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint'",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "Intermittent but recurring (cycles 485 AND 489, uninterrupted batches): a cycle completes real work — scout, build, tdd, prompt-regression-eval, adversarial-review, coverage-gate, test-amplification, secret-leak-scan all PASS — then the cycle terminates with outcome=FAILED_UNEXPLAINED and detail='no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint.' The ship phase produced no PASS and no recorded abort_reason, so the cycle-outcome recorder (C1 chokepoint = core.recordPhaseOutcome) never saw a terminal outcome. Not quota (claude/Fable session 25% used, phases PASSED), not the ship-SHA gate (expected_ship_sha aligned to running binary 22e6f5f3817b), not CLI-dead. This BLOCKS inbox draining: cycle 488 shipped fine but 485/489 escaped, so the loop churns (inbox grows with failure-learning retros) instead of converging. THE meta-blocker: the loop cannot reliably ship its own cycles.",
+  "root_cause": "HYPOTHESIS (needs confirmation): between the last audit sub-phase and ship, or inside ship, a code path returns/terminates WITHOUT calling the single-source outcome recorder core.recordPhaseOutcome (the C1 chokepoint the failure-learning layer keys on). Candidates: (a) ship phase early-returns on a non-error condition (e.g. 'nothing to ship' / empty deliverable) without recording a PASS/abort; (b) a wave-lane vs sequential divergence in how the terminal outcome is recorded; (c) an error path in the audit→ship transition that logs but does not route through recordPhaseOutcome. The FAILED_UNEXPLAINED classification EXISTS precisely to catch this escape — so the loop already knows the invariant (every terminal path MUST record via C1) is being violated; find the escaping path.",
+  "fix": "Locate every terminal/return path in the ship phase + the audit→ship orchestration transition and ensure each routes through core.recordPhaseOutcome (record PASS, or an explicit abort_reason). Add the missing recording at the escaping path. Regression: a test that drives the ship phase to the escaping condition (e.g. audit PASS + <the trigger>) and asserts a recorded outcome (never FAILED_UNEXPLAINED). Consider making the C1 chokepoint a hard invariant: a cycle that reaches terminal state without a recorded outcome should record an explicit 'chokepoint-escape' abort_reason naming the phase, so it is FAILED_EXPLAINED (diagnosable) not FAILED_UNEXPLAINED.",
+  "acceptance": [
+    "Reproduce the escape (a cycle that passes audit then escapes ship recording) in a test; then the fix records a terminal outcome so it is no longer FAILED_UNEXPLAINED.",
+    "A soak of N cycles shows 0 FAILED_UNEXPLAINED (all terminals recorded via C1).",
+    "go vet ./..., -race, apicover -enforce, acs durable green."
+  ],
+  "files": [
+    "go/internal/core/ (recordPhaseOutcome — the C1 chokepoint; find callers + non-callers on terminal paths)",
+    "go/internal/phases/ship/ (ship phase terminal/return paths)",
+    "go/internal/core/cyclerun.go (audit->ship transition + terminal outcome recording)",
+    "go/internal/failure_learning.go (FAILED_UNEXPLAINED classification — the escape detector)"
+  ],
+  "connects_to": ["never_stop_queue_inject_inbox (drain blocker)", "loop-goaltext-not-propagated-to-wave-lanes"],
+  "notes": "TOP weight (0.98) — this is the meta-blocker: fixing it lets the loop reliably ship, which unblocks draining the whole inbox. Observed 2026-07-04 across cycles 485 + 489 in uninterrupted batches (not caused by operator SIGTERM/reset)."
+}

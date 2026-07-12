@@ -1,0 +1,28 @@
+{
+  "cycle": 476,
+  "run_id": "01KWJTRC91MBVHGSX93RG2FEMJ",
+  "goal": "GOAL: T2 — ADVISOR TIER-EMISSION DETERMINISM (prompt-example hardening). OPERATOR PRIORITY OVERRIDE: outranks all carryover/inbox; triage commits THIS as top_n item 1.\n\nCONTEXT (verified): advisor tier emission is LIVE but INTERMITTENT — cycle 467 tagged 10 phases with {tier}, cycle 475 tagged 5, cycle 474 tagged ZERO. The advisor DOES differentiate correctly when it emits (deep=judgment: tdd/build/audit/adversarial; balanced=scan/triage/review; zero fast — respects the low-model floors). Root cause of intermittency: the {cli,tier} fields are described in the advisor PERSONA prose but are NOT present in the per-phase response-schema EXAMPLE inside the composed plan prompt (buildPlanPrompt/composePlanPrompt, go/internal/core/phase_advisor.go). The ONLY tier in advisor-prompt-plan.txt is the MINT example (line ~31). LLMs reliably mimic the EXAMPLE, not the prose =\u003e ~50-100% emission instead of 100%. The P3 overlay log IS working ('no advisor overlay (profile default)' / 'advisor overlay cli=.. tier=..' lines confirmed live in the 2-lane run).\n\nFIX (strict TDD red-first):\n(a) PROMPT EXAMPLE: add optional cli+tier to a run=true entry in the per-phase response EXAMPLE the plan prompt shows, with the tier policy inline (deep=judgment-heavy phases that write source/make verdicts; balanced=review/scan/triage; fast=simplest mechanical whitelist ONLY, never source/verdict/scoping; higher-when-in-doubt — operator low-model rule). Keep fields optional (absent =\u003e profile default, degrade byte-identical).\n(b) LIVENESS GOLDEN: a test that composes the REAL production plan prompt (the actual buildPlanPrompt/composePlanPrompt output) and asserts the per-phase entry EXAMPLE contains the tier field — the artifact the LLM mimics. This is the test class that would have caught both prior dormancy layers (schema-unwired, then example-missing).\n(c) pin the P3 overlay-log shape with a golden (it works; lock it).\n\nCONSTRAINTS: strict TDD red-first; go test -race green; apicover -enforce clean; no clamp/floor relaxation; degrade byte-identical when fields absent; reuse existing seams.\nACCEPTANCE: the composed production plan prompt's per-phase example contains {cli,tier}; a golden pins it; (runtime) the next cycles' advisor-response-plan.txt emit tiers for run=true phases consistently.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice"
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 476",
+      "priority": "high"
+    }
+  ]
+}

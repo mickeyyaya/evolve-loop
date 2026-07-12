@@ -1,0 +1,29 @@
+{
+  "id": "sleep-time-kb-consolidation",
+  "created_at": "2026-07-05T15:20:00Z",
+  "weight": 0.85,
+  "title": "Sleep-time knowledge-base consolidation: memo/retro pre-digest cycle history into a compact warm-start brief for the next cycle's scout; novelty-gate KB writes (skip near-duplicate observations); scout injects top-k relevant prior-cycle notes instead of the whole index (5x test-time compute cut pattern; A-MEM 1-2.5K vs 16-17K tokens per injection)",
+  "kind": "feature",
+  "priority": "medium",
+  "summary": "Research finding #10 (knowledge-base/research/token-optimization-2026/README.md, applicability E1/E2): (a) sleep-time compute - thinking offline about persistent context BEFORE queries arrive - cuts test-time compute ~5x at equal accuracy and lifts accuracy +13-18% when scaled; the cost amortizes across related queries, which maps perfectly onto a repeating cycle structure (Letta/UC Berkeley arXiv 2504.13171). (b) A-MEM (arXiv 2502.12110): selective top-k injection over linked atomic notes uses 1,000-2,500 context tokens vs 16,000-17,000 for injecting whole memory - 85-93% savings per operation. (c) SAGE (arXiv 2605.30711): a novelty gate on memory writes prevents unbounded growth and redundant-write spend. (d) Mem0 (arXiv 2504.19413): extract-then-consolidate (add/update/delete/no-op) keeps the store compact (>90% token cut vs full-context, with the caveat that vendor numbers measure memory-op footprint not end-task cost - validate on own telemetry).",
+  "root_cause": "Each cycle's scout re-derives repo/backlog understanding from scratch (or ingests a monotonically growing knowledge-base), and the memo phase appends observations without dedup - so the injectable corpus grows unbounded while every scout invocation pays cold-start tokens for conclusions prior cycles already reached.",
+  "fix": "Config-driven, using EXISTING phases (no new Go phase per phases_are_config_only): (1) WARM-START BRIEF - the memo/retro phase's contract gains a consolidated 'next-cycle brief' artifact (<= ~1-2K tokens: active campaign state, top backlog deltas, landmines/gotchas, last verdicts); the next cycle's scout prompt injects THE BRIEF instead of re-deriving. (2) NOVELTY GATE - memo skips writing observations that near-duplicate existing lessons (deterministic Go similarity check - normalized token overlap or embedding if available - threshold in policy.json). (3) TOP-K INJECTION - scout's KB injection becomes top-k relevant notes (k configurable, default ~3) selected against the cycle's goal/backlog instead of the whole index. (4) Consolidation pass (Mem0-style add/update/delete) over knowledge-base/cycles as a periodic memo duty, keeping the corpus bounded.",
+  "acceptance": [
+    "memo/retro emits a <=2K-token next-cycle brief artifact; scout's prompt injects the brief (contract-gated size).",
+    "memo skips near-duplicate observations (regression test: identical observation twice -> one write); threshold in policy.json.",
+    "scout KB injection is top-k (default 3) by goal relevance, not the whole index; k in policy.json.",
+    "Scout phase input tokens drop measurably across a soak batch with no scouting-quality regression (backlog still surfaces the same top items).",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    "agents/evolve-memo.md + memo/retro phase contracts (brief duty - config/agent-doc only)",
+    "go/internal/phases/ (scout injection: brief + top-k selection)",
+    "go/internal/policy/ (novelty threshold, k)"
+  ],
+  "connects_to": [
+    "token-optimization research README finding #10, applicability E1/E2",
+    "report-size-contracts-jit-artifacts (sibling: the brief IS a size-contracted handoff)",
+    "cache-stable-prompt-prefixes (a stable brief slot keeps the prefix cacheable)"
+  ],
+  "notes": "Injected 2026-07-05, research-derived batch 2/2 (completes the top-10 injection: #1-#3 batch 1, #4/#6/#7/#9 in per-phase-effort-routing + difficulty-conditioned-phase-budgets, #5/#8 folded into report-size-contracts, #10 = this). Weight 0.85: high value but touches agent contracts (more design surface than the deterministic levers). Evidence: arXiv 2504.13171 (5x/+13-18%), 2502.12110 (85-93% per-op), 2605.30711 (novelty gate), 2504.19413 (consolidation; caveat: validate on own telemetry)."
+}

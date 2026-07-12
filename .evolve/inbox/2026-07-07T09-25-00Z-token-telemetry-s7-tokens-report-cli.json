@@ -1,0 +1,12 @@
+{
+  "id": "token-telemetry-s7-tokens-report-cli",
+  "created_at": "2026-07-07T09:25:00Z",
+  "weight": 0.89,
+  "title": "Token-telemetry S7: evolve tokens report --last N (top consumers by phase/site/cycle/lane — the operator answer to LOCATE MAX TOKEN USAGE) + cyclecost prefers sidecar truth. DEPENDS: token-telemetry-s6 shipped",
+  "kind": "feature",
+  "priority": "high",
+  "summary": "New CLI reusing budgethistory's cycle walk: rank phases/sites by input tokens, cache-hit trend, waste class per cycle/lane. cyclecost switches to sidecar-preferred source with events-parse fallback (ONE aggregation model, no third path). FULL DESIGN: docs/plans/token-telemetry-2026-07.md (read it first; RED tests named there verbatim are the acceptance contract).",
+  "acceptance": ["RED: TestTokensReport_RanksPhasesByInputTokens, TestCycleCost_PrefersSidecarOverEvents", "go vet, -race, apicover -enforce green; cmd-layer test per test-coverage-audit conventions"],
+  "files": ["go/cmd/evolve/ (new cmd_tokens.go)", "go/internal/cyclecost/", "go/internal/budgethistory/"],
+  "connects_to": ["token-telemetry-s6-rollups-dossier (hard dep)", "docs/plans/token-telemetry-2026-07.md S7"]
+}

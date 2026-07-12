@@ -1,0 +1,19 @@
+{
+  "id": "artifact-name-ssot-retro-backfill",
+  "created_at": "2026-07-08T00:50:00Z",
+  "weight": 0.87,
+  "title": "Phase→artifact-filename mapping scattered across 6 packages with a LIVE bug: retro backfill writes retro-report.md (backfill default) while routing expects retrospective-report.md — timeout-backfill recovery for the retro phase silently produces no usable file",
+  "kind": "bug",
+  "priority": "high",
+  "summary": "phasecontract/contract_registry.go declares ArtifactName as SSOT, but 5 other sites re-encode the mapping: backfill/backfill.go:16-24 (phaseHeaders; retro → default 'retro-report.md'), core/routing_dispatch.go:369-383 (backfillArtifactPath: retro → 'retrospective-report.md', build-planner → 'build-plan.md' — phases NOT in the registry), cyclehealth/cyclehealth.go:152 (requiredArtifacts literal), gc/discover.go:40-47 (runMarkers), cyclesimulator/cyclesimulator.go:128-131 (own table). The retro filename disagreement is present drift: an artifact-timeout backfill on retro writes to a name routing never reads.",
+  "root_cause": "Filename convention duplicated per consumer; unregistered phases (retro, build-planner) get per-package ad-hoc defaults that already disagree.",
+  "fix": "phasecontract.For(phase).ArtifactName becomes the ONE authority: register retro and build-planner (artifact names only; no behavioral contract change), have backfill.TryExtract and routing_dispatch.backfillArtifactPath call phasecontract.For with the convention default ONLY for genuinely unregistered phases, derive cyclehealth.requiredArtifacts from Contracts() filtered to mandatory phases, and point gc/cyclesimulator at the same accessor.",
+  "acceptance": [
+    "RED: TestBackfill_RetroArtifactNameMatchesRouting — backfill target filename for 'retro' == routing_dispatch.backfillArtifactPath('retro') (fails today: retro-report.md vs retrospective-report.md)",
+    "RED: cross-package pin — for every phase in backfill.phaseHeaders, phasecontract.For(phase).ArtifactName matches the path TryExtract writes",
+    "cyclehealth.requiredArtifacts derived, not literal (grep proves literals deleted)",
+    "go vet, -race, apicover -enforce green"
+  ],
+  "files": ["go/internal/phasecontract/contract_registry.go", "go/internal/backfill/backfill.go", "go/internal/core/routing_dispatch.go", "go/internal/cyclehealth/cyclehealth.go", "go/internal/gc/discover.go", "go/internal/cyclesimulator/cyclesimulator.go"],
+  "connects_to": ["required-roles-ssot (same phasecontract SSOT family — natural same-campaign sibling)", "phase recovery/backfill family (ADR-0044)"]
+}
