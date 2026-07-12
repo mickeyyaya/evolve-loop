@@ -10,6 +10,9 @@ func TestExportedTypesNamed(t *testing.T) {
 	var _ Entry
 	var _ InboxItem = InboxItem{ID: "x", Weight: 0.5}
 	var _ Ledger
+	// Chronicle S2 digest vocabulary: the behavioural tests exercise WriteDigest
+	// via Dossiers/Index only, so name the remaining field here.
+	var _ = DigestInput{FailedApproaches: nil}
 
 	var esc Escalator = &fakeEscalator{open: map[string]InboxItem{}}
 	if _, ok := esc.OpenItemForPattern("nope"); ok {

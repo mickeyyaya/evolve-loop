@@ -118,6 +118,11 @@ type Policy struct {
 	// Gates configures persistent rollout stages for the contract, eval,
 	// triage-cap, and review gates. Absent ⇒ built-in defaults apply.
 	Gates *GatesPolicy `json:"gates,omitempty"`
+	// Chronicle configures the recurrence-chronicle stages (digest, escalation,
+	// historian) and digest budgets. Absent ⇒ built-in defaults apply
+	// (digest=shadow, digest_tokens=1200, digest_cycles=10, escalation=shadow,
+	// historian=off). See policy_chronicle.go.
+	Chronicle *ChroniclePolicy `json:"chronicle,omitempty"`
 	// Router configures advisor routing behavior and per-decision model
 	// overrides. Absent ⇒ built-in defaults apply.
 	Router *RouterPolicy `json:"router,omitempty"`
