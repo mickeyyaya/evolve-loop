@@ -39,11 +39,17 @@ const (
 // is the launch's unique artifact reference that must appear in a session's
 // first user message to disambiguate concurrent same-directory sessions.
 // Start and End bound the assistant turns that count toward the launch.
+// EventsLogPath and Scrollback carry the lower fallback tiers' inputs:
+// the launch's *-events.ndjson path (tier 2) and the captured pane
+// scrollback content — not a pane id — (tier 3). Either may be empty; an
+// empty input simply leaves that tier with no data.
 type Window struct {
-	Worktree     string
-	ArtifactPath string
-	Start        time.Time
-	End          time.Time
+	Worktree      string
+	ArtifactPath  string
+	EventsLogPath string
+	Scrollback    string
+	Start         time.Time
+	End           time.Time
 }
 
 // Result is the outcome of a scan: the summed token usage and the Source that

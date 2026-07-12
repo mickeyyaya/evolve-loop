@@ -541,11 +541,25 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		return
 	}
 	end := e.deps.Now()
+	// Lower fallback tiers' inputs both live in the workspace: the launch's
+	// <agent>-events.ndjson (tier 2) and the tmux driver's final scrollback
+	// capture (tier 3). Missing files just leave those tiers with no data.
+	var eventsLogPath, scrollback string
+	if req.Workspace != "" {
+		if req.Agent != "" {
+			eventsLogPath = filepath.Join(req.Workspace, req.Agent+"-events.ndjson")
+		}
+		if b, err := os.ReadFile(filepath.Join(req.Workspace, "tmux-final-scrollback.txt")); err == nil {
+			scrollback = string(b)
+		}
+	}
 	result, err := e.deps.TokenResolver(tokenusage.Window{
-		Worktree:     req.Worktree,
-		ArtifactPath: req.ArtifactPath,
-		Start:        start,
-		End:          end,
+		Worktree:      req.Worktree,
+		ArtifactPath:  req.ArtifactPath,
+		EventsLogPath: eventsLogPath,
+		Scrollback:    scrollback,
+		Start:         start,
+		End:           end,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token resolver failed: %v\n", err)

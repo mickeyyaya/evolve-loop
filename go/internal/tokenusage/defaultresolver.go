@@ -6,11 +6,15 @@ package tokenusage
 // defaultresolver_test.go for the RED contract this satisfies.
 
 // DefaultResolver returns a resolver that recovers token usage for a Window
-// from the transcript tier only (S4/S5 collectors need a logPath/pane that a
-// bare Window does not carry). It never errors — telemetry is best-effort —
-// and falls open to SourceNone when no transcript matches.
+// through the full fidelity chain: transcript > eventsResult (w.EventsLogPath)
+// > scrollbackPeak (w.Scrollback). It never errors — telemetry is best-effort —
+// and falls open to SourceNone when no tier has data.
 func DefaultResolver(configRoot string) func(Window) (Result, error) {
 	return func(w Window) (Result, error) {
-		return Chain(TranscriptCollector(configRoot, w)), nil
+		return Chain(
+			TranscriptCollector(configRoot, w),
+			EventsResultCollector(w.EventsLogPath),
+			ScrollbackPeakCollector(w.Scrollback),
+		), nil
 	}
 }
