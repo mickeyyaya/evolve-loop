@@ -394,11 +394,13 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[loop] no --cycles: advisor-decided, completion-driven (stops when the backlog drains), safety cap=%d\n", effectiveMax)
 	}
 
-	// FLEET-AS-POLICY S2: resolved once per batch (not per iteration — the
-	// policy block does not change mid-batch). Count==1 (absent block, the
-	// default) keeps every iteration on the existing sequential path below —
-	// shouldRunWave gates the wave branch off entirely, so no Supervisor is
-	// ever constructed.
+	// FLEET-AS-POLICY S2: the batch-start snapshot — wave 0's baseline. Every
+	// iteration re-resolves the committed fleet block via
+	// reloadFleetConfigAtWaveBoundary below (cycle 739), so operator
+	// count/min_lanes directives committed mid-batch take effect at the next
+	// wave without a lane-killing bounce. Count==1 (absent block, the default)
+	// keeps iterations on the existing sequential path below — shouldRunWave
+	// gates the wave branch off entirely, so no Supervisor is ever constructed.
 	fleetCfg := loadFleetConfig(cfg.EvolveDir)
 	for _, w := range fleetCfg.Warnings {
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: %s\n", w)
@@ -437,6 +439,21 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// phase boots one — so a fresh cap costs zero wasted boots. Off unless
 		// policy.json cli_health.proactive_probe is set.
 		runUsageProbe(cfg.ProjectRoot, cfg.EvolveDir, cycleEnv, stderr)
+
+		// fleet-config-hot-reload-wave-boundary (cycle 739): re-resolve the
+		// committed fleet block at every wave boundary, before quota/budget
+		// sizing. A malformed/unreadable policy.json holds the previous width
+		// (never collapses to defaults). A widening from Count==1 mid-batch
+		// needs the dispatch binary too, so resolve it here if not yet held.
+		fleetCfg = reloadFleetConfigAtWaveBoundary(cfg.EvolveDir, fleetCfg, stderr)
+		if (shouldRunWave(fleetCfg) || shouldRunPool(fleetCfg)) && waveBinPath == "" {
+			if bp, err := os.Executable(); err == nil {
+				waveBinPath = bp
+			} else {
+				fmt.Fprintf(stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
+				fleetCfg.Count = 1
+			}
+		}
 
 		// FLEET-AS-POLICY S2 wave path: this iteration IS a wave (--max-cycles
 		// counts waves). Each lane runs its own full `evolve cycle run`

@@ -202,6 +202,37 @@ func loadFleetConfig(evolveDir string) policy.FleetConfig {
 	return pol.FleetConfig()
 }
 
+// reloadFleetConfigAtWaveBoundary re-resolves the committed fleet block from
+// .evolve/policy.json at a wave boundary (cycle 739,
+// fleet-config-hot-reload-wave-boundary). The batch loop calls it every
+// iteration BEFORE the quota/budget sizing, so an operator width directive
+// (count/min_lanes) committed mid-batch takes effect at the next wave without
+// a lane-killing supervisor bounce — the control-plane preflight already
+// re-validates policy.json cleanliness per wave; this closes the other half
+// (dispatch consuming stale VALUES). Same resolution semantics as batch
+// start's loadFleetConfig, with ONE deliberate divergence: an unreadable or
+// malformed policy.json HOLDS prev (the operator's standing width commitment,
+// [fleet_width_always_respected]) and WARNs, instead of silently collapsing
+// to the Count=1 defaults the batch-start loader degrades to. Logs one
+// "fleet config reloaded" line only when the resolved dispatch-relevant
+// values changed vs prev — the steady-state path stays silent.
+func reloadFleetConfigAtWaveBoundary(evolveDir string, prev policy.FleetConfig, warn io.Writer) policy.FleetConfig {
+	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: fleet: policy.json unreadable at wave boundary (%v) — holding fleet config count=%d min_lanes=%d\n", err, prev.Count, prev.MinLanes)
+		return prev
+	}
+	got := pol.FleetConfig()
+	if got.Count != prev.Count || got.MinLanes != prev.MinLanes ||
+		got.PlanSource != prev.PlanSource || got.Scheduling != prev.Scheduling {
+		for _, w := range got.Warnings {
+			fmt.Fprintf(warn, "[loop] WARN: fleet: %s\n", w)
+		}
+		fmt.Fprintf(warn, "[loop] fleet config reloaded: count=%d min_lanes=%d\n", got.Count, got.MinLanes)
+	}
+	return got
+}
+
 // productionWaveLauncher builds the real waveLauncher: a fleet.Supervisor
 // wired to the same execCycleLaunch LaunchFn `evolve fleet` uses, so wave
 // lanes inherit EVOLVE_FLEET=1 + EVOLVE_FLEET_SCOPE exactly like
