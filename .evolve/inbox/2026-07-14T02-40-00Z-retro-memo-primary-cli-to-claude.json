@@ -1,0 +1,25 @@
+{
+  "id": "retro-memo-primary-cli-to-claude",
+  "title": "CONFIG-ONLY: repoint retrospective + memo primary cli agy-tmux -> claude-tmux so the post-verdict phases run on the Claude deep tier (=Opus, which has standing quota) and actually SUCCEED instead of dying on an exhausted Gemini",
+  "weight": 0.986,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "OPERATOR DIRECTIVE 2026-07-14 (repeated): retro must run on Claude/Opus. CONTEXT: the decouple half of retro-bridge-timeout-width10 landed (cycle-802: final_verdict_floor.go + contract-exhaustion degrade + allow_network=true) and STOPPED the 0/3 storm — good. BUT that item was then prematurely promoted to processed/cycle-802 (the inbox-promotion-requires-landed-ship bug) WITHOUT landing the part that makes retro actually reach Claude: retrospective.json + memo.json are STILL cli=agy-tmux. A wave-22 stale re-selection of the same name FAILed. So retro/memo still dispatch to Gemini-deep first, hit the exhaustion wall (exit=85), and — because the failure-adapter shim bypasses the family-fallback chain — never fall over to the configured claude-tmux fallback. The fallback-routing CODE fix is the proper long-term answer but has failed to land twice; this item is the CONFIG-ONLY realization that works today. CHANGE (exactly two files, no Go): (1) .evolve/profiles/retrospective.json cli \"agy-tmux\" -> \"claude-tmux\"; (2) .evolve/profiles/memo.json cli \"agy-tmux\" -> \"claude-tmux\". Drop agy from these two phases' primary per no_agy_fallback (agy is banned as the reliable path; Claude is the universal choice). Keep cli_fallback as a non-agy CLI (codex-tmux) or empty. The Claude deep tier already resolves to Opus (catalog pin 2026-07-14), which the operator confirmed has quota — so retro/memo will SUCCEED and once again produce retrospective lessons. Effect is immediate on the next post-verdict dispatch (profiles are read per-dispatch; no loop restart).",
+  "acceptance": [
+    "retrospective.json cli == claude-tmux AND memo.json cli == claude-tmux (agy removed from primary); cli_fallback contains NO agy-tmux",
+    "`evolve resolve-llm retrospective` -> {\"cli\":\"claude-tmux\",...}; same for memo",
+    "a subsequent FAIL/WARN cycle's retrospective phase launches on claude-tmux and returns a parseable verdict (no exit=85 escalation, retro lesson written) — verify in the loop log",
+    "no Go source changed (config-only cycle); go test -race still PASS (unchanged); apicover clean"
+  ],
+  "files": [".evolve/profiles/retrospective.json", ".evolve/profiles/memo.json"],
+  "deps": [],
+  "connects_to": [
+    "retro-bridge-timeout-width10 (decouple landed cycle-802; this is the un-landed retro->Claude half, re-filed as a clean focused item)",
+    "inbox-promotion-requires-landed-ship (root cause of why this was lost)",
+    "claude_model_fable_default (Claude deep tier = Opus since 2026-07-14)",
+    "no_agy_fallback (agy banned as the reliable path)"
+  ],
+  "source": "operator directive 2026-07-14; premature-promotion of retro-bridge-timeout-width10 left retrospective.json/memo.json still on agy (verified cli=agy-tmux post cycle-802 + wave-22 FAIL)",
+  "created_at": "2026-07-14T02:40:00Z"
+}

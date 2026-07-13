@@ -1,0 +1,43 @@
+{
+  "id": "overlay-injection-dormant-wire-fable-deep",
+  "title": "P0 DORMANT-FEATURE: the compiled-default skill overlay {deep,top}->[fable] never fires — Policy.ResolveOverlays has ZERO callers; wire skill-body injection into bridge Engine.Launch so the fable discipline actually reaches every deep/high-tier dispatch (all sessions, driver-agnostic)",
+  "weight": 0.984,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "OPERATOR DIRECTIVE 2026-07-14: 'make evo:fable applied to all deep/high thinking model across all sessions.' Investigation shows this is the INTENDED default but is DORMANT. `go/internal/policy/overlays.go` shipped the resolver + the correct compiled default `compiledDefaultOverlays() = [{Tiers:[deep,top], Skills:[fable]}]` (overlays.go:83) + ClampAdvisorSkills + tests — but `Policy.ResolveOverlays` (overlays.go:89) and `ResolveOverlaysWithAdvisor` (overlays.go:198) have ZERO callers outside the policy package, and NOTHING injects a skill body into the prompt at dispatch. Root cause (per the requeue item, processed/cycle-609): the original cycle-598 ship was GIT_PUSH_REJECTED (origin diverged via PR #318), the recovery reaudit never landed the bridge-injection half, and the item was wrongly promoted to processed — only the policy layer reached main. NET EFFECT: the deep tier (just switched fable->OPUS in the catalog, 2026-07-14) runs RAW, with none of the fable cognitive discipline the compiled default promises. This item wires the missing half so the overlay actually fires — across all sessions by construction (it's a compiled Go default + bridge chokepoint, not session state). SEAMS (verified current): inject at `Engine.Launch` (go/internal/bridge/engine.go:348 — the single dispatch chokepoint that ALSO carries non-phase advisor Plan/RePlan/Propose launches); compose the matched skill bodies ABOVE the cache boundary literal `cycleContextBoundary = \"\\n\\n## Cycle Context\\n\"` (runner.go:738) so `StaticPrefix` (runner.go:763) still returns a byte-stable prefix (prompt-cache contract holds). TOKEN ECONOMY: load `skills/<name>/COMPACT.md` when present (fable has one, 2.2KB) and fall back to `SKILL.md` (18KB) only if absent — the body is cache-stable so it amortizes, but inject the compact form. BridgeRequest selectors match on Agent(=phase), CLI, Model, plus the resolved Tier (add as an additive field if core.BridgeRequest lacks it).",
+  "acceptance": [
+    "RED: deep/top-tier dispatch -> composed prompt's STATIC section contains the fable COMPACT body; a fast/balanced dispatch with only the default rule -> NO overlay body (selector matrix, table test)",
+    "RED: Engine.Launch calls the resolver for BOTH a phase dispatch AND a non-phase advisor Launch (advisor Plan receives matching overlays too)",
+    "RED: fail-open — missing/unreadable skill body -> WARN + un-overlaid prompt; Launch proceeds (never blocks)",
+    "RED: cache contract — with an overlay applied, StaticPrefix(prompt) returns the enlarged-but-byte-stable static body across two identical dispatches (round-trip test); boundary literal single-sourced (runner + bridge import ONE leaf constant; drift-proof test)",
+    "RED: observability — per-Launch log line lists applied overlays (mirrors the advisor-overlay 'no advisor overlay' line), e.g. '[runner] phase=audit skill-overlays=[fable] (tier=deep)'",
+    "advisor-proposed skills flow through ClampAdvisorSkills then union via ResolveOverlaysWithAdvisor (dedup, stable order, max_skills cap honored)",
+    "go vet, go test -race PASS; apicover -enforce clean; zero Go literals for the tier->skills mapping outside compiledDefaultOverlays"
+  ],
+  "files": [
+    "go/internal/bridge/engine.go",
+    "go/internal/phases/runner/runner.go",
+    "go/internal/core/ports.go",
+    "go/internal/policy/overlays.go",
+    "skills/fable/COMPACT.md"
+  ],
+  "deps": [],
+  "connects_to": [
+    "skill-overlays-bridge-layer-requeue (this completes the undelivered bridge-injection half; policy layer already landed)",
+    "claude-deep-tier-opus-switch 2026-07-14 (fable is the discipline layer for the now-Opus deep tier)",
+    "token-telemetry-s3-engine-launch-instrumentation (same Engine.Launch seam — sequence/coordinate to avoid merge conflicts)",
+    "cache-stable-prefix contract (StaticPrefix/BaseCycleContext tests)",
+    "inbox-promotion-requires-landed-ship (the mis-promotion that hid this)"
+  ],
+  "engineering_contract": {
+    "tdd": "STRICT red-first: every acceptance RED written and observed FAILING before production code; each selector predicate gets a matching + adjacent non-matching twin; assert CONTRACTS only (composed prompt content, resolver output, log line) — never implementation internals.",
+    "design_patterns": [
+      "Specification: OverlayRule.matches already a predicate — engine composes union, no if/else selector ladder",
+      "Decorator: wrap the compose path at Engine.Launch; the un-overlaid path stays byte-identical when no rule matches",
+      "Strategy/DI: skill-body loader behind a small fs-injected interface (fixtures in tests; embedded/remote sources later swap without engine changes)"
+    ]
+  },
+  "source": "operator directive 2026-07-14 (deep-tier fable overlay); dormancy confirmed: ResolveOverlays 0 callers, no Launch injection, requeue item processed/cycle-609",
+  "created_at": "2026-07-14T00:50:00Z"
+}

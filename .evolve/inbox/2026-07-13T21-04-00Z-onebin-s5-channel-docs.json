@@ -1,0 +1,25 @@
+{
+  "id": "onebin-s5-stable-channel-docs",
+  "title": "One-binary S5: binary-stable release channel (config-release vs binary-release classification) + docs/operations/corporate-deployment.md with the agy recipe",
+  "weight": 0.972,
+  "summary": "OPERATOR-BOOSTED to second-block priority 2026-07-13. APPROVED PLAN slice 5/5 (dep S2). (1) Release pipeline classification step near the changelog step (releasepipeline.go:287): diff go/** since the last binary-release tag; unchanged => class=config-release, stamp 'binary fingerprint unchanged since vX.Y.Z' into CHANGELOG + release notes (no new approval needed); changed => class=binary-release (new fingerprint, approval required \u2014 policy: majors + security fixes). (2) New doc docs/operations/corporate-deployment.md: the agy corporate recipe \u2014 install the approved universal binary at a stable path via install.sh --binary; export EVOLVE_GO_BIN=<path> (FIRST in the skill's resolution order, platform-neutral: skills/loop/SKILL.md:21-27, same for agy projection); pin-at-install; approval-request flow using the Fingerprints manifest; the cert-based alternative (signing-identity/TeamID rules a la Santa CERTIFICATE => codesign+notarize once with a stable Developer ID = one approval EVER; operator decision, requires Apple Developer account); note on locally-compiled go test binaries being governed by company local-build policy, out of scope of distribution.",
+  "acceptance": [
+    "release pipeline stamps the release class + fingerprint continuity into CHANGELOG and release notes (test with a docs-only tag simulation)",
+    "docs/operations/corporate-deployment.md exists, cross-linked from runtime-reference.md and README",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": [
+    "go/internal/releasepipeline/",
+    "docs/operations/corporate-deployment.md",
+    "docs/operations/runtime-reference.md"
+  ],
+  "deps": [
+    "onebin-s2-universal-dist"
+  ],
+  "connects_to": [],
+  "created_at": "2026-07-13T21:04:00Z",
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "one-binary-2026-07",
+  "source": "approved plan 2026-07-13 (eventual-stirring-journal): one-binary corporate solution"
+}

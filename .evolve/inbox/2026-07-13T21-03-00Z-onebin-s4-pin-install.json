@@ -1,0 +1,28 @@
+{
+  "id": "onebin-s4-pin-at-install",
+  "title": "One-binary S4: deterministic pin-at-install + install.sh --binary mode installing a pre-approved artifact (checksum-verified, no local build)",
+  "weight": 0.975,
+  "summary": "OPERATOR-BOOSTED to second-block priority 2026-07-13. APPROVED PLAN slice 4/5 (dep S2). install.sh: (1) after the build at install.sh:251, invoke \"$INSTALL_LIB/evolve\" reset-sha -operator so expected_ship_sha/expected_ship_version are pinned deterministically at install (today pinning is lazy first-run, verify.go:107-108); (2) add --binary <path-or-url> mode that SKIPS the local go build entirely and installs a pre-approved downloaded artifact, verifying its SHA256 against the release checksums.txt before placement \u2014 the corporate path: no compiler, no new fingerprint, machine-independent hash. Because the pin is version-aware (verify.go:117 re-pins silently across plugin version bumps), adopting each newly approved release needs zero manual pin management. Keep bash 3.2 compatible (repo shell conventions: set -uo pipefail, no mapfile/declare -A).",
+  "acceptance": [
+    "install.sh --binary <artifact> installs without invoking go build; refuses on checksum mismatch (RED path tested in install e2e)",
+    "post-install .evolve/state.json carries expected_ship_sha + expected_ship_version matching the installed artifact",
+    "evolve loop --dry-run passes preflight on a --binary install with no compiler present",
+    "installer e2e rounds (macOS/Linux) green"
+  ],
+  "files": [
+    "install.sh",
+    "go/internal/phaseintegrity/",
+    "docs/operations/"
+  ],
+  "deps": [
+    "onebin-s2-universal-dist"
+  ],
+  "connects_to": [
+    "onebin-s5-stable-channel-docs"
+  ],
+  "created_at": "2026-07-13T21:03:00Z",
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "one-binary-2026-07",
+  "source": "approved plan 2026-07-13 (eventual-stirring-journal): one-binary corporate solution"
+}

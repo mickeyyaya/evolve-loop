@@ -1,7 +1,7 @@
 {
   "id": "merge-rung1-package-graph-disjoint",
   "title": "Merge ladder RUNG 1: conflicted rebases whose transitive package footprints are disjoint compose with native gates only \u2014 plus global-zone and overlap-zone registries",
-  "weight": 0.97,
+  "weight": 0.988,
   "kind": "efficiency",
   "priority": "high",
   "campaign": "merge-efficiency-2026-07",

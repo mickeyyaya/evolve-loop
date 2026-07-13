@@ -1,7 +1,7 @@
 {
   "id": "merge-rung2-scoped-merge-review",
   "title": "Merge ladder RUNG 2: real package overlap gets a scoped merge-review of the conflicting hunks only \u2014 full re-audit (rung 3) becomes the rare entangled case",
-  "weight": 0.95,
+  "weight": 0.987,
   "kind": "efficiency",
   "priority": "high",
   "campaign": "merge-efficiency-2026-07",
