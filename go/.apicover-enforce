@@ -64,6 +64,7 @@
 ./internal/selfsha
 ./internal/sessionrecord
 ./internal/setup
+./internal/shipwindow
 ./internal/sysexec
 ./internal/systemprompt
 ./internal/textutil

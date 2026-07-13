@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
 // loopAction signals how the slim RunCycle driver proceeds after a dispatch-loop
@@ -75,6 +76,12 @@ type cycleRun struct {
 	routingSeq    int    // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
 	recoveryDepth int    // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
 	replanDepth   int    // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
+
+	// shipLease serializes the audit→ship critical section across lanes
+	// (cycle-778): acquired in recordAndBranch just before the audit-binding
+	// HEAD snapshot, released after the next completed phase (normally ship,
+	// post-push) and by RunCycle's exit defer. nil ⇒ not held.
+	shipLease *shipwindow.Lease
 
 	// late-visibility exit-defer flags (R2 contract; highest hazard)
 	shipped                bool // latched true when ship records PASS this cycle; read by the dispatch abort path (postShipObserverSkip) so a post-ship observer failure stays non-fatal

@@ -696,6 +696,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// field values at exit (R2 late-visibility): the single most important
 	// state-promotion of the method-object refactor.
 	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
+	// Cycle-778: no exit path (abort, chokepoint escape, panic-free error
+	// return) may leave the ship-window lease held — siblings would wait out
+	// the full TTL. Idempotent; the normal release happens in recordAndBranch.
+	defer cr.releaseShipWindow()
 
 	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
 	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle

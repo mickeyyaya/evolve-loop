@@ -36,7 +36,21 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		return loopAbort, lerr
 	}
 
+	// Cycle-778 ship-window lease: audit's binding snapshot (`git rev-parse
+	// HEAD` inside emitPhaseBindings→recordAuditBinding) opens the window a
+	// sibling landing on main would turn into a deep-tier re-audit — acquire
+	// BEFORE the snapshot; any later completed phase (normally ship, after its
+	// push) releases below. No-op for every phase but audit; fail-open.
+	cr.acquireShipWindow(next)
+
 	cr.o.emitPhaseBindings(cr.ctx, cr.cycle, cr.req.ProjectRoot, cr.cs, next, dr.resp.Verdict)
+
+	// The first completed phase AFTER audit closes the critical section: ship
+	// has pushed (or the cycle routed away from ship, where holding buys
+	// nothing) — free the window for sibling lanes. No-op when not held.
+	if next != PhaseAudit {
+		cr.releaseShipWindow()
+	}
 
 	// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
 	// following evolve-builder.md:235) leaves its work in a worktree
