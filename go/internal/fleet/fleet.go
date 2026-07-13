@@ -12,6 +12,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -96,23 +97,28 @@ func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 			defer wg.Done()
 			sema <- struct{}{}
 			defer func() { <-sema }()
-			results[i] = s.launchOne(ctx, i, spec)
+			results[i] = s.launchOne(ctx, i, spec, limit)
 		}()
 	}
 	wg.Wait()
 	return results
 }
 
-func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec) Result {
+func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec, width int) Result {
 	if s.Launch == nil {
 		return Result{Index: i, ExitCode: -1, Err: errNoLaunch}
 	}
-	// Copy the env so the caller's map isn't mutated, then force fleet mode.
-	env := make(map[string]string, len(spec.Env)+1)
+	// Copy the env so the caller's map isn't mutated, then force fleet mode and
+	// advertise the effective lane width (contention-class ship-recovery budgets
+	// scale with it — core.shipRecoveryBudget).
+	env := make(map[string]string, len(spec.Env)+2)
 	for k, v := range spec.Env {
 		env[k] = v
 	}
 	env[ipcenv.FleetKey] = "1"
+	if width > 0 {
+		env[ipcenv.FleetWidthKey] = strconv.Itoa(width)
+	}
 	spec.Env = env
 
 	if s.CycleTimeout > 0 {

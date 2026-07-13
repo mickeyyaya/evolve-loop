@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"runtime"
+	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -98,7 +99,7 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		started := make(chan struct{})
 		go func() {
 			started <- struct{}{}
-			code, err := launch(ctx, poolSpec(backlog[idx]))
+			code, err := launch(ctx, poolSpec(backlog[idx], limit))
 			results[idx] = Result{Index: idx, ExitCode: code, Err: err}
 			completions <- idx
 		}()
@@ -155,14 +156,18 @@ func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) boo
 // PlanCycles' single-todo scope (Scope + Env[FleetScopeKey]) and forces
 // EVOLVE_FLEET on exactly as Supervisor.launchOne does, so a pool dispatch is the
 // SAME isolated seam as the wave path — never the unisolated sequential fallback.
-func poolSpec(td Todo) CycleSpec {
+func poolSpec(td Todo, width int) CycleSpec {
+	env := map[string]string{
+		ipcenv.FleetScopeKey: td.ID,
+		ipcenv.FleetKey:      "1",
+	}
+	if width > 0 {
+		env[ipcenv.FleetWidthKey] = strconv.Itoa(width)
+	}
 	return CycleSpec{
 		Scope:          []string{td.ID},
 		OutputContract: td.OutputContract,
 		Optional:       td.Optional,
-		Env: map[string]string{
-			ipcenv.FleetScopeKey: td.ID,
-			ipcenv.FleetKey:      "1",
-		},
+		Env:            env,
 	}
 }

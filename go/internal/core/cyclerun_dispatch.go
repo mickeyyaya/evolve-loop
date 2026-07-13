@@ -292,7 +292,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					// ship failure is unresolved (ADR-0039 §8 / D10) —
 					// cleared when a later ship attempt succeeds.
 					cr.preserveWorktree = true
-					if rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.cycle, cr.cs, se, cr.recoveryDepth); recovering {
+					fleetWidth := fleetWidthFromEnv(cr.req.Env)
+					if rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.cycle, cr.cs, se, cr.recoveryDepth, fleetWidth); recovering {
 						cr.ctxSnap["ship_error_code"] = string(se.Code)
 						cr.ctxSnap["ship_error_class"] = string(se.Class)
 						cr.ctxSnap["ship_error_stage"] = string(se.Stage)
@@ -301,7 +302,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 						// budget — record it before routing to recovery. A
 						// later successful ship records its own outcome.
 						cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
-							fmt.Sprintf("ship error %s: recovering via %s", se.Code, rec), cr.cs.PhaseStartedAt))
+							fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", se.Code, rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
 						cr.recoveryDepth++
 						cr.scheduledNext = rec
 						cr.current = PhaseShip // ship ran (and failed); keep forensics accurate

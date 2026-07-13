@@ -8,6 +8,13 @@ const FleetKey = "EVOLVE_FLEET"                // SSOT IPC-protocol-allowed
 const FleetScopeKey = "EVOLVE_FLEET_SCOPE"     // SSOT IPC-protocol-allowed
 const WorktreeRootKey = "EVOLVE_WORKTREE_ROOT" // SSOT IPC-protocol-allowed
 
+// FleetWidthKey advertises the fleet supervisor's effective lane width to each
+// launched cycle, so the orchestrator can scale contention-class ship-error
+// recovery budgets (shipRecoveryBudget: max(2, width+1)) with how many siblings
+// are actually racing main. Read from CycleRequest.Env, never os.Getenv, so
+// fleet siblings cannot leak width into each other. Unset/garbage ⇒ solo (1).
+const FleetWidthKey = "EVOLVE_FLEET_WIDTH" // SSOT IPC-protocol-allowed
+
 // CycleStateFileKey overrides the absolute path a process reads/writes cycle
 // state at, replacing the host-global <evolveDir>/cycle-state.json default.
 // Under the fleet supervisor each concurrent lane sets this to its OWN per-run

@@ -14,11 +14,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError, depth int) (Phase, bool) {
+func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
 	o.recordShipError(ctx, cycle, cs, se)
-	if depth >= maxRecoveryDepth {
-		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s); aborting\n", depth, se.Code, se.Class)
+	budget := shipRecoveryBudget(se.Code, fleetWidth)
+	if depth >= budget {
+		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
 		return "", false
+	}
+	// Contention-class errors (a sibling lane moved main) back off with jitter
+	// before re-auditing so lockstep siblings don't re-collide on every attempt.
+	// Non-contention errors recover immediately — a pause fixes nothing there.
+	if isContentionShipCode(se.Code) {
+		pause := contentionBackoff(depth)
+		fmt.Fprintf(os.Stderr, "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
+		backoffSleep(pause)
 	}
 	// ADR-0049 S5b: a fleet ff-merge divergence (a peer cycle moved main) is
 	// recovered by rebasing the cycle branch onto the new main BEFORE the
