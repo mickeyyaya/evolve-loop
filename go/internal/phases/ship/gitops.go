@@ -738,10 +738,33 @@ func stageReleaseSet(ctx context.Context, opts *Options) error {
 // binary update. Contrast with core.discardMainLeak, which runs mid-cycle on the
 // MAIN tree where the cycle is not yet committed and HEAD is the audited
 // reference — there `HEAD --` is correct. The two forms are not interchangeable.
+// osExecutable is a test seam for the running-binary lookup (production =
+// os.Executable). The churn discard must never delete the binary it is
+// executing from — inbox ship-manual-deletes-running-binary, 2026-07-12
+// incidents: `ship --class manual` resolved the untracked go/bin/evolve via
+// this fallback and os.Remove'd it, degrading every kernel hook to the stale
+// tracked fallback until rebuild.
+var osExecutable = os.Executable
+
+// isRunningExecutable reports whether path is the currently-executing binary,
+// resolving symlinks best-effort on both sides.
+func isRunningExecutable(path string) bool {
+	exe, err := osExecutable()
+	if err != nil {
+		return false
+	}
+	resolvedPath, errP := filepath.EvalSymlinks(path)
+	resolvedExe, errE := filepath.EvalSymlinks(exe)
+	if errP != nil || errE != nil {
+		return path == exe
+	}
+	return resolvedPath == resolvedExe
+}
+
 func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
-		if execPath, err := os.Executable(); err == nil {
+		if execPath, err := osExecutable(); err == nil {
 			binPath = execPath
 		}
 	}
@@ -770,7 +793,18 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 			// Revert the changes
 			_, _ = opts.run(ctx, "git", []string{"-C", dir, "checkout", "--", p}, io.Discard, io.Discard)
 		} else {
-			// Untracked: remove the file
+			// Untracked: remove the file — unless it is the currently-executing
+			// binary. An untracked go/bin/evolve is gitignored (go/.gitignore
+			// `/bin/`), so `git add -A` can never stage it; removing it has zero
+			// staging-hygiene value and kills the binary the kernel hooks and the
+			// rollback shellout are running (2026-07-12 incidents, cycle-243).
+			if isRunningExecutable(absPath) {
+				if opts.Stderr != nil {
+					fmt.Fprintf(opts.Stderr,
+						"[ship] WARN: churn discard skipped %s — it is the currently-executing binary\n", p)
+				}
+				continue
+			}
 			_ = os.Remove(absPath)
 		}
 	}

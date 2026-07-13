@@ -148,6 +148,16 @@ Migration note: `EVOLVE_ALLOW_DEEP_RESEARCH` is retired; use
 
 Bare `git push origin main` is denied by ship-gate (v8.13.0+). `EVOLVE_BYPASS_SHIP_VERIFY=1` is a permanent compatibility bridge but emits deprecation WARN — prefer `--class manual`.
 
+**Binary-churn discard (`cycle`/`manual` staging):** before `git add -A`, these classes discard
+post-audit rebuild churn of the tracked `go/evolve` (restore from index) and remove an *untracked*
+`go/evolve` so unaudited binaries never ride into commits. The discard **never deletes the
+currently-executing binary** — e.g. the gitignored `go/bin/evolve` that the kernel hooks and the
+rollback shellout (`evolve ship --class manual`) run — it is skipped with a
+`[ship] WARN: churn discard skipped …` line instead (cycle-764 fix; previously a *successful*
+manual ship deleted the running binary → exit 127 on the next invocation; heal was
+`make -C go build && evolve reset-sha -operator`). `release` ships skip the discard entirely —
+the pipeline's rebuild-binary step is the audited producer of `go/evolve`.
+
 ### Ship self-healing (repair ladder, ADR-0039 §8)
 
 Ship attempts ONE typed, provably-safe repair per error code per run before surfacing a
