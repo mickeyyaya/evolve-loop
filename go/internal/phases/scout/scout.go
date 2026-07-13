@@ -92,6 +92,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; scout ONLY within this assigned todo-id set, ignore all other candidate work: %s\n", scope)
 		b.WriteString("- lane_coherence: echo the pinned goal_hash verbatim under a \"goal_hash\" key in your report's Decision Trace JSON block\n")
 	}
+	// Chronicle S3 (digest stage=enforce): the orchestrator seeds
+	// Context["recent_outcomes"] with the recent-outcomes digest at cycle
+	// start. Appended AFTER the stable prefix lines (cache-friendly ordering);
+	// absent/empty key keeps the prompt byte-identical (shadow/off pin).
+	if ro := req.Context["recent_outcomes"]; ro != "" {
+		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
+	}
 	return b.String()
 }
 

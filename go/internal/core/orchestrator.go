@@ -337,6 +337,10 @@ type Orchestrator struct {
 	// workflowConfig is resolved once from policy.json at the composition root.
 	workflowConfig policy.WorkflowConfig
 
+	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
+	// once from policy.json at the composition root (chronicle S3).
+	chronicle policy.ChronicleConfig
+
 	// maxPhaseIterations bounds RunCycle's dispatch loop (the transition-table
 	// cycle guard). 0 ⇒ defaultMaxPhaseIterations. Injected via
 	// WithMaxPhaseIterations; tests set it low to exercise the C1
@@ -459,6 +463,13 @@ func WithRetryConfig(cfg policy.RetryConfig) Option {
 // WithWorkflowConfig injects the resolved workflow policy.
 func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
 	return func(o *Orchestrator) { o.workflowConfig = cfg }
+}
+
+// WithChronicleConfig injects the resolved chronicle policy (chronicle S3:
+// recent-outcomes digest stage + caps). The zero-option default is the
+// compiled default (digest=shadow).
+func WithChronicleConfig(cfg policy.ChronicleConfig) Option {
+	return func(o *Orchestrator) { o.chronicle = cfg }
 }
 
 // WithMaxPhaseIterations overrides the dispatch-loop iteration bound (the
@@ -604,6 +615,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		strategy:       router.StaticPreset{},
 		retryConfig:    policy.Policy{}.RetryConfig(),
 		workflowConfig: policy.Policy{}.WorkflowConfig(),
+		chronicle:      policy.Policy{}.ChronicleConfig(),
 		reviewer:       noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
 		observer:       noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
 	}

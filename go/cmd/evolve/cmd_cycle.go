@@ -566,6 +566,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
+	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	return orchDeps{

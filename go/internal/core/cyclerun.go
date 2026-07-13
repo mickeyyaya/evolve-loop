@@ -548,6 +548,14 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		}
 	}
 
+	// Chronicle S3: seed <workspace>/recent-outcomes.md from the committed
+	// dossier history + live failure state, per the resolved chronicle policy
+	// (resolved ONCE at the composition root via WithChronicleConfig). At
+	// enforce the digest bytes ride ctxSnap["recent_outcomes"] into every
+	// phase request; shadow writes the artifact only; off is a no-op.
+	// Best-effort — a digest failure WARNs and never blocks the cycle.
+	seedChronicleDigest(req.ProjectRoot, cs, state, o.chronicle, ctxSnap)
+
 	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.
 	preCycleHEAD, _ := o.gitHEAD()
 

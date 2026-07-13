@@ -78,6 +78,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
+	// Chronicle S3 (digest stage=enforce): the orchestrator seeds
+	// Context["recent_outcomes"] with the recent-outcomes digest at cycle
+	// start. Appended AFTER the stable prefix lines (cache-friendly ordering);
+	// absent/empty key keeps the prompt byte-identical (shadow/off pin).
+	if ro := req.Context["recent_outcomes"]; ro != "" {
+		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
+	}
 	return b.String()
 }
 
