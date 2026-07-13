@@ -569,6 +569,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
+	// RUNG 0 trivial-rebase composition-verdict fast path (cycle-786/801 built
+	// the pieces, cycle-804 wires them): bind the snapshot / gate-runner /
+	// verdict-writer closures so recoverFromShipError's clean fleet-rebase
+	// branch carries the audit verdict forward instead of always re-auditing.
+	// All fail-closed — see cmd_composition_wiring.go.
+	opts = append(opts, compositionOptions()...)
+
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,

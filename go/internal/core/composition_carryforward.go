@@ -83,6 +83,19 @@ func WithCompositionVerdictWriter(fn func(ledgerPath string, in CompositionVerdi
 	return func(o *Orchestrator) { o.compositionVerdictWriter = fn }
 }
 
+// CompositionFastPathWired reports whether the composition root bound ALL
+// THREE composition closures — snapshot, gate runner, and verdict writer.
+// It is an AND, not an OR: a partial binding (any nil) leaves
+// compositionCarryForward's nil-guard tripping, so it must NOT report itself
+// as wired. Mirrors FailureAdviserWired (failure_hook.go) — the same
+// observability seam that lets the composition root prove, in a real
+// (non-fake) test, that its wiring actually reaches production.
+func (o *Orchestrator) CompositionFastPathWired() bool {
+	return o.compositionSnapshot != nil &&
+		o.compositionGateRunner != nil &&
+		o.compositionVerdictWriter != nil
+}
+
 // compositionCarryForward attempts the RUNG 0 fast path after a CLEAN fleet
 // rebase: if the composed (post-rebase) diff's recomputed patch-id matches
 // the pre-rebase audited snapshot AND every required composed-tree gate is
