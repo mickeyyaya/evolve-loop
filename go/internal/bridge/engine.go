@@ -558,12 +558,18 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		ArtifactPath:  req.ArtifactPath,
 		EventsLogPath: eventsLogPath,
 		Scrollback:    scrollback,
+		Driver:        req.CLI,
 		Start:         start,
 		End:           end,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token resolver failed: %v\n", err)
 		return
+	}
+	if result.Warn != "" {
+		// Per-driver coverage WARN (cycle-779): an uncovered launch is recorded
+		// as unmeasured, never left to read as zero-cost.
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: %s (agent %s)\n", result.Warn, req.Agent)
 	}
 	resp.Tokens = core.TokenUsage(result.Usage)
 	attempt := req.Attempt

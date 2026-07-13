@@ -29,12 +29,17 @@ type PhaseTokenTotal struct {
 }
 
 // TokensReport is the walked-window aggregate `evolve tokens report` emits.
+// PhasesWithData/PhasesRun are the telemetry-coverage counters (cycle-779):
+// how many walked phase runs carried ANY token data versus how many ran —
+// so an unmeasured window reads as a coverage gap, not as "free".
 type TokensReport struct {
-	CyclesWalked  []int                 `json:"cycles_walked"`
-	Phases        []PhaseTokenTotal     `json:"phases"` // ranked, highest InputTokens first
-	TotalTokens   cyclestate.TokenUsage `json:"total_tokens"`
-	WastedTokens  cyclestate.TokenUsage `json:"wasted_tokens"` // FAIL-verdict phases (work that didn't ship)
-	CacheHitRatio float64               `json:"cache_hit_ratio"`
+	CyclesWalked   []int                 `json:"cycles_walked"`
+	Phases         []PhaseTokenTotal     `json:"phases"` // ranked, highest InputTokens first
+	TotalTokens    cyclestate.TokenUsage `json:"total_tokens"`
+	WastedTokens   cyclestate.TokenUsage `json:"wasted_tokens"` // FAIL-verdict phases (work that didn't ship)
+	CacheHitRatio  float64               `json:"cache_hit_ratio"`
+	PhasesWithData int                   `json:"phases_with_data"`
+	PhasesRun      int                   `json:"phases_run"`
 }
 
 func runTokens(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -140,6 +145,10 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 		for _, e := range entries {
 			totals[e.Phase] = addTokenUsage(totals[e.Phase], e.Tokens)
 			counts[e.Phase]++
+			report.PhasesRun++
+			if e.Tokens != (cyclestate.TokenUsage{}) {
+				report.PhasesWithData++
+			}
 			report.TotalTokens = addTokenUsage(report.TotalTokens, e.Tokens)
 			if e.Verdict == "FAIL" {
 				report.WastedTokens = addTokenUsage(report.WastedTokens, e.Tokens)
@@ -185,6 +194,7 @@ func renderTokensReport(w io.Writer, r TokensReport) {
 	fmt.Fprintf(w, "Token usage report — cycles %v\n\n", r.CyclesWalked)
 	if len(r.Phases) == 0 {
 		fmt.Fprintln(w, "(no token usage recorded in this window)")
+		fmt.Fprintf(w, "Coverage: %d/%d phases with token data\n", r.PhasesWithData, r.PhasesRun)
 		return
 	}
 	fmt.Fprintf(w, "%-28s %10s %10s %10s %10s %6s\n", "PHASE", "INPUT", "OUTPUT", "CACHE_R", "CACHE_W", "CYCLES")
@@ -196,4 +206,5 @@ func renderTokensReport(w io.Writer, r TokensReport) {
 		r.TotalTokens.Input, r.TotalTokens.Output, r.TotalTokens.CacheRead, r.TotalTokens.CacheWrite)
 	fmt.Fprintf(w, "Wasted (FAIL verdicts): input=%d output=%d\n", r.WastedTokens.Input, r.WastedTokens.Output)
 	fmt.Fprintf(w, "Cache-hit ratio: %.1f%%\n", r.CacheHitRatio*100)
+	fmt.Fprintf(w, "Coverage: %d/%d phases with token data\n", r.PhasesWithData, r.PhasesRun)
 }

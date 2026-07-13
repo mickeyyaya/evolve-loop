@@ -42,21 +42,29 @@ const (
 // EventsLogPath and Scrollback carry the lower fallback tiers' inputs:
 // the launch's *-events.ndjson path (tier 2) and the captured pane
 // scrollback content — not a pane id — (tier 3). Either may be empty; an
-// empty input simply leaves that tier with no data.
+// empty input simply leaves that tier with no data. Driver is the launch's
+// CLI/driver identity (req.CLI, e.g. "claude-tmux", "codex", "agy") so the
+// resolver can dispatch the fidelity chain per driver; empty means claude
+// (backward compatible).
 type Window struct {
 	Worktree      string
 	ArtifactPath  string
 	EventsLogPath string
 	Scrollback    string
+	Driver        string
 	Start         time.Time
 	End           time.Time
 }
 
 // Result is the outcome of a scan: the summed token usage and the Source that
-// produced it.
+// produced it. Warn carries an explicit per-driver coverage warning when no
+// tier could observe the launch's usage (Source == SourceNone) — the signal
+// that distinguishes "unmeasured" from "measured zero" so uncovered drivers
+// never masquerade as free (the 2026-07-13 all-zeros baseline defect).
 type Result struct {
 	Usage  cyclestate.TokenUsage
 	Source Source
+	Warn   string
 }
 
 // transcriptLine is the subset of a Claude Code transcript JSONL record the
