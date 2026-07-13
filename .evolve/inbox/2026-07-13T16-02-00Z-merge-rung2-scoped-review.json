@@ -1,0 +1,28 @@
+{
+  "id": "merge-rung2-scoped-merge-review",
+  "title": "Merge ladder RUNG 2: real package overlap gets a scoped merge-review of the conflicting hunks only \u2014 full re-audit (rung 3) becomes the rare entangled case",
+  "weight": 0.95,
+  "kind": "efficiency",
+  "priority": "high",
+  "campaign": "merge-efficiency-2026-07",
+  "summary": "OPERATOR-PRIORITIZED (ladder rung 3 of 4; rung 4 = existing full re-audit, no work needed). When rungs 0-1 do not apply (overlapping package footprints), dispatch a SCOPED merge-review instead of a full re-audit: a fast/balanced-tier reviewer receives ONLY the intersecting hunks, both change summaries, and the interaction question (does the composition break either change's intent?). Verdict compatible => composition-verdict{method:scoped-review} + native gates; verdict entangled => rung 3 full re-audit (today's behavior). Any LLM-assisted conflict RESOLUTION produces a new tree that must re-enter rung 0 verification (patch-id vs resolved diff; LLM merges are suggestion-grade per MergeBERT-lineage evidence). Deterministic structural merge (mergiraf-class, tree-sitter) MAY be used as a pre-step to shrink the conflict set, but its output is verified, never trusted.",
+  "acceptance": [
+    "RED: TestScopedReview_SeesOnlyIntersectingHunks (prompt contains conflict regions, not full diffs)",
+    "RED: TestScopedReview_CompatibleComposesEntangledEscalates",
+    "RED: TestLLMResolution_ReentersRung0Verification",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": [
+    "go/internal/phases/audit/",
+    "go/internal/phases/ship/",
+    "go/internal/core/"
+  ],
+  "deps": [
+    "merge-rung1-package-graph-disjoint"
+  ],
+  "connects_to": [
+    "prefix-speculation-landing-queue"
+  ],
+  "source": "operator prioritization 2026-07-13; merge-concurrency-2026 research",
+  "created_at": "2026-07-13T16:02:00Z"
+}

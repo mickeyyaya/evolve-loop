@@ -1,0 +1,29 @@
+{
+  "id": "scan-phase-fast-tier-envelopes",
+  "title": "Give judgment-light scan phases explicit fast-tier envelopes + 1-2K report budgets \u2014 the universal {balanced,deep} floor makes checklist work pay judgment prices",
+  "weight": 0.94,
+  "kind": "efficiency",
+  "priority": "high",
+  "campaign": "tokenopt-2026-07",
+  "summary": "OPERATOR-BOOSTED 2026-07-13 (\"move those tasks up in the priority now\"). Cycle-480's universal tier floor {Min:balanced, Max:deep} applies to the 72/91 profiles that declare no envelope \u2014 including scan/checklist phases (error-handling-scan, coverage-gate reporting, test-amplification) where fast-tier models handle the structured-checklist work fine per the 2026 research (caps and cheap models are quality-POSITIVE for template tasks; uniform caps only harm HARD tasks). Add explicit model_tier_envelope {Min:fast, Max:balanced} to the scan-phase profiles (an explicit envelope overrides the universal floor by design \u2014 no floor change needed) plus report-size contracts (1-2K token budgets per knowledge-base/research/token-optimization-2026 report-size-contracts finding). Parity-gate per the driver-agnostic rule: each driver's manifest must map fast to a real model. NOTE: skip phases that mechanical-scans-to-native converts to native Go (secret-leak, flake-rerun) \u2014 this item covers the scans that stay LLM-driven.",
+  "acceptance": [
+    "explicit envelopes land in the scan-phase profiles; TestSpineProfilesAreDriverAgnostic stays green",
+    "report-size budgets enforced via the deliverable contract (WARN then trim guidance, not cycle-fatal)",
+    "batch soak: scan phase output tokens drop measurably in evolve tokens report; quality gates (EGPS red_count) unchanged",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": [
+    ".evolve/profiles/",
+    "go/internal/policy/",
+    "docs/architecture/model-routing-policy.md"
+  ],
+  "deps": [
+    "token-telemetry-input-cache-fidelity"
+  ],
+  "connects_to": [
+    "mechanical-scans-to-native",
+    "difficulty-conditioned-phase-budgets"
+  ],
+  "source": "tokens report baseline 2026-07-13 (operator ultrathink); token-optimization-2026 research",
+  "created_at": "2026-07-13T13:08:00Z"
+}
