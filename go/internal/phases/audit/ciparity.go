@@ -32,9 +32,10 @@ import (
 // itself cannot run (no toolchain / no module); (nil, nil) → clean.
 
 const (
-	goVetTimeout      = 4 * time.Minute
-	acsDurableTimeout = 8 * time.Minute
-	apicoverTimeout   = 8 * time.Minute
+	goVetTimeout           = 4 * time.Minute
+	acsDurableTimeout      = 8 * time.Minute
+	apicoverTimeout        = 8 * time.Minute
+	integrationTierTimeout = 15 * time.Minute
 )
 
 // runCmd is the subprocess runner the CI-parity gates use. It is a package var
@@ -164,6 +165,52 @@ func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
 	}
 	return runCIGate(req, "acs-durable (-tags acs)", acsDurableTimeout,
 		"go", "test", "-count=1", "-tags", "acs", "./acs/regression/...")
+}
+
+// integrationTierCheckDefault runs the `-tags integration` test tier (go.yml's
+// "test … incl. integration tier" step: `go test -tags integration $(go list
+// ./... | grep -v /acs/)`) against the cycle worktree. It closes the parity
+// hole one tier above go vet: TestFleetSoak went CI-red under a green per-cycle
+// audit because ciparity never built the integration tier. Faithful to CI, it
+// enumerates the module packages, drops acs/ (per-cycle ACS evals read runtime
+// artifacts absent here), then runs the tier; any non-zero exit → offenders →
+// FAIL. No-op unless the cycle built Go. -race/-cover are dropped (the gate
+// proves the tier COMPILES + PASSES, not the coverage number CI records).
+func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
+	if !cycleTouchedGo(req) {
+		return nil, nil
+	}
+	dir := moduleDirForReq(req)
+	if dir == "" {
+		return nil, nil // no go module in the worktree → nothing to check
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), integrationTierTimeout)
+	defer cancel()
+	run := runCmd
+	// go.yml lists packages WITHOUT the integration tag, then filters acs/.
+	listOut, err := sysexec.Output(ctx, run, dir, "go", "list", "./...")
+	if err != nil {
+		return nil, fmt.Errorf("integration-tier gate: go list: %w", err) // fail-open → WARN
+	}
+	var pkgs []string
+	for _, p := range strings.Fields(listOut) {
+		if strings.Contains(p, "/acs/") {
+			continue
+		}
+		pkgs = append(pkgs, p)
+	}
+	if len(pkgs) == 0 {
+		return nil, nil
+	}
+	args := append([]string{"test", "-count=1", "-tags", "integration"}, pkgs...)
+	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, "go", args...)
+	if cerr != nil {
+		return nil, fmt.Errorf("integration-tier gate could not run: %w", cerr) // fail-open → WARN
+	}
+	if code == 0 {
+		return nil, nil // clean
+	}
+	return offenderLines(strings.TrimSpace(out + "\n" + errOut)), nil // ran + non-zero → FAIL
 }
 
 // apicoverEnforceChangedDefault runs `apicover -enforce` (CI go.yml "api-coverage

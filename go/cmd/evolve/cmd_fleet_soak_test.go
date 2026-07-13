@@ -119,38 +119,66 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		t.Errorf("AC8: soakreport should contain 4 PASS rows, got %d; stdout:\n%s", passCount, stdout)
 	}
 
-	// Invariant 2 (external behavioral check): ReapOrphans on evolveDir with
-	// the same fakeKiller finds 0 live runs and exactly N orphaned runs.
+	// Invariant 2 (tombstone contract — cycle-806 reconcile): runFleetSoak's
+	// in-harness reap (soakCheckReap → ReapOrphans) has ALREADY reaped all N
+	// runs, renaming each registry to its `.reaped` tombstone
+	// (sessionreaper.go:92-95, the cycle-769 bounded-reap contract). So the new
+	// correct assertions are (a) exactly N tombstones exist on disk, and (b) a
+	// SECOND ReapOrphans is an idempotent 0-orphan no-op — a tombstoned registry
+	// is skipped, never re-swept. The pre-806 test wrongly re-expected N orphans
+	// from the second reap, which the tombstone rename made impossible.
+	tombstones := 0
+	runEntries, rderr := os.ReadDir(filepath.Join(evolveDir, "runs"))
+	if rderr != nil {
+		t.Fatalf("Invariant 2: read runs dir: %v", rderr)
+	}
+	for _, e := range runEntries {
+		if !e.IsDir() {
+			continue
+		}
+		tomb := sessionrecord.PathIn(filepath.Join(evolveDir, "runs", e.Name())) + sessionrecord.ReapedSuffix
+		if _, serr := os.Stat(tomb); serr == nil {
+			tombstones++
+		}
+	}
+	if tombstones != n {
+		t.Errorf("Invariant 2: %d `.reaped` tombstones after the in-harness reap, want %d", tombstones, n)
+	}
+
 	reapRep, err := sessionreaper.ReapOrphans(context.Background(), evolveDir, sessionreaper.Options{
 		Now:      func() time.Time { return time.Now().Add(24 * time.Hour) },
 		LeaseTTL: runlease.DefaultTTL,
 		Kill:     fakeKiller,
 	})
 	if err != nil {
-		t.Fatalf("Invariant 2: ReapOrphans: %v", err)
+		t.Fatalf("Invariant 2: second ReapOrphans: %v", err)
 	}
 	if reapRep.LiveRunsSkipped != 0 {
 		t.Errorf("Invariant 2: %d live runs found — all leases should be stale", reapRep.LiveRunsSkipped)
 	}
-	if len(reapRep.Orphaned) != n {
-		t.Errorf("Invariant 2: %d orphaned runs, want %d", len(reapRep.Orphaned), n)
-	}
-	for _, o := range reapRep.Orphaned {
-		if o.Report.Killed != 1 {
-			t.Errorf("Invariant 2: run %s killed=%d sessions, want 1", o.RunDir, o.Report.Killed)
-		}
+	if len(reapRep.Orphaned) != 0 {
+		t.Errorf("Invariant 2: second reap found %d orphaned runs, want 0 (tombstoned registries must be idempotent no-ops)", len(reapRep.Orphaned))
 	}
 
-	// Invariant 3 (external behavioral check): every kill resolved to a runDir
-	// whose registry contains the killed session (no cross-run kill).
+	// Invariant 3 (tombstone contract — cycle-806 reconcile): every kill (all N
+	// recorded during the in-harness reap) must still resolve to a runDir whose
+	// registry contains the killed session. After the reap the live registry is
+	// tombstoned, so attribution is discovered through sessionrecord's
+	// tombstone-aware ReadAllResolving (task sweep-tombstone-attribution) rather
+	// than the live-path ReadAll — which now finds nothing. The UNKNOWN /
+	// cross-run-reap failure branch is KEPT (not relaxed): a session that
+	// resolves to no owning run is still a hard failure.
 	killMu.Lock()
 	defer killMu.Unlock()
+	if len(killLog) != n {
+		t.Errorf("Invariant 3: %d kills recorded, want %d (one per run)", len(killLog), n)
+	}
 	for _, k := range killLog {
 		if k.runDir == "UNKNOWN" {
 			t.Errorf("Invariant 3: session %q resolved to UNKNOWN runDir — cross-run reap", k.session)
 			continue
 		}
-		recs, _ := sessionrecord.ReadAll(sessionrecord.PathIn(k.runDir))
+		recs, _ := sessionrecord.ReadAllResolving(sessionrecord.PathIn(k.runDir))
 		found := false
 		for _, r := range recs {
 			if r.Session == k.session {
@@ -159,7 +187,7 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("Invariant 3: session %q killed by %q but not in that run's registry", k.session, k.runDir)
+			t.Errorf("Invariant 3: session %q killed by %q not discoverable via tombstone-aware resolver — attribution lost", k.session, k.runDir)
 		}
 	}
 

@@ -92,6 +92,13 @@ type hooks struct {
 	goVetCheck           func(req core.PhaseRequest) ([]string, error)
 	acsDurableCheck      func(req core.PhaseRequest) ([]string, error)
 	apicoverEnforceCheck func(req core.PhaseRequest) ([]string, error)
+	// integrationTierCheck runs the `-tags integration` test tier (go.yml's
+	// "test … incl. integration tier" step) against the cycle worktree. It
+	// closes the parity hole one tier up from goVetCheck: the fleet soak
+	// (TestFleetSoak) went red in CI while the per-cycle audit stayed green
+	// because ciparity ran vet/acs-durable/apicover but never the integration
+	// tier. nil = no gate. NewDefaultWithStageCompact wires the *Default impl.
+	integrationTierCheck func(req core.PhaseRequest) ([]string, error)
 	// apicoverNewPkgGraduationCheck reports changed go/internal/<pkg> packages
 	// that are new this cycle and absent from .apicover-enforce — the blind spot
 	// IntersectEnforced silently drops (a new package cannot yet be in the
@@ -243,6 +250,8 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		"go vet ./... reported %d issue(s) — CI `vet + fmt` would FAIL (e.g. import cycle). Offenders: %s")
 	applyCIGate(h.acsDurableCheck, "acs-durable gate",
 		"acs-durable (-tags acs) FAILED %d check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: %s")
+	applyCIGate(h.integrationTierCheck, "integration-tier gate",
+		"the integration tier (`go test -tags integration`) reported %d offender(s) — CI's integration-tier test step would FAIL (e.g. TestFleetSoak). Offenders: %s")
 	applyCIGate(h.apicoverEnforceCheck, "apicover-enforce gate",
 		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
 	applyCIGate(h.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
@@ -344,6 +353,11 @@ type Config struct {
 	CheckGoVet           func(req core.PhaseRequest) ([]string, error)
 	CheckACSDurable      func(req core.PhaseRequest) ([]string, error)
 	CheckApicoverEnforce func(req core.PhaseRequest) ([]string, error)
+	// CheckIntegrationTier runs the `-tags integration` test tier over the cycle
+	// worktree; any offender FAILs the audit (the tier that let TestFleetSoak go
+	// CI-red under a green per-cycle audit). nil = no gate.
+	// NewDefaultWithStageCompact wires integrationTierCheckDefault.
+	CheckIntegrationTier func(req core.PhaseRequest) ([]string, error)
 	// CheckApicoverNewPkgGraduation is the new-package graduation gate: it FAILs
 	// audit when a changed go/internal/<pkg> is new this cycle and absent from
 	// .apicover-enforce (the blind spot apicover -enforce's touched∩enforced
@@ -370,6 +384,7 @@ func New(c Config) *Phase {
 				skillsDriftCheck:              c.CheckSkillsDrift,
 				goVetCheck:                    c.CheckGoVet,
 				acsDurableCheck:               c.CheckACSDurable,
+				integrationTierCheck:          c.CheckIntegrationTier,
 				apicoverEnforceCheck:          c.CheckApicoverEnforce,
 				apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
 				phaseIO:                       c.PhaseIO,
@@ -415,6 +430,7 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 		CheckSkillsDrift:              skillsDriftCheckDefault,
 		CheckGoVet:                    goVetCheckDefault,
 		CheckACSDurable:               acsDurableCheckDefault,
+		CheckIntegrationTier:          integrationTierCheckDefault,
 		CheckApicoverEnforce:          apicoverEnforceChangedDefault,
 		CheckApicoverNewPkgGraduation: apicoverNewPackageGraduationDefault,
 		PhaseIO:                       stage,

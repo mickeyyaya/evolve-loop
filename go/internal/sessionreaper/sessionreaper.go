@@ -27,8 +27,10 @@ const DefaultReapTimeout = 15 * time.Second
 // "no registry → skip" walk check makes every later sweep skip the run for
 // free — the fix for the unbounded boot re-reap class (cycle-769: 4,388
 // sessions re-swept serially on every boot). A relaunched run recreates the
-// registry, so it becomes sweepable again.
-const reapedSuffix = ".reaped"
+// registry, so it becomes sweepable again. The suffix value lives in the
+// sessionrecord SSOT (ReapedSuffix) so the reader that resolves the tombstone
+// for attribution (sessionrecord.ReadAllResolving) shares one definition.
+const reapedSuffix = sessionrecord.ReapedSuffix
 
 // Options configures an orphan sweep.
 type Options struct {

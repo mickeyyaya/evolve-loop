@@ -33,6 +33,14 @@ var openAppendFileFn = func(path string) (appendFile, error) {
 // FileName is the registry's name inside a run workspace.
 const FileName = "tmux-sessions.jsonl"
 
+// ReapedSuffix is the tombstone suffix a fully-reaped registry is renamed to
+// (sessionreaper renames <registry> → <registry>+ReapedSuffix so every later
+// boot sweep skips the run for free — the cycle-769 bounded-reap contract).
+// It lives here, in the registry SSOT, so the reaper that writes the tombstone
+// and the attribution reader that recovers it (ReadAllResolving, below) share
+// one definition rather than two `.reaped` literals drifting apart.
+const ReapedSuffix = ".reaped"
+
 // RunScopeToken is the session-name run namespace: "r" + the first 8 ULID
 // chars. The single source shared by the bridge's resolveSession (mints it
 // into evolve-bridge-r<runid8>-… names) and the observer's run-scope
@@ -111,6 +119,36 @@ func ReadAll(path string) ([]Record, error) {
 	}
 	if err := sc.Err(); err != nil {
 		return out, fmt.Errorf("sessionrecord: scan: %w", err)
+	}
+	return out, nil
+}
+
+// ReadAllResolving returns every record still discoverable for a run's
+// registry, unioning the live path with its `.reaped` tombstone and deduping
+// by session id. Once ReapOrphans tombstones a fully-reaped registry the live
+// path is gone, so a plain ReadAll loses attribution — the exact accounting
+// hole the fleet soak's Invariant 3 hit; this reader recovers it from the
+// tombstone. With NEITHER file present it returns zero records and no error:
+// attribution that never existed is never fabricated (worse than losing it).
+func ReadAllResolving(path string) ([]Record, error) {
+	live, err := ReadAll(path)
+	if err != nil {
+		return nil, err
+	}
+	tomb, err := ReadAll(path + ReapedSuffix)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(live)+len(tomb))
+	out := make([]Record, 0, len(live)+len(tomb))
+	for _, group := range [][]Record{live, tomb} {
+		for _, r := range group {
+			if _, dup := seen[r.Session]; dup {
+				continue // a relaunched run re-recorded a tombstoned session
+			}
+			seen[r.Session] = struct{}{}
+			out = append(out, r)
+		}
 	}
 	return out, nil
 }
