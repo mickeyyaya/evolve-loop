@@ -46,8 +46,16 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
 		switch {
 		case ok:
-			// Clean (or derived-only, regenerated) replay → router routes
-			// RebaseNeeded to audit (re-bind the merged tree).
+			// A clean replay MAY carry the audit verdict forward without a
+			// full re-audit (RUNG 0, cycle-801): if the composed diff's
+			// patch-id still matches what the audit reviewed and every
+			// composed-tree gate is green, write a composition-verdict entry
+			// and reship directly. Any rejection falls through unchanged to
+			// the pre-existing route below (router routes RebaseNeeded to
+			// audit, re-binding the merged tree).
+			if o.compositionCarryForward(ctx, cycle, cs) {
+				return PhaseShip, true
+			}
 		case conflict:
 			// Genuine overlapping work — a re-audit cannot resolve it. Reclassify to
 			// the integrity-class conflict code so recovery routes to the debugger.

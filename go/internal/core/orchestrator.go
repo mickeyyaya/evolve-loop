@@ -277,6 +277,19 @@ type Orchestrator struct {
 	// is fail-open (returns a possibly-empty Set, never errors). nil ⇒ no directives.
 	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
+	// compositionSnapshot, compositionGateRunner, and compositionVerdictWriter
+	// wire the RUNG 0 trivial-rebase composition-verdict fast path
+	// (WithCompositionSnapshot / WithCompositionGateRunner /
+	// WithCompositionVerdictWriter) into recoverFromShipError's clean
+	// fleet-rebase branch. All three nil (default) ⇒ the fast path never
+	// fires ⇒ recovery behaves exactly as it does today (byte-identical).
+	// The composition root binds the writer closure to the real
+	// ledger.WriteCompositionVerdict; core stays adapter-agnostic (ledger
+	// already imports core, so a direct import would cycle).
+	compositionSnapshot      func(ctx context.Context, worktree string) (CompositionAuditSnapshot, error)
+	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
+	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
+
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
 	// WithWorktreeProvisioner so RunCycle runs without touching real git.
