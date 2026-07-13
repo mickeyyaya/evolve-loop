@@ -64,21 +64,18 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// ADR-0050 §3.10 Slice 2: typed envelope at enforce, legacy Context below it
 	// (byte-identical — Active() is false unless enforce).
 	carryover := req.Context["carryover_summary"]
-	fleetScope := req.Context["fleet_scope"]
 	if req.Input.Active() {
 		carryover = req.Input.CycleInputs().Carryover()
-		fleetScope = req.Input.CycleInputs().FleetScope()
 	}
 	if carryover != "" {
 		fmt.Fprintf(&b, "- carryover_summary: %s\n", carryover)
 	}
 	// ADR-0049 E: under `evolve fleet --plan` this cycle is one of several running
 	// concurrently, each assigned a DISJOINT set of tasks. Steer selection to ONLY
-	// the assigned ids so two cycles never pick work touching the same files. The
-	// ids come from the advisor's (LLM-authored) backlog, so strip control chars
-	// before injecting into the prompt — a newline in an id would otherwise forge a
-	// new context bullet (prompt injection via the data channel).
-	if scope := sanitizePromptValue(fleetScope); scope != "" {
+	// the assigned ids so two cycles never pick work touching the same files.
+	// Resolution + control-char sanitization live in runner.LaneScope (shared
+	// with scout/build/tdd since cycle-776).
+	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
 	return b.String()
@@ -101,18 +98,6 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 		}}, string(core.PhaseTDD)
 	}
 	return core.VerdictPASS, nil, string(core.PhaseTDD)
-}
-
-// sanitizePromptValue collapses newlines, carriage returns, and tabs to spaces
-// so advisor-authored data injected into a prompt context bullet cannot forge a
-// new line / directive (prompt injection via the data channel).
-func sanitizePromptValue(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\r' || r == '\t' {
-			return ' '
-		}
-		return r
-	}, s)
 }
 
 func hasTopNItems(trimmed string) bool {

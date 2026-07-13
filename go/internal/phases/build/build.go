@@ -38,6 +38,11 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
 	}
+	// Cycle-776 (fleet-lane-provisioning-split residual): render the pinned
+	// lane scope so the builder binds ONLY to this lane's task ids.
+	if scope := runner.LaneScope(req); scope != "" {
+		fmt.Fprintf(&b, "- fleet_scope: this cycle is one fleet lane; bind ONLY to tasks whose id is in this assigned set, ignore all others: %s\n", scope)
+	}
 	if req.BuildPlan != "" {
 		fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
 	}

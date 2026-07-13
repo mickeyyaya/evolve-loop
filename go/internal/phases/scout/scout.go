@@ -83,6 +83,15 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if tok != "" {
 		fmt.Fprintf(&b, "- challenge_token: %s\n", tok)
 	}
+	// Cycle-776 (fleet-lane-provisioning-split residual): cycle-766 pinned the
+	// lane scope into Context, but only triage rendered it — so scout scouted
+	// out-of-scope tasks (cycle-640/-776 incidents). Render the directive, and
+	// instruct the Decision Trace goal_hash echo so the scout→triage coherence
+	// gate (core/lanescope.go) can fire on a mismatch instead of failing open.
+	if scope := runner.LaneScope(req); scope != "" {
+		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; scout ONLY within this assigned todo-id set, ignore all other candidate work: %s\n", scope)
+		b.WriteString("- lane_coherence: echo the pinned goal_hash verbatim under a \"goal_hash\" key in your report's Decision Trace JSON block\n")
+	}
 	return b.String()
 }
 
