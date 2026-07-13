@@ -194,6 +194,23 @@ func (o *Options) cycleStateFile() string {
 //	git commit -m <msg-with-footer>
 //	git push origin <branch>
 func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch string) error {
+	// ADR-0049 S5 / gap G1: the non-worktree ship path (manual ships, release
+	// ships, and any cycle ship without a live worktree) mutates
+	// opts.ProjectRoot's index directly via add -A → commit → push. Hold the
+	// integrator lock across that whole critical section so two concurrent
+	// ships that both land here serialize instead of racing main's
+	// index/ref/origin — the same guard shipFromWorktree already holds.
+	// BLOCKING flock; skipped on dry-run (mutates nothing). No-op under the
+	// whole-cycle project lock (uncontended).
+	if !opts.DryRun {
+		release, lockErr := opts.acquireShipLock()
+		if lockErr != nil {
+			return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+				"ship: acquire integrator lock (.evolve/ship.lock): "+lockErr.Error())
+		}
+		defer release()
+	}
+
 	if !opts.DryRun {
 		if opts.Class == ClassRelease {
 			// Release staging is class-special (v18.3.0→v18.5.0 forensics):
