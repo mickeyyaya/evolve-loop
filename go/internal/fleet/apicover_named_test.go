@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"io"
 	"sync"
 	"testing"
 
@@ -35,5 +36,31 @@ func TestLaunchFn_InvokedWithFleetEnvForced(t *testing.T) {
 	}
 	if res[0].ExitCode != 7 {
 		t.Fatalf("ExitCode = %d, want 7 (LaunchFn return must propagate)", res[0].ExitCode)
+	}
+}
+
+// TestFreshnessGateFnTypes_Named names the dispatch freshness gate's bare
+// contract types (FreshnessProbeFn, RefillFn, FreshnessSkip — assigned inline
+// in freshness_test.go but never named there) and pins their contract: a probe
+// verdict of stale flows into a FreshnessSkip carrying the probe's reason, and
+// an ok=false RefillFn leaves the freed slot empty.
+func TestFreshnessGateFnTypes_Named(t *testing.T) {
+	var probe FreshnessProbeFn = func(string) TaskFreshness {
+		return TaskFreshness{Fresh: false, Reason: "consumed: processed"}
+	}
+	var refill RefillFn = func(map[string]bool) (CycleSpec, bool) {
+		return CycleSpec{}, false
+	}
+	kept, skipped := FreshenSpecs([]CycleSpec{{Scope: []string{"task-x"}}}, probe, refill, io.Discard)
+	if len(kept) != 0 {
+		t.Fatalf("stale-only wave with empty backlog must keep nothing, got %+v", kept)
+	}
+	var sk FreshnessSkip
+	if len(skipped) != 1 {
+		t.Fatalf("want exactly one skip record, got %+v", skipped)
+	}
+	sk = skipped[0]
+	if sk.TaskID != "task-x" || sk.Reason != "consumed: processed" {
+		t.Fatalf("FreshnessSkip must carry the probe's id + reason, got %+v", sk)
 	}
 }

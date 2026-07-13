@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
@@ -20,6 +21,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleetbudget"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
@@ -237,11 +240,98 @@ func reloadFleetConfigAtWaveBoundary(evolveDir string, prev policy.FleetConfig, 
 // wired to the same execCycleLaunch LaunchFn `evolve fleet` uses, so wave
 // lanes inherit EVOLVE_FLEET=1 + EVOLVE_FLEET_SCOPE exactly like
 // `evolve fleet --plan` lanes (scoped lane triage already exists at
-// internal/core/cyclerun.go:443).
-func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) *fleet.Supervisor {
-	return &fleet.Supervisor{
-		Concurrency: fc.Concurrency,
-		Launch:      execCycleLaunch(binPath, false, projectRoot, goalHash, goalText, stdout, stderr),
+// internal/core/cyclerun.go:443). The supervisor is wrapped in the dispatch
+// freshness gate (cycle 767, dispatch-freshness-gate): immediately before
+// launch, every spec's scope ids are re-resolved against the CURRENT inbox
+// lifecycle + deps, stale ids are skipped with a logged reason, and freed
+// slots are refilled from the pending backlog — a lane-slot is never burned
+// on known-dead work. Decorating here (instead of threading a param through
+// dispatchIteration) gates BOTH the wave path and the min-width repair path
+// at one seam.
+func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) waveLauncher {
+	return freshnessGatedLauncher{
+		inner: &fleet.Supervisor{
+			Concurrency: fc.Concurrency,
+			Launch:      execCycleLaunch(binPath, false, projectRoot, goalHash, goalText, stdout, stderr),
+		},
+		probe:  productionFreshnessProbe(projectRoot),
+		refill: productionRefillFn(filepath.Join(projectRoot, ".evolve")),
+		warn:   stderr,
+	}
+}
+
+// freshnessGatedLauncher decorates a waveLauncher with fleet.FreshenSpecs so
+// the gate runs at the last moment before lanes launch (planning happened
+// earlier and may be stale — the postmortem's whole failure class).
+type freshnessGatedLauncher struct {
+	inner  waveLauncher
+	probe  fleet.FreshnessProbeFn
+	refill fleet.RefillFn
+	warn   io.Writer
+}
+
+func (l freshnessGatedLauncher) Run(ctx context.Context, specs []fleet.CycleSpec) []fleet.Result {
+	kept, skipped := fleet.FreshenSpecs(specs, l.probe, l.refill, l.warn)
+	if len(kept) == 0 {
+		// Whole wave stale and backlog exhausted: launching nothing IS the fix
+		// (a shorter wave, never a doomed lane). Skips were already WARN-logged.
+		fmt.Fprintf(l.warn, "[fleet] freshness gate: all %d planned lane(s) stale (%d skip(s)), nothing to launch\n", len(specs), len(skipped))
+		return nil
+	}
+	return l.inner.Run(ctx, kept)
+}
+
+// productionFreshnessProbe re-resolves one task id against the inbox
+// lifecycle at dispatch time. Pending → fresh unless a declared dep is still
+// undone (pending/processing/retry — postmortem shape (3)); any consumed
+// lifecycle state → stale with the state as reason (shapes (1)/(2)); no
+// lifecycle evidence at all → fresh (fail-open: not every planned id is
+// inbox-backed, and a missing file must never false-skip a lane).
+func productionFreshnessProbe(projectRoot string) fleet.FreshnessProbeFn {
+	opts := inboxmover.Options{ProjectRoot: projectRoot, Stderr: io.Discard}
+	return func(taskID string) fleet.TaskFreshness {
+		ds := inboxmover.ResolveDispatchState(opts, taskID)
+		switch ds.State {
+		case inboxmover.StatePending:
+			for _, dep := range ds.Deps {
+				switch inboxmover.ResolveDispatchState(opts, dep).State {
+				case inboxmover.StatePending, inboxmover.StateProcessing, inboxmover.StateRetry:
+					return fleet.TaskFreshness{Fresh: false, Reason: "deps unmet: needs " + dep}
+				}
+			}
+			return fleet.TaskFreshness{Fresh: true}
+		case inboxmover.StateUnknown:
+			return fleet.TaskFreshness{Fresh: true}
+		default:
+			reason := "consumed: " + ds.State
+			if ds.Detail != "" {
+				reason += " " + ds.Detail
+			}
+			return fleet.TaskFreshness{Fresh: false, Reason: reason}
+		}
+	}
+}
+
+// productionRefillFn pulls the highest-weight pending inbox todo not already
+// owned by this wave into a freed slot, shaped exactly like a planned lane
+// spec (Scope + EVOLVE_FLEET_SCOPE; EVOLVE_FLEET is forced by the supervisor).
+// minimal: picks by weight only — it does not re-check file-disjointness
+// against the kept lanes; upgrade path is routing the refill through
+// triagecap.SelectFleetWidthTopN with the kept lanes' files as seeds.
+func productionRefillFn(evolveDir string) fleet.RefillFn {
+	return func(exclude map[string]bool) (fleet.CycleSpec, bool) {
+		backlog := triagecap.ReadInboxBacklog(evolveDir)
+		sort.SliceStable(backlog, func(i, j int) bool { return backlog[i].Weight > backlog[j].Weight })
+		for _, c := range backlog {
+			if exclude[c.ID] {
+				continue
+			}
+			return fleet.CycleSpec{
+				Scope: []string{c.ID},
+				Env:   map[string]string{ipcenv.FleetScopeKey: c.ID},
+			}, true
+		}
+		return fleet.CycleSpec{}, false
 	}
 }
 
