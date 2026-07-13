@@ -174,8 +174,9 @@ func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
 // audit because ciparity never built the integration tier. Faithful to CI, it
 // enumerates the module packages, drops acs/ (per-cycle ACS evals read runtime
 // artifacts absent here), then runs the tier; any non-zero exit → offenders →
-// FAIL. No-op unless the cycle built Go. -race/-cover are dropped (the gate
-// proves the tier COMPILES + PASSES, not the coverage number CI records).
+// FAIL. No-op unless the cycle built Go. -race IS included (CI runs it, so a
+// genuine data race in a touched package must fail the gate, not just CI); only
+// -cover is dropped — the coverage number is a CI-only concern (ADR-0069).
 func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if !cycleTouchedGo(req) {
 		return nil, nil
@@ -202,7 +203,7 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
-	args := append([]string{"test", "-count=1", "-tags", "integration"}, pkgs...)
+	args := append([]string{"test", "-race", "-count=1", "-tags", "integration"}, pkgs...)
 	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, "go", args...)
 	if cerr != nil {
 		return nil, fmt.Errorf("integration-tier gate could not run: %w", cerr) // fail-open → WARN
