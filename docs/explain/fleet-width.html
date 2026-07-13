@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet width — how N concurrent loops are delivered</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Fleet width</h1>
+<p class="meta">How the fleet delivers exactly N concurrent loops — and keeps delivering them through quota walls, benches, and operator changes.</p>
+
+<h2>How it works today</h2>
+<p>Width is policy, not a flag: <code>.evolve/policy.json</code> carries a <code>fleet</code> block with <code>count</code> (requested lanes per wave) and <code>min_lanes</code> (a floor the width may never sink below). The supervisor (<code>evolve loop</code>) dispatches lanes in <b>waves</b>: N isolated cycles, each in its own git worktree with its own LLM session, then the next N when all finish.</p>
+<div class="flow">
+<div class="node"><b>policy.json</b><small>count:3 · min_lanes:3</small></div><div class="arrow">→</div>
+<div class="node"><b>control-plane preflight</b><small>file must be COMMITTED</small></div><div class="arrow">→</div>
+<div class="node"><b>quota-aware sizing</b><small>QuotaAwareCount()</small></div><div class="arrow">→</div>
+<div class="node"><b>wave dispatch</b><small>N lanes, N worktrees</small></div>
+</div>
+<p>Before each wave, two guards run. The <b>control-plane preflight</b> refuses to dispatch if policy files have uncommitted changes — rules must be versioned before play resumes. Then <b>quota-aware sizing</b> (<code>go/internal/fleet/quota.go</code>) shrinks the wave by one lane per quota-benched CLI family — but never below <code>min_lanes</code>. Setting <code>min_lanes == count</code> is the operator idiom for "hold the width regardless": the floor absorbs every bench and the log says <code>capacity held at N by fleet.min_lanes floor</code>, while benched-CLI phases fall back to healthy families.</p>
+<p>Since cycle 739, the supervisor <b>re-reads the fleet block at every wave boundary</b> — a committed width change takes effect at the next wave, no restart. And since cycle 740, if <em>every</em> CLI family is quota-walled at once, a cycle checkpoints and defers instead of dying, resuming after the quota window resets.</p>
+
+<h2>How it got built — the cycles</h2>
+<table>
+<tr><th>Cycle(s)</th><th>Change</th><th>Provoked by</th></tr>
+<tr><td>#303 era</td><td><code>min_lanes</code> floor + bench absorption</td><td>Fleet width shaved to sequential under benches — width is a commitment, not a hint</td></tr>
+<tr><td>739, 744, 746 <span class="chip pass">PASS</span></td><td>Hot-reload of the fleet block at wave boundaries (<code>cmd_loop_wave.go</code>, commit <code>327cd9c1</code>)</td><td>2026-07-12: operator committed width 10 mid-batch; the snapshot ignored it; honoring it cost a supervisor bounce that orphaned nine lanes</td></tr>
+<tr><td>740 <span class="chip pass">PASS</span></td><td>All-families-exhausted → checkpoint + defer (<code>quota_exhaustion.go</code>, commit <code>a6c0fb40</code>)</td><td>The same night&rsquo;s "burn all tokens" directive: quota walls must be pauses, not lane deaths</td></tr>
+</table>
+<div class="callout"><b>The incident that taught it</b> — during the width-10 window, an uncommitted policy edit sat dirty for three minutes; a lane reached ship, failed the control-plane precondition, and its rollback deleted the shared binary, cascading <code>SELF_SHA_IO</code> failures to every sibling. Every rule above (commit-before-dispatch, wave-boundary reload, floors) exists because some version of that evening happened.</div>
+<p>Width economics, observed: at width 10 the waves scored 3/10 and 2/10 ok (ten concurrent retro REPLs starved each other); at width 3 the same pipeline cruised at 2/3–3/3. Concurrency amplifies contention along with throughput — the machinery on this page is what keeps the trade honest.</p>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · sources: loop logs, cycle dossiers, ship commits, campaign plans.</p>
+</div></body></html>

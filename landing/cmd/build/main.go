@@ -13,18 +13,47 @@ import (
 	"evolve-loop-landing/internal/buildsite"
 )
 
+// explainPages lists the docs/explain feature explainers projected into the
+// site at /explain/ (single source of truth: repo-root docs/explain/; build
+// runs from landing/, so ../ reaches it — same pattern as install.sh below).
+// Adding a new feature page = one entry here + the page in docs/explain/.
+var explainPages = []string{
+	"index",
+	"fleet-width",
+	"phase-pipeline",
+	"trust-kernel",
+	"bridge-drivers",
+	"model-routing",
+	"quality-gates",
+	"ship-release",
+	"token-telemetry",
+	"queue-integrity",
+	"chronicle",
+	"resilience",
+}
+
 // config returns the build configuration: the five landing-page versions plus
 // the gallery, and where content/templates/assets/output live.
 func config() buildsite.Config {
+	// Serve the one-line installer at /install.sh (single source of truth:
+	// the repo-root install.sh; build runs from landing/, so ../ reaches it).
+	rootFiles := []buildsite.RootFile{
+		{Src: "../install.sh", Dst: "install.sh"},
+		{Src: "shared/llms.txt", Dst: "llms.txt"},
+	}
+	for _, p := range explainPages {
+		rootFiles = append(rootFiles, buildsite.RootFile{
+			Src: "../docs/explain/" + p + ".html",
+			Dst: "explain/" + p + ".html",
+		})
+	}
 	return buildsite.Config{
 		ContentPath:  "shared/content.json",
 		TemplateGlob: "templates/*.html",
 		AssetsDir:    "assets",
 		OutDir:       "dist",
 		Gallery:      "gallery",
-		// Serve the one-line installer at /install.sh (single source of truth:
-		// the repo-root install.sh; build runs from landing/, so ../ reaches it).
-		RootFiles: []buildsite.RootFile{{Src: "../install.sh", Dst: "install.sh"}, {Src: "shared/llms.txt", Dst: "llms.txt"}},
+		RootFiles:    rootFiles,
 		Versions: []buildsite.Version{
 			{Slug: "luminous", Title: "Luminous Minimal", Tagline: "Light, Apple-white, calm authority.", Template: "luminous"},
 			{Slug: "noir", Title: "Keynote Noir", Tagline: "Dark, cinematic spotlight.", Template: "noir"},

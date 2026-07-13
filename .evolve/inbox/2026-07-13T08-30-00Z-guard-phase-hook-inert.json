@@ -1,0 +1,19 @@
+{
+  "id": "guard-phase-hook-inert",
+  "title": "evolve guard phase is inert as wired: inspects ToolName==Agent but hooked under the Bash matcher — rewire or retire, and fix every doc claiming it enforces phase order",
+  "weight": 0.9,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "docs-code-alignment-2026-07",
+  "summary": "Verified 2026-07-13 (code-vs-docs audit): guards.Phase.Decide (go/internal/guards/phase.go:26-49) only acts when ToolName=='Agent' (denies in-process Agent dispatch when cs.CycleID!=0) and returns Allow for every Bash command — yet .claude/settings.json wires it ONLY under the Bash PreToolUse matcher, so it never sees an Agent call and never enforces anything. Real phase-order enforcement is the in-process state machine (go/internal/core/statemachine.go SpineSatisfiedUpTo + legality graph). Docs that claim otherwise: CLAUDE.md ('Phase gate at every transition (Go orchestrator + evolve guard phase)'), .claude/settings.json:2 comment ('subagent-run.sh invocations must follow Scout→Builder→Auditor sequence'), skills/loop/SKILL.md:17/:86/:255/:271, docs/operations/runtime-reference.md:13 ('Agent denied whenever cycle-state.json exists' — actually only when CycleID!=0). Fix the class: EITHER (a) wire the guard under an Agent/Task PreToolUse matcher so its in-process-Agent denial actually fires (its designed purpose), OR (b) retire the guard and update all five doc surfaces to name the state machine as the enforcement point. Decide via ADR note; do not leave a dead gate documented as load-bearing.",
+  "acceptance": [
+    "either: settings.json matcher covers the Agent tool AND a red test proves an in-process Agent call during an active cycle is denied; or: guard removed + ledger/docs updated",
+    "all five listed doc surfaces corrected to describe the actual enforcement point",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": [".claude/settings.json", "go/internal/guards/phase.go", "skills/loop/SKILL.md", "docs/operations/runtime-reference.md", "CLAUDE.md"],
+  "deps": [],
+  "connects_to": ["docs-drift-sweep-2026-07"],
+  "source": "execution-core verification agent 2026-07-13",
+  "created_at": "2026-07-13T08:30:00Z"
+}

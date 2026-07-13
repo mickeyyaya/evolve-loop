@@ -102,3 +102,37 @@ func TestMain_DelegatesExitCode(t *testing.T) {
 		t.Errorf("main() exit code = %d, want 1", got)
 	}
 }
+
+// TestConfig_ExplainPagesProjected verifies every docs/explain feature page is
+// projected into dist/explain/ via RootFiles (single-source-with-projection:
+// docs/explain/ is the source, the deployed site serves the copy).
+func TestConfig_ExplainPagesProjected(t *testing.T) {
+	cfg := config()
+
+	got := map[string]string{}
+	for _, rf := range cfg.RootFiles {
+		got[rf.Dst] = rf.Src
+	}
+
+	if len(explainPages) != 12 {
+		t.Fatalf("explainPages: got %d entries, want 12", len(explainPages))
+	}
+	for _, p := range explainPages {
+		dst := "explain/" + p + ".html"
+		src, ok := got[dst]
+		if !ok {
+			t.Errorf("config(): missing RootFile projection for %q", dst)
+			continue
+		}
+		if want := "../docs/explain/" + p + ".html"; src != want {
+			t.Errorf("config(): RootFile[%q].Src = %q, want %q", dst, src, want)
+		}
+	}
+	// The installer + llms.txt projections must survive the refactor.
+	if got["install.sh"] != "../install.sh" {
+		t.Errorf("config(): install.sh projection lost: %q", got["install.sh"])
+	}
+	if got["llms.txt"] != "shared/llms.txt" {
+		t.Errorf("config(): llms.txt projection lost: %q", got["llms.txt"])
+	}
+}

@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chronicle — turning lessons into planning context</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Chronicle</h1>
+<p class="meta">Closing the lesson-to-action gap: what the loop learned yesterday must shape what it plans today.</p>
+
+<h2>How it works today</h2>
+<div class="flow">
+<div class="node"><b>cycle outcomes</b><small>dossiers · failures · recurrences</small></div><div class="arrow">→</div>
+<div class="node"><b>digest writer</b><small>recurrence.BuildIndex → WriteDigest</small></div><div class="arrow">→</div>
+<div class="node"><b>run workspace</b><small>seeded at cycle start</small></div><div class="arrow">→</div>
+<div class="node"><b>scout + triage prompts</b><small>recent_outcomes block</small></div>
+</div>
+<p>At cycle start, a digest of the last N cycles — what shipped, what failed, what keeps recurring — is written into the run workspace (best-effort: a digest failure warns, never blocks). At the <em>enforce</em> stage the digest is injected into scout and triage prompts, positioned after the stable prompt prefix so LLM caching stays warm. Planning now sees history.</p>
+
+<h2>Why it exists, and how it got built</h2>
+<p>The canonical meta-defect of this repo: retrospectives kept writing precise diagnoses — "7th occurrence of this pattern" — into lesson files that no planning phase ever read. Signals were captured and then rotted. The chronicle campaign is the delivery mechanism:</p>
+<table>
+<tr><th>Cycle(s)</th><th>Slice</th><th>Story</th></tr>
+<tr><td>698 → 702 <span class="chip pass">PASS</span></td><td>s2 digest writer (<code>recurrence/digest.go</code>)</td><td>The crash orphan: the Jul-11 power loss killed cycle 698 mid-scan; the recovered fleet re-picked the task and landed it in its first healthy wave</td></tr>
+<tr><td>725 <span class="chip pass">PASS</span></td><td>s3 prompt wiring (cyclerun seeding, scout/triage injection)</td><td>A digest nobody reads changes nothing — this slice makes it planning input</td></tr>
+<tr><td>queued</td><td>s6 escalation boundary · s7 historian · recurrence ledger</td><td>Repeated patterns should escalate weights automatically — the fleet-lane-provisioning-split FAIL ×4 is the standing test case</td></tr>
+</table>
+<div class="callout"><b>Live proof of the gap</b> — the very week chronicle landed, three fresh instances appeared: a consumed-without-landing queue item, ~70 stale P0 failure echoes in carryover, and a task failing four times on one unrepaired acceptance gap. The digest makes these visible at plan time; the ledger (next slice) makes them act.</div>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · sources: loop logs, cycle dossiers, ship commits, campaign plans.</p>
+</div></body></html>

@@ -1,0 +1,21 @@
+{
+  "id": "docs-drift-sweep-2026-07",
+  "title": "Docs↔code alignment sweep: fix the verified drift set from the 2026-07-13 three-agent audit (routing, checkpoint-resume, loop skill, flag index, version lines)",
+  "weight": 0.82,
+  "kind": "docs",
+  "priority": "medium",
+  "campaign": "docs-code-alignment-2026-07",
+  "summary": "Three verification agents cross-checked code vs docs on 2026-07-13; all items below are VERIFIED contradictions with file:line evidence. (1) docs/architecture/dynamic-phase-routing.md:110 claims advisor default model haiku — code default is opus/deep (core/phase_advisor.go:100, constructor comment explicitly rebuts the doc); same doc :122-123 'Default | Off' row contradicts config.go:508 StageAdvisory AND its own TL;DR. (2) docs/architecture/control-flags.md:35-54 cluster label 'Dynamic Phase Routing (... default-off)' on six rows contradicts the advisory default; also :3 says v20.2.0 while docs/operations/runtime-reference.md:43 says v18.12.0 — version drift between the two canonical docs (current release is v22.1.0). (3) docs/architecture/checkpoint-resume.md is bash-era: resume-cycle.sh/run-cycle.sh removed in v12; EVOLVE_RESUME_PHASE and EVOLVE_RESUME_COMPLETED_PHASES have ZERO readers in the Go tree; the 'three pause triggers' table lists two reasons no Go code ever writes and omits phase-complete (the one written every boundary); worktree examples show TMPDIR paths and an evolve/cycle-N branch name — actual is .evolve/worktrees + cycle-<lane>-<N>; Scenario D rc taxonomy is the bash contract not the Go one. (4) skills/loop/SKILL.md: '6 lean phases'/CALIBRATE/RESEARCH/LEARN/META diagram vs the real 15-phase registry and closed vocabulary; 'THREE shell hooks' vs five native-Go guards; tier-1/2/3 model-routing table vs the actual fast|balanced|deep tier vocabulary (modelcatalog.CanonicalTiers); triage opt-out documented as workflow.phase_enables.triage=off vs registry EVOLVE_TRIAGE_DISABLE. (5) runtime-reference.md:111 max_optional_insertions 'default 4' vs registry-effective 6. (6) docs/architecture/dynamic-model-routing.md body describes a non-shipped bash design (self-bannered but body unrevised) — either archive it per doc policy or rewrite the body. (7) go/internal/guards/role.go:14-18 stale header comment claims a lessons-dir allowance the Decide body lacks. Split into per-doc slices if one cycle is too large; guard-phase-hook-inert is filed separately (it may change behavior, not just docs).",
+  "acceptance": [
+    "every listed doc claim matches code behavior (re-verify each with the cited file:line)",
+    "docs/architecture/control-flags.md regenerated if it is a generated surface (fix the generator input, not the output)",
+    "checkpoint-resume.md rewritten against internal/checkpoint + internal/core/resume.go + cmd_loop.go --resume",
+    "skills/loop/SKILL.md phase list matches phase-registry.json spine + goal recipes; tier vocabulary fast|balanced|deep",
+    "no code behavior changes in this item (docs only)"
+  ],
+  "files": ["docs/architecture/dynamic-phase-routing.md", "docs/architecture/control-flags.md", "docs/architecture/checkpoint-resume.md", "docs/architecture/dynamic-model-routing.md", "docs/operations/runtime-reference.md", "skills/loop/SKILL.md", "go/internal/guards/role.go"],
+  "deps": [],
+  "connects_to": ["guard-phase-hook-inert", "quota-pause-wakeat-unpopulated"],
+  "source": "three-agent docs-code audit 2026-07-13 (operator ultrathink session)",
+  "created_at": "2026-07-13T08:32:00Z"
+}

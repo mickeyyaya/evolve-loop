@@ -1,0 +1,20 @@
+{
+  "id": "docs-drift-sweep-2-gates",
+  "title": "Docs↔code alignment sweep, part 2 (gates/ship/release/sandbox): verified drift from the 2026-07-13 audit",
+  "weight": 0.8,
+  "kind": "docs",
+  "priority": "medium",
+  "campaign": "docs-code-alignment-2026-07",
+  "summary": "Verified contradictions, gates/shipping domain (all with file:line evidence from the 2026-07-13 three-agent audit): (1) CLAUDE.md:21 says 'EVOLVE_SANDBOX=1' — accepted values are auto|on|off and '=1' is exactly the typo sandbox_wrap.go:47-62 normalizes-to-auto-with-WARN; runtime-reference.md:14 already says 'not 0/1', so CLAUDE.md contradicts its own canonical reference. (2) runtime-reference.md:141-149 ship-classes table omits the trivial class row (verify.go:217-219, cmd_ship.go:20-23 support it). (3) runtime-reference.md:212 release pipeline order reversed — code runs changelog-gen (releasepipeline.go:287) BEFORE version-bump (:297); doc also omits the rebuild-binary step (:300-315) and terminal release-verify (:374) and lists a 'cache refresh' step with no code counterpart. (4) '5-step preflight' framing hides the cycle-748 release-commit CI HARD-gate (releasepreflight.go:469-503) + naming-guard sub-check (:446-463). (5) docs/release-protocol.md DOES NOT EXIST yet is referenced (e.g. skills/loop/SKILL.md:88) — create it or repoint references to runtime-reference.md#publishing + docs/guides/publishing-releases.md. (6) sandbox.allow_network=false is silently forced true for any source-writing/worktree phase (sandbox_wrap.go:220-229) — undocumented anywhere; operators expecting network denial on builder/tdd get the opposite with only a stderr WARN. (7) runtime-reference.md:149 claims EVOLVE_BYPASS_SHIP_VERIFY=1 is a 'permanent compatibility bridge' — no reader found in the ship guard; verify or excise. (8) runtime-reference.md:14 still frames EPERM handling as flag-driven (EVOLVE_SANDBOX_FALLBACK_ON_EPERM) — Go measures capability directly (sandbox.go:126-144); no Go reader for the flag. (9) versionbump.DefaultPaths (gitops.go:688-692) is the marker SSOT; runtime-reference.md:214 hand-lists a subset that can silently fall behind. (10) runtime-reference.md:43 cites release line v18.12.0 vs control-flags.md:3 v20.2.0 vs actual v22.1.0 — unify version lines or derive them. Docs-only item; the binary-deletion behavior change is filed separately as ship-manual-deletes-running-binary.",
+  "acceptance": [
+    "each listed claim re-verified against cited file:line and corrected",
+    "docs/release-protocol.md either created (from runtime-reference publishing section) or all references repointed",
+    "allow_network worktree-phase override documented in runtime-reference sandbox section and profile docs",
+    "no code behavior changes (docs only)"
+  ],
+  "files": ["CLAUDE.md", "docs/operations/runtime-reference.md", "docs/architecture/control-flags.md", "docs/guides/publishing-releases.md", "skills/loop/SKILL.md"],
+  "deps": [],
+  "connects_to": ["docs-drift-sweep-2026-07", "ship-manual-deletes-running-binary"],
+  "source": "gates-and-release verification agent 2026-07-13",
+  "created_at": "2026-07-13T08:46:00Z"
+}

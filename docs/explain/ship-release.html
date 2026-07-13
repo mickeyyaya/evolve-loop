@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ship &amp; release — the only doors out of the repo</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.callout.drift{border-left-color:var(--fail)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Ship &amp; release</h1>
+<p class="meta">Four commit classes, one attestation chokepoint, a self-healing release pipeline — and the binary-deletion defect that hid on the success path.</p>
+<h2>How it works today</h2>
+<table>
+<tr><th>Class</th><th>Verification (code: <code>phases/ship/verify.go:182-223</code>)</th></tr>
+<tr><td><code>cycle</code></td><td>no control-plane edits (ADR-0064) + audit↔tree binding + persona-lint</td></tr>
+<tr><td><code>manual</code></td><td>confirm (TTY or <code>EVOLVE_SHIP_AUTO_CONFIRM</code>) + commit-gate attestation (tree-SHA of the reviewed diff must equal the staged tree) + persona-lint</td></tr>
+<tr><td><code>release</code></td><td>pipeline-only; audit skipped (version bump mutates post-audit)</td></tr>
+<tr><td><code>trivial</code></td><td>requires trivial size estimate + zero pipeline-critical paths</td></tr>
+</table>
+<ul>
+<li><b>The attestation chokepoint</b>: bare <code>git commit/push</code> is hook-denied; ship commits internally, so the Go-side check (<code>phases/ship/commitgate.go:79-135</code>) is the single enforcement point — missing/stale attestation refuses the ship. Reviewers become durable <code>Reviewed-by:</code> trailers.</li>
+<li><b>sync-main</b>: merge-only reconciliation of diverged main (no rebase, no force, no push); refuses on live leases or dirty trees.</li>
+<li><b>Release pipeline</b> (<code>releasepipeline.go:199</code>): preflight → changelog-gen → version-bump → <b>rebuild-binary</b> → consistency → atomic ship → marketplace-poll → release-verify, journaled per attempt for rollback. Preflight is 5 counted steps PLUS a hard release-commit CI gate (cycle-748, after v22.0.0 was cut on red CI).</li>
+</ul>
+<div class="callout drift"><b>The smoking gun (queued: ship-manual-deletes-running-binary, 0.94)</b> — <code>discardBinaryChurn</code> runs on the manual-ship SUCCESS path (<code>gitops.go:210</code>); with <code>ShipBinaryPath</code> never set it resolves <code>os.Executable()</code> and <code>os.Remove</code>s the untracked <code>go/bin/evolve</code> (<code>gitops.go:774</code>) — the very binary all five trust hooks resolve first. Every manual ship silently degrades the kernel to the stale tracked fallback until a rebuild. Observed live twice on 2026-07-12; undocumented anywhere.</div>
+<div class="callout drift"><b>More verified drift (queued: docs-drift-sweep-2)</b> — ship-classes doc table omits <code>trivial</code>; release step order reversed in docs; <code>docs/release-protocol.md</code> is referenced but does not exist; <code>sandbox.allow_network=false</code> is silently forced true for worktree phases.</div>
+<h2>How it got built</h2>
+<p>Ship-gate v8.13.0 ended a five-cycle parser-bypass arms race; the commit-gate&rsquo;s bash runner was deleted only after a differential test proved the Go port byte-identical; the release CI hard-gate exists because a release once shipped on red CI. Every door out of the repo has a story about someone (usually an agent) trying to walk around it.</p>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · verified against code 2026-07-13 (file:line citations) · doc drift found during verification is queued in .evolve/inbox (docs-code-alignment-2026-07 campaign).</p>
+</div></body></html>

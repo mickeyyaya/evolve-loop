@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model routing — tiers, pins, fallbacks, and an advisor on a leash</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.callout.drift{border-left-color:var(--fail)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Model routing</h1>
+<p class="meta">How each phase picks a CLI and model — and what happens when the pick fails.</p>
+<h2>How it works today</h2>
+<ul>
+<li><b>One resolver</b>: <code>llmroute.Resolve</code> (<code>llmroute.go:125-142</code>) → <code>Plan{Candidates, Triggers, Model}</code>. CLI precedence: <code>EVOLVE_&lt;AGENT&gt;_CLI &gt; EVOLVE_CLI &gt; profile.cli &gt; claude-tmux</code>; model: env &gt; <code>profile.model_tier_default</code> &gt; default.</li>
+<li><b>Tier vocabulary is <code>fast | balanced | deep</code></b> (<code>modelcatalog.CanonicalTiers</code>) — profiles speak tiers, each CLI&rsquo;s manifest <code>model_tier_map</code> translates to concrete models (<code>manifest.go:89-98</code>); legacy haiku/sonnet/opus aliases auto-migrate with a deprecation WARN. There is no "tier-1/2/3" anywhere in code.</li>
+<li><b>Fallback chain fires on exits {80, 81, 85, 124, 127}</b> (<code>llmroute.go:58</code>) — boot timeout, artifact timeout, unknown-prompt/quota, coreutils timeout, missing binary. 85 joined after cycle-267 (codex quota wall didn&rsquo;t fail over).</li>
+<li><b>Policy pins are absolute</b> (<code>llmroute.go:127-135</code>): a pin bypasses env, profile, and auto-expansion; bare family names normalize to the tmux driver (cycle-378 fix).</li>
+<li><b>Benches reorder, never veto</b>: quota/boot-timeout benches demote candidates in the chain; all-benched → least-recently-benched first with a loud WARN.</li>
+<li><b>The clamp</b> (<code>router/model_routing_clamp.go:43-110</code>): every advisor-proposed {CLI, tier} is re-validated against <code>allowed_clis</code> + tier envelopes + the live catalog; below-floor tiers clamp UP; a universal floor {balanced, deep} covers the 72/91 profiles that declare no envelope (cycle-480).</li>
+<li><b>Every decision is an artifact</b>: <code>routing-decision-N.json</code> per decision, <code>routing-plan.json</code> per cycle — replayable via <code>evolve routing</code>.</li>
+</ul>
+<div class="callout drift"><b>Verified drift (queued: docs-drift-sweep)</b> — <code>dynamic-phase-routing.md</code> claims the advisor defaults to haiku ("lightweight routing"); code defaults to <b>opus/deep</b> and the constructor comment explicitly rebuts the doc (<code>phase_advisor.go:92-100</code>). Same doc&rsquo;s status table still says "Default: Off" vs the shipped advisory default (<code>config.go:508</code>); <code>dynamic-model-routing.md</code>&rsquo;s entire body describes a never-shipped bash design behind its supersession banner.</div>
+<h2>How it got built</h2>
+<p>ADR-0022 (manifest realization), ADR-0024/0052 (advisory routing + clamps), cycle-436 (per-phase {cli,tier} plans + clamp), cycle-480 (universal envelope floor). The standing operator rule — tiers not model names, any CLI × any phase × any model must execute — is what the clamp + manifest layers implement.</p>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · verified against code 2026-07-13 (file:line citations) · doc drift found during verification is queued in .evolve/inbox (docs-code-alignment-2026-07 campaign).</p>
+</div></body></html>

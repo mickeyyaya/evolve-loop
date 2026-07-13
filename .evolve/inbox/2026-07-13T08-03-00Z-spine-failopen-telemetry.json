@@ -1,0 +1,19 @@
+{
+  "id": "spine-failopen-telemetry",
+  "title": "Count and surface spine fail-open events — 76 silent 'mandatory predecessor artifact missing' WARNs in one batch is an epidemic without a dashboard",
+  "weight": 0.85,
+  "kind": "defect",
+  "priority": "medium",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "Width-3 batch 2026-07-13: 76 occurrences of '[orchestrator] WARN spine not satisfied for next=<phase> (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (would-block at enforce)'. Phases are routinely completing WITHOUT their handoff artifacts (correlates with 29 exit=85 quota bounces mid-phase — the artifact is lost when a driver bounces), and fail-open makes it invisible: no counter, no dossier field, no threshold. Before any enforce flip is thinkable, add telemetry: per-cycle count of spine fail-opens with (phase, missing artifact) pairs in the dossier; a batch-level rollup in the loop summary; WARN escalation when a single cycle exceeds a threshold (e.g. 3). This is measurement-first (token-telemetry precedent): make the epidemic visible, then decide whether the fix is artifact-retry, driver-bounce recovery, or enforce.",
+  "acceptance": [
+    "RED: TestSpineFailOpen_CountedInDossierWithPhaseAndArtifact",
+    "RED: TestLoopSummary_RollsUpSpineFailOpensPerBatch",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/core/orchestrator.go", "go/internal/dossier/"],
+  "deps": [],
+  "connects_to": ["advisory-phase-contract-degrade", "retro-bridge-timeout-width10"],
+  "source": "ultrathink failure deep-dive 2026-07-13 (operator)",
+  "created_at": "2026-07-13T08:03:00Z"
+}

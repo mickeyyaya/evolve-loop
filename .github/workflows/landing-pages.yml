@@ -9,6 +9,7 @@ on:
       - 'landing/**'
       - '.github/workflows/landing-pages.yml'
       - 'install.sh'
+      - 'docs/explain/**'
   workflow_dispatch:
 
 permissions:

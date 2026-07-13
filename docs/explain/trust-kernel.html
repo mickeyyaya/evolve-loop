@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trust kernel — enforcement that survives a lying model</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.callout.drift{border-left-color:var(--fail)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Trust kernel</h1>
+<p class="meta">Why the pipeline&rsquo;s safety holds even in bypass-permissions mode: enforcement lives in OS-level hooks and the Go binary, not in prompts.</p>
+<h2>How it works today</h2>
+<ul>
+<li><b>Six guards, one dispatcher.</b> <code>evolve guard &lt;name&gt;</code> reads the tool call as JSON on stdin and exits 0 (allow) or 2 (deny), logging byte-compatibly to <code>.evolve/guards.log</code> (<code>go/internal/cli/guardcmd/guard.go:100-165</code>). Guards: ship, phase, role, docdelete, quota, chain.</li>
+<li><b>ship</b> (<code>go/internal/guards/ship.go:33-61</code>): denies any Bash containing <code>git commit</code>/<code>git push</code>/<code>gh release</code> unless it goes through <code>evolve ship</code> — heredoc bodies stripped first so payloads can&rsquo;t smuggle verbs.</li>
+<li><b>role</b> (<code>role.go:28-91</code>): Edit/Write must match the active phase&rsquo;s allowlist — workspace, or the lane worktree for tdd/build. A narrow <b>control-plane surface</b> (guards, ACS regression, audit skills, settings, policy — <code>integrity_surface.go:29-64</code>) is denied to EVERY phase and raises a CRITICAL integrity alarm.</li>
+<li><b>Audit↔tree binding</b> (<code>go/internal/phases/ship/audit.go:49-176</code>): a cycle ship requires the latest auditor ledger entry to match the exact tree — <code>HEAD</code>, <code>sha256(git diff HEAD)</code>, artifact SHA, verdict PASS, EGPS <code>red_count==0</code>, ≤7 days old. Change anything after audit and ship refuses (the <code>AUDIT_BINDING_HEAD_MOVED</code> you see under fleet contention is this working).</li>
+<li><b>Hook wiring</b> (<code>.claude/settings.json:4-44</code>): five PreToolUse hooks; each resolves <code>go/bin/evolve</code> first, falling back to the tracked <code>go/evolve</code>.</li>
+</ul>
+<div class="callout drift"><b>Verified drift (queued: guard-phase-hook-inert, 0.9)</b> — <code>guards.Phase</code> only inspects <code>ToolName=="Agent"</code> (<code>phase.go:26-49</code>) but is wired under the <b>Bash</b> matcher, so as configured it never fires. Real phase-order enforcement is the in-process state machine (<code>statemachine.go</code> + <code>SpineSatisfiedUpTo</code>). Several docs still describe the hook as the enforcer.</div>
+<h2>How it got built</h2>
+<p>The control-plane boundary is ADR-0064, born from the cycle-20 breach where a build agent edited the gate that graded it. The bash→Go guard cutover (v11.4.0) preserved the log byte format. The five-guard set grew from three (v8.13.x) as research-quota (v10.16) and doc-deletion (v10.17) joined. cycle-243 taught why hooks carry a fallback binary path: deleting <code>go/bin/evolve</code> once silently disabled every guard — a failure mode that resurfaced 2026-07-12 (see <a href="ship-release.html">ship &amp; release</a>).</p>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · verified against code 2026-07-13 (file:line citations) · doc drift found during verification is queued in .evolve/inbox (docs-code-alignment-2026-07 campaign).</p>
+</div></body></html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase pipeline — a config-defined machine with a non-negotiable floor</title><style>
+:root{--bg:#fdfdfb;--fg:#1e2126;--muted:#6b7280;--accent:#2563eb;--card:#fff;--border:#e5e7eb;--code:#f3f4f6;--pass:#16803c;--passbg:#e8f7ee;--fail:#b91c1c;--failbg:#fdecec;--callout:#eef4ff;--cb:#b8ccf5}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--accent:#7aa5f7;--card:#1c1f24;--border:#30343b;--code:#23262c;--pass:#5fd08a;--passbg:#14301e;--fail:#f08c8c;--failbg:#3a1a1a;--callout:#1d2635;--cb:#33517e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 Georgia,serif}
+.wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.55em;line-height:1.25;margin:.4em 0 .1em}h2{font-size:1.22em;margin-top:1.7em;border-bottom:1.5px solid var(--border);padding-bottom:.2em}h3{font-size:1.02em;margin-top:1.4em}
+a{color:var(--accent)}.meta{color:var(--muted);font-size:.85em}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.84em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.chip{display:inline-block;font:600 .72em/1.7 ui-monospace,Menlo,monospace;padding:0 .6em;border-radius:20px;vertical-align:middle}
+.chip.pass{color:var(--pass);background:var(--passbg)}.chip.fail{color:var(--fail);background:var(--failbg)}
+.callout{background:var(--callout);border:1px solid var(--cb);border-left:5px solid var(--accent);border-radius:8px;padding:10px 14px;margin:1.1em 0}
+.callout.drift{border-left-color:var(--fail)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:1em 0;font-size:.92em}
+ul{padding-left:1.3em}
+table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:1.1em 0}
+.node{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:.78em;line-height:1.45;min-width:110px}
+.node b{display:block}.node small{color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.82em}
+.arrow{font-size:1.15em;color:var(--muted)}
+</style></head><body><div class="wrap">
+<p class="meta"><a href="index.html">← all features</a> · evolve-loop explainers</p>
+
+<h1>Phase pipeline</h1>
+<p class="meta">Phases are configuration; legality, spine, and the ship floor are kernel-validated code.</p>
+<h2>How it works today</h2>
+<ul>
+<li><b>The registry is the SSOT</b> (<code>docs/architecture/phase-registry.json</code>, schema v4): 15 phases — intent, scout, triage, spec-verify, architecture-design, plan-review, tdd, build-planner, build, doc-sync, tester, audit, ship, retrospective, memo. Spine order: <code>intent → scout → triage → tdd → build-planner → build → audit → ship</code>. Goal recipes insert conditional phases (coverage-gate, adversarial-review, scans…) per goal type; the single-word phase vocabulary is CLOSED (<code>micro-phase-catalog.md</code>).</li>
+<li><b>Orchestrator = bounded loop</b> (<code>go/internal/core/orchestrator.go:659-865</code>): plan → select → dispatch → review → record, with a chokepoint-escape guard (ADR-0044) so no cycle can exit unrecorded.</li>
+<li><b>State machine legality</b> (<code>statemachine.go:170-203</code>): explicit graph — audit→{ship,retro}, retro→{ship,tdd,end}, etc. Verdict branches resolve from each phase spec&rsquo;s <code>on_pass/on_fail</code>.</li>
+<li><b>Spine gate</b> (<code>SpineSatisfiedUpTo</code>, <code>statemachine.go:368-386</code>): a mandatory anchor runs only if every earlier mandatory anchor left a real on-disk handoff artifact. Currently fail-open (76 warnings in one batch — queued: spine-failopen-telemetry).</li>
+<li><b>The floor is not config</b>: <code>router.DefaultShipFloor()</code> = {tdd, build, audit} (<code>floor.go:55</code>) — ship implies those ran, policy can relax only build/tdd (trivial class), never audit.</li>
+<li><b>Contract gate</b>: every phase&rsquo;s deliverable is checked for well-formedness (path, sections, parseable verdict), default enforce (ADR-0034), 2 correction re-dispatches, circuit breaker after repeated blocks.</li>
+</ul>
+<div class="callout"><b>Model proposes, kernel disposes</b> — the LLM advisor proposes per-cycle phase plans and per-phase {cli, tier}; the router clamps every proposal against mandatory phases, insertion caps (registry default 6), profile envelopes, and the ship floor. Clamps are recorded (<code>Clamp{Rule,Proposed,Forced}</code>), never silent.</div>
+<div class="callout drift"><b>Verified drift (queued: docs-drift-sweep)</b> — <code>skills/loop/SKILL.md</code> still describes a "6 lean phases" CALIBRATE/RESEARCH/LEARN/META architecture that matches no registry phase; runtime-reference documents insertion default 4 vs registry-effective 6.</div>
+<h2>How it got built</h2>
+<p>ADR-0058/0060 made verdict branches, spine, legality and gates config-driven with a one-time <code>ValidateSafetyInvariants</code> trust anchor; ADR-0052 added goal recipes and post-scout replanning; ADR-0024 set the proposes/disposes doctrine (first live advisory cycle-108, default flipped to advisory after soak — <code>config.go:508</code>).</p>
+<p class="meta" style="margin-top:2em">Generated by /evo:explain · verified against code 2026-07-13 (file:line citations) · doc drift found during verification is queued in .evolve/inbox (docs-code-alignment-2026-07 campaign).</p>
+</div></body></html>

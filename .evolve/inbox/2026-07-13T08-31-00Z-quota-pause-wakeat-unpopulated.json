@@ -1,0 +1,20 @@
+{
+  "id": "quota-pause-wakeat-unpopulated",
+  "title": "QUOTA-PAUSE wake-at is always empty: QuotaBoundaryCheckpointer writes QuotaResetAt=\"\" so auto-resume scheduling math has no timestamp",
+  "weight": 0.88,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "Verified 2026-07-13: go/internal/checkpoint/checkpoint.go:192 — the all-families-exhausted checkpointer (cycle-656 seam) writes ReasonQuotaLikely with QuotaResetAt left empty; cmd_loop_control.go:309-316 then emits 'QUOTA-PAUSE: ... wake-at= source=unknown'. skills/loop/SKILL.md:203-204 instructs the operator model to parse wake-at=ISO8601 and compute the ScheduleWakeup delay from it — math that can never run on the current Go path. Fix: wire the existing reset estimation into the checkpointer — usageprobe.ProbeQuota buckets carry ResetAt (quotastate.TightestRemaining) and quotareset.Compute provides the fallback estimate (operator override > hint file > now+DefaultHours); populate QuotaResetAt + QuotaResetSource at checkpoint-write time. Keep fail-open: no probe data => explicit source=estimate with the default-hours fallback rather than empty.",
+  "acceptance": [
+    "RED: TestQuotaBoundaryCheckpointer_PopulatesResetAtFromQuotaState",
+    "RED: TestQuotaBoundaryCheckpointer_FallsBackToQuotaresetCompute",
+    "RED: TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource",
+    "go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/checkpoint/checkpoint.go", "go/cmd/evolve/cmd_loop_control.go", "go/internal/usageprobe/", "go/internal/quotareset/"],
+  "deps": [],
+  "connects_to": ["all-families-exhausted-checkpoint-defer"],
+  "source": "execution-core verification agent 2026-07-13",
+  "created_at": "2026-07-13T08:31:00Z"
+}

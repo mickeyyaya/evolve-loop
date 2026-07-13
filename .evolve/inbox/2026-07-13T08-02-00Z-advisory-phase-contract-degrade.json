@@ -1,0 +1,20 @@
+{
+  "id": "advisory-phase-contract-degrade",
+  "title": "Advisory/scan phase contract exhaustion degrades to SKIPPED+WARN instead of cycle-fatal — formatting flakes must not kill shipped-quality work",
+  "weight": 0.9,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "Cycle 742 (2026-07-13): phase test-amplification emitted no parseable verdict ([bad_verdict] expected one of [PASS FAIL WARN SKIPPED]) after 2 corrections and the WHOLE CYCLE failed — an LLM output-formatting flake in an advisory-tier phase was cycle-fatal. The integrity floor treats build/audit/tdd as load-bearing (ship => build AND audit AND tdd-unless-trivial); the scan/amplification phases (test-amplification, secret-leak-scan, flake-rerun-scan, error-handling-scan) are NOT in the floor and already fail-open at the spine level (76 'spine not satisfied ... proceeding fail-open' WARNs in one batch). Make verdict-contract exhaustion on NON-floor phases consistent with that: after corrections are exhausted, record verdict SKIPPED with reason bad_verdict, WARN loudly, count it in the dossier, and continue the cycle. Keep cycle-fatal semantics for floor phases. Also raise correction attempts from 2 to 3 with a stricter format-only reprompt on the final attempt (cheap, catches most formatting flakes).",
+  "acceptance": [
+    "RED: TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn",
+    "RED: TestContractExhaustion_FloorPhase_RemainsCycleFatal",
+    "RED: TestContractCorrection_FinalAttemptUsesFormatOnlyReprompt",
+    "dossier records skipped_phases with reasons; go test -race PASS; apicover clean"
+  ],
+  "files": ["go/internal/core/", "go/internal/phaseio/", "go/internal/policy/"],
+  "deps": [],
+  "connects_to": ["retro-bridge-timeout-width10", "spine-failopen-telemetry"],
+  "source": "ultrathink failure deep-dive 2026-07-13 (operator)",
+  "created_at": "2026-07-13T08:02:00Z"
+}
