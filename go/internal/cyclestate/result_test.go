@@ -33,6 +33,23 @@ func TestDiagnostic_Wire(t *testing.T) {
 	}
 }
 
+// TestSkippedPhase_Wire pins the SkippedPhase wire shape — the degraded-phase
+// record (cycle-802 retro-bridge-timeout-width10 guard) that preserves a
+// non-floor phase's non-PASS verdict in the cycle dossier instead of letting it
+// clobber a floor-derived FinalVerdict. Its snake-case JSON tags are the dossier
+// contract, so a drift here silently drops the degrade audit trail.
+func TestSkippedPhase_Wire(t *testing.T) {
+	b, err := json.Marshal(SkippedPhase{Phase: "retro", Reason: "FAIL"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, want := range []string{`"phase"`, `"reason"`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("SkippedPhase JSON missing %s; got %s", want, b)
+		}
+	}
+}
+
 // TestCycleResult constructs the cycle-summary value and checks PhasesRun uses
 // the Phase type (so it composes with the rest of the leaf vocabulary).
 func TestCycleResult(t *testing.T) {

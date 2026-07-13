@@ -32,3 +32,14 @@ func TestSeal_AnchorKindIsSealKind(t *testing.T) {
 		t.Errorf("anchor Kind = %q, want %q", anchor.Kind, SealKind)
 	}
 }
+
+// TestTrivialRebaseMethod_WriterReaderContract names ledger.TrivialRebaseMethod
+// and pins the exact wire value the composition-verdict writer stamps into
+// compositionRecord.Method (composition.go:156) and the ship-side fast path
+// filters on. Writer and reader share this one constant on purpose; a drift
+// silently breaks the RUNG-0 trivial-rebase audit carry-forward.
+func TestTrivialRebaseMethod_WriterReaderContract(t *testing.T) {
+	if TrivialRebaseMethod != "trivial-rebase" {
+		t.Errorf("TrivialRebaseMethod = %q, want %q", TrivialRebaseMethod, "trivial-rebase")
+	}
+}
