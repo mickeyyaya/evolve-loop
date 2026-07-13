@@ -36,6 +36,7 @@
   .card:hover .open{color:var(--accent)}
   footer{border-top:1px solid var(--line);padding:34px 0;text-align:center;color:var(--faint);font-size:.85rem}
   footer .tag{font-family:var(--serif);color:var(--muted);font-size:1.05rem;display:block;margin-bottom:6px}
+  footer .flinks{margin-bottom:14px}footer .flinks a{color:var(--muted);text-decoration:none;margin:0 10px}footer .flinks a:hover{color:var(--fg,inherit);text-decoration:underline}
 </style>
 </head>
 <body>
@@ -63,7 +64,12 @@
   </div>
 </main>
 <footer>
-  <div class="wrap"><span class="tag">{{.Site.Footer.Tagline}}</span>{{.Site.Footer.Grounding}}</div>
+  <div class="wrap">
+    <div class="flinks">
+      {{range .Site.Footer.Links}}<a href="{{.Href}}">{{.Label}}</a>{{end}}
+    </div>
+    <span class="tag">{{.Site.Footer.Tagline}}</span>{{.Site.Footer.Grounding}}
+  </div>
 </footer>
 </body>
 </html>
