@@ -131,7 +131,10 @@ func soakCheckReap(evolveDir string) (status, evidence string) {
 	if killer == nil {
 		killer = swarm.ExecTmuxKill
 	}
-	rep, err := sessionreaper.ReapOrphans(context.Background(), evolveDir, sessionreaper.Options{
+	// Same wedged-tmux bound as the loop-boot sweep (cycle-769).
+	ctx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
+	defer cancel()
+	rep, err := sessionreaper.ReapOrphans(ctx, evolveDir, sessionreaper.Options{
 		Now:      func() time.Time { return time.Now().Add(24 * time.Hour) },
 		LeaseTTL: runlease.DefaultTTL,
 		Kill:     killer,

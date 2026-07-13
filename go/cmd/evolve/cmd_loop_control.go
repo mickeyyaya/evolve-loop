@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
@@ -41,7 +42,9 @@ const defaultCircuitBreakerThreshold = 5
 // orphanGCTimeout bounds the crash-recovery session sweep so a wedged tmux
 // socket (corrupted server, not the common "no server" case) can never hang the
 // loop — the GC must stay robust even when the surrounding pipeline is broken.
-const orphanGCTimeout = 15 * time.Second
+// Hoisted to sessionreaper.DefaultReapTimeout so the boot preflight and soak
+// checks share the same bound (cycle-769).
+const orphanGCTimeout = sessionreaper.DefaultReapTimeout
 
 // resolveDispatchPolicy maps a policy string (from DispatchConfig.Policy) to
 // the corresponding dispatch policy. Unknown values default to

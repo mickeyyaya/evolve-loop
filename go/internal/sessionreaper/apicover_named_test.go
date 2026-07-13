@@ -23,6 +23,9 @@ func TestExportedAPIContract(t *testing.T) {
 	if report.LiveRunsSkipped != 1 || report.Orphaned[0].RunDir != "run" || report.Orphaned[0].Report.Killed != 1 {
 		t.Fatal("Report or OrphanReap fields not bound")
 	}
+	if DefaultReapTimeout != 15*time.Second {
+		t.Fatal("DefaultReapTimeout must stay boot-scale (orphanGCTimeout discipline, (0, 30s])")
+	}
 	if _, err := ReapOrphans(context.Background(), t.TempDir(), opts); err != nil {
 		t.Fatal(err)
 	}

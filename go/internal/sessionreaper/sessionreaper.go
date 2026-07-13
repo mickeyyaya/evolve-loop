@@ -16,6 +16,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
+// DefaultReapTimeout bounds one orphan sweep so a wedged tmux socket (a
+// corrupted server, not the common "no server" case) can never hang its
+// caller — loop-boot preflight, soak checks, and the per-cycle GC all share
+// this discipline.
+const DefaultReapTimeout = 15 * time.Second
+
+// reapedSuffix tombstones a fully-reaped registry. Renaming (rather than
+// deleting) preserves the session audit trail, and the existing
+// "no registry → skip" walk check makes every later sweep skip the run for
+// free — the fix for the unbounded boot re-reap class (cycle-769: 4,388
+// sessions re-swept serially on every boot). A relaunched run recreates the
+// registry, so it becomes sweepable again.
+const reapedSuffix = ".reaped"
+
 // Options configures an orphan sweep.
 type Options struct {
 	Now      func() time.Time
@@ -73,10 +87,14 @@ func ReapOrphans(ctx context.Context, evolveDir string, o Options) (Report, erro
 			out.LiveRunsSkipped++
 			continue
 		}
-		out.Orphaned = append(out.Orphaned, OrphanReap{
-			RunDir: runDir,
-			Report: swarm.ReapRunSessions(ctx, registryPath, kill),
-		})
+		rep := swarm.ReapRunSessions(ctx, registryPath, kill)
+		if rep.Errors == 0 {
+			// Tombstone only a FULLY successful reap; any killer error leaves
+			// the registry in place so the next sweep retries this run.
+			// Best-effort: a failed rename costs one redundant re-sweep.
+			_ = os.Rename(registryPath, registryPath+reapedSuffix)
+		}
+		out.Orphaned = append(out.Orphaned, OrphanReap{RunDir: runDir, Report: rep})
 	}
 	return out, nil
 }

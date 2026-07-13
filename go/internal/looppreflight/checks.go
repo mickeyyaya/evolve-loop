@@ -9,7 +9,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
-	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // minFreeDiskBytes is the low-disk warning threshold (500 MiB). Below this the
@@ -149,10 +148,14 @@ func checkHostCapabilities(o resolved) CheckResult {
 			free>>20, minFreeDiskBytes>>20, o.evolveDir))
 	}
 
-	if _, err := sessionreaper.ReapOrphans(context.Background(), o.evolveDir, sessionreaper.Options{
+	// Deadline-bound the boot sweep: a wedged tmux must abandon the kill, not
+	// hang loop boot forever (cycle-769 incident; orphanGCTimeout discipline).
+	reapCtx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
+	defer cancel()
+	if _, err := sessionreaper.ReapOrphans(reapCtx, o.evolveDir, sessionreaper.Options{
 		Now:      o.now,
 		LeaseTTL: runlease.DefaultTTL,
-		Kill:     swarm.ExecTmuxKill,
+		Kill:     o.orphanKill,
 	}); err != nil {
 		warns = append(warns, fmt.Sprintf("orphan session reap failed: %v", err))
 	}

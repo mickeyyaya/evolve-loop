@@ -34,6 +34,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // CheckLevel is a check's severity. Ordered so the worst level across a set of
@@ -122,6 +123,10 @@ type Options struct {
 	HostProbe     func() preflight.Profile                // default preflight.Probe(ProjectRoot)
 	DirWritable   func(dir string) bool                   // default real touch-probe
 	DiskFreeBytes func(path string) (uint64, error)       // default statfs; error → disk check skipped
+	// OrphanKill is the killer handed to the boot orphan sweep (deadline-bound
+	// via sessionreaper.DefaultReapTimeout). Default swarm.ExecTmuxKill;
+	// injected because preflight is untestable against a real tmux server.
+	OrphanKill swarm.TmuxKiller
 
 	// Verified-fallback (sandbox.nested_fallback) seams.
 	// NestedFallbackStage gates the write-canary that verifies the OUTER
@@ -189,6 +194,7 @@ type resolved struct {
 	hostProbe     func() preflight.Profile
 	dirWritable   func(string) bool
 	diskFreeBytes func(string) (uint64, error)
+	orphanKill    swarm.TmuxKiller
 	bootTester    func(context.Context, string, bool) (int, string)
 
 	nestedFallbackStage config.Stage
@@ -229,6 +235,7 @@ func resolve(opts Options) (resolved, error) {
 		hostProbe:     opts.HostProbe,
 		dirWritable:   opts.DirWritable,
 		diskFreeBytes: opts.DiskFreeBytes,
+		orphanKill:    opts.OrphanKill,
 		bootTester:    opts.BootTester,
 
 		nestedFallbackStage: opts.NestedFallbackStage,
@@ -292,6 +299,9 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.diskFreeBytes == nil {
 		o.diskFreeBytes = defaultDiskFreeBytes
+	}
+	if o.orphanKill == nil {
+		o.orphanKill = swarm.ExecTmuxKill
 	}
 	if o.bootTester == nil {
 		o.bootTester = newDefaultBootTester(o.projectRoot, o.stderr)
