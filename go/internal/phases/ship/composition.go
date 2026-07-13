@@ -107,7 +107,7 @@ func findCompositionVerdict(ledgerPath, auditRef, currentHEAD string) *compositi
 		if err := json.Unmarshal([]byte(line), &ce); err != nil {
 			continue
 		}
-		if ce.Kind != ledger.CompositionVerdictKind || ce.Method != "trivial-rebase" {
+		if ce.Kind != ledger.CompositionVerdictKind || ce.Method != ledger.TrivialRebaseMethod {
 			continue
 		}
 		if ce.LaneAuditRef != auditRef || ce.GitHead != currentHEAD {

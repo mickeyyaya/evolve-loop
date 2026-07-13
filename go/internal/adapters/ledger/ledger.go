@@ -91,6 +91,21 @@ func New(evolveDir string) *FileLedger {
 // tip-read→append→tip-write critical section — two `evolve` processes
 // otherwise interleave and break the hash chain).
 func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
+	return l.appendChained(func(seq int, prevHash string) any {
+		e.EntrySeq = seq
+		e.PrevHash = prevHash
+		return e
+	})
+}
+
+// appendChained is the tip-read→append→tip-write critical section shared by
+// Append (core.LedgerEntry) and WriteCompositionVerdict (composition record):
+// fill receives the chained seq/prev_hash and returns the entry to marshal,
+// so every producer of a ledger line goes through the same flock, hash
+// chaining, and atomic tip replace — a line written outside this path would
+// break the NEXT chained entry (Append chains from the tip; walkChain chains
+// from the last line's SHA).
+func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	release, err := flock.Lock(l.lockPath)
@@ -103,15 +118,14 @@ func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 	if err != nil {
 		return err
 	}
+	seq := 0
 	if prevHash == "" {
-		e.PrevHash = ZeroSeed
-		e.EntrySeq = 0
+		prevHash = ZeroSeed
 	} else {
-		e.PrevHash = prevHash
-		e.EntrySeq = prevSeq + 1
+		seq = prevSeq + 1
 	}
 
-	line, err := hooks.marshal(e)
+	line, err := hooks.marshal(fill(seq, prevHash))
 	if err != nil {
 		return fmt.Errorf("ledger marshal: %w", err)
 	}
@@ -131,7 +145,7 @@ func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 	}
 
 	newHash := sha256Hex(line)
-	tip := fmt.Sprintf("%d:%s", e.EntrySeq, newHash)
+	tip := fmt.Sprintf("%d:%s", seq, newHash)
 	// Atomic tip replace (tmp+rename): a concurrent reader must never see a
 	// truncated tip — the RED stress run surfaced exactly that (`tip
 	// malformed: ""` from a mid-WriteFile read).
