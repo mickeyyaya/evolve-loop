@@ -818,6 +818,15 @@ OuterLoop:
 		// run-set or bypassing the spine gate. No-op until WS2-S3 wires the shadow
 		// RePlan behind EVOLVE_ROUTER_REPLAN.
 		if next == PhaseScout {
+			// Lane-scope coherence gate (cycle-640): a scout that reported a
+			// DIFFERENT lane's goal_hash than this lane's pinned lane-scope.json
+			// must abort BEFORE triage runs — no silent proceed on a split lane
+			// identity. Missing pin / report / goal_hash key fail open inside
+			// the gate (nil), so healthy sequential cycles are untouched.
+			if gerr := laneScopeCoherence(cr.cs.WorkspacePath); gerr != nil {
+				cr.recordLaneScopeAbort(gerr)
+				return cr.result, gerr
+			}
 			cr.postScoutReplan()
 		}
 	}

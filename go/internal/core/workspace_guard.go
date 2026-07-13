@@ -21,7 +21,17 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 	if err != nil {
 		return fmt.Errorf("readdir workspace: %w", err)
 	}
-	if len(entries) == 0 {
+	// lane-scope.json is provisioned by the fleet supervisor BEFORE the cycle
+	// runs (cycle-640 lane pin) — pre-phase by design, not pollution.
+	// minimal: a genuinely polluted dir is archived whole, pin included; the
+	// env-snapshot fallback re-materializes the pin for fleet lanes.
+	pollution := 0
+	for _, e := range entries {
+		if e.Name() != LaneScopeFile {
+			pollution++
+		}
+	}
+	if pollution == 0 {
 		return nil
 	}
 	stamp := now().UTC().Format("20060102T150405.000000000")
@@ -30,7 +40,7 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 		return fmt.Errorf("rename to %s: %w", archived, err)
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] archived polluted workspace: %s -> %s (%d files)\n",
-		workspace, archived, len(entries))
+		workspace, archived, pollution)
 	return nil
 }
 

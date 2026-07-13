@@ -131,6 +131,16 @@ func (cr *cycleRun) recordChokepointEscape(reason string) {
 	cr.result.FinalVerdict = VerdictFAIL
 }
 
+// recordLaneScopeAbort records the scout→triage lane-scope coherence abort as
+// an explicit terminal outcome (same rationale as recordChokepointEscape: an
+// abort without a recorded outcome classifies FAILED_UNEXPLAINED).
+func (cr *cycleRun) recordLaneScopeAbort(err error) {
+	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath,
+		phaseOutcomeFrom(PhaseScout, PhaseResponse{Phase: string(PhaseScout)}, 0, err.Error(), cr.cs.PhaseStartedAt))
+	cr.recordFailureLearning(PhaseScout, err, 0)
+	cr.result.FinalVerdict = VerdictFAIL
+}
+
 // cyclerun.go — methods extracted from the RunCycle engine (orchestrator.go) to
 // keep RunCycle a readable coordinator. Each extraction is behavior-preserving;
 // the orchestrator's characterization tests are the safety net.
@@ -487,13 +497,18 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		ctxSnap[k] = v
 	}
 
-	// ADR-0049 E: when `evolve fleet --plan` launched this cycle, EVOLVE_FLEET_SCOPE
-	// carries its assigned (disjoint) task IDs. Surface it to triage via
-	// Context["fleet_scope"] so the cycle selects ONLY its subset and concurrent
-	// cycles never pick work touching the same files. Read from the env SNAPSHOT
-	// (not live os.Getenv) so it stays per-cycle. Empty/unset ⇒ legacy behavior.
-	if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
+	// ADR-0049 E + lane-scope pin (cycle-640): the fleet scope every phase sees
+	// via Context["fleet_scope"] comes from <workspace>/lane-scope.json when a
+	// supervisor (or a prior attempt of this orchestrator) provisioned one —
+	// the on-disk pin is authoritative over the env snapshot, so cross-lane env
+	// drift can no longer split lane identity. Absent file ⇒ legacy env-snapshot
+	// fallback (sequential loop byte-identical), and an env-scoped run pins its
+	// own lane-scope.json here, BEFORE any phase runs.
+	if ls := loadLaneScope(cs.WorkspacePath); ls != nil {
+		ctxSnap["fleet_scope"] = strings.Join(ls.TodoIDs, ",")
+	} else if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
 		ctxSnap["fleet_scope"] = scope
+		materializeLaneScope(cs.WorkspacePath, scope, req.GoalHash)
 	}
 
 	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
