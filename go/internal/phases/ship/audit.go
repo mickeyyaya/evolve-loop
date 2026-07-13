@@ -144,18 +144,31 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
 	if currentHEAD != entry.GitHEAD {
-		return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
-			fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
-			"audited", entry.GitHEAD, "current", currentHEAD)
-	}
-	currentTree, err := computeTreeStateSHA(ctx, opts)
-	if err != nil {
-		return err
-	}
-	if currentTree != entry.TreeStateSHA {
-		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
-			"uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor",
-			"audited_tree", entry.TreeStateSHA, "current_tree", currentTree)
+		// Trivial-rebase carry-forward (merge ladder RUNG 0, cycle-786): a
+		// valid composition-verdict entry — unchanged patch-id, green
+		// composed-tree gates — lets the audit verdict follow the change
+		// across a clean rebase. Any rejected condition falls back here.
+		// The composition entry binds the COMPOSED tree (tree_state_sha
+		// verified inside), so the base tree check below is superseded.
+		carried, cfErr := tryTrivialRebaseCarryForward(ctx, opts, res, ledgerPath, entry, currentHEAD)
+		if cfErr != nil {
+			return cfErr
+		}
+		if !carried {
+			return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
+				fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
+				"audited", entry.GitHEAD, "current", currentHEAD)
+		}
+	} else {
+		currentTree, err := computeTreeStateSHA(ctx, opts)
+		if err != nil {
+			return err
+		}
+		if currentTree != entry.TreeStateSHA {
+			return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
+				"uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor",
+				"audited_tree", entry.TreeStateSHA, "current_tree", currentTree)
+		}
 	}
 
 	// 6. Freshness (7d cap when cycle-bound).

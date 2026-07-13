@@ -229,6 +229,14 @@ func walkChain(lines [][]byte, anchorLineSHA string) (lastSeq int, lastSha strin
 		if err != nil {
 			return 0, "", false, fmt.Errorf("%w: line %d unmarshal: %v", core.ErrLedgerChainBroken, i, err)
 		}
+		// Composition-verdict entries are kernel-recomputable (cycle-786):
+		// both persisted diff artifacts must re-derive the recorded patch_id,
+		// or the entry is tampered and breaks the chain like a hash break.
+		if e.Kind == CompositionVerdictKind {
+			if cerr := verifyCompositionLine(i, line); cerr != nil {
+				return 0, "", false, cerr
+			}
+		}
 		if hasPrev {
 			isReGenesis := e.PrevHash == ZeroSeed && e.EntrySeq == 0
 			// A sibling never shares a ZERO parent: a zero-prev line is
