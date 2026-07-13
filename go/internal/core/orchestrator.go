@@ -896,7 +896,7 @@ OuterLoop:
 	if dossierGoal == "" {
 		dossierGoal = cr.req.GoalHash
 	}
-	if derr := writeCycleDossier(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict); derr != nil {
+	if derr := writeCycleDossier(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return cr.result, nil

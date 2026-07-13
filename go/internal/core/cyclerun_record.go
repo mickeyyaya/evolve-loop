@@ -98,7 +98,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		}
 	}
 
-	cr.result.FinalVerdict = dr.resp.Verdict
+	// Cycle-802 (retro-bridge-timeout-width10): floor-gated verdict write —
+	// CompletedPhases already includes `next` (appended above), so
+	// floorAlreadyCompleted reflects whether an authoritative (floor/ship)
+	// verdict preceded this phase. A non-floor post-verdict phase failing under
+	// quota/timeout no longer clobbers a floor PASS; it degrades into
+	// SkippedPhases instead. See final_verdict_floor.go.
+	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict

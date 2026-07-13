@@ -119,7 +119,7 @@
       "README.md",
       "CLAUDE.md"
     ],
-    "allow_network": false
+    "allow_network": true
   },
   "parallel_eligible": false,
   "schema_filter_enabled": true,

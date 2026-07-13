@@ -56,9 +56,10 @@ func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }
 // value types — are defined in the internal/cyclestate leaf and re-exported here
 // so existing call sites are unchanged (see cyclestate/result.go).
 type (
-	TokenUsage  = cyclestate.TokenUsage
-	Diagnostic  = cyclestate.Diagnostic
-	CycleResult = cyclestate.CycleResult
+	TokenUsage   = cyclestate.TokenUsage
+	Diagnostic   = cyclestate.Diagnostic
+	CycleResult  = cyclestate.CycleResult
+	SkippedPhase = cyclestate.SkippedPhase
 )
 
 // PhaseRequest is the input envelope to PhaseRunner.Run. JSON-tagged

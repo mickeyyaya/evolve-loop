@@ -321,7 +321,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			return result, werr
 		}
 
-		result.FinalVerdict = resp.Verdict
+		// Cycle-802 resume-path parity (Task 2): identical floor-gated verdict
+		// write to cyclerun_record.go — a resumed non-floor phase (a batch mid-
+		// recovery is exactly where the storm recurred) cannot clobber a floor
+		// PASS. CompletedPhases carries phases from BOTH the prior session and
+		// this resume (next appended above), so floorAlreadyCompleted correctly
+		// sees an audit that PASSed before the crash.
+		o.recordFinalVerdict(&result, next, resp.Verdict, o.floorAlreadyCompleted(cs.CompletedPhases))
 		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, "", cs.PhaseStartedAt))
 		current = next
 		lastVerdict = resp.Verdict

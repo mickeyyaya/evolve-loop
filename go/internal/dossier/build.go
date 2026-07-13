@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
@@ -61,6 +62,10 @@ type BuildOpts struct {
 	// artifacts, so the dossier records WHY the cycle failed and still satisfies
 	// Validate — the producer never fabricates a PASS for a failed cycle.
 	FinalVerdict string
+	// SkippedPhases are non-floor phases whose non-PASS outcome was degraded
+	// rather than allowed to clobber the floor-derived FinalVerdict (cycle-802).
+	// Surfaced verbatim so the dossier records the degrade, never dropping it.
+	SkippedPhases []cyclestate.SkippedPhase
 }
 
 // Build assembles a Dossier for the given cycle. It validates the cycle number,
@@ -94,6 +99,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 				KeyFindings: "cycle completed; ledger walk deferred to future slice",
 			},
 		},
+		SkippedPhases: opts.SkippedPhases,
 	}
 	// Ingest the per-phase timing log when present: real per-phase records +
 	// the cycle-level roll-up replace the stub, so the committed dossier carries

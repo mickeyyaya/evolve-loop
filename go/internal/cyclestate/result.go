@@ -13,6 +13,21 @@ type CycleResult struct {
 	// RetroDecision is the failure-adapter's verdict on the retro branch,
 	// populated only when retro ran. Format: "<action>: <reason>".
 	RetroDecision string
+	// SkippedPhases records non-floor phases (retrospective, memo, the *-scans,
+	// router/advisor) whose non-PASS outcome was PREVENTED from overwriting an
+	// already-recorded floor-derived FinalVerdict (cycle-802,
+	// retro-bridge-timeout-width10). Without this a retro FAIL under quota/timeout
+	// pressure clobbered an audit PASS and zeroed the wave. The degrade is
+	// preserved here (never silently dropped) and surfaced in the cycle dossier.
+	SkippedPhases []SkippedPhase
+}
+
+// SkippedPhase is one non-floor phase whose non-PASS verdict was degraded rather
+// than allowed to overwrite a floor-derived cycle verdict. Reason carries the
+// verdict/label the phase actually produced (FAIL|WARN|SKIPPED).
+type SkippedPhase struct {
+	Phase  string `json:"phase"`
+	Reason string `json:"reason"`
 }
 
 // TokenUsage records the LLM token counts attributed to a phase run.

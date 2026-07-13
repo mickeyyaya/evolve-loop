@@ -149,7 +149,7 @@
       "README.md",
       "CLAUDE.md"
     ],
-    "allow_network": false
+    "allow_network": true
   },
   "parallel_eligible": true,
   "output_contract": {

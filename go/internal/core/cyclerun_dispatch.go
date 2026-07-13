@@ -365,6 +365,28 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		if err == nil && !IsVerdict(resp.Verdict) {
 			if attempt >= maxAttempts {
+				// Cycle-802 Task 3 (contract-exhaustion-degrades-non-floor,
+				// subsumes advisory-phase-contract-degrade): an unparseable
+				// verdict after retries exhausted is cycle-fatal ONLY for a
+				// floor/ship phase. A non-floor post-verdict phase degrades to
+				// SKIPPED+WARN and the cycle advances — recordFinalVerdict then
+				// records the degrade into SkippedPhases without clobbering the
+				// floor verdict, closing the same storm from the contract side.
+				if degraded, ok := cr.o.nonFloorExhaustionDegrade(next, cr.cs.WorkspacePath, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases)); ok {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (contract_exhaustion_skip)\n", next, resp.Verdict)
+					cr.recordFailureLearning(next, fmt.Errorf("phase %s: non-canonical verdict %q after %d attempts", next, resp.Verdict, attempt), attempt)
+					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
+						TS:       cr.o.now().UTC().Format(time.RFC3339),
+						Cycle:    cr.cycle,
+						Role:     string(next),
+						Kind:     "contract_exhaustion_skip",
+						ExitCode: 0,
+					}); lerr != nil {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN contract_exhaustion_skip ledger append: %v\n", lerr)
+					}
+					resp = degraded
+					break
+				}
 				ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 				// ADR-0044 C1: a non-canonical verdict is never recorded
 				// raw and never upgraded — phaseOutcomeFrom synthesizes FAIL.

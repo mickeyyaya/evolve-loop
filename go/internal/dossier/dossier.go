@@ -39,8 +39,13 @@ type Dossier struct {
 	Decisions    []string      `json:"decisions,omitempty"`
 	Lessons      []Lesson      `json:"lessons,omitempty"`
 	Carryover    []Carryover   `json:"carryover,omitempty"`
-	StartedAt    string        `json:"started_at,omitempty"`
-	EndedAt      string        `json:"ended_at,omitempty"`
+	// SkippedPhases records non-floor phases whose non-PASS outcome was degraded
+	// rather than allowed to overwrite the floor-derived FinalVerdict (cycle-802).
+	// Present so a cycle that PASSed its floor but had a retro/memo fail under
+	// quota pressure still records that experience instead of dropping it.
+	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`
+	StartedAt     string                    `json:"started_at,omitempty"`
+	EndedAt       string                    `json:"ended_at,omitempty"`
 	// Timing is the cycle-level latency roll-up (where the wall-clock went),
 	// ingested from phase-timing.json. Nil when the cycle wrote no timing log.
 	Timing *phasetiming.Summary `json:"timing,omitempty"`
