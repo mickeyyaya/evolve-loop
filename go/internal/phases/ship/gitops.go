@@ -362,9 +362,12 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 			"colliders", strings.Join(colliders, ","))
 	}
 
-	// Ship-bind manifest reconciliation (cycle-653 second seam, shadow):
-	// report any path about to be bound that no phase report declared.
-	reconcileManifestShadow(ctx, opts, res, worktree, branch, cycleBranch)
+	// Ship-bind manifest reconciliation (cycle-653 second seam): report (shadow,
+	// default) or FAIL CLOSED (enforce) on any path about to be bound that no
+	// phase report declared — the cross-lane untracked-leak guard (cycle-645).
+	if err := reconcileManifest(ctx, opts, res, worktree, branch, cycleBranch); err != nil {
+		return err
+	}
 
 	if !opts.DryRun {
 		_ = discardBinaryChurn(ctx, opts, worktree)

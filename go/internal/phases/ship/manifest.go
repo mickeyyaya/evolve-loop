@@ -8,24 +8,34 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// manifest.go — ship-bind tree-manifest reconciliation (SHADOW).
+// manifest.go — ship-bind tree-manifest reconciliation (shadow + enforce).
 //
 // Cycle-653 second seam: ship binds the whole `git diff HEAD` tree, so any
 // path present in the worktree ships (or blocks) regardless of whether the
-// cycle's build/TDD phases declared it. This reconciles the paths ship is
-// about to bind against the cycle's DECLARED file manifest (paths named in
-// build-report.md + test-report.md) and reports out-of-manifest paths.
+// cycle's build/TDD phases declared it. reconcileManifest reconciles the paths
+// ship is about to bind against the cycle's DECLARED file manifest (paths named
+// in build-report.md + test-report.md).
 //
-// minimal: shadow-only (log lines, never blocks) — the deliberate ceiling.
-// The provisioning seam (core.ensureCleanWorktree) is the blocking arm of the
-// cycle-653 fix; flipping this to enforce/targeted-stage is ONE future
-// mechanism converging with inbox `ship-stage-explicit-paths` (per the inbox
-// item: "implement as ONE mechanism, not two") and gets a policy.json block
-// when it flips — a mode knob with only shadow implemented would be flag
-// sprawl (no-feature-flags rule). ReportSizeGate precedent: new gates default
-// shadow.
+// Two modes (opts.ManifestGate, config-sourced; default shadow — the
+// ReportSizeGate "new gates default shadow" precedent):
+//   - shadow (default): log out-of-manifest paths, never block — behavior-preserving.
+//   - enforce: FAIL CLOSED on any out-of-manifest path — the cross-lane
+//     untracked-leak guard (inbox `ship-stage-explicit-paths`, cycle-645).
+//
+// BEFORE enabling enforce in production (the deferred policy.json→Options
+// wiring), two prerequisites remain (2026-07-14 review):
+//   1. pathToken (below) requires a '/', so DECLARED bare root-level filenames
+//      (CHANGELOG.md, go.mod, README.md) drop out of the manifest → enforce
+//      would FALSE-BLOCK a legit ship that changed them. Extend extraction to
+//      bare filenames (carefully — too loose re-introduces false negatives) and
+//      add a regression test.
+//   2. use a dedicated core.CodeManifestGate (mirroring CodeCommitPrefixGate)
+//      instead of reusing CodeGitStageFailed, so the ledger/debugger can tell a
+//      manifest block from a real `git add` failure.
 
 // manifestReportFiles are the phase reports whose named paths constitute the
 // cycle's declared file manifest.
@@ -96,18 +106,34 @@ func outOfManifest(changed, manifest []string) []string {
 	return extras
 }
 
-// reconcileManifestShadow reports (never blocks) the paths ship is about to
-// bind that no phase report declared. Changed set = worktree porcelain dirt
-// plus commits already on the cycle branch (same inputs detectColliders
-// binds). Skips loudly when the workspace has no readable reports.
-func reconcileManifestShadow(ctx context.Context, opts *Options, res *RunResult, worktree, branch, cycleBranch string) {
+// ManifestGateEnforce is the opts.ManifestGate value that switches the gate from
+// shadow (log-only) to fail-closed. Any other value (including "") is shadow.
+const ManifestGateEnforce = "enforce"
+
+// manifestGateEnforced reports whether the manifest gate BLOCKS on out-of-
+// manifest paths (enforce) vs only logs them (shadow, the default). Pure;
+// config-sourced via opts.ManifestGate, never a code literal.
+func manifestGateEnforced(mode string) bool {
+	return mode == ManifestGateEnforce
+}
+
+// reconcileManifest reconciles the paths ship is about to bind against the
+// cycle's DECLARED file manifest (build-report.md + test-report.md). Changed
+// set = worktree porcelain dirt plus commits already on the cycle branch (same
+// inputs detectColliders binds). In SHADOW mode (the default) it only REPORTS
+// out-of-manifest paths and returns nil — behavior-preserving. In ENFORCE mode
+// it FAILS CLOSED on any out-of-manifest path: refusing to commit files no
+// phase declared, which under a fleet are typically a sibling lane's untracked
+// leak (cycle-645) whose commit reddens main. A loud, recoverable block beats a
+// silent contaminated commit. Returns nil (skips) when no reports are readable.
+func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, worktree, branch, cycleBranch string) error {
 	if opts.WorkspacePath == "" {
-		return
+		return nil
 	}
 	manifest := declaredManifest(opts.WorkspacePath)
 	if len(manifest) == 0 {
-		res.Logs = append(res.Logs, "[ship] manifest-shadow: no readable phase reports in workspace — reconciliation skipped")
-		return
+		res.Logs = append(res.Logs, "[ship] manifest-gate: no readable phase reports in workspace — reconciliation skipped")
+		return nil
 	}
 	changedSet := map[string]bool{}
 	if out, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain", "-uall"); err == nil {
@@ -129,9 +155,17 @@ func reconcileManifestShadow(ctx context.Context, opts *Options, res *RunResult,
 		changed = append(changed, p)
 	}
 	sort.Strings(changed)
-	if extras := outOfManifest(changed, manifest); len(extras) > 0 {
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-shadow: %d out-of-manifest path(s) about to be bound (would block under enforce): %s", len(extras), strings.Join(extras, ", ")))
-		return
+	extras := outOfManifest(changed, manifest)
+	if len(extras) == 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: OK — all %d bound path(s) covered by the declared build/TDD manifest", len(changed)))
+		return nil
 	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-shadow: OK — all %d bound path(s) covered by the declared build/TDD manifest", len(changed)))
+	if manifestGateEnforced(opts.ManifestGate) {
+		// FAIL-CLOSED — see reconcileManifest's doc + the error string below.
+		return shipErr(core.CodeGitStageFailed, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: manifest-gate (enforce): refusing to commit %d path(s) no build/TDD report declared (likely a cross-lane untracked leak): %s", len(extras), strings.Join(extras, ", ")),
+			"out_of_manifest", strings.Join(extras, ","))
+	}
+	res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: %d out-of-manifest path(s) about to be bound (SHADOW — would block under enforce): %s", len(extras), strings.Join(extras, ", ")))
+	return nil
 }

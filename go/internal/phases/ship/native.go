@@ -90,6 +90,15 @@ type Options struct {
 	// PhaseRunner from PhaseRequest.Workspace.
 	WorkspacePath string
 
+	// ManifestGate is the ship-hygiene gate mode for the worktree ship path.
+	// "" (default) = SHADOW: log out-of-manifest paths, never block — behavior-
+	// preserving. "enforce" = FAIL-CLOSED: refuse to commit any path no phase
+	// report (build-report/test-report) declared; under a fleet these are
+	// typically a sibling lane's untracked leak (cycle-645) whose commit reddens
+	// main. Config-sourced (policy.json), never a code literal — the
+	// policy→Options wiring is a follow-up; today only tests set enforce.
+	ManifestGate string
+
 	// RunID is this run's event-sourced identity (CA.5). When set, the
 	// audit→ship binding lookup (findLatestAudit) prefers the auditor ledger
 	// entry stamped with THIS RunID over a concurrent run's later entry
