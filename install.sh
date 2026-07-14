@@ -28,10 +28,53 @@ SOURCE_TARBALL="${EVO_SOURCE_TARBALL:-https://github.com/${REPO}/archive/refs/he
 INSTALL_LIB="${EVO_INSTALL_LIB:-$HOME/.evolve-loop}"     # binary + skill payload live here
 BIN_DIR_DEFAULT="$HOME/.local/bin"
 FORCE_BUILD="${EVO_FORCE_BUILD:-0}"                      # test seam
+# Corporate air-gap path (--binary <path>): install a pre-approved local
+# artifact instead of downloading or building — no compiler, no network, one
+# approved fingerprint. Set --checksums (or EVO_CHECKSUMS) to a checksums.txt to
+# verify the artifact's SHA256 against the approved fingerprint before install.
+BINARY_PATH=""
+EVO_CHECKSUMS="${EVO_CHECKSUMS:-}"
 
 log()  { printf '%s\n' "evolve-install: $*"; }
 warn() { printf '%s\n' "evolve-install: WARNING: $*" >&2; }
 die()  { printf '%s\n' "evolve-install: ERROR: $*" >&2; exit 1; }
+
+usage() {
+	cat <<'EOF'
+evolve-loop installer.
+
+Usage:
+  curl -fsSL .../install.sh | sh                 # default: prebuilt, else build
+  sh install.sh --binary <path> [--checksums <f>] # air-gap: install a local artifact
+
+Options:
+  --binary <path>      Install a pre-approved local artifact (a release
+                       evolve_<os>_<arch>.tar.gz, or a raw evolve binary) instead
+                       of downloading or building. No compiler, no network.
+  --checksums <path>   checksums.txt to verify --binary against (default: a
+                       checksums.txt beside <path>, or $EVO_CHECKSUMS). Only used
+                       with --binary. The corporate single-fingerprint path.
+  -h, --help           Show this help.
+
+Env: EVO_VERSION, EVO_INSTALL_LIB, EVO_CHECKSUMS, EVO_NO_MODIFY_PATH, EVO_FORCE_BUILD.
+EOF
+}
+
+# parse_args consumes the optional flags (--binary/--checksums/--help). The
+# default curl|sh invocation passes none, so this is a no-op there.
+parse_args() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--binary)      shift; [ $# -gt 0 ] || die "--binary requires a <path> argument"; BINARY_PATH="$1" ;;
+			--binary=*)    BINARY_PATH="${1#--binary=}" ;;
+			--checksums)   shift; [ $# -gt 0 ] || die "--checksums requires a <path> argument"; EVO_CHECKSUMS="$1" ;;
+			--checksums=*) EVO_CHECKSUMS="${1#--checksums=}" ;;
+			-h|--help)     usage; exit 0 ;;
+			*)             die "unknown argument: $1 (try --help)" ;;
+		esac
+		shift
+	done
+}
 
 SUDO=""
 need_sudo() {
@@ -189,14 +232,29 @@ fetch() {  # fetch <url> <dest>  (curl or wget; non-zero on HTTP error)
 	fi
 }
 
-verify_checksum() {  # verify_checksum <file> <name-in-sums> <checksums.txt>
+# have_sha256_tool reports whether any SHA256 tool is on PATH — lets a caller
+# distinguish "cannot verify" from "verified" (a false "verified" claim is worse
+# than an honest "unverified" for a corporate approval fingerprint).
+have_sha256_tool() {
+	command -v sha256sum >/dev/null 2>&1 ||
+		command -v shasum >/dev/null 2>&1 ||
+		command -v openssl >/dev/null 2>&1
+}
+
+# sha256_of <file> — echo the file's SHA256 hex, or nothing if no tool is found.
+sha256_of() {
 	if command -v sha256sum >/dev/null 2>&1; then
-		got="$(sha256sum "$1" | awk '{print $1}')"
+		sha256sum "$1" | awk '{print $1}'
 	elif command -v shasum >/dev/null 2>&1; then
-		got="$(shasum -a 256 "$1" | awk '{print $1}')"
+		shasum -a 256 "$1" | awk '{print $1}'
 	elif command -v openssl >/dev/null 2>&1; then
-		got="$(openssl dgst -sha256 "$1" | awk '{print $NF}')"
-	else
+		openssl dgst -sha256 "$1" | awk '{print $NF}'
+	fi
+}
+
+verify_checksum() {  # verify_checksum <file> <name-in-sums> <checksums.txt>
+	got="$(sha256_of "$1")"
+	if [ -z "$got" ]; then
 		warn "no sha256 tool; skipping integrity check"
 		return 0
 	fi
@@ -230,6 +288,55 @@ try_prebuilt() {
 	INSTALLED_BIN="$INSTALL_LIB/evolve"
 	log "installed prebuilt binary → $INSTALLED_BIN"
 	return 0
+}
+
+# ---- 4b. Air-gap local artifact (--binary) --------------------------------
+# Install a pre-approved local artifact: a release evolve_<os>_<arch>.tar.gz
+# (binary + skill payload, fingerprinted in checksums.txt) or a raw evolve
+# binary. Verified against a checksums.txt when available — the corporate
+# single-fingerprint path: no compiler, no network, one approved fingerprint.
+install_local_binary() {
+	[ -f "$BINARY_PATH" ] || die "--binary artifact not found: $BINARY_PATH"
+	name="$(basename "$BINARY_PATH")"
+	sums="$EVO_CHECKSUMS"
+	[ -z "$sums" ] && sums="$(dirname "$BINARY_PATH")/checksums.txt"
+	if [ ! -f "$sums" ]; then
+		warn "no checksums.txt for $name (pass --checksums or set EVO_CHECKSUMS) — installing WITHOUT fingerprint verification"
+	elif ! have_sha256_tool; then
+		# Honest "cannot verify" instead of a false "verified" — a corporate
+		# approval fingerprint must never be claimed when nothing was hashed.
+		warn "no sha256 tool (sha256sum/shasum/openssl) — cannot verify $name against $sums; installing UNVERIFIED"
+	elif verify_checksum "$BINARY_PATH" "$name" "$sums"; then
+		log "checksum verified: $name matches $sums"
+	else
+		die "checksum verification failed for $name against $sums (mismatch or not listed) — refusing to install (not the approved artifact)"
+	fi
+	mkdir -p "$INSTALL_LIB"
+	case "$name" in
+		*.tar.gz|*.tgz)
+			tar -xzf "$BINARY_PATH" -C "$INSTALL_LIB" || die "could not extract $BINARY_PATH"
+			[ -x "$INSTALL_LIB/evolve" ] || die "archive $name has no evolve binary at its root"
+			;;
+		*)
+			# Raw binary: the operator supplies the skill payload separately (or it
+			# is already staged in $INSTALL_LIB from a prior install).
+			cp "$BINARY_PATH" "$INSTALL_LIB/evolve" || die "could not copy $BINARY_PATH"
+			chmod +x "$INSTALL_LIB/evolve"
+			[ -d "$INSTALL_LIB/skills" ] || warn "no skill payload in $INSTALL_LIB — a raw --binary needs skills/ staged there; prefer the release .tar.gz"
+			;;
+	esac
+	INSTALLED_BIN="$INSTALL_LIB/evolve"
+	log "installed approved binary → $INSTALLED_BIN"
+}
+
+# print_fingerprint echoes the installed binary's SHA256 — the value to record
+# in a corporate approval request. There is no global pin to set at install time:
+# the ship-SHA integrity pin is per-project and version-aware, so it auto-adopts
+# on the first cycle in each target repo (a cross-version SHA change re-pins itself).
+print_fingerprint() {
+	[ -n "${INSTALLED_BIN:-}" ] && [ -x "$INSTALLED_BIN" ] || return 0
+	fp="$(sha256_of "$INSTALLED_BIN")"
+	[ -n "$fp" ] && log "installed binary fingerprint (SHA256): $fp"
 }
 
 # ---- 5. Build fallback -----------------------------------------------------
@@ -341,17 +448,29 @@ final_checks() {
 }
 
 main() {
+	parse_args "$@"
 	detect_platform
 	detect_pkgmgr
 	need_sudo
-	ensure_tool git git soft
-	ensure_tool jq jq soft
-	ensure_tool tmux tmux hard
 	detect_llm_cli
-	if ! try_prebuilt; then build_from_source; fi
+	if [ -n "$BINARY_PATH" ]; then
+		# Air-gap corporate path: no compiler, no download, no package-manager
+		# network calls. tmux is a runtime need, but the locked-down env manages
+		# its own tools — probe it (pure, no pkg_install network attempt) and only
+		# warn, since ensure_tool would try to apt/dnf-install a missing tmux.
+		command -v tmux >/dev/null 2>&1 ||
+			warn "tmux not found — evolve's runtime needs it; install it via your environment's own tooling"
+		install_local_binary
+	else
+		ensure_tool git git soft
+		ensure_tool jq jq soft
+		ensure_tool tmux tmux hard
+		if ! try_prebuilt; then build_from_source; fi
+	fi
 	place_on_path
 	run_evolve_install
 	final_checks
+	print_fingerprint
 }
 
 main "$@"
