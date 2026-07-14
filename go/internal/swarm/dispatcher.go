@@ -53,12 +53,13 @@ type DispatchRequest struct {
 // metadata, so provisioning is serialized up-front (before the parallel launch
 // section) — only the launches run concurrently.
 //
-// V4 WIRING REQUIREMENT (orphan-on-cancel): launchWorker registers a session
-// only after Launch returns success. A real Launcher that spawns a tmux session
-// and is THEN cancelled could leave a live session this code never registered,
-// which the post-wg Reap would miss. The production Launcher adapter MUST either
-// register the session at spawn, or return the session identity even on error so
-// we can register-then-reap. The crash-safe `evolve swarm reap` is the backstop.
+// ORPHAN-ON-CANCEL WIRING: launchWorker pre-registers a deterministic named
+// session BEFORE calling Launch (see its doc), so a spawn that is THEN cancelled
+// still leaves a session the post-wg Reap can kill by name. Because the manifest
+// is the reaper's only record of live sessions, a pre-registration that fails to
+// persist aborts that worker rather than launching it unregistered (an
+// unrecorded session is an invisible orphan). The crash-safe `evolve swarm reap`
+// is the backstop for whatever a hard crash leaves behind.
 func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Deps) (SwarmResult, error) {
 	res := SwarmResult{Mode: plan.Mode, IntegrationBranch: plan.IntegrationBranch}
 
@@ -169,10 +170,17 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	// Pre-register: the session is reapable by name from this point on, before
 	// any spawn can be cancelled mid-flight.
 	if deps.Registry != nil {
-		_ = deps.Registry.Register(SessionHandle{
+		if err := deps.Registry.Register(SessionHandle{
 			WorkerID: w.WorkerID, Agent: agent, TmuxSession: tmuxSession,
 			Worktree: worktree, Branch: w.Branch,
-		})
+		}); err != nil {
+			// Pre-registration is the crash-safe reaper's source of truth: a
+			// session it cannot see is an invisible orphan leak. Abort this
+			// worker BEFORE any spawn rather than launch it unregistered — the
+			// pre-registration invariant only holds if its failure aborts.
+			wr.Err = fmt.Errorf("pre-register session %s: %w", w.WorkerID, err)
+			return wr
+		}
 	}
 
 	workspace := filepath.Join(req.Workspace, agent)

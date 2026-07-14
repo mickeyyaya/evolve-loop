@@ -101,7 +101,14 @@ func Reap(ctx context.Context, reg *SessionRegistry, killer SessionKiller) ReapR
 			// errors), and leaving it Live would make every future sweep retry a
 			// corpse. The error is surfaced for the operator, not retried forever.
 		}
-		_ = reg.MarkReaped(h.WorkerID)
+		if err := reg.MarkReaped(h.WorkerID); err != nil {
+			// Whether or not the kill above succeeded, the worker still lands
+			// in rep.Killed (the process is presumed dead) — but the manifest
+			// still shows it Live. A stale-Live entry makes the next sweep
+			// re-target a corpse, so surface the persistence failure instead
+			// of swallowing it. Reaping continues.
+			rep.Errors = append(rep.Errors, fmt.Sprintf("%s: mark-reaped: %v", h.WorkerID, err))
+		}
 		rep.Killed = append(rep.Killed, h.WorkerID)
 	}
 	return rep
