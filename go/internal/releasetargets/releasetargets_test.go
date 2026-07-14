@@ -63,6 +63,124 @@ checksum:
 	}
 }
 
+// TestParseConfig_UniversalBinary: a goreleaser universal_binaries block makes
+// the release publish ONE macOS artifact fingerprint (a lipo'd darwin fat
+// binary). goreleaser renders its archive with .Arch="all", so the published
+// asset is evolve_darwin_all.tar.gz — the parser must surface it as a target so
+// release-verify-binaries requires it present (one-binary S2: one macOS
+// fingerprint per version).
+func TestParseConfig_UniversalBinary(t *testing.T) {
+	p := writeGoreleaser(t, `
+version: 2
+builds:
+  - id: evolve
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+universal_binaries:
+  - id: evolve-universal
+    ids: [ evolve ]
+    replace: false
+    name_template: 'evolve'
+archives:
+  - id: evolve
+    name_template: 'evolve_{{ .Os }}_{{ .Arch }}'
+    formats: [ 'tar.gz' ]
+checksum:
+  name_template: 'checksums.txt'
+`)
+	cfg, err := ParseConfig(p)
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	have := map[string]bool{}
+	for _, tg := range cfg.Targets {
+		name, err := cfg.AssetName(tg)
+		if err != nil {
+			t.Fatalf("AssetName(%v): %v", tg, err)
+		}
+		have[name] = true
+	}
+	if !have["evolve_darwin_all.tar.gz"] {
+		t.Errorf("universal_binaries block must surface evolve_darwin_all.tar.gz; got %v", have)
+	}
+	// The per-arch archives remain (replace:false), so both fingerprints ship
+	// until the S4/S5 cutover — the gate must still require them too.
+	for _, core := range []string{"evolve_darwin_amd64.tar.gz", "evolve_darwin_arm64.tar.gz"} {
+		if !have[core] {
+			t.Errorf("per-arch archive %q must remain with replace:false; got %v", core, have)
+		}
+	}
+}
+
+// TestParseConfig_UniversalBinary_Replace: with replace:true, goreleaser drops
+// the per-arch darwin archives and publishes ONLY the universal — the parser
+// must mirror that (require darwin_all, NOT darwin_amd64/arm64) or the gate would
+// red-fail every release demanding assets goreleaser no longer builds.
+func TestParseConfig_UniversalBinary_Replace(t *testing.T) {
+	p := writeGoreleaser(t, `
+version: 2
+builds:
+  - id: evolve
+    targets: [ darwin_amd64, darwin_arm64, linux_amd64 ]
+universal_binaries:
+  - id: evolve-universal
+    ids: [ evolve ]
+    replace: true
+    name_template: 'evolve'
+archives:
+  - { id: evolve, name_template: 'evolve_{{ .Os }}_{{ .Arch }}', formats: [ 'tar.gz' ] }
+checksum: { name_template: 'checksums.txt' }
+`)
+	cfg, err := ParseConfig(p)
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	have := map[string]bool{}
+	for _, tg := range cfg.Targets {
+		name, err := cfg.AssetName(tg)
+		if err != nil {
+			t.Fatalf("AssetName(%v): %v", tg, err)
+		}
+		have[name] = true
+	}
+	if !have["evolve_darwin_all.tar.gz"] {
+		t.Errorf("replace:true must still surface the universal; got %v", have)
+	}
+	if !have["evolve_linux_amd64.tar.gz"] {
+		t.Errorf("replace:true must keep non-darwin targets; got %v", have)
+	}
+	for _, dropped := range []string{"evolve_darwin_amd64.tar.gz", "evolve_darwin_arm64.tar.gz"} {
+		if have[dropped] {
+			t.Errorf("replace:true must DROP per-arch darwin %q (goreleaser stops publishing it); got %v", dropped, have)
+		}
+	}
+}
+
+// TestParseConfig_NoUniversalBinary_NoAllTarget: without a universal_binaries
+// block, no synthetic darwin_all target is invented (guards against flagging a
+// missing universal asset on releases that don't build one).
+func TestParseConfig_NoUniversalBinary_NoAllTarget(t *testing.T) {
+	p := writeGoreleaser(t, `
+version: 2
+builds:
+  - { id: evolve, targets: [ darwin_arm64, linux_amd64 ] }
+archives:
+  - { id: evolve, name_template: 'evolve_{{ .Os }}_{{ .Arch }}', formats: [ 'tar.gz' ] }
+checksum: { name_template: 'checksums.txt' }
+`)
+	cfg, err := ParseConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tg := range cfg.Targets {
+		if tg.Arch == "all" {
+			t.Errorf("no universal_binaries block, but a darwin_all target was invented: %+v", cfg.Targets)
+		}
+	}
+}
+
 func TestParseConfig_RepoFromReleaseGithub(t *testing.T) {
 	p := writeGoreleaser(t, `
 version: 2
@@ -173,6 +291,10 @@ func TestParseConfig_RealRepo(t *testing.T) {
 		"evolve_darwin_arm64.tar.gz",
 		"evolve_linux_amd64.tar.gz",
 		"evolve_linux_arm64.tar.gz",
+		// one-binary S2: the universal macOS artifact is a committed campaign
+		// requirement — the single macOS fingerprint. Guard against accidental
+		// removal of the universal_binaries block from the real config.
+		"evolve_darwin_all.tar.gz",
 	} {
 		if !have[core] {
 			t.Errorf("core release asset %q missing from parsed matrix", core)

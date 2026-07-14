@@ -541,8 +541,33 @@ func extractReleaseNotes(repoRoot, target string) string {
 			out = append(out, line)
 		}
 	}
-	return strings.TrimSpace(strings.Join(out, "\n"))
+	notes := strings.TrimSpace(strings.Join(out, "\n"))
+	if notes == "" {
+		// Entry not found / empty — keep the empty result (ship proceeds without
+		// notes) and do NOT emit a lone Fingerprints section.
+		return ""
+	}
+	return notes + "\n\n" + fingerprintsSection
 }
+
+// fingerprintsSection is appended to every non-empty release-notes body
+// (one-binary S2). It points corporate operators at the single macOS fingerprint
+// — the universal evolve_darwin_all.tar.gz — and the checksums.txt asset for
+// approval requests. Static text (goreleaser computes the actual SHA256s AFTER
+// notes are generated, so the literal hashes live in the checksums.txt asset,
+// not here).
+const fingerprintsSection = "## Fingerprints (corporate approval)\n\n" +
+	"The recommended macOS artifact is the universal `evolve_darwin_all.tar.gz` " +
+	"(a lipo'd x86_64 + arm64 fat binary) — one fingerprint covering both Intel " +
+	"and Apple Silicon. SHA256 checksums for every published artifact are in the " +
+	"`checksums.txt` release asset. (The per-arch `evolve_darwin_amd64.tar.gz` / " +
+	"`evolve_darwin_arm64.tar.gz` archives remain published for existing installs, " +
+	"each with its own distinct hash — approve the universal one.)\n\n" +
+	"To adopt this release under a fingerprint-based approval system:\n\n" +
+	"1. Download `evolve_darwin_all.tar.gz` and `checksums.txt` from this release.\n" +
+	"2. Verify integrity: `shasum -a 256 -c checksums.txt`.\n" +
+	"3. Submit the universal binary's SHA256 as the one macOS approval fingerprint " +
+	"(one request per adopted version; the pin re-adopts automatically on first run)."
 
 // --- Default step implementations ------------------------------------------
 

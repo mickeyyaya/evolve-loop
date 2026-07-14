@@ -355,6 +355,31 @@ func TestExtractReleaseNotes(t *testing.T) {
 	}
 }
 
+// TestExtractReleaseNotes_AppendsFingerprints: when a real changelog entry is
+// found, the release notes gain a Fingerprints section (one-binary S2) pointing
+// at the universal macOS artifact + checksums.txt for corporate approval
+// requests — while the actual changelog content is preserved.
+func TestExtractReleaseNotes_AppendsFingerprints(t *testing.T) {
+	d := t.TempDir()
+	body := "# Changelog\n\n## [2.0.0] - 2026-07-14\n\n### Added\n\n- Feature A\n"
+	if err := os.WriteFile(filepath.Join(d, "CHANGELOG.md"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	notes := extractReleaseNotes(d, "2.0.0")
+	if !strings.Contains(notes, "Feature A") {
+		t.Errorf("notes must preserve changelog content; got %q", notes)
+	}
+	if !strings.Contains(notes, "Fingerprints") {
+		t.Errorf("notes must gain a Fingerprints section; got %q", notes)
+	}
+	if !strings.Contains(notes, "checksums.txt") {
+		t.Errorf("Fingerprints section must point at checksums.txt; got %q", notes)
+	}
+	if !strings.Contains(notes, "evolve_darwin_all.tar.gz") {
+		t.Errorf("Fingerprints section must name the universal macOS artifact; got %q", notes)
+	}
+}
+
 func TestExtractReleaseNotes_NotFound(t *testing.T) {
 	d := t.TempDir()
 	if err := os.WriteFile(filepath.Join(d, "CHANGELOG.md"), []byte("no entry here"), 0o644); err != nil {

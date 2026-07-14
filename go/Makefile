@@ -27,9 +27,18 @@ DIST_TARGETS := \
     $(DIST_DIR)/evolve-linux-amd64 \
     $(DIST_DIR)/evolve-linux-arm64
 
+# One-binary S2: single macOS fingerprint (lipo'd fat binary) + a checksums
+# manifest over every dist artifact (for approval-request fingerprinting and
+# install.sh --binary verification). The universal target is macOS-only (lipo);
+# `make dist` is operator-run locally on macOS — no CI/release job invokes it
+# (goreleaser's own universal_binaries block builds the release-time universal).
+DIST_UNIVERSAL := $(DIST_DIR)/evolve-darwin-universal
+DIST_CHECKSUMS := $(DIST_DIR)/checksums.txt
+
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
-        dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64
+        dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
+        dist-darwin-universal dist-checksums
 
 # FAST_PKGS is every non-acs package. The default (no build tags) compiles
 # only the fast cost-axis layer: tests in files tagged `//go:build integration`
@@ -48,12 +57,14 @@ build: ## Build evolve binary into ./bin/
 # dist-OS-ARCH target. CGO disabled for fully static binaries —
 # evolve-loop's Go tree has no cgo dependency (verified by go.mod) and
 # disabling it removes the glibc-version surface on linux.
-dist: $(DIST_TARGETS) ## Cross-compile all release binaries into ./bin/dist/
+dist: $(DIST_TARGETS) $(DIST_UNIVERSAL) $(DIST_CHECKSUMS) ## Cross-compile all release binaries + universal macOS binary + checksums.txt into ./bin/dist/
 
 dist-darwin-amd64: $(DIST_DIR)/evolve-darwin-amd64
 dist-darwin-arm64: $(DIST_DIR)/evolve-darwin-arm64
 dist-linux-amd64:  $(DIST_DIR)/evolve-linux-amd64
 dist-linux-arm64:  $(DIST_DIR)/evolve-linux-arm64
+dist-darwin-universal: $(DIST_UNIVERSAL)
+dist-checksums: $(DIST_CHECKSUMS)
 
 $(DIST_DIR)/evolve-%:
 	@mkdir -p $(DIST_DIR)
@@ -61,6 +72,22 @@ $(DIST_DIR)/evolve-%:
 	echo "==> cross-compile $$os/$$arch -> $@"; \
 	CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
 	  $(GO) build -trimpath -ldflags='$(LDFLAGS)' -o $@ ./cmd/evolve
+
+# lipo-merge the two darwin arch binaries into ONE fat macOS binary — a single
+# fingerprint per version. An explicit rule so it overrides the evolve-% pattern
+# above (which would otherwise try GOARCH=universal). macOS-only.
+$(DIST_UNIVERSAL): $(DIST_DIR)/evolve-darwin-amd64 $(DIST_DIR)/evolve-darwin-arm64
+	@command -v lipo >/dev/null 2>&1 || { echo "dist-darwin-universal requires lipo (macOS)"; exit 1; }
+	@echo "==> lipo darwin universal -> $@"
+	@lipo -create -output $@ $(DIST_DIR)/evolve-darwin-amd64 $(DIST_DIR)/evolve-darwin-arm64
+
+# SHA256 of every dist artifact — the fingerprint manifest for approval requests
+# and install.sh --binary checksum verification. Rebuilt whenever any binary
+# changes. $(notdir $^) is the basename list of the prerequisites above (single
+# source of truth for "what gets checksummed"); sorted for a stable manifest.
+$(DIST_CHECKSUMS): $(DIST_TARGETS) $(DIST_UNIVERSAL)
+	@echo "==> checksums -> $@"
+	@cd $(DIST_DIR) && shasum -a 256 $(notdir $^) | sort -k2 > checksums.txt
 
 dist-clean: ## Remove cross-compiled artifacts
 	rm -rf $(DIST_DIR)

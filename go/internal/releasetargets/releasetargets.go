@@ -53,7 +53,13 @@ type goreleaserDoc struct {
 	Builds []struct {
 		Targets []string `yaml:"targets"`
 	} `yaml:"builds"`
-	Archives []struct {
+	// UniversalBinaries: each entry lipo-merges the darwin builds into one fat
+	// macOS binary. goreleaser publishes its archive with .Arch="all"
+	// (evolve_darwin_all.tar.gz) — one macOS fingerprint per version. Replace
+	// mirrors goreleaser's semantics: when true the per-arch darwin archives are
+	// NOT published (only the universal), so the gate must stop requiring them.
+	UniversalBinaries []universalBinary `yaml:"universal_binaries"`
+	Archives          []struct {
 		NameTemplate string   `yaml:"name_template"`
 		Formats      []string `yaml:"formats"`
 	} `yaml:"archives"`
@@ -113,10 +119,58 @@ func ParseConfig(path string) (Config, error) {
 			cfg.Targets = append(cfg.Targets, Target{OS: goos, Arch: arch})
 		}
 	}
+	// A universal_binaries block publishes one lipo'd macOS artifact whose
+	// archive goreleaser names with .Arch="all". Surface it as a target so the
+	// gate requires evolve_darwin_all.tar.gz present — the single macOS
+	// fingerprint. Deduped like the rest; darwin is implied (universal is macOS).
+	if len(doc.UniversalBinaries) > 0 {
+		if !seen["darwin_all"] {
+			seen["darwin_all"] = true
+			cfg.Targets = append(cfg.Targets, Target{OS: "darwin", Arch: "all"})
+		}
+		// replace:true means goreleaser drops the per-arch darwin archives and
+		// ships only the universal — so the gate must not require the per-arch
+		// ones. (Our single build merges every darwin arch into the universal;
+		// drop all real darwin arches, keeping the "all" target just added.)
+		if anyReplace(doc.UniversalBinaries) {
+			cfg.Targets = dropPerArchDarwin(cfg.Targets)
+		}
+	}
 	if len(cfg.Targets) == 0 {
 		return Config{}, fmt.Errorf("goreleaser config %s declares zero build targets", path)
 	}
 	return cfg, nil
+}
+
+// universalBinary is one universal_binaries entry from .goreleaser.yml.
+type universalBinary struct {
+	ID      string `yaml:"id"`
+	Replace bool   `yaml:"replace"`
+}
+
+// anyReplace reports whether any universal_binaries entry sets replace:true —
+// the goreleaser flag that drops the per-arch darwin archives from the release.
+func anyReplace(unis []universalBinary) bool {
+	for _, u := range unis {
+		if u.Replace {
+			return true
+		}
+	}
+	return false
+}
+
+// dropPerArchDarwin removes real-arch darwin targets (darwin_amd64, darwin_arm64,
+// …) while preserving the universal darwin_all target — the asset set goreleaser
+// actually publishes under universal_binaries[].replace:true.
+func dropPerArchDarwin(targets []Target) []Target {
+	kept := targets[:0:0]
+	for _, t := range targets {
+		if t.OS == "darwin" && t.Arch != "all" {
+			continue
+		}
+		kept = append(kept, t)
+	}
+	return kept
 }
 
 // splitTarget splits a goreleaser target on the FIRST underscore so that arches

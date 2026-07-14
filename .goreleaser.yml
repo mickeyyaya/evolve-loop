@@ -56,6 +56,22 @@ builds:
       - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.commit={{.ShortCommit}}
       - -X github.com/mickeyyaya/evolve-loop/go/pkg/version.builtAt={{.Date}}
 
+# One macOS fingerprint per version (one-binary S2): lipo the two darwin arch
+# builds into a single fat binary. goreleaser publishes its archive with
+# .Arch="all" -> evolve_darwin_all.tar.gz, which release-verify-binaries requires
+# (releasetargets surfaces a darwin_all target when this block is present).
+# replace:false keeps the per-arch archives published too, so install.sh's
+# existing per-arch source URLs (evolve_darwin_arm64.tar.gz, …) keep working —
+# the universal is the ADDITIONAL single-fingerprint corporate artifact, not a
+# replacement. (releasetargets honors replace either way, so a future flip to
+# replace:true would correctly stop requiring the per-arch archives.)
+universal_binaries:
+  - id: evolve-universal
+    ids:
+      - evolve
+    replace: false
+    name_template: evolve
+
 archives:
   - id: evolve
     # Version-LESS name so install.sh can fetch a stable URL:
