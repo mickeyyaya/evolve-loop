@@ -193,62 +193,97 @@ func TestWrite_RenameErrorRemovesTemp(t *testing.T) {
 }
 
 func TestWrite_WriteErrorRemovesTemp(t *testing.T) {
-	old := createTempFn
-	t.Cleanup(func() { createTempFn = old })
+	t.Parallel()
 	tmpPath := filepath.Join(t.TempDir(), ".lease.test.tmp")
 	if err := os.WriteFile(tmpPath, []byte("partial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	createTempFn = func(dir, pattern string) (tempFile, error) {
-		return failingTempFile{name: tmpPath, writeErr: errors.New("disk full")}, nil
+	w := writer{
+		createTemp: func(dir, pattern string) (tempFile, error) {
+			return failingTempFile{name: tmpPath, writeErr: errors.New("disk full")}, nil
+		},
+		rename: os.Rename,
 	}
-	if err := Write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
-		t.Fatal("Write must surface temp-file write errors")
+	if err := w.write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
+		t.Fatal("write must surface temp-file write errors")
 	}
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Fatalf("Write must remove temp file after write error, stat err=%v", err)
+		t.Fatalf("write must remove temp file after write error, stat err=%v", err)
 	}
 }
 
 func TestWrite_CloseErrorRemovesTemp(t *testing.T) {
-	old := createTempFn
-	t.Cleanup(func() { createTempFn = old })
+	t.Parallel()
 	tmpPath := filepath.Join(t.TempDir(), ".lease.test.tmp")
 	if err := os.WriteFile(tmpPath, []byte("partial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	createTempFn = func(dir, pattern string) (tempFile, error) {
-		return failingTempFile{name: tmpPath, closeErr: errors.New("close failed")}, nil
+	w := writer{
+		createTemp: func(dir, pattern string) (tempFile, error) {
+			return failingTempFile{name: tmpPath, closeErr: errors.New("close failed")}, nil
+		},
+		rename: os.Rename,
 	}
-	if err := Write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
-		t.Fatal("Write must surface temp-file close errors")
+	if err := w.write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
+		t.Fatal("write must surface temp-file close errors")
 	}
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Fatalf("Write must remove temp file after close error, stat err=%v", err)
+		t.Fatalf("write must remove temp file after close error, stat err=%v", err)
 	}
 }
 
 func TestWrite_RenameSeamErrorRemovesTemp(t *testing.T) {
-	oldCreateTemp := createTempFn
-	oldRename := renameFn
-	t.Cleanup(func() {
-		createTempFn = oldCreateTemp
-		renameFn = oldRename
-	})
+	t.Parallel()
 	tmpPath := filepath.Join(t.TempDir(), ".lease.test.tmp")
 	if err := os.WriteFile(tmpPath, []byte("partial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	createTempFn = func(dir, pattern string) (tempFile, error) {
-		return failingTempFile{name: tmpPath}, nil
+	w := writer{
+		createTemp: func(dir, pattern string) (tempFile, error) {
+			return failingTempFile{name: tmpPath}, nil
+		},
+		rename: func(oldpath, newpath string) error {
+			return errors.New("rename failed")
+		},
 	}
-	renameFn = func(oldpath, newpath string) error {
-		return errors.New("rename failed")
-	}
-	if err := Write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
-		t.Fatal("Write must surface rename errors")
+	if err := w.write(t.TempDir(), Lease{RunID: "r"}, t0); err == nil {
+		t.Fatal("write must surface rename errors")
 	}
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Fatalf("Write must remove temp file after rename error, stat err=%v", err)
+		t.Fatalf("write must remove temp file after rename error, stat err=%v", err)
+	}
+}
+
+// TestWriter_PerInstanceSeamsAreIsolated is the acceptance for moving the write
+// seams off package globals (concurrency-hygiene): two writers with DIFFERENT
+// injected seams operate independently. The old package-var form (one shared
+// createTempFn/renameFn) structurally could not hold two live seams at once — so
+// this proves the seams are per-instance, which is what lets the seam tests
+// above run t.Parallel() without racing shared state.
+func TestWriter_PerInstanceSeamsAreIsolated(t *testing.T) {
+	t.Parallel()
+	var aCreated, bRenamed bool
+	a := writer{
+		createTemp: func(dir, pattern string) (tempFile, error) { aCreated = true; return os.CreateTemp(dir, pattern) },
+		rename:     os.Rename,
+	}
+	b := writer{
+		createTemp: func(dir, pattern string) (tempFile, error) { return os.CreateTemp(dir, pattern) },
+		rename:     func(oldpath, newpath string) error { bRenamed = true; return os.Rename(oldpath, newpath) },
+	}
+	if err := a.write(t.TempDir(), Lease{RunID: "a"}, t0); err != nil {
+		t.Fatal(err)
+	}
+	if !aCreated {
+		t.Error("writer a must use its own createTemp seam")
+	}
+	if bRenamed {
+		t.Error("writer a must NOT touch writer b's seam (seams are per-instance)")
+	}
+	if err := b.write(t.TempDir(), Lease{RunID: "b"}, t0); err != nil {
+		t.Fatal(err)
+	}
+	if !bRenamed {
+		t.Error("writer b must use its own rename seam")
 	}
 }

@@ -35,12 +35,23 @@ type tempFile interface {
 	Close() error
 }
 
-var (
-	createTempFn = func(dir, pattern string) (tempFile, error) {
-		return os.CreateTemp(dir, pattern)
+// writer holds the filesystem seams for an atomic lease write. The seams are
+// per-INSTANCE, not package globals: a test injects a failing createTemp/rename
+// on its OWN writer without mutating shared state, so write tests parallelize
+// safely (the old package-var seams raced any sibling test the moment someone
+// added t.Parallel()). newWriter supplies the real os-backed seams.
+type writer struct {
+	createTemp func(dir, pattern string) (tempFile, error)
+	rename     func(oldpath, newpath string) error
+}
+
+// newWriter returns a writer wired to the real filesystem.
+func newWriter() writer {
+	return writer{
+		createTemp: func(dir, pattern string) (tempFile, error) { return os.CreateTemp(dir, pattern) },
+		rename:     os.Rename,
 	}
-	renameFn = os.Rename
-)
+}
 
 // FileName is the lease file's name inside a run directory.
 const FileName = ".lease"
@@ -67,14 +78,20 @@ func PathIn(runDir string) string {
 }
 
 // Write atomically writes (or refreshes) the lease in runDir, stamping
-// HeartbeatAt with now.
+// HeartbeatAt with now. It is the package-level convenience over a real-seam
+// writer — the single production caller (core/runlease_hook.go) needs no seams.
 func Write(runDir string, l Lease, now time.Time) error {
+	return newWriter().write(runDir, l, now)
+}
+
+// write is the seam-driven implementation behind Write.
+func (w writer) write(runDir string, l Lease, now time.Time) error {
 	l.HeartbeatAt = now.UTC().Format(time.RFC3339Nano)
 	b, err := json.Marshal(l)
 	if err != nil {
 		return fmt.Errorf("runlease: marshal: %w", err)
 	}
-	tmp, err := createTempFn(runDir, FileName+".*.tmp")
+	tmp, err := w.createTemp(runDir, FileName+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("runlease: tmp: %w", err)
 	}
@@ -88,7 +105,7 @@ func Write(runDir string, l Lease, now time.Time) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("runlease: close: %w", err)
 	}
-	if err := renameFn(tmpPath, PathIn(runDir)); err != nil {
+	if err := w.rename(tmpPath, PathIn(runDir)); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("runlease: rename: %w", err)
 	}
