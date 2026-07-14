@@ -72,7 +72,7 @@ func TestApicoverNewPkgGraduation_OffendersFailAudit(t *testing.T) {
 // be flagged — the strongest anti-no-op guard against a naive "flag every
 // changed internal package" implementation.
 func TestApicoverNewPkgGraduationDefault_NoUngraduatedPackages_NoOp(t *testing.T) {
-	root, goDir := writeApicoverFixture(t) // .apicover-enforce has "./internal/p", handoff touches go/internal/p/x.go
+	root, goDir := writeApicoverFixture(t, apicoverCleanPkg) // .apicover-enforce has "./internal/p", handoff touches go/internal/p/x.go
 	_ = goDir
 	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
 	if err != nil || len(off) != 0 {

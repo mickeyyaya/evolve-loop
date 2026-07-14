@@ -424,3 +424,12 @@
 # cycle-661 ACS predicate package (2026-07-11): recurrence-ledger-weight-escalation.
 # Completeness invariant: every ./acs/cycle<N>/ package must be enrolled.
 ./acs/cycle661
+
+# One-binary S1 (2026-07-14): apicover core folded from cmd/apicover (package
+# main) into this importable package so the evolve binary — the `evolve apicover`
+# subcommand and the audit's in-process API-gate (ciparity.apicoverEnforceChanged
+# Default now calls apicover.Run directly, deleting the runtime `go build -o
+# bin/apicover`) — shares one measurement impl. apicover_named_test.go names the
+# lone entry (Main) no moved test covered; the run/classify/cover/enumerate/
+# ignore/refs tests cover the rest. Graduated at 18/18 covered, 86.7% line.
+./internal/apicover

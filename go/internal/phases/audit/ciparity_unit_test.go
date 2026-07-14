@@ -112,10 +112,28 @@ func TestCycleTouchedGo(t *testing.T) {
 	}
 }
 
-func writeApicoverFixture(t *testing.T) (root, goDir string) {
+// apicover enforced-package sources: the exported-symbol content decides whether
+// the IN-PROCESS apicover.Run reports an offender (an exported func no test names
+// → uncovered) or is clean (no exports at all).
+const (
+	apicoverOffenderPkg = "package p\n\n// Exported is public but no test names it → uncovered.\nfunc Exported() {}\n"
+	apicoverCleanPkg    = "package p\n\nfunc helper() {}\n"
+	// apicoverBrokenPkg has a syntax error, so apicover.Run's Enumerate returns a
+	// measurement error (code 2) — the gate must FAIL, not silently WARN.
+	apicoverBrokenPkg = "package p\n\nfunc (\n"
+)
+
+func writeApicoverFixture(t *testing.T, pkgSrc string) (root, goDir string) {
 	t.Helper()
 	root, goDir = goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pDir := filepath.Join(goDir, "internal", "p")
+	if err := os.MkdirAll(pDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pDir, "x.go"), []byte(pkgSrc), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1")
@@ -129,19 +147,21 @@ func writeApicoverFixture(t *testing.T) (root, goDir string) {
 	return root, goDir
 }
 
-// apicover pipeline: go list emits the touched dir; the final apicover -enforce
-// exit code decides clean (0) vs offenders (non-zero).
-func apicoverPipelineRunner(goDir string, enforceCode int, enforceOut string) sysexec.RunFunc {
+// apicoverPipelineRunner fakes only the toolchain subprocesses the gate still
+// forks (go test -coverprofile, go tool cover -func, go list). apicover itself
+// now runs IN-PROCESS (apicover.Run), so there is no apicover subprocess to fake
+// and no `go build -o bin/apicover` — it records every invocation into seen (when
+// non-nil) so a test can assert neither a build nor an apicover fork happens.
+func apicoverPipelineRunner(goDir string, seen *[]string) sysexec.RunFunc {
 	return func(_ context.Context, name string, _ string, args, _ []string, _ io.Reader, so, se io.Writer) (int, error) {
+		if seen != nil {
+			*seen = append(*seen, name+" "+strings.Join(args, " "))
+		}
 		if name == "go" && len(args) > 0 && args[0] == "list" {
 			_, _ = io.WriteString(so, filepath.Join(goDir, "internal", "p")+"\n")
 			return 0, nil
 		}
-		if strings.HasSuffix(name, "apicover") {
-			_, _ = io.WriteString(se, enforceOut)
-			return enforceCode, nil
-		}
-		return 0, nil // go build / go test / go tool cover succeed
+		return 0, nil // go test (coverprofile) + go tool cover -func succeed (no-op)
 	}
 }
 
@@ -155,17 +175,65 @@ func TestApicoverEnforceChanged_NoOps(t *testing.T) {
 	}
 }
 
+// TestApicoverEnforceChanged_Pipeline drives the gate end-to-end with apicover
+// running IN-PROCESS: a clean enforced package (no exports) passes; one with an
+// exported symbol no test names yields offenders.
 func TestApicoverEnforceChanged_Pipeline(t *testing.T) {
-	root, goDir := writeApicoverFixture(t)
-	req := core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1}
-
-	withFakeRunner(t, apicoverPipelineRunner(goDir, 0, ""))
-	if off, err := apicoverEnforceChangedDefault(req); off != nil || err != nil {
+	rootClean, goClean := writeApicoverFixture(t, apicoverCleanPkg)
+	withFakeRunner(t, apicoverPipelineRunner(goClean, nil))
+	if off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: rootClean, Worktree: rootClean, Cycle: 1}); off != nil || err != nil {
 		t.Errorf("clean pipeline: (%v,%v), want (nil,nil)", off, err)
 	}
 
-	withFakeRunner(t, apicoverPipelineRunner(goDir, 1, "UNCOVERED (no test names it): 1\n  type Foo"))
-	if off, err := apicoverEnforceChangedDefault(req); err != nil || len(off) == 0 {
+	rootBad, goBad := writeApicoverFixture(t, apicoverOffenderPkg)
+	withFakeRunner(t, apicoverPipelineRunner(goBad, nil))
+	if off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: rootBad, Worktree: rootBad, Cycle: 1}); err != nil || len(off) == 0 {
 		t.Errorf("offender pipeline: (%v,%v), want offenders", off, err)
+	}
+}
+
+// TestCiparity_ApicoverRunsInProcess_NoBinaryCreated pins one-binary S1: a cycle
+// touching an enforced package runs the API-coverage gate to completion WITHOUT
+// forking a `go build -o bin/apicover` and WITHOUT leaving a bin/apicover artifact
+// on the worktree — apicover.Run is folded into the evolve binary.
+func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
+	root, goDir := writeApicoverFixture(t, apicoverOffenderPkg)
+	var seen []string
+	withFakeRunner(t, apicoverPipelineRunner(goDir, &seen))
+
+	off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
+	if err != nil {
+		t.Fatalf("gate errored: %v", err)
+	}
+	if len(off) == 0 {
+		t.Fatal("expected offenders for an uncovered export — proves apicover actually ran in-process")
+	}
+	// No apicover binary was built or left behind.
+	if _, statErr := os.Stat(filepath.Join(goDir, "bin", "apicover")); !os.IsNotExist(statErr) {
+		t.Errorf("bin/apicover must NOT exist after an in-process gate; stat err=%v", statErr)
+	}
+	// No forked command builds apicover.
+	for _, c := range seen {
+		if strings.Contains(c, "build") && strings.Contains(c, "apicover") {
+			t.Errorf("gate forked an apicover build (%q); it must run in-process", c)
+		}
+	}
+}
+
+// TestApicoverEnforceChanged_MeasurementError_Fails: when apicover.Run itself
+// errors (a touched package won't parse → code 2), the gate must FAIL
+// (offenders, nil) — the same bucket the old bin/apicover exit-2 fell into — NOT
+// silently downgrade to a WARN (nil, err). In-process there is no exec-start
+// failure mode, so any measurement error is a real gate failure (cf. the
+// underivable-changed-set hard-FAIL, cycle-581 D1).
+func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
+	root, goDir := writeApicoverFixture(t, apicoverBrokenPkg)
+	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
+	off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
+	if err != nil {
+		t.Fatalf("measurement error must FAIL (offenders,nil), not WARN (nil,err); got err=%v", err)
+	}
+	if len(off) == 0 {
+		t.Fatal("measurement error must produce offenders (FAIL), got a clean pass")
 	}
 }

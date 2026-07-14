@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
@@ -250,13 +252,17 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	defer cancel()
 	run := runCmd
 
-	// Build apicover from this worktree, then a scoped coverage profile over the
-	// touched packages (apicover -enforce reads a func-coverage file), then run
-	// -enforce over just those dirs — the same pipeline as go.yml, scoped.
-	if _, err := sysexec.Output(ctx, run, dir, "go", "build", "-o", "bin/apicover", "./cmd/apicover"); err != nil {
-		return nil, fmt.Errorf("apicover gate: build apicover: %w", err)
+	// Scoped coverage profile over the touched packages (apicover reads a
+	// func-coverage file), then the enforce gate IN-PROCESS over just those dirs
+	// — the same pipeline as go.yml, scoped, but folded into the evolve binary
+	// (one-binary S1): no runtime `go build -o bin/apicover`. The scratch cover
+	// files still live under the worktree's bin/, which we ensure exists (the
+	// deleted build used to create it as a side effect).
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		return nil, fmt.Errorf("apicover gate: ensure bin dir: %w", err)
 	}
-	covPath := filepath.Join(dir, "bin", "ciparity-cover.txt")
+	covPath := filepath.Join(binDir, "ciparity-cover.txt")
 	defer func() { _ = os.Remove(covPath) }() // scratch profile — don't accumulate on a persistent worktree
 	// Tag-parity: build the scoped coverage args through the ciparity SSOT so
 	// the gate measures the SAME (tagged) coverage number CI does — an untagged
@@ -282,15 +288,24 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	if len(dirs) == 0 {
 		return nil, nil
 	}
-	args := append([]string{"-enforce", "-cover", funcPath}, dirs...)
-	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, filepath.Join(dir, "bin", "apicover"), args...)
-	if cerr != nil {
-		return nil, fmt.Errorf("apicover -enforce gate could not run: %w", cerr) // fail-open → WARN
+	// In-process enforce gate — the folded apicover.Run, not a bin/apicover
+	// subprocess. Exit-code contract: 0 clean; 1 offenders → FAIL; 2 (with a
+	// non-nil error) a measurement failure → also FAIL. In-process there is NO
+	// exec-start failure mode (the process always "runs"), so a measurement
+	// error is a real finding about the touched code — an unparseable enforced
+	// package — not the fail-open infra WARN a subprocess exit-2 warranted.
+	// Folding it into the offender report keeps the FAIL the old bin/apicover
+	// exit-2 produced (cf. the underivable-changed-set hard-FAIL, cycle-581 D1).
+	var report bytes.Buffer
+	code, runErr := apicover.Run(apicover.Config{Enforce: true, CoverPath: funcPath, Dirs: dirs}, &report)
+	if code == 0 && runErr == nil {
+		return nil, nil // clean
 	}
-	if code == 0 {
-		return nil, nil
+	detail := strings.TrimSpace(report.String())
+	if runErr != nil {
+		detail = strings.TrimSpace(detail + "\napicover -enforce measurement error: " + runErr.Error())
 	}
-	return offenderLines(strings.TrimSpace(out + "\n" + errOut)), nil // non-zero → FAIL
+	return offenderLines(detail), nil // offenders or measurement error → FAIL
 }
 
 // apicoverNewPackageGraduationDefault flags changed go/internal/<pkg> packages

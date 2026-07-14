@@ -1,4 +1,4 @@
-package main
+package apicover
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func Run(cfg Config, w io.Writer) (int, error) {
 		if err != nil {
 			return 2, err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }() // read-only file; close error is not actionable
 		entries, err := ParseCoverFunc(f)
 		if err != nil {
 			return 2, err

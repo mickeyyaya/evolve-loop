@@ -1,33 +1,17 @@
-// Command apicover measures public-API coverage: it enumerates every exported
-// symbol of a package (go/ast, stdlib only) and applies a two-signal check —
-// named by a _test AST AND >0% in `go tool cover -func` — flagging uncovered
-// symbols and named-but-0% false-greens. //apicover:ignore reason=... suppresses
-// a symbol (reason mandatory). It is warning-only by default; -enforce makes it
-// exit non-zero. See docs/architecture/adr/0050-modularization-and-unified-phase-io.md
-// and the decision log (docs/architecture/decision-log-modularization.md).
+// Command apicover is a thin CLI wrapper over the importable internal/apicover
+// package (folded there so the evolve binary — the `evolve apicover` subcommand
+// and the audit's in-process API-gate — and this standalone binary all share one
+// measurement implementation, never rebuilt at runtime). See package apicover
+// for the flag and behavior documentation, plus
+// docs/architecture/adr/0050-modularization-and-unified-phase-io.md.
 package main
 
 import (
-	"flag"
-	"fmt"
 	"os"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 )
 
 func main() {
-	cover := flag.String("cover", "", "path to `go tool cover -func` output")
-	requireDoc := flag.Bool("require-doc", false, "flag exported decls missing a godoc comment")
-	enforce := flag.Bool("enforce", false, "exit non-zero when uncovered/false-green symbols exist")
-	flag.Parse()
-
-	code, err := Run(Config{
-		Dirs:       flag.Args(),
-		CoverPath:  *cover,
-		RequireDoc: *requireDoc,
-		Enforce:    *enforce,
-	}, os.Stdout)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "apicover:", err)
-		os.Exit(2)
-	}
-	os.Exit(code)
+	os.Exit(apicover.Main(os.Args[1:], os.Stdout, os.Stderr))
 }

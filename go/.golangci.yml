@@ -22,6 +22,7 @@ linters:
   exclusions:
     paths:
       - acs/ # per-cycle ACS predicate evals — excluded from the unit gate (matches CI + Makefile)
+      - testdata/ # fixture packages (e.g. apicover's sample tree) parsed by tests, never built — deliberately carry unused/uncovered symbols; conventionally unlinted
     rules:
       # Test files legitimately ignore cleanup/setup errors, carry helper
       # scaffolding, and don't warrant style-level nits. Hold them to the
