@@ -27,31 +27,61 @@ import (
 //     untracked-leak guard (inbox `ship-stage-explicit-paths`, cycle-645).
 //
 // BEFORE enabling enforce in production (the deferred policy.json→Options
-// wiring), two prerequisites remain (2026-07-14 review):
-//   1. pathToken (below) requires a '/', so DECLARED bare root-level filenames
-//      (CHANGELOG.md, go.mod, README.md) drop out of the manifest → enforce
-//      would FALSE-BLOCK a legit ship that changed them. Extend extraction to
-//      bare filenames (carefully — too loose re-introduces false negatives) and
-//      add a regression test.
+// wiring), prerequisites (2026-07-14 review):
+//   1. DONE (2026-07-14): pathToken (below) now also extracts bare root-level
+//      filenames (CHANGELOG.md, go.mod) via an extension allow-list, so a legit
+//      root-file change is no longer a FALSE-BLOCK under enforce.
 //   2. use a dedicated core.CodeManifestGate (mirroring CodeCommitPrefixGate)
 //      instead of reusing CodeGitStageFailed, so the ledger/debugger can tell a
-//      manifest block from a real `git add` failure.
+//      manifest block from a real `git add` failure. (Still open — dormant until
+//      enforce is wired + activated; the enforce error path never fires in the
+//      default shadow mode.)
 
 // manifestReportFiles are the phase reports whose named paths constitute the
 // cycle's declared file manifest.
 var manifestReportFiles = []string{"build-report.md", "test-report.md"}
 
-// pathToken matches repo-relative path-like tokens (must contain a '/'; may
-// carry an extension). Conservative on purpose: shadow mode tolerates a loose
-// match, and a too-tight one would spam false out-of-manifest reports.
-var pathToken = regexp.MustCompile(`[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_.-]+)+`)
+// bareRootFileExts is the extension allow-list for bare root-level filenames
+// (no '/'). Kept to the extensions the repo actually tracks at its root or that
+// a phase report legitimately names as a bare file.
+const bareRootFileExts = `go|mod|sum|md|json|ya?ml|txt|toml|lock|sh`
+
+// pathToken matches repo-relative path-like tokens: EITHER a slashed path, OR a
+// bare root-level filename carrying one of the known source/doc extensions
+// (bareRootFileExts). The slash form is loose on purpose; the bare form is
+// gated by an extension allow-list so prose tokens with an incidental dot
+// ("cfg.Now", version "1.0", "e.g.") do NOT match — the false-positive risk a
+// naive `\w+\.\w+` would create. Files with no extension (Makefile, LICENSE) or
+// a leading dot (.goreleaser.yml) are out of scope: extractReportPaths's
+// left-boundary check makes them a CLEAN non-match (not a truncation). Declare
+// such files via a slashed path or an explicit manifest entry if enforce needs.
+var pathToken = regexp.MustCompile(
+	`[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_.-]+)+` +
+		`|[A-Za-z0-9_][A-Za-z0-9_-]*\.(?:` + bareRootFileExts + `)\b`)
+
+// isPathContinuationByte reports whether b could be the interior of a path/word
+// token (word char, '.', '-', or '/'). Used as a manual left-boundary check:
+// RE2 has no lookbehind, so without it the bare-filename alternative would start
+// matching INSIDE a larger token — e.g. truncating ".goreleaser.yml" to a bogus
+// "goreleaser.yml" that can never cover the real dotfile path.
+func isPathContinuationByte(b byte) bool {
+	return b == '.' || b == '-' || b == '/' || b == '_' ||
+		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
 
 // extractReportPaths pulls the repo-relative path tokens out of a phase
 // report's markdown (tables, backticks, JSON blocks all reduce to tokens).
 func extractReportPaths(md string) []string {
 	seen := map[string]bool{}
-	for _, m := range pathToken.FindAllString(md, -1) {
-		m = strings.Trim(m, ".")
+	for _, loc := range pathToken.FindAllStringIndex(md, -1) {
+		start, end := loc[0], loc[1]
+		// Reject a match whose left edge sits inside a larger token (a legit path
+		// token begins at string start or just after a separator). This makes
+		// leading-dot files a CLEAN non-match rather than a silent truncation.
+		if start > 0 && isPathContinuationByte(md[start-1]) {
+			continue
+		}
+		m := strings.Trim(md[start:end], ".")
 		if m != "" {
 			seen[m] = true
 		}

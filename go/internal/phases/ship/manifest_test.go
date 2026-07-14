@@ -27,6 +27,23 @@ func TestExtractReportPaths(t *testing.T) {
 	}
 }
 
+// Bare root-level filenames (no '/') that ARE declared must be extracted — else
+// the manifest gate flags a legit CHANGELOG.md / go.mod change as out-of-
+// manifest (noise in shadow, a FALSE-BLOCK under enforce). Prose tokens that
+// merely contain a dot (e.g., version "1.0", "cfg.Now") must still NOT match:
+// the extension allow-list is the discriminator.
+func TestExtractReportPaths_BareRootFilenames(t *testing.T) {
+	// The leading-dot `.goreleaser.yml` must be a CLEAN non-match — the bare-alt
+	// must not truncate it to a bogus root filename (left-boundary check).
+	md := "bumped `CHANGELOG.md`, `go.mod`, `go.sum` and edited `go/internal/foo.go`, " +
+		"plus the dotfile `.goreleaser.yml`; prose like e.g. and cfg.Now and 1.0 must not match."
+	got := extractReportPaths(md)
+	want := []string{"CHANGELOG.md", "go.mod", "go.sum", "go/internal/foo.go"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("extractReportPaths = %v, want %v", got, want)
+	}
+}
+
 func TestOutOfManifest_FlagsUndeclaredPaths(t *testing.T) {
 	changed := []string{
 		"go/internal/core/worktree_clean.go",
