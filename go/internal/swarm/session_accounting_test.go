@@ -80,3 +80,72 @@ func TestReap_MarkReapedFailure_SurfacedInErrors(t *testing.T) {
 		t.Fatalf("MarkReaped persist failure must surface in rep.Errors, got %v", rep.Errors)
 	}
 }
+
+// A Register whose persist fails must NOT leave a phantom entry in memory: the
+// on-disk manifest (the reaper's source of truth) never recorded it, so an
+// in-memory Live entry would be a divergence the disk contradicts. The mutation
+// rolls back to the pre-Register state.
+func TestRegister_PersistFailure_RollsBackInMemory(t *testing.T) {
+	reg := blockedRegistry(t)
+	if err := reg.Register(handle("w0")); err == nil {
+		t.Fatal("Register must surface the persist failure")
+	}
+	if snap := reg.Snapshot(); len(snap) != 0 {
+		t.Fatalf("failed Register must roll back the in-memory entry (no phantom), got %+v", snap)
+	}
+	if live := reg.Live(); len(live) != 0 {
+		t.Fatalf("no session may be Live after a failed Register, got %+v", live)
+	}
+}
+
+// A MarkReaped whose persist fails must roll back the status flip: the on-disk
+// manifest still shows the session Live, so memory must too (consistent), not
+// claim a Reaped state that never reached disk.
+func TestMarkReaped_PersistFailure_RollsBackStatus(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
+	if err := reg.Register(handle("w0")); err != nil {
+		t.Fatalf("setup register (should succeed): %v", err)
+	}
+	// Break persistence: replace the manifest's parent dir with a file.
+	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sub"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.MarkReaped("w0"); err == nil {
+		t.Fatal("MarkReaped must surface the persist failure")
+	}
+	live := reg.Live()
+	if len(live) != 1 || live[0].WorkerID != "w0" {
+		t.Fatalf("failed MarkReaped must roll back the status flip (w0 stays Live), got %+v", live)
+	}
+}
+
+// Re-registering an existing WorkerID takes upsertLocked's in-place-replace
+// branch; if that persist fails, the rollback must restore the ORIGINAL entry,
+// not leave the half-applied replacement in memory.
+func TestRegister_ReplacePersistFailure_RollsBackToOriginal(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
+	if err := reg.Register(handle("w0")); err != nil { // original Branch: cycle-1-w0
+		t.Fatalf("setup register (should succeed): %v", err)
+	}
+	// Break persistence, then re-register w0 with a changed field.
+	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sub"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changed := handle("w0")
+	changed.Branch = "cycle-1-w0-REPLACED"
+	if err := reg.Register(changed); err == nil {
+		t.Fatal("re-register with a failing persist must surface the error")
+	}
+	snap := reg.Snapshot()
+	if len(snap) != 1 || snap[0].Branch != "cycle-1-w0" {
+		t.Fatalf("failed re-register must roll back to the original entry, got %+v", snap)
+	}
+}

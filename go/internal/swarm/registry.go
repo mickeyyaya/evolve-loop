@@ -76,8 +76,9 @@ func (r *SessionRegistry) Register(h SessionHandle) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	h.Status = StatusLive
+	prev := r.snapshotSessionsLocked()
 	r.upsertLocked(h)
-	return r.persistLocked()
+	return r.persistOrRollbackLocked(prev)
 }
 
 // MarkReaped flips a session to Reaped and persists. Unknown WorkerID is a
@@ -85,12 +86,34 @@ func (r *SessionRegistry) Register(h SessionHandle) error {
 func (r *SessionRegistry) MarkReaped(workerID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	prev := r.snapshotSessionsLocked()
 	for i := range r.m.Sessions {
 		if r.m.Sessions[i].WorkerID == workerID {
 			r.m.Sessions[i].Status = StatusReaped
 		}
 	}
-	return r.persistLocked()
+	return r.persistOrRollbackLocked(prev)
+}
+
+// snapshotSessionsLocked returns a value copy of the current sessions, taken
+// BEFORE a mutation so it can be restored if the durable write fails.
+// SessionHandle is all value fields, so a slice copy is a full snapshot.
+func (r *SessionRegistry) snapshotSessionsLocked() []SessionHandle {
+	prev := make([]SessionHandle, len(r.m.Sessions))
+	copy(prev, r.m.Sessions)
+	return prev
+}
+
+// persistOrRollbackLocked persists the manifest and, on failure, restores the
+// sessions slice to the pre-mutation snapshot — the manifest is the reaper's
+// source of truth, so an in-memory mutation that was never durably written
+// must not silently diverge from disk.
+func (r *SessionRegistry) persistOrRollbackLocked(prev []SessionHandle) error {
+	if err := r.persistLocked(); err != nil {
+		r.m.Sessions = prev
+		return err
+	}
+	return nil
 }
 
 // Snapshot returns a copy of the current sessions (safe to range without the
