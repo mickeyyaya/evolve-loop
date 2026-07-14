@@ -1,20 +1,21 @@
 {
   "id": "advisory-phase-contract-degrade",
-  "title": "Advisory/scan phase contract exhaustion degrades to SKIPPED+WARN instead of cycle-fatal — formatting flakes must not kill shipped-quality work",
-  "weight": 0.8,
+  "title": "Complete the floor-only-verdict decouple for the SHIP-PROCEED decision: any NON-floor phase non-PASS (a legitimate coverage-gate WARN, a scan flake, OR contract exhaustion) degrades to a recorded advisory — only floor phases (build/audit/tdd + EGPS red_count==0) may block ship",
+  "weight": 0.95,
   "kind": "defect",
   "priority": "high",
   "campaign": "loop-reliability-2026-07",
-  "summary": "SUBSUMED 2026-07-14 by retro-bridge-timeout-width10 (now the class fix: any non-floor phase failure — bridge-launch exit code OR verdict-contract exhaustion — degrades to SKIPPED+WARN, never cycle-fatal). Kept as a verification companion: if the class fix lands first, this becomes a green regression check for the verdict-contract trigger specifically. Lowered to 0.8 to avoid a duplicate lane. ORIGINAL: Cycle 742 (2026-07-13): phase test-amplification emitted no parseable verdict ([bad_verdict] expected one of [PASS FAIL WARN SKIPPED]) after 2 corrections and the WHOLE CYCLE failed — an LLM output-formatting flake in an advisory-tier phase was cycle-fatal. The integrity floor treats build/audit/tdd as load-bearing (ship => build AND audit AND tdd-unless-trivial); the scan/amplification phases (test-amplification, secret-leak-scan, flake-rerun-scan, error-handling-scan) are NOT in the floor and already fail-open at the spine level (76 'spine not satisfied ... proceeding fail-open' WARNs in one batch). Make verdict-contract exhaustion on NON-floor phases consistent with that: after corrections are exhausted, record verdict SKIPPED with reason bad_verdict, WARN loudly, count it in the dossier, and continue the cycle. Keep cycle-fatal semantics for floor phases. Also raise correction attempts from 2 to 3 with a stricter format-only reprompt on the final attempt (cheap, catches most formatting flakes).",
+  "summary": "REVIVED + BOOSTED 2026-07-14: this is the UN-LANDED HALF of the cycle-802 decouple and a CONFIRMED width-2 storm cause (cycle-823). retro-bridge-timeout-width10 (0.988) landed final_verdict_floor.go, which stops a non-floor phase from CLOBBERING FinalVerdict — but it does NOT govern the SHIP-PROCEED / verdict-rollup decision, so a non-floor non-PASS still drives the cycle to non-ship and discard. LIVE PROOF cycle-823 (2026-07-14): audit PASS 0.93, NO phase emitted FAIL, but `coverage-gate = WARN` (severity MEDIUM, uncovered_changed_lines=1 — a single hard-to-test defensive fallback branch `root = dir` at dossier write.go:74) was rolled up by the loop to `previous_verdict: FAIL` -> non-ship -> failure-retro fired -> the whole audited cycle (build PASS, tdd RED->green, adversarial PASS, audit PASS 0.93) was DISCARDED and requeued from scratch. That is a legitimate advisory gate WARN killing shipped-quality work — the exact pathology the floor model forbids. FIX (class): the cycle's ship-proceed / verdict-rollup must gate ONLY on floor phases (build AND audit AND tdd-unless-trivial) plus the hard EGPS red_count==0; a NON-floor phase non-PASS (coverage-gate/adversarial-review/flake-rerun-scan/test-amplification/secret-leak-scan/error-handling-scan) — whether a legitimate gate WARN, an LLM formatting flake, or a bridge/contract exhaustion — degrades to verdict SKIPPED+WARN, is recorded in the dossier with reason, auto-files a follow-up todo for any real gap (e.g. the 1 uncovered line), and the cycle SHIPS on its floor verdict. Keep cycle-fatal semantics for floor phases only. Also: raise contract-correction attempts 2->3 with a stricter format-only reprompt on the final attempt (cheap flake catch). Composes with session-lifecycle-verdict-clobbers-ondisk-deliverable (the sibling surface: a session-lifecycle verdict overriding an on-disk floor PASS) — together they make the floor phases' on-disk deliverable verdicts the SINGLE authoritative source and demote every other surface to advisory. ORIGINAL trigger retained as a regression companion: cycle-742 test-amplification emitted `[bad_verdict]` after 2 corrections and was cycle-fatal.",
   "acceptance": [
+    "RED: TestCoverageGateWARN_NonFloor_ShipsOnFloorVerdict — audit PASS + coverage-gate WARN(1 uncovered line) => cycle SHIPS, coverage gap auto-filed as follow-up, NOT discarded",
     "RED: TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn",
-    "RED: TestContractExhaustion_FloorPhase_RemainsCycleFatal",
+    "RED: TestNonPASS_FloorPhase_RemainsCycleFatal (build/audit/tdd non-PASS still blocks ship)",
     "RED: TestContractCorrection_FinalAttemptUsesFormatOnlyReprompt",
-    "dossier records skipped_phases with reasons; go test -race PASS; apicover clean"
+    "width-2 soak: a cycle whose only non-PASS is a non-floor gate WARN ships; dossier records skipped_phases + auto-filed follow-ups; go test -race PASS; apicover clean"
   ],
   "files": ["go/internal/core/", "go/internal/phaseio/", "go/internal/policy/"],
-  "deps": ["retro-bridge-timeout-width10"],
-  "connects_to": ["retro-bridge-timeout-width10", "spine-failopen-telemetry"],
-  "source": "ultrathink failure deep-dive 2026-07-13 (operator)",
+  "deps": [],
+  "connects_to": ["session-lifecycle-verdict-clobbers-ondisk-deliverable", "spine-failopen-telemetry"],
+  "source": "ultrathink failure deep-dive 2026-07-13 (operator); RECONFIRMED cycle-823 coverage-gate WARN discard 2026-07-14",
   "created_at": "2026-07-13T08:02:00Z"
 }
