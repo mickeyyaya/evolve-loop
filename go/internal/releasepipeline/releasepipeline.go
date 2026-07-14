@@ -341,6 +341,22 @@ func Run(opts Options) (Result, error) {
 		return res, nil
 	}
 	releaseNotes := extractReleaseNotes(opts.RepoRoot, opts.Target)
+	// One-binary S5: stamp the fingerprint-impact class (binary- vs config-release)
+	// at the top of the notes so a corporate operator sees at a glance whether
+	// adopting this release needs a new approval. Skipped for empty notes to match
+	// the Fingerprints section's non-empty guard. MUST run BEFORE steps.Ship
+	// commits: rebuild-binary (step 3.5) rewrote go/evolve uncommitted, and
+	// `git diff prevTag..HEAD` compares COMMITTED trees — running after the commit
+	// would make every release diff as changed (always binary-release). On a git
+	// error the banner fails closed (assume approval needed) and we log it rather
+	// than silently drop the classification.
+	if releaseNotes != "" {
+		banner, cerr := releaseClassBanner(opts.RepoRoot, opts.Target, fromTag)
+		if cerr != nil {
+			logf("WARN: release-class classification failed (%v) — stamping fail-closed 'unavailable' banner", cerr)
+		}
+		releaseNotes = banner + "\n\n" + releaseNotes
+	}
 	logf("step: ship.sh (--class release)")
 	newSHA, err := steps.Ship(opts.RepoRoot, commitMsg, releaseNotes)
 	if err != nil {
