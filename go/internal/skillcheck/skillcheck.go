@@ -146,6 +146,21 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, ne)
 		drift = true
 	}
+
+	// Registry-membership surface: .claude-plugin/plugin.json (what Claude Code's
+	// loader reads) must be a bijection with the disk skills/ dirs the other
+	// projections source from. A skill dir the manifest omits passes every other
+	// check yet is invisible to the loader ("Unknown skill"). Not auto-fixable by
+	// generate, so this only fails the check gate, never the write path.
+	manifestProblems, mErr := ManifestProblems(projectRoot)
+	if mErr != nil {
+		fmt.Fprintf(stderr, "%v\n", mErr)
+		return 1
+	}
+	for _, mp := range manifestProblems {
+		fmt.Fprintln(stderr, mp)
+		drift = true
+	}
 	for _, d := range diffs {
 		if !d.drifted {
 			continue
@@ -265,7 +280,15 @@ func Check(projectRoot string) ([]string, error) {
 			drift = append(drift, d.rel)
 		}
 	}
-	return append(drift, nameErrs...), nil
+	// Registry-membership surface: .claude-plugin/plugin.json (what Claude Code's
+	// loader reads) must be a bijection with the disk skills/ dirs the other three
+	// projections source from. A skill dir the manifest omits passes every check
+	// above yet is invisible to the loader ("Unknown skill").
+	manifestProblems, mErr := ManifestProblems(projectRoot)
+	if mErr != nil {
+		return nil, mErr
+	}
+	return append(append(drift, nameErrs...), manifestProblems...), nil
 }
 
 // sortedPhaseSkillNames returns the projected phase names in stable order so
