@@ -340,11 +340,13 @@ func (e *Engine) HasTokenResolver() bool {
 // success — matching the existing subprocess adapter's behavior so the
 // cutover is a drop-in.
 //
-// NOT safe for concurrent calls on the same Engine: Launch installs a
-// call-local OnBoot hook on e.deps (restored via defer) to capture BootMS.
-// Production always builds a fresh Engine per Launch (adapters/bridge), so the
-// "sequential reuse" contract holds; a future caller must not Launch the same
-// Engine from multiple goroutines.
+// Concurrent-safe on Engine state: Launch captures BootMS via a call-local
+// OnBoot hook installed on a per-call Deps COPY (threaded through
+// launchArgsWithDeps), so it never mutates the shared e.deps. Production still
+// builds a fresh Engine per Launch (adapters/bridge); this makes that contract
+// structural rather than convention. (A caller that injects genuinely shared,
+// non-thread-safe Deps — e.g. a common BootTimeoutStore — still owns that
+// dependency's own concurrency.)
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	switch "" {
 	case req.CLI:
@@ -436,21 +438,27 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 
 	// Capture the cold-boot latency the tmux-REPL driver reports via OnBoot
 	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired
-	// callback. The production engine is built fresh per Launch, so mutating
-	// e.deps here is call-local; the defer restores it for any sequential reuse.
+	// callback. The hook is installed on a per-call Deps COPY (never e.deps).
 	var bootMS int64
-	prevOnBoot := e.deps.OnBoot
-	e.deps.OnBoot = func(ms int64) {
+	callDeps := e.deps
+	prevOnBoot := callDeps.OnBoot
+	callDeps.OnBoot = func(ms int64) {
 		bootMS = ms
 		if prevOnBoot != nil {
 			prevOnBoot(ms)
 		}
 	}
-	defer func() { e.deps.OnBoot = prevOnBoot }()
+	// Run the pipeline against a scoped Engine holding that per-call copy, so
+	// EVERY method in it (LaunchArgs, runDryRun, requireFullCheck, driver
+	// dispatch) reads the call-local OnBoot by construction and the shared
+	// e.deps is never mutated — concurrent Launch on one Engine is race-free,
+	// no defer-restore needed. e.deps is already defaulted (from NewEngine), so
+	// the scoped Engine needs no re-defaulting.
+	callEngine := &Engine{deps: callDeps}
 
 	var stderrBuf bytes.Buffer
 	start := e.deps.Now()
-	code := e.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
+	code := callEngine.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
 	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
 	// Token-telemetry S3: attribute this Launch's token cost on every exit path
 	// (before the ExitOK branch), so a failed attempt is still accounted. Runs
