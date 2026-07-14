@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"syscall"
 	"time"
 
@@ -139,8 +138,9 @@ type Observer struct {
 	incidents        []map[string]any
 	loopHistory      []loopEntry
 	rateLimitHist    []time.Time
-
-	mu sync.Mutex
+	// No mutex: an Observer is constructed and driven by Run's single poll-loop
+	// goroutine and is never shared (see Run's CONCURRENCY note). Fields are
+	// mutated lock-free; the type is not safe for concurrent use by design.
 }
 
 type loopEntry struct {
@@ -149,7 +149,23 @@ type loopEntry struct {
 	tool     string
 }
 
+// stopChan resolves the poll loop's stop-timer arm. A nil timer yields a nil
+// channel — the never-fires select idiom — instead of allocating a fresh
+// throwaway channel every iteration (the prior inline-func form). Hoisted once
+// before the loop, so it is alloc-free per tick.
+func stopChan(stopTimer *time.Timer) <-chan time.Time {
+	if stopTimer != nil {
+		return stopTimer.C
+	}
+	return nil
+}
+
 // Run drives the observer until shutdown. Returns the bash-compatible exit code.
+//
+// CONCURRENCY: Run constructs a local *Observer and drives it from THIS single
+// goroutine — the poll loop is the sole reader/writer of that Observer's state.
+// The Observer is never returned or shared, so its fields need no locking;
+// processLine/emit/writeReport are not safe for concurrent use by design.
 func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[phase-observer] "+format+"\n", args...)
@@ -293,6 +309,7 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 
 	eofQuietCount := 0
 	pollCounter := 0
+	stopCh := stopChan(stopTimer)
 
 OUTER:
 	for {
@@ -300,13 +317,7 @@ OUTER:
 		case <-cfg.ShutdownSig:
 			obs.emit(eventsPath, "observer_shutdown", "INFO", map[string]any{"reason": "sigusr1"})
 			break OUTER
-		case <-func() <-chan time.Time {
-			if stopTimer != nil {
-				return stopTimer.C
-			}
-			ch := make(chan time.Time)
-			return ch // never fires
-		}():
+		case <-stopCh:
 			obs.emit(eventsPath, "observer_shutdown", "INFO", map[string]any{"reason": "stop-timer"})
 			break OUTER
 		case <-pollTicker.C:
@@ -454,8 +465,6 @@ func (o *Observer) processLine(line string) {
 	if err := json.Unmarshal([]byte(line), &doc); err != nil {
 		return // malformed JSON — skip
 	}
-	o.mu.Lock()
-	defer o.mu.Unlock()
 	o.eventCount++
 	o.lastEventTS = o.cfg.Now()
 
@@ -519,8 +528,6 @@ func (o *Observer) processLine(line string) {
 
 // emit writes one event envelope to the events.ndjson file.
 func (o *Observer) emit(eventsPath, eventType, severity string, data map[string]any) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
 	now := o.cfg.Now()
 	envelope := map[string]any{
 		"id":             fmt.Sprintf("obs_%d_%d_%d", now.UnixNano(), os.Getpid(), o.eventCount),
@@ -558,8 +565,6 @@ func (o *Observer) emit(eventsPath, eventType, severity string, data map[string]
 
 // writeReport persists the phase summary atomically.
 func (o *Observer) writeReport(reportPath string) error {
-	o.mu.Lock()
-	defer o.mu.Unlock()
 	now := o.cfg.Now()
 	report := map[string]any{
 		"schema_version":        "1.0",
