@@ -391,9 +391,10 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	if o.Exec == nil {
 		return errors.New("gc: ApplyWorktrees requires Exec")
 	}
-	// Whole-apply critical section, mirroring ship's integrator lock
-	// (internal/phases/ship/gitops.go acquireShipLock -> blocking flock.Lock).
-	release, err := flock.Lock(filepath.Join(o.ProjectRoot, ".evolve", "ship.lock"))
+	// Whole-apply critical section on the SHARED integrator lock (flock.ShipLockPath,
+	// the SAME file internal/phases/ship acquireShipLock and the cycle-dossier commit
+	// take) so a gc worktree apply never races a lane's ship/dossier index mutation.
+	release, err := flock.Lock(flock.ShipLockPath(o.ProjectRoot))
 	if err != nil {
 		return fmt.Errorf("gc: acquire ship.lock: %w", err)
 	}

@@ -33,6 +33,19 @@ func TestLockOpenError(t *testing.T) {
 	}
 }
 
+// TestShipLockPath pins the shared git-mutation lock file's value at its single
+// source. Every writer that mutates the shared main-repo .git/index (ship's
+// add/commit/merge/push cluster, the cycle-dossier closeout commit, gc's
+// worktree apply) resolves the lock path through here, so a change that broke
+// the ".evolve/ship.lock" contract would desync all of them at once — this is
+// the one guard on that value.
+func TestShipLockPath(t *testing.T) {
+	root := t.TempDir()
+	if got, want := ShipLockPath(root), filepath.Join(root, ".evolve", "ship.lock"); got != want {
+		t.Errorf("ShipLockPath(%q) = %q, want %q", root, got, want)
+	}
+}
+
 func TestLockFlockErrorClosesFile(t *testing.T) {
 	old := flockFn
 	t.Cleanup(func() { flockFn = old })

@@ -21,6 +21,17 @@ import (
 // without a second process.
 var flockFn = syscall.Flock
 
+// ShipLockPath is the single source of truth for the shared git-mutation
+// advisory-lock file: <projectRoot>/.evolve/ship.lock. Every writer that
+// mutates the shared main-repo .git/index — the ship integrator's
+// add/commit/merge/push cluster AND the cycle-dossier closeout commit — MUST
+// Lock this exact path so their sections are mutually exclusive on the one
+// shared index. A second string literal of this path anywhere silently
+// reopens the .git/index.lock race, so both call sites resolve it here.
+func ShipLockPath(projectRoot string) string {
+	return filepath.Join(projectRoot, ".evolve", "ship.lock")
+}
+
 // Lock blocks until the exclusive lock on path is held. The returned
 // release unlocks and closes; call it exactly once (idempotence is the
 // caller's concern — defer it).

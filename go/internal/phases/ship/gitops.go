@@ -35,7 +35,7 @@ import (
 // flock.Lock on <ProjectRoot>/.evolve/ship.lock. No-op under the whole-cycle
 // project lock (uncontended); load-bearing once that lock is scoped per-run.
 func (o *Options) acquireShipLock() (release func(), err error) {
-	p := filepath.Join(o.ProjectRoot, ".evolve", "ship.lock")
+	p := flock.ShipLockPath(o.ProjectRoot)
 	if o.shipLock != nil {
 		return o.shipLock(p)
 	}

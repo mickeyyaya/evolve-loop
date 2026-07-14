@@ -251,6 +251,14 @@ type Orchestrator struct {
 	// outcome calculator falls back to SKIPPED_UNKNOWN.
 	gitHEAD func() (string, error)
 
+	// gitMutationLock serializes the shared-main-repo dossier closeout commit
+	// against concurrent fleet lanes on the integrator's .evolve/ship.lock, so a
+	// lane's `dossier: cycle-N closeout` commit never races a sibling's ship
+	// commit on .git/index.lock (fleet-ship-git-index-lock-serialization). nil ⇒
+	// fail-open (the commit's bounded index.lock retry is the backstop). Defaulted
+	// to defaultGitMutationLock; a test seam swaps in a deterministic spy.
+	gitMutationLock gitMutationLocker
+
 	// gitDirtyPaths returns the set of modified tracked paths in the main
 	// repo's working directory (`git diff --name-only HEAD` in repoRoot).
 	// Workstream B's tree-diff guard snapshots this before each source-
@@ -617,20 +625,21 @@ func (o *Orchestrator) HasRunner(p Phase) bool {
 
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
-		storage:        storage,
-		ledger:         ledger,
-		runners:        runners,
-		sm:             NewStateMachine(),
-		now:            time.Now,
-		gitHEAD:        defaultGitHEAD,
-		gitDirtyPaths:  defaultGitDirtyPaths,
-		worktree:       gitWorktree{},
-		strategy:       router.StaticPreset{},
-		retryConfig:    policy.Policy{}.RetryConfig(),
-		workflowConfig: policy.Policy{}.WorkflowConfig(),
-		chronicle:      policy.Policy{}.ChronicleConfig(),
-		reviewer:       noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
-		observer:       noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+		storage:         storage,
+		ledger:          ledger,
+		runners:         runners,
+		sm:              NewStateMachine(),
+		now:             time.Now,
+		gitHEAD:         defaultGitHEAD,
+		gitMutationLock: defaultGitMutationLock,
+		gitDirtyPaths:   defaultGitDirtyPaths,
+		worktree:        gitWorktree{},
+		strategy:        router.StaticPreset{},
+		retryConfig:     policy.Policy{}.RetryConfig(),
+		workflowConfig:  policy.Policy{}.WorkflowConfig(),
+		chronicle:       policy.Policy{}.ChronicleConfig(),
+		reviewer:        noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
+		observer:        noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -896,7 +905,7 @@ OuterLoop:
 	if dossierGoal == "" {
 		dossierGoal = cr.req.GoalHash
 	}
-	if derr := writeCycleDossier(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return cr.result, nil

@@ -57,7 +57,7 @@ func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
 	ws := t.TempDir()
-	if err := writeCycleDossier(root, ws, 7, "improve X", "run-ulid", CycleOutcomeShippedViaBuild, nil); err != nil {
+	if err := writeCycleDossier(nil, root, ws, 7, "improve X", "run-ulid", CycleOutcomeShippedViaBuild, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "knowledge-base", "cycles", "cycle-7.json"))
@@ -84,7 +84,7 @@ func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
-	if err := writeCycleDossier(root, t.TempDir(), 8, "fix Y", "run2", VerdictFAIL, nil); err != nil {
+	if err := writeCycleDossier(nil, root, t.TempDir(), 8, "fix Y", "run2", VerdictFAIL, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "knowledge-base", "cycles", "cycle-8.json"))
@@ -103,7 +103,7 @@ func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 func TestWriteCycleDossier_LeavesCleanTree(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
-	if err := writeCycleDossier(root, t.TempDir(), 537, "closeout", "run3", CycleOutcomeShippedViaBuild, nil); err != nil {
+	if err := writeCycleDossier(nil, root, t.TempDir(), 537, "closeout", "run3", CycleOutcomeShippedViaBuild, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	cmd := exec.Command("git", "status", "--porcelain", "-uall")
