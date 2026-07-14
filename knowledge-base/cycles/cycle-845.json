@@ -1,0 +1,40 @@
+{
+  "cycle": 845,
+  "run_id": "01KXH9QBFJK83BSA4V8AE3EHV0",
+  "goal": "6588b51f58ccef5d0649a40b8bcae2d25a69cccf3c2aac59f4d1dd8ca5fdaf20",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 845",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "retro",
+      "reason": "FAIL"
+    }
+  ]
+}
