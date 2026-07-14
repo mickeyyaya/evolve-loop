@@ -220,6 +220,61 @@ func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
 	}
 }
 
+// TestCiparity_NoExecutableFileCreatedByGate is the one-binary S3 runtime
+// guarantee (complementing the acs/regression/norebuild source-scan): running
+// the API-coverage gate over an enforced package must not create ANY executable
+// file anywhere in the worktree — not just the historic bin/apicover. It walks
+// the whole tree before and after and asserts the executable-file set is
+// unchanged.
+//
+// SCOPE (honest): the subprocess seam (runCmd) is replaced with a no-op fake
+// here, so this proves the IN-PROCESS work — apicover.Run plus any direct
+// os.WriteFile/os.Chmod the gate itself does — drops no executable. It does NOT
+// exercise a real forked `go build` (that path is faked out); catching a NEW
+// forked-build site is the acs/regression/norebuild source-scan's job. The two
+// guards are complementary: source-scan catches the site at ship/CI time, this
+// catches an in-process binary drop at runtime.
+func TestCiparity_NoExecutableFileCreatedByGate(t *testing.T) {
+	root, goDir := writeApicoverFixture(t, apicoverOffenderPkg)
+	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
+
+	before := executableFiles(t, root)
+	if _, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1}); err != nil {
+		t.Fatalf("gate errored: %v", err)
+	}
+	after := executableFiles(t, root)
+
+	for p := range after {
+		if !before[p] {
+			t.Errorf("gate created an executable file %q — the one-binary invariant forbids "+
+				"a runtime-built executable in a target-repo cycle", p)
+		}
+	}
+}
+
+// executableFiles returns the set of regular files under root whose owner-exec
+// bit is set (a first-party built binary would be one).
+func executableFiles(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !info.Mode().IsRegular() {
+			return nil
+		}
+		if info.Mode().Perm()&0o111 != 0 { // any exec bit (owner/group/other)
+			out[path] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+	return out
+}
+
 // TestApicoverEnforceChanged_MeasurementError_Fails: when apicover.Run itself
 // errors (a touched package won't parse → code 2), the gate must FAIL
 // (offenders, nil) — the same bucket the old bin/apicover exit-2 fell into — NOT
