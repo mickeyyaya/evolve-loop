@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -99,6 +100,7 @@ func TestRun_Timeout_NotWellFormed_StaysFail(t *testing.T) {
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: verifyReturns(notOK, nil),
+		SleepFn:  func(time.Duration) {}, // skip the real settle-retry delay on the miss path
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
@@ -283,5 +285,86 @@ func TestNew_DefaultVerifyFnIsCatalogAware(t *testing.T) {
 	if _, err := b.verifyFn("widget-scan", roots); err != nil {
 		t.Fatalf("default verifyFn must resolve a user phase via the merged catalog "+
 			"(reconcile parity with the gate + self-check); got: %v", err)
+	}
+}
+
+// TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass — cycles 824/825
+// (width-2 storm): a next-phase (retrospective) context-cancel tore down the
+// audit bridge session and was LAUNDERED into ErrArtifactTimeout at the exact
+// instant the auditor's PASS deliverable was still SETTLING to disk. A
+// single-shot verify at that instant reads a half-written file, so the mandatory
+// audit phase hard-FAILs and a genuinely-PASS audited cycle (build PASS, tdd
+// RED->green, adversarial PASS, audit PASS 0.95) is discarded and requeued from
+// scratch. The reconcile must re-verify across a bounded settle window so the
+// settled deliverable is caught and the cycle reconciles to the agent's real PASS
+// — honoring the reconcile block's own documented intent (trust a deliverable
+// written just as the bridge gave up on the wait window).
+func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
+	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
+	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}
+	// The deliverable is still settling: the first two verifies miss (file
+	// mid-write), the third — within the settle window — catches the well-formed
+	// PASS deliverable.
+	calls := 0
+	settling := func(string, phasecontract.Roots) (deliverable.Result, error) {
+		calls++
+		if calls < 3 {
+			return deliverable.Result{OK: false}, nil
+		}
+		return deliverable.Result{OK: true}, nil
+	}
+	r := New(Options{
+		Hooks:    hooks,
+		Bridge:   fb,
+		Prompts:  fakePromptsFS("evolve-auditor", "x"),
+		VerifyFn: settling,
+		SleepFn:  func(time.Duration) {}, // deterministic: no real settle delay in tests
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("a deliverable that settles within the retry window must reconcile to a NIL error; got %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("verdict=%q, want PASS (reconciled after settle-retry)", resp.Verdict)
+	}
+	if !resp.Reconciled {
+		t.Error("resp.Reconciled must be true once the settling deliverable is caught")
+	}
+	if calls < 3 {
+		t.Errorf("settle-retry must re-verify a settling deliverable; got only %d verify calls", calls)
+	}
+}
+
+// TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded — the settle-retry is
+// BOUNDED and never manufactures a PASS. A genuinely absent / never-settling
+// deliverable (a hung agent, not a settle race) still hard-FAILs after a fixed
+// number of re-verifies: the loop must not spin, and reconciliation can only
+// UPGRADE a timeout toward a real deliverable — never invent one.
+func TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded(t *testing.T) {
+	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
+	fb := &fakeBridge{err: artifactTimeoutErr()}
+	calls := 0
+	neverOK := func(string, phasecontract.Roots) (deliverable.Result, error) {
+		calls++
+		return deliverable.Result{OK: false}, nil
+	}
+	r := New(Options{
+		Hooks:    hooks,
+		Bridge:   fb,
+		Prompts:  fakePromptsFS("evolve-auditor", "x"),
+		VerifyFn: neverOK,
+		SleepFn:  func(time.Duration) {},
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
+	if err == nil {
+		t.Fatal("a never-settling deliverable on a mandatory phase must still hard-FAIL")
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("verdict=%q, want FAIL (real timeout, not a settle race)", resp.Verdict)
+	}
+	if want := 1 + reconcileSettleRetries; calls != want {
+		t.Errorf("settle-retry must be bounded: got %d verify calls, want %d (initial + %d retries)", calls, want, reconcileSettleRetries)
 	}
 }

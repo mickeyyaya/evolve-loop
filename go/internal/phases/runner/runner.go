@@ -146,6 +146,11 @@ type Options struct {
 	// defaults to deliverable.Verify. Per-instance (not a package global) so
 	// t.Parallel() tests stay race-free, mirroring StdoutFilter.
 	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	// SleepFn is the seam for the delay between verifyReconcileDeliverable's
+	// bounded settle-retry attempts (see its doc for the cycles 824/825
+	// rationale). When nil, defaults to time.Sleep. Per-instance so
+	// t.Parallel() tests can inject a no-op for determinism, mirroring NowFn.
+	SleepFn func(time.Duration)
 	// PhaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.10). When VerifyFn
 	// is nil, it is threaded into the catalog-aware reconcile default so the
 	// reconcile-on-timeout rung honors the same stage-gated failure-context
@@ -182,6 +187,7 @@ type BaseRunner struct {
 	eventsProducer      func(workspace, phase, cli string, cycle int, prompt string) error
 	optional            bool
 	verifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	sleepFn             func(time.Duration)
 	compactPrompts      bool
 	disableStdoutFilter bool
 	diag                log.Console
@@ -228,6 +234,10 @@ func New(opts Options) *BaseRunner {
 			return deliverable.VerifyCatalogAwareStage(phase, roots, stage)
 		}
 	}
+	sleepFn := opts.SleepFn
+	if sleepFn == nil {
+		sleepFn = time.Sleep
+	}
 	diag := opts.Diag
 	if diag.Out == nil && diag.Err == nil {
 		diag = log.Diag()
@@ -242,10 +252,36 @@ func New(opts Options) *BaseRunner {
 		eventsProducer:      eventsProducer,
 		optional:            opts.Optional,
 		verifyFn:            verifyFn,
+		sleepFn:             sleepFn,
 		compactPrompts:      opts.CompactPrompts,
 		disableStdoutFilter: opts.DisableStdoutFilter,
 		diag:                diag,
 	}
+}
+
+// reconcileSettleRetries / reconcileSettleInterval bound the settle-retry loop
+// in verifyReconcileDeliverable. Worst-case added latency on a genuine miss:
+// reconcileSettleRetries * reconcileSettleInterval, only on the exceptional
+// reconcile-on-timeout path.
+const (
+	reconcileSettleRetries  = 3
+	reconcileSettleInterval = 200 * time.Millisecond
+)
+
+// verifyReconcileDeliverable re-verifies the on-disk deliverable a bounded number
+// of times (reconcileSettleRetries) before giving up, sleeping reconcileSettleInterval
+// between attempts. It closes the settle-race behind cycles 824/825: a next-phase
+// context-cancel laundered into ErrArtifactTimeout can fire while the deliverable is
+// still being written, so a single-shot verify at that instant misses a
+// genuinely-PASS report. Retrying can only UPGRADE a timeout toward the agent's real
+// verdict — a never-settling deliverable still returns not-OK and hard-fails.
+func (b *BaseRunner) verifyReconcileDeliverable(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+	res, verr := b.verifyFn(phase, roots)
+	for attempt := 0; attempt < reconcileSettleRetries && (verr != nil || !res.OK); attempt++ {
+		b.sleepFn(reconcileSettleInterval)
+		res, verr = b.verifyFn(phase, roots)
+	}
+	return res, verr
 }
 
 // Name implements core.PhaseRunner.
@@ -594,7 +630,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				// catalog-aware default.
 				roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 			}
-			res, verr := b.verifyFn(phase, roots)
+			res, verr := b.verifyReconcileDeliverable(phase, roots)
 			switch {
 			case verr == nil && res.OK:
 				// Deliverable survived the timeout — fall through to Classify.

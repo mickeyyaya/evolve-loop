@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -28,6 +29,7 @@ func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-build-planner", "x"),
 		Optional: true,
+		SleepFn:  func(time.Duration) {}, // skip the real settle-retry delay on the miss path
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
@@ -78,6 +80,7 @@ func TestRun_MandatoryPhase_ArtifactTimeout_StillFails(t *testing.T) {
 		Bridge:  fb,
 		Prompts: fakePromptsFS("evolve-builder", "x"),
 		// Optional: false (default)
+		SleepFn: func(time.Duration) {}, // skip the real settle-retry delay on the miss path
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
