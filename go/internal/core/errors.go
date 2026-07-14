@@ -60,6 +60,20 @@ var (
 	ErrUnsafeConfig = errors.New("core: unsafe transition config")
 )
 
+// IsInfraTeardownError reports whether err is a bridge INFRA teardown — an
+// artifact-wait timeout (ErrArtifactTimeout, exit 81) OR a transient bridge
+// failure (ErrTransientBridgeFailure, exit 80/85/86: quota exhaustion,
+// liveness-exhaustion). Both end the bridge SESSION without implying the agent
+// failed: it may have written its contracted deliverable before the teardown.
+// The phase runner uses this as the single-source trigger for reconciling
+// against the on-disk deliverable instead of synthesizing FAIL (cycle-254/255
+// timeout false-FAIL; cycle-835 quota false-FAIL). Substantive errors
+// (launch/boot/safety/cost) are NEITHER sentinel and are intentionally excluded —
+// their output is untrustworthy, so those hard-fail without consulting disk.
+func IsInfraTeardownError(err error) bool {
+	return errors.Is(err, ErrArtifactTimeout) || errors.Is(err, ErrTransientBridgeFailure)
+}
+
 // ErrCycleLevelFailure wraps a phase failure that should escalate to cycle-level
 // instead of batch-fatal abort.
 type ErrCycleLevelFailure struct {

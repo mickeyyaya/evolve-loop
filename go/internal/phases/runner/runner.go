@@ -21,7 +21,6 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -608,21 +607,23 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 	durationMS := b.nowFn().Sub(start).Milliseconds()
 
-	// reconciled is set when a bridge ErrArtifactTimeout is overridden by a
-	// well-formed deliverable on disk: control then FALLS THROUGH to the same
-	// artifact-read + Classify path the happy case uses (so audit's EGPS gate
-	// still applies — reconciliation can never ship a green-looking report whose
-	// predicates are red). See the reconcile-on-timeout block below.
+	// reconciled is set when a bridge INFRA teardown (timeout OR transient) is
+	// overridden by a well-formed deliverable on disk: control then FALLS THROUGH
+	// to the same artifact-read + Classify path the happy case uses (so audit's
+	// EGPS gate still applies — reconciliation can never ship a green-looking
+	// report whose predicates are red). See the reconcile block below.
 	reconciled := false
 	if bridgeErr != nil {
-		// A bridge artifact-wait timeout (exit 81) is a PROCESS failure, not a
-		// verdict: the agent may have written its contracted deliverable just as
-		// the bridge gave up on the wait window (the cycle-254/255 false-FAIL —
-		// a complete PASS audit report recorded as FAIL). Reconcile against the
-		// deliverable: if it is on disk and well-formed, trust its verdict (via
-		// Classify) instead of synthesizing FAIL. Reconciliation can only UPGRADE
-		// a timeout toward the agent's real verdict, never downgrade a real one.
-		if errors.Is(bridgeErr, core.ErrArtifactTimeout) {
+		// A bridge INFRA teardown — an artifact-wait timeout (exit 81) OR a
+		// transient failure (exit 80/85/86: quota, liveness-exhaustion) — ends the
+		// SESSION, but is not a verdict: the agent may have written its contracted
+		// deliverable before the teardown (cycle-254/255 timeout false-FAIL;
+		// cycle-835 quota false-FAIL — a complete PASS audit discarded because the
+		// deep-tier auditor hit exit=85 at the tail while agy+codex were walled).
+		// Reconcile against the deliverable: if it is on disk and well-formed, trust
+		// its verdict (via Classify) instead of synthesizing FAIL. Reconciliation
+		// can only UPGRADE toward the agent's real verdict, never downgrade a real one.
+		if core.IsInfraTeardownError(bridgeErr) {
 			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
 			if req.ProjectRoot != "" {
 				// EvolveDir completes the roots (orchestrator-target
@@ -640,7 +641,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				// trustworthy deliverable, but an optional phase's successor is
 				// verdict-unconditional, so degrade to WARN and let the cycle
 				// advance instead of aborting.
-				msg := fmt.Sprintf("optional phase %q degraded: artifact never appeared (%v); cycle continues", phase, bridgeErr)
+				msg := fmt.Sprintf("optional phase %q degraded: no trustworthy deliverable after a bridge infra teardown (%v); cycle continues", phase, bridgeErr)
 				if verr != nil {
 					msg = fmt.Sprintf("%s [deliverable unverifiable: %v]", msg, verr)
 				}
@@ -677,8 +678,10 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 			}
 		} else {
-			// Any non-timeout bridge error (launch/boot/safety/cost) means no
-			// shippable work was produced — hard-fail, optional or not.
+			// A substantive bridge error (launch/boot/safety/cost — NEITHER infra
+			// sentinel) means the process failed in a way that makes any on-disk
+			// output untrustworthy: no shippable work was produced — hard-fail,
+			// optional or not, without consulting the deliverable.
 			return core.PhaseResponse{
 				Phase:        phase,
 				Verdict:      core.VerdictFAIL,
@@ -746,12 +749,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		ResolvedModel: model,
 	}
 	if reconciled {
-		// A well-formed deliverable on a bridge timeout means the phase actually
-		// COMPLETED — the timeout was a red herring (the bridge gave up on the
-		// wait window just as, or after, the agent finished writing). So we treat
-		// it exactly like a normal completed phase: nil error, the agent's own
+		// A well-formed deliverable on a bridge infra teardown (timeout OR
+		// transient) means the phase actually COMPLETED — the teardown was a red
+		// herring (the bridge gave up on the wait window, or hit a transient
+		// exit, just as, or after, the agent finished writing). So we treat it
+		// exactly like a normal completed phase: nil error, the agent's own
 		// Classify verdict authoritative. A reconciled FAIL therefore routes as a
-		// real code-audit-fail (→ retro), NOT an infra-timeout retry — which is
+		// real code-audit-fail (→ retro), NOT an infra-teardown retry — which is
 		// both correct classification and avoids re-running a finished phase.
 		// Reconciliation only ever upgrades a synthesized FAIL toward the agent's
 		// real verdict; it never invents a PASS (Classify, incl. audit's EGPS
@@ -759,9 +763,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		resp.Reconciled = true
 		resp.Diagnostics = append(resp.Diagnostics, core.Diagnostic{
 			Severity: "warning",
-			Message:  fmt.Sprintf("bridge timed out (exit 81) but deliverable %s is well-formed; reconciled to %s from the agent's own report", artifactPath, verdict),
+			Message:  fmt.Sprintf("bridge infra teardown (%v) but deliverable %s is well-formed; reconciled to %s from the agent's own report", bridgeErr, artifactPath, verdict),
 		})
-		log.Diag().Infof("[runner] RECONCILED phase=%s exit=81 verdict=%s deliverable=%s\n", phase, verdict, artifactPath)
+		log.Diag().Infof("[runner] RECONCILED phase=%s (%v) verdict=%s deliverable=%s\n", phase, bridgeErr, verdict, artifactPath)
 	}
 	return resp, nil
 }
