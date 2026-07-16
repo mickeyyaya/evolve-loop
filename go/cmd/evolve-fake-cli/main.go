@@ -323,8 +323,15 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		// is mandatory for the audit verdict parse, so a prose-only fake report
 		// would fail audit and the happy-path pipeline would never reach ship.
 		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"%s\",\"schema_version\":1} -->\n", verdict, verdict, verdict)
+		// Production-shaped acs-verdict (the generateACSVerdict schema): the
+		// armed spine floor's audit anchor reads the TOP-LEVEL verdict field,
+		// so the legacy shape without it (pre-2026-07-16 fake) made the anchor
+		// unsatisfiable and hard-blocked every e2e cycle at the ship
+		// transition (the 2c0559a5 e2e-tier red). A schema-faithful fake lets
+		// e2e exercise the floor exactly as production runs it.
 		acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
-		out[acsPath] = fmt.Sprintf(`{"red_count": %d, "yellow_count": 0, "green_count": 1}`, redCount) + "\n"
+		out[acsPath] = fmt.Sprintf(`{"schema_version":"1.0","verdict":%q,"ship_eligible":%t,"red_count":%d,"yellow_count":0,"green_count":1}`,
+			verdict, verdict != "FAIL", redCount) + "\n"
 	case "retro":
 		out[mainPath] = "# Retrospective\n\n## Lessons\n- synthetic lesson learned\n"
 		lessonPath := filepath.Join(filepath.Dir(mainPath), "failure-lesson-1.yaml")

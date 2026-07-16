@@ -232,6 +232,15 @@ func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSign
 	a := extractAudit(raw)
 	if !a.Present {
 		*degraded = append(*degraded, "audit: acs-verdict.json present but unparseable (fallback)")
+		return a
+	}
+	if a.Verdict == "" {
+		// Parses but carries no verdict — a legacy/schema-drifted artifact
+		// (the 2c0559a5 e2e red: Present:true + Verdict:"" is an UNSATISFIABLE
+		// audit anchor that read as a clean absence and hard-blocked at
+		// enforce). Schema drift is a DEGRADED read, never a clean gap.
+		*degraded = append(*degraded, "audit: acs-verdict.json has no verdict field (schema drift?) — degraded, not clean")
+		return AuditSignals{}
 	}
 	return a
 }

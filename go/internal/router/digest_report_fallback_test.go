@@ -128,6 +128,36 @@ func TestDigest_Audit_FAILVerdictCarriedHonestly(t *testing.T) {
 	}
 }
 
+// TestDigest_Audit_VerdictlessACSVerdictDegradesLoudly — the e2e-tier red at
+// 2c0559a5 (cycles blocked at ship on CI): an acs-verdict.json that PARSES but
+// carries no top-level verdict field (a legacy/schema-drifted artifact — the
+// e2e fake emitted exactly this) yielded Present:true + Verdict:"" — an
+// UNSATISFIABLE audit anchor (needs PASS|WARN) that read as a CLEAN absence,
+// so the armed spine floor hard-blocked. A schema-drifted artifact is a
+// DEGRADED read, not a clean gap: mark DigestDegraded (fail-open at enforce),
+// never a silent block.
+func TestDigest_Audit_VerdictlessACSVerdictDegradesLoudly(t *testing.T) {
+	ws := mkWorkspace(t)
+	writeWorkspaceFile(t, ws, "acs-verdict.json", `{"red_count": 0, "yellow_count": 0, "green_count": 1}`)
+
+	sig, err := Digest(ws, []string{"audit"})
+	if err != nil {
+		t.Fatalf("Digest error: %v", err)
+	}
+	if sig.Audit.Present {
+		t.Error("verdict-less acs-verdict must not report Present:true (an unsatisfiable anchor)")
+	}
+	found := false
+	for _, d := range sig.DigestDegraded {
+		if strings.Contains(d, "verdict") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("schema-drifted acs-verdict must degrade LOUDLY naming the missing verdict; DigestDegraded = %v", sig.DigestDegraded)
+	}
+}
+
 // TestDigest_Audit_CorruptACSVerdictDegradesLoudly: an unparseable
 // acs-verdict.json is a read-miss, not a clean absence — DigestDegraded must
 // record it (fail-open at enforce), mirroring the R5 distinction the digest
