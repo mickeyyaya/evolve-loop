@@ -72,6 +72,45 @@ func TestIntegrationTierGate_ScopesToTouchedPackages(t *testing.T) {
 	}
 }
 
+// TestIntegrationTierGate_BoundsParallelismForFDSafety — the gate's `go test`
+// invocation must cap -p (concurrent package binaries) and -parallel (in-package
+// parallel tests) so a run cannot exhaust file descriptors / memory under the
+// loop's concurrent fleet lanes (the EBADF-on-pipe root cause). CI runs unbounded
+// (isolated box); the local gate bounds execution concurrency only — same tests,
+// same -race, same tags.
+func TestIntegrationTierGate_BoundsParallelismForFDSafety(t *testing.T) {
+	root, _ := goWorktree(t)
+	runDir := filepath.Join(root, ".evolve", "runs", "cycle-9")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
+		[]byte(`{"thrusts":[{"files_modified":["go/cmd/foo/main.go"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var testArgs []string
+	withFakeRunner(t, func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, so, se io.Writer) (int, error) {
+		if name == "go" && len(args) > 0 && args[0] == "test" {
+			testArgs = append([]string(nil), args...)
+		}
+		return 0, nil
+	})
+	if _, err := integrationTierCheckDefault(core.PhaseRequest{Cycle: 9, ProjectRoot: root, Worktree: root}); err != nil {
+		t.Fatalf("gate err: %v", err)
+	}
+	joined := strings.Join(testArgs, " ")
+	if !strings.Contains(joined, "-p "+integrationTierParallelismArg) {
+		t.Fatalf("gate must cap -p at %s for FD safety; got %v", integrationTierParallelismArg, testArgs)
+	}
+	if !strings.Contains(joined, "-parallel "+integrationTierParallelismArg) {
+		t.Fatalf("gate must cap -parallel at %s for FD safety; got %v", integrationTierParallelismArg, testArgs)
+	}
+	// The caps must not displace the CI-parity flags.
+	if !strings.Contains(joined, "-race") || !strings.Contains(joined, "integration") {
+		t.Fatalf("caps must not drop -race/-tags integration; got %v", testArgs)
+	}
+}
+
 // TestIntegrationTierGate_ModuleRootChangeRunsWholeSuite — a module-root file
 // change (go.mod/go.sum/root main.go) derives to a `./...` pattern for which no
 // narrower scope exists, so the gate falls back to the whole module (minus /acs/)

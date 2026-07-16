@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,7 +39,23 @@ const (
 	goVetTimeout           = 4 * time.Minute
 	acsDurableTimeout      = 8 * time.Minute
 	integrationTierTimeout = 15 * time.Minute
+
+	// integrationTierParallelism bounds the local integration-tier gate's -p
+	// (concurrent package test binaries) and -parallel (in-package t.Parallel
+	// tests). CI runs unbounded on an isolated box; the per-cycle gate shares a
+	// contended machine with concurrent fleet lanes, where an unbounded `go test
+	// -race ./...` spawns enough git subprocesses to race on pipe FDs (EBADF,
+	// Path:"|0" — the flake the ship pkg's captureWithEBADFRetry band-aids) and to
+	// spike memory (the race detector is 5-10x) until clean isolated tests fail at
+	// 0.00s on mkdir. Bounding concurrency shrinks that footprint, including on the
+	// whole-suite fallback. (Raising RLIMIT_NOFILE would NOT help: the Go 1.19+
+	// runtime already lifts the soft limit to the hard max at startup, and EBADF
+	// here is a concurrent-spawn pipe race, not a soft-limit exhaustion.)
+	integrationTierParallelism = 4
 )
+
+// integrationTierParallelismArg is the decimal -p/-parallel value for the gate.
+var integrationTierParallelismArg = strconv.Itoa(integrationTierParallelism)
 
 // apicoverTimeout bounds the WHOLE apicover gate — the forked toolchain
 // pre-steps AND the in-process apicover.Run measurement (which threads this
@@ -217,7 +234,15 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if len(pkgs) == 0 {
 		return nil, nil // cycle touched only acs/ (or nothing testable) → gate skips
 	}
-	args := append([]string{"test", "-race", "-count=1", "-tags", "integration"}, pkgs...)
+	// Bound execution concurrency (see integrationTierParallelism) so the forked
+	// `go test -race` cannot exhaust pipe FDs / memory under concurrent fleet
+	// lanes. This changes -race goroutine interleavings vs CI's unbounded run, so
+	// it is a fail-open aid — a local pass that misses a race does not block, and
+	// CI (isolated + unbounded) still catches it — not strict outcome-parity.
+	args := append([]string{"test", "-race", "-count=1",
+		"-p", integrationTierParallelismArg,
+		"-parallel", integrationTierParallelismArg,
+		"-tags", "integration"}, pkgs...)
 	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, "go", args...)
 	if cerr != nil {
 		return nil, fmt.Errorf("integration-tier gate could not run: %w", cerr) // fail-open → WARN
