@@ -1,0 +1,12 @@
+{
+  "id": "tokenopt-attribution-marker-anchored",
+  "created_at": "2026-07-17T21:00:00Z",
+  "weight": 0.80,
+  "title": "Token-telemetry: anchor transcript attribution to the assembler marker (\"Artifact path: <path>\") instead of a bare substring — prevents cross-phase over-attribution when a phase's prompt cites another phase's deliverable",
+  "kind": "bug",
+  "priority": "medium",
+  "summary": "Follow-up to the ArtifactPath-primary attribution fix (fix/token-telemetry-artifactpath-attribution, scanner.go attributes()). attributes() now matches strings.Contains(firstUserText, ArtifactPath). go-reviewer found a real (currently-narrow) over-attribution vector: some profile prompts cite OTHER phases' artifacts in their own first user message (e.g. .evolve/profiles/retrospective.json:118 'Read .evolve/runs/cycle-{cycle}/build-report.md and audit-report.md'). A bare-substring match would attribute such a transcript to the builder's Window if that phase is ever routed onto a claude* driver (any-CLI-any-phase invariant) and its untimestamped lines slip past withinWindow. Fix: match the literal marker the assemblers stamp — subagent.go:350 'Artifact path: %s' / run.go:384 '- Artifact path: %s' — i.e. match ('Artifact path: ' + ArtifactPath), which excludes prose mentions while matching every real launch. NOTE: this DELIBERATELY updates the protected S1 contract test TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted (scanner_test.go), whose fixture uses a bare artifact-path-in-message; update it to the marker form as part of the change and document why. Currently low blast radius (retrospective defaults to agy-tmux, excluded from the transcript tier; a phase's usage is scanned right after its OWN launch before later transcripts exist) but it silently undermines this campaign's accuracy goal if it ever fires.",
+  "acceptance": ["attributes() matches the assembler marker, not a bare path substring", "a fixture where phase B's first user message merely REFERENCES phase A's ArtifactPath does NOT attribute B to A's Window", "every real production launch (INVOCATION CONTEXT header) still attributes", "S1 contract test updated to the marker form with a rationale comment"],
+  "files": ["go/internal/tokenusage/scanner.go", "go/internal/tokenusage/scanner_test.go", "go/internal/subagent/run.go (marker source)", "go/internal/subagent/subagent.go (marker source)"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli", "the ArtifactPath-primary attribution fix"]
+}

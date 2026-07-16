@@ -4,13 +4,15 @@
 // a missing or unreadable transcript yields zero usage and SourceNone rather
 // than an error, so telemetry never blocks a cycle.
 //
-// The scanner is deliberately conservative about attribution. A transcript is
-// counted only when its recorded cwd matches the launch Window's Worktree
-// exactly (the on-disk session-directory slug is a lossy sanitisation of cwd
-// and must never be trusted as a key), and — when concurrent same-directory
-// sessions are possible — only when the launch's unique ArtifactPath appears in
-// the first user message. Streamed usage deltas that repeat one message id are
-// deduplicated to the last (highest-cumulative) delta, never summed.
+// The scanner attributes a transcript to a launch by the launch's unique
+// ArtifactPath appearing in the transcript's first user message — the only key
+// that is both stable and unique across the exec boundary. Neither the on-disk
+// session-directory slug (a lossy sanitisation of cwd) nor the recorded cwd
+// itself can be trusted: cwd degrades when WORKTREE_PATH falls back to the repo
+// root and shifts when the agent cd's into a subdir. ArtifactPath-less Windows
+// (legacy launches, unit fixtures) fall back to an exact cwd==Worktree match.
+// Streamed usage deltas that repeat one message id are deduplicated to the last
+// (highest-cumulative) delta, never summed.
 package tokenusage
 
 import (
@@ -34,10 +36,11 @@ const (
 	SourceTranscript Source = "transcript"
 )
 
-// Window describes the launch whose token usage is being recovered. Worktree
-// is the exact cwd a matching transcript must record. ArtifactPath, when set,
-// is the launch's unique artifact reference that must appear in a session's
-// first user message to disambiguate concurrent same-directory sessions.
+// Window describes the launch whose token usage is being recovered.
+// ArtifactPath is the launch's unique deliverable reference and the PRIMARY
+// attribution key: it appears verbatim in the transcript's first user message.
+// Worktree is the fallback key — the exact cwd a matching transcript must
+// record — consulted only for ArtifactPath-less Windows.
 // Start and End bound the assistant turns that count toward the launch.
 // EventsLogPath and Scrollback carry the lower fallback tiers' inputs:
 // the launch's *-events.ndjson path (tier 2) and the captured pane
@@ -153,7 +156,7 @@ func readLines(path string) []transcriptLine {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var out []transcriptLine
 	sc := bufio.NewScanner(f)
@@ -168,25 +171,23 @@ func readLines(path string) []transcriptLine {
 	return out
 }
 
-// attributes reports whether a transcript belongs to the launch: its recorded
-// cwd must equal w.Worktree exactly, and — when w.ArtifactPath is set — that
-// path must appear in the first user message (content-verification for
-// concurrent same-directory sessions).
+// attributes reports whether a transcript belongs to the launch. When
+// w.ArtifactPath is set (all production launches) it alone attributes: the
+// deliverable path is stamped verbatim into this launch's first user message
+// (the subagent assembler's "Artifact path: <path>" line) and is cycle+phase
+// unique. Cwd is unreliable across the exec boundary (see the package doc), so
+// it is only a fallback for ArtifactPath-less Windows (legacy launches, unit
+// fixtures), which require an exact cwd == w.Worktree match.
 func attributes(lines []transcriptLine, w Window) bool {
-	cwdMatch := false
+	if w.ArtifactPath != "" {
+		return strings.Contains(firstUserText(lines), w.ArtifactPath)
+	}
 	for _, ln := range lines {
 		if ln.Cwd == w.Worktree {
-			cwdMatch = true
-			break
+			return true
 		}
 	}
-	if !cwdMatch {
-		return false
-	}
-	if w.ArtifactPath == "" {
-		return true
-	}
-	return strings.Contains(firstUserText(lines), w.ArtifactPath)
+	return false
 }
 
 // firstUserText returns the concatenated text of the first user message's
