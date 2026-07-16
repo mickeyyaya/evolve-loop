@@ -111,6 +111,17 @@ func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 	return out
 }
 
+// DispatchFromPhaseRequest builds an OverlayDispatch from a single phase
+// launch's routing fields. It is a pure field mapping — the caller resolves
+// the routing-mode tier logic BEFORE calling: pass tier="" for the non-auto
+// degrade floor, and a populated tier only under model_routing=auto with a
+// non-nil clamped plan (mirrors core.PhaseRequest.ModelRoutingCLI/
+// ModelRoutingTier). This function does not inject skills or touch
+// bridge.Engine.Launch; see the file header for the deferred wiring seam.
+func DispatchFromPhaseRequest(phase, cli, model, tier string) OverlayDispatch {
+	return OverlayDispatch{Phase: phase, CLI: cli, Model: model, Tier: tier}
+}
+
 // SkillRegistryFromFS reads the skill registry from the filesystem: every
 // immediate subdirectory of skillsDir that contains a SKILL.md is a skill, its
 // directory name the registry entry. A directory without SKILL.md is not a
