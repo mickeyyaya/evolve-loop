@@ -1,17 +1,15 @@
 {
   "id": "deliverable-authority-centralization",
-  "title": "4th recurrence of the deliverable-present-transport-error false-FAIL class (cycles 853/854 retro): centralize ONE deliverable-authority rule — a well-formed, challenge-token-matched deliverable on disk out-votes ANY non-launch/non-boot transport-termination error",
-  "weight": 0.92,
-  "kind": "defect",
-  "priority": "high",
+  "title": "RESIDUAL (primary rung SHIPPED): runner-level defense-in-depth for any POST-DELIVERY transport error NOT surfaced as the ctx-cancel -1 the engine now catches",
+  "weight": 0.4,
+  "kind": "hardening",
+  "priority": "low",
   "campaign": "loop-reliability-2026-07",
-  "summary": "Cycle-854's retro nails the CLASS (its analysis is the spec — read .evolve/runs/cycle-854/retrospective-report.md): deliverable-authority is gated behind two DISJOINT conditions — bridgeErr==nil (preferFile success path, runner.go:698) OR IsInfraTeardownError(bridgeErr) (reconcile path, runner.go:626, exits 80/81/85/86/124). A completion-wait CONTEXT-CANCEL after the agent wrote a valid PASS deliverable (Ink-wedge stall, cycle-603 signature) satisfies NEITHER: bridgeErr!=nil and not a teardown sentinel, so the substantive-error branch hard-FAILs a genuine EGPS-green PASS. Cycles 853+854 each burned a full pipeline this way on the SAME task (retro re-landed 853 as 854 → identical false-FAIL — the self-perpetuating burn). Prior fixes each patched ONE rung (254/255 timeout, 603 scrollback-vs-file, 824/825 settle-race, 835 quota-85, 2026-07-16 driver benign-cancel + exit-124): the class was never centralized. NOTE: the 2026-07-16 driver-level benign-cancel fix (2c0559a5, driver_tmux_repl.go final-poll-on-cancel) closes the OBSERVED 853/854 mechanism at the source for the artifact contract — this item is the runner-level DEFENSE-IN-DEPTH twin so the NEXT uncovered transport rung (and non-tmux drivers/headless) cannot revive the class. Anti-gaming boundary stays: launch/boot/safety/cost errors (ExitSafetyGate/ExitCostLeak/ExitBadFlags/boot-fail-before-prompt-delivery) still hard-fail WITHOUT consulting disk — their output is untrustworthy; the centralization covers only POST-DELIVERY transport termination.",
+  "summary": "PRIMARY RUNG RESOLVED 2026-07-16 (engine fix, branch fix/deliverable-authority-ctxcancel-859): cycle-859's false-FAIL was root-caused to exec.CommandContext SIGKILLing the driver on a completion-wait cancel -> Go ExitCode()=-1 -> engine mapped -1 to a PLAIN error -> runner substantive-error door (runner.go:680) hard-FAILed a green-ACS PASS (acs verdict=PASS red_count=0, valid sentinel, matched token, enforce-verify OK) WITHOUT consulting disk. Fix classifies `code==-1 && ctx.Err()!=nil` as ErrTransientBridgeFailure at the engine (engine.go, where the exit code is born) -> routes to the EXISTING reconcile door -> deliverable wins. Single-source (extends IsInfraTeardownError's domain, no runner predicate duplication); covers headless too (both route through execRunner). Anti-gaming intact: -1 with a LIVE ctx stays plain (start/launch failure, fail loud); 127 stays plain; reconcile still requires token-matched enforce-verify. RESIDUAL (this item, low): a hypothetical post-delivery transport termination that surfaces as a non-(-1), non-teardown exit code (some other signal, or a driver returning a stray >0 code AFTER writing a valid deliverable) would still hit the substantive door. No such rung is observed today; keep as defense-in-depth to revisit only if telemetry shows a non-(-1) post-delivery false-FAIL. If pursued: a single core.IsPostDeliveryTransportError predicate the substantive door also consults, gated by verifyReconcileDeliverable well-formedness + token match -- but do NOT duplicate the teardown classification the engine already owns.",
   "acceptance": [
-    "single-source predicate (e.g. core.IsPostDeliveryTransportError or an inversion: isPreDeliveryOrIntegrityError) consulted by ONE reconcile gate in runner.Run — the per-exit-code special cases collapse into it; verifyReconcileDeliverable well-formedness + challenge-token match stays the authority test",
-    "RED: completion-wait context-cancel with a valid PASS deliverable on disk → phase verdict PASS (the exact cycle-854 shape, driving the LIVE runner path)",
-    "RED: launch failure (exit 10/2/3) with a PASS-looking file on disk → still hard-FAIL (anti-gaming boundary pinned)",
-    "existing reconcile suites (runner_reconcile_test, runner_reconcile_transient_test) stay green unchanged",
-    "go test -race ./internal/phases/runner/... green; both reviewers"
+    "telemetry gate: scan post-fix runs for any FAIL where audit-report.md is well-formed PASS + acs-verdict.json green but the bridge error was non-(-1) non-teardown; close as not-observed if none",
+    "if observed: substantive-error door consults verifyReconcileDeliverable for the specific post-delivery code, RED test driving the exact shape; anti-gaming boundary (launch/boot/safety/cost/127) pinned unchanged",
+    "existing reconcile suites stay green; both reviewers"
   ],
   "files": [
     "go/internal/phases/runner/runner.go",
@@ -19,10 +17,10 @@
   ],
   "deps": [],
   "connects_to": [
-    "completion-contract-cancel-parity (stdout/git contracts driver-level twin)",
-    "infra-teardown-predicate-single-source (subsumed by this — retire it when this lands)",
+    "completion-contract-cancel-parity (stdout/git contracts driver-level twin -- still 0.3, telemetry-gated)",
     "loop-blocking-breaker (consumes this class's recurrence signature)"
   ],
-  "source": "cycle-854 retrospective (2026-07-16) — verbatim class statement + lesson cycle-854-deliverable-reconcile-bypassed-on-completion-wait-cancel.yaml; 4th recurrence",
-  "created_at": "2026-07-16T12:00:00Z"
+  "source": "cycle-854 retrospective (2026-07-16) -- primary rung shipped as the engine ctx-cancel -1 fix; this is the downgraded defense-in-depth residual. See memory project_deliverable_authority_ctxcancel_859_2026-07-16.",
+  "created_at": "2026-07-16T12:00:00Z",
+  "updated_at": "2026-07-16T15:40:00Z"
 }

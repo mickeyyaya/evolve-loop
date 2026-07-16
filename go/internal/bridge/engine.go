@@ -521,6 +521,19 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		}
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
+	// -1 (deliverable-authority-ctxcancel, cycle-859): Go's ExitError.ExitCode()
+	// reports -1 for a signal death, most commonly exec.CommandContext SIGKILLing
+	// the driver on our own cancellation. Gated on ctx.Err(): when our context is
+	// cancelled, treat it as infra teardown — the sibling of the 124 cmd-timeout —
+	// because the driver may already have written its contracted deliverable (a
+	// green-ACS PASS discarded because -1 fell through to a plain hard-FAIL). The
+	// reconcile door this routes to still requires an enforce-verified deliverable,
+	// so a genuine crash (SIGSEGV/OOM) racing the cancel with no valid deliverable
+	// still hard-fails. A -1 with a LIVE context is a start/launch failure and
+	// stays PLAIN below, failing loud.
+	if code == -1 && ctx.Err() != nil {
+		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
+	}
 	return resp, errors.New(msg)
 }
 

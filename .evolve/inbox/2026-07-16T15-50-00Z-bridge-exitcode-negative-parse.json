@@ -1,0 +1,23 @@
+{
+  "id": "bridge-exitcode-negative-parse",
+  "title": "bridgeExitCode digit-scan mislabels a -1 (signal-death) error as exit 0 — telemetry-accuracy bug now reachable via the ctx-cancel transient retry path",
+  "weight": 0.45,
+  "kind": "defect",
+  "priority": "low",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "go-reviewer MEDIUM on the deliverable-authority-ctxcancel fix (branch fix/deliverable-authority-ctxcancel-859). core.bridgeExitCode (go/internal/core/retry_backoff.go:58-80) parses the code out of a `bridge: launch exit=N` error via a digit-only scan (`errStr[end] >= '0' && errStr[end] <= '9'`) that does NOT accept a leading `-`. For a `-1` error the scan sees `-` at start, end==start, and returns 0 — indistinguishable from success. Pre-existing, but the ctx-cancel fix now makes -1 reach this parser in a TRANSIENT capacity (attemptExits telemetry at cyclerun_dispatch.go:196; ExitCode fields at :276/:331/:359) via the retry loop when reconciliation fails. Harmless TODAY (the only value-sensitive consumer is the quota check `== 85`, and 0 != 85 just as -1 != 85), so this is telemetry accuracy, not a correctness bug: attempt logs and checkpoint ExitCode fields record 0 for a signal death instead of -1. Fix: extend the scan to accept an optional single leading '-' before the digits (bounded, so it never swallows a stray '-' elsewhere in the message). RED: bridgeExitCode(errors.New(\"foo: bridge: launch exit=-1: bar\")) == -1; keep the existing positive-code and no-match(==0) cases green.",
+  "acceptance": [
+    "RED: a `-1` launch-exit error round-trips through bridgeExitCode to -1 (not 0); positive codes and no-match still parse as before",
+    "attemptExits / dispatch ExitCode telemetry record -1 for a ctx-cancel signal death instead of 0",
+    "go test ./internal/core/... green; no behavior change to the == 85 quota-exhaustion detection"
+  ],
+  "files": [
+    "go/internal/core/retry_backoff.go"
+  ],
+  "deps": [],
+  "connects_to": [
+    "deliverable-authority-centralization (this diff's residual review finding)"
+  ],
+  "source": "go-reviewer MEDIUM finding on branch fix/deliverable-authority-ctxcancel-859 (2026-07-16)",
+  "created_at": "2026-07-16T15:50:00Z"
+}

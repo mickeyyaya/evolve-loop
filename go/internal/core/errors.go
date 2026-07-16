@@ -34,10 +34,12 @@ var (
 
 	// ErrTransientBridgeFailure is wrapped into the Bridge.Launch error when a
 	// driver returns exit 80, 85, 86, or 124 (boot timeout / unknown prompt /
-	// respond-loop guard / command-level timeout kill) — transient infra issues.
-	// 127 (missing binary) is deliberately NOT transient: an absent CLI is an
-	// environment defect that must fail loud, recovered only by the exit-code-
-	// triggered family fallback.
+	// respond-loop guard / command-level timeout kill) — transient infra issues —
+	// OR when the driver subprocess exits -1 (signal death) while our own context
+	// is cancelled (a completion-wait / phase-timeout teardown SIGKILL'd it;
+	// cycle-859). 127 (missing binary) is deliberately NOT transient: an absent
+	// CLI is an environment defect that must fail loud, recovered only by the
+	// exit-code-triggered family fallback.
 	ErrTransientBridgeFailure = errors.New("core: transient bridge failure")
 
 	// ErrAllFamiliesExhausted marks the quota-terminal exhaustion case
@@ -67,7 +69,8 @@ var (
 // IsInfraTeardownError reports whether err is a bridge INFRA teardown — an
 // artifact-wait timeout (ErrArtifactTimeout, exit 81) OR a transient bridge
 // failure (ErrTransientBridgeFailure, exit 80/85/86/124: quota exhaustion,
-// liveness-exhaustion, command-timeout kill). Both end the bridge SESSION
+// liveness-exhaustion, command-timeout kill; and exit -1 under ctx-cancel: a
+// context-cancellation SIGKILL of the driver — cycle-859). Both end the SESSION
 // without implying the agent failed: it may have written its contracted
 // deliverable before the teardown.
 // The phase runner uses this as the single-source trigger for reconciling

@@ -35,6 +35,22 @@ func TestExecRunner_Real(t *testing.T) {
 	if err == nil || code != -1 {
 		t.Fatalf("missing binary: code=%d err=%v, want (-1, err)", code, err)
 	}
+	// ctx-cancel mid-Wait → exec.CommandContext SIGKILLs the child → (-1, nil).
+	// This locks in the causal premise the deliverable-authority-ctxcancel fix
+	// (cycle-859) rests on: a driver killed by our own cancellation exits -1
+	// (ExitCode()'s signal-death value) with cmd.Wait() returning an *exec.ExitError
+	// (classified away → nil second return), distinct from the (-1, err) start
+	// failure above. Engine.Launch then maps this -1 (with ctx.Err() != nil) to a
+	// transient teardown so the runner's reconcile door consults the deliverable.
+	ctxCancel, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	code, err = execRunner(ctxCancel, "sh", "", []string{"-c", "sleep 10"}, nil, nil, &out, &out)
+	if code != -1 || err != nil {
+		t.Fatalf("ctx-cancel mid-Wait: code=%d err=%v, want (-1, nil)", code, err)
+	}
+	if ctxCancel.Err() == nil {
+		t.Fatal("ctx should be Done after the kill — the fix's ctx.Err() gate depends on it")
+	}
 	// dir != "" → subprocess cwd is set to dir (the worktree-cwd fix).
 	dir := t.TempDir()
 	out.Reset()
