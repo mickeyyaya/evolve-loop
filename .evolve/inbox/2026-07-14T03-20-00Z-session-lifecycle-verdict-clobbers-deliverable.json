@@ -1,20 +1,19 @@
 {
   "id": "session-lifecycle-verdict-clobbers-ondisk-deliverable",
-  "title": "A floor phase's on-disk deliverable verdict (audit-report evolve-verdict PASS) is overridden by the bridge SESSION-LIFECYCLE verdict (audit-usage.json FAIL) that gets stamped when the NEXT phase context-cancels the audit session — discards good audited cycles (2 of 4 width-2 storm failures)",
-  "weight": 0.95,
+  "title": "RESIDUAL HARDENING (primary fix LANDED c2258b72): a context-cancel of an already-finished phase's bridge session is laundered into ExitArtifactTimeout, making a canceled-after-harvest session LOOK like an artifact timeout — clean the telemetry at the driver source so a benign teardown never masquerades as a phase timeout",
+  "weight": 0.5,
   "kind": "defect",
-  "priority": "high",
+  "priority": "medium",
   "campaign": "merge-efficiency-2026-07",
-  "summary": "RETRO-DIAGNOSED live 2026-07-14, cycles 824 AND 825 (both index-lock/merge-rung0 lanes), verbatim [D1]: 'phase verdict resolved FAIL despite BOTH authoritative verdict surfaces = PASS.' On-disk audit-report.md evolve-verdict = PASS (0.95) and routing-decision = PASS, every gate green (TDD RED->green, go test -race 4/4, coverage 96.2%>=90%, adversarial PASS, ACS red_count==0 PASS). The ONLY surface that said FAIL: audit-usage.json:verdict — the phase-supervisor's SESSION-LIFECYCLE verdict — stamped at the exact instant the retrospective phase started and context-CANCELED the audit bridge session (audit-observer-events.ndjson: 'stopped ... reason: context canceled'). The cycle verdict resolver read that session-lifecycle FAIL instead of the on-disk deliverable PASS -> routing-decision = audit-fail-to-retrospective -> cycle discarded, worktree preserved, good audited work thrown away and requeued from scratch. TWO defects compound: (a) PRECEDENCE — a floor phase's on-disk deliverable verdict (the machine-readable evolve-verdict line the auditor wrote) MUST be authoritative over the session-lifecycle/liveness status; a session teardown is telemetry, not a phase verdict. (b) TEARDOWN RACE — the next phase (retro) starting context-cancels the prior phase's (audit) session and back-stamps FAIL AFTER the deliverable+verdict were already written; the audit session must be fully harvested and marked complete BEFORE any next-phase start or context-cancel, and a cancel that lands after harvest is benign cleanup that stamps NO verdict. This is the SAME disease the cycle-802 floor-only-verdict fix targeted (a non-authoritative surface overriding a floor PASS) but on a DIFFERENT surface: final_verdict_floor.go guards the phase-loop FinalVerdict assignment; it does NOT govern which SURFACE a floor phase's verdict is read from. Distinct from signalcenter_exhaustion (that is liveness DETECTION; this is verdict PRECEDENCE + teardown ordering).",
+  "summary": "PRIMARY DEFECT FIXED 2026-07-14 (operator, commit c2258b72, ship --class manual): cycles 824/825 (2 of 4 width-2 storm failures) discarded genuinely-PASS audited cycles because the reconcile-on-timeout block (runner.go, `if errors.Is(bridgeErr, core.ErrArtifactTimeout)`) called verifyFn EXACTLY ONCE, at the instant a next-phase (retro) context-cancel was laundered into ExitArtifactTimeout while the auditor's PASS deliverable was still SETTLING to disk — the single read saw a half-written file and the mandatory phase synthesized VerdictFAIL. FIX: `verifyReconcileDeliverable` re-verifies a bounded number of times (reconcileSettleRetries=3 x reconcileSettleInterval=200ms, injectable SleepFn seam) so a settled deliverable is caught; reconciliation still only UPGRADES a timeout (never-settling stays FAIL, bounded, no spin). This completes the reconcile block's OWN documented intent ('trust a deliverable written just as the bridge gave up on the wait window') and is proven by two RED->GREEN tests driving the LIVE r.Run() path (TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass = the deliverable-PASS-beats-session-lifecycle-FAIL case; TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded = the bound), each failing if the call site is removed (WIRING PROOF satisfied — no cargo-cult). The settle-retry SUBSUMES the teardown-ordering race for the observed failure (any settle within 600ms reconciles). RESIDUAL (this item, demoted 0.95->0.5): two OPTIONAL hardenings that clean the ROOT rather than the reconcile symptom — (A, cleaner telemetry, the reason this item survives) driver_tmux_repl.go's wait loop breaks on ctx.Err() WITHOUT setting completed=true and returns ExitArtifactTimeout: a context-cancel of an already-finished/harvested session should return a distinct benign 'session-canceled' outcome, NOT masquerade as an artifact timeout, so telemetry (audit-usage.json, dispatch classifier) stops mislabeling clean teardowns as timeouts; (B, lower value now) harvest-before-cancel ordering so the next phase does not cancel the prior phase's session until its deliverable verdict is harvested. Neither is a false-FAIL risk anymore (the settle-retry closes that); they are correctness-of-telemetry + defense-in-depth. NOT a blocker for re-enabling width-2.",
   "acceptance": [
-    "WIRING PROOF (MANDATORY — cycle-831 FAILED here: fix functions existed with green unit tests but ZERO non-test call sites, so the live clobber remained; auditor WARN 0.72). ResolvePhaseVerdict / canCancelPriorPhaseSession / sessionCancelVerdict MUST be invoked from the LIVE audit-harvest / next-phase-cancel path (a non-test *.go call site the auditor can grep). Prove it with an INTEGRATION test driving a real cycle whose audit deliverable=PASS but session-lifecycle=FAIL, asserting the cycle SHIPS — and that FAILS if the call site is removed. No test-only helpers; no tautological tests (asserting a function returns its own argument is auto-rejected).",
-    "RED: TestPhaseVerdict_DeliverablePASSBeatsSessionLifecycleFAIL — audit-report evolve-verdict=PASS + audit-usage.json verdict=FAIL(session canceled) => resolved cycle verdict = PASS, ship proceeds",
-    "RED: TestAuditSession_HarvestedBeforeNextPhaseStarts — starting retro/next phase does NOT context-cancel the audit session until its deliverable verdict is harvested and the phase marked complete",
-    "RED: TestSessionCancelAfterHarvest_StampsNoVerdict — a context-cancel landing after the deliverable is written records cleanup, not a FAIL verdict",
-    "width-2 soak: cycles with all-PASS floor deliverables SHIP (no audit-fail-to-retrospective on a PASS deliverable); go test -race PASS; apicover clean"
+    "RED: TestSessionCancelAfterHarvest_ReturnsBenignNotTimeout — a context-cancel landing AFTER the deliverable is written/harvested returns a distinct benign session-canceled outcome (NOT ExitArtifactTimeout), so downstream telemetry records cleanup, not a timeout",
+    "RED (optional B): TestAuditSession_HarvestedBeforeNextPhaseStarts — starting the next phase does not context-cancel the prior phase's session until its deliverable verdict is harvested",
+    "WIRING PROOF: the benign-cancel path is reached from the LIVE bridge wait-loop (driver_tmux_repl.go), provable by an integration test that fails if the distinction is removed",
+    "no regression: internal/bridge + internal/phases/runner go test -race PASS; the settle-retry (c2258b72) remains the safety net if this driver-level change regresses",
+    "width-2 soak: audit-usage.json for a cleanly-canceled harvested session shows the deliverable verdict, not a laundered timeout FAIL"
   ],
   "files": [
-    "go/internal/core/",
     "go/internal/bridge/",
     "go/internal/agentbridge/"
   ],
@@ -24,6 +23,13 @@
     "scout-carryforward-real-cherrypick-filter",
     "fleet-ship-git-index-lock-serialization"
   ],
-  "source": "cycles 824 + 825 retrospective [D1] 2026-07-14 (audit-usage.json session-lifecycle FAIL vs audit-report.md PASS 0.95); routing-decision-8/11.json = audit-fail-to-retrospective",
-  "created_at": "2026-07-14T03:20:00Z"
+  "source": "PRIMARY FIXED c2258b72 (settle-retry, operator 2026-07-14); residual = driver-level cancel-vs-timeout telemetry distinction. Original: cycles 824+825 retrospective [D1] (audit-usage.json session-lifecycle FAIL vs audit-report.md PASS 0.95).",
+  "landed": {
+    "commit": "c2258b72",
+    "date": "2026-07-14",
+    "what": "verifyReconcileDeliverable bounded settle-retry + SleepFn seam in go/internal/phases/runner/runner.go; 2 new RED->GREEN tests + 3 timeout-path tests given no-op SleepFn",
+    "verify": "go test -race ./internal/phases/runner/... PASS; go vet + golangci-lint clean; ship --class manual attested"
+  },
+  "created_at": "2026-07-14T03:20:00Z",
+  "updated_at": "2026-07-14T06:35:00Z"
 }

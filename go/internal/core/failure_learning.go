@@ -241,12 +241,20 @@ func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, a
 	}
 }
 
-func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLearningRequest) {
-	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
-		return
-	}
-	summary := failureLearningSummary(fl.Cycle, fl.Failed, fl.Err)
-	todoID := fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
+// recordFailedApproachState persists the learn-from-failure STATE for a failed
+// phase — the FailedRecord appended to state.FailedAt, a deduped P0 carryover
+// todo, and the adopted structured failure block — and returns the summary, todo
+// id, and structured block for callers that continue with retro. It does NOT run
+// retro: that is the caller's concern. Single-sourced (never_duplicate) between
+// the error path (recordFailureLearning, which additionally force-runs retro to
+// capture the lesson before an aborted cycle ends) and the success path (a FLOOR
+// phase returning a FAIL verdict with err==nil via recordFloorVerdictFailure —
+// there the cycle still routes FAIL→retro through the normal state machine, so an
+// inline retro would be a duplicate). Callers guarantee fl.State/CycleState are
+// non-nil.
+func (o *Orchestrator) recordFailedApproachState(fl failureLearningRequest) (summary, todoID string, structured *phasecontract.FailureBlock) {
+	summary = failureLearningSummary(fl.Cycle, fl.Failed, fl.Err)
+	todoID = fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
 	now := o.now().UTC()
 	nowTS := now.Format(time.RFC3339)
 	record := FailedRecord{
@@ -264,7 +272,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	// Read ONCE here and thread to the deterministic-learning fallback, so
 	// state.json and the lesson artifacts can never diverge on the same
 	// failure event.
-	structured := adoptStructuredFailure(fl.CycleState.WorkspacePath, string(fl.Failed))
+	structured = adoptStructuredFailure(fl.CycleState.WorkspacePath, string(fl.Failed))
 	if structured != nil {
 		record.Classification = structured.Class
 		if len(structured.Defects) > 0 {
@@ -294,6 +302,14 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	fl.State.FailedAt = append(fl.State.FailedAt, record)
 	fl.State.LastCycleNumber = fl.Cycle
+	return summary, todoID, structured
+}
+
+func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLearningRequest) {
+	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
+		return
+	}
+	summary, todoID, structured := o.recordFailedApproachState(fl)
 
 	retroRunner, ok := o.runners[PhaseRetro]
 	if !ok {

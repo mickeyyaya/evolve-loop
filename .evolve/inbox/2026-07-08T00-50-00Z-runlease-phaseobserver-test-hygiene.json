@@ -1,18 +1,25 @@
 {
   "id": "runlease-phaseobserver-test-hygiene",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.74,
-  "title": "Concurrency-hygiene pair: runlease package-var seams (createTempFn/renameFn) are one t.Parallel() away from cross-test races; phaseobserver has sleep-based test sync (50-150ms), a per-select-iteration channel allocation, and split-brain locking discipline",
+  "weight": 0.05,
+  "title": "RESOLVED: runlease-phaseobserver concurrency-hygiene (all 3 sub-fixes landed)",
   "kind": "refactor",
   "priority": "medium",
-  "summary": "(1) runlease.go:39-43 exposes mutable package-level seams; tests at runlease_test.go:195-254 mutate+restore them while sibling tests call real Write through the same globals — safe only while nobody adds t.Parallel(). (2) phaseobserver: tests use bare time.Sleep(50-150ms) as startup barriers (phaseobserver_test.go:75,286; coverage_test.go:49) — flake source under CI contention; production Run() allocates a fresh make(chan time.Time) on EVERY select iteration via an inline func (phaseobserver.go:303-309) where the nil-channel idiom is the correct form; and locking is inconsistent — processLine/emit take obs.mu while the poll loop reads the same fields unlocked (fine single-threaded today, a trap for any future goroutine).",
-  "root_cause": "Test seams grafted onto package state instead of injected; observer written single-threaded but half-armored with a mutex, inviting wrong conclusions.",
-  "fix": "(1) Move createTempFn/renameFn into an injected writeConfig/Writer struct (constructor-default = real funcs); tests inject per-instance. (2) Hoist a nil stopCh before the loop (var stopCh <-chan time.Time; if stopTimer != nil { stopCh = stopTimer.C }); pick ONE locking story — Run is single-goroutine: remove obs.mu from processLine/emit and document 'not safe for concurrent use' (simplest), and replace test sleeps with a Ready channel / injected clock barrier.",
+  "summary": "TWO of three sub-fixes LANDED. (1) runlease seams: 2675394a (per-instance writer struct; seam tests t.Parallel; isolation test; -race -count=5 -parallel=8 green). (2) phaseobserver PRODUCTION hygiene: d413e5ec \u2014 dead o.mu removed (caller-trace PROVED Run is single-goroutine: package-level Run constructs a LOCAL *Observer, never shared; both reviewers independently re-verified incl. the adapters/observer.Observer being a distinct type) + per-iteration make(chan time.Time) killed via a hoisted nil-channel stopChan helper (AllocsPerRun==0 test). REMAINING (this item, low): the 5 bare time.Sleep(40-150ms) test barriers (apicover_named_test.go:37; coverage_test.go:49,272; phaseobserver_test.go:75,286) \u2014 a flake source under CI contention, not a production bug.",
+  "root_cause": "Test barriers grafted onto wall-clock sleeps instead of deterministic signals (the production single-threaded-but-mutexed + per-iter-alloc issues are now fixed).",
+  "fix": "Replace each of the 5 time.Sleep barriers with a deterministic signal: for observer-writes-a-file waits, poll-until-file-nonempty with a bounded deadline (or an injected Ready channel); for the StopAfterMS-driven waits, drive via the existing StopAfterMS/injected-clock seam and await the observer's own completion signal instead of a fixed sleep. Keep each test's intent; prove stability under -race -count=5 -parallel=8.",
   "acceptance": [
-    "RED: runlease seam-isolation test proving two Writers with different injected seams don't interfere (package-var version cannot pass this)",
-    "phaseobserver: testing.AllocsPerRun pins 0 allocs/iteration for the stop arm; all sleep barriers replaced by deterministic signals; suite stable under -race -count=5 -parallel=8",
+    "all 5 sleep barriers replaced by deterministic signals; suite stable under -race -count=5 -parallel=8",
     "go vet, -race, apicover -enforce green"
   ],
-  "files": ["go/internal/runlease/runlease.go", "go/internal/runlease/runlease_test.go", "go/internal/phaseobserver/phaseobserver.go", "go/internal/phaseobserver/phaseobserver_test.go", "go/internal/phaseobserver/coverage_test.go"],
-  "connects_to": ["observer-sink-close-race (adapters/observer sibling — separate item, do first)", "loop_lease_fencing family"]
+  "files": [
+    "go/internal/phaseobserver/phaseobserver.go",
+    "go/internal/phaseobserver/phaseobserver_test.go",
+    "go/internal/phaseobserver/coverage_test.go"
+  ],
+  "connects_to": [
+    "observer-sink-close-race (adapters/observer sibling \u2014 verify before removing the mutex)",
+    "loop_lease_fencing family"
+  ],
+  "operator_note": "RESOLVED 2026-07-14 (operator, fable+tdd, reviewers Approve, CI green). All 3 sub-fixes landed: (1) runlease per-instance write seams 2675394a; (2) phaseobserver production hygiene d413e5ec (dead-mutex removal proven single-goroutine + per-iter chan alloc kill); (3) phaseobserver test-sleep determinism <pending-commit> \u2014 all 5 time.Sleep barriers removed: Pattern A tests use <-done as the barrier (already-closed shutdown fires on first select iter), Pattern B tests use synchronous StopAfterMS-driven termination; suite stable -race -count=5 -parallel=8, 0 sleeps remain. Weight ->0.05 (done)."
 }

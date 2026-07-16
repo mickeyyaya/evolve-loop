@@ -1,18 +1,26 @@
 {
   "id": "engine-launch-deps-call-local",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.83,
-  "title": "Engine.Launch mutates shared e.deps.OnBoot with only a comment enforcing the fresh-engine-per-Launch contract — make Deps call-local so concurrent Launch on one Engine is structurally safe",
+  "weight": 0.05,
+  "title": "Engine.Launch mutates shared e.deps.OnBoot with only a comment enforcing the fresh-engine-per-Launch contract \u2014 make Deps call-local so concurrent Launch on one Engine is structurally safe",
   "kind": "refactor",
   "priority": "medium",
-  "summary": "bridge/engine.go:429-436: Launch saves prevOnBoot, writes a call-local closure into e.deps.OnBoot, and defer-restores it. The safety contract ('NOT safe for concurrent calls on the same Engine', engine.go:333-334) is enforced only by adapters/bridge building a fresh Engine per call — a comment in a different file. Any future engine-caching refactor (natural on THE hot path every LLM call funnels through) silently introduces a data race; no concurrent-Launch test exists to catch it.",
+  "summary": "bridge/engine.go:429-436: Launch saves prevOnBoot, writes a call-local closure into e.deps.OnBoot, and defer-restores it. The safety contract ('NOT safe for concurrent calls on the same Engine', engine.go:333-334) is enforced only by adapters/bridge building a fresh Engine per call \u2014 a comment in a different file. Any future engine-caching refactor (natural on THE hot path every LLM call funnels through) silently introduces a data race; no concurrent-Launch test exists to catch it.",
   "root_cause": "Call-scoped state stored on the shared receiver; invariant lives in prose instead of structure.",
-  "fix": "Copy deps at Launch entry (deps := e.deps), install the OnBoot wrapper on the copy, and thread the copy through LaunchArgs (accept Deps as a parameter instead of reading e.deps). Delete the defer-restore. e.deps becomes immutable after construction; the comment contract becomes unnecessary. CARE: engine.go was instrumented by token-telemetry S3 (llm-calls.ndjson appender) — rebase around that seam, do not disturb the collector call.",
+  "fix": "Copy deps at Launch entry (deps := e.deps), install the OnBoot wrapper on the copy, and thread the copy through LaunchArgs (accept Deps as a parameter instead of reading e.deps). Delete the defer-restore. e.deps becomes immutable after construction; the comment contract becomes unnecessary. CARE: engine.go was instrumented by token-telemetry S3 (llm-calls.ndjson appender) \u2014 rebase around that seam, do not disturb the collector call.",
   "acceptance": [
-    "RED: TestEngine_ConcurrentLaunchOnSameInstance — two Launches on ONE Engine under -race with distinct OnBoot observations; no race, each Launch sees its own bootMS (fails/races today)",
+    "RED: TestEngine_ConcurrentLaunchOnSameInstance \u2014 two Launches on ONE Engine under -race with distinct OnBoot observations; no race, each Launch sees its own bootMS (fails/races today)",
     "Existing Launch behavior byte-identical (bridge suite green, llm-calls.ndjson record still emitted per attempt)",
     "go vet, -race, apicover -enforce green"
   ],
-  "files": ["go/internal/bridge/engine.go", "go/internal/adapters/bridge/bridge.go"],
-  "connects_to": ["token-telemetry S3 (same chokepoint — coordinate edits)", "skill-overlays injection (also composes at Launch)"]
+  "files": [
+    "go/internal/bridge/engine.go",
+    "go/internal/adapters/bridge/bridge.go"
+  ],
+  "connects_to": [
+    "token-telemetry S3 (same chokepoint \u2014 coordinate edits)",
+    "skill-overlays injection (also composes at Launch)"
+  ],
+  "operator_note": "LANDED 94c01841 (2026-07-14, operator TDD): Launch installs the OnBoot hook on a per-call Deps copy and runs the pipeline against a scoped Engine{deps:copy}; RED test TestEngine_ConcurrentLaunch_OnBootRaceFree (data race on old code) now GREEN under -race. Closing.",
+  "resolved": true
 }

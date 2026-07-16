@@ -1,0 +1,26 @@
+{
+  "id": "registry-persist-then-commit-transactionality",
+  "created_at": "2026-07-14T19:30:00Z",
+  "weight": 0.05,
+  "title": "swarm SessionRegistry.Register/MarkReaped mutate in-memory state BEFORE persist — a persist failure leaves a phantom in-memory entry that contradicts the on-disk manifest, undercutting the 'manifest = single source of truth' invariant the fail-loud fix relies on",
+  "kind": "bug",
+  "priority": "medium",
+  "summary": "registry.go:75-81 Register calls upsertLocked(h) (adds Status=Live to r.m.Sessions) THEN persistLocked(); MarkReaped (85-94) mutates Status=Reaped THEN persists. On the persist failure that swarm-session-accounting-fail-loud now surfaces (parent-dir-is-a-file / disk-full / EACCES), the in-memory registry believes a worker is Live even though launchWorker aborts and never spawns it. Within one dispatch this is largely self-correcting (the post-wg Reap attempts a harmless kill + MarkReaped on the phantom), and the on-disk manifest stays truthful because persist never succeeded — but if a transient failure later RECOVERS and a sibling's Register/MarkReaped persists, the accumulated in-memory slice (including the phantom) flushes to the crash-safe manifest, and a later `evolve swarm reap` targets a session that was never launched (benign tmux no-op today, but a manifest lie). Root: mutate-then-persist is not transactional.",
+  "root_cause": "In-memory upsert/mutation is committed before the durable write; a persist error leaves the two out of sync with no rollback. The fail-loud fix (34a2151e sibling — swarm-session-accounting) exposes this by finally propagating the persist error instead of swallowing it.",
+  "fix": "Make the write transactional: persist to a candidate first, and only commit the in-memory mutation once the durable write succeeds — OR roll back the upsert/status-flip when persistLocked returns an error. Prefer persist-then-commit (compute the new r.m as a value, WriteFile+Rename, then assign) so a failed write is a clean no-op. Keep the API (Register/MarkReaped return error) unchanged.",
+  "acceptance": [
+    "RED: a test proving that after Register returns a persist error, reg.Live()/Snapshot() does NOT contain the phantom entry (current upsert-then-persist code cannot pass)",
+    "RED: after MarkReaped returns a persist error, the in-memory Status is unchanged from before the call (no half-applied flip)",
+    "existing swarm tests + session_accounting_test.go stay green; -race -count=5 stable",
+    "go vet, apicover -enforce green"
+  ],
+  "files": [
+    "go/internal/swarm/registry.go",
+    "go/internal/swarm/registry_test.go"
+  ],
+  "connects_to": [
+    "swarm-session-accounting-fail-loud (this item is the transactional half; that item made the persist error visible)",
+    "loop_lease_fencing family"
+  ],
+  "operator_note": "RESOLVED 2026-07-14 in commit 71a5a21c (operator, gated ship --class manual, CI green). Register/MarkReaped now snapshotSessionsLocked() before mutating and persistOrRollbackLocked() restores the slice on persist failure — a non-durable mutation is a no-op in memory, no phantom. 3 rollback tests (register-new / markreaped-flip / register-replace-in-place) with real persist-failure injection; both reviewers Approve (go-reviewer verified no aliasing + composes with Reap, no infinite re-reap; code-simplifier confirmed non-reuse of Snapshot avoids self-deadlock). Weight 0.72->0.05 (done). Escalated + resolved same session — the lesson-to-action loop closed."
+}

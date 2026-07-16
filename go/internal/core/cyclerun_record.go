@@ -105,6 +105,18 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// quota/timeout no longer clobbers a floor PASS; it degrades into
 	// SkippedPhases instead. See final_verdict_floor.go.
 	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
+	// Learn from a FLOOR-phase FAIL verdict returned with NO dispatch error:
+	// audit's in-process CI-parity gates (skills-drift / gofmt / EGPS / apicover)
+	// override the auditor's narrative PASS to FAIL (err==nil), so this success
+	// path — not an error path — records the outcome. Without feeding
+	// failure-learning here, the deterministic gate-FAIL never reached
+	// state.FailedAt, so the failure-adapter and Scout were blind to it and a
+	// self-defeating task (the skills-drift storm, cycles 836/838/841/843/849)
+	// re-derived the same doomed fix forever. Retro still runs via the normal
+	// FAIL→retro transition, so this records only — it does not run retro.
+	if dr.resp.Verdict == VerdictFAIL && cr.o.isAuthoritativePhase(next) {
+		cr.o.recordFloorVerdictFailure(cr.ctx, cr.req, cr.cycle, next, &cr.state, &cr.cs, dr.resp.Diagnostics)
+	}
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict

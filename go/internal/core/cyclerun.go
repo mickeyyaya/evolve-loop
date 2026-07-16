@@ -123,6 +123,59 @@ func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt i
 	})
 }
 
+// recordFloorVerdictFailure feeds the failure-learning STATE (a FailedRecord in
+// state.FailedAt + a P0 carryover todo) when a FLOOR phase records a FAIL verdict
+// on the SUCCESS path (dispatch err==nil) — e.g. audit's in-process CI-parity
+// gates (skills-drift / gofmt / EGPS / apicover) override the auditor's narrative
+// PASS to FAIL. Before this, the success path never fed failure-learning, so a
+// deterministic gate-FAIL was invisible to the failure-adapter and Scout, and a
+// self-defeating task (the skills-drift storm) retried forever. Unlike
+// recordFailureLearning it does NOT run retro — the cycle already routes
+// FAIL→retro through the normal state machine, so an inline retro would double it.
+//
+// It is an *Orchestrator method over explicit inputs so the TWO floor-gated
+// verdict-write sites — the live loop (recordAndBranch) and the resume path
+// (RunCycleFromPhase) — share ONE implementation. The storm recurred on resume
+// precisely because these sites are kept in lockstep (see the resume-parity
+// comment in resume.go): a fix wired into only one leaves the other exposed.
+func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleRequest, cycle int, failed Phase, state *State, cs *CycleState, diags []Diagnostic) {
+	o.recordFailedApproachState(failureLearningRequest{
+		CycleRequest: req,
+		Cycle:        cycle,
+		Failed:       failed,
+		Err:          floorVerdictError(failed, diags),
+		State:        state,
+		CycleState:   cs,
+	})
+	// Persist to state.json NOW. Unlike the error path (recordFailureLearning
+	// writes state at each of its own exits), this runs mid-loop, and several
+	// abort/early-return branches of BOTH call sites return WITHOUT reaching a
+	// final persistCycleEndState/WriteState (e.g. a later-iteration ledger or
+	// cycle-state write failure, or resume's illegal-retro-edge return). An
+	// in-memory-only append would then be lost, re-emptying FailedAt and reviving
+	// the invisible-retry storm this fixes. writeFailureLearningState RMW-merges
+	// the record durably.
+	o.writeFailureLearningState(ctx, state)
+}
+
+// floorVerdictError synthesizes the error a floor-phase FAIL verdict carries no
+// error for: it joins the error-severity diagnostics (audit's gate messages,
+// which include the remediation, e.g. "Run `evolve skills generate`") so the
+// FailedRecord names WHY the phase failed, not merely THAT it did — the missing
+// signal that let the skills-drift storm re-derive the same doomed fix forever.
+func floorVerdictError(phase Phase, diags []Diagnostic) error {
+	var msgs []string
+	for _, d := range diags {
+		if d.Severity == "error" {
+			msgs = append(msgs, d.Message)
+		}
+	}
+	if len(msgs) == 0 {
+		return fmt.Errorf("%s verdict=FAIL", phase)
+	}
+	return fmt.Errorf("%s verdict=FAIL: %s", phase, strings.Join(msgs, "; "))
+}
+
 // recordChokepointEscape closes the ADR-0044 C1 invariant on RunCycle's
 // bounded-loop exit. If the dispatch loop exhausts its iteration budget without
 // reaching PhaseEnd (a transition-table cycle), no phase recorded a terminal

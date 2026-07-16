@@ -328,6 +328,16 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// this resume (next appended above), so floorAlreadyCompleted correctly
 		// sees an audit that PASSed before the crash.
 		o.recordFinalVerdict(&result, next, resp.Verdict, o.floorAlreadyCompleted(cs.CompletedPhases))
+		// Resume-path parity for the floor-verdict failure-learning guard
+		// (cyclerun_record.go): a resumed authoritative phase — audit is the one
+		// the skills-drift storm recurred on, and a mid-batch recovery is exactly
+		// where it recurred — whose in-process CI-parity gate overrides a narrative
+		// PASS to FAIL (dispatch err==nil) must feed failure-learning HERE too, or
+		// the storm class is silently reproduced for resumed cycles specifically.
+		// Same single-source *Orchestrator primitive as the live loop.
+		if resp.Verdict == VerdictFAIL && o.isAuthoritativePhase(next) {
+			o.recordFloorVerdictFailure(ctx, req, cycle, next, &state, &cs, resp.Diagnostics)
+		}
 		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, "", cs.PhaseStartedAt))
 		current = next
 		lastVerdict = resp.Verdict
