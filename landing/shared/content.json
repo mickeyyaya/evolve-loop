@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v22.1.0",
+    "version": "v22.2.0",
     "mentalModel": "CI/CD for AI-written code",
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
