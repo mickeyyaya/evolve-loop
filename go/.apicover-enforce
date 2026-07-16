@@ -433,3 +433,6 @@
 # lone entry (Main) no moved test covered; the run/classify/cover/enumerate/
 # ignore/refs tests cover the rest. Graduated at 18/18 covered, 86.7% line.
 ./internal/apicover
+# inboxbatch (2026-07-16): deterministic backlog grouping for triage —
+# graduated at package creation per the new-package graduation guard.
+./internal/inboxbatch

@@ -46,7 +46,9 @@ func TestRun_AppliesZeroValueDefaults(t *testing.T) {
 		}, "", os.Stderr)
 		close(done)
 	}()
-	time.Sleep(50 * time.Millisecond)
+	// close(shutdown) is caught on the poll loop's first select iteration (an
+	// already-closed channel fires immediately); <-done is the real barrier —
+	// no sleep needed.
 	close(shutdown)
 	<-done
 
@@ -269,7 +271,8 @@ func TestRun_InstallsDefaultNowClock(t *testing.T) {
 		}, filepath.Join(ws, "builder-stdout.log"), os.Stderr)
 		close(done)
 	}()
-	time.Sleep(40 * time.Millisecond)
+	// <-done is the barrier; an already-closed shutdown fires on the first
+	// select iteration, so no startup sleep is needed.
 	close(shutdown)
 	<-done
 	if rc != ExitOK {

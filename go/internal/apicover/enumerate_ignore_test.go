@@ -1,9 +1,12 @@
 package apicover
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestEnumerate_IgnoreDirective_MarksSymbol(t *testing.T) {
-	syms, err := Enumerate("testdata/sample")
+	syms, err := Enumerate(context.Background(), "testdata/sample")
 	if err != nil {
 		t.Fatalf("Enumerate: %v", err)
 	}
@@ -25,7 +28,7 @@ func TestEnumerate_IgnoreDirective_MarksSymbol(t *testing.T) {
 }
 
 func TestEnumerate_MalformedIgnore_ReturnsError(t *testing.T) {
-	_, err := Enumerate("testdata/badignore")
+	_, err := Enumerate(context.Background(), "testdata/badignore")
 	if err == nil {
 		t.Fatal("Enumerate must return an error for an //apicover:ignore with no reason=")
 	}

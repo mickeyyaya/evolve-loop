@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/kerneltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -95,12 +96,21 @@ func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 
 // TestOrchestrator_SafeConfigRunsNormally: the guard does not false-positive — an
 // orchestrator built with the real reference config runs a full cycle.
+//
+// SpineFloor is dialed to shadow here because this test's fake runners write
+// NO artifacts (the literal cycle-283 shape) and the R8.5-armed floor now
+// correctly ABORTS that — which is the floor working, not the legality-graph
+// validator false-positiving. The floor's own contract (enforce blocks /
+// shadow proceeds / degraded fails open) is pinned by orchestrator_spinegate_test.go;
+// this test pins ONLY that ValidateSafetyInvariants accepts the reference config.
 func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
 	ref := kerneltest.Load(t)
+	cfg := ref.Config
+	cfg.SpineFloor = config.StageShadow
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil),
-		WithRouting(ref.Config, router.StaticPreset{}),
+		WithRouting(cfg, router.StaticPreset{}),
 		WithCatalog(ref.Catalog))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
 		t.Fatalf("the reference config is safe and must run; got err=%v", err)

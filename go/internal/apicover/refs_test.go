@@ -1,9 +1,12 @@
 package apicover
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestNamesReferencedInTests_CollectsIdentsAndSelectors(t *testing.T) {
-	named, err := NamesReferencedInTests("testdata/sample")
+	named, err := NamesReferencedInTests(context.Background(), "testdata/sample")
 	if err != nil {
 		t.Fatalf("NamesReferencedInTests: %v", err)
 	}

@@ -531,9 +531,26 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		if err := ctx.Err(); err != nil {
-			// Context cancelled (orchestrator timeout / SIGTERM): stop waiting
-			// promptly rather than running out the reviewer's extend budget.
-			// Load-bearing once a Stage-1 LLM reviewer can extend at length.
+			// Context cancelled (orchestrator timeout / SIGTERM / the next phase
+			// tearing down this session): before abandoning, ONE final completion
+			// poll — a deliverable already on disk means the session COMPLETED and
+			// the cancel is benign teardown, not a phase timeout. Pre-fix this
+			// break skipped straight to the !completed → ExitArtifactTimeout exit,
+			// laundering a finished session into a timeout (session-lifecycle
+			// residual; the runner's settle-retry was the only thing standing
+			// between that mislabel and a false FAIL). The artifact detector is a
+			// pure file stat, so the dead ctx cannot fail this last look; a
+			// genuinely unfinished session still exits ExitArtifactTimeout.
+			if ready, _, note, _ := detector.poll(ctx); ready {
+				completed = true
+				if note != "" {
+					fmt.Fprintf(deps.Stderr, "%s %s\n", pfx, note)
+				}
+				fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) AFTER completion — benign teardown of a finished session\n", pfx, err)
+				break
+			}
+			// Load-bearing once a Stage-1 LLM reviewer can extend at length:
+			// stop waiting promptly rather than running out the extend budget.
 			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning completion wait\n", pfx, err)
 			break
 		}
@@ -755,16 +772,30 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 
 	// --- Capture scrollback: raw → stderr-log, ANSI-stripped → stdout-log.
-	raw, _ := deps.Tmux.CapturePane(ctx, lp.session, artifactScrollback)
+	raw, capErr := deps.Tmux.CapturePane(ctx, lp.session, artifactScrollback)
+	if raw == "" && capErr != nil {
+		// Benign-cancel completion (the on-cancel final poll above): the dead
+		// ctx cannot fork tmux, so this capture fails — fall back to the
+		// freshest pane the wait loop observed (CB.6 lastGoodPane) instead of
+		// writing empty logs and losing the forensic record for exactly the
+		// teardown this path exists to classify correctly.
+		raw = lastGoodPane
+	}
 	recordTokens(raw)
 	_ = os.WriteFile(cfg.StderrLog, []byte(raw+"\n"), 0o644)
 	_ = os.WriteFile(cfg.StdoutLog, []byte(stripANSI(raw)+"\n"), 0o644)
 	writeTokenUsage(cfg.Workspace, peakTokens)
 	fmt.Fprintf(deps.Stderr, "%s scrollback captured\n", pfx)
 
-	if lp.named {
+	switch {
+	case lp.named:
 		fmt.Fprintf(deps.Stderr, "%s RESUME-PRESERVE: skipping exit; REPL stays running for next launch\n", pfx)
-	} else {
+	case ctx.Err() != nil:
+		// Dead ctx: SendKeys is a guaranteed no-op, so the exit sequence would
+		// only burn its inter-key pauses. The deferred session kill (and the
+		// cycle-start orphan GC behind it) owns teardown here.
+		fmt.Fprintf(deps.Stderr, "%s exit sequence skipped (ctx done) — session kill handles teardown\n", pfx)
+	default:
 		for _, k := range lp.exitSeq {
 			_ = deps.Tmux.SendKeys(ctx, lp.session, k.keys, k.enter)
 			if k.pauseS > 0 {

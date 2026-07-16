@@ -57,7 +57,7 @@ any `--class cycle` edit of a `guards.IsProtectedSurface` control-plane file.
 |---|---|
 | Phase | `audit` (evaluate archetype, mandatory) |
 | Persona | `agents/evolve-auditor.md` |
-| Profile | `.evolve/profiles/auditor.json` — CLI `claude-tmux`, tier `deep`, fan-out ×4 |
+| Profile | `.evolve/profiles/auditor.json` — CLI `claude-tmux`, tier `deep`, single-writer |
 | Inputs | `build-report.md` · `tester-report.md` |
 | Artifact | `audit-report.md` (cycle workspace) |
 

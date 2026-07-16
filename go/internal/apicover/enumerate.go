@@ -1,6 +1,7 @@
 package apicover
 
 import (
+	"context"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -57,8 +58,9 @@ type Symbol struct {
 // _test.go files and any file excluded by the default build context (i.e.
 // integration/e2e/acs-tagged or platform-mismatched files). Reusing
 // build.Default.MatchFile means the measured surface matches exactly what an
-// untagged `go test` compiles.
-func Enumerate(dir string) ([]Symbol, error) {
+// untagged `go test` compiles. ctx is checked at each file boundary so the
+// audit gate's deadline bounds the walk (apicover-inprocess-ctx-timeout).
+func Enumerate(ctx context.Context, dir string) ([]Symbol, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -66,6 +68,9 @@ func Enumerate(dir string) ([]Symbol, error) {
 	fset := token.NewFileSet()
 	var syms []Symbol
 	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		name := e.Name()
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue

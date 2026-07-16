@@ -1,9 +1,12 @@
 package apicover
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestEnumerate_FindsExportedFuncTypeVar(t *testing.T) {
-	syms, err := Enumerate("testdata/sample")
+	syms, err := Enumerate(context.Background(), "testdata/sample")
 	if err != nil {
 		t.Fatalf("Enumerate: %v", err)
 	}

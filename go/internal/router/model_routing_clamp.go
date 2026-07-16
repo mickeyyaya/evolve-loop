@@ -15,10 +15,31 @@ import (
 // clamped. Single-sourcing the floor HERE — rather than editing every profile
 // JSON — guarantees a below-floor tier is clamped UP to "balanced" for EVERY
 // phase, while any profile that DOES declare an envelope still wins (its explicit
-// Min is used verbatim). Min is the only field the clamp-up gate consults; Max
-// documents the intended ceiling for parity with declared envelopes (there is no
-// clamp-DOWN today).
-var universalTierFloor = &profiles.ModelTierEnvelope{Min: "balanced", Max: "deep"}
+// Min is used verbatim). Min feeds the clamp-up gate; Max feeds the clamp-DOWN
+// gate (L5, 2026-07-16): "top" is the HIGHEST rank in policy.TierRank's
+// fast<balanced<deep<top ladder (a live advisor-proposable frontier tier —
+// sanitizeAdvisorTier keeps it legal), so envelope-less profiles accept every
+// tier unchanged — only a profile declaring a lower explicit Max (e.g. a
+// memo-class balanced ceiling) gets a real ceiling. Pre-ceiling this field was
+// documentation-only and said "deep"; activating the ceiling with "deep" would
+// have silently foreclosed "top" for the 72/91 envelope-less profiles
+// (go-reviewer HIGH, 2026-07-16).
+var universalTierFloor = &profiles.ModelTierEnvelope{Min: "balanced", Max: "top"}
+
+// envelopeClamp builds the model-routing-guardrail Clamp record shared by the
+// floor (clamp-up) and ceiling (clamp-down) branches of ClampPlanModelRouting:
+// same rule, same proposed/forced format, differing only in the tier they
+// force onto and the reason phrase. reason is echoed into Forced so an
+// operator reading advisor-rejections.json can tell floor from ceiling at a
+// glance (RejectionsFromClamps' consumers grep for "ceiling"/"floor").
+func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
+	return Clamp{
+		Phase:    e.Phase,
+		Rule:     "model-routing-guardrail",
+		Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
+		Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (%s)", e.Phase, e.CLI, forcedTier, reason),
+	}
+}
 
 // ClampPlanModelRouting is the cycle-436 MR2 guardrail: it re-validates every
 // plan entry's advisor-proposed {CLI,Tier} against the phase's OWN profile
@@ -70,15 +91,19 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 				env = universalTierFloor
 			}
 			tierRank := policy.TierRank(e.Tier)
-			minRank := policy.TierRank(env.Min)
-			if tierRank > 0 && minRank > 0 && tierRank < minRank {
-				clamps = append(clamps, Clamp{
-					Phase:    e.Phase,
-					Rule:     "model-routing-guardrail",
-					Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
-					Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (clamped up to envelope floor)", e.Phase, e.CLI, env.Min),
-				})
+			if minRank := policy.TierRank(env.Min); tierRank > 0 && minRank > 0 && tierRank < minRank {
+				clamps = append(clamps, envelopeClamp(e, env.Min, "clamped up to envelope floor"))
 				e.Tier = env.Min
+				continue
+			}
+			// Ceiling (L5, 2026-07-16): a tier ABOVE the envelope maximum clamps
+			// DOWN to the ceiling — an over-provisioned proposal is cost/quota
+			// drift (a memo-class phase routed to deep), the same shape the floor
+			// closes from below. The universal envelope's Max is the top tier, so
+			// this only ever fires against an explicitly-declared lower Max.
+			if maxRank := policy.TierRank(env.Max); tierRank > 0 && maxRank > 0 && tierRank > maxRank {
+				clamps = append(clamps, envelopeClamp(e, env.Max, "clamped down to envelope ceiling"))
+				e.Tier = env.Max
 				continue
 			}
 		}

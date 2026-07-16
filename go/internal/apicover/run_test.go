@@ -2,6 +2,7 @@ package apicover
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 
 func TestRun_ReportsUncoveredAndIgnoredWarningOnly(t *testing.T) {
 	var buf bytes.Buffer
-	code, err := Run(Config{Dirs: []string{"testdata/sample"}}, &buf)
+	code, err := Run(context.Background(), Config{Dirs: []string{"testdata/sample"}}, &buf)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -33,7 +34,7 @@ func TestRun_ReportsUncoveredAndIgnoredWarningOnly(t *testing.T) {
 
 func TestRun_EnforceExitsNonZeroOnUncovered(t *testing.T) {
 	var buf bytes.Buffer
-	code, err := Run(Config{Dirs: []string{"testdata/sample"}, Enforce: true}, &buf)
+	code, err := Run(context.Background(), Config{Dirs: []string{"testdata/sample"}, Enforce: true}, &buf)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestRun_WithCoverFile_ClassifiesCovered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("packageImportPath: %v", err)
 	}
-	syms, err := Enumerate("testdata/sample")
+	syms, err := Enumerate(context.Background(), "testdata/sample")
 	if err != nil {
 		t.Fatalf("Enumerate: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestRun_WithCoverFile_ClassifiesCovered(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if _, err := Run(Config{Dirs: []string{"testdata/sample"}, CoverPath: cover}, &buf); err != nil {
+	if _, err := Run(context.Background(), Config{Dirs: []string{"testdata/sample"}, CoverPath: cover}, &buf); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	out := buf.String()

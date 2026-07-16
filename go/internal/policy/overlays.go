@@ -12,7 +12,7 @@
 // audit-F1 protected-surface gap (skill dirs referenced by overlays) stays
 // dormant. Wiring Engine.Launch to inject these skills — the Tier producer that
 // makes F1 reachable — MUST land in the same slice that extends
-// protectedSurfaceFragments (guards/integrity_surface.go), and that file is on
+// ProtectedSurfaceManifest (guards/integrity_surface.go), and that file is on
 // the control-plane boundary (no autonomous --class cycle may edit it). So the
 // injection seam is intentionally deferred to an out-of-cycle manual ship; see
 // build-report.md § Deferred.

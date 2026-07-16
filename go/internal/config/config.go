@@ -230,6 +230,18 @@ type RolloutStages struct {
 	// applyEnv. Default StageShadow per ADR-0044 (behavior-neutral first ship).
 	PhaseRecovery Stage
 
+	// SpineFloor is the artifact-backed spine floor's OWN rollout dial (the
+	// R8.5 flip, 2026-07-16). Split out of PhaseRecovery because that dial is
+	// overloaded — ADR-0045 I6 folded the bidirectional channel into it
+	// (channel.Enabled: enforce → live producer + per-tick capture) and the
+	// failure-adviser promotion hook also keys on it — so arming the floor
+	// through PhaseRecovery would have armed two unsoaked subsystems along
+	// with it. This dial gates EXACTLY ONE behavior: whether a clean-absence
+	// mandatory-predecessor handoff gap ABORTS the cycle (StageEnforce, the
+	// default) or WARN-and-proceeds (StageShadow). Degraded reads fail open at
+	// every stage. Policy override: `recovery.spine_floor` (no env var).
+	SpineFloor Stage
+
 	// PhaseIO is the ADR-0050 Phase-3 unified-phase-I/O rollout dial. Unlike the
 	// gate dials above (off/shadow/enforce trichotomy) it uses the FULL
 	// off→shadow→advisory→enforce ladder, like the dynamic-routing Stage:
@@ -505,9 +517,23 @@ func defaults() RoutingConfig {
 		// EVOLVE_DYNAMIC_ROUTING still overrides (e.g. =off for the legacy static
 		// path). Flipped from StageOff after the advisory mode soaked since
 		// cycle-108.
-		Stage:          StageAdvisory,
-		Mode:           ModeDynamicLLM,
-		RolloutStages:  RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, TopNGate: StageEnforce, PhaseRecovery: StageShadow, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
+		Stage: StageAdvisory,
+		Mode:  ModeDynamicLLM,
+		// SpineFloor=StageEnforce (the R8.5 flip, landed 2026-07-16 as its OWN
+		// dial): the artifact-backed spine floor ABORTS on a clean-absence
+		// handoff gap instead of WARN-and-proceed. Evidence: after the
+		// scout/audit digest fallbacks (router/digest.go), a 536-run-dir replay
+		// showed 0 would-block transitions on every cycle shape since
+		// ~cycle-480 (the only misses were pre-convention dirs from the 361-479
+		// era). Degraded reads stay fail-open (the cleanAbsence guard in
+		// cyclerun_select.go), an enforce block records to failure-learning,
+		// and policy.json `recovery.spine_floor: "shadow"` is the no-recompile
+		// escape hatch. Deliberately DECOUPLED from PhaseRecovery: that dial is
+		// overloaded (ADR-0045 I6 folded the bidirectional channel into it, and
+		// the failure-adviser promotion path also keys on it), so arming the
+		// floor via PhaseRecovery would have armed two unsoaked subsystems.
+		// PhaseRecovery itself stays shadow.
+		RolloutStages:  RolloutStages{CommitEvidence: StageOff, SandboxMode: SandboxModeAuto, EvalGate: StageEnforce, ContractGate: StageEnforce, TriageCapGate: StageEnforce, TopNGate: StageEnforce, PhaseRecovery: StageShadow, SpineFloor: StageEnforce, PhaseIO: StageEnforce, RouterReplan: StageShadow, MergeGate: StageShadow, ParallelEvaluate: StageOff, ScoutDecompose: StageOff},
 		CompactPrompts: true, // default ON: strips ~23 KB/cycle of on-demand reference tails
 		// NOTE: this built-in baseline intentionally omits triage; the real
 		// registry (docs/architecture/phase-registry.json) adds it via

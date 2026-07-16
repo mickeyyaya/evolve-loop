@@ -143,24 +143,6 @@
     ],
     "codex-tmux": []
   },
-  "parallel_subtasks": [
-    {
-      "name": "eval-replay",
-      "prompt_template": "You are auditor-eval-replay for cycle {cycle}. Re-run every eval in .evolve/evals/cycle-*/ via scripts/verify-eval.sh and report PASS/FAIL per eval. The first content line of your report MUST be 'Verdict: PASS' (all evals pass) or 'Verdict: FAIL' (any eval fails). Body lists each eval and its outcome. DO NOT do lint or regression work — those are other workers."
-    },
-    {
-      "name": "lint",
-      "prompt_template": "You are auditor-lint for cycle {cycle}. Run static analysis on changed files since cycle start (git diff HEAD): shellcheck for .sh, jsonlint for .json, type-checks for any .py/.ts. First content line: 'Verdict: PASS' (no critical lint errors) or 'Verdict: FAIL'. Body lists findings with file:line. DO NOT run tests."
-    },
-    {
-      "name": "regression",
-      "prompt_template": "You are auditor-regression for cycle {cycle}. Run scripts/run-all-regression-tests.sh and parse the JSON output. First content line: 'Verdict: PASS' (zero failures) or 'Verdict: FAIL' (any failures, even pre-existing — Builder is responsible for not regressing further). Body summarizes total/passed/failed counts and lists any new failures vs. baseline."
-    },
-    {
-      "name": "build-quality",
-      "prompt_template": "You are auditor-build-quality for cycle {cycle}. Verify build artifacts and dependency hygiene: package-lock changes are intentional, no committed secrets, no unintended large files added. First content line: 'Verdict: PASS' or 'Verdict: WARN' (issues but not blocking) or 'Verdict: FAIL' (blocking)."
-    }
-  ],
   "sandbox": {
     "enabled": true,
     "write_subpaths": [

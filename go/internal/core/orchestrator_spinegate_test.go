@@ -33,12 +33,14 @@ import (
 
 // spineGateOrch builds an advisory-routing orchestrator whose fake runners
 // write NO handoff artifacts — the cycle-283 shape: CompletedPhases says
-// scout ran, but no handoff-scout.json exists, so SpineSatisfiedUpTo(build)
-// is false at the build transition.
+// scout ran, but no handoff-scout.json (and, post-fallback, no
+// scout-report.md) exists, so SpineSatisfiedUpTo(build) is false at the build
+// transition. R8.5: the gate keys on the spine floor's OWN dial (SpineFloor),
+// decoupled from the overloaded PhaseRecovery.
 func spineGateOrch(t *testing.T, recovery config.Stage, mandatory []string) (*Orchestrator, *fakeWorktree, *fakeStorage) {
 	t.Helper()
 	cfg := shadowCfg(config.StageAdvisory)
-	cfg.PhaseRecovery = recovery
+	cfg.SpineFloor = recovery
 	if mandatory != nil {
 		cfg.Mandatory = mandatory
 	}

@@ -213,7 +213,10 @@ func TestStageAndModeString(t *testing.T) {
 func TestLoad_PhaseRecoveryStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// Default (no env): SHADOW — ADR-0044's behavior-neutral first ship.
+	// Default (no env): SHADOW — ADR-0044's behavior-neutral first ship. Note
+	// the R8.5 spine-floor flip deliberately did NOT move this dial: it is
+	// overloaded (bidirectional channel + failure-adviser promotion), so the
+	// floor got its own SpineFloor dial instead (TestLoad_SpineFloorStage).
 	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseRecovery != StageShadow {
 		t.Errorf("default PhaseRecovery = %v, want StageShadow", cfg.PhaseRecovery)
 	}
@@ -224,6 +227,24 @@ func TestLoad_PhaseRecoveryStage(t *testing.T) {
 		cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": v})
 		if cfg.PhaseRecovery != StageShadow {
 			t.Errorf("EVOLVE_PHASE_RECOVERY=%q should be ignored (retired flag); got %v, want StageShadow", v, cfg.PhaseRecovery)
+		}
+	}
+}
+
+// TestLoad_SpineFloorStage pins the R8.5 flip: the artifact-backed spine floor
+// defaults ENFORCE on its OWN dial (decoupled from the overloaded PhaseRecovery
+// — see the SpineFloor field doc), with no env-var override (policy-only:
+// `recovery.spine_floor`).
+func TestLoad_SpineFloorStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+	if cfg, _ := Load(absent, map[string]string{}); cfg.SpineFloor != StageEnforce {
+		t.Errorf("default SpineFloor = %v, want StageEnforce (R8.5 flip)", cfg.SpineFloor)
+	}
+	// No env vocabulary exists for it — any EVOLVE_SPINE_FLOOR value is inert.
+	for _, v := range []string{"off", "shadow", "banana"} {
+		cfg, _ := Load(absent, map[string]string{"EVOLVE_SPINE_FLOOR": v})
+		if cfg.SpineFloor != StageEnforce {
+			t.Errorf("EVOLVE_SPINE_FLOOR=%q must be inert (policy-only dial); got %v, want StageEnforce", v, cfg.SpineFloor)
 		}
 	}
 }

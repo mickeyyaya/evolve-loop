@@ -32,11 +32,8 @@ func scopeFromStartedEvent(t *testing.T, configured Scope) string {
 	t.Helper()
 	ws := tempWorkspace(t)
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
-	shutdown := make(chan struct{})
-	go func() {
-		time.Sleep(40 * time.Millisecond)
-		close(shutdown)
-	}()
+	// StopAfterMS drives a deterministic termination after the observer_started
+	// envelope is emitted at startup — no shutdown goroutine racing a sleep.
 	rc := Run(Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
 		Scope:       configured,
@@ -44,8 +41,7 @@ func scopeFromStartedEvent(t *testing.T, configured Scope) string {
 		StallS:      9999,
 		EOFGraceS:   9999,
 		Now:         func() time.Time { return now },
-		ShutdownSig: shutdown,
-		StopAfterMS: 200,
+		StopAfterMS: 60,
 	}, filepath.Join(ws, "builder-stdout.log"), os.Stderr)
 	if rc != ExitOK {
 		t.Fatalf("rc=%d, want ExitOK", rc)

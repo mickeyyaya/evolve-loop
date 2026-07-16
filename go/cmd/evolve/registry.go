@@ -59,6 +59,7 @@ var commands = []subcommand{
 	{Name: "names", Summary: "Guard naming after a rename: names check (scan) | names fix (rewrite dead tokens)", Run: runNames},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "apicover", Summary: "Measure public-API coverage (apicover [-cover f] [-require-doc] [-enforce] <pkgdir>...)", Run: runApicover},
+	{Name: "inbox", Summary: "Inspect the backlog: inbox batches [--json] [--max N] — the deterministic grouping triage consumes", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: phasecmd.RunPhase},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.RunServePhase},

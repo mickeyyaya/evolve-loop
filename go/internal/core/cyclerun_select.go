@@ -116,7 +116,11 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 					// Transient: the handoff appeared on re-read. Proceed.
 					// (dec was decided from the stale signals — diagnostic
 					// record only; the gate, not Decide, owns blocking.)
-				case cr.o.cfg.PhaseRecovery == config.StageEnforce && cleanAbsence:
+				// R8.5 (2026-07-16): the abort keys on the spine floor's OWN
+				// dial (SpineFloor, default enforce), NOT PhaseRecovery — that
+				// dial is overloaded (bidirectional channel + failure-adviser
+				// promotion) and stays shadow. See config.RolloutStages.SpineFloor.
+				case cr.o.cfg.SpineFloor == config.StageEnforce && cleanAbsence:
 					spineErr := fmt.Errorf("spine gate: next=%s blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-283 class)", next)
 					// startedAt="" — the spine gate blocks BEFORE this phase
 					// dispatches, so it has no measured wall-clock start (the
@@ -127,8 +131,9 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 					return "", loopAbort, spineErr
 				default:
 					// Two fail-open sources, deliberately identical in
-					// behavior: (a) dial below enforce (shadow default —
-					// byte-compatible until the R8.5 flip), (b) the
+					// behavior: (a) SpineFloor dialed below enforce (the
+					// policy.json `recovery.spine_floor: "shadow"` escape
+					// hatch — enforce is the default since R8.5), (b) the
 					// absence is NOT clean (degraded read or digest
 					// error). The reason string tells them apart.
 					dec.Clamps = append(dec.Clamps, router.Clamp{

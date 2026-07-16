@@ -72,7 +72,8 @@ func TestRun_WritesShutdownReport(t *testing.T) {
 		close(done)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	// <-done is the real barrier: Run catches an already-closed shutdown on its
+	// first select iteration and writes the report before returning. No sleep.
 	close(shutdown)
 	<-done
 
@@ -281,17 +282,14 @@ func TestRun_TailsStdoutLog(t *testing.T) {
 {"type":"user","message":{"content":[{"type":"tool_result","is_error":false}]}}
 `), 0o644)
 
-	shutdown := make(chan struct{})
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		close(shutdown)
-	}()
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
+	// StopAfterMS drives a deterministic termination: Run blocks until the stop
+	// timer (200ms), having tailed the pre-seeded stdout on its poll ticks
+	// (interval = StopAfterMS/4 = 50ms). No shutdown goroutine racing a sleep.
 	rc := Run(Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
 		PollS: 1, StallS: 9999, EOFGraceS: 9999,
 		Now:         func() time.Time { return now },
-		ShutdownSig: shutdown,
 		StopAfterMS: 200,
 	}, stdoutLog, os.Stderr)
 	if rc != ExitOK {

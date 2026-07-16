@@ -1,6 +1,7 @@
 package apicover
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +23,14 @@ type Config struct {
 // It returns the process exit code: 0 in warning-only mode (the default), or 1
 // under Enforce when any uncovered or false-green symbol remains. A non-nil
 // error (returned with code 2) means the measurement itself failed.
-func Run(cfg Config, w io.Writer) (int, error) {
+//
+// ctx bounds the measurement (checked at each dir and file boundary): the
+// audit's in-process enforce gate runs Run under its apicoverTimeout, and
+// without the ctx thread a wedged AST walk (pathological package, hung
+// filesystem) escaped the gate's own deadline (apicover-inprocess-ctx-timeout).
+// Cancellation surfaces as the code-2 measurement error with ctx.Err() in the
+// chain, so callers can distinguish infra interruption from a real finding.
+func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
 	// Join coverage to symbols on the import-path-qualified path + line. A method
 	// prints under its bare name in `go tool cover -func`, so name-keying is
 	// impossible; the qualified path:line is exact and collision-free across
@@ -45,11 +53,14 @@ func Run(cfg Config, w io.Writer) (int, error) {
 
 	totalProblems := 0
 	for _, dir := range cfg.Dirs {
-		syms, err := Enumerate(dir)
+		if err := ctx.Err(); err != nil {
+			return 2, err
+		}
+		syms, err := Enumerate(ctx, dir)
 		if err != nil {
 			return 2, err
 		}
-		named, err := NamesReferencedInTests(dir)
+		named, err := NamesReferencedInTests(ctx, dir)
 		if err != nil {
 			return 2, err
 		}

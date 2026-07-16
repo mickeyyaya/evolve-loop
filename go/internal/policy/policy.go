@@ -1292,20 +1292,34 @@ func (p Policy) SandboxConfig() SandboxPolicy {
 
 // RecoveryPolicy is the .evolve/policy.json "recovery" block.
 // It surfaces the ADR-0044 Unified Phase Recovery rollout stage so operators
-// can set phase_recovery = "enforce" in policy.json without an env var.
+// can set phase_recovery = "enforce" in policy.json without an env var, and
+// (R8.5, 2026-07-16) the artifact-backed spine floor's OWN dial — split from
+// phase_recovery because that stage ALSO arms the bidirectional channel
+// (ADR-0045 I6) and the failure-adviser promotion path (see
+// config.RolloutStages.SpineFloor for the full decoupling rationale).
 type RecoveryPolicy struct {
 	PhaseRecovery string `json:"phase_recovery,omitempty"`
+	// SpineFloor gates ONLY the clean-absence handoff-gap abort:
+	// "enforce" (default) aborts the cycle; "shadow" WARN-and-proceeds (the
+	// no-recompile escape hatch); anything else parses to off ≡ shadow (the
+	// gate never acts below enforce).
+	SpineFloor string `json:"spine_floor,omitempty"`
 }
 
 // RecoveryConfig returns recovery configuration with built-in defaults resolved.
-// Empty/absent PhaseRecovery ⇒ "shadow" (behavior-neutral first-ship default).
+// Empty/absent PhaseRecovery ⇒ "shadow" (behavior-neutral first-ship default);
+// empty/absent SpineFloor ⇒ "enforce" (the R8.5 flip — replay-evidenced; see
+// config.defaults()).
 func (p Policy) RecoveryConfig() RecoveryPolicy {
-	c := RecoveryPolicy{PhaseRecovery: "shadow"}
+	c := RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"}
 	if p.Recovery == nil {
 		return c
 	}
 	if p.Recovery.PhaseRecovery != "" {
 		c.PhaseRecovery = p.Recovery.PhaseRecovery
+	}
+	if p.Recovery.SpineFloor != "" {
+		c.SpineFloor = p.Recovery.SpineFloor
 	}
 	return c
 }

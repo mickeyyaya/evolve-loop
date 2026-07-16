@@ -14,6 +14,7 @@ package triage
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -85,7 +87,40 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if ro := req.Context["recent_outcomes"]; ro != "" {
 		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
 	}
+	// Inbox batch classifier (2026-07-16): one-item-per-cycle consumption pays
+	// the full pipeline per item, so internal/inboxbatch DETERMINISTICALLY
+	// groups the backlog by campaign / package area / explicit links (Core
+	// Rule 5 — grouping is mechanical Go; only the PICK stays LLM judgment).
+	// Rendered last (the section varies as items land — keeps the stable
+	// prefix cache-friendly); an empty/missing/unreadable inbox keeps the
+	// prompt byte-identical (fail-open: a broken backlog must not block
+	// triage, which still reads the inbox directly).
+	if section := inboxBatchesSection(req.ProjectRoot); section != "" {
+		b.WriteString(section)
+	}
 	return b.String()
+}
+
+// inboxBatchesSection renders the deterministic backlog grouping for the
+// triage prompt, or "" when there is nothing to group (the byte-identity pin).
+// An empty projectRoot returns "" rather than resolving a CWD-relative path —
+// the dual-root landmine PhaseRequest's own docs warn about.
+func inboxBatchesSection(projectRoot string) string {
+	if projectRoot == "" {
+		return ""
+	}
+	items, _, err := inboxbatch.LoadDir(filepath.Join(projectRoot, ".evolve", "inbox"))
+	if err != nil || len(items) == 0 {
+		return ""
+	}
+	rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(items, inboxbatch.Config{}))
+	if rendered == "" {
+		return ""
+	}
+	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
+		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
+		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
+		rendered
 }
 
 func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {

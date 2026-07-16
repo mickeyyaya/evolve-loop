@@ -3,6 +3,7 @@ package audit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,9 +37,15 @@ import (
 const (
 	goVetTimeout           = 4 * time.Minute
 	acsDurableTimeout      = 8 * time.Minute
-	apicoverTimeout        = 8 * time.Minute
 	integrationTierTimeout = 15 * time.Minute
 )
+
+// apicoverTimeout bounds the WHOLE apicover gate — the forked toolchain
+// pre-steps AND the in-process apicover.Run measurement (which threads this
+// ctx to its per-file AST walks; apicover-inprocess-ctx-timeout). A var, not a
+// const, for the same reason as runCmd below: tests shrink it to force the
+// ctx-interruption path without an 8-minute wait.
+var apicoverTimeout = 8 * time.Minute
 
 // runCmd is the subprocess runner the CI-parity gates use. It is a package var
 // so tests can inject a fake runner and exercise the exit-code mapping + the
@@ -296,10 +303,19 @@ func apicoverEnforceChangedDefault(req core.PhaseRequest) ([]string, error) {
 	// package — not the fail-open infra WARN a subprocess exit-2 warranted.
 	// Folding it into the offender report keeps the FAIL the old bin/apicover
 	// exit-2 produced (cf. the underivable-changed-set hard-FAIL, cycle-581 D1).
+	// The gate ctx bounds the measurement itself (apicover-inprocess-ctx-timeout):
+	// pre-ctx, a wedged AST walk escaped apicoverTimeout entirely.
 	var report bytes.Buffer
-	code, runErr := apicover.Run(apicover.Config{Enforce: true, CoverPath: funcPath, Dirs: dirs}, &report)
+	code, runErr := apicover.Run(ctx, apicover.Config{Enforce: true, CoverPath: funcPath, Dirs: dirs}, &report)
 	if code == 0 && runErr == nil {
 		return nil, nil // clean
+	}
+	// A ctx-deadline/cancel interruption is INFRA weather, not a finding about
+	// the touched code — surface it as an error so this gate fails OPEN (WARN),
+	// exactly like the sibling ctx-bounded exec steps above. Real measurement
+	// errors (unparseable package) stay in the offender report → FAIL.
+	if runErr != nil && (errors.Is(runErr, context.DeadlineExceeded) || errors.Is(runErr, context.Canceled)) {
+		return nil, fmt.Errorf("apicover gate: measurement interrupted: %w", runErr)
 	}
 	detail := strings.TrimSpace(report.String())
 	if runErr != nil {

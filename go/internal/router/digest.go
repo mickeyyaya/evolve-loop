@@ -31,6 +31,8 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			raw = unwrapPayload(raw)
 			sig.Scout = extractScout(raw)
 			sig.foldGeneric("scout", raw)
+		} else {
+			sig.Scout = scoutFromReportFallback(workspace, &sig.DigestDegraded)
 		}
 	}
 	if done["triage"] {
@@ -54,6 +56,8 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			raw = unwrapPayload(raw)
 			sig.Audit = extractAudit(raw)
 			sig.foldGeneric("audit", raw)
+		} else {
+			sig.Audit = auditFromACSVerdictFallback(workspace, &sig.DigestDegraded)
 		}
 	}
 	// ADR-0039 §7: lift each completed phase's structured failure context
@@ -184,6 +188,52 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 	// handoff's exact file tally — still non-zero on any real change, which is
 	// what closes the silent-gap hole this fallback exists for.
 	return BuildSignals{Present: true, FilesTouched: len(pkgs)}
+}
+
+// scoutFromReportFallback derives ScoutSignals from the artifact scout
+// actually writes every cycle — scout-report.md — when handoff-scout.json is
+// absent (handoffs have been extinct since ~cycle 215; buildFromGitFallback
+// closed the same gap for build). Presence is the only signal the spine floor
+// gates on, so the richer handoff fields stay zero — the router's digest
+// degrades in richness, never in floor truth. A missing report is a CLEAN
+// absence (Present:false, no degrade entry — the enforce gate's fail-closed
+// signal); a report that exists but cannot be read is a read-miss and degrades
+// LOUDLY (R5), matching readFirstTracked's distinction.
+func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
+	info, err := os.Stat(filepath.Join(workspace, "scout-report.md"))
+	switch {
+	case err == nil && info.Size() > 0:
+		return ScoutSignals{Present: true}
+	case err == nil:
+		return ScoutSignals{} // empty report: the phase did not really deliver
+	case os.IsNotExist(err):
+		return ScoutSignals{} // clean absence
+	default:
+		*degraded = append(*degraded, "scout: report fallback stat: "+err.Error())
+		return ScoutSignals{}
+	}
+}
+
+// auditFromACSVerdictFallback derives AuditSignals from acs-verdict.json — the
+// DETERMINISTIC verdict artifact generateACSVerdict writes every audited cycle
+// — when handoff-audit.json is absent. Its top-level verdict/red_count keys
+// are exactly what extractAudit reads, so the extraction is shared, and a FAIL
+// verdict flows through honestly (the spine's audit anchor then refuses ship —
+// that is the floor working, not a gap). Corrupt-but-present degrades LOUDLY
+// (fail-open at enforce); genuinely absent stays a clean absence.
+func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSignals {
+	raw, err := os.ReadFile(filepath.Join(workspace, "acs-verdict.json"))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			*degraded = append(*degraded, "audit: acs-verdict fallback read: "+err.Error())
+		}
+		return AuditSignals{} // clean absence (or loudly-degraded read-miss)
+	}
+	a := extractAudit(raw)
+	if !a.Present {
+		*degraded = append(*degraded, "audit: acs-verdict.json present but unparseable (fallback)")
+	}
+	return a
 }
 
 // projectRootFromWorkspace inverts core.RunWorkspacePath's

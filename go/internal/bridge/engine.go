@@ -506,7 +506,14 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if code == ExitArtifactTimeout {
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrArtifactTimeout)
 	}
-	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard {
+	// 124 (advisory-phase-contract-degrade residual): a driver killed by a
+	// command-level timeout is infra weather — the sibling of 81 — so it joins
+	// the transient set: retry backoff, optionalInfraSkip, and the reconcile
+	// IsInfraTeardownError predicate all treat it as interruption, not defect.
+	// 127 (missing binary) deliberately stays PLAIN below: an absent CLI is an
+	// environment defect that must fail loud; its only recovery is the exit-
+	// code-triggered family fallback (llmroute), which sees the raw 127.
+	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard || code == ExitCmdTimeout {
 		if code == ExitREPLBootTimeout && e.deps.BootTimeoutStore != nil {
 			if _, err := e.deps.BootTimeoutStore.RecordBootStrike(req.CLI); err != nil {
 				_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-timeout bench record failed for %s: %v\n", req.CLI, err)

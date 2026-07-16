@@ -1,0 +1,24 @@
+{
+  "id": "completion-contract-cancel-parity",
+  "title": "Benign-cancel completion parity for the stdout/git completion contracts (the 2026-07-16 driver fix covers only the artifact detector)",
+  "weight": 0.3,
+  "kind": "hardening",
+  "priority": "low",
+  "campaign": "merge-efficiency-2026-07",
+  "summary": "go-reviewer LOW on the 2026-07-16 cancel-after-deliverable fix (driver_tmux_repl.go): the on-cancel final detector.poll gives benign-completion semantics only to the ARTIFACT contract, because artifactDetector.poll is a pure file stat (ctx-independent). stdoutDetector/gitEvidenceDetector polls (completion.go:107,191) depend on ctx-bound CapturePane/git calls, which fail closed under an already-dead ctx — so a router/advisor-style phase using the stdout or git contract whose ctx dies just after its completion condition was met still exits ExitArtifactTimeout (the pre-fix mislabel). Low weight: those phases are short-lived and the runner reconcile + settle-retry remain the safety net; fix only if telemetry shows the mislabel actually occurring for non-artifact contracts. Approach if pursued: give each detector a ctx-independent last-observation snapshot (mirror lastGoodPane) consulted on the cancel path — do NOT re-fork tmux under a fresh ctx (teardown races).",
+  "acceptance": [
+    "telemetry first: confirm (or refute) occurrences of cancel-laundered timeouts for stdout/git-contract phases in recent runs; close as not-observed if none",
+    "if observed: on-cancel benign completion for stdout/git contracts via last-observation snapshot; RED test per contract mirroring TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout",
+    "go test -race ./internal/bridge/... green"
+  ],
+  "files": [
+    "go/internal/bridge/completion.go",
+    "go/internal/bridge/driver_tmux_repl.go"
+  ],
+  "deps": [],
+  "connects_to": [
+    "session-lifecycle-verdict-clobbers-ondisk-deliverable (closed 2026-07-16; this is its last residual)"
+  ],
+  "source": "go-reviewer LOW finding, inbox-batch review 2026-07-16",
+  "created_at": "2026-07-16T10:30:00Z"
+}

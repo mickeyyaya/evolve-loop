@@ -12,6 +12,7 @@
 package apicover
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,7 +41,10 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-	code, err := Run(Config{
+	// The CLI has no deadline semantics of its own (the operator can ^C);
+	// Background keeps the standalone binary and `evolve apicover` byte-parity
+	// with the pre-ctx behavior. The audit gate is the caller that bounds Run.
+	code, err := Run(context.Background(), Config{
 		Dirs:       fs.Args(),
 		CoverPath:  *cover,
 		RequireDoc: *requireDoc,

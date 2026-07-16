@@ -2,6 +2,8 @@ package policy_test
 
 // RecoveryPolicy — the ADR-0044 Unified Phase Recovery config (cycle-12 flag retirement).
 // PhaseRecovery defaults "shadow" (behavior-neutral); absent block is safe.
+// R8.5 (2026-07-16): SpineFloor — the spine floor's OWN dial — defaults
+// "enforce" (replay-evidenced flip); "shadow" is the policy escape hatch.
 
 import (
 	"testing"
@@ -18,22 +20,22 @@ func TestRecoveryConfig_Resolution(t *testing.T) {
 		{
 			"absent-defaults-shadow",
 			policy.Policy{},
-			policy.RecoveryPolicy{PhaseRecovery: "shadow"},
+			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"},
 		},
 		{
 			"empty-block-defaults-shadow",
 			policy.Policy{Recovery: &policy.RecoveryPolicy{}},
-			policy.RecoveryPolicy{PhaseRecovery: "shadow"},
+			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"},
 		},
 		{
 			"enforce-set",
-			policy.Policy{Recovery: &policy.RecoveryPolicy{PhaseRecovery: "enforce"}},
-			policy.RecoveryPolicy{PhaseRecovery: "enforce"},
+			policy.Policy{Recovery: &policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "enforce"}},
+			policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "enforce"},
 		},
 		{
 			"off-set",
-			policy.Policy{Recovery: &policy.RecoveryPolicy{PhaseRecovery: "off"}},
-			policy.RecoveryPolicy{PhaseRecovery: "off"},
+			policy.Policy{Recovery: &policy.RecoveryPolicy{PhaseRecovery: "off", SpineFloor: "enforce"}},
+			policy.RecoveryPolicy{PhaseRecovery: "off", SpineFloor: "enforce"},
 		},
 	}
 	for _, tc := range cases {
@@ -55,17 +57,24 @@ func TestLoad_RecoveryBlock(t *testing.T) {
 		{
 			"absent-block-defaults-shadow",
 			`{}`,
-			policy.RecoveryPolicy{PhaseRecovery: "shadow"},
+			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"},
 		},
 		{
 			"enforce-set",
 			`{"recovery":{"phase_recovery":"enforce"}}`,
-			policy.RecoveryPolicy{PhaseRecovery: "enforce"},
+			policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "enforce"},
 		},
 		{
 			"shadow-explicit",
 			`{"recovery":{"phase_recovery":"shadow"}}`,
-			policy.RecoveryPolicy{PhaseRecovery: "shadow"},
+			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"},
+		},
+		{
+			// The R8.5 escape hatch: dial the spine floor back to shadow via
+			// policy.json, no recompile, without touching phase_recovery.
+			"spine-floor-shadow-escape-hatch",
+			`{"recovery":{"spine_floor":"shadow"}}`,
+			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "shadow"},
 		},
 	}
 	for _, tc := range cases {
