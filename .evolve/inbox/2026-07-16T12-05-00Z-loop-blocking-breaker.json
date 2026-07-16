@@ -1,0 +1,33 @@
+{
+  "id": "loop-blocking-breaker",
+  "title": "Pause-until-resolved: a three-layer deterministic circuit breaker so the loop STOPS dispatching when blocked instead of burning waves on zero progress (operator directive 2026-07-16)",
+  "weight": 0.9,
+  "kind": "architecture",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "Operator: cycles 853+854 burned two full pipelines false-FAILing the SAME task with the SAME signature; the loop had every signal (failedApproaches records existed — the 2026-07-16 failure-learning fix works; cycle-854's retro even wrote 'Re-landing a third time will false-FAIL again') and NO mechanism to act on it. The only existing breaker is the same-cycle-number dispatcher-deadlock abort (cmd_loop.go:675). Design (all deterministic Go, config-injected thresholds via policy.json, no flags): LAYER 1 — per-task repeat quarantine: at cycle finalize, if the new FailedRecord matches a prior UNRESOLVED FailedRecord on (task id, failed phase, classification) within the retention window, MOVE the driving inbox item to .evolve/inbox/blocked/<id>.json with a reason sidecar (blocked_by: <failure signature>) so triage cannot re-pick it; auto-unblock when the linked fix item ships (recurrence ledger already links pattern->item) or the operator moves it back. One repeat maximum, ever. LAYER 2 — wave-signature breaker: after a 0/N wave where all lanes' FailedRecords share a signature (same failed phase + same classification), the supervisor writes .evolve/loop-blocked.json {signature, cycles, evidence paths} and exits stop_reason=blocked instead of dispatching the next wave (generalizes the existing allFamiliesQuotaExhausted checkpoint from quota to any shared systemic signature). LAYER 3 — pre-dispatch blocking gate: evolve loop boot (and each wave start) refuses to dispatch while loop-blocked.json exists OR any carryover P0 tagged blocking=true is unresolved — prints the blockers + the fix items; `evolve loop --acknowledge-blocked` is the explicit operator override. Classification matters: transient/infra-weather signatures (quota family exhaustion) keep the existing pause-and-auto-resume; only SYSTEMIC signatures (repeat false-FAIL, gate-defect, poisoned-task classes) hard-block. This is the process answer to the skills-drift storm (836-849), the false-FAIL burn (853/854), and every future 'burning tokens for zero progress' shape.",
+  "acceptance": [
+    "L1 RED: a second FAIL of the same (task,phase,classification) quarantines the item (file moved + reason sidecar) and triage's next plan cannot select it; unblock path tested (linked fix ships -> item restored)",
+    "L2 RED: a simulated 0/2 wave with matching FailedRecord signatures -> supervisor exits stop_reason=blocked + loop-blocked.json carries signature+evidence; a MIXED-signature 0/2 wave does NOT trip it (one bad apple != systemic)",
+    "L3 RED: `evolve loop` with loop-blocked.json present refuses dispatch, exit 2, names the blockers; --acknowledge-blocked proceeds and archives the marker",
+    "quota-class signatures keep today's checkpoint+resume behavior byte-identical (regression pinned)",
+    "thresholds (repeat window, wave-signature min-width) from policy.json with compiled defaults; no env flags",
+    "go test -race on touched packages; both reviewers; docs row in runtime-reference"
+  ],
+  "files": [
+    "go/internal/core/failure_learning.go",
+    "go/cmd/evolve/cmd_loop.go",
+    "go/internal/recurrence/",
+    "go/internal/policy/"
+  ],
+  "deps": [
+    "deliverable-authority-centralization"
+  ],
+  "connects_to": [
+    "retro-preventive-actions-autofile-inbox (retro output should FEED the blocked registry)",
+    "lesson_to_action_gap (this is its enforcement half)",
+    "goal-stall-escalation"
+  ],
+  "source": "operator directive 2026-07-16 after the wave-2 0/2 deep dive; evidence cycles 853/854/855 + retro cycle-854",
+  "created_at": "2026-07-16T12:05:00Z"
+}

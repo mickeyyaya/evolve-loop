@@ -1,0 +1,28 @@
+{
+  "id": "deliverable-authority-centralization",
+  "title": "4th recurrence of the deliverable-present-transport-error false-FAIL class (cycles 853/854 retro): centralize ONE deliverable-authority rule — a well-formed, challenge-token-matched deliverable on disk out-votes ANY non-launch/non-boot transport-termination error",
+  "weight": 0.92,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "Cycle-854's retro nails the CLASS (its analysis is the spec — read .evolve/runs/cycle-854/retrospective-report.md): deliverable-authority is gated behind two DISJOINT conditions — bridgeErr==nil (preferFile success path, runner.go:698) OR IsInfraTeardownError(bridgeErr) (reconcile path, runner.go:626, exits 80/81/85/86/124). A completion-wait CONTEXT-CANCEL after the agent wrote a valid PASS deliverable (Ink-wedge stall, cycle-603 signature) satisfies NEITHER: bridgeErr!=nil and not a teardown sentinel, so the substantive-error branch hard-FAILs a genuine EGPS-green PASS. Cycles 853+854 each burned a full pipeline this way on the SAME task (retro re-landed 853 as 854 → identical false-FAIL — the self-perpetuating burn). Prior fixes each patched ONE rung (254/255 timeout, 603 scrollback-vs-file, 824/825 settle-race, 835 quota-85, 2026-07-16 driver benign-cancel + exit-124): the class was never centralized. NOTE: the 2026-07-16 driver-level benign-cancel fix (2c0559a5, driver_tmux_repl.go final-poll-on-cancel) closes the OBSERVED 853/854 mechanism at the source for the artifact contract — this item is the runner-level DEFENSE-IN-DEPTH twin so the NEXT uncovered transport rung (and non-tmux drivers/headless) cannot revive the class. Anti-gaming boundary stays: launch/boot/safety/cost errors (ExitSafetyGate/ExitCostLeak/ExitBadFlags/boot-fail-before-prompt-delivery) still hard-fail WITHOUT consulting disk — their output is untrustworthy; the centralization covers only POST-DELIVERY transport termination.",
+  "acceptance": [
+    "single-source predicate (e.g. core.IsPostDeliveryTransportError or an inversion: isPreDeliveryOrIntegrityError) consulted by ONE reconcile gate in runner.Run — the per-exit-code special cases collapse into it; verifyReconcileDeliverable well-formedness + challenge-token match stays the authority test",
+    "RED: completion-wait context-cancel with a valid PASS deliverable on disk → phase verdict PASS (the exact cycle-854 shape, driving the LIVE runner path)",
+    "RED: launch failure (exit 10/2/3) with a PASS-looking file on disk → still hard-FAIL (anti-gaming boundary pinned)",
+    "existing reconcile suites (runner_reconcile_test, runner_reconcile_transient_test) stay green unchanged",
+    "go test -race ./internal/phases/runner/... green; both reviewers"
+  ],
+  "files": [
+    "go/internal/phases/runner/runner.go",
+    "go/internal/core/errors.go"
+  ],
+  "deps": [],
+  "connects_to": [
+    "completion-contract-cancel-parity (stdout/git contracts driver-level twin)",
+    "infra-teardown-predicate-single-source (subsumed by this — retire it when this lands)",
+    "loop-blocking-breaker (consumes this class's recurrence signature)"
+  ],
+  "source": "cycle-854 retrospective (2026-07-16) — verbatim class statement + lesson cycle-854-deliverable-reconcile-bypassed-on-completion-wait-cancel.yaml; 4th recurrence",
+  "created_at": "2026-07-16T12:00:00Z"
+}
