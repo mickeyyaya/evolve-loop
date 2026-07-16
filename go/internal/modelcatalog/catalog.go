@@ -49,6 +49,26 @@ type CLIEntry struct {
 	// Only "live" entries are trustworthy enough to OVERRIDE the manifest at
 	// dispatch; "detect" entries are informational (shown by `models list`).
 	Source string `json:"source,omitempty"`
+	// TierFallbacks is the operator-authored per-tier fallback chain: when
+	// TierModels[tier] is empty, the first non-empty model in
+	// TierFallbacks[tier] is used instead. Absent or exhausted chains degrade
+	// to the single-shot behavior (ok=false → manifest fallback at the caller).
+	TierFallbacks map[string][]string `json:"tier_fallbacks,omitempty"`
+}
+
+// modelForTier resolves the entry's model for tier: the primary TierModels
+// mapping when non-empty, else the first non-empty model in the tier's
+// TierFallbacks chain. ok=false when both are empty/absent.
+func (e CLIEntry) modelForTier(tier string) (model string, ok bool) {
+	if m := e.TierModels[tier]; m != "" {
+		return m, true
+	}
+	for _, m := range e.TierFallbacks[tier] {
+		if m != "" {
+			return m, true
+		}
+	}
+	return "", false
 }
 
 // SourceLive marks a tier map queried from the CLI itself (authoritative).
@@ -66,27 +86,20 @@ func (c Catalog) DispatchModel(cli, tier string) (model string, ok bool) {
 	if !found || entry.Source != SourceLive {
 		return "", false
 	}
-	m := entry.TierModels[tier]
-	if m == "" {
-		return "", false
-	}
-	return m, true
+	return entry.modelForTier(tier)
 }
 
-// Lookup returns the concrete model for (cli, tier). ok is false when the CLI
-// is unknown, the tier is absent, or the mapped model is empty — in every such
-// case the caller must fall back to the static manifest. cli must already be a
-// base name (no -tmux/-p suffix).
+// Lookup returns the concrete model for (cli, tier), consulting the tier's
+// fallback chain when the primary mapping is empty or absent. ok is false when
+// the CLI is unknown or neither the primary nor the chain yields a model — in
+// every such case the caller must fall back to the static manifest. cli must
+// already be a base name (no -tmux/-p suffix).
 func (c Catalog) Lookup(cli, tier string) (model string, ok bool) {
 	entry, found := c.CLIs[cli]
 	if !found {
 		return "", false
 	}
-	m, found := entry.TierModels[tier]
-	if !found || m == "" {
-		return "", false
-	}
-	return m, true
+	return entry.modelForTier(tier)
 }
 
 // IsStale reports whether the catalog must be refreshed: it was never fetched
