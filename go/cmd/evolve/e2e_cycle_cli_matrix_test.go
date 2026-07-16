@@ -292,6 +292,15 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 		}
 	}
 
+	// PROBE (debug/e2e-spinefloor-probe): dial the R8.5-armed spine floor to
+	// shadow in the e2e temp project via the sanctioned policy escape hatch —
+	// if this heals the tier, the armed floor vs artifact-less e2e fixtures is
+	// the confirmed root cause.
+	policyPath := filepath.Join(root, ".evolve", "policy.json")
+	if err := os.WriteFile(policyPath, []byte(`{"recovery":{"spine_floor":"shadow"}}`), 0o644); err != nil {
+		t.Fatalf("write policy.json: %v", err)
+	}
+
 	// .evolve/state.json — minimal seed so storage adapter doesn't bail.
 	statePath := filepath.Join(root, ".evolve", "state.json")
 	seed := `{"lastUpdated":"2026-01-01T00:00:00Z","lastCycleNumber":0,"version":1,"currentBatch":{"cycleAccruedCostUSD":0}}`
