@@ -180,12 +180,12 @@ func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
 // "test … incl. integration tier" step: `go test -tags integration $(go list
 // ./... | grep -v /acs/)`) against the cycle worktree. It closes the parity
 // hole one tier above go vet: TestFleetSoak went CI-red under a green per-cycle
-// audit because ciparity never built the integration tier. Faithful to CI, it
-// enumerates the module packages, drops acs/ (per-cycle ACS evals read runtime
-// artifacts absent here), then runs the tier; any non-zero exit → offenders →
-// FAIL. No-op unless the cycle built Go. -race IS included (CI runs it, so a
-// genuine data race in a touched package must fail the gate, not just CI); only
-// -cover is dropped — the coverage number is a CI-only concern (ADR-0069).
+// audit because ciparity never built the integration tier. Faithful to CI on the
+// tier and flags (-race IS included — a genuine data race in a touched package
+// must fail the gate; only -cover is dropped, a CI-only concern per ADR-0069),
+// it runs the tier over the cycle's TOUCHED packages (see integrationTierScope),
+// not the whole module. No-op unless the cycle built Go; any non-zero exit →
+// offenders → FAIL.
 func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if !cycleTouchedGo(req) {
 		return nil, nil
@@ -194,23 +194,28 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if dir == "" {
 		return nil, nil // no go module in the worktree → nothing to check
 	}
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	// cycleTouchedGo guarantees a derivable, non-empty change-set here: an
+	// underivable set (git diff failed) yields no packages, so cycleTouchedGo
+	// already returned false above. The derivable bool is therefore always true
+	// at this point and intentionally discarded. (The pre-existing gap that an
+	// underivable cycle silently skips this AND the sibling whole-repo gates —
+	// go vet / acs-durable, all gated on cycleTouchedGo — is tracked separately
+	// as the cycleTouchedGo-derivability-propagation defect; fixing it here would
+	// turn transient git-index.lock hiccups into new WARNs, out of scope.)
+	changed, _ := changedPackagesForAudit(root, req.Cycle)
 	ctx, cancel := context.WithTimeout(context.Background(), integrationTierTimeout)
 	defer cancel()
 	run := runCmd
-	// go.yml lists packages WITHOUT the integration tag, then filters acs/.
-	listOut, err := sysexec.Output(ctx, run, dir, "go", "list", "./...")
+	pkgs, err := integrationTierScope(ctx, run, dir, changed)
 	if err != nil {
-		return nil, fmt.Errorf("integration-tier gate: go list: %w", err) // fail-open → WARN
-	}
-	var pkgs []string
-	for _, p := range strings.Fields(listOut) {
-		if strings.Contains(p, "/acs/") {
-			continue
-		}
-		pkgs = append(pkgs, p)
+		return nil, err // fail-open → WARN
 	}
 	if len(pkgs) == 0 {
-		return nil, nil
+		return nil, nil // cycle touched only acs/ (or nothing testable) → gate skips
 	}
 	args := append([]string{"test", "-race", "-count=1", "-tags", "integration"}, pkgs...)
 	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, "go", args...)
@@ -221,6 +226,55 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 		return nil, nil // clean
 	}
 	return offenderLines(strings.TrimSpace(out + "\n" + errOut)), nil // ran + non-zero → FAIL
+}
+
+// integrationTierScope returns the `go test` package patterns the integration
+// tier should run for a cycle's already-derived, non-empty changed-package set
+// (`changed`): the TOUCHED packages themselves (the same O(change) scoping the
+// apicover-enforce gate uses), minus /acs/ (which has its own -tags acs gate).
+// The one whole-module fallback is a module-root change (a `./...` pattern from
+// go.mod/go.sum/root main.go) — rare, and no narrower scope exists.
+//
+// Scoping is load-bearing for RELIABILITY, not just speed. The old unconditional
+// whole-suite `go test -race -tags integration ./...` run is parallel-unsafe
+// under the loop's contended LOCAL environment — two fleet lanes running it
+// concurrently plus real tmux/git — so heavy env-dependent tests (TestFleetSoak
+// spawns tmux fleets, TestShipFromWorktree drives real git worktrees) flaked the
+// gate EVERY cycle, producing false-REDs on tests CI passes. CI runs the same
+// command once, isolated, and stays green; scoping means a cycle that only
+// touched, say, internal/bridge never runs the fleet/ship tests at all. The rare
+// module-root fallback is derivable (not the contention-correlated git-failure
+// case), so it does not reintroduce the flake. Whole-repo integration coverage
+// remains CI's job — the identical backstop apicover-enforce relies on.
+func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, changed []string) ([]string, error) {
+	scoped := make([]string, 0, len(changed))
+	for _, p := range changed {
+		if p == "./..." {
+			return integrationTierWholeSuite(ctx, run, dir) // module-root change → whole module
+		}
+		if strings.Contains(p, "/acs/") {
+			continue // acs has its own -tags acs gate (acsDurableCheckDefault)
+		}
+		scoped = append(scoped, p)
+	}
+	return scoped, nil // may be empty (cycle touched only acs/) → gate skips
+}
+
+// integrationTierWholeSuite lists every module package minus /acs/ — go.yml's
+// exact `go list ./... | grep -v /acs/` filter — for the module-root fallback.
+func integrationTierWholeSuite(ctx context.Context, run sysexec.RunFunc, dir string) ([]string, error) {
+	listOut, err := sysexec.Output(ctx, run, dir, "go", "list", "./...")
+	if err != nil {
+		return nil, fmt.Errorf("integration-tier gate: go list: %w", err)
+	}
+	var pkgs []string
+	for _, p := range strings.Fields(listOut) {
+		if strings.Contains(p, "/acs/") {
+			continue
+		}
+		pkgs = append(pkgs, p)
+	}
+	return pkgs, nil
 }
 
 // apicoverEnforceChangedDefault runs `apicover -enforce` (CI go.yml "api-coverage

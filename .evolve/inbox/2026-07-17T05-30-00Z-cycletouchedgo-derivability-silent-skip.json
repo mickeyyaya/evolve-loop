@@ -1,0 +1,26 @@
+{
+  "id": "cycletouchedgo-derivability-silent-skip",
+  "title": "cycleTouchedGo swallows the derivable bool → an underivable (git-diff-failed) cycle SILENTLY SKIPS all three whole-repo audit gates (go vet, acs-durable, integration-tier) — cycle-581-class fail-open reintroduced one call-frame up",
+  "weight": 0.72,
+  "kind": "defect",
+  "priority": "medium",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "go-reviewer HIGH finding on the integration-tier scoping branch (fix/integration-tier-scope-flake). cycleTouchedGo (go/internal/phases/audit/ciparity.go:148-155) computes `pkgs, _ := changedPackagesForAudit(root, cycle); return len(pkgs) > 0` — it DISCARDS the derivable bool. Because changedpkgs.FromGitChecked only ever returns (nil, false) on git failure (never non-empty+underivable), `derivable==false` implies `len(pkgs)==0` implies cycleTouchedGo==false. So when git diff fails (the changedpkgs.go doc names the concrete trigger: a concurrent-fleet .git/index.lock race — the SAME fleet contention the scoping fix addresses), go vet / acs-durable / integration-tier all short-circuit to (nil,nil) — a SILENT skip, not a WARN and not a whole-repo run. This is exactly the cycle-581 D1/D2 fail-open conflation (git-clean vs underivable) that changedPackagesForAudit itself was hardened against, and that apicoverEnforceChangedDefault guards with a fail-loud (ciparity.go ~246-252) — reintroduced at the cycleTouchedGo layer that the other gates share. Deliberately NOT fixed inside the flake-fix branch: making cycleTouchedGo fail-loud/WARN on underivable changes go-vet + acs-durable behavior too (would turn transient git hiccups into new WARNs), so it needs its own tests + per-gate disposition, not a drive-by. Root fix: propagate derivability (return `(touched bool, derivable bool)` or similar) from cycleTouchedGo and have each whole-repo gate emit a WARN 'change-set underivable — gate skipped this cycle, CI backstops' on !derivable instead of a silent no-op, mirroring apicover's fail-loud intent (WARN not FAIL, since a transient lock shouldn't hard-block a ship).",
+  "acceptance": [
+    "RED: with a handoff absent AND git diff forced to fail (underivable change-set), each of go-vet / acs-durable / integration-tier surfaces a WARN-level 'underivable, gate skipped, CI backstops' signal rather than returning (nil,nil) silently",
+    "cycleTouchedGo (or a replacement) is the SINGLE source of the touched∧derivable decision the three gates consult — no gate re-derives independently",
+    "a genuinely Go-untouched cycle (derivable, empty change-set) still no-ops silently (no spurious WARN) — the WARN fires only on underivable, not on legitimately-empty",
+    "go test -race green (untagged + -tags integration + -tags acs); both reviewers"
+  ],
+  "files": [
+    "go/internal/phases/audit/ciparity.go",
+    "go/internal/changedpkgs/changedpkgs.go"
+  ],
+  "deps": [],
+  "connects_to": [
+    "warnship-apicover-ci-gap (same cycle-581 fail-open class)",
+    "integration-tier-scope-flake (the branch this finding was raised on; that branch documents the gap at ciparity.go ~197-204 and defers it here)"
+  ],
+  "source": "go-reviewer HIGH finding on branch fix/integration-tier-scope-flake (2026-07-17)",
+  "created_at": "2026-07-17T05:30:00Z"
+}
