@@ -198,6 +198,130 @@ func TestPlanCycles_SkipsEmptyBuckets(t *testing.T) {
 	}
 }
 
+// locateTodo returns the bucket index of id (found=true, deferred=false), or
+// deferred=true if id is in the deferred slice, or found=false if missing from
+// both — a caller-contract violation.
+func locateTodo(buckets [][]Todo, deferred []Todo, id string) (bucket int, isDeferred bool, found bool) {
+	for i, b := range buckets {
+		for _, td := range b {
+			if td.ID == id {
+				return i, false, true
+			}
+		}
+	}
+	for _, td := range deferred {
+		if td.ID == id {
+			return -1, true, true
+		}
+	}
+	return -1, false, false
+}
+
+// assertGraphConnectedNotSplit is the cycle-871 load-bearing invariant (rung 1
+// of the merge ladder, research finding #2): two todos whose transitive
+// package sets intersect (or either touches a global-zone file) must be
+// co-scheduled into the SAME bucket, or deferred — NEVER split across two
+// distinct concurrent buckets, since that would let two cycles independently
+// touch reachable code and merge-skew (rename + call-site) on landing.
+func assertGraphConnectedNotSplit(t *testing.T, buckets [][]Todo, deferred []Todo, idA, idB string) {
+	t.Helper()
+	ba, da, fa := locateTodo(buckets, deferred, idA)
+	bb, db, fb := locateTodo(buckets, deferred, idB)
+	if !fa || !fb {
+		t.Fatalf("todo missing from PartitionGraph result: %s found=%v, %s found=%v", idA, fa, idB, fb)
+	}
+	if !da && !db && ba != bb {
+		t.Errorf("%s (bucket %d) and %s (bucket %d) are package-graph-connected but split across concurrent buckets", idA, ba, idB, bb)
+	}
+}
+
+// TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets pins
+// the rung-1 fix: todo "a" edits go/internal/fleet/partition.go (package
+// fleet) and todo "b" edits go/internal/ipcenv/ipcenv.go (package ipcenv,
+// transitively imported BY fleet — see partition.go's import block). Their
+// Files sets are disjoint, but the package graph connects them, so today's
+// file-only Partition would wrongly spread them to two concurrent buckets —
+// exactly the merge-skew gap (rename in ipcenv, call-site in fleet) research
+// finding #2 warns about.
+func TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/fleet/partition.go"}},
+		{ID: "b", Files: []string{"internal/ipcenv/ipcenv.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphConnectedNotSplit(t, buckets, deferred, "a", "b")
+}
+
+// TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets is the
+// no-regression baseline: fleet and acsrunner have ZERO import relationship
+// in either direction (verified via `go list -deps` at authoring time), so
+// they must still spread to distinct concurrent buckets and NEVER defer —
+// over-conflicting everything would defeat the point of fleet concurrency.
+func TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	if len(deferred) != 0 {
+		t.Fatalf("unrelated packages must not defer: %v", bucketIDs(deferred))
+	}
+	ba, _, fa := locateTodo(buckets, deferred, "a")
+	bb, _, fb := locateTodo(buckets, deferred, "b")
+	if !fa || !fb {
+		t.Fatalf("todo missing from result: a found=%v b found=%v", fa, fb)
+	}
+	if ba == bb {
+		t.Errorf("unrelated packages a (bucket %d) and b (bucket %d) collapsed into the same bucket — over-conflicting defeats fleet concurrency", ba, bb)
+	}
+}
+
+// TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket pins the fixed
+// global-zone list (go.mod, go.sum, policy/hook/generated files): a todo
+// touching go.mod must conflict with every other bucket regardless of the
+// package graph, since a go.mod edit can change ANY package's build.
+func TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "b", Files: []string{"go.mod"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphConnectedNotSplit(t, buckets, deferred, "a", "b")
+}
+
+// TestPartitionGraph_PureFileDisjointness_Unchanged pins the no-regression AC:
+// with no package-graph or global-zone relationship at all, PartitionGraph's
+// behavior matches plain Partition — same-file todos cluster, disjoint-file
+// todos spread, bridging todos defer.
+func TestPartitionGraph_PureFileDisjointness_Unchanged(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/fleet/partition.go"}},
+		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	if len(deferred) != 0 {
+		t.Fatalf("same-file todos should cluster, not defer: %v", bucketIDs(deferred))
+	}
+	assertCrossBucketDisjoint(t, buckets)
+	for i, b := range buckets {
+		if len(b) == 1 {
+			t.Errorf("bucket %d holds only %v — same-file todos a,b must cluster together", i, bucketIDs(b))
+		}
+	}
+}
+
 // TestPartition_NLessThanOne_DefaultsToOne keeps a degenerate n safe.
 func TestPartition_NLessThanOne_DefaultsToOne(t *testing.T) {
 	buckets, deferred := Partition([]Todo{{ID: "a"}}, 0)
