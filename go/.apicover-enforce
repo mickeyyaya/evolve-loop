@@ -436,3 +436,7 @@
 # inboxbatch (2026-07-16): deterministic backlog grouping for triage —
 # graduated at package creation per the new-package graduation guard.
 ./internal/inboxbatch
+# coherence (2026-07-17, ADR-0072): the verdict-coherence signal (recorded
+# verdict vs on-disk audit+acs) that the system-failure floor gates on.
+# Graduated at package creation per the new-package graduation guard.
+./internal/coherence

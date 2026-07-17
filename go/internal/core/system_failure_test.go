@@ -74,6 +74,19 @@ func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
 	}
 }
 
+func TestWithFailurePolicy_InjectsResolvedPolicy(t *testing.T) {
+	// Names WithFailurePolicy + the SystemFailureSignal alias (apicover).
+	o := &Orchestrator{}
+	WithFailurePolicy(policy.DefaultSystemFailurePolicy())(o)
+	if !o.failurePolicy.IsFloor(policy.CategoryVerdictIncoherence) {
+		t.Error("WithFailurePolicy did not inject the resolved policy (floor missing)")
+	}
+	sig := SystemFailureSignal{Category: policy.CategoryVerdictIncoherence, Level: policy.LevelSystem, Halt: true}
+	if !sig.Halt {
+		t.Error("SystemFailureSignal.Halt not set")
+	}
+}
+
 func TestDetectVerdictIncoherence_PassVerdict_NoHalt(t *testing.T) {
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()

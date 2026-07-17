@@ -6,6 +6,14 @@ import (
 	"testing"
 )
 
+func TestCoherence_ResultShape(t *testing.T) {
+	// Names the Coherence result type (apicover) and pins its incoherent shape.
+	var got Coherence = CheckVerdictCoherence(VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "PASS", AuditRan: true})
+	if !got.Incoherent || got.Category != "verdict-incoherence" || got.Evidence == "" {
+		t.Errorf("Coherence = %+v; want incoherent verdict-incoherence with evidence", got)
+	}
+}
+
 func TestReadCycleVerdicts_Fixture(t *testing.T) {
 	dir := t.TempDir()
 	audit := "## Verdict\n**PASS**\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"

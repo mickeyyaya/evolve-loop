@@ -6,6 +6,25 @@ import (
 	"testing"
 )
 
+// TestSystemFailureSignal_Wire pins the ADR-0072 system-failure signal JSON
+// shape (serialized into the escalation dossier) and names the type (apicover).
+func TestSystemFailureSignal_Wire(t *testing.T) {
+	b, err := json.Marshal(SystemFailureSignal{Category: "verdict-incoherence", Level: "system", Evidence: "e", Halt: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"category"`, `"level"`, `"evidence"`, `"halt"`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("SystemFailureSignal JSON missing %s: %s", want, b)
+		}
+	}
+	// CycleResult carries the signal by pointer.
+	r := CycleResult{SystemFailure: &SystemFailureSignal{Category: "verdict-incoherence", Halt: true}}
+	if r.SystemFailure == nil || !r.SystemFailure.Halt {
+		t.Error("CycleResult.SystemFailure not wired")
+	}
+}
+
 // TestTokenUsage_Wire pins the snake_case JSON wire shape (cost telemetry is
 // serialized into ledger/phase artifacts).
 func TestTokenUsage_Wire(t *testing.T) {
