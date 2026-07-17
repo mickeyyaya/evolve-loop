@@ -28,6 +28,15 @@
   "max_turns": 12,
   "output_artifact": "bug-reproduction-report.md",
   "challenge_token_required": true,
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
   "parallel_eligible": false,
   "sandbox": {
     "enabled": true,
