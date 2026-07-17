@@ -2,7 +2,10 @@
 
 > **Status:** research complete 2026-07-05 (3 parallel web sweeps, ~50 papers/sources, all 2025–2026 unless seminal).
 > **Goal served:** `805f6ced` — "Optimize per-agent token usage across all phase agents … and the system; preserve every phase-integrity guarantee."
-> **Companion files:** [part1-context-compression.md](part1-context-compression.md) · [part2-multiagent-economics.md](part2-multiagent-economics.md) · [part3-reasoning-efficiency.md](part3-reasoning-efficiency.md) — full per-paper detail + citations.
+> **Companion files:**
+> — *Research:* [part1-context-compression.md](part1-context-compression.md) · [part2-multiagent-economics.md](part2-multiagent-economics.md) · [part3-reasoning-efficiency.md](part3-reasoning-efficiency.md) — full per-paper detail + citations.
+> — *Design:* [part4-per-phase-boot-context.md](part4-per-phase-boot-context.md) — the clean-boot / per-phase boot-context minimization design.
+> — *Implementation record:* [part5-campaign-implementation-2026-07-17.md](part5-campaign-implementation-2026-07-17.md) — the 2026-07-17 campaign: telemetry fix, clean-boot B-v1/v2/v3, per-CLI investigation, Slice C design, GOTCHAs, measured **−39% cache_read/cycle**. Decision record: [ADR-0071](../../../docs/architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md).
 
 ## Executive summary
 

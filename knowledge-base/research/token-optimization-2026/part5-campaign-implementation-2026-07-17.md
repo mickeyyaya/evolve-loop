@@ -166,11 +166,22 @@ reflector, …) — a *proven in-repo pattern*, not net-new. So the whole campai
      declared `allowed_tools` under `--dangerously-skip-permissions`). *Not* applied to
      orchestration-heavy phases (coverage-gate/build/scout use Agent/Monitor/Task*/
      ScheduleWakeup — a tight whitelist would break them and cut little anyway).
-  2. **Skill de-risk**: removed `--disable-slash-commands` from bug-reproduction and
-     adversarial-review — they invoke real skills (`superpowers:systematic-debugging`,
-     `security-patterns-code-review`), and "Disable all skills" would degrade them
-     (rare — 1/138, 4/320 runs — but a security-review gate isn't worth it). Caught by
-     inspecting *actual tool usage*, not assuming.
+  2. **Skill handling — a correction (see ADR-0002).** B-v3 first *removed*
+     `--disable-slash-commands` from bug-reproduction and adversarial-review because
+     their transcripts invoked skills (`superpowers:systematic-debugging`,
+     `security-patterns-code-review`). **A subsequent doc audit showed that was wrong**:
+     `docs/adr/0002-disable-slash-commands-semantics.md` (Accepted) mandates the
+     defense-in-depth pattern *master-off (`--disable-slash-commands`) + explicit
+     `Skill(<name>)` allowlist* (as `builder.json` uses `Skill(code-review-simplify)`/
+     `Skill(security-review-scored)`) and **explicitly rejects** "remove the flag, trust
+     the allowlist alone." The flag was **restored** (`2f25b89a`); it also turned out
+     `security-patterns-code-review` is not registered locally, so the invocations were
+     likely no-ops under `--setting-sources project`. Empirical skill-verification
+     (ADR-0002's own "verify, don't remove controls" principle) is queued as
+     `skill-allowlist-for-skill-using-phases`. Net: the ADR-aligned posture also
+     reclaims the ~18K/turn skill-schema cut on those 2 phases. **Lesson: check the ADR
+     record before changing a security-relevant flag** — this exact removal was a
+     pre-rejected alternative.
 
 ### 2.6 Validation (quality, not just tokens)
 Every ship was checked for **quality**, not just token drop — the lesson from §1.
@@ -241,10 +252,14 @@ rate.
 
 - **Verify telemetry/parsing fixes against real on-disk data** — unit fixtures hid the
   string-vs-block content bug (§1.3). Write a throwaway real-`~/.claude` probe.
-- **churn-discard nukes untracked main-tree files mid-loop.** A research doc written to
-  `knowledge-base/` while the loop ran *vanished* — the loop's ship churn-discard cleans
-  untracked files from the main tree. Only `.evolve/inbox/` is safe for loose writes;
-  commit anything else promptly. (Extends `boundary_only_main_tree_writes` to untracked.)
+- **churn-discard reverts BOTH untracked files AND uncommitted tracked-file edits
+  mid-loop.** A research doc written to `knowledge-base/` while the loop ran *vanished*
+  (untracked → deleted); separately, edits to already-tracked docs (README.md, this
+  file) made while the loop ran were silently **reverted** at the next cycle's ship
+  churn-discard — they weren't on disk at ship time and dropped out of the commit. Only
+  `.evolve/inbox/` is safe for loose writes; **make any other tree edit with the loop
+  PAUSED, then ship immediately.** (Extends `boundary_only_main_tree_writes` to untracked
+  files and to uncommitted tracked modifications.)
 - **`COMMIT_GATE_STALE` has two causes:** (a) `cmd | tail` masks the gate's non-zero
   exit so `&&` lets `ship` run against a stale attestation — use `gate=$?` after an
   un-piped command; (b) SIGTERM the loop then *immediately* ship → the graceful-shutdown
