@@ -150,7 +150,16 @@ behavior as if cost had hit first.
 - `docs/architecture/token-economics-2026.md` — per-phase cost forensics
   and ROI-ordered optimization roadmap.
 - `docs/architecture/token-floor-history.md` — campaign-by-campaign
-  static-context floor measurements.
+  static-context floor measurements (see **Campaign E — clean-boot, 2026-07-17**).
+- `knowledge-base/research/token-optimization-2026/part4-per-phase-boot-context.md`
+  + `part5-campaign-implementation-2026-07-17.md` — the **clean-boot** campaign: cut the
+  per-turn boot base ~64K→~19–32K via config-injected launch flags (`extra_flags_by_cli`),
+  measured **−39% cache_read/cycle**. Complementary lever to autotrim: autotrim trims the
+  *assembled prompt*; clean-boot trims the *fixed boot + tool-schema base* re-read every
+  turn. Measurement prerequisite (token telemetry attribution fix): part5 §1 +
+  `docs/architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md`.
+- `docs/adr/0002-disable-slash-commands-semantics.md` — the defense-in-depth semantics
+  the clean-boot skill flags follow (master-off + `Skill(<name>)` allowlist).
 - `legacy/scripts/observability/show-context-monitor.sh` — operator-facing tool.
 - `legacy/scripts/tests/context-window-control-test.sh` — 22-assertion test
   suite covering autotrim algorithm, monitor JSON, and operator tool.

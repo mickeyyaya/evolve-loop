@@ -76,6 +76,27 @@ via `Read`.
 | `agents/evolve-scout.md` | 15,962 | 15,962 (0%) | (no extraction — monolithic responsibilities) |
 | `agents/evolve-retrospective.md` | 12,988 | 12,988 (0%) | (only fires on FAIL/WARN; persona load is already conditional) |
 
+## Campaign E — Per-phase clean-boot (2026-07-17)
+
+Cut the **per-turn boot base** (claude system prompt + tool schemas + MCP + skills +
+CLAUDE.md, re-read on *every* turn as `cache_read`) via config-injected launch flags in
+each phase's `extra_flags_by_cli.claude-tmux` — no Go changes. Full record:
+[part5-campaign-implementation-2026-07-17.md](../../knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md);
+design: [part4](../../knowledge-base/research/token-optimization-2026/part4-per-phase-boot-context.md).
+
+| lever | flags | per-turn base |
+|---|---|---|
+| pre-campaign default | — | ~64–82K |
+| clean-boot (B-v1/v2) | `--strict-mcp-config --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project` | ~46–50K (−33 to −38%) |
+| + per-phase `--tools` (B-v3) | `--tools <observed set>` on simple-tool phases | ~19–32K (fault-localization **−61%**) |
+
+**Aggregate (live telemetry, adjacent cycles):** `cache_read`/cycle **36.6M → 22.2M
+(−39%, ~14.4M tokens/cycle)**. Prerequisite: the token-telemetry attribution fix
+(ArtifactPath keying, part5 §1) made these numbers visible — before it, all input/cache
+read as zero. Ships: `315175bd`/`42fe5244`/`94f5d84b`. Skill-flag posture follows
+[ADR-0002](../adr/0002-disable-slash-commands-semantics.md) (master-off + `Skill(<name>)`
+allowlist, not flag removal).
+
 ## How to reproduce
 
 ```bash

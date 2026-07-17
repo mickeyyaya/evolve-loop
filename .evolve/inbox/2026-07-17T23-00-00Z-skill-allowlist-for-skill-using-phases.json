@@ -1,0 +1,12 @@
+{
+  "id": "skill-allowlist-for-skill-using-phases",
+  "created_at": "2026-07-17T23:00:00Z",
+  "weight": 0.5,
+  "title": "Empirically verify (ADR-0002 pattern) whether bug-reproduction/adversarial-review need their skills on the claude path; if so, register + Skill(<name>) allowlist rather than removing --disable-slash-commands",
+  "kind": "chore",
+  "priority": "low",
+  "summary": "Correction context: token-opt B-v3 (94f5d84b) REMOVED --disable-slash-commands from bug-reproduction + adversarial-review because their transcripts invoked skills (superpowers:systematic-debugging, security-patterns-code-review). That violated ADR-0002 (docs/adr/0002-disable-slash-commands-semantics.md), which mandates the defense-in-depth pattern: --disable-slash-commands (master kill-switch) + explicit Skill(<name>) allowlist entries in allowed_tools (see builder.json: Skill(code-review-simplify)/Skill(security-review-scored)), and explicitly REJECTS 'remove the flag, trust allowlist alone'. The flag was RESTORED (this correction). But two open questions per ADR-0002's own principle (empirical verification, not assumption): (1) security-patterns-code-review is NOT registered locally (only security-review-scored is) — was the invocation a no-op? (2) superpowers:systematic-debugging is a GLOBAL plugin skill — is it even loaded under --setting-sources project? SMOKE-TEST both phases on the claude path: if they genuinely need + can use these skills, register the skill locally + add Skill(<name>) to allowed_tools (ADR-0002 pattern); if the invocations are no-ops, no action needed (the restored flag is correct as-is). Do NOT re-remove --disable-slash-commands.",
+  "acceptance": ["smoke test: does bug-reproduction/adversarial-review's skill invocation succeed on claude with --disable-slash-commands + no allowlist? (confirms no-op vs needed)", "if needed: skill registered locally + Skill(<name>) in allowed_tools, verified working under --disable-slash-commands", "--disable-slash-commands stays ON (defense-in-depth per ADR-0002)"],
+  "files": [".evolve/profiles/bug-reproduction.json", ".evolve/profiles/adversarial-review.json", "docs/adr/0002-disable-slash-commands-semantics.md"],
+  "connects_to": ["docs/adr/0002-disable-slash-commands-semantics.md", "knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md"]
+}
