@@ -27,6 +27,14 @@
   "challenge_token_required": true,
   "extra_flags_by_cli": {
     "claude-tmux": [
+      "--tools",
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Grep",
+      "Glob",
+      "ToolSearch",
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
       "--disable-slash-commands",

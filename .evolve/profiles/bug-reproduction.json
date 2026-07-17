@@ -32,7 +32,6 @@
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
       "--setting-sources",
       "project"
     ]

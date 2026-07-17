@@ -1,0 +1,12 @@
+{
+  "id": "telemetry-coverage-tripwire-nonclaude-success",
+  "created_at": "2026-07-17T22:00:00Z",
+  "weight": 0.6,
+  "title": "Telemetry coverage tripwire: WARN when a NON-claude CLI records a SUCCESSFUL run (exit 0, real duration) with source=none — the signal that the codex/agy token blind spot went live and per-CLI collectors are now needed",
+  "kind": "feature",
+  "priority": "low",
+  "summary": "Token telemetry has real input/cache fidelity ONLY for claude (transcript tier in tokenusage/defaultresolver.go); codex/agy fall to events/scrollback → source=none/scrollback_peak with input/cache=0. Investigation 2026-07-17 (measure-first) showed this is NOT a live gap: EVERY recent agy launch exited 85 (quota-bench) or 10 (probe-fail) — avg 4-11s, zero exit-0 — and codex is benched (strikes=21). So agy/codex do ~zero real token work and fall back to claude (measured); their zero records are ACCURATE. Building full codex/agy usage collectors is unnecessary now AND infeasible from disk (codex token_count.info is null; agy persists no session log). BUT the gap is LATENT: if codex/agy quotas free up and they complete real phases (exit 0, minutes-long), that usage becomes silently unmeasured. This item = the cheap tripwire, not the collectors: scan llm-calls.ndjson (or the S6 rollup) and emit a WARN / surface in `evolve tokens report` when cli!=claude* AND exit_code==0 AND source==none AND duration_ms > ~60000. That WARN is the trigger to THEN build per-CLI collectors (codex exec --json usage if it emits it; agy --print usage capture; or usage into the <agent>-events.ndjson envelope the driver-agnostic tier already reads). Honors 'no silent caps' without over-building measurement for launches that currently consume nothing.",
+  "acceptance": ["A successful (exit 0, >60s) non-claude launch recorded as source=none produces a visible WARN (not a silent zero)", "the WARN names the CLI + agent + cycle so the operator knows which collector to build", "no false positives on the current quota-abort pattern (exit 85/10 short launches stay quiet)"],
+  "files": ["go/internal/tokenusage/defaultresolver.go (already emits a per-driver Warn on SourceNone — extend the consumer to escalate on exit-0)", "go/internal/bridge/engine.go recordTokenUsage (has exit code + duration + source at the record site)", "the S6 rollup / S7 tokens-report CLI"],
+  "connects_to": ["token-telemetry-s7-tokens-report-cli", "the ArtifactPath-primary attribution fix (claude fidelity)"]
+}
