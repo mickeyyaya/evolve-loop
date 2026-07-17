@@ -106,6 +106,15 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
 		return 1
 	}
+	// Preserve operator-authored tier_fallbacks: the refresh rebuilds the
+	// catalog wholesale, so merge prior chains in before overwriting the cache.
+	// A corrupt prior cache must not block refresh — refresh IS the repair
+	// path — so warn and write the unmerged catalog (no chains to preserve).
+	if prior, readErr := modelcatalog.Read(o.EvolveDir); readErr != nil {
+		fmt.Fprintf(stderr, "evolve models refresh: prior catalog unreadable, tier_fallbacks not preserved: %v\n", readErr)
+	} else {
+		cat = modelcatalog.MergeFallbacks(prior, cat)
+	}
 	if err := modelcatalog.Write(o.EvolveDir, cat); err != nil {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
 		return 1

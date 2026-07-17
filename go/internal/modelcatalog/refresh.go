@@ -64,3 +64,28 @@ func BuildFromSnapshots(snaps []CLISnapshot, fetchedAt time.Time) Catalog {
 	}
 	return cat
 }
+
+// MergeFallbacks carries operator-authored TierFallbacks from a prior catalog
+// into a freshly built one, so `evolve models refresh` (which rebuilds and
+// rewrites the cache wholesale) does not silently destroy fallback chains.
+// It fills gaps only: a fresh entry that already carries its own chain keeps
+// it, and a CLI absent from next is never resurrected just to preserve its old
+// chain. Pure — neither input is mutated; the returned catalog is next with a
+// copied CLIs map and, where filled, a copied fallbacks map.
+func MergeFallbacks(prior, next Catalog) Catalog {
+	merged := next
+	merged.CLIs = make(map[string]CLIEntry, len(next.CLIs))
+	for name, entry := range next.CLIs {
+		if len(entry.TierFallbacks) == 0 {
+			if chains := prior.CLIs[name].TierFallbacks; len(chains) > 0 {
+				copied := make(map[string][]string, len(chains))
+				for tier, chain := range chains {
+					copied[tier] = append([]string(nil), chain...)
+				}
+				entry.TierFallbacks = copied
+			}
+		}
+		merged.CLIs[name] = entry
+	}
+	return merged
+}

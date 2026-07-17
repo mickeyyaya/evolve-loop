@@ -235,7 +235,7 @@ func New(opts Options) *BaseRunner {
 	}
 	sleepFn := opts.SleepFn
 	if sleepFn == nil {
-		sleepFn = time.Sleep
+		sleepFn = settleSleep
 	}
 	diag := opts.Diag
 	if diag.Out == nil && diag.Err == nil {
@@ -259,21 +259,29 @@ func New(opts Options) *BaseRunner {
 }
 
 // reconcileSettleRetries / reconcileSettleInterval bound the settle-retry loop
-// in verifyReconcileDeliverable. Worst-case added latency on a genuine miss:
-// reconcileSettleRetries * reconcileSettleInterval, only on the exceptional
-// reconcile-on-timeout path.
+// in verifyReconcileDeliverable. Worst-case added latency on a genuine first-probe
+// miss: reconcileSettleRetries * reconcileSettleInterval (~600ms).
 const (
 	reconcileSettleRetries  = 3
 	reconcileSettleInterval = 200 * time.Millisecond
 )
 
+// settleSleep is the process clock for verifyReconcileDeliverable's inter-attempt
+// wait — time.Sleep in production; a test init flips it to a no-op so the settle
+// window costs zero wall-clock in the package's test suite (the retry now sits on
+// the common clean-exit path, so real sleeps would balloon package test time).
+var settleSleep = time.Sleep
+
 // verifyReconcileDeliverable re-verifies the on-disk deliverable a bounded number
 // of times (reconcileSettleRetries) before giving up, sleeping reconcileSettleInterval
-// between attempts. It closes the settle-race behind cycles 824/825: a next-phase
-// context-cancel laundered into ErrArtifactTimeout can fire while the deliverable is
-// still being written, so a single-shot verify at that instant misses a
-// genuinely-PASS report. Retrying can only UPGRADE a timeout toward the agent's real
-// verdict — a never-settling deliverable still returns not-OK and hard-fails.
+// between attempts. It serves BOTH the reconcile-on-timeout path (cycles 824/825: a
+// next-phase context-cancel laundered into ErrArtifactTimeout fires while the
+// deliverable is still being written) AND the clean-exit artifact-read path
+// (cycle-603/899: a cleanly-exited agent idles while the presence probe races the
+// transient state). On the clean-exit path it fires on ANY first-probe miss, not
+// only an idle-settle race — an ordinary malformed deliverable pays the bounded
+// retry too before falling back to stdout. Retrying can only UPGRADE toward the
+// agent's real on-disk verdict; a never-settling deliverable still returns not-OK.
 func (b *BaseRunner) verifyReconcileDeliverable(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 	res, verr := b.verifyFn(phase, roots)
 	for attempt := 0; attempt < reconcileSettleRetries && (verr != nil || !res.OK); attempt++ {
@@ -699,20 +707,29 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// Prefer the on-disk deliverable over captured stdout whenever it exists and
 	// verifies well-formed. bres.Stdout is bridge scrollback that can contain the
 	// Deliverable Contract's own prompt-echoed example verdict sentinels — a real
-	// PASS report was recorded as FAIL this way (cycle-603) when the agent wrote a
-	// good deliverable then idled without a clean signal (a non-timeout completion,
-	// so the reconcile-on-timeout fallback above never engaged). The agent's real
-	// report is the file. This never downgrades: if the file is absent/malformed,
-	// fall back to stdout exactly as before (fail-open preserved, no verdict gets
-	// easier to game). On a reconciled timeout the file was already proven
-	// well-formed above, so read it unconditionally.
+	// PASS report was recorded as FAIL this way (cycle-603, then recurring 877→899
+	// ≥10× on one goal_hash) when the agent EXITS CLEANLY (exit 0) then idles
+	// without a clean completion signal (a non-timeout completion, so the
+	// reconcile-on-timeout fallback above never engaged). The agent's real report
+	// is the file. This never downgrades: if the file is absent/malformed, fall
+	// back to stdout exactly as before (fail-open preserved, no verdict gets easier
+	// to game). On a reconciled timeout the file was already proven well-formed
+	// above, so read it unconditionally.
+	//
+	// The presence check uses the SAME bounded settle-retry as the reconcile path
+	// (verifyReconcileDeliverable), not a single-shot verify: a clean-exit-idle
+	// agent leaves the deliverable settling / the presence extraction racing a
+	// transient state, so one instantaneous verify can misreport a genuinely-PASS
+	// report absent — which then Classifies multi-phase-contaminated scrollback
+	// into a synthetic FAIL. Retrying can only UPGRADE toward the on-disk verdict;
+	// a never-settling deliverable still returns not-OK and falls back to stdout.
 	preferFile := reconciled || artifact == ""
 	if !preferFile {
 		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
 		if req.ProjectRoot != "" {
 			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 		}
-		if res, verr := b.verifyFn(phase, roots); verr == nil && res.OK {
+		if res, verr := b.verifyReconcileDeliverable(phase, roots); verr == nil && res.OK {
 			preferFile = true
 		}
 	}
