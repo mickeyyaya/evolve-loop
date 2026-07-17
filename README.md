@@ -313,11 +313,11 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v22.2.1)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v22.3)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
-| **v22.2.1** | Jul 17 | **Hotfix:** clean-exit-idle verdict-authority (fixes a loop false-FAIL that discarded valid PASS cycles) + token-telemetry attribution fix + clean-boot token campaign (−39% context/cycle) |
+| v22.3 | Jul 17 | **System-failure policy (ADR-0072):** loop halts on forged verdicts instead of retrying; clean-exit verdict-authority fix; token-telemetry + clean-boot campaign (−39% context/cycle) |
 | v22.2 | Jul 16 | Spine artifact floor armed; static/dynamic boundary-leak closures; inbox batch classifier; reconcile-on-quota-teardown |
 | v22.1 | Jul 8 | Landing-page interactive labs + demos; llms.txt |
 | v22.0 | Jul 5 | Self-healing SELF_SHA auto-repin + fleet 2-wide concurrency; "top" canonical model tier |
