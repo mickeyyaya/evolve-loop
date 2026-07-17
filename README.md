@@ -313,24 +313,25 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v22.2)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v22.2.1)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
-| v20.4 | Jun 24 | see [CHANGELOG.md](CHANGELOG.md) |
-| v21.0 | Jun 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.1 | Jun 24 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.2 | Jun 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.3 | Jun 26 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.4 | Jun 29 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.5 | Jun 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.6 | Jul 2 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.7 | Jul 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.8 | Jul 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v21.9 | Jul 3 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.0 | Jul 5 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.1 | Jul 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.2 | Jul 16 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| **v22.2.1** | Jul 17 | **Hotfix:** clean-exit-idle verdict-authority (fixes a loop false-FAIL that discarded valid PASS cycles) + token-telemetry attribution fix + clean-boot token campaign (−39% context/cycle) |
+| v22.2 | Jul 16 | Spine artifact floor armed; static/dynamic boundary-leak closures; inbox batch classifier; reconcile-on-quota-teardown |
+| v22.1 | Jul 8 | Landing-page interactive labs + demos; llms.txt |
+| v22.0 | Jul 5 | Self-healing SELF_SHA auto-repin + fleet 2-wide concurrency; "top" canonical model tier |
+| v21.9 | Jul 3 | Quota-aware fleet budgeting wired into the live fleet wave |
+| v21.8 | Jul 3 | Dynamic fleet budgeting (`fleet.budget` + native usage probe) |
+| v21.7 | Jul 3 | Fleet wave guards |
+| v21.6 | Jul 2 | Dynamic model routing — advisor `{cli,tier}` axis + clamp |
+| v21.5 | Jun 30 | ACS predicate-quality safeguard preserved under context compaction |
+| v21.4 | Jun 29 | Claude Code 2.1.195 plugin-schema fix; codex native install; agy skill trees; `/evo:` command namespacing |
+| v21.3 | Jun 26 | claude-tmux boot-dialog dismissal + prompt-delivery fix |
+| v21.2 | Jun 26 | Loop lease fencing + tmux session GC |
+| v21.1 | Jun 24 | Prebuilt binaries for 13 Unix targets + install.sh OS/arch detection |
+| v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the `EVOLVE_STRICT_AUDIT` dial |
+| v20.4 | Jun 24 | Public OSS-mirror release automation |
 
 ---
 
