@@ -330,7 +330,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v21.3 | Jun 26 | claude-tmux boot-dialog dismissal + prompt-delivery fix |
 | v21.2 | Jun 26 | Loop lease fencing + tmux session GC |
 | v21.1 | Jun 24 | Prebuilt binaries for 13 Unix targets + install.sh OS/arch detection |
-| v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the `EVOLVE_STRICT_AUDIT` dial |
+| v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the strict-audit gate dial |
 | v20.4 | Jun 24 | Public OSS-mirror release automation |
 
 ---
