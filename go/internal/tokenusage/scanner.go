@@ -84,10 +84,9 @@ type transcriptLine struct {
 			CacheRead  int `json:"cache_read_input_tokens"`
 			CacheWrite int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
+		// Content is a JSON union (bare string OR array of typed blocks); kept
+		// raw so contentText can decode either form.
+		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
 
@@ -190,16 +189,39 @@ func attributes(lines []transcriptLine, w Window) bool {
 	return false
 }
 
-// firstUserText returns the concatenated text of the first user message's
-// content blocks, or "" if there is none.
+// firstUserText returns the text of the first user message, or "" if there is
+// none. The Claude Code transcript encodes message content in two forms and the
+// scanner must read both (the first user message — the phase prompt carrying the
+// ArtifactPath attribution key — is commonly the bare-string form).
 func firstUserText(lines []transcriptLine) string {
 	for _, ln := range lines {
 		if ln.Type != "user" {
 			continue
 		}
+		return contentText(ln.Message.Content)
+	}
+	return ""
+}
+
+// contentText decodes a transcript message's content, which is EITHER a bare
+// JSON string OR an array of typed blocks ({"type":"text","text":...}). It
+// returns the string form directly, or the concatenated block text; unknown or
+// empty content yields "".
+func contentText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var blocks []struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(raw, &blocks) == nil {
 		var b strings.Builder
-		for _, c := range ln.Message.Content {
-			b.WriteString(c.Text)
+		for _, blk := range blocks {
+			b.WriteString(blk.Text)
 		}
 		return b.String()
 	}

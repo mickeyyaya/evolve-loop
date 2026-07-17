@@ -83,3 +83,42 @@ func TestTranscriptScan_ArtifactPathNotInMessage_NotAttributed(t *testing.T) {
 		t.Errorf("Source = %q, want %q — a transcript lacking the launch's ArtifactPath must not be attributed", res.Source, SourceNone)
 	}
 }
+
+// TestTranscriptScan_AttributesByArtifactPath_StringContent — the first user
+// message's content is a BARE JSON STRING (the common Claude Code transcript
+// form for the phase prompt), not an array of {type,text} blocks. firstUserText
+// must decode the string form; otherwise the ArtifactPath key never matches and
+// attribution silently fails. This is the production blind spot that made the
+// prior ArtifactPath-primary fix (c41fa94b) inert: unit fixtures used the block
+// form, real transcripts use the string form, so cache_read read as zero.
+func TestTranscriptScan_AttributesByArtifactPath_StringContent(t *testing.T) {
+	worktree := "/repo/.evolve/worktrees/cycle-500"
+	artifact := "/repo/.evolve/runs/cycle-500/build-report.md"
+	root := t.TempDir()
+	sessionDir := filepath.Join(root, "projects", "-repo--evolve-worktrees-cycle-500")
+	// content is a JSON STRING (not an array of blocks), as real transcripts emit:
+	body := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":"## Deliverable Contract\n\nWrite it to the EXACT path: ` + artifact + `"}}
+{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":9,"output_tokens":100,"cache_read_input_tokens":88000,"cache_creation_input_tokens":12}}}
+`
+	writeTranscript(t, sessionDir, "sess1.jsonl", body)
+
+	// Worktree is irrelevant to this test — ArtifactPath governs attribution
+	// unconditionally; set to an arbitrary value for parity with sibling fixtures.
+	w := Window{
+		Worktree:     "/repo",
+		ArtifactPath: artifact,
+		Start:        mustParse(t, launchWindowStart),
+		End:          mustParse(t, launchWindowEnd),
+	}
+	res, err := ScanConfigRoot(root, w)
+	if err != nil {
+		t.Fatalf("ScanConfigRoot: %v", err)
+	}
+	if res.Source != SourceTranscript {
+		t.Fatalf("Source = %q, want %q — bare-string content must be read so ArtifactPath attributes", res.Source, SourceTranscript)
+	}
+	want := cyclestate.TokenUsage{Input: 9, Output: 100, CacheRead: 88000, CacheWrite: 12}
+	if res.Usage != want {
+		t.Errorf("Usage = %+v, want %+v", res.Usage, want)
+	}
+}
