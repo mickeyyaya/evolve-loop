@@ -129,6 +129,7 @@ If you only read one section, read this. These are the things Evolve Loop is bui
 - **Get smarter every run.** Failures are distilled into lesson files that are fed back into the next cycle's planning. Mistakes don't repeat; the system compounds.
 - **Survive long unattended runs.** Quota walls, rate limits, and context-window failures are expected. Work in flight is checkpointed and resumable rather than discarded.
 - **Stay vendor-flexible.** Route Scout to Gemini, the builder to Claude Sonnet, the auditor to Claude Opus — whatever mix you trust — without changing the pipeline.
+- **Run lean on context.** Each phase boots with only the context it needs — the redundant tool schemas, MCP servers, skills, and repo instructions that every turn silently re-reads are stripped per phase (config-injected, no code changes). Measured **~39% fewer context tokens per cycle**, so long unattended runs cost less and hit context walls later. Full record: [token-optimization campaign](knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md).
 
 It is **not** a benchmark-chasing code-writing agent. It's the governance and trust layer you put *around* one.
 
