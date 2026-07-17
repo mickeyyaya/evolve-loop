@@ -20,6 +20,24 @@ type CycleResult struct {
 	// pressure clobbered an audit PASS and zeroed the wave. The degrade is
 	// preserved here (never silently dropped) and surfaced in the cycle dossier.
 	SkippedPhases []SkippedPhase
+	// SystemFailure, when non-nil, marks that this cycle's failure was
+	// classified as SYSTEM-level (ADR-0072): the pipeline itself — not the
+	// task's code — is the cause (verdict-incoherence, infra-systemic,
+	// non-progress). The batch loop reads it to HALT + escalate instead of
+	// re-selecting the same inbox task. Nil ⇒ an ordinary task-level outcome
+	// (never-stop: retry/defer/quarantine as usual).
+	SystemFailure *SystemFailureSignal
+}
+
+// SystemFailureSignal records a system-level failure classification (ADR-0072).
+// Category is the failure_policy category (e.g. "verdict-incoherence"); Halt is
+// true when the Go floor mandates a loop halt regardless of orchestrator
+// judgment. Evidence is the deterministic proof (e.g. the coherence signal).
+type SystemFailureSignal struct {
+	Category string `json:"category"`
+	Level    string `json:"level"` // "system"
+	Evidence string `json:"evidence"`
+	Halt     bool   `json:"halt"`
 }
 
 // SkippedPhase is one non-floor phase whose non-PASS verdict was degraded rather

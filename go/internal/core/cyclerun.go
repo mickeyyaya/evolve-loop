@@ -218,6 +218,20 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	postCycleHEAD, _ := o.gitHEAD()
 	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
 
+	// ADR-0072 Go floor: verdict-coherence. If the cycle recorded a negative
+	// verdict but the phases' own on-disk artifacts (audit-report + acs-verdict)
+	// are green, the pipeline forged the verdict — a SYSTEM-level failure, not a
+	// task failure. Mark it so the batch loop HALTS + escalates for pipeline
+	// diagnosis instead of re-selecting the same inbox task (which would just
+	// reproduce the forged verdict — the cycle 862→899 livelock). This floor is
+	// non-negotiable: independent of orchestrator judgment and strict_audit.
+	if result.SystemFailure == nil {
+		if sig := o.detectVerdictIncoherence(cs, result.FinalVerdict); sig != nil {
+			result.SystemFailure = sig
+			fmt.Fprintf(os.Stderr, "[orchestrator] SYSTEM-FAILURE HALT cycle %d: %s — %s. Halting the loop for pipeline diagnosis instead of retrying the task (ADR-0072).\n", cycle, sig.Category, sig.Evidence)
+		}
+	}
+
 	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
 	// HEAD advancing and without an audit-advisory "would-have-blocked" record —
 	// i.e. work may have been produced and then discarded with the worktree

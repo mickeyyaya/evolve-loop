@@ -631,6 +631,23 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		ranCycle := result.Cycle
 		workspace := cycleWorkspace(cfg.ProjectRoot, ranCycle)
 
+		// ADR-0072: a SYSTEM-level failure (the pipeline forged a verdict, not a
+		// task-code failure) HALTS the loop for diagnosis instead of retrying the
+		// same inbox task — which would only reproduce the fault (the cycle
+		// 862→899 livelock). This Go floor is non-negotiable. Checked HERE, before
+		// the quota-pause / circuit-breaker / verify branches below can early-
+		// return, so the escalation dossier + P0 pipeline-repair item are always
+		// written even when another condition also trips this cycle. rc=4 is
+		// distinct from the soft rc=3 (batch completed with absorbed FAILs).
+		if sf := result.SystemFailure; sf != nil && sf.Halt {
+			writePipelineEscalation(cfg.EvolveDir, cfg.ProjectRoot, ranCycle, workspace, sf, stderr)
+			fmt.Fprintf(stderr, "[loop] SYSTEM-FAILURE HALT: cycle=%d category=%s level=%s\n[loop]   %s\n[loop]   The pipeline (not the task) is the cause — diagnose + fix before resuming; a P0 pipeline-repair item was filed to .evolve/inbox/. Escalation: .evolve/pipeline-escalation.json\n",
+				ranCycle, sf.Category, sf.Level, sf.Evidence)
+			lr.StopReason = "system_failure_halt"
+			lr.emitFatal(stdout, stderr, cfg, ranCycle)
+			return 4
+		}
+
 		if lastAfter <= lastBefore {
 			// The counter didn't advance — record an abnormal event in
 			// the cycle workspace if it exists. (Workspace may be

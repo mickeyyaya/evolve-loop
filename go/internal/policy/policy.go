@@ -81,6 +81,14 @@ type Policy struct {
 	// artifacts on every abnormal termination) is NON-configurable, like
 	// the integrity floor.
 	FailureFloor *FailureFloor `json:"failure_floor,omitempty"`
+	// FailurePolicy is the declarative system-failure DECISION policy
+	// (ADR-0072): the category→action mapping the orchestrator classifies
+	// against, the non-negotiable Go-enforced floor categories
+	// (verdict-incoherence, infra-systemic — always halt), and the
+	// non-progress/retry thresholds. Distinct from FailureFloor (which tunes
+	// the LLM-learning layer) and Classify (the hang reclassifier). Absent ⇒
+	// compiled defaults (DefaultFailurePolicy). See policy_failure.go.
+	SystemFailurePolicy *SystemFailurePolicy `json:"failure_policy,omitempty"`
 	// GC is the declarative retention policy for the .evolve data tree
 	// (L3.1). The schema lives in internal/gc (a stdlib-only leaf this
 	// package may import without weight); absent ⇒ gc defaults. The hard

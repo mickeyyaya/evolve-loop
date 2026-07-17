@@ -568,6 +568,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
+	// ADR-0072 system-failure decision policy. A malformed failure_policy block
+	// falls back to the orchestrator's compiled DefaultSystemFailurePolicy (the
+	// Go-enforced floor is preserved regardless) — same safe semantics as an
+	// absent block; only an operator's non-floor tuning would be dropped.
+	if fp, err := pol.FailurePolicyConfig(); err == nil {
+		opts = append(opts, core.WithFailurePolicy(fp))
+	} else {
+		fmt.Fprintf(os.Stderr, "[cycle] WARN: malformed failure_policy in policy.json (%v) — using compiled defaults (floor preserved)\n", err)
+	}
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	// RUNG 0 trivial-rebase composition-verdict fast path (cycle-786/801 built
