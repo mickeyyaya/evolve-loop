@@ -230,9 +230,10 @@ func TestRun_FallbackOnArtifactTimeout_DefaultTriggerListIncludes81(t *testing.T
 	}
 	root := writeFallbackProfile(t, "evolve-tdd-engineer", "codex-tmux", []string{"claude-tmux"})
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  sb,
-		Prompts: fakePromptsFS("evolve-tdd-engineer", "x"),
+		Hooks:    hooks,
+		Bridge:   sb,
+		Prompts:  fakePromptsFS("evolve-tdd-engineer", "x"),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
@@ -275,9 +276,10 @@ func TestRun_FallbackOnGNUTimeout_124(t *testing.T) {
 	}
 	root := writeFallbackProfile(t, "evolve-tdd-engineer", "codex-tmux", []string{"claude-tmux"})
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  sb,
-		Prompts: fakePromptsFS("evolve-tdd-engineer", "x"),
+		Hooks:    hooks,
+		Bridge:   sb,
+		Prompts:  fakePromptsFS("evolve-tdd-engineer", "x"),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
@@ -305,9 +307,10 @@ func TestRun_NoFallback_ByteIdentical(t *testing.T) {
 	sb := &scriptedBridge{} // empty → default success for any cli
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  sb,
-		Prompts: fakePromptsFS("evolve-scout", "x"),
+		Hooks:    hooks,
+		Bridge:   sb,
+		Prompts:  fakePromptsFS("evolve-scout", "x"),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
 	if err != nil {
@@ -349,9 +352,10 @@ func TestRun_FallbackOnArtifactTimeout_CarriesVerdictCostDuration(t *testing.T) 
 	base := time.Date(2026, 6, 9, 14, 0, 0, 0, time.UTC)
 	tick := 0
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  sb,
-		Prompts: fakePromptsFS("evolve-builder", "x"),
+		Hooks:    hooks,
+		Bridge:   sb,
+		Prompts:  fakePromptsFS("evolve-builder", "x"),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 		NowFn: func() time.Time {
 			tick++
 			return base.Add(time.Duration(tick) * time.Second)

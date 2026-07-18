@@ -258,18 +258,18 @@ func New(opts Options) *BaseRunner {
 	}
 }
 
-// reconcileSettleRetries / reconcileSettleInterval bound the settle-retry loop
-// in verifyReconcileDeliverable. The window is only paid when a deliverable does
-// NOT verify on the first probe (a settling/racing file) — a report that is ready
-// verifies immediately and pays zero retries. The window MUST outlast the worst-
-// case flush latency of a clean-exit-idle agent's deliverable, or a genuinely-
-// valid-but-late-flushed report is missed and the runner falls back to the
-// (sentinel-lost) pane → a false FAIL that contradicts the green artifact
-// (verdict-incoherence, ADR-0072; cycle-921). The prior ~600ms (3x200ms) was too
-// short under heavy CPU/disk contention (deliverable.Verify(cycle-921) passes
-// cleanly AFTER the fact — the file was valid, just flushed late). Widened to ~3s;
-// still bounded, still fail-closed (a never-settling/malformed report still falls
-// back to stdout after the window — the anti-gaming invariant is preserved).
+// reconcileSettleRetries / reconcileSettleInterval bound the settle-WAIT for a
+// contracted deliverable that has not finished flushing to disk yet. A clean-exit
+// agent can return control before its `Write <phase>-report.md` lands, so the first
+// verify probe can miss a report that is moments from valid. This wait is a pure
+// LIVENESS ceiling, NOT the verdict-correctness mechanism: correctness comes from the
+// file-authoritative rule in Run (the lossy terminal pane is never a verdict source
+// for a contracted phase), so the window width can no longer flip a valid PASS into a
+// scrollback FAIL — at worst an extreme over-run degrades to a COHERENT "deliverable
+// not produced" FAIL, never a fabricated contradicting verdict. ~3s comfortably covers
+// observed clean-exit flush latency under CPU/disk contention (the prior ~600ms did
+// not — cycle-921, the ADR-0072 verdict-incoherence that motivated the file-authoritative
+// rule).
 const (
 	reconcileSettleRetries  = 15
 	reconcileSettleInterval = 200 * time.Millisecond
@@ -281,19 +281,23 @@ const (
 // the common clean-exit path, so real sleeps would balloon package test time).
 var settleSleep = time.Sleep
 
-// verifyReconcileDeliverable re-verifies the on-disk deliverable a bounded number
-// of times (reconcileSettleRetries) before giving up, sleeping reconcileSettleInterval
-// between attempts. It serves BOTH the reconcile-on-timeout path (cycles 824/825: a
-// next-phase context-cancel laundered into ErrArtifactTimeout fires while the
-// deliverable is still being written) AND the clean-exit artifact-read path
-// (cycle-603/899: a cleanly-exited agent idles while the presence probe races the
-// transient state). On the clean-exit path it fires on ANY first-probe miss, not
-// only an idle-settle race — an ordinary malformed deliverable pays the bounded
-// retry too before falling back to stdout. Retrying can only UPGRADE toward the
-// agent's real on-disk verdict; a never-settling deliverable still returns not-OK.
+// verifyReconcileDeliverable waits (bounded) for a contracted deliverable to become
+// well-formed, re-probing verifyFn up to reconcileSettleRetries times with
+// reconcileSettleInterval between attempts. It serves BOTH the reconcile-on-timeout
+// path (cycles 824/825: a next-phase context-cancel laundered into ErrArtifactTimeout
+// fires while the deliverable is still being written) AND the clean-exit artifact-read
+// path (cycle-603/899/921: a cleanly-exited agent idles while its `Write` flush lands).
+//
+// It retries ONLY while the report is contracted-but-not-yet-well-formed
+// (verr == nil && !res.OK) — the state a late flush passes through (a missing file is
+// CodeMissingArtifact, verr==nil). An ERROR (verr != nil) means "no contract for this
+// phase" or an IO fault; neither resolves by waiting, so those return immediately —
+// uncontracted phases pay ZERO retries (no wasted settle window). Waiting can only
+// UPGRADE toward the agent's real on-disk verdict; a never-settling deliverable still
+// returns not-OK.
 func (b *BaseRunner) verifyReconcileDeliverable(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 	res, verr := b.verifyFn(phase, roots)
-	for attempt := 0; attempt < reconcileSettleRetries && (verr != nil || !res.OK); attempt++ {
+	for attempt := 0; attempt < reconcileSettleRetries && verr == nil && !res.OK; attempt++ {
 		b.sleepFn(reconcileSettleInterval)
 		res, verr = b.verifyFn(phase, roots)
 	}
@@ -748,38 +752,62 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	artifact := bres.Stdout
-	// Prefer the on-disk deliverable over captured stdout whenever it exists and
-	// verifies well-formed. bres.Stdout is bridge scrollback that can contain the
-	// Deliverable Contract's own prompt-echoed example verdict sentinels — a real
-	// PASS report was recorded as FAIL this way (cycle-603, then recurring 877→899
-	// ≥10× on one goal_hash) when the agent EXITS CLEANLY (exit 0) then idles
-	// without a clean completion signal (a non-timeout completion, so the
-	// reconcile-on-timeout fallback above never engaged). The agent's real report
-	// is the file. This never downgrades: if the file is absent/malformed, fall
-	// back to stdout exactly as before (fail-open preserved, no verdict gets easier
-	// to game). On a reconciled timeout the file was already proven well-formed
-	// above, so read it unconditionally.
+	// VERDICT SOURCE (ADR-0072 coherence). For a phase that HAS a deliverable contract,
+	// the on-disk report is the SOLE verdict source — the terminal pane (bres.Stdout) is
+	// never classified. The pane is bridge scrollback: it can lose the real verdict
+	// sentinel to a TUI `Write` collapse AND carry the Deliverable Contract's own
+	// prompt-echoed EXAMPLE sentinels, so classifying it fabricates a verdict the agent
+	// never emitted — a real PASS recorded as FAIL (cycle-603, then recurring 877→921
+	// ≥10× on one goal_hash). The earlier "prefer the file when it verifies, else fall
+	// back to the pane" design left that fabricated verdict reachable under any flush-
+	// timing pressure; widening the settle window only lowered the odds. This removes the
+	// pane from the contracted-verdict path entirely, so timing can no longer cause
+	// incoherence — only latency. (Precise invariant: the verdict is sourced from the file
+	// as verifyFn read it; the runner then re-reads the path — a pre-existing double read.
+	// A file swap in the microsecond window between the two would classify the swapped
+	// bytes; see the deliverable-verified-bytes-single-read follow-up.)
 	//
-	// The presence check uses the SAME bounded settle-retry as the reconcile path
-	// (verifyReconcileDeliverable), not a single-shot verify: a clean-exit-idle
-	// agent leaves the deliverable settling / the presence extraction racing a
-	// transient state, so one instantaneous verify can misreport a genuinely-PASS
-	// report absent — which then Classifies multi-phase-contaminated scrollback
-	// into a synthetic FAIL. Retrying can only UPGRADE toward the on-disk verdict;
-	// a never-settling deliverable still returns not-OK and falls back to stdout.
-	preferFile := reconciled || artifact == ""
-	if !preferFile {
+	//   - verr != nil  → no contract for this phase (or an IO fault): well-formedness is
+	//     undeterminable, so the pane/Classify remains the legitimate source. UNCHANGED.
+	//   - res.OK       → contracted + well-formed: classify the FILE. Anti-gaming intact —
+	//     the file passed Verify's challenge-token + required-section + ADR-0039 checks.
+	//   - !res.OK      → contracted + malformed/absent after the settle WAIT: a COHERENT
+	//     deliverable-production FAIL. Do NOT classify the malformed file (Classify would
+	//     launder its sentinel past the FAILED challenge-token gate) NOR the pane; hand
+	//     Classify an EMPTY artifact (no sentinel → FAIL) and surface the contract Codes.
+	//
+	// The reconcile-on-timeout path already proved the file well-formed above, so it reads
+	// unconditionally.
+	var deliverableViolations []deliverable.Violation
+	deliverableUnverified := false
+	if reconciled {
+		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
+			artifact = string(data)
+		}
+	} else {
 		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
 		if req.ProjectRoot != "" {
 			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 		}
-		if res, verr := b.verifyReconcileDeliverable(phase, roots); verr == nil && res.OK {
-			preferFile = true
-		}
-	}
-	if preferFile {
-		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
-			artifact = string(data)
+		res, verr := b.verifyReconcileDeliverable(phase, roots)
+		switch {
+		case verr != nil:
+			// Uncontracted phase (or IO fault): keep the pane as the verdict source.
+		default:
+			// Contracted phase → classify the FILE, never the pane — on BOTH res.OK and
+			// !res.OK. A phase can derive a legitimate NON-SHIP verdict from partial content
+			// that fails full verification (intent delta's "[intent-unchanged]" → SKIPPED),
+			// so the content must reach Classify; the ship-guard after Classify then stops a
+			// verification-FAILED deliverable from laundering a ship-eligible verdict.
+			if data, readErr := os.ReadFile(artifactPath); readErr == nil {
+				artifact = string(data)
+			} else if !res.OK {
+				artifact = "" // contracted file genuinely absent → Classify sees no sentinel → FAIL
+			}
+			if !res.OK {
+				deliverableViolations = res.Violations
+				deliverableUnverified = true
+			}
 		}
 	}
 
@@ -795,6 +823,35 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	verdict, diags, nextPhase := b.hooks.Classify(artifact, req, bres)
+	if deliverableUnverified {
+		// SHIP-GUARD (anti-gaming). A deliverable that FAILED its well-formedness/anti-
+		// gaming contract must NEVER launder a CLEAN-ship verdict past the failed contract —
+		// the CodeMissingChallengeToken case (a PASS sentinel in a file that never echoed the
+		// per-cycle challenge token). PASS is the only clean-ship claim; downgrade it (and any
+		// non-canonical verdict) to a coherent FAIL. FAIL/SKIPPED/WARN pass through: FAIL and
+		// SKIPPED are non-ship, and WARN is NOT a clean ship — it already flags issues, and
+		// whether it ships is an orchestrator policy call (workflow.strict_audit promotes
+		// WARN→FAIL there), not the runner's to preempt. Downgrading WARN here would break
+		// fluent-mode WARN-ships (TestE2EPipeline_AuditWarn_FluentShips) and regress origin/main,
+		// which also ships a failed-verify WARN via the pane. Routing is verdict-driven (cyclerun
+		// maps resp.Verdict → FinalVerdict/lastVerdict), so downgrading re-routes without
+		// touching nextPhase.
+		switch verdict {
+		case core.VerdictFAIL, core.VerdictWARN, core.VerdictSKIPPED:
+		default:
+			verdict = core.VerdictFAIL
+		}
+	}
+	// Surface the contract Codes behind a coherent deliverable-production FAIL, so the
+	// retro/operator sees WHY the deliverable was rejected — not a bare verdict with no
+	// trail. Only populated when a CONTRACTED deliverable failed verification (the
+	// !res.OK branch above); empty otherwise, so this is a no-op on the happy path.
+	for _, v := range deliverableViolations {
+		diags = append(diags, core.Diagnostic{
+			Severity: "error",
+			Message:  fmt.Sprintf("deliverable contract violation [%s]: %s", v.Code, v.Message),
+		})
+	}
 
 	resp := core.PhaseResponse{
 		Phase:         phase,

@@ -58,10 +58,11 @@ func TestRun_StdoutFilter_ErrorDoesNotBlockPhase(t *testing.T) {
 		prompt: "p", verdict: core.VerdictPASS, nextPhase: "triage",
 	}
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
-		Prompts: fakePromptsFS("evolve-scout", "body"),
-		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
+		Hooks:    hooks,
+		Bridge:   &fakeBridge{writeArtifact: "ok\n"},
+		Prompts:  fakePromptsFS("evolve-scout", "body"),
+		NowFn:    fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 		StdoutFilter: func(workspace, phase string) error {
 			return errors.New("synthetic filter blowup")
 		},

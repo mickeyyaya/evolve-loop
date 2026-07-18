@@ -108,12 +108,13 @@ func TestRun_NonTimeout_CleanExitIdle_GenuineFAILOnDisk_RecordsFromFileNotScroll
 	}
 }
 
-// TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_BoundedFallbackToStdout
-// — the settle-retry is BOUNDED and fail-open: a clean-exit phase whose deliverable
-// never verifies (a genuinely hung/absent deliverable, not a settle race) must fall
-// back to stdout after a fixed number of re-verifies. The loop must not spin, and
-// the retry must never manufacture a PASS from an absent deliverable.
-func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_BoundedFallbackToStdout(t *testing.T) {
+// TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPane
+// — the settle-WAIT is BOUNDED: a clean-exit CONTRACTED phase whose deliverable never
+// verifies (a genuinely hung/absent report, not a settle race) must yield a coherent
+// deliverable-production FAIL — Classify receives an EMPTY artifact, never the lossy
+// pane. The loop must not spin, and it must never manufacture a PASS from an absent
+// deliverable NOR a FAIL scraped from prompt-contaminated scrollback.
+func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPane(t *testing.T) {
 	stdout := "raw scrollback with no clean deliverable\n"
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
 	nb := &noisyStdoutBridge{fileContent: "", stdout: stdout}
@@ -133,11 +134,11 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_BoundedFallbackToS
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if hooks.gotArtifact != stdout {
-		t.Errorf("a never-settling clean-exit deliverable must fall back to stdout (fail-open); got %q", hooks.gotArtifact)
+	if hooks.gotArtifact != "" {
+		t.Errorf("a never-settling CONTRACTED deliverable must yield a coherent FAIL (empty artifact to Classify), never the lossy pane; got %q", hooks.gotArtifact)
 	}
 	if calls <= 1 {
-		t.Errorf("clean-exit path must RE-VERIFY (settle-retry), not single-shot; got %d verify call(s)", calls)
+		t.Errorf("clean-exit path must RE-VERIFY (settle-wait), not single-shot; got %d verify call(s)", calls)
 	}
 	if calls > reconcileSettleRetries+1 {
 		t.Errorf("settle-retry must be BOUNDED at %d calls (1 + %d retries) so the loop cannot spin; got %d", reconcileSettleRetries+1, reconcileSettleRetries, calls)
