@@ -133,6 +133,13 @@ type ControlSpec struct {
 	Send           string `json:"send"`
 	Await          string `json:"await,omitempty"`
 	ExhaustedRegex string `json:"exhausted_regex,omitempty"`
+	// DriftProbeRegex is a BROAD, deliberately-loose quota-wall heuristic used
+	// ONLY by the fail-loud drift alarm (exhaustion_drift.go): when an exit-81
+	// teardown pane matches this but ExhaustedRegex did NOT, the wall wording
+	// likely drifted ahead of ExhaustedRegex. Diagnostic-only — it never drives
+	// the fast-fail (too loose to be a verdict). Empty = drift alarm off for
+	// this CLI (fail-open).
+	DriftProbeRegex string `json:"drift_probe_regex,omitempty"`
 }
 
 // Control resolves the ControlSpec for an abstract event. ok=false when the CLI
