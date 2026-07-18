@@ -51,13 +51,6 @@ func alwaysOKVerify(phase string, _ phasecontract.Roots) (deliverable.Result, er
 	return deliverable.Result{OK: true, Phase: phase}, nil
 }
 
-// alwaysFailVerify is the negative counterpart: the deliverable is always
-// reported as failing well-formedness checks, exercising the "never
-// downgrades" fail-open guarantee.
-func alwaysFailVerify(phase string, _ phasecontract.Roots) (deliverable.Result, error) {
-	return deliverable.Result{OK: false, Phase: phase}, nil
-}
-
 // TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout
 // amplifies runner-classify-prefer-deliverable-file beyond the audit-only RED
 // test: the build-report explicitly claims the fix is "phase-agnostic ...
@@ -91,29 +84,37 @@ func TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout(t *t
 	}
 }
 
-// TestRun_NonTimeout_DeliverableFailsVerification_FallsBackToStdout guards the
-// "never downgrades" half of the contract: a plausible buggy implementation
-// might prefer the file whenever it merely EXISTS, skipping the verifyFn OK
-// check. This adversarial case makes that regression concrete: the file is
-// present but reported not-well-formed, so stdout (which — in this scenario —
-// carries the agent's real failure detail) must still win.
-func TestRun_NonTimeout_DeliverableFailsVerification_FallsBackToStdout(t *testing.T) {
+// TestRun_NonTimeout_ContractedDeliverableFailsVerification_ShipVerdictDowngraded guards
+// the anti-gaming half of the verdict-source rule (ADR-0072). A CONTRACTED deliverable
+// that FAILS its well-formedness/anti-gaming contract (here: a missing challenge token)
+// carries a PASS sentinel in the file, and the pane also shows PASS. Classify would
+// extract PASS — the exact laundering vector the earlier sentinel-authoritative attempt
+// was blocked for. The ship-guard must downgrade the ship-eligible verdict to a coherent
+// FAIL, and the contract Codes must surface as diagnostics. (Previously this fell back to
+// the pane, leaving a fabricated verdict reachable.)
+func TestRun_NonTimeout_ContractedDeliverableFailsVerification_ShipVerdictDowngraded(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
-	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
-	const malformed = "not a well-formed deliverable at all\n"
-	const stdout = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\nreal failure detail\n"
-	bridge := &divergentBridge{fileContent: malformed, stdoutContent: stdout}
+	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
+	const passSentinelFile = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n(challenge token omitted)\n"
+	const panePass = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
+	bridge := &divergentBridge{fileContent: passSentinelFile, stdoutContent: panePass}
 	r := New(Options{
 		Hooks: hooks, Bridge: bridge, Prompts: fakePromptsFS("evolve-auditor", "x"),
-		VerifyFn: alwaysFailVerify,
+		VerifyFn: verifyReturns(deliverable.Result{
+			OK:         false,
+			Violations: []deliverable.Violation{{Code: "MISSING_CHALLENGE_TOKEN", Message: "deliverable did not echo the challenge token"}},
+		}, nil),
 	})
 
-	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if hooks.gotArtifact != stdout {
-		t.Errorf("Classify received %q, want fallback to bridge stdout %q — a deliverable that FAILS verification must never be preferred; the fix may only ever upgrade toward a well-formed file, never trust a malformed one", hooks.gotArtifact, stdout)
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("verdict=%q, want FAIL — a ship-eligible verdict from a verification-FAILED deliverable must be downgraded; it must not launder a PASS past the challenge-token gate (via the file OR the pane)", resp.Verdict)
+	}
+	if !diagsContain(resp.Diagnostics, "MISSING_CHALLENGE_TOKEN") {
+		t.Errorf("contract Codes must surface as diagnostics behind the coherent FAIL; got %+v", resp.Diagnostics)
 	}
 }
 

@@ -17,9 +17,10 @@ func TestBaseRunner_TypeNamedAndRuns(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "# scout-report\n"}
 
 	var br *BaseRunner = New(Options{
-		Hooks:   hooks,
-		Bridge:  fb,
-		Prompts: fakePromptsFS("evolve-scout", "agent body"),
+		Hooks:    hooks,
+		Bridge:   fb,
+		Prompts:  fakePromptsFS("evolve-scout", "agent body"),
+		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 	})
 	if br == nil {
 		t.Fatal("New returned nil *BaseRunner")

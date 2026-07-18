@@ -281,6 +281,7 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "x"}
 	r := New(Options{
 		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-scout", "x"),
+		VerifyFn:       alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
 		EventsProducer: func(_, _, _ string, _ int, _ string) error { return errors.New("disk full") },
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
