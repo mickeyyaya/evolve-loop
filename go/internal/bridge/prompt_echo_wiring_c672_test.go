@@ -21,7 +21,7 @@ package bridge
 //
 // UPDATE (exhaustion-gate, 2026-07): C672_004's tick COUNT was revised from 1 to
 // exhaustionPersistObservations because the exhaustion fast-fail is now
-// persistence-gated (exhaustion_gate.go) — a genuine wall still escalates (intent
+// persistence-gated (exhaustion_persistence.go) — a genuine wall still escalates (intent
 // preserved: it survives prompt-echo stripping), it just does so on the
 // threshold-th consecutive tick, not the first. The echo-veto behavior C672_003
 // and C672_005 pin is unchanged.
@@ -76,7 +76,7 @@ func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	ar.injectedPrompt = "Instructions: do the task and report." // banner is NOT a substring
 
 	// The genuine banner survives prompt-echo stripping (walled every tick), but
-	// the persistence guard (exhaustion_gate.go) requires it to PERSIST for
+	// the persistence guard (exhaustion_persistence.go) requires it to PERSIST for
 	// exhaustionPersistObservations consecutive ticks before escalating — the fake
 	// pane replays the banner every capture, so a genuine wall crosses on the
 	// threshold-th tick. A single transient frame (wall text passing through a

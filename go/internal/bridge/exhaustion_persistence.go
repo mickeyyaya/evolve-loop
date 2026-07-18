@@ -1,6 +1,6 @@
 package bridge
 
-// exhaustion_gate.go — persistence guard for the quota/rate-limit fast-fail.
+// exhaustion_persistence.go — persistence guard for the quota/rate-limit fast-fail.
 //
 // The exhaustion detectors (the ~2s fast-poll's ExhaustedOf and the 300s
 // stop-review checkpoint's Observe) match a regex against the RAW captured

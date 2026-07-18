@@ -514,7 +514,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
 	lastGoodPane := intervalBaselinePane
-	// Persistence guard for the checkpoint exhaustion fast-fail (exhaustion_gate.go):
+	// Persistence guard for the checkpoint exhaustion fast-fail (exhaustion_persistence.go):
 	// the wall must be present across consecutive checkpoints before failing over,
 	// so wall-shaped text a working agent momentarily rendered does not kill it.
 	// Its OWN gate (not shared with the fast-poll's) — the two loops observe at
@@ -686,7 +686,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// Exhaustion fast-fail: a quota/rate-limit WALL means the artifact will
 			// NEVER come — fail over to the fallback CLI (exit 85) instead of
 			// burning the full artifact timeout. Scanned on the agent-stripped pane
-			// and persistence-gated (exhaustion_gate.go): a re-printing real wall is
+			// and persistence-gated (exhaustion_persistence.go): a re-printing real wall is
 			// present every checkpoint and still crosses (preserving the agy
 			// hang-without-exit fix), while wall text passing through a WORKING
 			// agent's pane clears by the next checkpoint — the raw-pane false-FAIL

@@ -101,7 +101,7 @@ func stripPromptEchoLines(pane, injectedPrompt string) string {
 // (autoResponder.tick) and the stop-review checkpoint (driver_tmux_repl.go) run
 // it, so the two detections can never strip differently. An empty prompt strips
 // no echoes (fail-open); stripping is best-effort surface-reduction — the
-// persistence gate (exhaustion_gate.go) is what actually prevents a transient
+// persistence gate (exhaustion_persistence.go) is what actually prevents a transient
 // wall-text frame from fast-failing a working agent.
 func strippedForExhaustionScan(pane, injectedPrompt string) string {
 	return stripAgentDiffLines(stripPromptEchoLines(pane, injectedPrompt))
@@ -206,7 +206,7 @@ type autoResponder struct {
 	// exhaustGate persistence-guards the exhaustion fast-fail: a wall must be
 	// present for exhaustionPersistObservations consecutive ticks before rc 85
 	// fires, so wall-shaped text a working agent momentarily renders never kills
-	// it (exhaustion_gate.go). Non-nil for the lifetime of the responder.
+	// it (exhaustion_persistence.go). Non-nil for the lifetime of the responder.
 	exhaustGate *exhaustionGate
 	// injectedPrompt is the resolved prompt text delivered to this session.
 	// tick() strips pane lines that are a verbatim echo of it before the
@@ -361,7 +361,7 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// wall-shaped text (a cat/grep/diff quoting a provider's "reached your … limit"
 	// message — the cardinal false-FAIL sin, cycle-314/641): (1) the scan runs on
 	// the diff-stripped pane too (scanPane already has prompt-echo removed), and
-	// (2) it is persistence-gated (exhaustion_gate.go) — a single transient frame
+	// (2) it is persistence-gated (exhaustion_persistence.go) — a single transient frame
 	// never crosses; a real wall, present every frame, crosses in a couple ticks.
 	if rc != 85 && ar.exhaustedRegex != "" {
 		if ar.exhaustGate == nil { // bulletproof against a direct struct construction
