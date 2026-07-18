@@ -354,6 +354,32 @@
       "skippable_when_present": false
     },
     {
+      "name": "secret-leak-scan",
+      "role": "auditor",
+      "kind": "native",
+      "optional": true,
+      "description": "native regex scan of the diff for credential leaks; 0 tokens, no REPL boot",
+      "when_to_use": "security/supply-chain recipes needing a deterministic secret sweep of added lines",
+      "categories": ["security", "supply-chain"],
+      "inputs": { "files": [], "state_fields": [] },
+      "outputs": { "files": [".evolve/runs/cycle-{cycle}/secret-leak-scan-report.md"] },
+      "parallel_eligible": true,
+      "skippable_when_present": true
+    },
+    {
+      "name": "flake-rerun-scan",
+      "role": "auditor",
+      "kind": "native",
+      "optional": true,
+      "description": "native rerun-and-diff of new/failed tests to detect flakiness; 0 tokens, no REPL boot",
+      "when_to_use": "resilience/bugfix recipes needing deterministic flake detection via repeated reruns",
+      "categories": ["resilience", "bugfix"],
+      "inputs": { "files": [], "state_fields": [] },
+      "outputs": { "files": [".evolve/runs/cycle-{cycle}/flake-rerun-scan-report.md"] },
+      "parallel_eligible": true,
+      "skippable_when_present": true
+    },
+    {
       "name": "retrospective",
       "role": "retrospective",
       "optional": true,

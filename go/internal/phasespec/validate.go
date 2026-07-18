@@ -103,9 +103,10 @@ func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	}
 
 	switch s.KindOrDefault() {
-	case "llm":
-		// supported
-	case "native", "command":
+	case "llm", "native":
+		// supported — "native" dispatches to an in-process Go phase
+		// implementation (registry-selected per phase name), not a REPL boot.
+	case "command":
 		v = append(v, fmt.Sprintf("kind %q is reserved but not yet executable — use \"llm\"", s.Kind))
 	default:
 		v = append(v, fmt.Sprintf("unknown kind %q (expected llm|native|command)", s.Kind))

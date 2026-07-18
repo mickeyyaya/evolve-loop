@@ -192,11 +192,11 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 5. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
    gate/infrastructure defect that failed the previous cycle, `top_n` length MUST be exactly 1.
 6. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
-5. No item is in two buckets.
+7. No item is in two buckets.
 
-6. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+8. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
 
-If any check fails, fix in place. Do not mark complete until all six hold.
+If any check fails, fix in place. Do not mark complete until all eight hold.
 
 ## Reference Index (Layer 3, on-demand)
 

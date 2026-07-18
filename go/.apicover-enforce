@@ -49,7 +49,9 @@
 ./internal/phaseio
 ./internal/phaseorder
 ./internal/phases/debugger
+./internal/phases/flakererunscan
 ./internal/phases/registry
+./internal/phases/secretleakscan
 ./internal/phases/specrunner
 # Per-phase latency evidence: the single-source timing schema (Entry) + Read +
 # Rollup + HumanMS, consumed by core (writer), dossier, and `evolve cycle timing`.
