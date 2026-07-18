@@ -94,6 +94,19 @@ func stripPromptEchoLines(pane, injectedPrompt string) string {
 	return strings.Join(kept, "\n")
 }
 
+// strippedForExhaustionScan removes agent-rendered content — prompt echoes AND
+// diff/edit lines — from a captured pane so the exhaustion regex sees the CLI's
+// own chrome, not wall-shaped text the agent is merely quoting or writing. It is
+// the SINGLE source for the exhaustion-scan pane treatment: both the fast-poll
+// (autoResponder.tick) and the stop-review checkpoint (driver_tmux_repl.go) run
+// it, so the two detections can never strip differently. An empty prompt strips
+// no echoes (fail-open); stripping is best-effort surface-reduction — the
+// persistence gate (exhaustion_gate.go) is what actually prevents a transient
+// wall-text frame from fast-failing a working agent.
+func strippedForExhaustionScan(pane, injectedPrompt string) string {
+	return stripAgentDiffLines(stripPromptEchoLines(pane, injectedPrompt))
+}
+
 // decideAutoRespond is the pure decision: first interactive_prompts regex
 // to match the pane wins; counts tracks per-pattern match frequency for
 // the loop guard. Mirrors auto_respond_decide. Agent edit-diff lines are
@@ -190,6 +203,11 @@ type autoResponder struct {
 	// fast-poll path that fast-fails an exhausted phase without waiting for the
 	// 300s stop-review checkpoint's Observe.
 	exhaustedRegex string
+	// exhaustGate persistence-guards the exhaustion fast-fail: a wall must be
+	// present for exhaustionPersistObservations consecutive ticks before rc 85
+	// fires, so wall-shaped text a working agent momentarily renders never kills
+	// it (exhaustion_gate.go). Non-nil for the lifetime of the responder.
+	exhaustGate *exhaustionGate
 	// injectedPrompt is the resolved prompt text delivered to this session.
 	// tick() strips pane lines that are a verbatim echo of it before the
 	// prompt-match and exhaustion scans (stripPromptEchoLines, cycle-654
@@ -279,7 +297,7 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 		prompts = m.InteractivePrompts
 		exhaustedRegex = manifestExhaustedPattern(m) // single-source wall pattern
 	}
-	return &autoResponder{prompts: prompts, exhaustedRegex: exhaustedRegex, workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
+	return &autoResponder{prompts: prompts, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
@@ -338,8 +356,21 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// the artifact will never come. Detected via the SignalCenter (ExhaustedOf, the
 	// fast-poll twin of BusyOf); the rc==85 arm below then writes the escalation
 	// report exactly as for any escalate, so the fallback fires within one poll.
-	if rc != 85 && ar.exhaustedRegex != "" && ar.deps.LivenessCenter.ExhaustedOf(scanPane, panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex}) {
-		action, rc = "escalate:exhausted", 85
+	//
+	// Two guards against fast-failing a WORKING agent that merely RENDERS
+	// wall-shaped text (a cat/grep/diff quoting a provider's "reached your … limit"
+	// message — the cardinal false-FAIL sin, cycle-314/641): (1) the scan runs on
+	// the diff-stripped pane too (scanPane already has prompt-echo removed), and
+	// (2) it is persistence-gated (exhaustion_gate.go) — a single transient frame
+	// never crosses; a real wall, present every frame, crosses in a couple ticks.
+	if rc != 85 && ar.exhaustedRegex != "" {
+		if ar.exhaustGate == nil { // bulletproof against a direct struct construction
+			ar.exhaustGate = newExhaustionGate()
+		}
+		walled := ar.deps.LivenessCenter.ExhaustedOf(strippedForExhaustionScan(pane, ar.injectedPrompt), panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex})
+		if ar.exhaustGate.observe(walled) {
+			action, rc = "escalate:exhausted", 85
+		}
 	}
 	switch rc {
 	case 1:

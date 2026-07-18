@@ -13,11 +13,18 @@ package bridge
 // stripPromptEchoLines in tick() ahead of the exhaustion check.
 //
 // RED today: autoResponder has no injectedPrompt field — compile failure.
-// DO NOT MODIFY THESE TESTS. C672_004 is the negative guard (genuine banner
-// must STILL escalate) and must be GREEN after the wiring lands. C672_005 is
-// the discriminating anti-gaming check for the construction-site half — the
-// behavioral tests alone could be satisfied by a field nothing populates in
-// production (exactly the class of gap that let cycles 654/656 slip).
+// DO NOT MODIFY THESE TESTS (echo-veto intent). C672_004 is the negative guard
+// (genuine banner must STILL escalate) and must be GREEN after the wiring lands.
+// C672_005 is the discriminating anti-gaming check for the construction-site
+// half — the behavioral tests alone could be satisfied by a field nothing
+// populates in production (exactly the class of gap that let cycles 654/656 slip).
+//
+// UPDATE (exhaustion-gate, 2026-07): C672_004's tick COUNT was revised from 1 to
+// exhaustionPersistObservations because the exhaustion fast-fail is now
+// persistence-gated (exhaustion_gate.go) — a genuine wall still escalates (intent
+// preserved: it survives prompt-echo stripping), it just does so on the
+// threshold-th consecutive tick, not the first. The echo-veto behavior C672_003
+// and C672_005 pin is unchanged.
 
 import (
 	"context"
@@ -68,9 +75,18 @@ func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	ar := newC672TickResponder(t, pane)
 	ar.injectedPrompt = "Instructions: do the task and report." // banner is NOT a substring
 
-	_, rc := ar.tick(context.Background(), "s")
+	// The genuine banner survives prompt-echo stripping (walled every tick), but
+	// the persistence guard (exhaustion_gate.go) requires it to PERSIST for
+	// exhaustionPersistObservations consecutive ticks before escalating — the fake
+	// pane replays the banner every capture, so a genuine wall crosses on the
+	// threshold-th tick. A single transient frame (wall text passing through a
+	// working agent's pane) would never cross — that is the guard's purpose.
+	var rc int
+	for i := 0; i < exhaustionPersistObservations; i++ {
+		_, rc = ar.tick(context.Background(), "s")
+	}
 	if rc != 85 {
-		t.Errorf("tick() rc = %d, want 85 — genuine exhaustion banner must survive prompt-echo stripping", rc)
+		t.Errorf("tick() rc = %d after %d persistent ticks, want 85 — genuine exhaustion must survive stripping and escalate once it persists", rc, exhaustionPersistObservations)
 	}
 }
 
