@@ -15,6 +15,7 @@
 
 ./internal/failuregrade
 ./internal/skillcheck
+./internal/skilloverlay
 ./internal/flagregistry
 ./internal/soakreport
 

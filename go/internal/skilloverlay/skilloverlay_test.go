@@ -89,6 +89,27 @@ func TestMaterialize_OrderPreserved(t *testing.T) {
 	}
 }
 
+// TestStripFrontmatter_EdgeCases covers the malformed (no closing delimiter),
+// leading-blank-line, and no-frontmatter branches so the persona body is
+// preserved verbatim when there is nothing safe to strip.
+func TestStripFrontmatter_EdgeCases(t *testing.T) {
+	// Frontmatter opened but never closed → return unchanged (don't eat the body).
+	noClose := "---\nname: x\nbody line with no closing marker\n"
+	if got := stripFrontmatter(noClose); got != noClose {
+		t.Errorf("no-closing-delimiter must return unchanged, got %q", got)
+	}
+	// Leading blank lines before the opening delimiter are skipped.
+	got := stripFrontmatter("\n\n---\nname: x\n---\nBODY\n")
+	if strings.Contains(got, "name: x") || !strings.Contains(got, "BODY") {
+		t.Errorf("leading-blank frontmatter not stripped: %q", got)
+	}
+	// No frontmatter at all → passthrough.
+	body := "# Heading\ntext\n"
+	if got := stripFrontmatter(body); got != body {
+		t.Errorf("no-frontmatter must pass through, got %q", got)
+	}
+}
+
 // TestMaterialize_PathTraversalNameYieldsMissing: a name is a single registry
 // entry, never a path fragment — a traversal-y name must not resolve a file
 // outside skillsDir; it simply reports missing (defense-in-depth; the policy
