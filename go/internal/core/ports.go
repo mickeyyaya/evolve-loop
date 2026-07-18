@@ -273,6 +273,16 @@ type BridgeRequest struct {
 	// SystemPrompt is the per-agent launch-time rules block prepended to the
 	// prompt body (facet B). Resolved by the runner via systemprompt.Resolve.
 	SystemPrompt string `json:"system_prompt,omitempty"`
+	// Skills is the ordered list of policy-resolved skill-overlay NAMES to
+	// preload for this dispatch (internal/policy Policy.ResolveOverlays, keyed on
+	// phase/cli/model/tier — "which skill for which phase agent" is config, not
+	// code). The bridge adapter materializes each named skill's SKILL.md persona
+	// body into a prompt prefix (skilloverlay.Materialize) just above the profile
+	// Rules block, so the phase agent begins with the configured operating discipline
+	// preloaded — CLI-agnostic. Empty ⇒ no overlay (byte-identical to a
+	// pre-feature dispatch). The runner is the producer; the adapter the injector
+	// (mirrors SystemPrompt's producer→adapter split).
+	Skills []string `json:"skills,omitempty"`
 	// CorrectionDirective, when non-empty, is prepended as a "## Correction"
 	// block (the orchestrator's contract-correction retry — the previous
 	// deliverable was rejected; fix it). Empty = no-op. See injectCorrectionPrefix.

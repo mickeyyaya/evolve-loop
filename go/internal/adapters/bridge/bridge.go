@@ -20,8 +20,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skilloverlay"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -198,14 +200,16 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	}
 	inproc := req
 	// Prompt assembly order (top of string → bottom):
-	//   Correction (outermost, re-dispatch only) > Operator Directives > Rules > Policy > Contract block > Body > path footer.
+	//   Correction (outermost, re-dispatch only) > Operator Directives > Skills > Rules > Policy > Contract block > Body > path footer.
 	// The contract's invariant block sits in the cacheable prefix; the volatile
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
-	// optimal. See injectContract.
+	// optimal. See injectContract. Skill overlays sit at the persona altitude
+	// (just above the profile Rules): stable per phase/tier, so cache-coherent.
 	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
-	withDirectives := injectOperatorDirectives(withRules, req.OperatorDirectives)
+	withSkills := injectSkillOverlays(withRules, req)
+	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
 
 	// When an onStopReview callback is wired (production path), build the engine
@@ -328,6 +332,31 @@ func injectRulesPrefix(prompt, rules string) string {
 		return prompt
 	}
 	return "## Rules\n\n" + rules + "\n\n---\n\n" + prompt
+}
+
+// injectSkillOverlays prepends the policy-resolved skill-overlay persona blocks
+// (req.Skills, materialized from <project_root>/skills/<name>/SKILL.md) to the
+// prompt at the persona altitude, so a phase agent begins its turn with the
+// configured operating discipline preloaded — CLI-agnostic (the block is plain
+// prompt text every driver receives). "Which skill for which phase agent" is
+// resolved upstream by policy (internal/policy Policy.ResolveOverlays) and
+// carried on req.Skills; this only materializes it. A configured skill that
+// cannot be resolved (missing/unreadable SKILL.md, unsafe name) is WARNed
+// loudly and the dispatch proceeds without it — never a silent drop. No
+// ProjectRoot or no Skills ⇒ prompt unchanged (byte-identical pre-feature).
+func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
+	if req.ProjectRoot == "" || len(req.Skills) == 0 {
+		return prompt
+	}
+	skillsDir := filepath.Join(req.ProjectRoot, "skills")
+	overlay, missing := skilloverlay.Materialize(skillsDir, req.Skills)
+	for _, m := range missing {
+		log.Diag().Warnf("[bridge] WARN skill-overlay: configured skill %q for phase %q not found under %s — dispatched WITHOUT it (check policy.json overlays + skills registry)\n", m, req.Agent, skillsDir)
+	}
+	if overlay == "" {
+		return prompt
+	}
+	return overlay + "---\n\n" + prompt
 }
 
 // injectCorrectionPrefix prepends a "## Correction" block carrying the
