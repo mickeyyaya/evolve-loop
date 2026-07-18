@@ -18,10 +18,14 @@ import (
 // A pane matching the CLI's exhausted_regex fast-fails to ExitUnknownPrompt.
 func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	// Boots (prompt marker ❯ present) AND shows the quota wall (matches
-	// claude-tmux's usage.exhausted_regex "reached your usage limit"). The
-	// artifact is never written, so only the exhaustion override can end the run.
-	walled := "❯\n⚠ You've reached your usage limit — upgrade to continue.\n❯"
+	// Boots (prompt marker ❯ present) AND shows the quota wall. This is the
+	// EXACT wall captured in cycles 904–911's audit-escalation-report.json —
+	// the per-model wording ("your Fable 5 limit") that the pre-fix
+	// exhausted_regex ("reached your (usage|weekly) limit") did NOT match, so
+	// the fast-fail was bypassed and 8 audit cycles burned the full artifact
+	// timeout. The artifact is never written, so only the exhaustion override
+	// can end the run.
+	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
 	code, stderr := runTmuxNudge(t, fx, tmux)
 	if code != ExitUnknownPrompt {
@@ -47,7 +51,8 @@ func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 // per poll) as the iteration proxy.
 func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	walled := "❯\n⚠ You've reached your usage limit — upgrade to continue.\n❯"
+	// Real per-model wall wording (cycle-910/911 capture), as above.
+	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
 	polls := 0
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) { polls++ }, LookupEnv: mapLookup(nil)})

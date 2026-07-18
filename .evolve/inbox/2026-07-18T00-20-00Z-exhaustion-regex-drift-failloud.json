@@ -1,0 +1,30 @@
+{
+  "id": "exhaustion-regex-drift-failloud",
+  "created_at": "2026-07-18T00:20:00Z",
+  "weight": 0.8,
+  "title": "Fail-loud on exhaustion-regex DRIFT: when a phase dies exit-81 (artifact timeout) AND its final_pane shows a quota-wall signal the manifest exhausted_regex did NOT match, emit a LOUD drift diagnostic so the next upstream wording change is caught in 1 cycle, not 8.",
+  "kind": "bug",
+  "campaign": "pipeline-stability",
+  "priority": "high",
+  "summary": "Durability backstop for the class of bug that cost 8 cycles (904-911). Root cause of that incident: Claude Code changed its quota wall from the legacy usage/weekly wording to a per-model 'reached-your-<MODEL>-limit' form (de-spaced here so this todo is not itself an exhausted_regex trigger); the manifest exhausted_regex silently stopped matching, so LivenessExhausted never fired, the exit-85 fast-fail was bypassed, and every audit died as a generic exit-81 artifact timeout that self-heal-relaunched forever. The failure was SILENT: nothing said 'this looks like a quota wall the regex missed.' The regex was fixed (audit-artifact-timeout-2wide), but detection patterns that track a vendor's UI wording WILL drift again. Convert the silent burn into an immediate loud signal.",
+  "root_cause": "Exhaustion detection is fail-OPEN by design (panedelta.go: 'Empty = no exhaustion detection for this CLI (fail-open)') — a regex miss degrades gracefully to 'not exhausted', which then manifests as an artifact timeout far from the root cause, with no breadcrumb tying the two together. There is no cross-check that asks: 'the pane at teardown looks like a quota wall — did the exhausted_regex actually match it?' So drift is invisible until an operator hand-reads a final_pane (as happened here).",
+  "fix": "At the exit-81 (ExitArtifactTimeout) teardown path, run a BROAD, deliberately-loose secondary quota-wall probe over the captured final_pane (e.g. case-insensitive any-of: 'usage-credits', 'reached your', 'usage limit', 'rate limit', 'upgrade to', 'switch models with /model'). If the broad probe hits but the manifest's real exhausted_regex did NOT match the same pane, emit a LOUD, distinctive diagnostic to stderr + the failure-diag JSON: 'POSSIBLE EXHAUSTION-REGEX DRIFT: pane at teardown matched a broad quota-wall heuristic but the claude-tmux exhausted_regex did not — the wall wording may have changed; update controls.usage.exhausted_regex.' Optionally auto-file a P1 inbox todo with the unmatched pane snippet. Keep the broad probe OUT of the decision path (it must NOT drive fast-fail — too loose, would risk false-FAIL on a working agent); it is a DIAGNOSTIC-ONLY drift detector. Config-driven (the broad-heuristic terms live in the manifest or policy, single-source), zero Go literals for the pattern.",
+  "acceptance": [
+    "A synthetic exit-81 teardown whose final_pane contains a quota-wall phrase the real exhausted_regex misses produces the loud DRIFT diagnostic in the failure-diag artifact and stderr.",
+    "The broad drift probe never changes a verdict or triggers fast-fail (diagnostic-only) — a healthy idle pane and a working-but-slow pane produce NO drift diagnostic.",
+    "Regression test feeds the exact 904-911 pre-fix scenario (real captured pane + the OLD regex) and asserts the drift diagnostic fires; feeds the post-fix regex and asserts it does NOT fire (the real regex matched, so no drift).",
+    "go vet, -race, apicover -enforce green."
+  ],
+  "files": [
+    "go/internal/bridge/driver_tmux_repl.go (exit-81 teardown — add the diagnostic-only drift cross-check)",
+    "go/internal/bridge/manifests/claude-tmux.json (broad drift-heuristic terms, single-source)",
+    "go/internal/core/ (audit-failure-diag emission — carry the drift flag)"
+  ],
+  "note_scope": "This item is the UNDER-match failure mode (regex too narrow, misses a real wall -> silent burn). The OPPOSITE mode (over-match: regex/raw-pane matches non-wall agent content -> kills a working agent) is a separate item: exhaustion-checkpoint-raw-pane-stripping.",
+  "connects_to": [
+    "audit-artifact-timeout-2wide (the incident this backstops)",
+    "infra-teardown-predicate-single-source (0.7 — same exit-81 teardown seam)",
+    "bridge-exitcode-negative-parse (0.45 — sibling telemetry-accuracy fix at teardown)"
+  ],
+  "notes": "Design principle: fail-loud (Core Rule 12) + no-silent-skip. A fail-open detector must have a loud drift alarm, or the open-fail is indistinguishable from 'all healthy'. Lesson from token-telemetry: parsing/detection code must be validated against real on-disk data — this backstop institutionalizes that by watching real panes for drift continuously."
+}

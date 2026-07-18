@@ -82,7 +82,7 @@
     }
   },
   "controls": {
-    "usage":     { "send": "/usage",   "await": "prompt_marker", "exhausted_regex": "(?i)(reached your (usage|weekly) limit|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))" },
+    "usage":     { "send": "/usage",   "await": "prompt_marker", "exhausted_regex": "(?i)(reached your (usage|weekly) limit|you(?:.?ve| have) reached your .{1,40}? limit\\b.{0,40}?/usage-credits|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))" },
     "status":    { "send": "/status",  "await": "prompt_marker" },
     "clean_ctx": { "send": "/clear" },
     "compact":   { "send": "/compact" },
