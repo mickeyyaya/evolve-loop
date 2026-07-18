@@ -381,60 +381,18 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if model == "" {
 		model = "auto"
 	}
-	args := []string{
-		"--cli=" + req.CLI,
-		"--profile=" + req.Profile,
-		"--model=" + model,
-		"--prompt-file=" + promptFile,
-		"--workspace=" + req.Workspace,
-		"--stdout-log=" + stdoutLog,
-		"--stderr-log=" + stderrLog,
-		"--artifact=" + req.ArtifactPath,
-	}
-	if req.Cycle > 0 {
-		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
-	}
-	if req.Agent != "" {
-		args = append(args, "--agent="+req.Agent)
-	}
-	if req.Worktree != "" {
-		args = append(args, "--worktree="+req.Worktree)
-	}
-	if req.RunID != "" {
-		// CB.5: run identity → run-scoped session names + per-run registry.
-		args = append(args, "--run-id="+req.RunID)
-	}
-	if req.ProjectRoot != "" {
-		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
-		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
-		// stays the single source of truth for Config construction.
-		args = append(args, "--project-root="+req.ProjectRoot)
-	}
-	if req.Completion != "" {
-		args = append(args, "--completion="+req.Completion)
-	}
-	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
-	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
-	// into a non-claude launch command.
-	if req.PermissionMode != "" {
-		args = append(args, "--permission-mode="+req.PermissionMode)
-	}
-	// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
-	// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
-	// Config.SessionName; resolveSession then uses the named-session path.
-	if req.SessionName != "" {
-		args = append(args, "--session-name="+req.SessionName)
-	}
-	// The in-process entry is the autonomous runner's trusted path: it is the
-	// bypass authority, so it enables --allow-bypass for the tmux safety gates
-	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
-	// use, not for the programmatic orchestrator). Harmless for headless
-	// drivers, which do not consult AllowBypass.
-	args = append(args, "--allow-bypass")
-	if len(req.ExtraFlags) > 0 {
-		args = append(args, "--")
-		args = append(args, req.ExtraFlags...)
-	}
+	// Within-tier MODEL-failover (model_failover.go): a phase's tier can map to an
+	// ordered chain of concrete models (model-catalog tier_fallbacks, e.g. claude
+	// deep → [fable, opus, sonnet]). Dispatch the first; on a per-model quota wall
+	// (exit=85) advance to the NEXT model at the SAME cli+tier before the caller
+	// escalates to the CLI/tier fallback — the innermost fallback axis, and the ONLY
+	// redundancy for a phase pinned to one tier AND one CLI (e.g. the auditor:
+	// envelope min=max=deep, cli_fallback=[]). Empty catalog / no chain ⇒ a
+	// single-element [model] chain → byte-identical to pre-feature dispatch.
+	// dispatchModelsFor keeps a SessionName-pinned (swarm) dispatch single-shot:
+	// a named session reattaches the same REPL on attempt 2+, so a mid-chain model
+	// switch would not take effect and would mis-attribute telemetry (go-review HIGH).
+	models := dispatchModelsFor(req.CLI, model, req.SessionName)
 
 	// Capture the cold-boot latency the tmux-REPL driver reports via OnBoot
 	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired
@@ -456,21 +414,89 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	// the scoped Engine needs no re-defaulting.
 	callEngine := &Engine{deps: callDeps}
 
-	var stderrBuf bytes.Buffer
-	start := e.deps.Now()
-	code := callEngine.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
-	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
-	// Token-telemetry S3: attribute this Launch's token cost on every exit path
-	// (before the ExitOK branch), so a failed attempt is still accounted. Runs
-	// once per Launch call → one llm-calls.ndjson record per fallback attempt.
-	e.recordTokenUsage(req, model, code, start, &resp)
-	// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
-	// the consecutive-strike counter so non-adjacent failures never bench.
-	if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(code) {
-		if err := e.deps.BootTimeoutStore.ClearBootStrike(req.CLI); err != nil {
-			_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-strike clear failed for %s: %v\n", req.CLI, err)
+	var (
+		stderrBuf bytes.Buffer
+		resp      core.BridgeResponse
+	)
+	// launchOnce dispatches the inner CLI with ONE concrete model, recording its
+	// token cost + boot-strike outcome per attempt (unchanged from the single-shot
+	// path). dispatchModelFailover invokes it once per model, advancing only on 85.
+	launchOnce := func(m string) int {
+		stderrBuf.Reset()
+		args := []string{
+			"--cli=" + req.CLI,
+			"--profile=" + req.Profile,
+			"--model=" + m,
+			"--prompt-file=" + promptFile,
+			"--workspace=" + req.Workspace,
+			"--stdout-log=" + stdoutLog,
+			"--stderr-log=" + stderrLog,
+			"--artifact=" + req.ArtifactPath,
 		}
+		if req.Cycle > 0 {
+			args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
+		}
+		if req.Agent != "" {
+			args = append(args, "--agent="+req.Agent)
+		}
+		if req.Worktree != "" {
+			args = append(args, "--worktree="+req.Worktree)
+		}
+		if req.RunID != "" {
+			// CB.5: run identity → run-scoped session names + per-run registry.
+			args = append(args, "--run-id="+req.RunID)
+		}
+		if req.ProjectRoot != "" {
+			// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
+			// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
+			// stays the single source of truth for Config construction.
+			args = append(args, "--project-root="+req.ProjectRoot)
+		}
+		if req.Completion != "" {
+			args = append(args, "--completion="+req.Completion)
+		}
+		// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
+		// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
+		// into a non-claude launch command.
+		if req.PermissionMode != "" {
+			args = append(args, "--permission-mode="+req.PermissionMode)
+		}
+		// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
+		// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
+		// Config.SessionName; resolveSession then uses the named-session path.
+		if req.SessionName != "" {
+			args = append(args, "--session-name="+req.SessionName)
+		}
+		// The in-process entry is the autonomous runner's trusted path: it is the
+		// bypass authority, so it enables --allow-bypass for the tmux safety gates
+		// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
+		// use, not for the programmatic orchestrator). Harmless for headless
+		// drivers, which do not consult AllowBypass.
+		args = append(args, "--allow-bypass")
+		if len(req.ExtraFlags) > 0 {
+			args = append(args, "--")
+			args = append(args, req.ExtraFlags...)
+		}
+
+		start := e.deps.Now()
+		c := callEngine.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
+		resp = core.BridgeResponse{ExitCode: c, Stderr: stderrBuf.String(), BootMS: bootMS}
+		// Token-telemetry S3: attribute this Launch's token cost on every exit path
+		// (before the ExitOK branch), so a failed attempt is still accounted. Runs
+		// once per dispatch → one llm-calls.ndjson record per (fallback, model) attempt.
+		e.recordTokenUsage(req, m, c, start, &resp)
+		// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
+		// the consecutive-strike counter so non-adjacent failures never bench.
+		if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(c) {
+			if err := e.deps.BootTimeoutStore.ClearBootStrike(req.CLI); err != nil {
+				_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-strike clear failed for %s: %v\n", req.CLI, err)
+			}
+		}
+		return c
 	}
+	_, code := dispatchModelFailover(models, launchOnce, func(from, to string) {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] model-failover: %s model %q hit exit=85 (quota); stepping to next catalog model %q\n", req.CLI, from, to)
+	})
 	if code == ExitOK {
 		// Strategy-aware result read (ADR-0027): the stdout contract writes no
 		// artifact file — its answer is the captured scrollback (stdoutLog), so

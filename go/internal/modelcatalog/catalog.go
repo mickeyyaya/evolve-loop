@@ -89,6 +89,48 @@ func (c Catalog) DispatchModel(cli, tier string) (model string, ok bool) {
 	return entry.modelForTier(tier)
 }
 
+// DispatchModelChain returns the ordered, deduped concrete-model preference for
+// (cli, tier) — TierModels[tier] (the primary) first, then each TierFallbacks
+// [tier] entry — but ONLY for a live-sourced entry (the SAME trust gate as
+// DispatchModel; a degenerate detect-derived catalog must not drive dispatch).
+// This is the within-tier model-failover chain: dispatch the first model, and on
+// a per-model quota wall (bridge exit=85) advance to the NEXT model at the same
+// cli+tier BEFORE escalating to the CLI/tier fallback — the innermost fallback
+// axis. Empty when the entry is missing/non-live or the tier names no models, so
+// the caller falls back to the single-shot manifest ModelTierMap realization
+// (byte-identical to pre-feature dispatch). cli must be a base name (no suffix).
+func (c Catalog) DispatchModelChain(cli, tier string) []string {
+	entry, found := c.CLIs[cli]
+	if !found || entry.Source != SourceLive {
+		return nil
+	}
+	return entry.modelChainForTier(tier)
+}
+
+// modelChainForTier builds the deduped, order-preserving concrete-model chain for
+// tier: TierModels[tier] first, then the operator-authored TierFallbacks[tier].
+// Empty strings and duplicates are dropped (the primary commonly repeats as the
+// chain's head). Empty result ⇒ the tier names no models.
+func (e CLIEntry) modelChainForTier(tier string) []string {
+	var out []string
+	seen := map[string]struct{}{}
+	add := func(m string) {
+		if m == "" {
+			return
+		}
+		if _, dup := seen[m]; dup {
+			return
+		}
+		seen[m] = struct{}{}
+		out = append(out, m)
+	}
+	add(e.TierModels[tier])
+	for _, m := range e.TierFallbacks[tier] {
+		add(m)
+	}
+	return out
+}
+
 // Lookup returns the concrete model for (cli, tier), consulting the tier's
 // fallback chain when the primary mapping is empty or absent. ok is false when
 // the CLI is unknown or neither the primary nor the chain yields a model — in
