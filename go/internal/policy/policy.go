@@ -189,6 +189,11 @@ type Policy struct {
 	// concurrency, and the todo-source strategy. Absent ⇒ Count=1 —
 	// byte-identical to today's single-cycle sequential execution.
 	Fleet *FleetPolicy `json:"fleet,omitempty"`
+	// GoalStall configures the goal-stall escalation: after N consecutive
+	// empty/blocked (non-shipping) cycles on the SAME goal, the loop stops
+	// blindly re-dispatching it and self-files a weighted inbox todo naming the
+	// stalled goal. Absent ⇒ Threshold=3 (the compiled-in safe default).
+	GoalStall *GoalStallPolicy `json:"goal_stall,omitempty"`
 	// ObservationMask configures the deterministic observation-masking window
 	// (research-backed #1 token lever): tool observations older than a rolling
 	// window of N turns have their bulky payload replaced by a placeholder in
@@ -1272,6 +1277,43 @@ func (p Policy) RetroAutofileDefaultWeight() float64 {
 		return safeDefault
 	}
 	return p.RetroAutofile.DefaultWeight
+}
+
+// GoalStallPolicy is the .evolve/policy.json "goal_stall" block. It tunes the
+// goal-stall escalation (cmd/evolve/cmd_loop_goalstall.go): Threshold is the
+// number of CONSECUTIVE empty/blocked (non-shipping) cycles on one goal after
+// which the loop stops blind re-dispatch and self-files an inbox todo; Weight is
+// that todo's weight. Absent ⇒ the compiled-in safe defaults.
+type GoalStallPolicy struct {
+	Threshold int     `json:"threshold,omitempty"`
+	Weight    float64 `json:"weight,omitempty"`
+}
+
+// GoalStallThreshold returns the consecutive non-shipping-cycle count that
+// triggers goal-stall escalation. Absent/non-positive block ⇒ 3 (the compiled-in
+// safe default); a present positive Threshold overrides it. Sourced from policy,
+// never a Go literal at the call site (feedback_phase_settings_from_config_not_code).
+func (p Policy) GoalStallThreshold() int {
+	const safeDefault = 3
+	if p.GoalStall == nil || p.GoalStall.Threshold <= 0 {
+		return safeDefault
+	}
+	return p.GoalStall.Threshold
+}
+
+// GoalStallWeight returns the weight applied to a self-filed goal-stall inbox
+// todo. Absent/non-positive block ⇒ 0.9 (a stalled goal is a high-priority
+// self-prioritization signal, never a low-weight afterthought). A present
+// positive Weight raises it above 0.9; the item-build layer independently
+// re-floors any value below 0.9 back UP to 0.9 (goalStallWeightFloor), so a
+// config value under 0.9 is accepted here but does not take effect — the
+// effective floor is always 0.9 regardless of config.
+func (p Policy) GoalStallWeight() float64 {
+	const safeDefault = 0.9
+	if p.GoalStall == nil || p.GoalStall.Weight <= 0 {
+		return safeDefault
+	}
+	return p.GoalStall.Weight
 }
 
 // SandboxPolicy is the .evolve/policy.json "sandbox" block. NestedFallback

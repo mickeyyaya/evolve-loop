@@ -40,6 +40,7 @@ const (
 	EventCircuitBreakerTripped EventType = "circuit-breaker-tripped"
 	EventVerifyFailed          EventType = "verify-failed"
 	EventClassification        EventType = "classification"
+	EventGoalStallEscalated    EventType = "goal-stall-escalated"
 )
 
 // Event is one line in abnormal-events.jsonl.
@@ -174,5 +175,19 @@ func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 		Cycle:           cycle,
 		Details:         fmt.Sprintf("same cycle number %d reported %d consecutive times (threshold=%d) — dispatcher deadlocked", cycle, streak, threshold),
 		RemediationHint: "Use the explicit no-worktree operator mode or raise EVOLVE_DISPATCH_REPEAT_THRESHOLD; inspect cycle workspace orchestrator-report.md",
+	})
+}
+
+// EmitGoalStallEscalated records that one goal produced `streak` consecutive
+// empty/blocked (non-shipping) cycles, crossing the goal-stall threshold — the
+// loop self-filed an inbox todo naming the goal instead of re-dispatching it
+// blindly again. goalHash identifies the stalled goal.
+func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash string) error {
+	return w.Emit(Event{
+		EventType:       EventGoalStallEscalated,
+		Severity:        SeverityWarn,
+		Cycle:           cycle,
+		Details:         fmt.Sprintf("goal %s produced %d consecutive empty/blocked cycles (threshold=%d) — nothing shipped; escalated instead of re-dispatching", goalHash, streak, threshold),
+		RemediationHint: "See the auto-filed goal-stall inbox todo: re-scope or split the goal, or address the recurring block reason before re-running it",
 	})
 }
