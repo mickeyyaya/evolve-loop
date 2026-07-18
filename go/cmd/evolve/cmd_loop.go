@@ -421,6 +421,14 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// below; a sequential (Count==1) batch never touches it.
 	var starvationTracker fleet.StarvationTracker
 
+	// goal-stall escalation (cmd_loop_goalstall.go): counts consecutive
+	// empty/blocked (non-shipping) cycles on the running goal so a goal that keeps
+	// landing nothing (cycles 640-644) is escalated, not re-dispatched forever.
+	// Held outside the loop so the streak spans cycles. Threshold/weight sourced
+	// from policy.json (never a Go literal).
+	var goalStall goalStallTracker
+	goalStallThreshold, goalStallWeight := loadGoalStallConfig(cfg.EvolveDir)
+
 	for i := 0; i < effectiveMax; i++ {
 		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
 		if ctx.Err() != nil {
@@ -813,6 +821,19 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.ContinuedFailures++
 			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
+		}
+
+		// Goal-stall escalation: an empty/blocked cycle shipped nothing and left
+		// no FAIL signal (the consecutive-FAIL breaker above misses it). N
+		// consecutive such cycles on the SAME goal means blind re-dispatch is
+		// burning pipelines (goal_hash 805f6ced, cycles 640-644) — self-file a
+		// weighted inbox todo naming the goal + reasons and emit an abnormal-event
+		// instead of re-running the identical goal again. The queue is never
+		// halted: escalate and continue (never_stop_queue_inject_inbox).
+		nonShipping := result.FinalVerdict == core.CycleOutcomeSkippedUnknown ||
+			result.FinalVerdict == core.CycleOutcomeSkippedAuditAdvisory
+		if esc := goalStall.observe(nonShipping, result.FinalVerdict, goalStallThreshold); esc != nil {
+			handleGoalStall(cfg.EvolveDir, cfg.GoalHash, workspace, ranCycle, esc, goalStallThreshold, goalStallWeight, stderr)
 		}
 
 		// Cycle-budget completion: when the operator gave no explicit --cycles,
