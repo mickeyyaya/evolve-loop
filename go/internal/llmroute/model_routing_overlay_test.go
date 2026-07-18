@@ -1,13 +1,18 @@
 package llmroute
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+)
 
 // TestApplySoftOverlay_ZeroValueIsNoop (mr4-projection AC3, I8 byte-identical
 // regression floor): a zero-value Overlay ({CLI:"",Tier:""} — the static/
 // advisory no-proposal case) returns the input Plan unchanged.
 func TestApplySoftOverlay_ZeroValueIsNoop(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}, Model: "sonnet", Triggers: []int{80, 81}}
-	out := ApplySoftOverlay(in, Overlay{})
+	out := ApplySoftOverlay(in, Overlay{}, nil)
 	if len(out.Candidates) != 2 || out.Candidates[0] != "claude-tmux" || out.Candidates[1] != "codex-tmux" {
 		t.Errorf("Candidates = %v, want unchanged [claude-tmux codex-tmux]", out.Candidates)
 	}
@@ -23,7 +28,7 @@ func TestApplySoftOverlay_ZeroValueIsNoop(t *testing.T) {
 // overlay from a HARD pin: the chain never shrinks to a single candidate.
 func TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}, Triggers: []int{80, 81}}
-	out := ApplySoftOverlay(in, Overlay{CLI: "codex"})
+	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
 	if len(out.Candidates) != 2 {
 		t.Fatalf("Candidates = %v, want 2 entries (overlay primary + preserved chain, deduped)", out.Candidates)
 	}
@@ -44,7 +49,7 @@ func TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved(t *testing.T) {
 // chain.
 func TestApplySoftOverlay_CLIAlreadyPrimaryDeduped(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
-	out := ApplySoftOverlay(in, Overlay{CLI: "claude"})
+	out := ApplySoftOverlay(in, Overlay{CLI: "claude"}, nil)
 	if len(out.Candidates) != 2 {
 		t.Fatalf("Candidates = %v, want exactly 2 (no duplicate claude-tmux)", out.Candidates)
 	}
@@ -58,9 +63,44 @@ func TestApplySoftOverlay_CLIAlreadyPrimaryDeduped(t *testing.T) {
 // that happens later at bridge dispatch via the manifest's ModelTierMap).
 func TestApplySoftOverlay_TierReplacesModel(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
-	out := ApplySoftOverlay(in, Overlay{Tier: "deep"})
+	out := ApplySoftOverlay(in, Overlay{Tier: "deep"}, nil)
 	if out.Model != "deep" {
 		t.Errorf("Model = %q, want deep (overlay tier replaces the resolved model)", out.Model)
+	}
+}
+
+// TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor (WS-876): an overlaid
+// tier's fallback chain must NOT step below the phase's OWN envelope Min under a
+// quota wall. A phase declaring min:deep (auditor.json/intent.json) must floor
+// the chain at deep, not the universal balanced — else an overlaid auditor would
+// silently drop below its configured quality floor when its tier is fully walled.
+func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
+	in := Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
+	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep"}}
+	out := ApplySoftOverlay(in, Overlay{Tier: "top"}, prof)
+
+	if len(out.Tiers) == 0 || out.Tiers[0] != "top" {
+		t.Fatalf("Tiers = %v, want to START at the overlay tier top", out.Tiers)
+	}
+	deepRank := policy.TierRank("deep")
+	for _, tr := range out.Tiers {
+		if policy.TierRank(tr) < deepRank {
+			t.Errorf("overlaid Tiers %v stepped BELOW the phase envelope floor deep (tier %q rank %d < %d)",
+				out.Tiers, tr, policy.TierRank(tr), deepRank)
+		}
+	}
+
+	// Contrast: with NO profile the universal balanced floor applies, so the
+	// chain is allowed to step down to balanced (proving the floor is what changed).
+	uni := ApplySoftOverlay(in, Overlay{Tier: "top"}, nil)
+	sawBalanced := false
+	for _, tr := range uni.Tiers {
+		if tr == "balanced" {
+			sawBalanced = true
+		}
+	}
+	if !sawBalanced {
+		t.Errorf("nil-profile Tiers %v should include the universal balanced floor", uni.Tiers)
 	}
 }
 
@@ -69,7 +109,7 @@ func TestApplySoftOverlay_TierReplacesModel(t *testing.T) {
 func TestApplySoftOverlay_PureDoesNotMutateInput(t *testing.T) {
 	inCandidates := []string{"claude-tmux", "codex-tmux"}
 	in := Plan{Candidates: inCandidates}
-	_ = ApplySoftOverlay(in, Overlay{CLI: "codex"})
+	_ = ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
 	if inCandidates[0] != "claude-tmux" || inCandidates[1] != "codex-tmux" {
 		t.Errorf("input Candidates mutated in place: %v", inCandidates)
 	}
