@@ -514,6 +514,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
 	lastGoodPane := intervalBaselinePane
+	// Persistence guard for the checkpoint exhaustion fast-fail (exhaustion_persistence.go):
+	// the wall must be present across consecutive checkpoints before failing over,
+	// so wall-shaped text a working agent momentarily rendered does not kill it.
+	// Its OWN gate (not shared with the fast-poll's) — the two loops observe at
+	// different cadences and must each confirm on their own consecutive frames.
+	checkpointExhaustGate := newExhaustionGate()
 	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
 	// baseline (no extra capture, no fixture-frame drift): the prompt was
 	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
@@ -666,16 +672,28 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// maxExtends backstop, not this diff, bounds a spinner-stuck agent
 			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
 			// disambiguate genuine work from animation.
-			livenessCenter.Observe(lp.session, curPane, paneProfile)
+			// Liveness WITHOUT the exhaustion override (empty ExhaustedRegex): a
+			// wall in the pane must not collapse the real converging/idle signal,
+			// because the exhaustion decision is made SEPARATELY below — on the
+			// stripped pane and persistence-gated — so wall-shaped text a working
+			// agent merely rendered cannot pause or kill it. Safe: nothing
+			// consumes the center's Exhausted SignalEvent (no RegisterSignalHandler
+			// caller); this fast-fail was its only actor.
+			livenessProfile := paneProfile
+			livenessProfile.ExhaustedRegex = ""
+			livenessCenter.Observe(lp.session, curPane, livenessProfile)
 			livenessState := livenessCenter.Aggregate()
-			// Exhaustion fast-fail (SignalCenter ExhaustionProbe, ADR-0068): the
-			// pane shows a quota/rate-limit WALL, so the artifact will NEVER come —
-			// fail over to the fallback CLI (exit 85) NOW instead of nudging and
-			// burning the full artifact timeout. Without this the re-printed error
-			// reads as Converging and wedges the phase in an extend-forever livelock
-			// (the agy hang-without-exit incident).
-			if livenessState == panestream.LivenessExhausted {
-				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall — failing over to fallback CLI (exit %d)\n", pfx, ExitUnknownPrompt)
+			// Exhaustion fast-fail: a quota/rate-limit WALL means the artifact will
+			// NEVER come — fail over to the fallback CLI (exit 85) instead of
+			// burning the full artifact timeout. Scanned on the agent-stripped pane
+			// and persistence-gated (exhaustion_persistence.go): a re-printing real wall is
+			// present every checkpoint and still crosses (preserving the agy
+			// hang-without-exit fix), while wall text passing through a WORKING
+			// agent's pane clears by the next checkpoint — the raw-pane false-FAIL
+			// class the go-review of the per-model regex fix surfaced.
+			walled := livenessCenter.ExhaustedOf(strippedForExhaustionScan(curPane, ar.injectedPrompt), paneProfile)
+			if checkpointExhaustGate.observe(walled) {
+				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall (persisted %d checkpoints) — failing over to fallback CLI (exit %d)\n", pfx, exhaustionPersistObservations, ExitUnknownPrompt)
 				return ExitUnknownPrompt, nil
 			}
 			// Progressed is sourced from the center's Changed(session)
@@ -768,6 +786,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if lastVerdict.Action == ReviewPause || lastVerdict.Action == ReviewStop {
 			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, lastEv, lastVerdict)
 		}
+		// Fail-loud drift alarm (exhaustion_drift.go): if this timed-out pane looks
+		// like a quota wall the exhausted_regex missed, the wall wording may have
+		// drifted ahead of the pattern — surface it now so the NEXT drift is caught
+		// in one cycle, not eight (as the per-model wording change was). Diagnostic
+		// only; the exit-81 verdict stands.
+		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, lastGoodPane, paneProfile.ExhaustedRegex)
 		return ExitArtifactTimeout, nil
 	}
 
