@@ -786,6 +786,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if lastVerdict.Action == ReviewPause || lastVerdict.Action == ReviewStop {
 			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, lastEv, lastVerdict)
 		}
+		// Fail-loud drift alarm (exhaustion_drift.go): if this timed-out pane looks
+		// like a quota wall the exhausted_regex missed, the wall wording may have
+		// drifted ahead of the pattern — surface it now so the NEXT drift is caught
+		// in one cycle, not eight (as the per-model wording change was). Diagnostic
+		// only; the exit-81 verdict stands.
+		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, lastGoodPane, paneProfile.ExhaustedRegex)
 		return ExitArtifactTimeout, nil
 	}
 
