@@ -423,6 +423,12 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// out-of-bounds pin hard-fails the phase loudly rather than silently
 	// breaching the trust-kernel constraints. Escape hatch: --bypass-policy flag.
 	var pin *policy.Pin
+	// overlayPolicy carries the skill-overlay rules down to the dispatch closure
+	// (which skill each phase-agent dispatch preloads — config, not code). Zero
+	// value ⇒ compiled-default overlays (ResolveOverlays); under --bypass-policy
+	// the compiled default still applies so the operating discipline is not
+	// dropped by a pin-bypass.
+	var overlayPolicy policy.Policy
 	if !req.BypassPolicy {
 		pol, perr := policy.Load(filepath.Join(req.ProjectRoot, ".evolve", "policy.json"))
 		if perr != nil {
@@ -432,6 +438,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				Diagnostics: []core.Diagnostic{{Severity: "error", Message: perr.Error()}},
 			}, fmt.Errorf("%s: %w", phase, perr)
 		}
+		overlayPolicy = pol
 		if p, ok := pol.PinFor(phase); ok {
 			if verr := policy.ValidatePin(phase, p, prof); verr != nil {
 				return core.PhaseResponse{
@@ -586,6 +593,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				"[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
 				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
 		}
+		// Skill overlays are resolved PER ATTEMPT: the fallback tier steps down
+		// across attempts, and overlay rules key on tier (e.g. deep/top→fable), so
+		// the configured skill set is recomputed for each (cli, tier) actually
+		// dispatched. Pure policy lookup; the adapter materializes the SKILL.md.
+		overlaySkills := overlayPolicy.ResolveOverlays(policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier))
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:                 candidateCLI,
 			Profile:             profilePath,
@@ -602,6 +614,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			PermissionMode:      permissionMode,
 			InteractivePolicy:   interactivePolicy,
 			SystemPrompt:        sysPrompt,
+			Skills:              overlaySkills,
 			CorrectionDirective: req.CorrectionDirective,
 			OperatorDirectives:  req.OperatorDirectives,
 		})

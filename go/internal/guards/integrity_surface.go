@@ -53,6 +53,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/knowledge-base/research/flag-campaign-plan.json", Rationale: "the campaign contract"},
 	{Fragment: "/skills/audit/", Rationale: "the audit grading rubric"},
 	{Fragment: "/skills/adversarial-testing/", Rationale: "the adversarial anti-gaming rubric (M4 goal-integrity)"},
+	{Fragment: "/skills/fable/", Rationale: "the operating-discipline overlay preloaded into deep/top-tier phase agents (policy.ResolveOverlays → bridge skill-overlay injection); its SKILL.md persona is integrity-load-bearing once injected into every phase prompt (audit-F1)"},
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
