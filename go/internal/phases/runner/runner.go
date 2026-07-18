@@ -825,15 +825,19 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	verdict, diags, nextPhase := b.hooks.Classify(artifact, req, bres)
 	if deliverableUnverified {
 		// SHIP-GUARD (anti-gaming). A deliverable that FAILED its well-formedness/anti-
-		// gaming contract may still report a NON-SHIP outcome its phase derives from partial
-		// content (intent delta's "[intent-unchanged]" → SKIPPED), but it must NEVER launder
-		// a ship-eligible verdict past the failed contract — the CodeMissingChallengeToken
-		// case (a PASS sentinel in a file that never echoed the per-cycle challenge token).
-		// Only FAIL/SKIPPED pass through; PASS/WARN/anything else becomes a coherent FAIL.
-		// Routing is verdict-driven (cyclerun maps resp.Verdict → FinalVerdict/lastVerdict),
-		// so downgrading the verdict re-routes correctly without touching nextPhase.
+		// gaming contract must NEVER launder a CLEAN-ship verdict past the failed contract —
+		// the CodeMissingChallengeToken case (a PASS sentinel in a file that never echoed the
+		// per-cycle challenge token). PASS is the only clean-ship claim; downgrade it (and any
+		// non-canonical verdict) to a coherent FAIL. FAIL/SKIPPED/WARN pass through: FAIL and
+		// SKIPPED are non-ship, and WARN is NOT a clean ship — it already flags issues, and
+		// whether it ships is an orchestrator policy call (workflow.strict_audit promotes
+		// WARN→FAIL there), not the runner's to preempt. Downgrading WARN here would break
+		// fluent-mode WARN-ships (TestE2EPipeline_AuditWarn_FluentShips) and regress origin/main,
+		// which also ships a failed-verify WARN via the pane. Routing is verdict-driven (cyclerun
+		// maps resp.Verdict → FinalVerdict/lastVerdict), so downgrading re-routes without
+		// touching nextPhase.
 		switch verdict {
-		case core.VerdictFAIL, core.VerdictSKIPPED:
+		case core.VerdictFAIL, core.VerdictWARN, core.VerdictSKIPPED:
 		default:
 			verdict = core.VerdictFAIL
 		}

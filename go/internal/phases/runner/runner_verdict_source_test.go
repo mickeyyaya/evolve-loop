@@ -33,8 +33,8 @@ func diagsContain(diags []core.Diagnostic, substr string) bool {
 // must NOT clobber a legitimate NON-SHIP verdict a phase derives from partial content
 // that fails full verification. The canonical case is intent delta mode — an
 // "[intent-unchanged]" body is not a full intent contract (so Verify fails) yet
-// classifies as SKIPPED, and that SKIPPED must survive. Only ship-eligible verdicts
-// (PASS/WARN) are downgraded; FAIL and SKIPPED pass through unchanged.
+// classifies as SKIPPED, and that SKIPPED must survive. Only a clean PASS (or a
+// non-canonical verdict) is downgraded; FAIL, WARN, and SKIPPED pass through unchanged.
 func TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-intent", "claude-tmux", nil)
 	// The phase's Classify legitimately returns SKIPPED from partial content; the file is
@@ -55,10 +55,39 @@ func TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough(t
 		t.Fatalf("Run: %v", err)
 	}
 	if resp.Verdict != core.VerdictSKIPPED {
-		t.Errorf("verdict=%q, want SKIPPED — a legitimate NON-SHIP verdict a phase derives from partial content must survive the ship-guard (only PASS/WARN are downgraded)", resp.Verdict)
+		t.Errorf("verdict=%q, want SKIPPED — a legitimate NON-SHIP verdict a phase derives from partial content must survive the ship-guard (only a clean PASS is downgraded)", resp.Verdict)
 	}
 	if hooks.gotArtifact != partial {
 		t.Errorf("Classify received %q, want the partial file content %q — the content must reach Classify so the phase can derive its non-ship verdict", hooks.gotArtifact, partial)
+	}
+}
+
+// TestRun_ContractedPhase_UnverifiedDeliverable_WarnPassesThrough guards fluent-mode
+// WARN-ships (TestE2EPipeline_AuditWarn_FluentShips): a WARN from a deliverable that fails
+// verification must NOT be downgraded. WARN is not a CLEAN ship — it already flags issues,
+// and whether it ships is an orchestrator policy call (workflow.strict_audit promotes
+// WARN→FAIL there), not the runner's to preempt. Only a clean PASS is the laundering vector
+// the ship-guard clamps. Downgrading WARN here would regress origin/main (which ships a
+// failed-verify WARN via the pane) and break the fluent-ships e2e path.
+func TestRun_ContractedPhase_UnverifiedDeliverable_WarnPassesThrough(t *testing.T) {
+	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
+	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictWARN}
+	const partial = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"WARN\"} -->\n(issues noted, but no challenge token)\n"
+	bridge := &divergentBridge{fileContent: partial, stdoutContent: partial}
+	r := New(Options{
+		Hooks: hooks, Bridge: bridge, Prompts: fakePromptsFS("evolve-auditor", "x"),
+		VerifyFn: verifyReturns(deliverable.Result{
+			OK:         false,
+			Violations: []deliverable.Violation{{Code: "MISSING_CHALLENGE_TOKEN", Message: "deliverable did not echo the challenge token"}},
+		}, nil),
+	})
+
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictWARN {
+		t.Errorf("verdict=%q, want WARN — a failed-verify WARN must pass the ship-guard (fluent ships it; strict_audit promotes it in the orchestrator); only a clean PASS is clamped", resp.Verdict)
 	}
 }
 
