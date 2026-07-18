@@ -17,6 +17,25 @@ func tierTestPlan() Plan {
 	}
 }
 
+// TestTieredDispatchResult_NamedShape names the exported TieredDispatchResult
+// type explicitly so its return-value fields are part of the tested contract: an
+// all-quota walk reports the terminal CLI/Tier, every attempt in order, and the
+// terminal error.
+func TestTieredDispatchResult_NamedShape(t *testing.T) {
+	var res TieredDispatchResult = DispatchTiered(tierTestPlan(), func(cli, tier string) (int, error) {
+		return 85, errors.New("quota") // every cli×tier exits 85 → the full walk
+	}, nil)
+	if res.CLI == "" || res.Tier == "" {
+		t.Errorf("TieredDispatchResult must report the terminal CLI/Tier, got %+v", res)
+	}
+	if len(res.Attempts) != 4 { // 2 CLIs × 2 tiers (deep, balanced)
+		t.Errorf("Attempts = %v, want 4 (2 CLIs × 2 tiers)", res.Attempts)
+	}
+	if res.Err == nil {
+		t.Error("an all-quota walk must return the terminal error, got nil")
+	}
+}
+
 func TestTierChain(t *testing.T) {
 	cases := []struct {
 		name          string
