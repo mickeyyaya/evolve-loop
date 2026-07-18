@@ -259,10 +259,19 @@ func New(opts Options) *BaseRunner {
 }
 
 // reconcileSettleRetries / reconcileSettleInterval bound the settle-retry loop
-// in verifyReconcileDeliverable. Worst-case added latency on a genuine first-probe
-// miss: reconcileSettleRetries * reconcileSettleInterval (~600ms).
+// in verifyReconcileDeliverable. The window is only paid when a deliverable does
+// NOT verify on the first probe (a settling/racing file) — a report that is ready
+// verifies immediately and pays zero retries. The window MUST outlast the worst-
+// case flush latency of a clean-exit-idle agent's deliverable, or a genuinely-
+// valid-but-late-flushed report is missed and the runner falls back to the
+// (sentinel-lost) pane → a false FAIL that contradicts the green artifact
+// (verdict-incoherence, ADR-0072; cycle-921). The prior ~600ms (3x200ms) was too
+// short under heavy CPU/disk contention (deliverable.Verify(cycle-921) passes
+// cleanly AFTER the fact — the file was valid, just flushed late). Widened to ~3s;
+// still bounded, still fail-closed (a never-settling/malformed report still falls
+// back to stdout after the window — the anti-gaming invariant is preserved).
 const (
-	reconcileSettleRetries  = 3
+	reconcileSettleRetries  = 15
 	reconcileSettleInterval = 200 * time.Millisecond
 )
 
