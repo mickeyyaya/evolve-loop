@@ -72,8 +72,14 @@ func TestRunnerDispatch_NoInlineFallbackLoop(t *testing.T) {
 // reused, not duplicated).
 func TestRunnerDispatch_CallsLlmrouteDispatch(t *testing.T) {
 	src := readRunnerSource(t)
-	if !strings.Contains(src, "llmroute.Dispatch(") {
-		t.Errorf("runner.go does not call llmroute.Dispatch — the fallback walk must be the SAME implementation the advisor uses, not a parallel copy")
+	// WS-876: the runner dispatches through llmroute.DispatchTiered — the tier×CLI
+	// fallback walk lives in the llmroute PACKAGE, not hand-rolled in the runner.
+	// (DispatchTiered re-uses the same trigger/break CLI-walk semantics as
+	// Dispatch, but re-implements the inner loop rather than calling Dispatch
+	// per-tier, because the all-85 tier step-down decision needs each attempt's
+	// exit code — which Dispatch's return type does not expose.)
+	if !strings.Contains(src, "llmroute.DispatchTiered(") {
+		t.Errorf("runner.go does not call llmroute.DispatchTiered — the tier+CLI fallback walk must live in the shared llmroute package, not a hand-rolled copy in the runner")
 	}
 
 	hooks := &fakeHooks{

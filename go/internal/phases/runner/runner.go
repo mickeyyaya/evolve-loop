@@ -490,7 +490,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		modelSource = "advisor"
 	}
 	if pin == nil && overlayProposed {
-		plan = llmroute.ApplySoftOverlay(plan, llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier})
+		plan = llmroute.ApplySoftOverlay(plan, llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier}, prof)
 		b.diag.Infof("[runner] phase=%s advisor overlay cli=%s tier=%s\n", phase, req.ModelRoutingCLI, req.ModelRoutingTier)
 	} else if pin == nil {
 		b.diag.Infof("[runner] phase=%s no advisor overlay (profile default)\n", phase)
@@ -566,17 +566,30 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
-	llmroute.Dispatch(plan, func(candidateCLI string) (int, error) {
+	// WS-876: dispatch through the TIER fallback chain. DispatchTiered walks
+	// plan.Tiers outer × plan.Candidates inner: within a tier it behaves exactly
+	// like Dispatch (trigger exit advances the CLI, a real FAIL stops), and it
+	// steps DOWN to the next tier ONLY when every CLI at the current tier exited
+	// 85 (quota) — the fable/opus→sonnet step-down the operator needs so a
+	// fully-quota-walled top tier fails over to a lower-cost live tier instead of
+	// aborting the phase. The tier string flows straight into BridgeRequest.Model:
+	// the bridge realizer maps it per-CLI via the manifest's model_tier_map
+	// (opus→opus/gpt-5.5, balanced→sonnet/gpt-5.4, …), so no runner-side model
+	// resolution is needed — passing the tier is as literal as passing plan.Model.
+	tieredRes := llmroute.DispatchTiered(plan, func(candidateCLI, tier string) (int, error) {
 		i := len(attemptLog)
 		if i > 0 {
+			// Read the previous attempt from attemptLog, NOT plan.Candidates[i-1]:
+			// under tiering i grows past len(Candidates) (candidates × tiers), so
+			// indexing Candidates would panic on the first real step-down.
 			log.Diag().Infof(
-				"[runner] phase=%s fallback %d/%d: trying cli=%s (previous=%s exit=%d)\n",
-				phase, i+1, len(plan.Candidates), candidateCLI, plan.Candidates[i-1], bres.ExitCode)
+				"[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
+				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
 		}
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:                 candidateCLI,
 			Profile:             profilePath,
-			Model:               model,
+			Model:               tier,
 			Prompt:              prompt,
 			Workspace:           req.Workspace,
 			Worktree:            req.Worktree,
@@ -598,7 +611,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
-		attemptLog = append(attemptLog, fmt.Sprintf("%s=%d", candidateCLI, bres.ExitCode))
+		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
 		// CLI-health bench: an exit-85 with a fresh benchable escalation
 		// report (rate_limit class) is remembered ACROSS dispatches — run on
 		// every candidate including the last, so the wall is recorded even
@@ -609,7 +622,16 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			b.maybeBenchOnEscalation(req.ProjectRoot, req.Workspace, candidateCLI, start, req.Env)
 		}
 		return bres.ExitCode, bridgeErr
+	}, func(from, to string) {
+		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})
+	// ResolvedModel reports the tier the terminal attempt actually ran at (a
+	// step-down means the phase ran below its resolved tier); fall back to the
+	// resolved model for the empty-candidates edge case DispatchTiered guards.
+	resolvedModel := tieredRes.Tier
+	if resolvedModel == "" {
+		resolvedModel = model
+	}
 	if len(attemptLog) > 1 {
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
@@ -763,7 +785,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		BootMS:        bres.BootMS,
 		Diagnostics:   diags,
 		ModelSource:   modelSource,
-		ResolvedModel: model,
+		ResolvedModel: resolvedModel,
 	}
 	if reconciled {
 		// A well-formed deliverable on a bridge infra teardown (timeout OR

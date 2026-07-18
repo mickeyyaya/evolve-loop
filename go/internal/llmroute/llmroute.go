@@ -85,6 +85,7 @@ type Plan struct {
 	Triggers      []int    // exit codes that advance the chain
 	PrimarySource string   // "env(EVOLVE_AUDITOR_CLI)" / "env(EVOLVE_CLI)" / "profile.auditor.cli" / "default"
 	Model         string   // resolved model, "auto" already expanded when possible
+	Tiers         []string // ordered tier fallback chain, resolved tier first (see TierChain)
 }
 
 // TriggersFallback reports whether exitCode should advance the chain. A
@@ -128,17 +129,31 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 		primary, source = defaultDriverForFamily(pin.CLI), "policy.pin"
 	}
 	var model string
+	tiers := []string(nil)
 	if pin != nil && pin.Model != "" {
-		model = pin.Model // absolute — skip the env/profile/default/auto chain entirely
+		model = pin.Model       // absolute — skip the env/profile/default/auto chain entirely
+		tiers = []string{model} // a pin is ABSOLUTE: never tier-step-down away from it
 	} else {
 		model = resolveModel(agent, phase, defaultModel, env, prof, autoExpand)
+		tiers = TierChain(model, envelopeMin(prof))
 	}
 	return Plan{
 		Candidates:    candidatesFrom(primary, prof),
 		Triggers:      resolveTriggers(prof),
 		PrimarySource: source,
 		Model:         model,
+		Tiers:         tiers,
 	}
+}
+
+// envelopeMin returns the profile's ModelTierEnvelope.Min tier floor, or ""
+// (→ TierChain's universal "balanced" floor) when the profile or envelope is
+// absent.
+func envelopeMin(prof *profiles.Profile) string {
+	if prof == nil || prof.ModelTierEnvelope == nil {
+		return ""
+	}
+	return prof.ModelTierEnvelope.Min
 }
 
 // resolveModel runs the model precedence: request override > profile

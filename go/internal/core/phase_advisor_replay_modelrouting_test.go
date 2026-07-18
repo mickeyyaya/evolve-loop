@@ -54,7 +54,7 @@ func TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto(t *testing.T
 
 	// Simulate the runner's MR4c dispatch overlay from the clamped entry.
 	base := llmroute.Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
-	overlaid := llmroute.ApplySoftOverlay(base, llmroute.Overlay{CLI: entry.CLI, Tier: entry.Tier})
+	overlaid := llmroute.ApplySoftOverlay(base, llmroute.Overlay{CLI: entry.CLI, Tier: entry.Tier}, prof)
 	if len(overlaid.Candidates) == 0 || overlaid.Candidates[0] != "codex-tmux" {
 		t.Errorf("dispatch chain = %v, want codex-tmux promoted to primary", overlaid.Candidates)
 	}
@@ -87,7 +87,7 @@ func TestReplayPlanFromResponse_LegacyResponseByteIdenticalDispatch(t *testing.T
 
 	base := llmroute.Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
 	for _, e := range mrPlan.Entries {
-		overlaid := llmroute.ApplySoftOverlay(base, llmroute.Overlay{CLI: e.CLI, Tier: e.Tier})
+		overlaid := llmroute.ApplySoftOverlay(base, llmroute.Overlay{CLI: e.CLI, Tier: e.Tier}, prof)
 		if len(overlaid.Candidates) != 1 || overlaid.Candidates[0] != "claude-tmux" || overlaid.Model != "sonnet" {
 			t.Errorf("phase %s: dispatch = %+v, want byte-identical to the profile-static baseline (no overlay)", e.Phase, overlaid)
 		}

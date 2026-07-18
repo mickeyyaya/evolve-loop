@@ -15,6 +15,13 @@ const abortReasonAllFamiliesExhausted = "all-families-exhausted"
 // family in the fallback chain was tried and is drained. A single attempt
 // proves nothing about the chain, so len < 2 is never terminal — single-family
 // 85 with a healthy sibling keeps the existing failover behavior.
+//
+// Since WS-876 (llmroute.DispatchTiered) the quota-terminal error feeding this
+// classification is only reachable after the LOWEST tier in the plan's tier
+// fallback chain (Plan.Tiers, floored at the phase's ModelTierEnvelope.Min /
+// the universal "balanced" floor) is also exhausted — an all-85 sequence now
+// means every family at every allowed tier is drained, not just at the
+// initially resolved tier.
 func allFamiliesQuotaExhausted(attemptExits []int) bool {
 	if len(attemptExits) < 2 {
 		return false
