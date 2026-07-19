@@ -1,0 +1,11 @@
+{
+  "id": "scout-goalhash-machine-stamped-not-llm-transcribed",
+  "title": "scout-report Decision Trace goal_hash must be machine-stamped, never LLM-transcribed — a one-hex-digit typo aborted a lane (lane-scope coherence guard, verify-run 2026-07-19)",
+  "weight_hint": 0.85,
+  "created": "2026-07-19T15:10:00Z",
+  "why": "Live 2-lane verify run: lane merge-rung2-wire-ship-recovery aborted at triage with 'lane-scope goal-hash mismatch' — scout-report Decision Trace goal_hash …c05356e vs pinned lane-scope.json …c05376e. Exactly ONE hex digit differs: the scout LLM hand-copied the 64-char hash into its report and typo'd it. The guard did its job (refused an incoherent lane identity, task-level abort, loop continued), but the whole failure class is manufactured: a value the orchestrator MINTED and PINNED is round-tripped through an LLM's transcription and then string-compared against itself.",
+  "how_to_apply": "Single-source-with-projection: the runner (or the scout deliverable contract post-processor) should stamp the canonical goal_hash into the scout-report Decision Trace mechanically — e.g. template substitution at prompt-composition or a post-write normalization that replaces the Decision Trace goal_hash line with the pinned lane-scope value + flags a WARN if the LLM-written value differed. The guard's comparison then verifies pipeline plumbing, not LLM typing accuracy. Zero prompt changes needed for agents beyond removing the hand-copy instruction.",
+  "evidence": "loop-verify2 run 2026-07-19: 'evolve cycle run: lane-scope goal-hash mismatch: scout-report Decision Trace goal_hash \"…c05356e\" != pinned lane-scope.json goal_hash \"…c05376e\" — triage must not run on an incoherent lane identity'",
+  "files": ["go/internal/phases/scout", "go/internal/core/lane_scope*.go"],
+  "class": "llm-transcribed-values-must-be-machine-stamped"
+}

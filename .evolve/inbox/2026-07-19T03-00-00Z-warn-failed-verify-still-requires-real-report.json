@@ -1,0 +1,15 @@
+{
+  "id": "warn-failed-verify-still-requires-real-report",
+  "title": "Anti-gaming gap (pre-existing, low): a WARN verdict from a deliverable that FAILS deliverable.Verify (e.g. no challenge-token) still ships in fluent mode. The ship-guard clamps a laundered PASS but lets WARN through. Consider requiring a real challenge-token-bearing report before a WARN may ship.",
+  "weight": 0.4,
+  "kind": "security",
+  "root_cause": "The runner ship-guard (go/internal/phases/runner/runner.go) downgrades only a CLEAN-ship verdict (PASS) to FAIL when a contracted deliverable fails deliverable.Verify; FAIL/WARN/SKIPPED pass through. WARN passes through because (a) it is not a clean-success claim, (b) whether WARN ships is an orchestrator policy call (workflow.strict_audit promotes WARN→FAIL downstream, cyclerun_record.go/cyclerun_select.go), and (c) origin/main ALSO ships a failed-verify WARN via its pane fallback — so clamping WARN would regress fluent-mode WARN-ships (TestE2EPipeline_AuditWarn_FluentShips). The residual gap: in FLUENT mode an agent could pair a WARN sentinel with a deliberately-malformed report (missing challenge token / failure-context) and still ship real code, bypassing the anti-gaming report contract. Strictly no worse than origin/main, and WARN is self-flagged 'issues noted' (asymmetric to PASS's clean claim), so it is a pre-existing, low-severity surface — NOT introduced by fix/verdict-source-file-authoritative. Flagged by go-review of that fix.",
+  "fix": "Decide the intended contract for a fluent-mode WARN ship: option (A) require the WARN report to still carry the anti-gaming essentials (challenge token + ADR-0039 failure-context) before it may ship — i.e. distinguish 'WARN with a real, complete report' (ship in fluent) from 'WARN with a malformed/absent report' (treat as a deliverable-production FAIL); option (B) accept fluent WARN-ships as-is (operator explicitly opted into shipping warnings) and document that anti-gaming for WARN is deferred to strict mode. If (A): the ship-guard would clamp WARN→FAIL ONLY when the failure is an ANTI-GAMING violation (missing challenge token / failure-context) but pass WARN through for benign structural gaps — which requires distinguishing Violation Codes, so weigh the added coupling. Do NOT clamp WARN unconditionally (that regresses fluent-ships).",
+  "acceptance": [
+    "A decision recorded (A or B) with rationale; if (A), a WARN paired with a challenge-token-missing report does NOT ship in fluent mode, while a WARN with a complete report DOES; TestE2EPipeline_AuditWarn_FluentShips still passes for the complete-report case.",
+    "The clean-PASS clamp is unchanged; go test -race on internal/phases/runner + the e2e pipeline-paths tier green; go-review clears."
+  ],
+  "connects_to": ["verdict-incoherence-why-verify-fails", "antigaming_boundary", "deliverable-verified-bytes-single-read"],
+  "source": "go-review of the WARN-whitelist fix on fix/verdict-source-file-authoritative (finding: WARN passes the ship-guard even when the deliverable fails verification).",
+  "created_at": "2026-07-19T03:00:00Z"
+}
