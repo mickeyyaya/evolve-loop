@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -302,6 +303,70 @@ func (b *BaseRunner) verifyReconcileDeliverable(phase string, roots phasecontrac
 		res, verr = b.verifyFn(phase, roots)
 	}
 	return res, verr
+}
+
+// forensicSnapshot / forensicCodes render a file's + a violation set's state as a single
+// log-safe token for the teardown-reconcile decision log (the retro's cycle-3 ask: today a
+// teardown false-FAIL records no reasoning, so a recurrence is a 30-minute forensic dig).
+// forensicSnapshot reports a file's existence, byte size, and last tailN bytes (where the
+// audit-report.md verdict sentinel lives).
+func forensicSnapshot(path string, tailN int) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "absent"
+	}
+	data, _ := os.ReadFile(path)
+	tail := string(data)
+	if len(tail) > tailN {
+		tail = tail[len(tail)-tailN:]
+	}
+	return fmt.Sprintf("size=%d tail=%q", fi.Size(), tail)
+}
+
+func forensicCodes(vs []deliverable.Violation) string {
+	parts := make([]string, 0, len(vs))
+	for _, v := range vs {
+		parts = append(parts, string(v.Code))
+	}
+	return strings.Join(parts, ",")
+}
+
+// acsFloorRescues reports whether a teardown-time deliverable.Verify not-OK should
+// be OVERRIDDEN by the deterministic ACS ground truth (verdict-incoherence family:
+// cycles 603/921/924/931/3). True iff ALL hold:
+//   - the phase is audit (the acs-verdict.json + coherence floor are audit-scoped);
+//   - the acssuite verdict is PASS — a NON-LLM signal a session stall cannot corrupt;
+//   - the report declares a PASS-class verdict sentinel (via the canonical
+//     ParseVerdictSentinel, with its placeholder-echo guard — read by ReadCycleVerdicts);
+//   - the report echoes THIS cycle's minted challenge token (anti-gaming: a stale,
+//     forged, or cross-cycle report cannot be laundered to PASS by the ACS verdict alone).
+//
+// This is precisely the (audit==PASS && acs==PASS) condition the ADR-0072 coherence
+// floor flags as incoherent — reusing coherence.ReadCycleVerdicts keeps a single
+// definition of "both verdicts agree on PASS", so the teardown floor rescues exactly
+// what the post-hoc floor would otherwise HALT on. It never manufactures a PASS: a
+// malformed/verdict-less/token-missing report, or a non-ship-eligible suite, declines.
+func acsFloorRescues(phase, workspace, artifactPath string) bool {
+	if phase != string(core.PhaseAudit) {
+		return false
+	}
+	audit, acs, auditRan := coherence.ReadCycleVerdicts(workspace)
+	if !auditRan || audit != "PASS" || acs != "PASS" {
+		return false
+	}
+	tokRaw, err := os.ReadFile(filepath.Join(workspace, "challenge-token.txt"))
+	if err != nil {
+		return false
+	}
+	tok := strings.TrimSpace(string(tokRaw))
+	if tok == "" {
+		return false
+	}
+	report, err := os.ReadFile(artifactPath)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(report), tok)
 }
 
 // Name implements core.PhaseRunner.
@@ -669,6 +734,8 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// EGPS gate still applies — reconciliation can never ship a green-looking
 	// report whose predicates are red). See the reconcile block below.
 	reconciled := false
+	acsFloorRescued := false
+	acsFloorOverriddenCodes := "" // teardown Verify codes the ACS floor overrode (surfaced on the response)
 	if bridgeErr != nil {
 		// A bridge INFRA teardown — an artifact-wait timeout (exit 81) OR a
 		// transient failure (exit 80/85/86: quota, liveness-exhaustion) — ends the
@@ -715,6 +782,26 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 					}},
 				}, nil
 			default:
+				// ACS DETERMINISTIC FLOOR (verdict-incoherence family: cycles
+				// 603/921/924/931/3). The teardown-time deliverable.Verify can return
+				// not-OK on a report that standalone-verifies OK — a session-lifecycle
+				// artifact (the agent wrote a valid report, then idled without the
+				// `evolve phase verify` handshake until ctx-cancel), NOT a defect. Before
+				// discarding a possibly-shippable cycle as FAIL, consult the NON-LLM ground
+				// truth a stall cannot corrupt: the acssuite verdict. When it is PASS AND
+				// the report carries THIS cycle's challenge token with a PASS sentinel
+				// (anti-gaming: a forged/stale report fails the token), the phase genuinely
+				// passed — reconcile to the agent's own report via the same Classify path
+				// the clean exit uses. This is exactly the (audit==PASS && acs==PASS)
+				// condition the ADR-0072 coherence floor flags as incoherent, prevented at
+				// the source instead of halting after the fact.
+				if acsFloorRescues(phase, req.Workspace, artifactPath) {
+					reconciled = true
+					acsFloorRescued = true
+					acsFloorOverriddenCodes = forensicCodes(res.Violations)
+					log.Diag().Infof("[runner] ACS-FLOOR phase=%s: teardown Verify not-OK (codes=[%s]) but the acssuite verdict is ship-eligible and the report carries this cycle's challenge token with a PASS sentinel — reconciled to the deterministic verdict\n", phase, acsFloorOverriddenCodes)
+					break
+				}
 				// Mandatory phase, no trustworthy deliverable (absent/malformed/
 				// unverifiable): hard-fail as before, enriched with the
 				// well-formedness violation when we have one.
@@ -722,6 +809,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				if verr == nil && len(res.Violations) > 0 {
 					msg = fmt.Sprintf("%s; deliverable not trustworthy: %s", msg, res.Violations[0].Message)
 				}
+				// [VERDICT-FORENSIC] The retro's #1 ask (cycle-3): a teardown default-FAIL
+				// today records NO reasoning, so a false-FAIL is a 30-minute forensic dig.
+				// Log the roots passed to verifyFn, the violation codes, verr, and the
+				// on-disk deterministic state so the next recurrence is one grep.
+				log.Diag().Infof("[VERDICT-FORENSIC] teardown-FAIL phase=%s roots{ws=%s wt=%s evolve=%s} verr=%v codes=[%s] report{%s} acs{%s}\n",
+					phase, roots.Workspace, roots.Worktree, roots.EvolveDir, verr, forensicCodes(res.Violations),
+					forensicSnapshot(artifactPath, 160), forensicSnapshot(filepath.Join(req.Workspace, "acs-verdict.json"), 200))
 				return core.PhaseResponse{
 					Phase:        phase,
 					Verdict:      core.VerdictFAIL,
@@ -879,11 +973,28 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// real verdict; it never invents a PASS (Classify, incl. audit's EGPS
 		// red_count gate, still decides).
 		resp.Reconciled = true
+		reconcileMsg := fmt.Sprintf("bridge infra teardown (%v) but deliverable %s is well-formed; reconciled to %s from the agent's own report", bridgeErr, artifactPath, verdict)
+		if acsFloorRescued {
+			// The deliverable did NOT pass teardown-time Verify — it was rescued by the
+			// deterministic ACS floor. Record that accurately so the trail isn't misleading.
+			reconcileMsg = fmt.Sprintf("bridge infra teardown (%v): teardown-time deliverable.Verify returned not-OK, but the acssuite verdict is ship-eligible and %s carries this cycle's challenge token with a PASS sentinel — reconciled to %s via the ACS deterministic floor (verdict-incoherence family)", bridgeErr, artifactPath, verdict)
+		}
 		resp.Diagnostics = append(resp.Diagnostics, core.Diagnostic{
 			Severity: "warning",
-			Message:  fmt.Sprintf("bridge infra teardown (%v) but deliverable %s is well-formed; reconciled to %s from the agent's own report", bridgeErr, artifactPath, verdict),
+			Message:  reconcileMsg,
 		})
-		log.Diag().Infof("[runner] RECONCILED phase=%s (%v) verdict=%s deliverable=%s\n", phase, bridgeErr, verdict, artifactPath)
+		if acsFloorRescued && acsFloorOverriddenCodes != "" {
+			// Surface the OVERRIDDEN well-formedness violations on the RESPONSE (not just the
+			// log), so the ACS-floor rescue is never a silent bypass: a hygiene flag such as
+			// stray_in_worktree that shipped on the deterministic verdict's authority stays
+			// visible to the operator/retro for investigation. Not a downgrade — routing keys
+			// on resp.Verdict (PASS); this is an informational trail only.
+			resp.Diagnostics = append(resp.Diagnostics, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("ACS floor overrode teardown deliverable.Verify violation(s) [%s] — the deterministic acssuite verdict took precedence; investigate if any is a genuine hygiene regression (e.g. a stray worktree artifact)", acsFloorOverriddenCodes),
+			})
+		}
+		log.Diag().Infof("[runner] RECONCILED phase=%s (%v) verdict=%s deliverable=%s acsFloor=%v\n", phase, bridgeErr, verdict, artifactPath, acsFloorRescued)
 	}
 	return resp, nil
 }
