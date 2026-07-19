@@ -358,3 +358,179 @@ func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
 		t.Fatal("measurement error must produce offenders (FAIL), got a clean pass")
 	}
 }
+
+// --- integration-tier flake-absorb (post-v22.4.2 false-RED class) ----------
+//
+// Post-release audit of the verification batch proved 3 audit-FAILs (cycles
+// 943/950/955) were tier false-REDs: every named test PASSES in isolation in
+// the failed cycles' own preserved worktrees. Two mechanisms, two remedies:
+//   - env-inheritance: the gate subprocess inherited the lane's full
+//     environment (sysexec nil-env → os.Environ()) while CI runs clean — a
+//     CI-parity bug; the tier now ALWAYS runs with a scrubbed allowlist env;
+//   - fleet contention: -race integration tests starve under live lanes; on
+//     red the tier retakes ONCE under a cross-lane exclusive lock — a green
+//     retake is a flake (absorbed → WARN), a red retake is genuine (FAIL).
+
+// seqRunFunc scripts one (code, stdout) per successive call and records the
+// env each call received.
+func seqRunFunc(t *testing.T, script []struct {
+	Code int
+	Out  string
+}) (sysexec.RunFunc, *int, *[][]string) {
+	t.Helper()
+	calls := 0
+	envs := [][]string{}
+	fn := func(_ context.Context, _, _ string, _, env []string, _ io.Reader, so, _ io.Writer) (int, error) {
+		if calls >= len(script) {
+			t.Fatalf("run func called %d times, script has %d entries", calls+1, len(script))
+		}
+		step := script[calls]
+		calls++
+		envs = append(envs, env)
+		_, _ = io.WriteString(so, step.Out)
+		return step.Code, nil
+	}
+	return fn, &calls, &envs
+}
+
+// tierFixture builds a root with a go module, a build handoff naming a
+// NON-env-exclusive package, and a workspace dir — everything
+// integrationTierCheckDefault needs to reach the run seam.
+func tierFixture(t *testing.T) core.PhaseRequest {
+	t.Helper()
+	root, _ := goWorktree(t)
+	runDir := filepath.Join(root, ".evolve", "runs", "cycle-3")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
+		[]byte(`{"thrusts":[{"files_modified":["go/internal/widget/w.go"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return core.PhaseRequest{Cycle: 3, ProjectRoot: root, Worktree: root, Workspace: t.TempDir()}
+}
+
+// TestIntegrationTier_GreenFirstAttempt_SingleRunCleanEnv — the fast path is
+// unchanged (exactly one run) AND that one run already gets the scrubbed env:
+// PATH survives, a lane-leaked EVOLVE_* canary does not (CI parity — CI's env
+// is clean, so inheriting the lane's environment was a parity bug even when
+// nothing flaked).
+func TestIntegrationTier_GreenFirstAttempt_SingleRunCleanEnv(t *testing.T) {
+	t.Setenv("EVOLVE_LEAK_CANARY", "1")
+	req := tierFixture(t)
+	fn, calls, envs := seqRunFunc(t, []struct {
+		Code int
+		Out  string
+	}{{0, "ok"}})
+	withFakeRunner(t, fn)
+
+	off, err := integrationTierCheckDefault(req)
+	if off != nil || err != nil {
+		t.Fatalf("green first attempt: (%v, %v), want (nil, nil)", off, err)
+	}
+	if *calls != 1 {
+		t.Fatalf("green path must run exactly once, ran %d times", *calls)
+	}
+	env := (*envs)[0]
+	if env == nil {
+		t.Fatal("tier subprocess env must be an explicit scrubbed allowlist, not nil (nil inherits the lane's os.Environ())")
+	}
+	joined := strings.Join(env, "\n")
+	if !strings.Contains(joined, "PATH=") {
+		t.Errorf("scrubbed env must keep PATH; got %d vars", len(env))
+	}
+	if strings.Contains(joined, "EVOLVE_LEAK_CANARY") {
+		t.Error("lane-leaked EVOLVE_* vars must NOT reach the tier subprocess")
+	}
+}
+
+// TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn — a red first attempt
+// retakes once (serialized) and a GREEN retake is absorbed as a contention
+// flake: (nil, error) so applyCIGate surfaces a WARN, never a false FAIL. Both
+// attempts persist to integration-tier.log for the retro.
+func TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn(t *testing.T) {
+	req := tierFixture(t)
+	fn, calls, _ := seqRunFunc(t, []struct {
+		Code int
+		Out  string
+	}{{1, "--- FAIL: TestFlaky (0.00s)\nFAIL\tpkg\t1.0s\n"}, {0, "ok\n"}})
+	withFakeRunner(t, fn)
+
+	off, err := integrationTierCheckDefault(req)
+	if off != nil {
+		t.Fatalf("green retake must not FAIL the audit; got offenders %v", off)
+	}
+	if err == nil || !strings.Contains(err.Error(), "flake") {
+		t.Fatalf("green retake must surface a WARN-carrying error naming the flake; got %v", err)
+	}
+	if *calls != 2 {
+		t.Fatalf("red first attempt must retake exactly once, ran %d times", *calls)
+	}
+	logB, rerr := os.ReadFile(filepath.Join(req.Workspace, "integration-tier.log"))
+	if rerr != nil {
+		t.Fatalf("both attempts must persist to integration-tier.log: %v", rerr)
+	}
+	log := string(logB)
+	if !strings.Contains(log, "attempt 1") || !strings.Contains(log, "attempt 2") || !strings.Contains(log, "TestFlaky") {
+		t.Errorf("log must carry both attempts (got %d bytes)", len(log))
+	}
+}
+
+// TestIntegrationTier_RedThenRed_GenuineOffendersFromRetake — a red retake is a
+// genuine failure: FAIL with the RETAKE's offender lines (the serialized,
+// clean-env attempt is the truthful one) plus the log pointer.
+func TestIntegrationTier_RedThenRed_GenuineOffendersFromRetake(t *testing.T) {
+	req := tierFixture(t)
+	fn, calls, _ := seqRunFunc(t, []struct {
+		Code int
+		Out  string
+	}{{1, "--- FAIL: TestNoisyFirst (0.00s)\n"}, {1, "--- FAIL: TestGenuine (0.01s)\nFAIL\tpkg\t2.0s\n"}})
+	withFakeRunner(t, fn)
+
+	off, err := integrationTierCheckDefault(req)
+	if err != nil {
+		t.Fatalf("double red must FAIL via offenders, not error: %v", err)
+	}
+	if *calls != 2 {
+		t.Fatalf("want exactly 2 attempts, got %d", *calls)
+	}
+	joined := strings.Join(off, "\n")
+	if !strings.Contains(joined, "TestGenuine") {
+		t.Errorf("offenders must come from the serialized retake; got %v", off)
+	}
+	if !strings.Contains(joined, "integration-tier.log") {
+		t.Errorf("offenders must carry the log pointer; got %v", off)
+	}
+}
+
+// TestAcquireTierLock_SerializesAndReleases — the retake lock is a real mutual
+// exclusion: while held, a second acquire blocks (bounded by its ctx); after
+// release, it succeeds immediately. Uses two distinct fds on the same lock file
+// (flock is per-fd), exactly like two fleet lanes.
+func TestAcquireTierLock_SerializesAndReleases(t *testing.T) {
+	root := t.TempDir()
+	req := core.PhaseRequest{ProjectRoot: root}
+	// Shrink the independent lock-wait budget so the held-lock case times out
+	// fast (the budget is deliberately NOT a caller ctx — go-review HIGH: the
+	// attempt-1 ctx is already consumed exactly when contention is worst).
+	origWait := tierLockWait
+	tierLockWait = 50 * time.Millisecond
+	t.Cleanup(func() { tierLockWait = origWait })
+
+	release1, note1 := acquireTierLock(req)
+	if note1 != "" {
+		t.Fatalf("first acquire must succeed cleanly, note=%q", note1)
+	}
+	// Second acquire while held must NOT get the lock (bounded wait, then note).
+	_, note2 := acquireTierLock(req)
+	if !strings.Contains(note2, "lock wait timed out") {
+		t.Fatalf("second acquire while held must time out (serialization), note=%q", note2)
+	}
+	release1()
+	// After release, acquisition succeeds again.
+	release3, note3 := acquireTierLock(req)
+	if note3 != "" {
+		t.Fatalf("post-release acquire must succeed, note=%q", note3)
+	}
+	release3()
+}

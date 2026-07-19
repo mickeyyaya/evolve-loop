@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
@@ -257,30 +259,158 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 		"-p", integrationTierParallelismArg,
 		"-parallel", integrationTierParallelismArg,
 		"-tags", "integration"}, pkgs...)
-	out, errOut, code, cerr := sysexec.Capture(ctx, run, dir, "go", args...)
+	// CI-parity env scrub: CI runs the tier with a CLEAN environment; inheriting
+	// the lane's os.Environ() (sysexec nil-env default) leaked EVOLVE_*/session
+	// vars into env-sensitive integration tests and false-REDded them
+	// deterministically (cycles 950/955: identical 0.00s failures in two
+	// different worktrees, all green in isolation). Every attempt runs scrubbed.
+	scrubbed := scrubbedRun(run)
+	out, errOut, code, cerr := sysexec.Capture(ctx, scrubbed, dir, "go", args...)
 	if cerr != nil {
 		return nil, fmt.Errorf("integration-tier gate could not run: %w", cerr) // fail-open → WARN
 	}
 	if code == 0 {
 		return nil, nil // clean
 	}
-	// Ran + non-zero → FAIL. Persist the FULL output to the workspace first:
-	// the verdict diagnostic carries only the bounded offender lines and
-	// state.json truncates further, which left cycles 930/931/932 citing noise
-	// with the real failing test unrecoverable from artifacts. The log makes
-	// the next red a one-grep diagnosis.
-	offenders := offenderLines(strings.TrimSpace(out + "\n" + errOut))
-	if req.Workspace != "" {
-		logPath := filepath.Join(req.Workspace, "integration-tier.log")
-		content := fmt.Sprintf("# go %s\n# exit: %d\n\n%s\n%s", strings.Join(args, " "), code, out, errOut)
-		if werr := os.WriteFile(logPath, []byte(content), 0o644); werr == nil {
-			// Pointer line (not a failure marker): tells the retro/operator where
-			// the untruncated output lives. Slightly inflates the offender count —
-			// acceptable for the discoverability.
-			offenders = append(offenders, "full output: "+logPath)
+	// Red first attempt. Under a live fleet the -race tier also starves for
+	// CPU/IO (cycle-943: one package took 469s then failed; green in isolation),
+	// so a single red is not yet evidence: RETAKE ONCE under a cross-lane
+	// exclusive lock (isolation on demand — the root cause is contention, and
+	// serialization removes it). Both attempts persist to integration-tier.log
+	// (state.json truncates; the artifact is the one-grep diagnosis).
+	// DELIBERATE trade-offs: worst-case gate wall-clock doubles (attempt 1 +
+	// a fresh integrationTierTimeout retake — red paths only, and a false FAIL
+	// discarding a shippable cycle costs far more); a retake that itself dies
+	// (exec failure / retake-deadline kill) falls back to attempt-1 offenders —
+	// possibly contended data, but a real red must never be laundered by retake
+	// infra trouble.
+	// logPath is set on the FIRST successful log write and never cleared: a
+	// later append failure must not drop the pointer to a real on-disk artifact
+	// that already carries attempt 1 (go-review MEDIUM).
+	logPath := ""
+	appendLog := func(attempt int, note, o, e string, c int) {
+		if req.Workspace == "" {
+			return
+		}
+		p := filepath.Join(req.Workspace, "integration-tier.log")
+		entry := fmt.Sprintf("# attempt %d%s\n# go %s\n# exit: %d\n\n%s\n%s\n", attempt, note, strings.Join(args, " "), c, o, e)
+		f, ferr := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if ferr != nil {
+			return
+		}
+		defer func() { _ = f.Close() }()
+		if _, werr := f.WriteString(entry); werr == nil {
+			logPath = p
 		}
 	}
-	return offenders, nil
+	appendLog(1, " (lane env, contended)", out, errOut, code)
+
+	// offendersWithLogPointer turns a run's raw output into FAIL offenders,
+	// plus a pointer line (not a failure marker) to the untruncated log —
+	// slightly inflates the offender count, acceptable for discoverability.
+	offendersWithLogPointer := func(o, e string) []string {
+		offenders := offenderLines(strings.TrimSpace(o + "\n" + e))
+		if logPath != "" {
+			offenders = append(offenders, "full output: "+logPath)
+		}
+		return offenders
+	}
+
+	release, lockNote := acquireTierLock(req)
+	retakeCtx, retakeCancel := context.WithTimeout(context.Background(), integrationTierTimeout)
+	out2, errOut2, code2, cerr2 := sysexec.Capture(retakeCtx, scrubbed, dir, "go", args...)
+	retakeCancel()
+	release()
+	if cerr2 != nil {
+		// The retake itself could not run — fall back to the first attempt's
+		// offenders (a real red should not be laundered by retake infra trouble).
+		return offendersWithLogPointer(out, errOut), nil
+	}
+	appendLog(2, " (serialized retake"+lockNote+")", out2, errOut2, code2)
+	if code2 == 0 {
+		// Red-then-green: a contention flake, absorbed. Surface a visible WARN
+		// (applyCIGate's could-not-run path) — never a false FAIL that discards
+		// a shippable cycle, and never silent.
+		where := "integration-tier.log unavailable"
+		if logPath != "" {
+			where = "both attempts: " + logPath
+		}
+		return nil, fmt.Errorf("integration tier was RED under fleet contention but GREEN on a serialized clean-env retake — contention flake absorbed, not a code defect (%s)", where)
+	}
+	// Red-then-red: genuine. The serialized clean-env retake is the truthful
+	// attempt — its offenders name the real failure.
+	return offendersWithLogPointer(out2, errOut2), nil
+}
+
+// integrationTierEnvAllowlist is the minimal environment the tier subprocess
+// keeps — what a clean CI shell provides. Everything else (EVOLVE_*, BRIDGE_*,
+// tmux/session vars) is the lane's runtime state and must not reach
+// env-sensitive integration tests.
+var integrationTierEnvAllowlist = []string{
+	"PATH", "HOME", "TMPDIR", "USER", "SHELL",
+	"GOROOT", "GOPATH", "GOCACHE", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "CC",
+}
+
+func integrationTierCleanEnv() []string {
+	env := make([]string, 0, len(integrationTierEnvAllowlist))
+	for _, k := range integrationTierEnvAllowlist {
+		if v, ok := os.LookupEnv(k); ok {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
+}
+
+// scrubbedRun wraps a sysexec.RunFunc so every invocation carries the scrubbed
+// allowlist env instead of whatever env the caller passes (nil would inherit
+// the lane's full os.Environ()).
+func scrubbedRun(run sysexec.RunFunc) sysexec.RunFunc {
+	clean := integrationTierCleanEnv()
+	return func(ctx context.Context, name, dir string, args, _ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		return run(ctx, name, dir, args, clean, stdin, stdout, stderr)
+	}
+}
+
+// tierLockWait bounds how long a red retake waits for the cross-lane lock. An
+// INDEPENDENT budget, deliberately NOT the attempt-1 ctx: under the exact
+// contention the retake exists to absorb, attempt 1 may have consumed most of
+// the tier deadline, and a lock wait bounded by the leftovers would degrade to
+// an unserialized retake precisely when serialization matters most (go-review
+// HIGH). A var so tests can shrink the wait.
+var tierLockWait = 5 * time.Minute
+
+// acquireTierLock takes a best-effort cross-lane exclusive lock so the retake
+// runs serialized against other lanes' tier/test load, via the shared
+// internal/adapters/flock primitive (which owns the runtime.KeepAlive raw-fd
+// defense and in-process held-tracking — never re-derive raw flock here,
+// go-review HIGH). Best-effort by design: a lock failure degrades to an
+// unserialized retake (noted in the log), never blocks the gate. Root is
+// ProjectRoot FIRST — deliberately reversed vs moduleDirForReq's Worktree-first
+// order: the lock must live on the CYCLE-SHARED path so lanes contend on ONE
+// file; a per-lane worktree path would defeat cross-lane serialization.
+func acquireTierLock(req core.PhaseRequest) (release func(), note string) {
+	root := req.ProjectRoot
+	if root == "" {
+		root = req.Worktree
+	}
+	if root == "" {
+		return func() {}, ", lock unavailable: no project root"
+	}
+	path := filepath.Join(root, ".evolve", "locks", "integration-tier.lock")
+	deadline := time.Now().Add(tierLockWait)
+	for {
+		rel, held, err := flock.TryLock(path)
+		if err != nil {
+			return func() {}, ", lock unavailable: " + err.Error()
+		}
+		if !held {
+			return rel, ""
+		}
+		if time.Now().After(deadline) {
+			return func() {}, ", lock wait timed out (retake unserialized)"
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 // integrationTierScope returns the `go test` package patterns the integration
