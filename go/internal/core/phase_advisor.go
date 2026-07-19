@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -275,10 +276,20 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 	var resp BridgeResponse
 	dispatched := llmroute.Dispatch(plan, func(cli string) (int, error) {
 		var launchErr error
+		// Skill overlays resolved per-attempt on the SAME contract as an ordinary
+		// phase dispatch (phases/runner/runner.go:678): the advisor's identity.Model
+		// is a tier-shaped string ("deep"/"top" under WithProposerModel), so pass it
+		// as both the Model and Tier selector. A zero policy.Policy resolves the
+		// compiled default (deep/top→fable); the bridge adapter materializes the
+		// skill body and fails open on a missing file. Without this, a deep-tier
+		// advisor Launch silently missed the overlay a deep-tier phase Launch gets.
+		overlaySkills := policy.Policy{}.ResolveOverlays(
+			policy.DispatchFromPhaseRequest(p.identity.AgentLabel, cli, p.identity.Model, p.identity.Model))
 		resp, launchErr = p.bridge.Launch(context.Background(), BridgeRequest{
 			CLI:          cli,
 			Profile:      profile,
 			Model:        p.identity.Model,
+			Skills:       overlaySkills,
 			Prompt:       prompt,
 			Workspace:    in.Workspace,
 			Worktree:     in.ActiveWorktree,
