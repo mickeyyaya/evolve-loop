@@ -101,11 +101,11 @@ type parsedHunk struct {
 // compatible). An empty intersection returns compatible without invoking the
 // reviewer (nothing entangled — no wasted review).
 func RunScopedMergeReview(in ScopedMergeInput, review ScopedMergeReviewer) (ScopedMergeResult, error) {
-	audited, err := parseUnifiedDiff(in.AuditedDiff)
+	audited, err := parseUnifiedDiffToHunks(in.AuditedDiff)
 	if err != nil {
 		return ScopedMergeResult{Disposition: ScopedMergeEntangled}, fmt.Errorf("scoped merge review: audited diff: %w", err)
 	}
-	composed, err := parseUnifiedDiff(in.ComposedDiff)
+	composed, err := parseUnifiedDiffToHunks(in.ComposedDiff)
 	if err != nil {
 		return ScopedMergeResult{Disposition: ScopedMergeEntangled}, fmt.Errorf("scoped merge review: composed diff: %w", err)
 	}
@@ -168,10 +168,10 @@ func rangesOverlap(a, b parsedHunk) bool {
 	return a.oldStart < bEnd && b.oldStart < aEnd
 }
 
-// parseUnifiedDiff splits a unified diff into hunks tagged with their file and
+// parseUnifiedDiffToHunks splits a unified diff into hunks tagged with their file and
 // old-side line range. A `@@` header that does not parse as
 // `@@ -old[,n] +new[,m] @@` is fail-closed: a non-nil error, no partial result.
-func parseUnifiedDiff(diff []byte) ([]parsedHunk, error) {
+func parseUnifiedDiffToHunks(diff []byte) ([]parsedHunk, error) {
 	var (
 		hunks       []parsedHunk
 		currentFile string
