@@ -94,6 +94,72 @@ func TestOffenderLines(t *testing.T) {
 	}
 }
 
+// TestOffenderLines_DropsPassingTestChatter — the cycle-930/931/932 false-FAIL
+// diagnostic corruption: the old substring heuristics ("error"/"FAIL" anywhere in
+// the line) kept PASSING tests' verbose chatter — in-test orchestrator WARN lines
+// and a git usage dump — while the last-12 cap pushed the REAL failure lines out.
+// The verdict then cited 12 lines of noise and the true offender was unknowable.
+// Only line-anchored failure markers may survive.
+func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
+	out := strings.Join([]string{
+		"[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)", // chatter: mid-line "error"
+		"    --check               warn if changes introduce conflict markers or whitespace errors",                    // git usage dump chatter
+		"    highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff",                           // git usage dump chatter
+		"audit verdict=FAIL: something quoted by a passing test",                                                       // chatter: mid-line "FAIL"
+		"--- FAIL: TestRealThing (0.03s)",                                 // real: test failure header
+		"panic: runtime error: index out of range",                        // real: panic
+		"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core\t55.2s", // real: package summary
+		"apicover -enforce measurement error: go.mod not found above /x",  // real: apicover infra line (go-review LOW)
+	}, "\n")
+	got := offenderLines(out)
+	if len(got) != 4 {
+		t.Fatalf("got %d offender lines %v, want exactly the 4 real failure markers", len(got), got)
+	}
+	for _, ln := range got {
+		if strings.Contains(ln, "orchestrator") || strings.Contains(ln, "whitespace") || strings.HasPrefix(ln, "audit verdict") {
+			t.Errorf("chatter survived into the verdict diagnostic: %q", ln)
+		}
+	}
+}
+
+// TestIntegrationTierScope_EnvExclusiveSkipped — cycles 930/931/932 (+ cycle-3 in
+// a second repo): internal/core's integration tests drive full RunCycle
+// orchestrators over real git; under a live 2-lane fleet they false-RED the tier
+// while CI (isolated) stays green. Such env-exclusive packages are CI's job
+// (ADR-0069 backstop): all-excluded → (nil, error) so applyCIGate surfaces a
+// visible WARN instead of a false FAIL; mixed → the runnable remainder proceeds.
+func TestIntegrationTierScope_EnvExclusiveSkipped(t *testing.T) {
+	ctx := context.Background()
+	// All touched packages env-exclusive → explicit WARN-carrying error, no run.
+	pkgs, err := integrationTierScope(ctx, nil, "", []string{"./internal/core/..."})
+	if err == nil || pkgs != nil {
+		t.Fatalf("core-only scope: got (%v, %v), want (nil, env-exclusive error → WARN)", pkgs, err)
+	}
+	if !strings.Contains(err.Error(), "env-exclusive") {
+		t.Errorf("the WARN must explain the skip; got %q", err.Error())
+	}
+	// Mixed → env-exclusive dropped, runnable remainder kept.
+	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/core/...", "./internal/bridge/..."})
+	if err != nil {
+		t.Fatalf("mixed scope must run the remainder, got err %v", err)
+	}
+	if len(pkgs) != 1 || pkgs[0] != "./internal/bridge/..." {
+		t.Errorf("pkgs = %v, want only ./internal/bridge/...", pkgs)
+	}
+	// The other two evidence-named env-exclusive packages.
+	if _, err := integrationTierScope(ctx, nil, "", []string{"./cmd/evolve/..."}); err == nil {
+		t.Error("cmd/evolve (TestFleetSoak spawns tmux fleets) must be env-exclusive")
+	}
+	if _, err := integrationTierScope(ctx, nil, "", []string{"./internal/phases/ship/..."}); err == nil {
+		t.Error("internal/phases/ship (TestShipFromWorktree drives real git worktrees) must be env-exclusive")
+	}
+	// Non-exclusive packages pass through untouched.
+	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/skilloverlay/..."})
+	if err != nil || len(pkgs) != 1 {
+		t.Errorf("plain package: (%v, %v), want it kept", pkgs, err)
+	}
+}
+
 func TestCycleTouchedGo(t *testing.T) {
 	if cycleTouchedGo(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}) {
 		t.Error("no build handoff → false")

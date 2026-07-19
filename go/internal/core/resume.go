@@ -265,6 +265,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// a post-crash resume is exactly when latency evidence matters most.
 		cs.PhaseStartedAt = o.now().UTC().Format(time.RFC3339)
 		cs.ActiveAgent = string(next)
+		if next == PhaseAudit {
+			// Mirrors cyclerun_dispatch.go (resume-parity): a resumed audit
+			// re-dispatch supersedes any prior attempt's diagnosed-FAIL
+			// explanation — stale reasons must never mark a later FAIL as
+			// diagnosed to the ADR-0072 floor.
+			resetFloorFailReason(&cs, next)
+		}
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}

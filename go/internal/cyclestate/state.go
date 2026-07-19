@@ -113,4 +113,14 @@ type CycleState struct {
 	// run-local variable. Empty (omitted) for pre-field checkpoints and
 	// worktree-less cycles → the normalize degrades to a no-op.
 	WorktreeBaseSHA string `json:"worktree_base_sha,omitempty"`
+	// AuditFailReasons: the error-severity diagnostics behind an audit FAIL
+	// verdict recorded by the runner's OWN gates (set in-process at the
+	// recordFloorVerdictFailure chokepoint; cleared on every audit re-dispatch).
+	// The ADR-0072 coherence floor reads THIS field — orchestrator memory, never
+	// an agent-writable workspace file — to tell a DIAGNOSED gate-downgrade
+	// (coherent task-FAIL → retro + continue) from an unexplained forged verdict
+	// (halt). Additive omitempty; persisted so a crash between the verdict
+	// record and cycle finalization resumes without a false halt (the resume
+	// path already trusts cycle-state.json wholesale).
+	AuditFailReasons []string `json:"audit_fail_reasons,omitempty"`
 }
