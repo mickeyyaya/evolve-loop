@@ -47,6 +47,14 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	cr.cs.Phase = string(next)
 	cr.cs.PhaseStartedAt = phaseStarted.Format(time.RFC3339)
 	cr.cs.ActiveAgent = string(next)
+	if next == PhaseAudit {
+		// A (re-)dispatch supersedes any prior attempt's diagnosed-FAIL
+		// explanation (ship-error recovery re-audits, debugger RERUN_PHASE):
+		// stale reasons must never mark a later, differently-caused FAIL as
+		// diagnosed to the ADR-0072 floor. Cleared BEFORE the pre-phase
+		// cycle-state write below so the cleared state is also what persists.
+		resetFloorFailReason(&cr.cs, next)
+	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return dispatchResult{}, loopAbort, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 	}
