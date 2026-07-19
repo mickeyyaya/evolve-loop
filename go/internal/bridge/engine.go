@@ -510,9 +510,14 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	// command-level timeout is infra weather — the sibling of 81 — so it joins
 	// the transient set: retry backoff, optionalInfraSkip, and the reconcile
 	// IsInfraTeardownError predicate all treat it as interruption, not defect.
-	// 127 (missing binary) deliberately stays PLAIN below: an absent CLI is an
-	// environment defect that must fail loud; its only recovery is the exit-
-	// code-triggered family fallback (llmroute), which sees the raw 127.
+	// 127 (missing binary) has no dedicated branch here: an absent CLI is an
+	// environment defect whose primary recovery is the exit-code-triggered
+	// family fallback (llmroute), which sees the raw 127. If our context is
+	// ALSO cancelled, the broadened ctx.Err() check below now wraps a 127 as
+	// transient too (cycle-931 widened the guard past code==-1) — but a missing
+	// binary never produced a deliverable, so the reconcile door's no-valid-
+	// deliverable branch still hard-fails: the outcome is unchanged, only the
+	// path there.
 	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard || code == ExitCmdTimeout {
 		if code == ExitREPLBootTimeout && e.deps.BootTimeoutStore != nil {
 			if _, err := e.deps.BootTimeoutStore.RecordBootStrike(req.CLI); err != nil {
@@ -521,17 +526,20 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		}
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
-	// -1 (deliverable-authority-ctxcancel, cycle-859): Go's ExitError.ExitCode()
-	// reports -1 for a signal death, most commonly exec.CommandContext SIGKILLing
-	// the driver on our own cancellation. Gated on ctx.Err(): when our context is
-	// cancelled, treat it as infra teardown — the sibling of the 124 cmd-timeout —
+	// ANY exit code paired with a cancelled ctx.Err() reconciles below
+	// (deliverable-authority-ctxcancel, cycle-859 for code==-1; broadened to
+	// every code by cycle-931). Go's ExitError.ExitCode() reports -1 for a
+	// signal death, most commonly exec.CommandContext SIGKILLing the driver on
+	// our own cancellation — but a stalled agent killed after /exit can surface
+	// other codes while our context is still cancelled. Either way, our own
+	// cancellation is infra teardown — the sibling of the 124 cmd-timeout —
 	// because the driver may already have written its contracted deliverable (a
-	// green-ACS PASS discarded because -1 fell through to a plain hard-FAIL). The
-	// reconcile door this routes to still requires an enforce-verified deliverable,
-	// so a genuine crash (SIGSEGV/OOM) racing the cancel with no valid deliverable
-	// still hard-fails. A -1 with a LIVE context is a start/launch failure and
-	// stays PLAIN below, failing loud.
-	if code == -1 && ctx.Err() != nil {
+	// green-ACS PASS discarded because it fell through to a plain hard-FAIL).
+	// The reconcile door this routes to still requires an enforce-verified
+	// deliverable, so a genuine crash (SIGSEGV/OOM) racing the cancel with no
+	// valid deliverable still hard-fails. A LIVE context is a start/launch
+	// failure regardless of code and stays PLAIN below, failing loud.
+	if ctx.Err() != nil { // cycle-931: broadened from code==-1 — a stalled agent we cancel post-/exit can exit non-(-1) while ctx is cancelled; ANY cancelled-context exit reconciles
 		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
 	}
 	return resp, errors.New(msg)

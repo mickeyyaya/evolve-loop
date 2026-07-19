@@ -62,6 +62,36 @@ func TestEngineLaunch_CtxCancelSignalKill_WrapsTransient(t *testing.T) {
 	}
 }
 
+// TestEngineLaunch_CtxCancelNonMinusOneExit_WrapsTransient (cycle-931, the 6th rung of
+// the class): a STALLED agent we cancel after injecting /exit can exit with a NON-(-1)
+// code (a shell/REPL-specific kill code, not a Go signal-death -1) while the context is
+// cancelled. cycle-859 gated the transient classification on code==-1, so this slipped
+// through to a plain hard-FAIL — discarding a green, ship-eligible on-disk PASS audit
+// (reproduced LIVE on v22.4.1). ANY cancelled-context exit is a teardown → must wrap
+// core.ErrTransientBridgeFailure so the runner's reconcile door consults the deliverable.
+func TestEngineLaunch_CtxCancelNonMinusOneExit_WrapsTransient(t *testing.T) {
+	ws := t.TempDir()
+	prof := writeProfile(t, ws, "eng-test", "")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Our context is cancelled (as the stall-teardown does), but the driver exits with a
+	// NON-(-1) code (e.g. 143 = SIGTERM) rather than a Go signal-death -1.
+	runner := func(_ context.Context, name, dir string, args, env []string,
+		_ io.Reader, _, _ io.Writer) (int, error) {
+		cancel()
+		return 143, nil
+	}
+	eng := NewEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
+
+	_, err := eng.Launch(ctx, core.BridgeRequest{
+		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
+		Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md"), Agent: "auditor",
+	})
+	if !errors.Is(err, core.ErrTransientBridgeFailure) {
+		t.Errorf("a cancelled-context exit with a NON-(-1) code must wrap core.ErrTransientBridgeFailure so the runner reconciles against the on-disk deliverable (cycle-931); got %v", err)
+	}
+}
+
 // TestEngineLaunch_StartFailure_MinusOne_StaysPlain: a -1 with a LIVE context is
 // a genuine start/launch failure (bad path, exec error), NOT a teardown — it must
 // stay a plain error so it fails loud and never reconciles against stale disk.

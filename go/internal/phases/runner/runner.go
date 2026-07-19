@@ -21,6 +21,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -670,34 +671,43 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// report whose predicates are red). See the reconcile block below.
 	reconciled := false
 	if bridgeErr != nil {
-		// A bridge INFRA teardown — an artifact-wait timeout (exit 81) OR a
-		// transient failure (exit 80/85/86: quota, liveness-exhaustion) — ends the
-		// SESSION, but is not a verdict: the agent may have written its contracted
-		// deliverable before the teardown (cycle-254/255 timeout false-FAIL;
-		// cycle-835 quota false-FAIL — a complete PASS audit discarded because the
-		// deep-tier auditor hit exit=85 at the tail while agy+codex were walled).
-		// Reconcile against the deliverable: if it is on disk and well-formed, trust
-		// its verdict (via Classify) instead of synthesizing FAIL. Reconciliation
-		// can only UPGRADE toward the agent's real verdict, never downgrade a real one.
-		if core.IsInfraTeardownError(bridgeErr) {
+		// A bridge TEARDOWN ends the SESSION but is not itself a verdict. Two kinds reconcile
+		// against the deliverable: an INFRA teardown (artifact-wait timeout 81, or a transient
+		// failure 80/85/86 — quota/liveness), AND a CONTEXT-CANCEL from an agent that wrote its
+		// contracted deliverable then STALLED without a clean-completion signal (cycle-603/921/
+		// 931 false-FAIL — a green, verified, ship-eligible PASS discarded as FAIL, reproduced
+		// live on v22.4.1). For both, the file-authoritative principle (ADR-0072, #336) applies
+		// at teardown, not only on a clean-completion handshake: consult the deliverable FIRST —
+		// if it is on disk and verifies well-formed, trust its verdict (via Classify) instead of
+		// synthesizing FAIL. deliverable.Verify (challenge-token + required sections + ADR-0039)
+		// and the ship-guard below still gate it, and it only ever UPGRADES toward the agent's
+		// real on-disk verdict, never invents one; the anomaly is at most a WARN, never a flip.
+		//
+		// A SUBSTANTIVE process failure that is NOT a teardown — a safety-gate / launch / boot
+		// kill (the process was terminated FOR CAUSE, not merely torn down, and our context is
+		// still live) — makes any on-disk output untrustworthy and hard-fails WITHOUT consulting
+		// the deliverable.
+		isTeardown := core.IsInfraTeardownError(bridgeErr) ||
+			errors.Is(bridgeErr, context.Canceled) ||
+			errors.Is(bridgeErr, context.DeadlineExceeded) ||
+			ctx.Err() != nil
+		if isTeardown {
 			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
 			if req.ProjectRoot != "" {
-				// EvolveDir completes the roots (orchestrator-target
-				// deliverables) AND locates the merged catalog for the
-				// catalog-aware default.
+				// EvolveDir completes the roots (orchestrator-target deliverables) AND
+				// locates the merged catalog for the catalog-aware default.
 				roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 			}
 			res, verr := b.verifyReconcileDeliverable(phase, roots)
 			switch {
 			case verr == nil && res.OK:
-				// Deliverable survived the timeout — fall through to Classify.
+				// Deliverable survived the teardown — fall through to Classify.
 				reconciled = true
 			case b.optional:
-				// Optional-phase soft-fail (Workstream D / cycle-120): no
-				// trustworthy deliverable, but an optional phase's successor is
-				// verdict-unconditional, so degrade to WARN and let the cycle
-				// advance instead of aborting.
-				msg := fmt.Sprintf("optional phase %q degraded: no trustworthy deliverable after a bridge infra teardown (%v); cycle continues", phase, bridgeErr)
+				// Optional-phase soft-fail (Workstream D / cycle-120): no trustworthy
+				// deliverable, but an optional phase's successor is verdict-unconditional,
+				// so degrade to WARN and let the cycle advance instead of aborting.
+				msg := fmt.Sprintf("optional phase %q degraded: no trustworthy deliverable after a bridge teardown (%v); cycle continues", phase, bridgeErr)
 				if verr != nil {
 					msg = fmt.Sprintf("%s [deliverable unverifiable: %v]", msg, verr)
 				}
@@ -715,9 +725,8 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 					}},
 				}, nil
 			default:
-				// Mandatory phase, no trustworthy deliverable (absent/malformed/
-				// unverifiable): hard-fail as before, enriched with the
-				// well-formedness violation when we have one.
+				// Mandatory phase, no trustworthy deliverable (absent/malformed/unverifiable):
+				// hard-fail, enriched with the well-formedness violation when we have one.
 				msg := bridgeErr.Error()
 				if verr == nil && len(res.Violations) > 0 {
 					msg = fmt.Sprintf("%s; deliverable not trustworthy: %s", msg, res.Violations[0].Message)
@@ -734,10 +743,10 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				}, fmt.Errorf("%s: bridge: %w", phase, bridgeErr)
 			}
 		} else {
-			// A substantive bridge error (launch/boot/safety/cost — NEITHER infra
-			// sentinel) means the process failed in a way that makes any on-disk
-			// output untrustworthy: no shippable work was produced — hard-fail,
-			// optional or not, without consulting the deliverable.
+			// A substantive bridge error (safety-gate / launch / boot — NOT a teardown, and our
+			// context is still live) means the process failed in a way that makes any on-disk
+			// output untrustworthy: no shippable work was produced — hard-fail, optional or not,
+			// without consulting the deliverable.
 			return core.PhaseResponse{
 				Phase:        phase,
 				Verdict:      core.VerdictFAIL,
@@ -867,21 +876,21 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		ResolvedModel: resolvedModel,
 	}
 	if reconciled {
-		// A well-formed deliverable on a bridge infra teardown (timeout OR
-		// transient) means the phase actually COMPLETED — the teardown was a red
-		// herring (the bridge gave up on the wait window, or hit a transient
-		// exit, just as, or after, the agent finished writing). So we treat it
-		// exactly like a normal completed phase: nil error, the agent's own
-		// Classify verdict authoritative. A reconciled FAIL therefore routes as a
-		// real code-audit-fail (→ retro), NOT an infra-teardown retry — which is
-		// both correct classification and avoids re-running a finished phase.
-		// Reconciliation only ever upgrades a synthesized FAIL toward the agent's
-		// real verdict; it never invents a PASS (Classify, incl. audit's EGPS
-		// red_count gate, still decides).
+		// A well-formed deliverable on a bridge teardown (timeout, transient, OR a
+		// context-cancel from a stalled agent) means the phase actually COMPLETED — the
+		// teardown was a red herring (the bridge gave up on the wait window, hit a transient
+		// exit, or canceled a session that had already written its report). So we treat it
+		// exactly like a normal completed phase: nil error, the agent's own Classify verdict
+		// authoritative. A reconciled FAIL therefore routes as a real code-audit-fail
+		// (→ retro), NOT a teardown retry — both correct classification and avoids re-running
+		// a finished phase. The lifecycle anomaly is surfaced as this WARN diagnostic only;
+		// reconciliation only ever upgrades a synthesized FAIL toward the agent's real
+		// verdict, never invents a PASS (Classify, incl. audit's EGPS red_count gate, and the
+		// ship-guard still decide).
 		resp.Reconciled = true
 		resp.Diagnostics = append(resp.Diagnostics, core.Diagnostic{
 			Severity: "warning",
-			Message:  fmt.Sprintf("bridge infra teardown (%v) but deliverable %s is well-formed; reconciled to %s from the agent's own report", bridgeErr, artifactPath, verdict),
+			Message:  fmt.Sprintf("bridge teardown (%v) but deliverable %s is well-formed; reconciled to %s from the agent's own report (lifecycle anomaly, not a verdict flip)", bridgeErr, artifactPath, verdict),
 		})
 		log.Diag().Infof("[runner] RECONCILED phase=%s (%v) verdict=%s deliverable=%s\n", phase, bridgeErr, verdict, artifactPath)
 	}
