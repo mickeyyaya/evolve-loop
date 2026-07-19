@@ -14,6 +14,10 @@ import (
 // are green is verdict-incoherence (the pipeline forged the verdict) → HALT.
 // A recorded-negative with a RED artifact is a genuine task failure → nil.
 
+// writeVerdicts writes a FULLY-VALID audit-report.md (the required ## Verdict
+// section + a PASS-vocabulary sentinel) plus the acs-verdict.json. The forgery
+// (halt) path is driven by an injected okStubVerifier returning ok=false or by an
+// unconfigured (nil) verifier — independent of the on-disk report's shape.
 func writeVerdicts(t *testing.T, dir, audit, acs string) {
 	t.Helper()
 	if audit != "" {
@@ -29,15 +33,34 @@ func writeVerdicts(t *testing.T, dir, audit, acs string) {
 	}
 }
 
+// okStubVerifier is a controllable ContractVerifier double: VerifyDeliverable
+// returns ok verbatim, so a test can drive the reconcile-vs-halt branch off the
+// deliverable's well-formedness INDEPENDENTLY of the (green) verdict sentinel —
+// proving detectVerdictIncoherence keys off the FULL Verify, not ReadCycleVerdicts's
+// cheap sentinel parse. (Distinct from correction_ladder_test.go's path-aware
+// fakeVerifier — this one needs no filesystem fixture.)
+type okStubVerifier struct{ ok bool }
+
+func (v okStubVerifier) VerifyDeliverable(_ context.Context, _ ReviewInput) (ContractVerification, error) {
+	return ContractVerification{OK: v.ok}, nil
+}
+
 func TestDetectVerdictIncoherence_ForgedVerdict_Halts(t *testing.T) {
+	// No ContractVerifier configured → DeliverableValid can never be proven → the
+	// pre-fix conservative halt: green sentinels with no way to verify the
+	// deliverable is a forged verdict, not a reconcile. (The reconcile self-heal is
+	// exercised with an injected verifier in TestDetectVerdictIncoherence_ReconcileUsesFullVerify.)
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts
 	cs := CycleState{CycleID: 1, WorkspacePath: dir}
 
-	sig := o.detectVerdictIncoherence(cs, VerdictFAIL)
+	sig, reconciled := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL)
+	if reconciled {
+		t.Fatal("no verifier configured must NOT reconcile (cannot prove the deliverable is valid)")
+	}
 	if sig == nil {
-		t.Fatal("recorded FAIL + green artifacts must produce a system-failure signal")
+		t.Fatal("recorded FAIL + green artifacts + unverifiable deliverable must produce a system-failure signal")
 	}
 	if !sig.Halt {
 		t.Error("verdict-incoherence must be a floor HALT")
@@ -60,7 +83,7 @@ func TestDetectVerdictIncoherence_SilentNoShip_DefersToOrchestrator(t *testing.T
 	// the deterministic floor — a benign no-op cycle can also produce it, so the
 	// floor stays narrow (recorded FAIL/WARN only) and leaves the ambiguous skip
 	// to the orchestrator's judgment layer (S4). No false-halt on a benign skip.
-	if sig := o.detectVerdictIncoherence(cs, CycleOutcomeSkippedUnknown); sig != nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, CycleOutcomeSkippedUnknown); sig != nil {
 		t.Errorf("silent no-ship must NOT hard-halt (deferred to orchestrator), got %+v", sig)
 	}
 }
@@ -71,8 +94,49 @@ func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
 	writeVerdicts(t, dir, "FAIL", "PASS") // RED audit artifact = genuine failure
 	cs := CycleState{CycleID: 3, WorkspacePath: dir}
 
-	if sig := o.detectVerdictIncoherence(cs, VerdictFAIL); sig != nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig != nil {
 		t.Errorf("genuine audit FAIL must NOT halt (never-stop task path), got %+v", sig)
+	}
+}
+
+// TestDetectVerdictIncoherence_ReconcileUsesFullVerify — the clean-exit-late-write
+// self-heal, proven to key off the FULL deliverable.Verify chain (the injected
+// ContractVerifier) and NOT the cheap ParseVerdictSentinel read. Both fixtures
+// have the IDENTICAL green audit+acs sentinels (so ReadCycleVerdicts sees
+// audit=PASS, acs=PASS in both) — only the verifier's OK differs: OK=true →
+// reconcile (nil signal), OK=false → still halt. If the code trusted the sentinel
+// alone, both would resolve the same way; that they diverge proves the branch
+// keys off the full Verify. The real verifier (deliverable.NewVerifierWithCatalog
+// Stage) is wired at the composition root and its correctness is covered by the
+// deliverable package's own tests; core cannot import it (import cycle), so the
+// unit-level proof uses the injected double.
+func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
+	newOrch := func(verifyOK bool) *Orchestrator {
+		return &Orchestrator{
+			failurePolicy:    policy.DefaultSystemFailurePolicy(),
+			contractVerifier: okStubVerifier{ok: verifyOK},
+		}
+	}
+
+	// Green sentinels + a deliverable that FULLY verifies → benign late-write race
+	// → reconcile (nil signal, reconciled=true).
+	valid := t.TempDir()
+	writeVerdicts(t, valid, "PASS", "PASS")
+	sig, reconciled := newOrch(true).detectVerdictIncoherence(context.Background(), CycleState{CycleID: 1, WorkspacePath: valid}, VerdictFAIL)
+	if sig != nil || !reconciled {
+		t.Errorf("green artifacts + valid deliverable must reconcile (nil signal), got sig=%+v reconciled=%v", sig, reconciled)
+	}
+
+	// IDENTICAL green sentinels but the deliverable does NOT verify (a malformed
+	// report merely tagged with a PASS sentinel) → genuine forgery → still halt.
+	forged := t.TempDir()
+	writeVerdicts(t, forged, "PASS", "PASS")
+	sig, reconciled = newOrch(false).detectVerdictIncoherence(context.Background(), CycleState{CycleID: 2, WorkspacePath: forged}, VerdictFAIL)
+	if reconciled {
+		t.Error("a PASS-sentinel-tagged report that does not fully verify must NOT reconcile (would launder forgery)")
+	}
+	if sig == nil || !sig.Halt {
+		t.Errorf("unverified deliverable must still halt, got sig=%+v", sig)
 	}
 }
 
@@ -95,7 +159,7 @@ func TestDetectVerdictIncoherence_PassVerdict_NoHalt(t *testing.T) {
 	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 4, WorkspacePath: dir}
 
-	if sig := o.detectVerdictIncoherence(cs, VerdictPASS); sig != nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictPASS); sig != nil {
 		t.Errorf("a PASS cycle is never a system failure, got %+v", sig)
 	}
 }
@@ -115,7 +179,7 @@ func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
 	cs := CycleState{CycleID: 932, WorkspacePath: dir,
 		AuditFailReasons: []string{"the integration tier (`go test -tags integration`) reported 12 offender(s)"}}
 
-	if sig := o.detectVerdictIncoherence(cs, VerdictFAIL); sig != nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig != nil {
 		t.Errorf("a diagnosed gate-downgrade FAIL must be a coherent task failure (no halt), got %+v", sig)
 	}
 }
@@ -128,7 +192,9 @@ func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
 // (set at the verdict-record chokepoint) marks a FAIL as explained; the file is
 // forensic output, never floor input.
 func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing.T) {
-	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
+	// A deliverable that does NOT verify (ok=false) is the genuine forgery under
+	// test; the point is that an agent-writable reason file cannot rescue it.
+	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
 	// A perfectly VALID reason file, planted in the workspace — but no
@@ -139,7 +205,7 @@ func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing
 	}
 	cs := CycleState{CycleID: 6, WorkspacePath: dir}
 
-	if sig := o.detectVerdictIncoherence(cs, VerdictFAIL); sig == nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig == nil {
 		t.Fatal("a workspace reason file ALONE must never suppress the forged-verdict halt (agent-writable territory)")
 	}
 }
@@ -148,7 +214,10 @@ func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing
 // record call whose diagnostics carry NO error severity explains nothing, so
 // the forged-verdict floor keeps halting (warning-only diags never suppress).
 func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
-	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
+	// Deliverable does not verify (ok=false) → the forgery signature stands; the
+	// point is that warning-only diags explain nothing (SubstantiveError stays
+	// false), so they never suppress the halt.
+	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 5, WorkspacePath: dir}
@@ -156,7 +225,7 @@ func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
 		{Severity: "warning", Message: "gofmt gate skipped (could not run)"},
 	})
 
-	if sig := o.detectVerdictIncoherence(cs, VerdictFAIL); sig == nil {
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig == nil {
 		t.Fatal("an UNEXPLAINED FAIL with green artifacts must still halt — warning-only reasons explain nothing")
 	}
 }

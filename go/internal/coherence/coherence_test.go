@@ -104,3 +104,61 @@ func TestCheckVerdictCoherence(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckVerdictCoherence_Reconcile — the clean-exit-late-write self-heal: the
+// SAME forgery signature (recorded FAIL/WARN, green artifacts) but with a
+// FULLY-VALID deliverable (DeliverableValid=true) is a benign timing race →
+// Reconciled, NOT Incoherent (no halt). Also pins that DeliverableValid never
+// manufactures a reconcile out of a case that is coherent without it — it only
+// ever downgrades the would-be halt.
+func TestCheckVerdictCoherence_Reconcile(t *testing.T) {
+	for _, rec := range []string{"FAIL", "WARN"} {
+		got := CheckVerdictCoherence(VerdictInputs{Recorded: rec, Audit: "PASS", ACS: "PASS", AuditRan: true, DeliverableValid: true})
+		if !got.Reconciled {
+			t.Errorf("recorded=%s + green artifacts + valid deliverable: Reconciled=false, want true (%+v)", rec, got)
+		}
+		if got.Incoherent {
+			t.Errorf("recorded=%s + valid deliverable must NOT be Incoherent (no halt) (%+v)", rec, got)
+		}
+		if got.Category != "verdict-reconciled" || got.Evidence == "" {
+			t.Errorf("recorded=%s reconcile result = %+v, want category verdict-reconciled with evidence", rec, got)
+		}
+	}
+
+	// DeliverableValid only downgrades the forgery signature; a case that is
+	// coherent without it must stay the zero Coherence{} even when valid.
+	coherentWithValid := []struct {
+		name string
+		in   VerdictInputs
+	}{
+		{"recorded PASS", VerdictInputs{Recorded: "PASS", Audit: "PASS", ACS: "PASS", AuditRan: true, DeliverableValid: true}},
+		{"substantive error", VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "PASS", AuditRan: true, SubstantiveError: true, DeliverableValid: true}},
+		{"audit never ran", VerdictInputs{Recorded: "FAIL", Audit: "", ACS: "PASS", AuditRan: false, DeliverableValid: true}},
+		{"acs absent", VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "", AuditRan: true, DeliverableValid: true}},
+	}
+	for _, tc := range coherentWithValid {
+		got := CheckVerdictCoherence(tc.in)
+		if got.Reconciled || got.Incoherent {
+			t.Errorf("%s: a coherent case must stay zero Coherence{} even with a valid deliverable, got %+v", tc.name, got)
+		}
+	}
+}
+
+// TestCheckVerdictCoherence_ForgedStillHalts — the anti-laundering boundary: the
+// forgery signature with a deliverable that does NOT fully verify
+// (DeliverableValid=false — a malformed report merely tagged with a PASS
+// sentinel) is genuine forgery → still Incoherent (halt), never Reconciled.
+func TestCheckVerdictCoherence_ForgedStillHalts(t *testing.T) {
+	for _, rec := range []string{"FAIL", "WARN"} {
+		got := CheckVerdictCoherence(VerdictInputs{Recorded: rec, Audit: "PASS", ACS: "PASS", AuditRan: true, DeliverableValid: false})
+		if !got.Incoherent {
+			t.Errorf("recorded=%s + green sentinels + INVALID deliverable: Incoherent=false, want true (forgery must halt) (%+v)", rec, got)
+		}
+		if got.Reconciled {
+			t.Errorf("recorded=%s + INVALID deliverable must NOT reconcile (would launder forgery to PASS) (%+v)", rec, got)
+		}
+		if got.Category != "verdict-incoherence" {
+			t.Errorf("recorded=%s category = %q, want verdict-incoherence", rec, got.Category)
+		}
+	}
+}

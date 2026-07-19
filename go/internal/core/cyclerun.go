@@ -227,7 +227,16 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// reproduce the forged verdict — the cycle 862→899 livelock). This floor is
 	// non-negotiable: independent of orchestrator judgment and strict_audit.
 	if result.SystemFailure == nil {
-		if sig := o.detectVerdictIncoherence(cs, result.FinalVerdict); sig != nil {
+		sig, reconciled := o.detectVerdictIncoherence(ctx, cs, result.FinalVerdict)
+		switch {
+		case reconciled:
+			// Clean-exit-late-write self-heal: the recorded-negative was contradicted
+			// by green artifacts AND a fully-valid audit-report — a benign timing race,
+			// not a forged verdict. Reconcile the recorded verdict to PASS and do NOT
+			// halt (the alternative was the cycles-930/931/932 false-HALT batch-killer).
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d verdict-coherence SELF-HEAL: recorded %s but on-disk audit=PASS, acs=PASS, and the audit-report fully verifies (challenge-token + sections + ADR-0039) — a benign clean-exit-late-write race; reconciled recorded verdict to PASS, not halting (ADR-0072).\n", cycle, result.FinalVerdict)
+			result.FinalVerdict = VerdictPASS
+		case sig != nil:
 			result.SystemFailure = sig
 			fmt.Fprintf(os.Stderr, "[orchestrator] SYSTEM-FAILURE HALT cycle %d: %s — %s. Halting the loop for pipeline diagnosis instead of retrying the task (ADR-0072).\n", cycle, sig.Category, sig.Evidence)
 		}

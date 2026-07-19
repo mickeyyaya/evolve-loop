@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -145,22 +146,54 @@ func readFloorFailReasons(workspace string, phase Phase) []string {
 // the response. The signal is deliberately NOT the workspace reason file
 // (agent-writable — see floorFailReason's trust boundary): only the
 // orchestrator's own in-process record can mark a FAIL as explained.
-func (o *Orchestrator) detectVerdictIncoherence(cs CycleState, finalVerdict string) *SystemFailureSignal {
+//
+// A clean-exit-late-write RACE is NOT forgery either: the bridge can declare a
+// phase's clean exit before Claude Code finishes its post-turn async writes, so
+// the runner records FAIL while a VALID audit-report is still landing (the
+// ~3s settle window < the observed 60-90s dribble, cycles 930/931/932/cycle-3).
+// When the on-disk audit-report passes the FULL deliverable.Verify chain
+// (challenge-token + required sections + ADR-0039 failure-context — NOT the
+// cheap ParseVerdictSentinel read ReadCycleVerdicts uses), the contradiction is
+// a benign timing race → reconcile the recorded verdict to PASS, no halt
+// (returned as the second result). A PASS-sentinel-tagged but MALFORMED report
+// yields Verify OK==false → still a forged verdict → halt — the anti-laundering
+// boundary the inbox explicitly requires be preserved.
+//
+// The FULL Verify runs through the SAME injected ContractVerifier the correction
+// ladder's salvage rung uses (WithContractVerifier → deliverable.NewVerifierWith
+// CatalogStage; the breaker-neutral re-check, so a coherence probe never trips
+// the contract-gate breaker). Injection is required because core cannot import
+// deliverable (deliverable imports core). A nil verifier (unconfigured
+// composition) leaves DeliverableValid=false → the pre-fix conservative halt,
+// never a launder — the self-heal is purely additive, gated on a verifier being
+// present. Verify's fail-OPEN err (infra ambiguity) also leaves it false.
+func (o *Orchestrator) detectVerdictIncoherence(ctx context.Context, cs CycleState, finalVerdict string) (sig *SystemFailureSignal, reconciled bool) {
 	audit, acs, auditRan := coherence.ReadCycleVerdicts(cs.WorkspacePath)
+	deliverableValid := false
+	if auditRan && o.contractVerifier != nil {
+		in := ReviewInput{Phase: string(PhaseAudit), Workspace: cs.WorkspacePath, Worktree: cs.ActiveWorktree}
+		if res, err := o.contractVerifier.VerifyDeliverable(ctx, in); err == nil {
+			deliverableValid = res.OK
+		}
+	}
 	coh := coherence.CheckVerdictCoherence(coherence.VerdictInputs{
 		Recorded:         finalVerdict,
 		Audit:            audit,
 		ACS:              acs,
 		AuditRan:         auditRan,
 		SubstantiveError: len(cs.AuditFailReasons) > 0,
+		DeliverableValid: deliverableValid,
 	})
+	if coh.Reconciled {
+		return nil, true
+	}
 	if !coh.Incoherent || !o.failurePolicy.IsFloor(coh.Category) {
-		return nil
+		return nil, false
 	}
 	return &SystemFailureSignal{
 		Category: coh.Category,
 		Level:    policy.LevelSystem,
 		Evidence: coh.Evidence,
 		Halt:     true,
-	}
+	}, false
 }
