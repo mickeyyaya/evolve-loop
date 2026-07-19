@@ -139,6 +139,12 @@ func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt i
 // precisely because these sites are kept in lockstep (see the resume-parity
 // comment in resume.go): a fix wired into only one leaves the other exposed.
 func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleRequest, cycle int, failed Phase, state *State, cs *CycleState, diags []Diagnostic) {
+	// Record the downgrade reasons FIRST: authoritative in CycleState (the
+	// ADR-0072 coherence floor's ONLY source — orchestrator memory, so no
+	// workspace writer can talk the floor out of halting) + the forensic
+	// <phase>-fail-reason.json for retros (state.json truncates the defect
+	// string). See persistFloorFailReasons / detectVerdictIncoherence.
+	persistFloorFailReasons(cs, failed, diags)
 	o.recordFailedApproachState(failureLearningRequest{
 		CycleRequest: req,
 		Cycle:        cycle,
@@ -164,12 +170,7 @@ func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleR
 // FailedRecord names WHY the phase failed, not merely THAT it did — the missing
 // signal that let the skills-drift storm re-derive the same doomed fix forever.
 func floorVerdictError(phase Phase, diags []Diagnostic) error {
-	var msgs []string
-	for _, d := range diags {
-		if d.Severity == "error" {
-			msgs = append(msgs, d.Message)
-		}
-	}
+	msgs := errorSeverityMessages(diags)
 	if len(msgs) == 0 {
 		return fmt.Errorf("%s verdict=FAIL", phase)
 	}

@@ -64,7 +64,7 @@ func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
 // AC3.3 (membership / anti-drift pin) — NewDefault must WIRE the real
 // integration-tier gate (cycle-147 dormant-seam lesson), and that gate must
 // actually build the test binary under `-tags integration`. Proof that does NOT
-// couple to the exact -run pattern: a fixture cmd/evolve package with an
+// couple to the exact -run pattern: a fixture cmd/tool package (deliberately NOT env-exclusive — see integrationTierEnvExclusive) with an
 // integration-tagged test file that FAILS TO COMPILE only under that tag. Under
 // `-tags integration` the whole test binary fails to build → non-zero exit →
 // offenders, regardless of any -run filter (go compiles the binary before -run
@@ -75,14 +75,14 @@ func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
 		t.Skip("skips real `go test -tags integration` subprocess under -short; full `go test` + CI still run it")
 	}
 	root := t.TempDir()
-	cmdDir := filepath.Join(root, "go", "cmd", "evolve")
+	cmdDir := filepath.Join(root, "go", "cmd", "tool")
 	if err := os.MkdirAll(cmdDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), []byte("module inttest\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A non-test file so `package main` in ./cmd/evolve is a real, buildable package.
+	// A non-test file so `package main` in ./cmd/tool is a real, buildable package.
 	if err := os.WriteFile(filepath.Join(cmdDir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(buildRun, "handoff-build.json"),
-		[]byte(`{"thrusts":[{"files_modified":["go/cmd/evolve/main.go"]}]}`), 0o644); err != nil {
+		[]byte(`{"thrusts":[{"files_modified":["go/cmd/tool/main.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -136,7 +136,7 @@ func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
 func writeRaceFixtureWorktree(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	cmdDir := filepath.Join(root, "go", "cmd", "evolve")
+	cmdDir := filepath.Join(root, "go", "cmd", "tool")
 	if err := os.MkdirAll(cmdDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func writeRaceFixtureWorktree(t *testing.T) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(buildRun, "handoff-build.json"),
-		[]byte(`{"thrusts":[{"files_modified":["go/cmd/evolve/main.go"]}]}`), 0o644); err != nil {
+		[]byte(`{"thrusts":[{"files_modified":["go/cmd/tool/main.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return root

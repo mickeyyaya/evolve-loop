@@ -23,11 +23,18 @@ import (
 // recorded verdict is NEVER trusted as ground truth on its own — the whole
 // point is to compare it against the artifacts.
 type VerdictInputs struct {
-	Recorded         string // final recorded cycle verdict: PASS/FAIL/WARN
-	Audit            string // on-disk audit evolve-verdict, "" if absent
-	ACS              string // acs-verdict.json verdict, "" if absent
-	AuditRan         bool   // audit phase ran and wrote a report
-	SubstantiveError bool   // a substantive (non-infra-teardown) bridge error occurred
+	Recorded string // final recorded cycle verdict: PASS/FAIL/WARN
+	Audit    string // on-disk audit evolve-verdict, "" if absent
+	ACS      string // acs-verdict.json verdict, "" if absent
+	AuditRan bool   // audit phase ran and wrote a report
+	// SubstantiveError: the negative verdict is EXPLAINED by real recorded
+	// evidence — a substantive (non-infra-teardown) bridge error, or a diagnosed
+	// runner-side gate downgrade (audit's CI-parity gates overrode a narrative
+	// PASS; persisted as audit-fail-reason.json error-severity reasons). An
+	// explained negative is a coherent task-level outcome, never forgery — the
+	// cycles-930/931/932 false-HALT was this field left unpopulated at the sole
+	// call site while the explanation sat in the response diagnostics.
+	SubstantiveError bool
 }
 
 // Coherence is the result of the check.
