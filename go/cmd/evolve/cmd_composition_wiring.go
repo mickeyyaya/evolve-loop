@@ -46,6 +46,7 @@ func compositionOptions() []core.Option {
 func writeCompositionVerdict(ledgerPath string, in core.CompositionVerdictInput) error {
 	return ledger.WriteCompositionVerdict(ledgerPath, ledger.CompositionVerdictInput{
 		Cycle:        in.Cycle,
+		Method:       in.Method,
 		LaneAuditRef: in.LaneAuditRef,
 		PatchID:      in.PatchID,
 		AuditedBase:  in.AuditedBase,

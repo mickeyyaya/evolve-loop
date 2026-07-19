@@ -44,6 +44,7 @@ type CompositionAuditSnapshot struct {
 // validation logic duplicated in core.
 type CompositionVerdictInput struct {
 	Cycle        int
+	Method       string
 	LaneAuditRef string
 	PatchID      string
 	AuditedBase  string
@@ -155,6 +156,107 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 		return false
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: wrote composition-verdict for cycle %d; skipping re-audit\n", cycle)
+	return true
+}
+
+// WithScopedMergeReviewer injects the RUNG 2 scoped merge reviewer closure.
+// Nil (default) keeps RUNG 2 dark — recovery falls straight from a RUNG 0 miss
+// to the RUNG 3 full re-audit, exactly as it does today.
+func WithScopedMergeReviewer(fn ScopedMergeReviewer) Option {
+	return func(o *Orchestrator) { o.scopedMergeReviewer = fn }
+}
+
+// ScopedMergeReviewWired reports whether the composition root bound the RUNG 2
+// reviewer closure. Mirrors CompositionFastPathWired — the observability seam
+// that lets a real (non-fake) test prove the wiring reaches production.
+func (o *Orchestrator) ScopedMergeReviewWired() bool {
+	return o.scopedMergeReviewer != nil
+}
+
+// scopedMergeCarryForward attempts the RUNG 2 fast path after a RUNG 0 miss
+// (the composed patch-id drifted from the audited one — real overlapping
+// edits): it dispatches only the intersecting hunks to the injected reviewer.
+// A `compatible` disposition whose (optional) resolution re-enters RUNG 0
+// patch-id verification writes a composition-verdict{method:"scoped-review"}
+// and lets recovery reship; `entangled`, a nil reviewer, any missing seam, a
+// red gate, an unverified resolution, or a writer error returns false — the
+// pre-existing full re-audit route is untouched (this can only narrow, never
+// widen, what ships).
+func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, cs CycleState) bool {
+	if o.scopedMergeReviewer == nil || o.compositionSnapshot == nil ||
+		o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
+		return false
+	}
+	worktree := cs.ActiveWorktree
+	if worktree == "" {
+		return false
+	}
+	snap, err := o.compositionSnapshot(ctx, worktree)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: snapshot unavailable: %v; falling back to full re-audit\n", err)
+		return false
+	}
+	composedDiff, exit, err := gitCapture(ctx, worktree, "diff", "main...HEAD")
+	if err != nil || exit != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
+		return false
+	}
+	res, err := RunScopedMergeReview(ScopedMergeInput{
+		AuditedDiff:     snap.Diff,
+		ComposedDiff:    []byte(composedDiff),
+		AuditedSummary:  "audited change (ref " + snap.LaneAuditRef + ")",
+		ComposedSummary: "composed tree after fleet rebase",
+	}, o.scopedMergeReviewer)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review failed closed: %v; falling back to full re-audit\n", err)
+		return false
+	}
+	if res.Disposition != ScopedMergeCompatible {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: %s — escalating to full re-audit\n", res.Disposition)
+		return false
+	}
+	// MergeBERT invariant: a compatible verdict is trusted only when its
+	// resolution re-enters RUNG 0 patch-id verification against the audited
+	// change — never on the reviewer's word. The resolution is the reviewer's
+	// suggested diff when it supplied one, else the composed diff itself.
+	resolution := res.ResolutionDiff
+	if len(resolution) == 0 {
+		resolution = []byte(composedDiff)
+	}
+	matches, err := ResolutionMatchesAudited(snap.PatchID, resolution)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: resolution rung-0 re-entry failed: %v; falling back to full re-audit\n", err)
+		return false
+	}
+	if !matches {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
+		return false
+	}
+	gateResults := o.compositionGateRunner(ctx, worktree)
+	if missing := ciparity.MissingComposedGates(gateResults); missing != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: composed-tree gates not green (%s); falling back to full re-audit\n", strings.Join(missing, ","))
+		return false
+	}
+	gitHead, _, _ := gitCapture(ctx, worktree, "rev-parse", "HEAD")
+	in := CompositionVerdictInput{
+		Cycle:        cycle,
+		Method:       scopedReviewMethod,
+		LaneAuditRef: snap.LaneAuditRef,
+		PatchID:      snap.PatchID,
+		AuditedBase:  snap.AuditedBase,
+		GitHead:      strings.TrimSpace(gitHead),
+		TreeStateSHA: worktreeContentSHA(ctx, worktree),
+		GateResults:  gateResults,
+		AuditedDiff:  snap.Diff,
+		ComposedDiff: resolution,
+		ArtifactDir:  filepath.Join(worktree, ".evolve", compositionArtifactDirName),
+	}
+	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
+	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: wrote scoped-review composition-verdict for cycle %d; skipping re-audit\n", cycle)
 	return true
 }
 

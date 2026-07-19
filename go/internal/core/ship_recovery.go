@@ -56,6 +56,15 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 			if o.compositionCarryForward(ctx, cycle, cs) {
 				return PhaseShip, true
 			}
+			// RUNG 2 (cycle-941): a RUNG 0 miss means the composed patch-id
+			// drifted (real overlapping edits). Before the RUNG 3 full
+			// re-audit, review ONLY the intersecting hunks; a compatible,
+			// patch-id-verified overlap composes directly with a
+			// composition-verdict{method:"scoped-review"} and reships.
+			// Entangled (or a dark reviewer) falls through unchanged.
+			if o.scopedMergeCarryForward(ctx, cycle, cs) {
+				return PhaseShip, true
+			}
 		case conflict:
 			// Genuine overlapping work — a re-audit cannot resolve it. Reclassify to
 			// the integrity-class conflict code so recovery routes to the debugger.

@@ -298,6 +298,12 @@ type Orchestrator struct {
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
 
+	// scopedMergeReviewer wires the merge ladder's RUNG 2 scoped merge review
+	// (WithScopedMergeReviewer) into recoverFromShipError, between the RUNG 0
+	// carry-forward miss and the RUNG 3 full re-audit. Nil (default) ⇒ RUNG 2
+	// stays dark ⇒ recovery behaves exactly as it does today (no regression).
+	scopedMergeReviewer ScopedMergeReviewer
+
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
 	// WithWorktreeProvisioner so RunCycle runs without touching real git.

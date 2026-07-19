@@ -31,9 +31,15 @@ import (
 // verify kernel-recomputes it).
 const CompositionVerdictKind = "composition-verdict"
 
-// TrivialRebaseMethod is the only composition method RUNG 0 defines; the
+// TrivialRebaseMethod is the composition method RUNG 0 defines; the
 // ship-side reader filters on it, so writer and reader share one constant.
 const TrivialRebaseMethod = "trivial-rebase"
+
+// ScopedReviewMethod is the composition method RUNG 2 records when a scoped
+// merge review (mergerung2.go) resolved an overlapping change — distinct from
+// a trivial-rebase carry-forward so the ship-side reader and any audit can
+// tell a reviewed composition from a no-op rebase.
+const ScopedReviewMethod = "scoped-review"
 
 // compositionFields is the kernel-recomputable subset of a
 // composition-verdict line.
@@ -69,6 +75,7 @@ func PatchID(diff []byte) (string, error) {
 // verifyCompositionLine would immediately flag as tampered.
 type CompositionVerdictInput struct {
 	Cycle        int
+	Method       string            // composition method; blank defaults to TrivialRebaseMethod (RUNG 0)
 	LaneAuditRef string            // artifact_sha256 of the bound auditor entry
 	PatchID      string            // caller-claimed patch-id of the change
 	AuditedBase  string            // git HEAD the audit originally bound
@@ -149,11 +156,15 @@ func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) erro
 		}
 	}
 
+	method := in.Method
+	if method == "" {
+		method = TrivialRebaseMethod
+	}
 	rec := compositionRecord{
 		TS:               time.Now().UTC().Format(time.RFC3339),
 		Cycle:            in.Cycle,
 		Kind:             CompositionVerdictKind,
-		Method:           TrivialRebaseMethod,
+		Method:           method,
 		LaneAuditRef:     in.LaneAuditRef,
 		PatchID:          in.PatchID,
 		AuditedBase:      in.AuditedBase,
