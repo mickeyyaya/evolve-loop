@@ -1,0 +1,40 @@
+{
+  "cycle": 949,
+  "run_id": "01KXXKRYJ9V5H8SG22WFK1D7BS",
+  "goal": "drain the .evolve/inbox backlog: pick the highest-weight queued todos, implement and ship them one cycle at a time",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 949",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "retro",
+      "reason": "FAIL"
+    }
+  ]
+}
