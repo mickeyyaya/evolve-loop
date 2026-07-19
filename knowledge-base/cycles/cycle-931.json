@@ -1,0 +1,40 @@
+{
+  "cycle": 931,
+  "run_id": "01KXVW2XBXN5334V0K2496EZXQ",
+  "goal": "consume the .evolve/inbox backlog to verify the verdict-source fix; each cycle must reach its verdict from the on-disk deliverable, not the terminal pane",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 931",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "retro",
+      "reason": "FAIL"
+    }
+  ]
+}
