@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 )
 
 // reviewAndGuard runs the per-phase deliverable review gate + correction ladder,
@@ -314,14 +315,36 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				// isScoutEvalMaterialization: scout writes its selected evals to the
 				// main tree by contract (materialization.go), which recoverBuildLeak
 				// never sees (scout is not a WorktreePhase) so it lives only here
-				// (soak-#6 cycle 318→319). Real escapes stay armed: source files and
+				// (soak-#6 cycle 318→319). PLUS a third guard-only classifier,
+				// isActiveMintPhasePath: in fleet mode a CONCURRENT lane's advisor
+				// mint persists .evolve/phases/<name>/phase.json into the SHARED
+				// tree this lane diffs, charging the mint to an innocent phase
+				// (cycle-967 false-abort). The registrar records minted names in
+				// the shared mintregistry before persisting, so a registered,
+				// TTL-fresh name is mint infrastructure, not a leak; an
+				// UNREGISTERED phase-config write still aborts. A registry read
+				// error only disables the exemption (guard stays armed — the
+				// fail-safe direction). Real escapes stay armed: source files and
 				// non-scout/non-eval deliverable paths classify as leaks, and
 				// porcelainDirtySet emits both rename sides so a deliverable renamed
 				// to a .evolve/evals/ look-alike still aborts via its source path.
 				leaked := res2.Leaked
+				mints, mintErr := mintregistry.ActiveNames(mintregistry.Path(cr.req.ProjectRoot), time.Now())
+				if mintErr != nil {
+					// ABNORMAL, not WARN: a corrupt registry is either damage or a
+					// deliberate availability attack (a lane-wide exemption outage
+					// reproduces the cycle-967 false-abort). Quarantine bounds the
+					// outage to this one check; the guard stays armed either way.
+					fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL tree-diff: mint registry unreadable (%v); mint exemption disabled for this check\n", mintErr)
+					if _, qErr := mintregistry.QuarantineCorrupt(mintregistry.Path(cr.req.ProjectRoot)); qErr != nil {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: mint registry quarantine failed: %v\n", qErr)
+					}
+				} else {
+					mints = verifiedActiveMints(cr.req.ProjectRoot, mints)
+				}
 				var realLeaks []string
 				for _, p := range leaked {
-					if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) {
+					if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) || isActiveMintPhasePath(mints, p) {
 						continue
 					}
 					realLeaks = append(realLeaks, p)

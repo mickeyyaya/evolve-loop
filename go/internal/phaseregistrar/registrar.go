@@ -21,6 +21,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -32,12 +33,16 @@ import (
 // Registrar builds phase runners from unified configs. Bridge + Prompts are
 // the runner dependencies; ProfilesDir/PhasesDir are where the minted phase's
 // dispatch profile and spec are persisted (empty → skip that persistence).
+// RegistryPath is the shared active-mints registry (mintregistry.Path) every
+// lane's tree-diff guard consults; empty skips registration (single-lane
+// harnesses without the guard).
 type Registrar struct {
-	Bridge      core.Bridge
-	Prompts     *prompts.Loader
-	ProfilesDir string
-	PhasesDir   string
-	NowFn       func() time.Time
+	Bridge       core.Bridge
+	Prompts      *prompts.Loader
+	ProfilesDir  string
+	PhasesDir    string
+	RegistryPath string
+	NowFn        func() time.Time
 }
 
 // Result is a registrable phase: the normalized spec (for the caller to splice
@@ -90,6 +95,21 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 	}
 	if err := policy.ValidatePin(spec.Name, policy.Pin{CLI: cfg.Dispatch.CLI, Model: tier}, &prof); err != nil {
 		return Result{}, fmt.Errorf("phaseregistrar: %w", err)
+	}
+
+	// Register-before-persist (cycle-967 Variant A2): the minted name must be
+	// discoverable by every lane's tree-diff guard BEFORE its files can appear
+	// in a shared-tree diff — the reverse order recreates the cross-lane
+	// false-abort race. An unregistered mint is an abort landmine for every
+	// concurrent lane, so a registry failure rejects the mint loudly.
+	if r.RegistryPath != "" {
+		now := time.Now()
+		if r.NowFn != nil {
+			now = r.NowFn()
+		}
+		if err := mintregistry.Append(r.RegistryPath, spec.Name, now); err != nil {
+			return Result{}, fmt.Errorf("phaseregistrar: register mint: %w", err)
+		}
 	}
 
 	if err := r.persist(spec, prof); err != nil {
