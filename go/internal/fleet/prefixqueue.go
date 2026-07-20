@@ -1,6 +1,9 @@
 package fleet
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // prefixqueue.go implements the cycle-975 inbox item prefix-speculation-landing-queue
 // (campaign merge-efficiency-2026-07): a single-writer landing composer modeled on
@@ -39,7 +42,16 @@ type LaneCandidate struct {
 
 // PrefixQueue is the single-writer landing composer: a FIFO of PASS lane candidates
 // plus the AIMD window controlling how many lanes it will speculate over at once.
+//
+// The composer is the single writer to main, but its own state (lanes/window) is
+// still reached from >1 goroutine the moment a concurrent driver enqueues PASS
+// lanes or reports AIMD outcomes; mu enforces the single-writer contract on that
+// shared state so a torn append never silently loses a lane (the 948/949 lost-work
+// class). Every exported method that reads or mutates lanes/window takes mu; the
+// unexported groups() helper does NOT lock and is only ever called from a method
+// that already holds it (no re-entrant re-lock, no deadlock).
 type PrefixQueue struct {
+	mu     sync.Mutex
 	lanes  []LaneCandidate
 	window int
 }
@@ -51,21 +63,29 @@ func NewPrefixQueue() *PrefixQueue {
 
 // Enqueue appends a PASS lane candidate to the FIFO.
 func (q *PrefixQueue) Enqueue(c LaneCandidate) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.lanes = append(q.lanes, c)
 }
 
 // Window returns the current AIMD speculation window.
 func (q *PrefixQueue) Window() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	return q.window
 }
 
 // OnGreen records a green landing: additive increase (+1).
 func (q *PrefixQueue) OnGreen() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.window++
 }
 
 // OnRed records a red landing: multiplicative decrease (halve), floored at 1.
 func (q *PrefixQueue) OnRed() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	if w := q.window / 2; w > 1 {
 		q.window = w
 	} else {
@@ -120,6 +140,8 @@ func (q *PrefixQueue) groups() [][]LaneCandidate {
 // lane IDs [0..k]); iffy and overlap-zone lanes land in their own single-element group,
 // so they never appear in a multi-lane prefix.
 func (q *PrefixQueue) ComposePrefixes() [][]string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	var prefixes [][]string
 	for _, g := range q.groups() {
 		var ids []string
@@ -140,6 +162,8 @@ func (q *PrefixQueue) ComposePrefixes() [][]string {
 // while the lanes behind it re-form and continue. This runs in O(lanes) verify calls —
 // exactly one per lane — with no bisection sweep.
 func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed, ejected []string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	for _, g := range q.groups() {
 		var committed []string
 		for _, lane := range g {
@@ -151,6 +175,26 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 				ejected = append(ejected, lane.ID)
 			}
 		}
+	}
+	// Post-ejection whole-set re-verify (T3, F2 gap). Per-group NNFI proves each
+	// group's prefix green in isolation, but the UNION of independently-green
+	// groups can still be red — two solo-green iffy lanes whose composite fails
+	// (each is its own group, so the cross-group interaction is never speculated
+	// on). Invariant to restore: verify(landed) must ALWAYS hold. Re-verify the
+	// surviving set as a whole and, while it is red, eject the positionally-newest
+	// landed lane and re-check.
+	//
+	// DESIGN NOTE — positional-NNFI limitation (AC-T3c): NNFI blames the newest
+	// addition to a known-good set, so this tail-trim ejects the LAST-landed lane,
+	// not necessarily the true composite-poisoning one. An innocent later lane may
+	// be ejected in place of an earlier culprit. The guarantee here is only that no
+	// poisoned composite LANDS (verify(landed) holds); the ejected identity is
+	// positional, not causal. Precise blame would need cross-group bisection, which
+	// this NNFI design deliberately trades away for a linear verify budget.
+	for len(landed) > 0 && !verify(landed) {
+		last := len(landed) - 1
+		ejected = append(ejected, landed[last])
+		landed = landed[:last]
 	}
 	return landed, ejected
 }
