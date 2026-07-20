@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -292,3 +294,62 @@ func TestRegister_SpecPersistFails_PropagatesError(t *testing.T) {
 // marshal-error + happy-path JSON layout now live in internal/atomicwrite and
 // are pinned by its own 100%-coverage tests. persist's error wraps are covered
 // by TestRegister_ProfilePersistFails / _SpecPersistFails above.
+
+// --- cycle-967 (Variant A2): Register records the mint in the shared registry ---
+//
+// The tree-diff guard exempts a leaked .evolve/phases/<name> path only for a
+// REGISTERED mint (core.isActiveMintPhasePath), so Register must append the
+// name to the mintregistry — and must do so BEFORE persisting the files: the
+// reverse order recreates the cycle-967 race (files visible to a concurrent
+// lane's guard before the exemption exists).
+
+func TestRegister_AppendsActiveMintRegistry(t *testing.T) {
+	r := newRegistrar(t)
+	r.RegistryPath = mintregistry.Path(t.TempDir())
+	if _, err := r.Register(validCfg()); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	names, err := mintregistry.ActiveNames(r.RegistryPath, time.Now())
+	if err != nil {
+		t.Fatalf("ActiveNames: %v", err)
+	}
+	if !names["minted-reviewer"] {
+		t.Errorf("registered mint must be in the active-mints registry; got %v", names)
+	}
+}
+
+func TestRegister_Rejected_NoRegistryEntry(t *testing.T) {
+	r := newRegistrar(t)
+	r.RegistryPath = mintregistry.Path(t.TempDir())
+	cfg := validCfg()
+	cfg.Dispatch.AllowedCLIs = []string{"codex"} // claude not allowed → clamp rejects
+	if _, err := r.Register(cfg); err == nil {
+		t.Fatal("expected clamp rejection")
+	}
+	names, err := mintregistry.ActiveNames(r.RegistryPath, time.Now())
+	if err != nil {
+		t.Fatalf("ActiveNames: %v", err)
+	}
+	if len(names) != 0 {
+		t.Errorf("a rejected mint must not be registered; got %v", names)
+	}
+}
+
+// TestRegister_RegistryAppendFails_RejectsBeforePersist: a mint the guard
+// cannot discover is a cross-lane abort landmine, so a registry failure must
+// reject the mint loudly — and nothing may have been persisted yet
+// (register-before-persist ordering).
+func TestRegister_RegistryAppendFails_RejectsBeforePersist(t *testing.T) {
+	r := newRegistrar(t)
+	base := t.TempDir()
+	fixtures.MustWrite(t, filepath.Join(base, "blocker"), "a file, not a dir")
+	r.RegistryPath = filepath.Join(base, "blocker", "active-mints.json") // MkdirAll fails
+	_, err := r.Register(validCfg())
+	fixtures.RequireErrContains(t, err, "mintregistry")
+	if fixtures.FilePresent(filepath.Join(r.ProfilesDir, "minted-reviewer.json")) {
+		t.Error("profile persisted despite registry failure")
+	}
+	if fixtures.FilePresent(filepath.Join(r.PhasesDir, "minted-reviewer", "phase.json")) {
+		t.Error("phase spec persisted despite registry failure")
+	}
+}

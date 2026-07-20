@@ -29,6 +29,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -525,11 +526,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// profile + spec under .evolve so the unchanged runner resolves them
 		// from disk, then dispatch by name like a built-in. Only active when the
 		// advisor drives (Stage>=Advisory) and a plan carries MintPhases.
+		// RegistryPath anchors to projectRoot (not evolveDir) because the
+		// tree-diff guard reads mintregistry.Path(ProjectRoot) — the guard only
+		// sees writes under the project tree, so write and read must agree
+		// there (cycle-967 Variant A2).
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
-			Bridge:      br,
-			Prompts:     prm,
-			ProfilesDir: filepath.Join(evolveDir, "profiles"),
-			PhasesDir:   filepath.Join(evolveDir, "phases"),
+			Bridge:       br,
+			Prompts:      prm,
+			ProfilesDir:  filepath.Join(evolveDir, "profiles"),
+			PhasesDir:    filepath.Join(evolveDir, "phases"),
+			RegistryPath: mintregistry.Path(projectRoot),
 		}}),
 	}
 	// Cycle-122 Fix 3 / ADR-0030: auto-spawn the per-phase observer
