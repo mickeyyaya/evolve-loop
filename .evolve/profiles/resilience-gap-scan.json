@@ -3,7 +3,8 @@
   "role": "resilience-gap-scan",
   "cli": "claude-tmux",
   "cli_fallback": [],
-  "model_tier_default": "deep",
+  "model_tier_default": "balanced",
+  "model_tier_envelope": {"min": "fast", "default": "balanced", "max": "balanced"},
   "allowed_tools": [
     "Read",
     "Grep",
