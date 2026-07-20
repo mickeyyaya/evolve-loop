@@ -232,6 +232,58 @@ func TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv(t *testing.T) {
 	}
 }
 
+// skillsBridge captures the Skills the launcher resolved onto the BridgeRequest.
+type skillsBridge struct{ gotSkills []string }
+
+func (b *skillsBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
+	b.gotSkills = r.Skills
+	return core.BridgeResponse{ExitCode: 0}, nil
+}
+
+func (b *skillsBridge) Probe(context.Context) (core.BridgeProbe, error) {
+	return core.BridgeProbe{}, nil
+}
+
+func skillsContain(got []string, want string) bool {
+	for _, s := range got {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+// TestSwarmRunnerBridgeLauncherThreadsSkills is the C2 manual-verify predicate:
+// the unexported bridgeLauncher (unreachable from the external cycle943 ACS
+// package) must resolve the tier-gated overlay and thread its NAMES onto the
+// BridgeRequest — deep tier attaches fable, balanced attaches nothing — exactly
+// like the phase runner and the other non-phase dispatch sites.
+func TestSwarmRunnerBridgeLauncherThreadsSkills(t *testing.T) {
+	root := t.TempDir() // no policy.json ⇒ compiled-default overlays (deep/top→fable)
+
+	deep := &skillsBridge{}
+	l := bridgeLauncher{bridge: deep, env: map[string]string{}}
+	if _, err := l.Launch(context.Background(), swarm.LaunchRequest{
+		Agent: "builder", CLI: "claude-tmux", Model: "deep", ProjectRoot: root,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !skillsContain(deep.gotSkills, "fable") {
+		t.Errorf("deep-tier launcher Skills = %v, want it to contain %q", deep.gotSkills, "fable")
+	}
+
+	balanced := &skillsBridge{}
+	lb := bridgeLauncher{bridge: balanced, env: map[string]string{}}
+	if _, err := lb.Launch(context.Background(), swarm.LaunchRequest{
+		Agent: "builder", CLI: "claude-tmux", Model: "sonnet", ProjectRoot: root,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if skillsContain(balanced.gotSkills, "fable") {
+		t.Errorf("balanced-tier launcher Skills = %v, want no fable overlay (tier-gated)", balanced.gotSkills)
+	}
+}
+
 func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
 	b := &envBridge{}
 	phaseEnv := map[string]string{"A": "1"}

@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
@@ -255,11 +256,16 @@ type bridgeLauncher struct {
 }
 
 func (l bridgeLauncher) Launch(ctx context.Context, r swarm.LaunchRequest) (swarm.LaunchResult, error) {
+	// Skill overlays: resolve the tier-gated persona for this worker launch and
+	// thread the NAMES onto BridgeRequest.Skills, matching the phase runner and
+	// the other non-phase dispatch sites. Fail-open on a missing/malformed policy.
+	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(r.ProjectRoot, r.Agent, r.CLI, r.Model)
 	resp, err := l.bridge.Launch(ctx, core.BridgeRequest{
 		CLI: r.CLI, Model: r.Model, Profile: r.Profile, Agent: r.Agent,
 		SessionName: r.SessionName, Prompt: r.Prompt,
 		Workspace: r.Workspace, Worktree: r.Worktree, ProjectRoot: r.ProjectRoot,
 		ArtifactPath: r.ArtifactPath, Cycle: r.Cycle, Env: mergeEnv(l.env, r.Env),
+		Skills: overlaySkills,
 	})
 	if err != nil {
 		return swarm.LaunchResult{}, err
