@@ -443,3 +443,8 @@
 # verdict vs on-disk audit+acs) that the system-failure floor gates on.
 # Graduated at package creation per the new-package graduation guard.
 ./internal/coherence
+# mintregistry (2026-07-20, cycle-967 Variant A2): the shared active-mints
+# registry — registrar-written, tree-diff-guard-read — that distinguishes a
+# concurrent lane's sanctioned phase mint from a deliverable leak.
+# Graduated at package creation per the new-package graduation guard.
+./internal/mintregistry
