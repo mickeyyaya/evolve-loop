@@ -523,6 +523,19 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					}
 				}
 				fmt.Fprintf(stderr, "[loop] wave %d: %d/%d lanes ok\n", i, len(results)-failedLanes, len(results))
+				// ADR-0072 (adr0072-fleet-halt-unwired): a lane that exited with the
+				// system-failure halt code means the pipeline forged a verdict — the
+				// lane subprocess already wrote .evolve/pipeline-escalation.json + a P0
+				// pipeline-repair inbox item via haltOnSystemFailure. A forged verdict
+				// makes the pipeline untrustworthy fleet-wide, so STOP the batch instead
+				// of dispatching the next wave (which would only reproduce the fault).
+				// Ordinary lane FAILs above keep the never-stop retry semantics.
+				if anyLaneHaltedForSystemFailure(results) {
+					fmt.Fprintf(stderr, "[loop] SYSTEM-FAILURE HALT: a fleet lane in wave %d exited with the ADR-0072 halt code (rc=%d) — the lane already filed .evolve/pipeline-escalation.json + a P0 pipeline-repair inbox item. Stopping the batch; diagnose the pipeline (not the task) before resuming with evolve loop --resume.\n", i, systemFailureHaltExitCode)
+					lr.StopReason = "system_failure_halt"
+					lr.emitFatal(stdout, stderr, cfg, 0)
+					return systemFailureHaltExitCode
+				}
 				// Work-supply-starvation observation: DesiredLanes is the
 				// operator-asserted fleetCfg.Count (NOT the quota-shrunk
 				// waveCfg.Count); QuotaShrunk distinguishes a benched-family
@@ -648,12 +661,10 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// written even when another condition also trips this cycle. rc=4 is
 		// distinct from the soft rc=3 (batch completed with absorbed FAILs).
 		if sf := result.SystemFailure; sf != nil && sf.Halt {
-			writePipelineEscalation(cfg.EvolveDir, cfg.ProjectRoot, ranCycle, workspace, sf, stderr)
-			fmt.Fprintf(stderr, "[loop] SYSTEM-FAILURE HALT: cycle=%d category=%s level=%s\n[loop]   %s\n[loop]   The pipeline (not the task) is the cause — diagnose + fix before resuming; a P0 pipeline-repair item was filed to .evolve/inbox/. Escalation: .evolve/pipeline-escalation.json\n",
-				ranCycle, sf.Category, sf.Level, sf.Evidence)
+			rc := haltOnSystemFailure(cfg.EvolveDir, cfg.ProjectRoot, ranCycle, workspace, sf, stderr)
 			lr.StopReason = "system_failure_halt"
 			lr.emitFatal(stdout, stderr, cfg, ranCycle)
-			return 4
+			return rc
 		}
 
 		if lastAfter <= lastBefore {

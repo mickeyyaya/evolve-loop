@@ -223,10 +223,18 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	buf, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
-	if result.FinalVerdict == core.VerdictFAIL {
-		return 2
+	// ADR-0072 (adr0072-fleet-halt-unwired): every fleet lane runs THIS
+	// entrypoint as a subprocess, and its exit code is the ONLY channel back to
+	// the parent wave loop. A halting SystemFailure must therefore surface as a
+	// distinct exit code (not the ambiguous rc=2 FAIL) so the parent can halt the
+	// batch — and it writes the escalation dossier + P0 inbox item HERE, via the
+	// same shared helper the sequential path uses, so the breadcrumb exists even
+	// when the halt originated inside a lane. Ordinary outcomes keep the historical
+	// rc=2/0 mapping (cycleRunExitCode).
+	if sf := result.SystemFailure; sf != nil && sf.Halt {
+		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr)
 	}
-	return 0
+	return cycleRunExitCode(result)
 }
 
 // filterEvolveEnv extracts the EVOLVE_* and BRIDGE_* slice of the
