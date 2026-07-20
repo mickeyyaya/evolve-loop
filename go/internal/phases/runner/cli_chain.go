@@ -1,5 +1,7 @@
 package runner
 
+import "strings"
+
 // cli_chain.go — dispatch-log helpers for the per-phase CLI fallback chain.
 //
 // The chain RESOLUTION (primary + fallback + triggers) and the capability
@@ -36,4 +38,18 @@ func joinAttempts(attempts []string) string {
 		out += " -> " + a
 	}
 	return out
+}
+
+// FormatSkillOverlayLog renders the operator-visible line announcing the
+// skill-overlay set a dispatch resolved — e.g.
+// `[runner] phase=audit skill-overlays=[fable] (tier=deep)`. It is a pure
+// formatter (no I/O); the per-attempt DispatchTiered closure emits it via
+// log.Diag().Infof so operators/graders can see the fable persona fired for a
+// given (phase, tier) without diffing the prompt file. An empty skill set is
+// rendered explicitly as `skill-overlays=[]` so "no overlay resolved" is
+// distinguishable from "the line never ran".
+func FormatSkillOverlayLog(phase string, skills []string, tier string) string {
+	return "[runner] phase=" + phase +
+		" skill-overlays=[" + strings.Join(skills, ",") + "]" +
+		" (tier=" + tier + ")"
 }

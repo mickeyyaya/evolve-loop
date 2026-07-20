@@ -6,19 +6,19 @@
 // overlays, NOT the default); a non-nil block with rules resolves the UNION of
 // every matching rule's skills, deduped, in stable (first-seen) order.
 //
-// This is the policy-layer resolver only — a pure, side-effect-free mapping
-// from a dispatch descriptor to an ordered skill list. It carries no producer:
-// nothing constructs an OverlayDispatch from a live BridgeRequest yet, so the
-// audit-F1 protected-surface gap (skill dirs referenced by overlays) stays
-// dormant. Wiring Engine.Launch to inject these skills — the Tier producer that
-// makes F1 reachable — MUST land in the same slice that extends
-// ProtectedSurfaceManifest (guards/integrity_surface.go), and that file is on
-// the control-plane boundary (no autonomous --class cycle may edit it). So the
-// injection seam is intentionally deferred to an out-of-cycle manual ship; see
-// build-report.md § Deferred.
+// The core is the policy-layer resolver — a pure, side-effect-free mapping from
+// a dispatch descriptor to an ordered skill list (ResolveOverlays). The
+// producers that construct an OverlayDispatch from a live launch already landed:
+// the phase runner threads ResolveOverlays onto BridgeRequest.Skills per tiered
+// dispatch (phases/runner/runner.go), and the non-phase dispatch sites
+// (subagent.Run, retro.Phase.Run, swarmrunner's launcher) resolve through
+// ResolveLaunchOverlaysFailOpen below. skills/fable/ is already covered by the
+// ProtectedSurfaceManifest (guards/integrity_surface.go), so the F1 surface is
+// live, not dormant.
 package policy
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -116,10 +116,30 @@ func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 // the routing-mode tier logic BEFORE calling: pass tier="" for the non-auto
 // degrade floor, and a populated tier only under model_routing=auto with a
 // non-nil clamped plan (mirrors core.PhaseRequest.ModelRoutingCLI/
-// ModelRoutingTier). This function does not inject skills or touch
-// bridge.Engine.Launch; see the file header for the deferred wiring seam.
+// ModelRoutingTier).
 func DispatchFromPhaseRequest(phase, cli, model, tier string) OverlayDispatch {
 	return OverlayDispatch{Phase: phase, CLI: cli, Model: model, Tier: tier}
+}
+
+// ResolveLaunchOverlaysFailOpen loads projectRoot's policy.json and returns the
+// skill-overlay NAMES for the given dispatch. It is the shared entry point for
+// the non-phase dispatch sites (subagent.Run, retro.Phase.Run, swarmrunner's
+// bridgeLauncher) so a launch through ANY BridgeRequest construction seam
+// attaches the same tier-gated persona the phase runner threads — a single
+// source, not three copies of load+resolve. It is FAIL-OPEN (AC3): a missing or
+// malformed policy.json degrades to the compiled-default overlays with a WARN to
+// stderr rather than aborting the launch (the phase runner hard-fails on a
+// malformed policy instead, since a phase dispatch has a report path to carry
+// the error; these seams do not). These sites have no separate routing tier, so
+// the model override IS the tier — pass model for both, mirroring runner.go's
+// DispatchFromPhaseRequest(phase, cli, tier, tier).
+func ResolveLaunchOverlaysFailOpen(projectRoot, phase, cli, model string) []string {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[overlays] WARN policy load failed (%v) — using compiled-default overlays\n", err)
+		pol = Policy{}
+	}
+	return pol.ResolveOverlays(DispatchFromPhaseRequest(phase, cli, model, model))
 }
 
 // SkillRegistryFromFS reads the skill registry from the filesystem: every

@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -211,6 +212,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	fullPrompt := composePrompt(req.Prompt, token, artifactPath, req.Agent, req.Cycle)
 
+	// Skill overlays: resolve the tier-gated persona set for this launch and
+	// thread the NAMES onto BridgeRequest.Skills, exactly as the phase runner
+	// does — so a native-bridge subagent dispatch (deep/top tier) gets the fable
+	// operating-discipline overlay too. Fail-open on a missing/malformed policy.
+	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, req.Agent, cli, model)
+
 	start := r.cfg.Now()
 	bres, bridgeErr := r.cfg.Bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
@@ -223,6 +230,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		Agent:        req.Agent,
 		Cycle:        req.Cycle,
 		Env:          req.Env,
+		Skills:       overlaySkills,
 	})
 	durationMS := r.cfg.Now().Sub(start).Milliseconds()
 

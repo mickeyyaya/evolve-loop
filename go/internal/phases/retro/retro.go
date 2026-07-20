@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -99,6 +100,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		cli = "claude-tmux"
 	}
 
+	// Skill overlays: resolve the tier-gated persona for this retro launch and
+	// thread the NAMES onto BridgeRequest.Skills, matching the phase runner — a
+	// deep/top-tier retro gets the fable operating-discipline overlay. Fail-open.
+	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, p.model)
+
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
 		CLI:          cli,
 		Profile:      profilePath,
@@ -110,6 +116,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Agent:        "retrospective",
 		Cycle:        req.Cycle,
 		Env:          req.Env,
+		Skills:       overlaySkills,
 	})
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 

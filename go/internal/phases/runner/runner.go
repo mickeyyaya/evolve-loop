@@ -676,6 +676,10 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// the configured skill set is recomputed for each (cli, tier) actually
 		// dispatched. Pure policy lookup; the adapter materializes the SKILL.md.
 		overlaySkills := overlayPolicy.ResolveOverlays(policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier))
+		// Observability: announce the resolved overlay set for THIS (cli, tier)
+		// attempt so operators/graders see the persona fired without diffing the
+		// prompt file. Rendered even for the empty set (skill-overlays=[]).
+		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, overlaySkills, tier))
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:                 candidateCLI,
 			Profile:             profilePath,
