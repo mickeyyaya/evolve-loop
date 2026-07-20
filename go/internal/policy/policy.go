@@ -690,7 +690,8 @@ type WorkflowPolicy struct {
 	// CompactPrompts enables on-demand reference-section stripping from disk-loaded
 	// agent docs before dispatch (strips "## Reference Index (Layer 3, on-demand)"
 	// and everything after it). Absent/nil = default ON; explicit false opts out.
-	CompactPrompts *bool `json:"compact_prompts,omitempty"`
+	CompactPrompts    *bool `json:"compact_prompts,omitempty"`
+	UniversalFallback *bool `json:"universal_fallback,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -711,6 +712,12 @@ type WorkflowConfig struct {
 	// CompactPrompts mirrors WorkflowPolicy.CompactPrompts with the default applied.
 	// Default true: phase runners strip the on-demand reference tail before dispatch.
 	CompactPrompts bool
+	// UniversalFallback (default true): when a phase's whole configured CLI chain
+	// (primary + cli_fallback) has no binary on this host, the runner discovers
+	// installed+authed CLIs via bridge.Doctor and appends the phase-allowlisted
+	// ones to the chain instead of halting (any_cli_any_phase invariant). Set
+	// workflow.universal_fallback=false to hard-pin to the configured chain.
+	UniversalFallback bool
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -727,6 +734,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		BackfillEnabled:       true,
 		ConsensusAuditEnabled: true,
 		CompactPrompts:        true, // default ON: strips ~23 KB/cycle of reference tails
+		UniversalFallback:     true, // default ON: discover+route to an installed CLI when the configured chain is absent
 	}
 	if p.Workflow == nil {
 		return c
@@ -760,6 +768,9 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	c.StrictAudit = p.Workflow.StrictAudit
 	if p.Workflow.CompactPrompts != nil {
 		c.CompactPrompts = *p.Workflow.CompactPrompts
+	}
+	if p.Workflow.UniversalFallback != nil {
+		c.UniversalFallback = *p.Workflow.UniversalFallback
 	}
 	return c
 }
