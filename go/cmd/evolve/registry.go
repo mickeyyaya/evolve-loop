@@ -67,6 +67,7 @@ var commands = []subcommand{
 	{Name: "fleet", Summary: "Launch N concurrent cycles (ADR-0049 S6)", Run: runFleet},
 	{Name: "campaign", Summary: "Multi-cycle campaign planner (study|replan|run|status)", Run: runCampaign},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
+	{Name: "branches", Summary: "Audit/prune superseded orphan cycle-* branches (branches audit|prune)", Run: runBranches},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "gc", Summary: "Reap orphaned tmux sessions whose creator PID is dead (gc [--dry-run])", Run: runGC},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},

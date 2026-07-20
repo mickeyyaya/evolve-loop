@@ -47,20 +47,20 @@ import (
 func brInitRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	brGit(t, dir, "init", "-q")
-	brGit(t, dir, "config", "user.email", "ci@example.com")
-	brGit(t, dir, "config", "user.name", "ci")
-	brGit(t, dir, "config", "commit.gpgsign", "false")
+	bootRecoveryGit(t, dir, "init", "-q")
+	bootRecoveryGit(t, dir, "config", "user.email", "ci@example.com")
+	bootRecoveryGit(t, dir, "config", "user.name", "ci")
+	bootRecoveryGit(t, dir, "config", "commit.gpgsign", "false")
 	// A HEAD commit so autoseal's git-head capture succeeds.
 	if err := os.WriteFile(filepath.Join(dir, "README"), []byte("seed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	brGit(t, dir, "add", "-A")
-	brGit(t, dir, "commit", "-m", "seed")
+	bootRecoveryGit(t, dir, "add", "-A")
+	bootRecoveryGit(t, dir, "commit", "-m", "seed")
 	return dir
 }
 
-func brGit(t *testing.T, dir string, args ...string) {
+func bootRecoveryGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
@@ -97,8 +97,8 @@ func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 	if err := os.WriteFile(src, []byte("package leak\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	brGit(t, repo, "add", "-A")
-	brGit(t, repo, "commit", "-m", "add leak.go")
+	bootRecoveryGit(t, repo, "add", "-A")
+	bootRecoveryGit(t, repo, "commit", "-m", "add leak.go")
 	if err := os.WriteFile(src, []byte("package leak\n// leaked\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

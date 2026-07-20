@@ -93,8 +93,8 @@ func TestDefaultBootRecovery_QuarantineStashLabelIsTimestamped(t *testing.T) {
 	if err := os.WriteFile(src, []byte("package leak\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	brGit(t, repo, "add", "-A")
-	brGit(t, repo, "commit", "-m", "add leak.go")
+	bootRecoveryGit(t, repo, "add", "-A")
+	bootRecoveryGit(t, repo, "commit", "-m", "add leak.go")
 	if err := os.WriteFile(src, []byte("package leak\n// leaked\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
