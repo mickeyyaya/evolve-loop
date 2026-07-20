@@ -1,12 +1,16 @@
 package subagent
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // ModelTier names recognized by the resolver. Adapters accept these as -m
@@ -116,7 +120,54 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 	if defaultTier == "" {
 		return "", fmt.Errorf("subagent/modeltier: profile %s missing model_tier_default", req.ProfilePath)
 	}
-	return defaultTier, nil
+	return applyModelTierOverride(defaultTier, profileBody, req), nil
+}
+
+// applyModelTierOverride consumes profile.model_tier_overrides: when the
+// request's active situation matches an override key, the override tier is
+// clamped to the profile's envelope max (reusing policy.TierRank — never a new
+// rank table) and applied as a FLOOR over the base tier (max(base, clamped) by
+// rank). Vocabulary stays abstract. An empty/nil override map, an inactive
+// situation, an absent key, or an unparseable body all leave base unchanged.
+func applyModelTierOverride(base, profileBody string, req ResolveModelTierRequest) string {
+	var p profiles.Profile
+	if err := json.Unmarshal([]byte(profileBody), &p); err != nil {
+		return base // unmodeled/invalid body ⇒ base tier stands (defensive)
+	}
+	if len(p.ModelTierOverrides) == 0 {
+		return base
+	}
+	situation := activeSituation(req)
+	if situation == "" {
+		return base
+	}
+	override := strings.TrimSpace(p.ModelTierOverrides[situation])
+	if override == "" {
+		return base
+	}
+	// Clamp to the envelope max (skip when max is unset or unclassifiable).
+	if p.ModelTierEnvelope != nil && p.ModelTierEnvelope.Max != "" {
+		if maxRank := policy.TierRank(p.ModelTierEnvelope.Max); maxRank > 0 &&
+			policy.TierRank(override) > maxRank {
+			override = p.ModelTierEnvelope.Max
+		}
+	}
+	// Floor: apply only when the override outranks the base tier.
+	if policy.TierRank(override) > policy.TierRank(base) {
+		return override
+	}
+	return base
+}
+
+// activeSituation maps real request signals to a model_tier_overrides key.
+// Primary (only currently plumbed) producer: cycle_1_or_low_goal fires for the
+// first cycle. Additional situation keys (audit_retry_2plus, cold_start, …)
+// remain inert until their producer signals are plumbed — see builder-notes.
+func activeSituation(req ResolveModelTierRequest) string {
+	if req.Cycle <= 1 {
+		return "cycle_1_or_low_goal"
+	}
+	return ""
 }
 
 // readConsecutiveSuccesses returns the streak count from
