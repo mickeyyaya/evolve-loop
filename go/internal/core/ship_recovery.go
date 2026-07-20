@@ -43,6 +43,32 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 	// a clean RebaseNeeded into a CONFLICT (G13a) that routes to the debugger.
 	recoverCode, recoverClass := se.Code, se.Class
 	if se.Code == CodeGitFleetRebaseNeeded {
+		// Deterministic, zero-LLM pre-screen (cycle-968) BEFORE the blind rebase
+		// replay: ClassifyFleetRebaseCandidate reuses the cycle-962 carry-forward
+		// filter to decide whether this candidate is already landed, cleanly
+		// mergeable, or a genuine conflict. A superseded (already-landed) candidate
+		// short-circuits here with NO wasted rebase + re-audit — the explicit fix
+		// for the 948 "PASS-but-unlanded duplicate" waste class. Clean/Conflict fall
+		// through to the existing rebaseCycleBranchOntoMain path unchanged (which
+		// itself replays a clean candidate and routes a real conflict to the
+		// debugger). A pre-screen git-infra error is non-fatal here: log it and let
+		// the rebase below run and report its own infra failure loudly.
+		if cs.ActiveWorktree != "" {
+			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
+			case perr != nil:
+				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet-rebase pre-screen error (%v); falling through to rebase\n", cycle, perr)
+			case verdict == FleetRebaseAlreadyLanded:
+				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
+				return "", false
+			case verdict == FleetRebaseConflict:
+				// A genuine conflict the rebase would also detect. Fall through to
+				// rebaseCycleBranchOntoMain, which performs the real replay and
+				// reclassifies to the debugger route below — keeping a single
+				// conflict-handling path rather than duplicating it here.
+			case verdict == FleetRebaseClean:
+				// Clean & not landed — the replay is worthwhile; fall through.
+			}
+		}
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
 		switch {
 		case ok:

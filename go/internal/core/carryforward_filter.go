@@ -62,6 +62,59 @@ func CarryforwardCandidateLandable(ctx context.Context, dir, candidateRef, base 
 	}
 }
 
+// FleetRebaseVerdict is the deterministic three-way classification of a
+// fleet-rebase carry-forward candidate, produced by ClassifyFleetRebaseCandidate
+// as a pre-screen before the blind rebase replay in the ship-recovery path.
+type FleetRebaseVerdict int
+
+const (
+	// FleetRebaseAlreadyLanded — the candidate is superseded (an ancestor of base,
+	// or every commit already on base by patch-id). Short-circuit: no replay, no
+	// re-audit (the explicit fix for the 948 "PASS-but-unlanded duplicate" waste).
+	FleetRebaseAlreadyLanded FleetRebaseVerdict = iota
+	// FleetRebaseClean — the candidate cleanly 3-way merges onto base and is not
+	// already landed. Worth replaying: proceed to the existing rebase path.
+	FleetRebaseClean
+	// FleetRebaseConflict — a genuine 3-way conflict (real overlapping work). Must
+	// route to the debugger, NEVER be short-circuited as AlreadyLanded.
+	FleetRebaseConflict
+)
+
+// ClassifyFleetRebaseCandidate is the deterministic, zero-LLM pre-screen for the
+// fleet-rebase recovery path. It REUSES CarryforwardCandidateLandable (giving that
+// otherwise-inert cycle-962 surface its first production caller) and splits its
+// false result into the two outcomes that must be handled differently:
+//
+//	FleetRebaseClean         → landable (clean 3-way merge, not superseded)
+//	FleetRebaseAlreadyLanded → not landable BECAUSE superseded (short-circuit)
+//	FleetRebaseConflict      → not landable BECAUSE a genuine conflict (→ debugger)
+//	err                      → git-infrastructure failure only; never masked as a verdict.
+//
+// The naive "landable==false ⇒ already landed" reading is WRONG: landable is false
+// for BOTH a superseded candidate AND a real conflict, so a second supersession
+// screen disambiguates them — mislabelling a conflict as landed would silently drop
+// real overlapping work.
+func ClassifyFleetRebaseCandidate(ctx context.Context, dir, candidateRef, base string) (FleetRebaseVerdict, error) {
+	landable, err := CarryforwardCandidateLandable(ctx, dir, candidateRef, base)
+	if err != nil {
+		return FleetRebaseAlreadyLanded, err
+	}
+	if landable {
+		return FleetRebaseClean, nil
+	}
+	// Not landable: superseded (already landed) or a genuine conflict. Re-run the
+	// supersession screen to disambiguate — the same deterministic git checks the
+	// filter already used, so the classification stays coherent with it.
+	superseded, err := refSuperseded(ctx, dir, candidateRef, base)
+	if err != nil {
+		return FleetRebaseAlreadyLanded, err
+	}
+	if superseded {
+		return FleetRebaseAlreadyLanded, nil
+	}
+	return FleetRebaseConflict, nil
+}
+
 // refSuperseded reports whether ref is already landed on base: either a strict
 // ancestor (fast-forward merged) or a functional duplicate whose every commit
 // already exists on base under a different sha (patch-id equivalence, robust to
