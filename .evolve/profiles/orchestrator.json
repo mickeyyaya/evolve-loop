@@ -5,9 +5,9 @@
   "context_mode": "digest",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: removed inert 'cycle_4_plus_mature'=fast (zero production consumers; below floor). clamped 'cycle_1_or_low_goal' deep->balanced: orchestration is lightweight coordination bounded by envelope max=balanced.",
   "model_tier_overrides": {
-    "cycle_1_or_low_goal": "deep",
-    "cycle_4_plus_mature": "fast"
+    "cycle_1_or_low_goal": "balanced"
   },
   "allowed_tools": [
     "Bash(ship.sh:*)",

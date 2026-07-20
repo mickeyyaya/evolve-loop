@@ -6,11 +6,11 @@
     "claude-tmux"
   ],
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: removed inert 's_complex_with_cache'=fast (zero production consumers; was below envelope floor 'balanced'). deep overrides are within [balanced,deep].",
   "model_tier_overrides": {
     "ultrathink_strategy": "deep",
     "m_complex_5plus_files": "deep",
-    "audit_retry_2plus": "deep",
-    "s_complex_with_cache": "fast"
+    "audit_retry_2plus": "deep"
   },
   "allowed_tools": [
     "Read",

@@ -4,9 +4,9 @@
   "cli": "claude-tmux",
   "cli_fallback": [],
   "model_tier_default": "deep",
+  "_model_tier_overrides_note": "cycle-974: removed inert 'routine_review'=fast (zero production consumers; was below envelope floor 'balanced'). high_ambiguity=deep is within [balanced,deep].",
   "model_tier_overrides": {
-    "high_ambiguity": "deep",
-    "routine_review": "fast"
+    "high_ambiguity": "deep"
   },
   "allowed_tools": [
     "Read",

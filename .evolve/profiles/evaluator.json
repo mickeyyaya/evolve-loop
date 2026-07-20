@@ -6,6 +6,7 @@
     "claude-tmux"
   ],
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: widened envelope max balanced->deep so 'harden_strategy'=deep sits within bounds — security/harden evaluation legitimately warrants deep reasoning.",
   "model_tier_overrides": {
     "harden_strategy": "deep"
   },
@@ -92,7 +93,7 @@
   "model_tier_envelope": {
     "min": "balanced",
     "default": "balanced",
-    "max": "balanced"
+    "max": "deep"
   },
   "allowed_clis": [
     "all"

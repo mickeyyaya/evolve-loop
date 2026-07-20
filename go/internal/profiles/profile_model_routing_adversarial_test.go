@@ -159,3 +159,66 @@ func TestSubstitutabilityParityCoversMinimumProfiles(t *testing.T) {
 			len(names), minExpectedProfiles)
 	}
 }
+
+// TestModelTierOverridesWithinEnvelope is the permanent regression guard added
+// in cycle-974 (envelope-floor-guard-model-tier-overrides). It asserts that
+// every model_tier_overrides value ranks within its OWN profile's
+// model_tier_envelope [min,max] on the canonical ladder fast<balanced<deep<top.
+//
+// The two pre-existing envelope tests leave a gap this closes:
+// TestAllProfilesModelTierOverridesValuesAreCanonical checks an override value
+// is a canonical tier name; TestEnvelopeTierHierarchyOrdering checks a
+// profile's own min/default/max are non-decreasing. Neither cross-checks an
+// override value against its own envelope bounds — the exact drift that let a
+// below-floor ("fast" under min="balanced") and above-ceiling ("deep" over
+// max="balanced") override ship undetected across six profiles.
+//
+// Profiles without an envelope (or with an empty/non-canonical min/max) are
+// skipped, matching the conventions of the tests above.
+func TestModelTierOverridesWithinEnvelope(t *testing.T) {
+	t.Parallel()
+
+	tierRank := make(map[string]int, len(modelcatalog.CanonicalTiers))
+	for i, tier := range modelcatalog.CanonicalTiers {
+		tierRank[tier] = i
+	}
+
+	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
+	names, err := loader.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(names) == 0 {
+		t.Fatal("List returned no profiles")
+	}
+
+	for _, name := range names {
+		profile, err := loader.Get(name)
+		if err != nil {
+			t.Fatalf("Get(%q): %v", name, err)
+		}
+		env := profile.ModelTierEnvelope
+		if env == nil || env.Min == "" || env.Max == "" {
+			continue
+		}
+		minR, okMin := tierRank[env.Min]
+		maxR, okMax := tierRank[env.Max]
+		if !okMin || !okMax {
+			// Non-canonical envelope bounds are TestEnvelopeTierHierarchyOrdering's
+			// concern; isolate the override-vs-envelope range here.
+			continue
+		}
+		for key, tier := range profile.ModelTierOverrides {
+			r, ok := tierRank[tier]
+			if !ok {
+				// Non-canonical override value → covered by
+				// TestAllProfilesModelTierOverridesValuesAreCanonical.
+				continue
+			}
+			if r < minR || r > maxR {
+				t.Errorf("%s: model_tier_overrides[%q]=%q ranks outside its own envelope [min=%q, max=%q] — raise the override to the floor, or widen the envelope with a justifying comment",
+					name, key, tier, env.Min, env.Max)
+			}
+		}
+	}
+}

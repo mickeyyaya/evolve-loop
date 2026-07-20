@@ -3,11 +3,11 @@
   "role": "builder",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: removed inert 's_complex_with_cache'=fast (zero production consumers; below floor). widened envelope max balanced->deep so complex/adversarial test-authoring strategies (ultrathink/m_complex/audit_retry=deep) sit within bounds, matching sibling profiles builder+tdd-engineer (max=deep, identical override intent).",
   "model_tier_overrides": {
     "ultrathink_strategy": "deep",
     "m_complex_5plus_files": "deep",
-    "audit_retry_2plus": "deep",
-    "s_complex_with_cache": "fast"
+    "audit_retry_2plus": "deep"
   },
   "allowed_tools": [
     "Read",
@@ -105,7 +105,7 @@
   "model_tier_envelope": {
     "min": "balanced",
     "default": "balanced",
-    "max": "balanced"
+    "max": "deep"
   },
   "allowed_clis": [
     "claude"

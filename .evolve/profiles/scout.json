@@ -3,9 +3,9 @@
   "role": "scout",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: removed inert 'cycle_4_plus_mature'=fast (zero production consumers; was below envelope floor 'balanced'). cycle_1_or_low_goal=deep is within [balanced,deep].",
   "model_tier_overrides": {
-    "cycle_1_or_low_goal": "deep",
-    "cycle_4_plus_mature": "fast"
+    "cycle_1_or_low_goal": "deep"
   },
   "allowed_tools": [
     "Bash(evolve phase verify:*)",

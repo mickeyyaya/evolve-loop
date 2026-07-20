@@ -4,11 +4,11 @@
   "effort_level": "medium",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
+  "_model_tier_overrides_note": "cycle-974: removed inert 's_complex_with_cache'=deep (zero production consumers). deep overrides are within [balanced,deep].",
   "model_tier_overrides": {
     "ultrathink_strategy": "deep",
     "m_complex_5plus_files": "deep",
-    "audit_retry_2plus": "deep",
-    "s_complex_with_cache": "deep"
+    "audit_retry_2plus": "deep"
   },
   "cross_family_with": "builder",
   "_model_family_rationale": "Balanced tier by default for test authoring, with opus retained for ultrathink, complex, retry, and cache-sensitive overrides. Decision updated by cycle 337 per model-routing-policy.md.",

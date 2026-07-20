@@ -3,9 +3,10 @@
   "role": "intent",
   "cli": "claude-tmux",
   "model_tier_default": "deep",
+  "_model_tier_overrides_note": "cycle-974: raised 'clear_goal' balanced->deep — intent parsing is floored at deep (envelope min=default=max=deep); goal-clarity does not lower the reasoning floor.",
   "model_tier_overrides": {
     "vague_goal": "deep",
-    "clear_goal": "balanced"
+    "clear_goal": "deep"
   },
   "allowed_tools": [
     "Bash(evolve phase verify:*)",
