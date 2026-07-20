@@ -64,3 +64,21 @@ func anyLaneHaltedForSystemFailure(results []fleet.Result) bool {
 	}
 	return false
 }
+
+// dispatchHaltDecision is the ONE ADR-0072 halt outcome BOTH the wave and pool
+// dispatch branches apply after an iteration completes, so the two
+// structurally-similar branches cannot drift on the halt floor (per
+// [[never_duplicate_centralize_via_design_patterns]]): the pool branch shipped
+// without any halt check while the wave branch had one, exactly the drift this
+// single-sources away. Detection is delegated to anyLaneHaltedForSystemFailure
+// (no branch re-implements the ExitCode==systemFailureHaltExitCode scan): when
+// any lane forged a verdict it returns halt=true with rc=systemFailureHaltExitCode
+// and stopReason="system_failure_halt" so the caller STOPS the batch; otherwise
+// halt=false (rc=0, stopReason="") so the caller keeps the never-stop retry
+// semantics an ordinary lane FAIL is entitled to.
+func dispatchHaltDecision(results []fleet.Result) (rc int, stopReason string, halt bool) {
+	if anyLaneHaltedForSystemFailure(results) {
+		return systemFailureHaltExitCode, "system_failure_halt", true
+	}
+	return 0, "", false
+}

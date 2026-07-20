@@ -495,6 +495,18 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					}
 				}
 				fmt.Fprintf(stderr, "[loop] pool %d: %d/%d lanes ok (rolling, target=%d)\n", i, len(results)-failedLanes, len(results), fleetCfg.Count)
+				// ADR-0072 (adr0072-fleet-pool-halt-unwired): mirror the wave branch
+				// below — a lane that exited with the system-failure halt code forged a
+				// verdict, so STOP the batch instead of rolling the next pool iteration
+				// (which would only reproduce the fault). The lane subprocess already
+				// filed .evolve/pipeline-escalation.json + a P0 pipeline-repair inbox
+				// item; ordinary lane FAILs above keep the never-stop retry semantics.
+				if rc, sr, halt := dispatchHaltDecision(results); halt {
+					fmt.Fprintf(stderr, "[loop] SYSTEM-FAILURE HALT: a fleet lane in pool %d exited with the ADR-0072 halt code (rc=%d) — the lane already filed .evolve/pipeline-escalation.json + a P0 pipeline-repair inbox item. Stopping the batch; diagnose the pipeline (not the task) before resuming with evolve loop --resume.\n", i, systemFailureHaltExitCode)
+					lr.StopReason = sr
+					lr.emitFatal(stdout, stderr, cfg, 0)
+					return rc
+				}
 				continue
 			default:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", i)
@@ -530,11 +542,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				// makes the pipeline untrustworthy fleet-wide, so STOP the batch instead
 				// of dispatching the next wave (which would only reproduce the fault).
 				// Ordinary lane FAILs above keep the never-stop retry semantics.
-				if anyLaneHaltedForSystemFailure(results) {
+				if rc, sr, halt := dispatchHaltDecision(results); halt {
 					fmt.Fprintf(stderr, "[loop] SYSTEM-FAILURE HALT: a fleet lane in wave %d exited with the ADR-0072 halt code (rc=%d) — the lane already filed .evolve/pipeline-escalation.json + a P0 pipeline-repair inbox item. Stopping the batch; diagnose the pipeline (not the task) before resuming with evolve loop --resume.\n", i, systemFailureHaltExitCode)
-					lr.StopReason = "system_failure_halt"
+					lr.StopReason = sr
 					lr.emitFatal(stdout, stderr, cfg, 0)
-					return systemFailureHaltExitCode
+					return rc
 				}
 				// Work-supply-starvation observation: DesiredLanes is the
 				// operator-asserted fleetCfg.Count (NOT the quota-shrunk
