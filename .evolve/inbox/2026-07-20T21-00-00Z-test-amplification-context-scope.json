@@ -1,0 +1,11 @@
+{
+  "id": "test-amplification-context-scope",
+  "title": "Scope test-amplification's context to the diff's covering tests — it is the per-run token outlier (5.4M cache-read/run, 13.5 min avg, 3.5x build's per-run context)",
+  "weight_hint": 0.84,
+  "created": "2026-07-20T21:00:00Z",
+  "why": "MEASURED (knowledge-base/research/token-usage-history-2026-07-20.md, cycles>=900): test-amplification burns 81.2M cache-read tokens across only 15 runs — 5.4M/run, the highest per-run context in the pipeline, at 13.5 min avg — because it reads broad test corpora instead of the tests actually covering the cycle's diff. It is an advisor-inserted optional phase, so this cost lands opportunistically and unpredictably.",
+  "how_to_apply": "Near-term (independent of codegraph): derive the covering-test set deterministically — packages touched by the cycle diff -> their *_test.go files + direct reverse-import test packages (go list -deps seam already exists in changedpkgs) — and inject ONLY that set as phase context; cap corpus bytes with a loud truncation note (no silent caps). Long-term: consume codegraph S2 impact API (covering-tests edge) when codegraph-blast-radius lands. Measure the delta via token-telemetry before/after (the per-phase usage.json artifacts). Guard: scoping must fail-open to today's behavior on derivation error, never block the phase.",
+  "evidence": "knowledge-base/research/token-usage-history-2026-07-20.md table row test-amplification: 15 runs, 956,786 output, 81,154,076 cache_read, 13.5 min avg.",
+  "files": ["go/internal/phases/", "go/internal/changedpkgs/", "go/internal/phasespec/"],
+  "class": "token-efficiency"
+}
