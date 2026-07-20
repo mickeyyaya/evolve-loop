@@ -1,19 +1,26 @@
 {
   "id": "guards-role-hermetic-home",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.86,
-  "title": "guards.Role reads $HOME directly and its C1 security regression test silently verifies the WRONG path when HOME is unset — plus always-safe allows never assert Alarm=false",
+  "weight": 0.85,
+  "title": "guards.Role reads $HOME directly and its C1 security regression test silently verifies the WRONG path when HOME is unset \u2014 plus always-safe allows never assert Alarm=false",
   "kind": "bug",
   "priority": "high",
-  "summary": "role.go:97 isAlwaysSafe reads os.Getenv(\"HOME\") raw; role_test.go:12-17 homeDir() falls back to '/tmp' when HOME is unset, making TestRole_DeniesGlobalSettingsInCycle (role_integrity_test.go:94) test /tmp/.claude/settings.json — which is itself always-safe → the guard short-circuits to Allow before IsProtectedSurface, and the C1 regression (deny global settings edits mid-cycle, the most security-critical predicate in the codebase) passes for the wrong reason in HOME-less sandboxes/CI. Sibling gap: TestRole_AlwaysSafeDirs (role_test.go:148-163) asserts Allow but never !Alarm, so a regression that alarms on every /tmp write (flooding operator signal, masking real violations) is undetectable.",
-  "root_cause": "Production env read without a seam + tests inheriting the machine's real HOME — the exact hermeticity wound class that produced past local-vs-CI splits (leak-recover git-identity lesson).",
+  "summary": "role.go:97 isAlwaysSafe reads os.Getenv(\"HOME\") raw; role_test.go:12-17 homeDir() falls back to '/tmp' when HOME is unset, making TestRole_DeniesGlobalSettingsInCycle (role_integrity_test.go:94) test /tmp/.claude/settings.json \u2014 which is itself always-safe \u2192 the guard short-circuits to Allow before IsProtectedSurface, and the C1 regression (deny global settings edits mid-cycle, the most security-critical predicate in the codebase) passes for the wrong reason in HOME-less sandboxes/CI. Sibling gap: TestRole_AlwaysSafeDirs (role_test.go:148-163) asserts Allow but never !Alarm, so a regression that alarms on every /tmp write (flooding operator signal, masking real violations) is undetectable.",
+  "root_cause": "Production env read without a seam + tests inheriting the machine's real HOME \u2014 the exact hermeticity wound class that produced past local-vs-CI splits (leak-recover git-identity lesson).",
   "fix": "Give isAlwaysSafe an injected home (param or os.UserHomeDir seam consistent with the package's existing style); every test exercising $HOME/.claude paths uses t.Setenv(\"HOME\", t.TempDir()). Extend TestRole_AlwaysSafeDirs to assert !dec.Alarm on each allow. Add the unset-HOME case as an explicit test.",
   "acceptance": [
-    "RED: TestRole_C1_DeniesGlobalSettingsUnsetHome — with HOME unset/isolated, the settings.json deny+alarm still fires (today the test silently tests an always-safe path)",
+    "RED: TestRole_C1_DeniesGlobalSettingsUnsetHome \u2014 with HOME unset/isolated, the settings.json deny+alarm still fires (today the test silently tests an always-safe path)",
     "RED: TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude",
     "RED: TestRole_AlwaysSafeDirs asserts Allow AND !Alarm",
     "go vet, -race, apicover -enforce green; hermetic under env -u HOME"
   ],
-  "files": ["go/internal/guards/role.go", "go/internal/guards/role_test.go", "go/internal/guards/role_integrity_test.go"],
-  "connects_to": ["C1 escape family (#309, cycle-terminal-path-escapes)", "warnship_apicover_ci_gap (local-vs-CI hermeticity class)"]
+  "files": [
+    "go/internal/guards/role.go",
+    "go/internal/guards/role_test.go",
+    "go/internal/guards/role_integrity_test.go"
+  ],
+  "connects_to": [
+    "C1 escape family (#309, cycle-terminal-path-escapes)",
+    "warnship_apicover_ci_gap (local-vs-CI hermeticity class)"
+  ]
 }

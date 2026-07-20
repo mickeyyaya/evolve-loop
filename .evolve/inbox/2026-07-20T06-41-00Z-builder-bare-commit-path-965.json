@@ -1,0 +1,11 @@
+{
+  "id": "builder-must-not-bare-commit-use-sanctioned-path",
+  "title": "cycle-965 FAIL: builder attempted a bare commit (ship-gate correctly denied on any branch) → no deliverable commit → build rejected; builder must use the sanctioned cycle-commit path",
+  "weight_hint": 0.87,
+  "created": "2026-07-20T06:41:00Z",
+  "why": "Cycle-965 (pipeline-hardening batch) FAILed at the build->audit gate: build-report 'Worktree commit was ship-gate-denied (bare git commit correctly refused on any branch)'. The builder agent tried to commit its own work with a bare commit; the ship-gate hook (fires on ALL commits repo-wide, incl worktrees) correctly denied it, so the cycle produced no valid deliverable commit. Cycles 968/969 committed fine via the sanctioned path — so this is builder-behavior divergence, not the fix code being wrong (a FALSE-code-RED). The delivered work may be sound but was thrown away for using the wrong commit mechanism.",
+  "how_to_apply": "Root-cause: the builder should NOT self-commit; the orchestrator/ship phase owns the cycle commit. Either (a) strengthen the builder persona/prompt contract to never run git commit (leave commits to ship), and/or (b) make the ship-gate denial RECOVERABLE for the build phase — on a denied bare commit in a worktree, the orchestrator absorbs the uncommitted work (like leak recovery stages it) rather than failing the cycle. Prefer (b): the builder's SOURCE is intact in the worktree; a wrong commit mechanism should not discard sound work. Add a regression test (builder emits bare commit → work preserved + cycle proceeds).",
+  "evidence": ".evolve/runs/cycle-965/build-report.md 'Worktree commit was ship-gate-denied (bare ... correctly refused on any branch)'; cycle-state completed=[scout,triage,fault-localization,tdd,retro] (no build/audit).",
+  "files": ["go/internal/phases/build", "go/internal/core/leak_recovery.go", "skills/evolve-builder"],
+  "class": "builder-commit-contract"
+}

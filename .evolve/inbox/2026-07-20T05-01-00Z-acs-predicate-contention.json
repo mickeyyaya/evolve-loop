@@ -1,0 +1,15 @@
+{
+  "id": "acs-predicate-suite-contention-serialization",
+  "title": "ACS predicates that subprocess whole-package `go test -race` flake under fleet contention \u2014 same class PR #340 fixed for the tier gate, unfixed at the predicate layer",
+  "weight_hint": 0.93,
+  "created": "2026-07-20T05:01:00Z",
+  "why": "Cycle-944 no-shipped on EGPS red_count=1: the sole red was TestC944_005_core_race_clean, a predicate that re-runs `go test -race internal/core` as a SUBPROCESS (37s) inside the ACS lane. Under 2-wide fleet contention this is the exact false-RED family PR #340 (3c5ed711) fixed for the integration-tier gate via env-scrub + flock-serialized retake \u2014 but the ACS predicate lane got neither. Such predicates ALSO duplicate the CI-parity tier gate (never_duplicate violation): the tier gate already proves core -race green; a predicate re-proving it adds only flake surface.",
+  "how_to_apply": "Two-part class fix: (1) eval-quality pre-flight (evolve eval quality-check) rejects new predicates that shell out to whole-package go test / -race suites \u2014 predicates must assert specific behavior, not re-run gates; (2) for existing suite-runner predicates, acssuite serializes them through the same adapters/flock tier lock (independent wait) + scrubbed env used by integrationTierCheckDefault, and red->green on retake = WARN-absorb like the tier gate. Re-adjudicate cycle-944's deliverable after (it may be a lost-work salvage).",
+  "evidence": ".evolve/runs/cycle-944/acs-verdict.json results[]: TestC944_005_core_race_clean exit_code=1 'go test -race ... exited 1' with orchestrator workspace-archive noise in stdout \u2014 contention signature",
+  "files": [
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/phases/audit/ciparity.go",
+    "go/internal/evalquality"
+  ],
+  "class": "fleet-contention-false-red"
+}

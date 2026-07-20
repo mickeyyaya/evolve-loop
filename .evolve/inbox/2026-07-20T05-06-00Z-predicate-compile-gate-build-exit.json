@@ -1,0 +1,14 @@
+{
+  "id": "acs-predicate-compile-gate-at-build-exit",
+  "title": "Gate build-phase exit on `go vet ./acs/cycleN/...` compiling \u2014 catch tdd-seam drift (949's undefined WithJudgeModel) in-cycle instead of as an opaque audit FAIL",
+  "weight_hint": 0.91,
+  "created": "2026-07-20T05:06:00Z",
+  "why": "Cycle-949's builder implemented a different API shape than the tdd predicates encoded (never added core.WithJudgeModel), so the predicate package could not compile. Nothing checked predicate compilability until the ACS lane at audit time \u2014 4 phases (test-amplification, coverage-gate, bug-reproduction, audit-narrative) ran and PASSed on work whose acceptance predicates were already un-runnable. A 2-second `go vet ./go/acs/cycleN/...` at build exit fails fast with the exact compiler error, in the phase that can still fix it.",
+  "how_to_apply": "Per phases_are_config_only: add the check to the build phase deliverable contract / phase-gate precondition for build->next transition (Go orchestrator side, config-driven): if go/acs/cycle<N> exists in the worktree, `go vet ./go/acs/cycle<N>/...` must exit 0; non-zero => build-phase RETRY verdict with compiler stderr as the failure reason (fed back to builder). Do NOT run the predicates (that is the audit ACS lane's job) \u2014 compile-only.",
+  "evidence": ".evolve/runs/cycle-949/cycle-state.json completed_phases (10 phases ran); retrospective-stdout.log compile root-cause",
+  "files": [
+    "go/internal/core",
+    "go/internal/phases/build"
+  ],
+  "class": "phase-contract-drift"
+}

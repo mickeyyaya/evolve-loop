@@ -1,16 +1,20 @@
 {
   "id": "verifyreconcile-ctx-cancel-unconditional-sleep",
   "title": "verifyReconcileDeliverable ignores context cancellation: it sleeps reconcileSettleInterval unconditionally between probes, so a cancelled ctx still waits out the full settle window (now ~3s after the cycle-921 widening, was ~600ms). Thread ctx so a cancelled phase stops re-probing immediately.",
-  "weight": 0.6,
+  "weight": 0.86,
   "kind": "bug",
   "root_cause": "go/internal/phases/runner/runner.go verifyReconcileDeliverable (~line 294-301) is a bounded retry loop: `res, verr := b.verifyFn(...); for attempt := 0; attempt < reconcileSettleRetries && (verr != nil || !res.OK); attempt++ { b.sleepFn(reconcileSettleInterval); res, verr = b.verifyFn(...) }`. It takes no context.Context and calls sleepFn unconditionally, so if the surrounding phase ctx is already cancelled (deadline exceeded / operator abort) the loop still sleeps out the remaining window before returning. Pre-existing since the settle-retry was introduced, but the settle-window widening for the verdict-incoherence hotfix (reconcileSettleRetries 3->15, ~600ms->~3s; see verdict-incoherence-why-verify-fails) amplifies the worst-case blocking-after-cancel 5x. Surfaced by go-review of fix/settle-window-late-flush.",
-  "fix": "Thread the phase context.Context into verifyReconcileDeliverable and make the inter-probe wait cancellation-aware: replace the unconditional sleepFn with a select over ctx.Done() and a timer (or check ctx.Err() at the top of each iteration and bail with the last result). Keep the bounded retry count as the non-cancelled ceiling. Do NOT change the OK/not-OK decision or the fail-closed fallback — only stop wasting up to ~3s re-probing a deliverable whose phase is already cancelled.",
+  "fix": "Thread the phase context.Context into verifyReconcileDeliverable and make the inter-probe wait cancellation-aware: replace the unconditional sleepFn with a select over ctx.Done() and a timer (or check ctx.Err() at the top of each iteration and bail with the last result). Keep the bounded retry count as the non-cancelled ceiling. Do NOT change the OK/not-OK decision or the fail-closed fallback \u2014 only stop wasting up to ~3s re-probing a deliverable whose phase is already cancelled.",
   "acceptance": [
     "verifyReconcileDeliverable observes ctx cancellation: a test with an already-cancelled ctx returns promptly (well under reconcileSettleRetries*reconcileSettleInterval) with the last verify result, without exhausting the window.",
     "The existing settle-retry semantics are unchanged when ctx is live: NeverSettles still falls back to stdout after the full bounded window; DeliverableSettlesLate still catches a call-10 settle; GenuineFAILOnDisk still records from file.",
     "go test -race on internal/phases/runner + acs-durable green; go-review clears."
   ],
-  "connects_to": ["verdict-incoherence-why-verify-fails", "system_failure_policy", "quota_reconcile_transient_fix"],
+  "connects_to": [
+    "verdict-incoherence-why-verify-fails",
+    "system_failure_policy",
+    "quota_reconcile_transient_fix"
+  ],
   "source": "go-review of the settle-window hotfix (fix/settle-window-late-flush, cycle-921 verdict-incoherence), finding #2 (non-blocking): the widened window amplifies a pre-existing ctx-unaware sleep.",
   "created_at": "2026-07-18T14:45:00Z"
 }

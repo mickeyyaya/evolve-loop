@@ -1,0 +1,11 @@
+{
+  "id": "loop-must-base-lanes-on-origin-main-not-stale-local",
+  "title": "Loop pins fleet-lane base to LOCAL main; when origin/main advances after boot (or local main diverged), EVERY lane ship is GIT_PUSH_REJECTED — whole batch lands nothing",
+  "weight_hint": 0.95,
+  "created": "2026-07-20T06:15:00Z",
+  "why": "Live 2026-07-20 pipeline-hardening batch: local main (c26dd82a, an unpushed cycle-962 dossier on c37dc324) diverged from origin/main (faec6118, the #342 universal-fallback merge that landed AFTER the loop booted). Fleet lanes based on c26dd82a. cycle-969 wired the inert carryforward/prune CLI, PASSED audit (ACS red=0/206), reached ship — then GIT_PUSH_REJECTED 'origin/main diverged — audited tree must be re-audited on the new base'. Same rejection will hit every PASSing lane, so a healthy batch lands ZERO work (cycles burned). Root: the loop does not fetch/rebase onto origin/main at boot, and tolerates a diverged local main as the lane base.",
+  "how_to_apply": "Boot preflight (looppreflight): git fetch origin <base>; if local base is behind OR diverged from origin/base, HALT loud with the exact reconcile command (evolve sync-main) BEFORE spawning lanes — never boot a batch whose ships are doomed to reject (parallels the SELF_SHA boot halt). Additionally: lanes should branch from origin/<base> (fetched) not local <base>; and the ship-reject path should auto-enqueue an evolve sync-main reconcile at the batch boundary rather than silently preserving on the lane. Add a preflight regression test (diverged local base => halt-with-instruction).",
+  "evidence": ".evolve/runs/cycle-969/ship-error.json code=GIT_PUSH_REJECTED 'origin/main diverged'; git merge-base --is-ancestor c26dd82a origin/main => false",
+  "files": ["go/internal/looppreflight", "go/internal/phases/ship", "go/cmd/evolve"],
+  "class": "stale-base-ship-reject"
+}

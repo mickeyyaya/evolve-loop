@@ -1,0 +1,14 @@
+{
+  "id": "acssuite-relative-evolvedir-litter",
+  "title": "acssuite accepts relative evolveDir/root \u2014 a run with cwd=<worktree>/go littered go/.evolve/runs/cycle-104/ inside the 949 worktree; abs-resolve inputs",
+  "weight_hint": 0.85,
+  "created": "2026-07-20T05:07:00Z",
+  "why": "Found .evolve/worktrees/cycle-21f9f7ae-949/go/.evolve/runs/cycle-104/acs-verdict.json (mtime Jul 20 00:36, TestC104_* advisory predicates, all PASS) \u2014 an acssuite invocation resolved '.evolve' relative to a go/ cwd and wrote a nested phantom tree. Harmless this time, but a relative resolution in the WRITE path means a future gate could also READ from the wrong root, recreating the 949 missing-file class from the other side.",
+  "how_to_apply": "In acssuite.Run/WriteVerdict (and cmd_acs.go arg handling): filepath.Abs + require the evolveDir to end in /.evolve (or resolve via core.ResolveCycleStatePath SSOT); reject/WARN on relative inputs. Add a regression test. Sweep + delete existing go/.evolve litter in worktrees.",
+  "evidence": "ls -la .evolve/worktrees/cycle-21f9f7ae-949/go/.evolve/runs/cycle-104/",
+  "files": [
+    "go/internal/acssuite/acssuite.go",
+    "go/cmd/evolve/cmd_acs.go"
+  ],
+  "class": "path-hermeticity"
+}

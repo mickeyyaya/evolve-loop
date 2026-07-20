@@ -1,19 +1,25 @@
 {
   "id": "evaluate-batch-retry-parity",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.82,
-  "title": "Parallel-evaluate retry loop (dispatchRunnerWithRetry) has silently diverged from the main dispatch loop — missing optionalInfraSkip + postShipObserverSkip added since; MUST close before the parallel-evaluate enforce flip",
+  "weight": 0.87,
+  "title": "Parallel-evaluate retry loop (dispatchRunnerWithRetry) has silently diverged from the main dispatch loop \u2014 missing optionalInfraSkip + postShipObserverSkip added since; MUST close before the parallel-evaluate enforce flip",
   "kind": "bug",
   "priority": "medium",
-  "summary": "core/evaluate_batch.go:84-106 (dormant StageOff, shipped as parallel-eval shadow #311) reimplements the retry core of core/cyclerun_dispatch.go:164-342. Since evaluate_batch was written (2026-06-25), the main loop gained optionalInfraSkip (:222) and postShipObserverSkip (:276) — the parallel path has neither. Its own comment calls this a 'v1 fidelity gap… closed before the enforce flip', but no tracked item existed (this is now that item). If promoted as-is, an infra timeout on an OPTIONAL evaluate phase aborts the whole cycle instead of degrading.",
-  "root_cause": "Two parallel dispatch retry loops with no shared core — each feature added to one silently doesn't land in the other (replicated-beliefs disease, same class as the campaign retro).",
+  "summary": "core/evaluate_batch.go:84-106 (dormant StageOff, shipped as parallel-eval shadow #311) reimplements the retry core of core/cyclerun_dispatch.go:164-342. Since evaluate_batch was written (2026-06-25), the main loop gained optionalInfraSkip (:222) and postShipObserverSkip (:276) \u2014 the parallel path has neither. Its own comment calls this a 'v1 fidelity gap\u2026 closed before the enforce flip', but no tracked item existed (this is now that item). If promoted as-is, an infra timeout on an OPTIONAL evaluate phase aborts the whole cycle instead of degrading.",
+  "root_cause": "Two parallel dispatch retry loops with no shared core \u2014 each feature added to one silently doesn't land in the other (replicated-beliefs disease, same class as the campaign retro).",
   "fix": "Extract the shared retry core: func (cr *cycleRun) retryPhaseRunner(phase, req, opts retryOpts) (PhaseResponse, int, error) where retryOpts is a small Strategy struct carrying the optional hooks (backfill, optionalInfraSkip, shipRecovery, postShipObserverSkip). Main loop passes all hooks; evaluate batch passes the evaluate-appropriate subset (ship recovery disabled). Future features land once.",
   "acceptance": [
-    "RED: TestEvaluateBatch_OptionalInfraTimeoutSkips — optional evaluate phase hitting ErrArtifactTimeout exhaustion degrades (skip) instead of aborting the batch (fails today)",
+    "RED: TestEvaluateBatch_OptionalInfraTimeoutSkips \u2014 optional evaluate phase hitting ErrArtifactTimeout exhaustion degrades (skip) instead of aborting the batch (fails today)",
     "Parity pin: a table test enumerating retryOpts hooks asserts the main loop passes the full set (a new hook added to cyclerun without registering in retryOpts fails compilation or the table)",
     "Existing cyclerun dispatch behavior unchanged (core suite green)",
     "go vet, -race, apicover -enforce green"
   ],
-  "files": ["go/internal/core/cyclerun_dispatch.go", "go/internal/core/evaluate_batch.go"],
-  "connects_to": ["parallel-evaluate enforce flip (phase_timing_evidence NEXT step — this item is its blocker)", "campaign retro: replicated-beliefs disease"]
+  "files": [
+    "go/internal/core/cyclerun_dispatch.go",
+    "go/internal/core/evaluate_batch.go"
+  ],
+  "connects_to": [
+    "parallel-evaluate enforce flip (phase_timing_evidence NEXT step \u2014 this item is its blocker)",
+    "campaign retro: replicated-beliefs disease"
+  ]
 }

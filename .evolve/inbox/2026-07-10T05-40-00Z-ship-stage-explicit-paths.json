@@ -1,7 +1,7 @@
 {
   "id": "ship-stage-explicit-paths",
   "title": "Cycle ship stages the whole worktree: cross-lane untracked files become shippable hazards - stage the build-report's declared paths only",
-  "weight": 0.55,
+  "weight": 0.88,
   "kind": "bugfix",
   "root_cause": "The ship phase auto-stages the entire worktree (git add -A semantics) instead of the paths the cycle actually changed. Under fleet concurrency a worktree can carry another lane's untracked artifacts (cycle 645: TDD-red go/internal/topngate/*_test.go, undefined symbols - committing them would turn main CI red); the same whole-tree behavior bit the operator release flow (attestation STALE unless runtime state is quarantined first). Companion defect: repo-wide graders (go test ./...) go environmentally red from the same pollution even when the cycle's own diff is clean (cycle 645 D-645-GRADER-SCOPE).",
   "evidence": ".evolve/runs/cycle-645/retrospective-report.md (D-645-HYGIENE + D-645-GRADER-SCOPE + root cause 2, flagged SYSTEMIC: cycle-92, cycle-93, warnship_apicover_ci_gap family 413/516-522); stage-lesson-2.yaml pattern another-lanes-untracked-tdd-red-files-in-worktree-plus-whole-tree-ship; operator standing rule git_add_explicit_paths.",

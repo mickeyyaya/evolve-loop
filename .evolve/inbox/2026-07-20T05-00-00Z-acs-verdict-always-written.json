@@ -1,0 +1,14 @@
+{
+  "id": "acs-verdict-always-written-with-reason",
+  "title": "acssuite must ALWAYS write acs-verdict.json \u2014 compile-fail/zero-discovery must produce a red verdict WITH the real reason, never a missing file",
+  "weight_hint": 0.97,
+  "created": "2026-07-20T05:00:00Z",
+  "why": "Cycle-949: the cycle's ACS predicate package failed to COMPILE (undefined: core.WithJudgeModel \u2014 tdd encoded a seam the builder never implemented). acssuite discovered 0 predicates; generateACSVerdict (audit.go:497-501) deliberately writes NOTHING on Total==0 so the missing-file floor FAILs the cycle. The floor held, but the user-visible defect string was 'acs-verdict.json: read: no such file or directory' \u2014 the REAL cause (predicate compile error) was buried in retro logs. Diagnosability failure: every operator/orchestrator layer above saw an opaque infra-looking FAIL and could not distinguish 'predicates red' / 'predicates never compiled' / 'suite crashed'. Same missing-file opacity would fire on any acssuite.Run error.",
+  "how_to_apply": "Root-cause redesign, not workaround: acssuite.Run must return a verdict object in ALL failure modes \u2014 (a) predicate package compile failure => verdict with red_count>=1 and a synthetic result {ac_id: cycleN/COMPILE, result: red, evidence_excerpt: <compiler stderr>}; (b) zero predicates discovered => verdict with an explicit zero_predicates:true marker (floor still FAILs \u2014 no auto-pass \u2014 but the reason is in the artifact); (c) generateACSVerdict always calls WriteVerdict. Update the audit gate + detectVerdictIncoherence to read the reason from the artifact. Keep the EGPS red_count==0 ship rule unchanged.",
+  "evidence": ".evolve/runs/cycle-949/audit-fail-reason.json (sole reason = file-not-found); .evolve/runs/cycle-949/retrospective-stdout.log ('Root cause confirmed. The cycle-949 acs predicate package fails to compile: undefined: core.WithJudgeModel'); go/internal/phases/audit/audit.go:483-508",
+  "files": [
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/phases/audit/audit.go"
+  ],
+  "class": "verdict-diagnosability"
+}

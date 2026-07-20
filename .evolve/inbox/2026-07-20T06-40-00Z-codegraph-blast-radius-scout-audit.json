@@ -1,0 +1,11 @@
+{
+  "id": "codegraph-blast-radius-context-for-scout-audit-review",
+  "title": "Build a Go code-graph (tree-sitter→SQLite) with blast-radius impact analysis to scope scout/audit/review context — cut token cost + raise precision (ref: github.com/tirth8205/code-review-graph)",
+  "weight_hint": 0.82,
+  "created": "2026-07-20T06:40:00Z",
+  "why": "Operator 2026-07-20: build our own feature (referencing github.com/tirth8205/code-review-graph) to optimize code search/review/scout effort + efficiency. That project builds a persistent knowledge graph (tree-sitter AST → SQLite: functions/classes/imports + call/inherit/test-coverage edges) and does BLAST-RADIUS analysis: when a diff touches a file, it traces callers/dependents/tests and feeds the AI only that minimal set — claimed ~82x median token reduction vs whole-corpus, 0.71 impact F1. For evolve-loop this directly attacks scout (discovery reads whole subsystems today), audit/adversarial-review (re-reads changed files' context), and carry-forward/merge conflict scoping. NOTE: the reference is Python; go_only_all_tooling REQUIRES a Go build — this is inspiration, not adoption.",
+  "how_to_apply": "Go implementation, phased: (S1) tree-sitter Go bindings (smacker/go-tree-sitter) → extract symbols+edges for the repo's Go (+ later multi-lang) into a SQLite graph under .evolve/codegraph/ (gitignored runtime state, incremental on file mtime). (S2) impact API: given a diff/changed-files set, BFS callers+dependents+covering-tests → minimal context set; expose as `evolve codegraph impact <paths>` and an internal seam. (S3) wire into scout (impact-scoped discovery for bugfix cycles), audit/adversarial-review (context = blast radius of build's diff, not whole files), and carryforward filter (real dependency check). Measure token delta via existing token-telemetry. Guard: graph staleness must fail-open to today's grep/read behavior, never block a cycle. Deep/top planning of this feature uses opus + fable overlay.",
+  "evidence": "WebFetch github.com/tirth8205/code-review-graph 2026-07-20: blast-radius impact, tree-sitter, SQLite FTS5, MCP 30 tools incl get_impact_radius_tool, 82x median token reduction, incremental <2s.",
+  "files": ["go/internal/codegraph", "go/cmd/evolve", "go/internal/phases/scout", "go/internal/phases/audit"],
+  "class": "efficiency-feature"
+}

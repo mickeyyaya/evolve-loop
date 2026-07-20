@@ -1,12 +1,23 @@
 {
   "id": "worktree-path-propagation-fallback",
   "created_at": "2026-07-17T21:05:00Z",
-  "weight": 0.55,
-  "title": "WORKTREE_PATH degrades to ProjectRoot (repo root) on the tmux phase path — req.Worktree ≠ the actual cycle worktree; audit every consumer of BridgeRequest.Worktree for silent mis-scoping",
+  "weight": 0.86,
+  "title": "WORKTREE_PATH degrades to ProjectRoot (repo root) on the tmux phase path \u2014 req.Worktree \u2260 the actual cycle worktree; audit every consumer of BridgeRequest.Worktree for silent mis-scoping",
   "kind": "bug",
   "priority": "low",
-  "summary": "Root-cause byproduct of the token-telemetry attribution fix: on the default tmux phase path the transcript's recorded cwd is the real cycle worktree (.evolve/worktrees/cycle-N) but req.Worktree (← WORKTREE_PATH ← env) was NOT that path — subagent/run.go:290 falls back worktreePath=req.ProjectRoot (repo root) when WORKTREE_PATH is empty. The token resolver was the visible victim (exact cwd==Worktree attribution failed → zero input/cache telemetry), now fixed by keying on ArtifactPath instead. But other consumers of BridgeRequest.Worktree / Window.Worktree may be silently mis-scoped by the same degraded value. Investigate: does the orchestrator export WORKTREE_PATH with the provisioned worktree to `evolve subagent run`, or does it rely on cwd only? Fix at the propagation source (export the real worktree) OR make the fallback loud (WARN when it fires) rather than silently substituting ProjectRoot. TDD: a launch whose orchestrator provisions worktree W must yield req.Worktree==W, not ProjectRoot.",
-  "acceptance": ["req.Worktree equals the provisioned cycle worktree on the tmux phase path (not ProjectRoot)", "the ProjectRoot fallback either cannot fire for real launches or emits a visible WARN when it does", "no other Worktree consumer silently mis-scopes"],
-  "files": ["go/internal/subagent/run.go", "go/internal/subagent/validateprofile.go", "go/cmd/evolve/cmd_subagent.go", "orchestrator dispatch that spawns `evolve subagent run`"],
-  "connects_to": ["the ArtifactPath-primary attribution fix (this made the mis-propagation visible)"]
+  "summary": "Root-cause byproduct of the token-telemetry attribution fix: on the default tmux phase path the transcript's recorded cwd is the real cycle worktree (.evolve/worktrees/cycle-N) but req.Worktree (\u2190 WORKTREE_PATH \u2190 env) was NOT that path \u2014 subagent/run.go:290 falls back worktreePath=req.ProjectRoot (repo root) when WORKTREE_PATH is empty. The token resolver was the visible victim (exact cwd==Worktree attribution failed \u2192 zero input/cache telemetry), now fixed by keying on ArtifactPath instead. But other consumers of BridgeRequest.Worktree / Window.Worktree may be silently mis-scoped by the same degraded value. Investigate: does the orchestrator export WORKTREE_PATH with the provisioned worktree to `evolve subagent run`, or does it rely on cwd only? Fix at the propagation source (export the real worktree) OR make the fallback loud (WARN when it fires) rather than silently substituting ProjectRoot. TDD: a launch whose orchestrator provisions worktree W must yield req.Worktree==W, not ProjectRoot.",
+  "acceptance": [
+    "req.Worktree equals the provisioned cycle worktree on the tmux phase path (not ProjectRoot)",
+    "the ProjectRoot fallback either cannot fire for real launches or emits a visible WARN when it does",
+    "no other Worktree consumer silently mis-scopes"
+  ],
+  "files": [
+    "go/internal/subagent/run.go",
+    "go/internal/subagent/validateprofile.go",
+    "go/cmd/evolve/cmd_subagent.go",
+    "orchestrator dispatch that spawns `evolve subagent run`"
+  ],
+  "connects_to": [
+    "the ArtifactPath-primary attribution fix (this made the mis-propagation visible)"
+  ]
 }

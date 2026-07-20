@@ -1,7 +1,7 @@
 {
   "id": "goal-stall-escalation",
   "title": "Goal-scheduler re-dispatches stalled goals forever: >=3 consecutive empty/blocked dossiers must escalate, not repeat (goal 805f6ced: 4 wasted pipelines)",
-  "weight": 0.87,
+  "weight": 0.86,
   "kind": "feature",
   "root_cause": "No goal-level stall detection exists. When a goal_hash keeps producing empty or blocked dossiers (nothing shipped), the scheduler re-dispatches identical work with no re-scope, split, or flag: goal_hash 805f6ced... burned 4 full pipelines in one batch (cycles 640/642/643/644) landing nothing. Same no-escalation shape as the self-sha recurrence family (cycles 630/632/634, '6th/7th/8th occurrence') and cycle-630 fleet-scope P0 drop - failures repeat under one identity because nothing counts them at the goal layer.",
   "evidence": ".evolve/runs/cycle-644/retrospective-report.md (D5 + systemic axis 2); .evolve/instincts/lessons/cycle-644-goalhash-stall-four-empty-dossiers-no-escalation.yaml; dossiers for cycles 640/642/643/644 (empty/blocked, same goal_hash).",
@@ -12,7 +12,11 @@
     "Threshold read from policy.json with compiled default 3 (policy-absent case covered by test)",
     "go test -race on touched packages PASS; apicover clean"
   ],
-  "connects_to": ["retro-preventive-actions-autofile-inbox", "fleet-lane-provisioning-split", "builder-task-binding-topn-gate"],
+  "connects_to": [
+    "retro-preventive-actions-autofile-inbox",
+    "fleet-lane-provisioning-split",
+    "builder-task-binding-topn-gate"
+  ],
   "source": "operator-injection from cycle-644 retrospective preventive actions",
   "created_at": "2026-07-10T05:12:00Z"
 }

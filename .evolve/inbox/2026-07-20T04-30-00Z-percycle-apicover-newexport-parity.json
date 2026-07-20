@@ -1,0 +1,15 @@
+{
+  "id": "percycle-audit-apicover-newexport-parity",
+  "title": "Per-cycle audit must fail a cycle that adds an exported symbol with no naming test / 0% coverage \u2014 repo-wide apicover per-package hard-fail is the delayed detector, and it turned main RED after cycle-960 shipped 3 orphaned internal/core exports",
+  "weight_hint": 0.94,
+  "created": "2026-07-20T04:30:00Z",
+  "why": "Cycle-960 (504bc913) added carryforward_filter.go + prune_superseded_orphans.go exporting CarryforwardCandidateLandable, PruneSupersededOrphans, and the OrphanVerdict type \u2014 with ZERO tests naming them. The cycle SHIPPED: the per-cycle audit's CI-parity apicover check runs CHANGED-SCOPE (only symbols in the diff, plus a new-package graduation grace) and green-lit it. But the repo-wide `go` workflow enforces apicover PER-PACKAGE HARD-FAIL (every exported symbol in the package), so on push main's `go` workflow went RED ('UNCOVERED (no test names it): 3'). This is the recurring warnship_apicover_ci_gap class (#288/#313, ADR-0069): the per-cycle gate and the repo-wide gate disagree on scope, so a cycle can ship green and STILL red-line main \u2014 which then blocks EVERY subsequent PR (universal-fallback #342 and the scout-goalhash fix both inherited the red) and stalls the operator's 4-ship release gate. Delayed detection = the whole point of the parity gate (ADR-0069) is defeated for apicover specifically.",
+  "how_to_apply": "Close the scope gap in the per-cycle audit's apicover check (internal/phases/audit/ciparity.go apicoverEnforceChanged* path): when a cycle's diff ADDS an exported symbol to a package that is already on the .apicover-enforce list, run the SAME per-package hard-fail apicover the repo-wide `go` workflow runs on that touched package (named-by-test AST AND >0% executed coverage, -tags integration), not just changed-scope. A newly-exported-but-unnamed/uncovered symbol must FAIL the cycle audit at build time \u2014 before ship \u2014 so the author adds the naming test in-cycle. Reuse bin/apicover -enforce; the touched-package list already exists in the audit. Keep the new-package graduation grace for brand-new packages not yet on the enforce list, but a symbol added to an ALREADY-enforced package gets no grace.",
+  "evidence": "go workflow run 29715145940 (2026-07-20) job 'api-coverage enforce (apicover; per-package hard-fail, Phase 5)': '== .../internal/core ==\\nUNCOVERED (no test names it): 3\\n  func CarryforwardCandidateLandable (carryforward_filter.go)\\n  func PruneSupersededOrphans (prune_superseded_orphans.go)\\n  type OrphanVerdict (prune_superseded_orphans.go)'. main HEAD 504bc913 `go` workflow conclusion=failure while its `CI` workflow conclusion=success (the two-workflow split that hid it from the cycle audit).",
+  "files": [
+    "go/internal/phases/audit/ciparity.go",
+    "go/cmd/apicover/main.go",
+    "go/.apicover-enforce"
+  ],
+  "class": "warnship-apicover-ci-gap"
+}

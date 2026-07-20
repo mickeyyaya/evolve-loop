@@ -1,0 +1,11 @@
+{
+  "id": "reset-sha-pins-invoker-not-boot-artifact",
+  "title": "reset-sha -operator pins the INVOKING binary's hash, not the boot-verified go/bin/evolve — the documented SELF_SHA self-heal recipe silently fails when run via the stale tracked go/evolve",
+  "weight_hint": 0.86,
+  "created": "2026-07-20T05:30:00Z",
+  "why": "Live repro 2026-07-20: after `make -C go build`, `go/evolve reset-sha -operator` re-pinned 6d6a5d->6d6a5d (its OWN stale hash) while boot verifies go/bin/evolve (3f4190ad) -> second SELF_SHA_TAMPERED boot halt with a 'followed the recipe, still halted' operator experience. Only `go/bin/evolve reset-sha -operator` converged. The runtime-reference recipe (make build -> reset-sha -> relaunch) does not name WHICH binary must run reset-sha, and the wrong-but-obvious choice diverges silently.",
+  "how_to_apply": "reset-sha must pin the artifact boot verifies (sha256 of <project-root>/go/bin/evolve read from DISK), never the invoker's self-hash; if the on-disk file is absent, fail loud naming the path. Add a regression test (invoke via a copied stale binary; assert pin == disk artifact hash). Update runtime-reference.md self-heal recipe to name go/bin/evolve explicitly.",
+  "evidence": "Session 2026-07-20: bq70bi9qs boot halt (expected 6d6a5d vs on-disk 3f4190ad) immediately after `go/evolve reset-sha -operator` printed 're-pinned 6d6a5d -> 6d6a5d'.",
+  "files": ["go/cmd/evolve", "docs/operations/runtime-reference.md"],
+  "class": "self-heal-recipe-divergence"
+}

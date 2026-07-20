@@ -1,7 +1,7 @@
 {
   "id": "auditor-tier-cascade",
   "created_at": "2026-07-06T02:10:00Z",
-  "weight": 0.84,
+  "weight": 0.87,
   "title": "Auditor tier cascade (FrugalGPT pattern): cheap-tier first audit pass, escalate to deep-tier ONLY on uncertainty/flags - audit family is the measured token hog (~59% of agentic-SWE pipeline tokens)",
   "kind": "feature",
   "priority": "medium",

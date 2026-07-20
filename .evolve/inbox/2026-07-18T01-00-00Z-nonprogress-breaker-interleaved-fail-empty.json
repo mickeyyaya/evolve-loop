@@ -1,14 +1,14 @@
 {
   "id": "nonprogress-breaker-interleaved-fail-empty",
   "created_at": "2026-07-18T01:00:00Z",
-  "weight": 0.7,
-  "title": "Interleaved FAIL/EMPTY goal escapes BOTH breakers: consecutive-FAIL breaker resets on an EMPTY cycle, goal-stall breaker resets on a FAIL — a goal alternating FAIL,EMPTY,FAIL,EMPTY lands nothing forever, caught by neither. Add a combined consecutive-NON-SHIPPING breaker.",
+  "weight": 0.87,
+  "title": "Interleaved FAIL/EMPTY goal escapes BOTH breakers: consecutive-FAIL breaker resets on an EMPTY cycle, goal-stall breaker resets on a FAIL \u2014 a goal alternating FAIL,EMPTY,FAIL,EMPTY lands nothing forever, caught by neither. Add a combined consecutive-NON-SHIPPING breaker.",
   "kind": "bug",
   "campaign": "pipeline-stability",
   "priority": "medium",
-  "summary": "Surfaced in the 2026-07-18 go-review of goal-stall-escalation. The loop now has two independent non-progress breakers, each keyed to ONE outcome class: consecutiveFailBreaker (cmd_loop_control.go) counts consecutive core.VerdictFAIL and HALTS the batch at maxConsecutiveFails; goalStallTracker (cmd_loop_goalstall.go) counts consecutive EMPTY/BLOCKED (SkippedUnknown/SkippedAuditAdvisory) and self-files+continues at the threshold. Each RESETS on the other's outcome. So a goal that alternates FAIL, EMPTY, FAIL, EMPTY, … resets BOTH counters every cycle and crosses NEITHER threshold — it burns pipelines indefinitely while landing nothing, which is exactly the class both breakers exist to stop.",
+  "summary": "Surfaced in the 2026-07-18 go-review of goal-stall-escalation. The loop now has two independent non-progress breakers, each keyed to ONE outcome class: consecutiveFailBreaker (cmd_loop_control.go) counts consecutive core.VerdictFAIL and HALTS the batch at maxConsecutiveFails; goalStallTracker (cmd_loop_goalstall.go) counts consecutive EMPTY/BLOCKED (SkippedUnknown/SkippedAuditAdvisory) and self-files+continues at the threshold. Each RESETS on the other's outcome. So a goal that alternates FAIL, EMPTY, FAIL, EMPTY, \u2026 resets BOTH counters every cycle and crosses NEITHER threshold \u2014 it burns pipelines indefinitely while landing nothing, which is exactly the class both breakers exist to stop.",
   "root_cause": "The two breakers partition the non-shipping outcomes (FAIL vs EMPTY/BLOCKED) into disjoint counters instead of tracking the union. 'Landed nothing this cycle' is the real signal (FAIL, EMPTY, and BLOCKED all ship nothing); splitting it across two consecutive-counters means an interleaving of the two classes never accumulates in either.",
-  "fix": "Add a THIRD counter (or generalize one) that counts consecutive NON-SHIPPING cycles regardless of class — i.e. any FinalVerdict that is not PASS and not SHIPPED_VIA_BUILD. On its (config-driven) threshold, escalate the SAME way goal-stall does (self-file a weighted inbox todo naming the goal + the mix of block/fail reasons, emit an abnormal-event) — never_stop_queue_inject_inbox, so escalate-and-continue, do not blanket-halt (the consecutive-FAIL breaker already owns the hard-halt decision for pure-FAIL streaks). Reuse the goalStallTracker shape (reasons already collected). Config: a `goal_stall.nonprogress_threshold` (compiled default e.g. 5, higher than the pure-EMPTY threshold since a mix is noisier). Regression test: FAIL,EMPTY,FAIL,EMPTY,FAIL with threshold 5 escalates on the 5th; a single PASS anywhere in the run resets it.",
+  "fix": "Add a THIRD counter (or generalize one) that counts consecutive NON-SHIPPING cycles regardless of class \u2014 i.e. any FinalVerdict that is not PASS and not SHIPPED_VIA_BUILD. On its (config-driven) threshold, escalate the SAME way goal-stall does (self-file a weighted inbox todo naming the goal + the mix of block/fail reasons, emit an abnormal-event) \u2014 never_stop_queue_inject_inbox, so escalate-and-continue, do not blanket-halt (the consecutive-FAIL breaker already owns the hard-halt decision for pure-FAIL streaks). Reuse the goalStallTracker shape (reasons already collected). Config: a `goal_stall.nonprogress_threshold` (compiled default e.g. 5, higher than the pure-EMPTY threshold since a mix is noisier). Regression test: FAIL,EMPTY,FAIL,EMPTY,FAIL with threshold 5 escalates on the 5th; a single PASS anywhere in the run resets it.",
   "acceptance": [
     "A goal alternating FAIL/EMPTY for `nonprogress_threshold` cycles escalates (self-files + abnormal-event), where today neither breaker fires.",
     "A shipping cycle (PASS / SHIPPED_VIA_BUILD) resets the non-progress counter.",
@@ -22,7 +22,7 @@
   ],
   "connects_to": [
     "goal-stall-escalation (the EMPTY/BLOCKED-only breaker this generalizes)",
-    "the consecutive-FAIL breaker (cmd_loop_control.go — pure-FAIL hard-halt)"
+    "the consecutive-FAIL breaker (cmd_loop_control.go \u2014 pure-FAIL hard-halt)"
   ],
-  "notes": "The fleet (Count>1) path also does not run these sequential-loop breakers at all (the wave/pool path continues before RunCycle) — a separate, pre-existing coverage gap the same review flagged; track under fleet-loop-breaker-parity if it recurs. Diagnostic-only escalation, never a blanket halt."
+  "notes": "The fleet (Count>1) path also does not run these sequential-loop breakers at all (the wave/pool path continues before RunCycle) \u2014 a separate, pre-existing coverage gap the same review flagged; track under fleet-loop-breaker-parity if it recurs. Diagnostic-only escalation, never a blanket halt."
 }

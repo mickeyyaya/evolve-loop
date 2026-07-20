@@ -1,0 +1,11 @@
+{
+  "id": "ship-addall-staging-surface",
+  "title": "Ship's main-tree `git add -A` stages arbitrary residue (forged specs, leaked artifacts) into cycle commits — narrow to an explicit-path/manifest-driven stage",
+  "weight_hint": 0.89,
+  "created": "2026-07-20T18:12:00Z",
+  "why": "SECURITY-REVIEW-CONFIRMED (ADR-0073 review): internal/phases/ship/gitops.go:228 runs `git add -A` on the MAIN tree at ship time, so ANY untracked residue present at that moment — a smuggled .evolve/phases spec (tracked-by-gitignore-re-include), an aborted cycle's leak residue, cross-lane junk — is silently staged and committed with zero operator-visible signal. Also previously observed benignly: 'ship auto-stages ALL -> commit-gate STALE' gotcha (2026-07-17) and churn-discard nuking untracked main-tree files (2026-07-17). One staging chokepoint, several failure classes.",
+  "how_to_apply": "Replace the blanket -A with an explicit staging set derived from the cycle's declared deliverables (worktree merge set + dossier + .evolve tracked re-includes actually produced THIS cycle). Anything else present must be listed loudly in the ship report as UNSTAGED RESIDUE (fail-loud inventory, not silent adoption). Coordinate with the commit-prefix-scope manifest (internal/commitprefixgate) so prefix rules and staging agree. TDD: a planted untracked .evolve/phases/foreign/phase.json at ship time must NOT land in the cycle commit and MUST appear in the residue inventory.",
+  "evidence": "go/internal/phases/ship/gitops.go:228; .gitignore:87-95 (phases re-include makes smuggles committable); ADR-0073 security-review Finding 1 downstream trace; memory gotchas 2026-07-17 (auto-stage STALE, churn-discard).",
+  "files": ["go/internal/phases/ship/gitops.go", "go/internal/commitprefixgate/"],
+  "class": "ship-staging-integrity"
+}

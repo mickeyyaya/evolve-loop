@@ -1,7 +1,7 @@
 {
   "id": "scout-carryforward-real-cherrypick-filter",
   "title": "Scout carryforward candidate filter uses bare `git merge-tree` (reports clean on real conflicts) \u2014 mis-selects already-superseded orphan branches, wasting operator-prioritized rebase cycles; use a real cherry-pick dry-run + functional-duplicate screen",
-  "weight": 0.94,
+  "weight": 0.85,
   "kind": "defect",
   "priority": "high",
   "campaign": "merge-efficiency-2026-07",

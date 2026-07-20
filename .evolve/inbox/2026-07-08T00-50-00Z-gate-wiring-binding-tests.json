@@ -1,18 +1,26 @@
 {
   "id": "gate-wiring-binding-tests",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.85,
-  "title": "Two gate-wiring blind spots: ship-gate attestation READER has no writer↔reader binding test (stale attestation would be accepted), and evalgate.qualityGate can be removed from NewReviewer without any test failing",
+  "weight": 0.9,
+  "title": "Two gate-wiring blind spots: ship-gate attestation READER has no writer\u2194reader binding test (stale attestation would be accepted), and evalgate.qualityGate can be removed from NewReviewer without any test failing",
   "kind": "test",
   "priority": "high",
-  "summary": "(1) commitgate writes attestation.json (commitgate.go:194-200, mutation-verified strong: gremlins 24 killed/0 survived in-package) but the ENFORCER in phases/ship/commitgate.go has no test binding the pair: nothing pins that a stale tree_state_sha is rejected or that a missing/corrupt attestation blocks ship — the two packages are only tested in isolation. (2) evalgate/gates_test.go:111-160 tests qualityGate{}.check() directly, never through NewReviewer().Review(); TestFloorBindingGate_WiredIntoReviewer exists (floorbinding_test.go:219) but has no qualityGate equivalent — deleting qualityGate from the reviewer's gates slice passes the whole suite, silently re-admitting tautological evals (the exact defect the gate was built for).",
-  "root_cause": "Per-package coverage discipline (apicover) verifies units; nothing forces cross-package/wiring binding tests for gate enforce paths — mutation testing within one package cannot see a severed wire.",
-  "fix": "Test-only cycle: (1) TestShipGate_StaleAttestationBlocked — write attestation for tree SHA X, mutate a file (tree Y), invoke the ship-gate reader, assert block; twins: fresh attestation passes, missing attestation blocks. (2) TestQualityGate_WiredIntoReviewer mirroring the floor-binding pattern + TestNewReviewer_TautologyEvalBlocksAtEnforce end-to-end. No production changes expected; if the stale-attestation test FAILS as red against current code semantics, that graduates to a P0 production fix in the same cycle.",
+  "summary": "(1) commitgate writes attestation.json (commitgate.go:194-200, mutation-verified strong: gremlins 24 killed/0 survived in-package) but the ENFORCER in phases/ship/commitgate.go has no test binding the pair: nothing pins that a stale tree_state_sha is rejected or that a missing/corrupt attestation blocks ship \u2014 the two packages are only tested in isolation. (2) evalgate/gates_test.go:111-160 tests qualityGate{}.check() directly, never through NewReviewer().Review(); TestFloorBindingGate_WiredIntoReviewer exists (floorbinding_test.go:219) but has no qualityGate equivalent \u2014 deleting qualityGate from the reviewer's gates slice passes the whole suite, silently re-admitting tautological evals (the exact defect the gate was built for).",
+  "root_cause": "Per-package coverage discipline (apicover) verifies units; nothing forces cross-package/wiring binding tests for gate enforce paths \u2014 mutation testing within one package cannot see a severed wire.",
+  "fix": "Test-only cycle: (1) TestShipGate_StaleAttestationBlocked \u2014 write attestation for tree SHA X, mutate a file (tree Y), invoke the ship-gate reader, assert block; twins: fresh attestation passes, missing attestation blocks. (2) TestQualityGate_WiredIntoReviewer mirroring the floor-binding pattern + TestNewReviewer_TautologyEvalBlocksAtEnforce end-to-end. No production changes expected; if the stale-attestation test FAILS as red against current code semantics, that graduates to a P0 production fix in the same cycle.",
   "acceptance": [
     "RED-first: both wiring tests written and observed failing via temporary severing (comment-out gate / bypass reader) then green against real wiring",
     "Stale-attestation, missing-attestation, and fresh-attestation triangle all pinned",
     "go vet, -race, apicover -enforce green"
   ],
-  "files": ["go/internal/phases/ship/commitgate.go", "go/internal/commitgate/commitgate.go", "go/internal/evalgate/reviewer.go", "go/internal/evalgate/gates_test.go"],
-  "connects_to": ["commit-gate attestation family", "eval-quality pre-flight (bypass-mode invariant 7)"]
+  "files": [
+    "go/internal/phases/ship/commitgate.go",
+    "go/internal/commitgate/commitgate.go",
+    "go/internal/evalgate/reviewer.go",
+    "go/internal/evalgate/gates_test.go"
+  ],
+  "connects_to": [
+    "commit-gate attestation family",
+    "eval-quality pre-flight (bypass-mode invariant 7)"
+  ]
 }

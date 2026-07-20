@@ -1,17 +1,17 @@
 {
   "id": "adr0072-s5-task-quarantine",
   "created_at": "2026-07-17T14:31:00Z",
-  "weight": 0.85,
-  "title": "ADR-0072 S5: task-level failure memory + quarantine — stop re-picking a poison todo after task_retry_ceiling instead of releasing it back to inbox root every cycle",
+  "weight": 0.87,
+  "title": "ADR-0072 S5: task-level failure memory + quarantine \u2014 stop re-picking a poison todo after task_retry_ceiling instead of releasing it back to inbox root every cycle",
   "kind": "feature",
   "campaign": "system-failure-policy",
   "priority": "high",
-  "summary": "The system-level halt (S3) covers pipeline failures. S5 covers the softer TASK-level case: an inbox item that genuinely fails on task grounds (real build/audit defect) is today released back to .evolve/inbox root on every cycle failure (inboxmover.ReleaseCycleProcessing) with NO memory of why — so triage re-selects it forever. Give the inbox item a durable failure memory and quarantine it after failure_policy.thresholds.task_retry_ceiling, so the loop stops burning tokens on one poison task while continuing other work (never_stop preserved for the healthy backlog).",
-  "root_cause": "internal/inboxmover has no per-item failure count; internal/phases/triage reads .evolve/inbox root fresh every cycle. The CyclesUnpicked counter in cyclestate/state.go is DEAD (never incremented — confirmed by the ADR-0072 architecture map). So a task-level poison todo has no cooldown or ceiling.",
-  "fix": "(1) Inbox item gains a durable failureHistory: [{cycle, classification, verdict}] written by inboxmover.Promote/Release on a task-level failure. (2) When an item's failure count reaches failure_policy.thresholds.task_retry_ceiling (already in policy, default 2), inboxmover routes it to .evolve/inbox/quarantine/ (with the diagnostic) instead of back to root — triage stops selecting it. (3) Wire the dead CyclesUnpicked with real increment semantics OR replace it with the failureHistory count. (4) An operator command to list/release quarantined items (evolve inbox quarantine). Config-driven via the shipped failure_policy block; zero new flags.",
+  "summary": "The system-level halt (S3) covers pipeline failures. S5 covers the softer TASK-level case: an inbox item that genuinely fails on task grounds (real build/audit defect) is today released back to .evolve/inbox root on every cycle failure (inboxmover.ReleaseCycleProcessing) with NO memory of why \u2014 so triage re-selects it forever. Give the inbox item a durable failure memory and quarantine it after failure_policy.thresholds.task_retry_ceiling, so the loop stops burning tokens on one poison task while continuing other work (never_stop preserved for the healthy backlog).",
+  "root_cause": "internal/inboxmover has no per-item failure count; internal/phases/triage reads .evolve/inbox root fresh every cycle. The CyclesUnpicked counter in cyclestate/state.go is DEAD (never incremented \u2014 confirmed by the ADR-0072 architecture map). So a task-level poison todo has no cooldown or ceiling.",
+  "fix": "(1) Inbox item gains a durable failureHistory: [{cycle, classification, verdict}] written by inboxmover.Promote/Release on a task-level failure. (2) When an item's failure count reaches failure_policy.thresholds.task_retry_ceiling (already in policy, default 2), inboxmover routes it to .evolve/inbox/quarantine/ (with the diagnostic) instead of back to root \u2014 triage stops selecting it. (3) Wire the dead CyclesUnpicked with real increment semantics OR replace it with the failureHistory count. (4) An operator command to list/release quarantined items (evolve inbox quarantine). Config-driven via the shipped failure_policy block; zero new flags.",
   "acceptance": [
     "A task failing task_retry_ceiling times is routed to .evolve/inbox/quarantine/ and is NOT visible to the next cycle's triage (test).",
-    "Other inbox items keep flowing (the loop does not stop) — only the poison task is quarantined (test).",
+    "Other inbox items keep flowing (the loop does not stop) \u2014 only the poison task is quarantined (test).",
     "Quarantined item carries the failure diagnostic (why quarantined).",
     "System-level halt (S3) still takes precedence over task quarantine when both apply.",
     "go vet, -race on internal/inboxmover, no regression in inbox lifecycle tests."
@@ -23,7 +23,7 @@
   ],
   "connects_to": [
     "docs/architecture/adr/0072-system-failure-policy-and-halt.md (S5)",
-    "d531fc32 (deterministic floor, shipped — failure_policy.thresholds.task_retry_ceiling already exists)",
+    "d531fc32 (deterministic floor, shipped \u2014 failure_policy.thresholds.task_retry_ceiling already exists)",
     "adr0072-s4-orchestrator-failure-judgment"
   ],
   "notes": "This is the task-level half of 'don't keep retrying the same todo'. The system-level half (halt on a broken pipeline) already shipped in d531fc32. Quarantine != halt: quarantine one task and keep going; halt stops the whole loop for a pipeline fault."

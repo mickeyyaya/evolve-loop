@@ -1,0 +1,14 @@
+{
+  "id": "salvage-949-advisor-judge-skill-overlay",
+  "title": "Salvage cycle-949's advisor/judge skill-overlay injection (audit-PASS narrative, FAILed only on predicate compile) \u2014 add the WithJudgeModel seam tdd encoded",
+  "weight_hint": 0.91,
+  "created": "2026-07-20T05:04:00Z",
+  "why": "Cycle-949 wired policy-resolved skill-overlay injection into the three non-phase advisor/judge dispatch sites (PhaseAdvisor.advisorLaunch, FailureAdvisor.Advise, PlanJudge.GradePlan) so deep/top-tier advisor/judge launches receive the fable overlay that runner.go already injects for phase dispatch. The audit narrative was PASS ('additive, tier-gated, fully verified') but the cycle FAILed because the tdd predicates referenced a core.WithJudgeModel seam the builder never added \u2014 the predicate package could not compile, acs-verdict.json was never written, and the missing-file floor FAILed the cycle. The work sits in worktree cycle-21f9f7ae-949, unlanded. OPERATOR PRIORITY 2026-07-20: deep/top phase agents should run opus/pro-class models with the fable skill overlay for planning/audit \u2014 this is exactly that wiring.",
+  "how_to_apply": "Re-derive on a fresh branch off main: (1) port the 3-site overlay injection from the 949 worktree diff; (2) ADD the core.WithJudgeModel functional option the predicates expect (or regenerate predicates against the real seam \u2014 prefer adding the seam: it is the documented tdd contract); (3) predicates must compile at build exit (see acs-verdict-always-written item). Verify with the standard suite + tier chains (deep/top => opus per model-catalog pin).",
+  "evidence": ".evolve/runs/cycle-949/audit-report.md (PASS narrative naming the 3 sites); retrospective-stdout.log (undefined: core.WithJudgeModel); worktree .evolve/worktrees/cycle-21f9f7ae-949 still on disk",
+  "files": [
+    "go/internal/core",
+    "go/internal/phases/runner/runner.go"
+  ],
+  "class": "lost-work-salvage"
+}

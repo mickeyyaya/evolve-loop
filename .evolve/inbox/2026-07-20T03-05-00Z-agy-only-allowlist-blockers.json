@@ -1,0 +1,18 @@
+{
+  "id": "agy-only-allowlist-excludes-agy-for-3-phases",
+  "title": "agy-only readiness: tester + tdd-engineer (allowed_clis=[claude]) and builder (=[claude,codex]) hard-exclude agy, so setup.Recommend cannot route them to agy and the preflight HALTs in an agy-only environment",
+  "weight_hint": 0.86,
+  "created": "2026-07-20T03:05:00Z",
+  "why": "Verified live 2026-07-20 in .evolve/profiles: tester.json + tdd-engineer.json pin allowed_clis:[claude]; builder.json pins [claude,codex]. In an agy-only env setup.Recommend.chooseCLI finds an empty poolFor(allowed,avail) for these phases, keeps prefBase=claude with an 'advisory' warn, and the loop preflight checkLLMCLIStatus then HALTs because the claude binary is absent. Operator is standing up a COMPLETELY ISOLATED agy environment \u2014 these three allowlists make it unrunnable even after `evolve setup`. SECURITY REVIEW (2026-07-20, universal-fallback PR): widening these 3 profiles' allowed_clis to include agy was REVERTED \u2014 it (a) contradicts the standing [no_agy_fallback] operator rule + builder.json's own _note ('agy removed 2026-06-07... banned per operator'), and (b) has a blast radius beyond universal-fallback: allowed_clis ALSO gates policy.ValidatePin, so adding agy silently lets an operator PIN these safety-critical phases (RED-phase test writing) to agy. The runtime universal-fallback feature SHIPPED without the profile change \u2014 it already routes the 14 all-wildcard phases to agy on an agy-only host; only tester/tdd-engineer/builder stay claude-restricted by design.",
+  "how_to_apply": "OPERATOR DECISION (needs explicit sign-off \u2014 touches a standing rule): to make tester/tdd-engineer/builder runnable on an agy-only host, EITHER (a) explicitly lift the agy ban for these phases \u2014 add agy to allowed_clis AND update the stale _note fields explaining why the safety-critical RED-phase pin is relaxed, accepting that ValidatePin now permits agy pins there; OR (b) keep the ban and run the isolated agy env with ENV-SPECIFIC profiles (a separate .evolve/profiles overlay for that box, not the shipped defaults); OR (c) enhance setup.Recommend to auto-relax allowlists to the sole available family in a single-family env, with a loud warning. Note the builder/auditor cross-family adversarial design degrades to same-family under agy-only regardless.",
+  "files": [
+    ".evolve/profiles/tester.json",
+    ".evolve/profiles/tdd-engineer.json",
+    ".evolve/profiles/builder.json",
+    "go/internal/setup/recommend.go"
+  ],
+  "class": "any_cli_any_phase_any_model_invariant",
+  "connects_to": [
+    "runtime-universal-cli-fallback-discovery-on-exhausted-chain"
+  ]
+}

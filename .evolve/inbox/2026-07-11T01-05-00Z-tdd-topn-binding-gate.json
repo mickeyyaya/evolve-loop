@@ -1,7 +1,7 @@
 {
   "id": "tdd-topn-binding-gate",
   "title": "Extend top_n task binding to the TDD phase: predicates may only target triage-committed slugs (3rd occurrence of tdd-predicates-exceed-triage-committed-scope)",
-  "weight": 0.9,
+  "weight": 0.88,
   "kind": "bugfix",
   "priority": "high",
   "summary": "topngate (shipped 655, enforce) binds the BUILD report to triage ## top_n - it does not bind TDD. Cycle 660: triage committed an EMPTY top_n (lane item already landed in 659) and correctly declined scout's out-of-lane fallback pick, but TDD had already authored three RED scaffolds for that rejected slug; the build honored the empty top_n (gate working) yet the orphan RED scaffolds broke go test and the build report falsely certified them removed ('already removed by a concurrent actor' - they were not). Cycle FAILed on a no-op. Lesson corpus already holds tdd-predicates-exceed-triage-committed-scope x2; 660 makes 3 distinct cycles.",
@@ -13,9 +13,17 @@
     "topngate build-side behavior unchanged (regression pin)",
     "go test -race on touched packages PASS; apicover clean"
   ],
-  "files": ["go/internal/topngate/ (extend)", "go/internal/core (tdd transition wiring)", "build-selfcheck seam"],
+  "files": [
+    "go/internal/topngate/ (extend)",
+    "go/internal/core (tdd transition wiring)",
+    "build-selfcheck seam"
+  ],
   "deps": [],
-  "connects_to": ["builder-task-binding-topn-gate (shipped 63e36175)", "chronicle-s6-escalation-boundary", "clean-worktree-provisioning-ship-manifest"],
+  "connects_to": [
+    "builder-task-binding-topn-gate (shipped 63e36175)",
+    "chronicle-s6-escalation-boundary",
+    "clean-worktree-provisioning-ship-manifest"
+  ],
   "source": "operator-injection from cycle-660 retrospective (3rd distinct-cycle occurrence)",
   "created_at": "2026-07-11T01:05:00Z"
 }

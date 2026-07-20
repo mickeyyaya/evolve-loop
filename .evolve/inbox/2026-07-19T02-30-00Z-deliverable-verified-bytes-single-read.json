@@ -1,16 +1,20 @@
 {
   "id": "deliverable-verified-bytes-single-read",
-  "title": "Eliminate the deliverable double-read (TOCTOU): deliverable.Verify reads the artifact, then BaseRunner.Run re-reads the same path to classify. Have verifyFn return the bytes it verified so the runner classifies the EXACT content that passed — closing the microsecond file-swap window and making the 'file-authoritative' invariant literal.",
-  "weight": 0.55,
+  "title": "Eliminate the deliverable double-read (TOCTOU): deliverable.Verify reads the artifact, then BaseRunner.Run re-reads the same path to classify. Have verifyFn return the bytes it verified so the runner classifies the EXACT content that passed \u2014 closing the microsecond file-swap window and making the 'file-authoritative' invariant literal.",
+  "weight": 0.86,
   "kind": "bug",
-  "root_cause": "go/internal/phases/runner/runner.go: the file-authoritative verdict path does TWO independent reads of the deliverable path — (1) deliverable.Verify (deliverable.go:104 os.ReadFile) inspects the file for well-formedness, then (2) the runner os.ReadFile(artifactPath) reads it again to feed Classify. If the file is deleted/overwritten in the window between the two reads (a background process racing a just-completed bridge launch), the runner either falls back to the pane on read-error (res.OK==true case) or classifies swapped bytes that Verify never saw. Pre-existing since before the verdict-source fix (origin/main has the same verify-then-read pattern), NOT introduced by fix/verdict-source-file-authoritative — but that fix's doc comment claims 'the file is the sole verdict source', which is precisely true only 'as of the Verify read'. Surfaced by go-review of the fix (MEDIUM, non-blocking).",
+  "root_cause": "go/internal/phases/runner/runner.go: the file-authoritative verdict path does TWO independent reads of the deliverable path \u2014 (1) deliverable.Verify (deliverable.go:104 os.ReadFile) inspects the file for well-formedness, then (2) the runner os.ReadFile(artifactPath) reads it again to feed Classify. If the file is deleted/overwritten in the window between the two reads (a background process racing a just-completed bridge launch), the runner either falls back to the pane on read-error (res.OK==true case) or classifies swapped bytes that Verify never saw. Pre-existing since before the verdict-source fix (origin/main has the same verify-then-read pattern), NOT introduced by fix/verdict-source-file-authoritative \u2014 but that fix's doc comment claims 'the file is the sole verdict source', which is precisely true only 'as of the Verify read'. Surfaced by go-review of the fix (MEDIUM, non-blocking).",
   "fix": "Change the verifyFn seam to return the verified content alongside the Result (e.g. deliverable.Result carries the read bytes, or verifyFn returns (Result, []byte, error)). BaseRunner.Run then classifies THOSE bytes instead of re-reading the path, so the classified content is byte-identical to what passed Verify. Single read = no TOCTOU window, and the 'file-authoritative' invariant becomes literal rather than 'file as of the Verify read'. Keep the ship-guard and the uncontracted/pane branches unchanged. Update the runner.go doc comment to drop the double-read caveat once the single-read lands.",
   "acceptance": [
     "verifyFn (and deliverable.Verify/VerifyCatalogAwareStage) surface the verified bytes; BaseRunner.Run classifies those bytes, never a second os.ReadFile of the artifact path on the contracted-verdict path.",
     "A regression test simulates a file swap between verify and classify and proves the classified content is the verified content (not the swapped bytes / not a pane fallback).",
     "The existing verdict-source suite (ship-guard, SKIPPED-passthrough, uncontracted, never-settles) stays green; go test -race on internal/phases/runner + acs-durable green; go-review clears."
   ],
-  "connects_to": ["verdict-incoherence-why-verify-fails", "nonconforming-deliverable-settle-wait-latency", "antigaming_boundary"],
+  "connects_to": [
+    "verdict-incoherence-why-verify-fails",
+    "nonconforming-deliverable-settle-wait-latency",
+    "antigaming_boundary"
+  ],
   "source": "go-review of fix/verdict-source-file-authoritative, finding #1 residual (pre-existing double-read TOCTOU).",
   "created_at": "2026-07-19T02:30:00Z"
 }

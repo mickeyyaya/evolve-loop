@@ -1,0 +1,14 @@
+{
+  "id": "salvage-948-merge-rung2-scoped-review",
+  "title": "Re-derive cycle-948's lost merge-rung2 scoped-review fix (branch conflicts with current main; mergerung2.go diverged)",
+  "weight_hint": 0.9,
+  "created": "2026-07-20T05:03:00Z",
+  "why": "Cycle-948 PASSed but its fix never landed (see ship-landed-verification-floor). The original inbox item merge-rung2-scoped-review was archived as consumed, so nothing re-queues the work. The branch commit 12bab1df now CONFLICTS with main (6459f9ae + c0eabef6 touched mergerung2.go since), so a mechanical cherry-pick is unsafe \u2014 the fix must be re-derived against current main using the branch as the reference implementation.",
+  "how_to_apply": "Read git show 12bab1df on branch cycle-21f9f7ae-948 (production delta is small: ~8 lines mergerung2.go + ~8 lines composition_scoped_review.go + acs predicates). Determine whether later main changes (6459f9ae/c0eabef6) already subsume the fix; if not, reimplement the same intent on current main with fresh ACS predicates. Then delete the branch (it has an unlanded commit \u2014 verify_remote_pr_before_branch_delete satisfied once re-derived work lands).",
+  "evidence": "git show 12bab1df --stat; git log origin/main -- go/internal/core/mergerung2.go",
+  "files": [
+    "go/internal/core/mergerung2.go",
+    "go/internal/core/composition_scoped_review.go"
+  ],
+  "class": "lost-work-salvage"
+}
