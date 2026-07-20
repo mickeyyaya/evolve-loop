@@ -1,7 +1,11 @@
 # False-FAIL blast-radius audit & recovery ledger (cycles 862–899)
 
-**Status:** prevention SHIPPED (`ad446a76`, ADR-0072 floor); feature recovery QUEUED.
-**Date:** 2026-07-17.
+**Status:** CLOSED (cycle-986) — prevention SHIPPED (`ad446a76`, ADR-0072 floor) **and** all
+three false-FAILed features recovered + landed on main: tier-fallback via `6b4e4096` (PR #331)
+and skill-overlay via `daf993e8` (PR #333), scoped-review in `internal/core`. The genuine FAILs
+(889/894/895/896) remain classified do-**NOT**-land (see Disposition). Stale recovery inbox item
+`recover-false-fail-features-876-897-898` retired the same cycle to end the livelock.
+**Date:** 2026-07-17 (opened) → 2026-07-21 (CLOSED).
 
 ## What happened
 
@@ -47,17 +51,25 @@ worktrees `.evolve/worktrees/cycle-21f9f7ae-{876,884,897,898,...}` (branch HEAD 
 SHA; no commit on top). They are durable while the worktrees exist but are NOT git-committed.
 To harvest a deliverable: `cd <worktree> && git add -A && git diff --cached`.
 
-## Recovery plan (queued: inbox `recover-false-fail-features-876-897-898`, weight 0.9)
+## Recovery plan — CLOSED (all landed cycle ≤986)
 
-Land the **best verified implementation of each distinct feature** through the normal
-pipeline (TDD + audit + ship) — **not** a blind stack of overlapping old diffs:
+The recovery landed the **best verified implementation of each distinct feature** through the
+normal pipeline (TDD + audit + ship) — **not** a blind stack of overlapping old diffs. Final
+disposition (verified green this cycle across runner/bridge/guards/core):
 
-1. **tier-fallback (876)** — land the machinery + do the production call-site swap so
-   fable→opus fallback is LIVE on exit 85 (currently inert). Highest value + operator-urgent.
-2. **skill-overlay / `/evo:fable` injection (897, 884)** — deep/high/medium phases load the
-   `/evo:fable` skill; add `skills/fable/` to `ProtectedSurfaceManifest` via a manual ship
-   (security gate flagged by cycle-884's auditor).
-3. **scoped-review (898)** — land with the real coverage the 889/894/895/896 iterations lacked.
+1. **tier-fallback (876)** — ✅ LANDED `6b4e4096` (PR #331): the production call-site swap
+   (runner `Dispatch`→`DispatchTiered`, `runner.go:704`) is done, so fable/opus→sonnet failover
+   is LIVE on exit 85 (no longer inert; reproduction test passes).
+2. **skill-overlay / `/evo:fable` injection (897, 884)** — ✅ LANDED `daf993e8` (PR #333):
+   config-driven overlay injection for phase agents; `skills/fable/` is in
+   `ProtectedSurfaceManifest` (`guards/integrity_surface.go`), closing the cycle-884 security gate.
+3. **scoped-review (898)** — ✅ LANDED in `internal/core` (`composition_scoped_review.go`) with
+   the real coverage the 889/894/895/896 iterations lacked.
+
+The genuine FAILs **889/894/895/896** are NOT recovered — they remain do-**NOT**-land per the
+Disposition table (real zero-coverage / live-reproduced / cross-lane-contamination defects).
+The stale inbox item `recover-false-fail-features-876-897-898` (weight 0.93) was retired this
+cycle so triage stops re-selecting completed work.
 
 ## Prevention (shipped)
 
