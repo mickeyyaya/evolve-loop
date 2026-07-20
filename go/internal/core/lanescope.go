@@ -11,6 +11,7 @@ package core
 // destruction class.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -85,6 +86,15 @@ func scoutReportGoalHash(workspace string) string {
 	if err != nil {
 		return ""
 	}
+	return scoutReportGoalHashFromBytes(b)
+}
+
+// scoutReportGoalHashFromBytes extracts the Decision Trace goal_hash from raw
+// scout-report bytes. The LAST fenced-json block carrying a goal_hash wins (the
+// Decision Trace is conventionally the report's final block). "" when no block
+// carries the key. Shared by scoutReportGoalHash and normalizeScoutGoalHash so
+// the parse — and the single file read behind it — is single-sourced.
+func scoutReportGoalHashFromBytes(b []byte) string {
 	hash := ""
 	for _, m := range fencedJSONRe.FindAllSubmatch(b, -1) {
 		var trace struct {
@@ -97,19 +107,59 @@ func scoutReportGoalHash(workspace string) string {
 	return hash
 }
 
-// laneScopeCoherence is the scout→triage lane-identity gate: a scout-report
-// whose Decision Trace goal_hash differs from the pinned lane-scope.json
-// goal_hash returns an explicit error (the caller aborts the cycle before
-// triage runs). Missing pin, missing report, or missing goal_hash key all
-// return nil — fail-open by contract.
-func laneScopeCoherence(workspace string) error {
+// canonicalGoalHashRe matches a well-formed goal hash: the lower-hex 64-char
+// SHA256 goalhash.Compute emits. normalizeScoutGoalHash refuses to blind-replace
+// a mis-echo that is NOT this shape — a truncated / placeholder / hallucinated
+// echo could be a short or generic token whose whole-file ReplaceAll would
+// corrupt unrelated report content.
+var canonicalGoalHashRe = regexp.MustCompile("^[0-9a-f]{64}$")
+
+// normalizeScoutGoalHash is the scout→triage lane-identity reconciliation
+// (supersedes the cycle-640 hard-abort gate). The scout prompt asks the LLM to
+// echo the pinned goal_hash into its Decision Trace, but that echo proved a
+// fragile signal: a DETERMINISTIC transcription flip (cycles 945/947/... —
+// greedy decoding reproduces the same wrong digit every run, so retries and
+// batch re-runs can never self-heal) made the old gate false-abort healthy
+// cycles before triage. The pinned lane-scope.json goal_hash is the
+// AUTHORITATIVE lane identity — and the echo verified nothing the per-cycle
+// workspace isolation + the fleet_scope directive don't already guarantee (the
+// LLM echoes the pin regardless of what it actually scouted, so the echo never
+// even caught the cycle-640 split it was added for). So on a divergence, this
+// machine-STAMPS the pin into the report (triage then runs on a coherent lane)
+// and WARNs so the mis-echo stays visible — never a silent proceed, never a
+// false abort. The stamp is guarded: it fires only when the mis-echoed value is
+// itself a canonical goal hash, so the whole-file replace can never corrupt
+// unrelated report content off a malformed echo. Fail-open with a WARN on every
+// unexpected degraded path (unreadable report, non-canonical echo, write
+// failure); a truly absent report / pin / goal_hash key is a silent no-op.
+func normalizeScoutGoalHash(workspace string) {
 	ls := loadLaneScope(workspace)
 	if ls == nil || ls.GoalHash == "" {
-		return nil
+		return
 	}
-	got := scoutReportGoalHash(workspace)
+	reportPath := filepath.Join(workspace, "scout-report.md")
+	b, err := os.ReadFile(reportPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report.md unreadable during goal_hash normalize: %v (lane identity still pinned in %s)\n", err, LaneScopeFile)
+		}
+		return // absent report ⇒ nothing to reconcile (fail-open)
+	}
+	got := scoutReportGoalHashFromBytes(b)
 	if got == "" || got == ls.GoalHash {
-		return nil
+		return // absent echo (fail-open) or already coherent — nothing to stamp
 	}
-	return fmt.Errorf("lane-scope goal-hash mismatch: scout-report Decision Trace goal_hash %q != pinned %s goal_hash %q — triage must not run on an incoherent lane identity", got, LaneScopeFile, ls.GoalHash)
+	if !canonicalGoalHashRe.MatchString(got) {
+		// A real mismatch, but the echoed value is not a canonical goal hash:
+		// refuse the blind whole-file replace (unbounded blast radius) and
+		// surface it loudly. The pin still governs the lane identity on disk.
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report goal_hash %q is not a canonical 64-hex hash — NOT machine-stamping (blast-radius guard); lane identity is the pin %q in %s.\n", got, ls.GoalHash, LaneScopeFile)
+		return
+	}
+	fixed := bytes.ReplaceAll(b, []byte(got), []byte(ls.GoalHash))
+	if err := os.WriteFile(reportPath, fixed, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout goal_hash normalize write failed: %v (lane identity still pinned in %s)\n", err, LaneScopeFile)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report Decision Trace goal_hash %q != pinned %q — machine-stamped the authoritative pin (scout mis-echoed the hash; lane identity is the pin, not the LLM transcription).\n", got, ls.GoalHash)
 }

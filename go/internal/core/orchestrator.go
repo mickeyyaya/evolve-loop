@@ -874,15 +874,16 @@ OuterLoop:
 		// run-set or bypassing the spine gate. No-op until WS2-S3 wires the shadow
 		// RePlan behind EVOLVE_ROUTER_REPLAN.
 		if next == PhaseScout {
-			// Lane-scope coherence gate (cycle-640): a scout that reported a
-			// DIFFERENT lane's goal_hash than this lane's pinned lane-scope.json
-			// must abort BEFORE triage runs — no silent proceed on a split lane
-			// identity. Missing pin / report / goal_hash key fail open inside
-			// the gate (nil), so healthy sequential cycles are untouched.
-			if gerr := laneScopeCoherence(cr.cs.WorkspacePath); gerr != nil {
-				cr.recordLaneScopeAbort(gerr)
-				return cr.result, gerr
-			}
+			// Lane-scope reconciliation (cycle-640 pin; supersedes the old
+			// hard-abort gate). The scout is asked to echo the pinned goal_hash
+			// into its Decision Trace, but that echo is a FRAGILE signal — a
+			// deterministic LLM transcription flip false-aborted healthy cycles
+			// before triage (cycles 945/947/... — greedy decoding reproduces the
+			// same wrong digit, so retries never self-heal). The pinned
+			// lane-scope.json goal_hash is authoritative, so a divergence is
+			// machine-STAMPED into the report (triage proceeds on a coherent lane)
+			// with a WARN, not an abort. Fail-open on missing pin/report/hash.
+			normalizeScoutGoalHash(cr.cs.WorkspacePath)
 			cr.postScoutReplan()
 		}
 	}

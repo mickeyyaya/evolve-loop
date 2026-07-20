@@ -15,12 +15,15 @@ package core
 //     derived from THAT file (comma-joined todo_ids) — authoritative over the
 //     env snapshot, so cross-lane env drift can no longer split lane identity.
 //     Absent file ⇒ legacy env fallback (sequential loop byte-identical).
-//  3. COHERENCE: after scout completes and before triage runs, a scout-report
-//     whose Decision Trace goal_hash differs from lane-scope.json's goal_hash
-//     aborts the cycle with an explicit "lane-scope goal-hash mismatch" error
-//     (no silent proceed). Missing report / missing goal_hash key / missing
-//     lane-scope.json stay fail-open — a guard that false-aborts healthy
-//     sequential cycles would recreate the cycle-760..762 destruction class.
+//  3. COHERENCE (superseded — scout-goalhash-machine-stamped): after scout
+//     completes and before triage runs, a scout-report whose Decision Trace
+//     goal_hash differs from lane-scope.json's goal_hash is MACHINE-STAMPED to
+//     the pin (the authoritative lane identity) + WARNed, and triage PROCEEDS —
+//     it no longer aborts. The old hard-abort false-fired on a deterministic LLM
+//     transcription flip (retries could never self-heal), and the echo verified
+//     nothing the workspace isolation + fleet_scope directive don't already
+//     guarantee. Missing report / goal_hash key / lane-scope.json stay
+//     fail-open (no-op) — never a false abort on a healthy cycle.
 
 import (
 	"context"
@@ -28,7 +31,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -190,25 +192,36 @@ func TestLaneScopePin_MaterializedFromEnvBeforePhases(t *testing.T) {
 	}
 }
 
-// COHERENCE: scout-report goal_hash ≠ lane-scope.json goal_hash must abort the
-// cycle at the scout→triage transition with an explicit reason — triage must
-// never run on an incoherent lane identity.
-func TestLaneScopePin_ScoutGoalHashMismatchAbortsBeforeTriage(t *testing.T) {
+// COHERENCE (superseded contract, scout-goalhash-machine-stamped): a scout-report
+// goal_hash ≠ lane-scope.json goal_hash is MACHINE-STAMPED to the pin and triage
+// PROCEEDS — it no longer aborts. The old hard-abort false-fired on a
+// deterministic LLM transcription flip (cycles 945/947/... — greedy decoding
+// reproduces the same wrong digit, so retries never self-heal), and the echo
+// verified nothing the workspace isolation + fleet_scope directive don't already
+// guarantee. The pin is authoritative; the divergence is reconciled, not fatal.
+func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
 	root := t.TempDir()
-	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")
+	ws := RunWorkspacePath(root, 1)
+	// Canonical 64-hex pin vs a one-digit-flipped canonical echo (pinGoalHash /
+	// misGoalHash, defined in lanescope_normalize_test.go) — the real failure
+	// shape the machine-stamp guard reconciles.
+	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 
 	runners := buildRunners(nil)
-	runners[PhaseScout] = &scoutReportRunner{fakeRunner: fakeRunner{name: string(PhaseScout)}, goalHash: "goal-OTHER-lane"}
+	runners[PhaseScout] = &scoutReportRunner{fakeRunner: fakeRunner{name: string(PhaseScout)}, goalHash: misGoalHash}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "goal-1"})
-	if err == nil {
-		t.Fatal("RunCycle succeeded; want abort on lane-scope goal-hash mismatch")
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: pinGoalHash})
+	if err != nil {
+		t.Fatalf("a mis-echoed goal_hash must normalize + proceed, not abort: %v", err)
 	}
-	if !strings.Contains(err.Error(), "lane-scope goal-hash mismatch") {
-		t.Errorf("abort reason %q does not name the lane-scope goal-hash mismatch", err.Error())
+	if res.FinalVerdict != VerdictPASS {
+		t.Errorf("verdict=%s, want PASS (lane reconciled, cycle continues)", res.FinalVerdict)
 	}
-	if tr := runners[PhaseTriage].(*fakeRunner); tr.calls != 0 {
-		t.Errorf("triage ran %d time(s) after an incoherent scout; want 0 (fail fast, no silent proceed)", tr.calls)
+	if tr := runners[PhaseTriage].(*fakeRunner); tr.calls != 1 {
+		t.Errorf("triage calls=%d, want 1 (proceeds on the machine-stamped lane, no false abort)", tr.calls)
+	}
+	if got := scoutReportGoalHash(ws); got != pinGoalHash {
+		t.Errorf("report Decision Trace goal_hash=%q, want the machine-stamped pin %q", got, pinGoalHash)
 	}
 }
 
