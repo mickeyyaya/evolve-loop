@@ -937,6 +937,15 @@ type FleetPolicy struct {
 	// Mirrors SwarmPolicy.Stage / FleetBudgetPolicy.Stage's shadow-first, config-
 	// selected Strategy idiom — not a feature flag.
 	Scheduling string `json:"scheduling,omitempty"`
+	// Landing selects how PASS fleet lanes reach main: "per-lane" (today's
+	// behaviour — each lane independently ff-merges/pushes) or "prefix-queue"
+	// (the single-writer prefix composer, fleet.PrefixQueue, owns the sole
+	// main-push path and speculates over composed queue prefixes). Empty/absent
+	// ⇒ "per-lane". Like Scheduling, an UNKNOWN value fails safe to "per-lane"
+	// (NOT the composer) plus a surfaced warning — an operator typo must never
+	// silently route landing through the unsoaked composer. Mirrors Scheduling's
+	// shadow-first, config-selected Strategy idiom — not a feature flag.
+	Landing string `json:"landing,omitempty"`
 	// Budget is the OPT-IN quota-driven lane-sizing block (Q4 of the quota
 	// budgeting campaign). Absent ⇒ FleetConfig.Budget is nil and the wave
 	// never probes quota — zero added latency, byte-identical lanes. Present
@@ -1012,6 +1021,11 @@ type FleetConfig struct {
 	// wave-barrier) or "pool" (rolling lane pool). An unknown raw value resolves
 	// to "wave" with a surfaced warning — the new mode is never silently entered.
 	Scheduling string
+	// Landing is the resolved main-push strategy: "per-lane" (default, each lane
+	// lands independently) or "prefix-queue" (the single-writer composer owns the
+	// only main-push path). An unknown raw value resolves to "per-lane" with a
+	// surfaced warning — the composer is never silently entered.
+	Landing string
 	// Budget is the resolved quota-budgeting block, or nil when the operator
 	// supplied no fleet.budget block (the default — quota budgeting off).
 	Budget *FleetBudgetConfig
@@ -1040,7 +1054,7 @@ const (
 // rejected value.
 func (p Policy) FleetConfig() FleetConfig {
 	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage",
-		Scheduling: "wave", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
+		Scheduling: "wave", Landing: "per-lane", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
 	if p.Fleet == nil {
 		return c
 	}
@@ -1079,6 +1093,17 @@ func (p Policy) FleetConfig() FleetConfig {
 	default:
 		c.Scheduling = "wave"
 		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.scheduling: unknown value %q, falling back to \"wave\"", p.Fleet.Scheduling))
+	}
+	// Landing: closed vocab, fail-safe to "per-lane" (NOT the composer) — a typo
+	// must never silently route the main-push path through the unsoaked composer.
+	switch p.Fleet.Landing {
+	case "", "per-lane":
+		c.Landing = "per-lane"
+	case "prefix-queue":
+		c.Landing = "prefix-queue"
+	default:
+		c.Landing = "per-lane"
+		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.landing: unknown value %q, falling back to \"per-lane\"", p.Fleet.Landing))
 	}
 	if p.Fleet.Budget != nil {
 		b := &FleetBudgetConfig{
