@@ -282,6 +282,65 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 	return out
 }
 
+// hasAvailableCandidate reports whether any candidate's binary is on PATH. An
+// unknown candidate name (not in cliBinaryFor) is treated as available — it
+// matches Probe's "unknown name keeps position" and means an
+// operator-configured novel CLI is trusted over discovery.
+func hasAvailableCandidate(candidates []string, lookPath func(string) (string, error)) bool {
+	for _, cli := range candidates {
+		bin := cliBinaryFor[cli]
+		if bin == "" {
+			return true
+		}
+		if _, err := lookPath(bin); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// ApplyUniversalFallback is the LAST-RESORT dispatch tier (any_cli_any_phase
+// invariant): when EVERY candidate in the static chain (primary +
+// profile.cli_fallback) has an absent binary — e.g. an isolated agy-only host
+// whose profiles still name claude/codex — it appends the caller-DISCOVERED
+// CLIs so the loop routes to whatever LLM is actually installed instead of
+// halting the batch. Discovered CLIs (already filtered by the caller to
+// binary-present + auth-configured + phase-allowlist + policy) are appended
+// AFTER the configured chain, so an operator CLI merely not-yet-on-PATH still
+// leads, and are deduped against it.
+//
+// It is a NO-OP when any static candidate is available (operator config is
+// authoritative — universal fallback never overrides a working configured CLI)
+// or when discovered is empty (fail-loud preserved: the classifier still sees a
+// real ExitMissingBinary on the absent chain, never a silent green). lookPath is
+// the seam (nil ⇒ exec.LookPath). Non-Candidates Plan fields are carried through.
+func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (string, error)) Plan {
+	if len(discovered) == 0 {
+		return p
+	}
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	if hasAvailableCandidate(p.Candidates, lookPath) {
+		return p // a configured CLI is usable → last resort not needed
+	}
+	seen := make(map[string]struct{}, len(p.Candidates))
+	for _, c := range p.Candidates {
+		seen[c] = struct{}{}
+	}
+	cands := append([]string(nil), p.Candidates...)
+	for _, d := range discovered {
+		if _, dup := seen[d]; dup {
+			continue
+		}
+		seen[d] = struct{}{}
+		cands = append(cands, d)
+	}
+	out := p
+	out.Candidates = cands
+	return out
+}
+
 // Family maps a registered CLI driver name to its CLI family — the binary
 // name from cliBinaryFor ("codex-tmux" → "codex"). A transient outage (quota
 // wall, auth expiry) hits every transport of a family, so health state is
