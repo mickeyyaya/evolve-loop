@@ -161,3 +161,79 @@ func has(args []string, prefix ...string) bool {
 	}
 	return strings.Join(args[:len(prefix)], " ") == strings.Join(prefix, " ")
 }
+
+// TestClassifyFleetRebaseCandidate_ThreeWayVerdicts names + exercises the
+// fleet-rebase pre-screen surface (apicover): FleetRebaseVerdict and all three
+// constants, bound via the classifier's REAL decision paths through the git
+// seam. The key intent pin is the disambiguation the doc warns about: a
+// not-landable candidate is AlreadyLanded ONLY when the supersession screen
+// says so — a genuine 3-way conflict must classify FleetRebaseConflict, never
+// be short-circuited as landed (which would silently drop overlapping work).
+func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
+	cases := []struct {
+		label   string
+		respond func(args []string) (string, int)
+		want    FleetRebaseVerdict
+	}{
+		{"clean-merge-not-superseded", func(args []string) (string, int) {
+			switch {
+			case has(args, "merge-base", "--is-ancestor"):
+				return "", 1 // not an ancestor
+			case has(args, "cherry"):
+				return "+ deadbeef\n", 0 // new commits exist
+			case has(args, "merge-tree", "--write-tree"):
+				return "", 0 // clean 3-way merge
+			}
+			return "", 0
+		}, FleetRebaseClean},
+		{"ancestor-already-landed", func(args []string) (string, int) {
+			if has(args, "merge-base", "--is-ancestor") {
+				return "", 0 // ancestor → superseded
+			}
+			return "", 0
+		}, FleetRebaseAlreadyLanded},
+		{"genuine-conflict-not-masked-as-landed", func(args []string) (string, int) {
+			switch {
+			case has(args, "merge-base", "--is-ancestor"):
+				return "", 1
+			case has(args, "cherry"):
+				return "+ deadbeef\n", 0
+			case has(args, "merge-tree", "--write-tree"):
+				return "", 1 // real 3-way conflict
+			}
+			return "", 0
+		}, FleetRebaseConflict},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			s := &seamGit{respond: tc.respond}
+			useSeamGit(t, s)
+			got, err := ClassifyFleetRebaseCandidate(context.Background(), "repo", "cycle-x", "main")
+			if err != nil {
+				t.Fatalf("ClassifyFleetRebaseCandidate: %v", err)
+			}
+			var want FleetRebaseVerdict = tc.want // named binding for the exported type
+			if got != want {
+				t.Errorf("verdict=%d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// TestClassifyFleetRebaseCandidate_GitInfraErrorIsError pins the contract that
+// infrastructure failure surfaces as an error, never masked as a verdict.
+func TestClassifyFleetRebaseCandidate_GitInfraErrorIsError(t *testing.T) {
+	s := &seamGit{respond: func(args []string) (string, int) {
+		if has(args, "merge-base", "--is-ancestor") {
+			return "", 1
+		}
+		if has(args, "cherry") {
+			return "", 2 // git infrastructure failure
+		}
+		return "", 0
+	}}
+	useSeamGit(t, s)
+	if _, err := ClassifyFleetRebaseCandidate(context.Background(), "repo", "cycle-x", "main"); err == nil {
+		t.Fatal("expected git-infrastructure error to surface, got nil")
+	}
+}

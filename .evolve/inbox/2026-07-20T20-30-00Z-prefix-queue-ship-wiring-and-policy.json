@@ -1,0 +1,11 @@
+{
+  "id": "prefix-queue-ship-wiring-and-policy",
+  "title": "Wire the cycle-975 prefix-speculation landing queue into the ship main-push path (salvage preserved worktree; the foundation is built+tested but INERT)",
+  "weight_hint": 0.9,
+  "created": "2026-07-20T20:30:00Z",
+  "why": "Cycle-975 built and TESTED PrefixQueue/ResolveCulprit/ComposePrefixes (4 green ACS predicates) but shipped ZERO production callers — EGPS correctly refused ship (goal floor: no inert API, wiring proof required). Worktree PRESERVED at .evolve/worktrees/cycle-21f9f7ae-975. Without a first-class queue item this is 948-class lost work: the follow-up slug exists only inside run artifacts.",
+  "how_to_apply": "Salvage the preserved worktree (or cherry-pick its module). Wire: (1) composer becomes a caller in the ship main-push path (go/internal/phases/ship/), policy vocabulary fleet.landing wired through internal/policy+config (config-injected, no flags); (2) FIX adversarial findings BEFORE wiring: F1 add mutex or single-goroutine ownership contract for q.lanes/q.window (doc promises concurrency it does not make safe); F2 NNFI culprit misattribution — after ejecting a culprit, RE-VERIFY the surviving committed set so a composite-poisoning lane cannot land while an innocent lane is ejected; (3) WIRING PROOF: composed-path test that the native gate-set runner drives ResolveCulprit via the verify seam; (4) gate-wiring-proof phase obligation carries forward per pipeline-class standing rule.",
+  "evidence": ".evolve/runs/cycle-975/{adversarial-review-report.md (F1,F2,F5), audit-report.md (deferral note), acs-verdict.json (4 green)}; preserved worktree cycle-21f9f7ae-975; dossier cycle-975 final_verdict=FAIL SystemFailure=null.",
+  "files": ["go/internal/phases/ship/", "go/internal/policy/", "go/internal/config/"],
+  "class": "pipeline-landing-integrity"
+}
