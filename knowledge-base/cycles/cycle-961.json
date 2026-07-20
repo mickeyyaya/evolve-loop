@@ -1,0 +1,19 @@
+{
+  "cycle": 961,
+  "run_id": "01KXYNZFNJ1Y0ZDX746NFZKSXT",
+  "goal": "drain the .evolve/inbox backlog: pick the highest-weight queued todos, implement and ship them one cycle at a time",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "PASS",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ]
+}

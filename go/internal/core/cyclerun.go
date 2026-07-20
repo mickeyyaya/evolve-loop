@@ -192,16 +192,6 @@ func (cr *cycleRun) recordChokepointEscape(reason string) {
 	cr.result.FinalVerdict = VerdictFAIL
 }
 
-// recordLaneScopeAbort records the scout→triage lane-scope coherence abort as
-// an explicit terminal outcome (same rationale as recordChokepointEscape: an
-// abort without a recorded outcome classifies FAILED_UNEXPLAINED).
-func (cr *cycleRun) recordLaneScopeAbort(err error) {
-	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath,
-		phaseOutcomeFrom(PhaseScout, PhaseResponse{Phase: string(PhaseScout)}, 0, err.Error(), cr.cs.PhaseStartedAt))
-	cr.recordFailureLearning(PhaseScout, err, 0)
-	cr.result.FinalVerdict = VerdictFAIL
-}
-
 // cyclerun.go — methods extracted from the RunCycle engine (orchestrator.go) to
 // keep RunCycle a readable coordinator. Each extraction is behavior-preserving;
 // the orchestrator's characterization tests are the safety net.
