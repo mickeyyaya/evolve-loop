@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
@@ -21,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -37,6 +39,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/debugger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/intent"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/retro"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
@@ -350,6 +353,43 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Resolved once here so all phase constructors below share the same value.
 	// Avoids a second pol.WorkflowConfig() call at line ~538.
 	wfCfg := pol.WorkflowConfig()
+
+	// Universal-fallback discovery seam (workflow.universal_fallback, default on):
+	// set the runner package-var seams ONCE, before the phase constructors below,
+	// so a phase whose whole configured CLI chain is absent on THIS host routes to
+	// a present+usable LLM instead of halting the batch. Discovery is a memoized
+	// bridge.Doctor probe (installed + non-blocked, one driver per family, tmux
+	// variant — the fleet default); it runs at most once per process, lazily on
+	// the first phase that actually needs it. Off ⇒ both seams stay nil/false and
+	// dispatch is byte-identical to the pre-feature path.
+	runner.DefaultUniversalFallback = wfCfg.UniversalFallback
+	if wfCfg.UniversalFallback {
+		var discOnce sync.Once
+		var discovered []string
+		runner.DefaultDiscoverCLIsFn = func() []string {
+			discOnce.Do(func() {
+				// BOUNDED context (go-review HIGH): Doctor shells `<cli> --version`
+				// per installed CLI; on the unattended loop hot path a hung probe
+				// (stuck auth prompt / network stall) under context.Background()
+				// would wedge this sync.Once forever and stall the whole loop —
+				// defeating the feature's own no-halt goal. A timeout degrades to
+				// "no discovery" (empty → fail-loud ExitMissingBinary), never a hang.
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				rep, _ := gobridge.NewEngine(gobridge.Deps{}).Doctor(ctx, "", false)
+				seenFam := map[string]bool{}
+				for _, r := range rep.Results {
+					fam := llmroute.Family(r.CLI)
+					if seenFam[fam] || !r.Binary.Present || r.Verdict == "blocked" {
+						continue
+					}
+					seenFam[fam] = true
+					discovered = append(discovered, fam+"-tmux")
+				}
+			})
+			return discovered
+		}
+	}
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),

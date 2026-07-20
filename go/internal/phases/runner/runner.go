@@ -167,6 +167,17 @@ type Options struct {
 	// Replaces the former EVOLVE_STDOUT_FILTER=off env check. Default false =
 	// filter enabled, matching the historical "on" default.
 	DisableStdoutFilter bool
+	// UniversalFallback (workflow.universal_fallback, default true) enables the
+	// last-resort dispatch tier: when a phase's whole configured CLI chain has no
+	// binary on this host, DiscoverCLIsFn's installed+authed CLIs (family-filtered
+	// by the profile allowlist) are appended so the loop routes to whatever LLM is
+	// present instead of halting. No-op unless DiscoverCLIsFn is also wired.
+	UniversalFallback bool
+	// DiscoverCLIsFn is the memoized system-CLI discovery seam (composition root
+	// closes it over bridge.Doctor: installed + authed + non-blocked driver names,
+	// e.g. "agy-tmux"). nil ⇒ universal fallback is inert (byte-identical to the
+	// pre-feature dispatch). Kept a seam so the runner package never imports bridge.
+	DiscoverCLIsFn func() []string
 	// Diag is the injectable diagnostics logger (T3, cycle-463): the MR4c
 	// advisor-overlay observability lines route through it so a test can
 	// capture them instead of the global log.Diag() stderr sink. Zero value
@@ -190,6 +201,8 @@ type BaseRunner struct {
 	sleepFn             func(time.Duration)
 	compactPrompts      bool
 	disableStdoutFilter bool
+	universalFallback   bool
+	discoverCLIsFn      func() []string
 	diag                log.Console
 }
 
@@ -242,6 +255,17 @@ func New(opts Options) *BaseRunner {
 	if diag.Out == nil && diag.Err == nil {
 		diag = log.Diag()
 	}
+	// Universal-fallback defaults: per-instance Options win (test injection);
+	// otherwise fall back to the composition-root package seams (set once in
+	// cmd_cycle.go from workflow.universal_fallback + a memoized bridge.Doctor
+	// closure — same set-once pattern as PhaseBoundaryCheckpointer, so the ~10
+	// per-phase constructors need not each thread the discovery closure). Default
+	// zero values ⇒ inert, byte-identical to the pre-feature dispatch.
+	universalFallback := opts.UniversalFallback || DefaultUniversalFallback
+	discoverCLIsFn := opts.DiscoverCLIsFn
+	if discoverCLIsFn == nil {
+		discoverCLIsFn = DefaultDiscoverCLIsFn
+	}
 	return &BaseRunner{
 		hooks:               opts.Hooks,
 		bridge:              opts.Bridge,
@@ -255,6 +279,8 @@ func New(opts Options) *BaseRunner {
 		sleepFn:             sleepFn,
 		compactPrompts:      opts.CompactPrompts,
 		disableStdoutFilter: opts.DisableStdoutFilter,
+		universalFallback:   universalFallback,
+		discoverCLIsFn:      discoverCLIsFn,
 		diag:                diag,
 	}
 }
@@ -603,6 +629,20 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// instead of re-burning the walled primary's boot window (cycle-283).
 	// Same pin bypass as the capability probe; lazy expiry inside.
 	plan = b.applyBenchToPlan(req.ProjectRoot, phase, plan, pin != nil && pin.CLI != "", req.Env)
+	// Universal fallback (last resort): if the whole configured chain's binaries
+	// are absent on this host (e.g. an isolated agy-only box whose profiles still
+	// name claude/codex), append the DISCOVERED installed+authed CLIs the phase
+	// allowlist permits, so the loop routes to a present LLM instead of halting.
+	// Pin-bypassed (a policy pin is absolute) and gated on workflow.universal_fallback.
+	if (pin == nil || pin.CLI == "") && b.universalFallback && b.discoverCLIsFn != nil {
+		discovered := allowedDiscovered(b.discoverCLIsFn(), prof)
+		pre := plan.Candidates
+		plan = llmroute.ApplyUniversalFallback(plan, discovered, nil)
+		if !sameCandidates(pre, plan.Candidates) {
+			log.Diag().Infof("[runner] phase=%s UNIVERSAL-FALLBACK: configured chain %v all absent on this host — discovered+allowed CLIs appended -> %v\n",
+				phase, pre, plan.Candidates)
+		}
+	}
 	cli := plan.Candidates[0]
 	// Disambiguating dispatch log: tells observers which CLI is actually being
 	// invoked and why (an output stream saying `model: claude-sonnet-4-6` could
