@@ -675,7 +675,13 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 			// dispatch, so there is nothing worth persisting either).
 			if o.cfg.ModelRouting != config.ModelRoutingStatic {
 				var mrClamps []router.Clamp
-				clampedPlan, mrClamps = router.ClampPlanModelRouting(clampedPlan, o.profileForModelRouting, o.modelCatalogLookup)
+				// Bind the per-phase profile lookup to THIS cycle's ProjectRoot so the
+				// guard resolves .evolve/profiles/<agent>.json from the live tree
+				// (profileForModelRouting is otherwise root-less — it only gets a phase).
+				profileFor := func(phase string) *profiles.Profile {
+					return o.profileForModelRouting(req.ProjectRoot, phase)
+				}
+				clampedPlan, mrClamps = router.ClampPlanModelRouting(clampedPlan, profileFor, o.modelCatalogLookup)
 				clamps = append(clamps, mrClamps...)
 			}
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
@@ -698,16 +704,30 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 }
 
 // profileForModelRouting resolves a phase's profiles.Profile for the MR4(a)
-// guardrail check. Always nil today: a phase's profile file is keyed by AGENT
-// name (e.g. "builder.json"), and the phase→agent mapping is only known inside
-// each phase package (internal/phases/build, .../audit, ...) — which already
-// imports core, so core resolving it here would be an import cycle. A nil
-// profile is ValidatePin's own "nothing to validate ⇒ ok" contract (matching
-// router.ClampPlanModelRouting's doc comment), so this degrades safely rather
-// than silently fabricating a wrong mapping; the catalog-resolvability gate
-// (modelCatalogLookup) still applies independently. Wiring a real per-phase
-// profile lookup is future work (a composition-root DI seam mirroring
-// catalogRefresh), out of MR4's scope.
-func (o *Orchestrator) profileForModelRouting(string) *profiles.Profile {
-	return nil
+// guardrail check by reading .evolve/profiles/<agent>.json from the cycle's
+// ProjectRoot, where <agent> is the phase's AGENT name (phaseAgentName table —
+// the cycle-safe static mirror of each phase package's AgentPromptName(), which
+// core cannot import without an import cycle). This closes the DI seam that
+// previously returned nil for every phase, silently disabling the whole
+// floor/ceiling/universal-floor envelope guard in the composed production path.
+// nil is still returned — the documented ValidatePin "nothing to validate ⇒ ok"
+// pass-through — but now ONLY when the profile is genuinely absent: a phase with
+// no agent name (e.g. native ship), an unconfigured profiles dir, or a missing
+// profile file (mint-only phases). A resolved profile with no explicit
+// model_tier_envelope is returned non-nil so router.ClampPlanModelRouting's
+// universalTierFloor still governs it.
+func (o *Orchestrator) profileForModelRouting(projectRoot, phase string) *profiles.Profile {
+	agent, ok := phaseAgentName[phase]
+	if !ok {
+		return nil // phase has no governing profile (e.g. native ship) — nil-safe
+	}
+	loader := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles"))
+	if loader == nil {
+		return nil
+	}
+	prof, err := loader.Get(agent)
+	if err != nil {
+		return nil // profile file genuinely absent — matches ValidatePin's nil contract
+	}
+	return &prof
 }
