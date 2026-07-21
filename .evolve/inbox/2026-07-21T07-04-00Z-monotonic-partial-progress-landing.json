@@ -1,0 +1,11 @@
+{
+  "id": "monotonic-partial-progress-landing",
+  "title": "Land verified partial progress on monotonic convergence tasks instead of discarding it — cycle-992 pruned 101 of 140 items (audit-defensible) yet FAILed the binary <=25 target and ALL 101 prunes were thrown away",
+  "weight_hint": 0.9,
+  "created": "2026-07-21T07:04:00Z",
+  "why": "ULTRATHINK FAIL-ANALYSIS 2026-07-21: all-or-nothing acceptance on MONOTONIC tasks wastes real verified work. Cycle-992 reduced 140->39 (101 pruned, audit called it 'defensible spirit-over-letter') but the AC was binary (<=25) so the cycle FAILed and the 101-item reduction never landed. The operator's no-wasted-effort directive (graduated-remediation-fix-forward) applies doubly here: this work PASSED review and was still discarded.",
+  "how_to_apply": "Task-contract design, not a gate bypass: (1) convergence/cleanup items declare AC as DIRECTION+FLOOR ('reduce by >=N, land whatever verified reduction is achieved; requeue the remainder with the delta') instead of a binary absolute target; (2) triage/eval authoring rule + an evalgate lint that flags binary absolute targets on monotonic task classes; (3) ship accepts the partial delta ONLY when the per-item prune evidence passed audit (no partial-credit for unreviewed work); (4) the item requeues automatically with remaining count + the prior attempt's evidence attached. Composes with operator-state-task-archetype (most monotonic tasks are state mutations) and graduated-remediation.",
+  "evidence": ".evolve/runs/cycle-992/audit-report.md defects[0] ('140->=<25 not met: landed at 39 keep (101 pruned); defensible spirit-over-letter but a stated-AC deviation').",
+  "files": ["go/internal/phases/triage/", "go/internal/evalgate/", "docs/operations/"],
+  "class": "task-contract-design"
+}

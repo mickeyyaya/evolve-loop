@@ -1,11 +1,15 @@
 {
   "id": "treediff-guard-worktree-phase-crosslane-residual",
-  "title": "Residual after the non-worktree-phase carve-out: two concurrent WORKTREE phases can still cross-contaminate the shared-tree tree-diff guard — needs a fleet-lane-owned-paths registry",
-  "weight_hint": 0.88,
+  "title": "Residual after the non-worktree-phase carve-out: two concurrent WORKTREE phases can still cross-contaminate the shared-tree tree-diff guard \u2014 needs a fleet-lane-owned-paths registry",
+  "weight_hint": 0.9,
   "created": "2026-07-20T06:42:00Z",
-  "why": "The immediate cycle-967 fix exempts .evolve/ deliverable-prefix writes for NON-worktree phases (scout/triage/audit/etc.) — correct because those phases cannot author a worktree-bound deliverable, so such a path is always orchestrator/other-lane activity. But it does NOT cover two concurrent WORKTREE phases (e.g., two builds) where lane A's legit main-tree write is charged to lane B: the tree-diff guard diffs the SHARED cr.req.ProjectRoot with a per-lane beforeDirty baseline, so any concurrent write is a false 'new' path. Fully robust attribution needs lane ownership.",
+  "why": "THIRD LIVE INSTANCE 2026-07-21: an OPERATOR mid-batch write of knowledge-base/research/fail-analysis-pass-rate-2026-07-21.md was charged to cycle-1011's retro phase (false abort) and then RELOCATED out of the main tree by lane-1010's leak recovery. The shared-tree attribution disease now has three proven sources: advisor mints (967, fixed via mint-registry clamp-parity), ship-adopted residue (gate-wiring-proof stub), and operator writes. The general cure is this item: a lane/actor-owned-paths registry so the guard attributes writes to their ACTUAL author instead of whichever phase's diff window they land in; an operator-write channel (registered paths, boundary-applied) belongs in the design. The immediate cycle-967 fix exempts .evolve/ deliverable-prefix writes for NON-worktree phases (scout/triage/audit/etc.) \u2014 correct because those phases cannot author a worktree-bound deliverable, so such a path is always orchestrator/other-lane activity. But it does NOT cover two concurrent WORKTREE phases (e.g., two builds) where lane A's legit main-tree write is charged to lane B: the tree-diff guard diffs the SHARED cr.req.ProjectRoot with a per-lane beforeDirty baseline, so any concurrent write is a false 'new' path. Fully robust attribution needs lane ownership.",
   "how_to_apply": "Fleet supervisor maintains a shared registry (e.g. .evolve/runs/<run>/lane-owned-paths.json, written under each lane's flock) of paths each active lane is currently writing / its workspace surface. The tree-diff guard excludes leaked paths owned by ANOTHER active lane. Alternatively/additionally: re-snapshot beforeDirty at check time minus the union of other lanes' dirty sets. TDD: two concurrent worktree phases, lane A writes .evolve/phases/X, lane B's guard must NOT abort.",
-  "evidence": "cyclerun_review.go:301 dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty) — shared ProjectRoot; cycle-967 root cause (lane-970 concurrent write).",
-  "files": ["go/internal/core/cyclerun_review.go", "go/internal/guards/treediff/treediff.go", "go/internal/phases/fleet"],
+  "evidence": "cyclerun_review.go:301 dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty) \u2014 shared ProjectRoot; cycle-967 root cause (lane-970 concurrent write).",
+  "files": [
+    "go/internal/core/cyclerun_review.go",
+    "go/internal/guards/treediff/treediff.go",
+    "go/internal/phases/fleet"
+  ],
   "class": "fleet-shared-tree-attribution"
 }

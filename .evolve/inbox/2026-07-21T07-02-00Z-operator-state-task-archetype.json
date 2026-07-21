@@ -1,0 +1,11 @@
+{
+  "id": "operator-state-task-archetype-native-apply",
+  "title": "New task archetype for live main-tree STATE mutations (inbox archival, carryoverTodos convergence, state.json edits): native orchestrator-side apply at the batch/cycle boundary — NOT a worktree builder",
+  "weight_hint": 0.93,
+  "created": "2026-07-21T07:02:00Z",
+  "why": "ULTRATHINK FAIL-ANALYSIS 2026-07-21: the state-mutation task FAMILY (984 archival-in-wrong-tree, 992 live-mutation-deferred-for-loop-safety, 994 grouped lane refusal, 999/1000 apply-never-reached-live) fails STRUCTURALLY: a worktree-isolated builder cannot safely mutate live main-tree state while the loop runs — the execution model forbids what the task demands, independent of the CAS/propagation bugs. PROOF: the operator-side apply of 984's archival (main-tree copy+rm at the boundary) took 30 seconds and turned its ACS predicates 3/3 green.",
+  "how_to_apply": "Classify-and-route, config-first: (1) task class 'operator-state' detected at triage (declared in the item, or inferred: deliverable paths are live .evolve/ state, no source changes); (2) execution = a NATIVE apply step (Go, no LLM worktree build): the plan phase (LLM) produces a deterministic apply manifest {ops: move/delete/mutate-json-field with expected-before values}; the orchestrator applies it against CANONICAL paths through the statemap RMW (composing with statejson-stalerevision-cas-lost-write) at a safe point (cycle end / wave boundary — single-writer window); (3) verify = ACS predicates against canonical (git-common-dir anchored, the cycle-984 pattern); (4) expected-before mismatches abort the op loudly (no blind apply); (5) worktree/build/audit phases SKIPPED for this class — the wrapper drops from ~7.6M tokens to near-zero (also a token-optimization win). Guard: source-touching ops are NEVER accepted in an operator-state manifest.",
+  "evidence": "Cycles 984/992/994/999/1000 failure analyses; operator-side 984 remediation (3/3 green in seconds); 992 audit note 'live non-dry-run mutation deferred (live-loop safety)'; wrapper economics knowledge-base/research/token-usage-history-2026-07-20.md.",
+  "files": ["go/internal/phases/triage/", "go/internal/core/", "go/internal/adapters/statemap/", "go/internal/phasespec/"],
+  "class": "pipeline-architecture"
+}

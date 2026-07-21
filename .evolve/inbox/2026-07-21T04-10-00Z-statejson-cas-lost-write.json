@@ -1,0 +1,15 @@
+{
+  "id": "statejson-stalerevision-cas-lost-write",
+  "title": "state.json lost-write: add stateRevision CAS to every locked RMW \u2014 a Jul-14 snapshot (rev 1356) was clobbered over the live array mid-cycle-1001, destroying 136 carryoverTodos",
+  "weight_hint": 0.96,
+  "created": "2026-07-21T04:10:00Z",
+  "why": "LIVE INCIDENT cycle-1001 (audit-report, SYSTEM-class): carryoverTodos=136 at premise-challenge 09:54, =0 at build 10:03; on-disk state.json was a 2026-07-14 snapshot (lastUpdated 2026-07-14T05:01:14Z, stateRevision 1356) written OVER the live file. Post-incident probe: stateRevision now 1359 / lastCycleNumber 1001 / todos regenerated at 138, but lastUpdated STILL frozen at Jul-14 \u2014 the clobbered snapshot became the new base; the original 136-id population is unrecoverable. Some writer holds a stale in-memory copy and wins the flock without checking freshness: the sidecar lock serializes but does not VALIDATE \u2014 a stale writer that re-reads nothing overwrites newer revisions legally.",
+  "how_to_apply": "Single chokepoint (adapters/statemap is the RMW SSOT): (1) every UpdateStateMap RMW re-reads INSIDE the lock and compares stateRevision; mismatch vs the caller's read snapshot => retry the mutation on fresh state (bounded retries), NEVER write a lower/equal revision over a higher one; (2) writes always bump stateRevision and refresh lastUpdated (the frozen Jul-14 stamp shows some writers skip it \u2014 make both mandatory in the single writer path); (3) find the stale-snapshot writer: audit all writers that hold state across long spans (loop process boot snapshot? fleet supervisor? checkpoint restore?) and migrate any direct atomicwrite of state.json to statemap; (4) forensic tripwire: WARN loudly when an incoming write would DECREASE stateRevision or shrink carryoverTodos by >50% in one write. TDD red-first: two writers, stale one must lose with a retry, not clobber.",
+  "evidence": "CAREFUL-REVIEW SYNTHESIS 2026-07-21: SIX failed cycles are this ONE disease \u2014 992 (adversarial F1 MEDIUM flagged 'non-atomic RMW lost-update race on state.json, pre-existing pattern' BEFORE the incident), 994 (no-phase-FAIL ship refusal on a grouped carryover lane during the defect window), 995 (adversarial FAIL, 'flocked RMW claim corrected'), 999 (symlink sever, no copy-back), 1000 (apply not present in live state), 1001 (the lost-write incident itself). The pipeline WARNED at 992 before it BIT at 1001. .evolve/runs/cycle-1001/audit-report.md defects[0]; build-report BLOCKED note (136@09:54 -> 0@10:03); live probe 2026-07-21: stateRevision 1359 + lastCycleNumber 1001 but lastUpdated frozen 2026-07-14T05:01:14Z.",
+  "files": [
+    "go/internal/adapters/statemap/",
+    "go/internal/adapters/storage/",
+    "go/cmd/evolve/cmd_loop.go"
+  ],
+  "class": "shared-state-integrity"
+}

@@ -1,11 +1,16 @@
 {
   "id": "optional-phase-ev-gating-by-cycle-class",
-  "title": "Gate advisor-inserted optional phases on cycle class/size — coverage-gate+bug-repro+fault-loc+flake-rerun cost ~4.7M tokens/cycle and are near-pure overhead on trivial cycles",
-  "weight_hint": 0.85,
+  "title": "Gate advisor-inserted optional phases on cycle class/size \u2014 coverage-gate+bug-repro+fault-loc+flake-rerun cost ~4.7M tokens/cycle and are near-pure overhead on trivial cycles",
+  "weight_hint": 0.92,
   "created": "2026-07-21T01:32:00Z",
-  "why": "MEASURED (knowledge-base/research/token-usage-history-2026-07-20.md): per-run cache-read averages — coverage-gate 1.67M, bug-reproduction 1.31M, flake-rerun-scan 0.87M, fault-localization 0.83M. These advisor-inserted optionals fire liberally regardless of cycle size/class; on trivial/docs/config cycles they add ~4.7M tokens with little expected value. The integrity floor already models class-aware skipping (tdd unless trivial; cycle_size_estimate exists in cycle-state).",
-  "how_to_apply": "phases_are_config_only + phase_settings_from_config_not_code: (1) extend the advisor plan clamp so optional-phase insertion consults cycle class (bugfix => bug-repro/fault-loc justified; feature/docs/trivial => skip unless the advisor JUSTIFIES with a cited signal); (2) declare per-phase insertion predicates in the phase catalog/policy (e.g. applies_to: [bugfix]) rather than Go literals; (3) integrity floor untouched — mandatory spine phases are never gated; (4) telemetry proves the delta (expect ~30-40% wrapper reduction on non-bugfix cycles). Wiring proof: a trivial-class cycle plan must show the skipped optionals and the reason in the routing plan artifact.",
+  "why": "OPERATOR PRIORITIZATION 2026-07-21: token-optimization class bumped by directive ('prioritize and bump token optimization related tasks'). MEASURED (knowledge-base/research/token-usage-history-2026-07-20.md): per-run cache-read averages \u2014 coverage-gate 1.67M, bug-reproduction 1.31M, flake-rerun-scan 0.87M, fault-localization 0.83M. These advisor-inserted optionals fire liberally regardless of cycle size/class; on trivial/docs/config cycles they add ~4.7M tokens with little expected value. The integrity floor already models class-aware skipping (tdd unless trivial; cycle_size_estimate exists in cycle-state).",
+  "how_to_apply": "phases_are_config_only + phase_settings_from_config_not_code: (1) extend the advisor plan clamp so optional-phase insertion consults cycle class (bugfix => bug-repro/fault-loc justified; feature/docs/trivial => skip unless the advisor JUSTIFIES with a cited signal); (2) declare per-phase insertion predicates in the phase catalog/policy (e.g. applies_to: [bugfix]) rather than Go literals; (3) integrity floor untouched \u2014 mandatory spine phases are never gated; (4) telemetry proves the delta (expect ~30-40% wrapper reduction on non-bugfix cycles). Wiring proof: a trivial-class cycle plan must show the skipped optionals and the reason in the routing plan artifact.",
   "evidence": "per-phase usage aggregation cycles>=900; advisor-inserted phase run counts (coverage-gate 40, bug-repro 36, fault-loc 47 across ~85 cycles); existing trivial-class floor precedent (tdd unless trivial).",
-  "files": ["go/internal/router/", "go/internal/policy/", "go/internal/phasespec/", "go/internal/core/routing_dispatch.go"],
+  "files": [
+    "go/internal/router/",
+    "go/internal/policy/",
+    "go/internal/phasespec/",
+    "go/internal/core/routing_dispatch.go"
+  ],
   "class": "token-efficiency"
 }

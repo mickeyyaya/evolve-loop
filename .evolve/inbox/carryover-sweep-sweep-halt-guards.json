@@ -1,6 +1,6 @@
 {
   "id": "carryover-sweep-sweep-halt-guards",
-  "weight": 0.75,
+  "weight": 0.5,
   "kind": "sweep",
   "title": "Halt-dispatch + guard-seam small items",
   "items": [
@@ -8,5 +8,6 @@
     "todo-guards-hermetic-home-seam",
     "todo-multilane-halt-dossier-dedup",
     "todo-swarm-manifest-errors-fail-loud"
-  ]
+  ],
+  "why": "BLOCKED-ON 2026-07-21: statejson-stalerevision-cas-lost-write (0.96) + statejson-worktree-canonical-propagation (0.95) \u2014 cycles 999/1000/1001 ALL failed on the shared-state propagation/lost-write defect; any live-state convergence task is unwinnable until those land. De-prioritized from 0.75 to 0.5; restore after the state-integrity cluster ships. "
 }

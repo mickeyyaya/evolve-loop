@@ -1,20 +1,27 @@
 {
   "id": "carryover-consolidation-sweep",
   "title": "Consolidate 107 carryoverTodos: prune stale failure echoes + dedup landed-work shadows, then batch real small items into 4-6-per-cycle sweep groups",
-  "weight": 0.9,
+  "weight": 0.5,
   "kind": "maintenance",
   "priority": "high",
   "campaign": "lesson-to-action-2026-07",
-  "summary": "state.json carryoverTodos has 107 entries in three populations (operator audit 2026-07-13): (1) ~71 stale failure echoes (cycle-366..375-failed-* etc., cycles_unpicked>=20, expiresAt 2026-08-05) whose root causes are long fixed — including cycle-704/709-failed-ship items describing the SELF_SHA_IO cascade already healed 2026-07-12; these carry priority P0 yet are never picked (priority inversion) and pollute every triage read. (2) ~10-15 duplicate shadows of inbox items or already-landed work (fleet-config-hot-reload-wave-boundary LANDED 2026-07-13; loop-batch-chaining duplicates the 0.88 inbox item; todo-chronicle-s3-digest-wiring duplicates chronicle-s3). (3) ~15-25 genuinely small file-scoped actions (e.g. tdd-topn-binding-gate-extension gate.go:49, ship-stage-explicit-paths, tdd-topn-binding-gate-treeclaim). THIS CYCLE: judge each todo against landed dossiers + current inbox — DELETE population 1 and 2 (record ids+reason in the cycle dossier), CLUSTER population 3 by code area into 4-6-item sweep groups and file each group as ONE inbox item (weight ~0.75, kind=sweep, trivial-class-eligible where diffs are small) so sweep cycles consume them with multi-item top_n and amortize pipeline overhead. Do NOT hand-edit state.json outside the sanctioned state RMW path (flock). Related enabling mechanism: difficulty-conditioned-phase-budgets (inbox 2026-07-05) — lean phase spine for small items; consider raising its effective priority in triage.",
+  "summary": "BLOCKED-ON 2026-07-21: statejson-stalerevision-cas-lost-write (0.96) + statejson-worktree-canonical-propagation (0.95) \u2014 cycles 999/1000/1001 ALL failed on the shared-state propagation/lost-write defect; any live-state convergence task is unwinnable until those land. De-prioritized from 0.9 to 0.5; restore after the state-integrity cluster ships. state.json carryoverTodos has 107 entries in three populations (operator audit 2026-07-13): (1) ~71 stale failure echoes (cycle-366..375-failed-* etc., cycles_unpicked>=20, expiresAt 2026-08-05) whose root causes are long fixed \u2014 including cycle-704/709-failed-ship items describing the SELF_SHA_IO cascade already healed 2026-07-12; these carry priority P0 yet are never picked (priority inversion) and pollute every triage read. (2) ~10-15 duplicate shadows of inbox items or already-landed work (fleet-config-hot-reload-wave-boundary LANDED 2026-07-13; loop-batch-chaining duplicates the 0.88 inbox item; todo-chronicle-s3-digest-wiring duplicates chronicle-s3). (3) ~15-25 genuinely small file-scoped actions (e.g. tdd-topn-binding-gate-extension gate.go:49, ship-stage-explicit-paths, tdd-topn-binding-gate-treeclaim). THIS CYCLE: judge each todo against landed dossiers + current inbox \u2014 DELETE population 1 and 2 (record ids+reason in the cycle dossier), CLUSTER population 3 by code area into 4-6-item sweep groups and file each group as ONE inbox item (weight ~0.75, kind=sweep, trivial-class-eligible where diffs are small) so sweep cycles consume them with multi-item top_n and amortize pipeline overhead. Do NOT hand-edit state.json outside the sanctioned state RMW path (flock). Related enabling mechanism: difficulty-conditioned-phase-budgets (inbox 2026-07-05) \u2014 lean phase spine for small items; consider raising its effective priority in triage.",
   "acceptance": [
     "carryoverTodos count drops to only genuinely-live items (target <= ~25), with pruned ids + reasons recorded in the cycle dossier",
     "each surviving small action appears in exactly one filed sweep-group inbox item (no orphans, no duplicates vs existing inbox)",
     "state.json modified only via the sanctioned flocked RMW path; go test -race PASS on any touched packages",
     "next-cycle triage prompt no longer carries the pruned P0 echoes"
   ],
-  "files": [".evolve/state.json", "go/internal/core/", "go/internal/phases/triage/"],
+  "files": [
+    ".evolve/state.json",
+    "go/internal/core/",
+    "go/internal/phases/triage/"
+  ],
   "deps": [],
-  "connects_to": ["difficulty-conditioned-phase-budgets", "retro-preventive-actions-autofile-inbox"],
+  "connects_to": [
+    "difficulty-conditioned-phase-budgets",
+    "retro-preventive-actions-autofile-inbox"
+  ],
   "source": "operator carryover audit 2026-07-13 (WDYT discussion)",
   "created_at": "2026-07-13T07:15:00Z"
 }
