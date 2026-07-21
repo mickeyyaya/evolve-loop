@@ -116,6 +116,16 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// FAIL→retro transition, so this records only — it does not run retro.
 	if dr.resp.Verdict == VerdictFAIL && cr.o.isAuthoritativePhase(next) {
 		cr.o.recordFloorVerdictFailure(cr.ctx, cr.req, cr.cycle, next, &cr.state, &cr.cs, dr.resp.Diagnostics)
+		// Surface the override explanation in the RESULT too (cycle-1022: the
+		// reason lived only in workspace artifacts + orchestrator memory while
+		// the summary and dossier stayed silent — an invisible refusal).
+		// Audit-scoped guard (reviewer HIGH): cs.AuditFailReasons is set/reset
+		// ONLY for PhaseAudit — appending it on another authoritative phase's
+		// FAIL (e.g. a retro-routed tdd retry failing later for its own
+		// reason) would misattribute the stale audit string to that phase.
+		if next == PhaseAudit && len(cr.cs.AuditFailReasons) > 0 {
+			cr.result.FailReasons = append(cr.result.FailReasons, cr.cs.AuditFailReasons...)
+		}
 	}
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 	cr.current = next

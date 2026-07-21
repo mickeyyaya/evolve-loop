@@ -44,15 +44,18 @@ func goTest(t *testing.T, args ...string) (string, int) {
 }
 
 // TestC652_001_OutOfLaneBuildBlocked binds AC-1: a build report claiming a
-// slug outside triage ## top_n is BLOCKED at the transition with a recorded
-// abort_reason (table-driven: in-lane passes, out-of-lane blocks). Exercised
-// by the real white-box gate suite, which drives topNBindingGate.check and
-// NewReviewer(config.StageEnforce).Review over the in-lane / out-of-lane /
-// multi-member / fail-open table.
-func TestC652_001_OutOfLaneBuildBlocked(t *testing.T) {
+// slug outside triage ## top_n is surfaced as a LOUD ADVISORY (logged reason,
+// approved) — the committed set is the binding authority.
+// POLICY CHANGE 2026-07-22 (operator-directed, cycles 916 + 1012): the
+// out-of-lane label check is now ADVISORY — both recorded fatal rejections
+// discarded CORRECT work over label drift between two LLM strings, with zero
+// true-fraud catches. The binding authority is triage's committed set; scope
+// verification (deliverable files vs committed item scope) is the queued
+// fraud guard. These predicates now bind the ADVISORY contract.
+func TestC652_001_OutOfLaneBuildAdvisory(t *testing.T) {
 	out, code := goTest(t, "-race", "-count=1", "-run", "TestTopNBindingGate|TestNewReviewer_Enforce", "./internal/topngate/")
 	if code != 0 {
-		t.Errorf("AC-1: the out-of-lane build->audit block suite must PASS; got exit=%d\n%s", code, out)
+		t.Errorf("AC-1 (advisory contract): the label-drift suite must PASS; got exit=%d\n%s", code, out)
 	}
 }
 
@@ -70,15 +73,13 @@ func TestC652_002_BuilderPromptNamesTopNSoleAuthority(t *testing.T) {
 }
 
 // TestC652_003_ReplayCycle640ShapeBlocksBeforeAudit binds AC-3: replaying the
-// cycle-640 shape (triage=statefile task, build=token-resolver task) blocks at
-// the build->audit transition instead of consuming audit/ship phases, with an
-// abort_reason naming the wrong-task slug. Exercised by the real
-// TestReplayCycle640Shape regression, which asserts Review returns Approve=false
-// with the wrong slug in Reason.
-func TestC652_003_ReplayCycle640ShapeBlocksBeforeAudit(t *testing.T) {
+// cycle-640 shape (triage=statefile task, build=token-resolver task) passes
+// with a loud drift advisory — see the 2026-07-22 policy note on AC-1; the
+// replay test itself documents why the fatal form was retired.
+func TestC652_003_ReplayCycle640ShapeAdvisory(t *testing.T) {
 	out, code := goTest(t, "-count=1", "-run", "TestReplayCycle640Shape", "./internal/topngate/")
 	if code != 0 {
-		t.Errorf("AC-3: cycle-640-replay regression must PASS (blocked before audit); got exit=%d\n%s", code, out)
+		t.Errorf("AC-3: cycle-640-replay (advisory contract) must PASS; got exit=%d\n%s", code, out)
 	}
 }
 

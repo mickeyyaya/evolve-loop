@@ -22,8 +22,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 )
 
@@ -94,7 +98,31 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	if len(pkgs) == 0 {
 		return nil
 	}
-	fails := runBuildSelfCheck(ctx, codequality.ModuleDir(in.Worktree), pkgs, buildSelfCheckRunner)
+	// Split the changed set: ENFORCED packages run once under the coverage-
+	// instrumented pass inside apicoverNamingFailures (their test run doubles
+	// as the selfcheck — reviewer MED: never run the same package's tests
+	// twice per handoff); everything else takes the plain selfcheck.
+	moduleDir := codequality.ModuleDir(in.Worktree)
+	enforcedSet := map[string]bool{}
+	if enforceBytes, err := os.ReadFile(filepath.Join(moduleDir, ".apicover-enforce")); err == nil {
+		for _, p := range ciparity.IntersectEnforced(pkgs, enforceBytes) {
+			enforcedSet[p] = true
+		}
+	}
+	plain := make([]string, 0, len(pkgs))
+	enforced := make([]string, 0, len(enforcedSet))
+	for _, p := range pkgs {
+		if enforcedSet[p] {
+			enforced = append(enforced, p)
+		} else {
+			plain = append(plain, p)
+		}
+	}
+	fails := runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner)
+	// The apicover parity class (5 live instances: 3 main REDs, a console PR
+	// red, and cycle-1022's invisible audit override): an ENFORCED changed
+	// package with an unnamed export dies at HANDOFF, not at audit/CI.
+	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced)
 	// Persist the artifact for the ACS toolchain gate (same producer contract
 	// as the advisory binding, which skips its duplicate run when the floor is
 	// enforced — one go-test pass per build, not two).
@@ -102,7 +130,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	if len(fails) > 0 {
 		writeBuildSelfCheckArtifact(in.Worktree, fails)
 	}
-	out := make([]string, 0, len(fails))
+	out := make([]string, 0, len(fails)+len(namingFails))
 	for _, f := range fails {
 		head := f.Output
 		if len(head) > 400 {
@@ -110,5 +138,94 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 		}
 		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, head))
 	}
+	out = append(out, namingFails...)
 	return out
+}
+
+// apicoverNamingFailures runs the coverage-backed apicover enforce check over
+// the enforced changed packages — the same naming floor CI applies, shifted
+// to build handoff. The coverage test run DOUBLES as those packages'
+// selfcheck (a test failure is returned as a floor failure, never silently
+// dropped), and every fail-open plumbing branch WARNs loudly (reviewer MED:
+// silence here would let a coverage-run flake vanish the naming check).
+func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string) []string {
+	if len(enforced) == 0 {
+		return nil
+	}
+	dirs := make([]string, 0, len(enforced))
+	for _, p := range enforced {
+		dirs = append(dirs, filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
+	}
+	// apicover's enforce contract is named-AND-executed — it needs a coverage
+	// profile or every named export reads as false-green. Generate one scoped
+	// to the enforced changed packages (their single test run this handoff).
+	coverFunc, testOut, status := scopedCoverFunc(ctx, moduleDir, enforced)
+	if coverFunc != "" {
+		defer func() { _ = os.RemoveAll(filepath.Dir(coverFunc)) }() // reviewer HIGH: no temp leak
+	}
+	switch status {
+	case coverStatusTestsFailed:
+		head := testOut
+		if len(head) > 600 {
+			head = head[:600] + "…"
+		}
+		return []string{fmt.Sprintf("enforced package tests FAIL (coverage run doubles as their selfcheck):\n%s", head)}
+	case coverStatusPlumbingError:
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: scoped coverage generation failed (%s) — apicover naming check skipped this handoff; audit/CI gates stay armed\n", testOut)
+		return nil
+	}
+	var buf strings.Builder
+	code, rerr := apicover.Run(ctx, apicover.Config{Enforce: true, Dirs: dirs, CoverPath: coverFunc}, &buf)
+	if rerr != nil {
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: apicover measurement failed (%v) — naming check skipped this handoff\n", rerr)
+		return nil
+	}
+	if code == 0 {
+		return nil
+	}
+	report := buf.String()
+	if len(report) > 800 {
+		report = report[:800] + "…"
+	}
+	return []string{fmt.Sprintf("apicover naming floor: %d enforced changed package(s) carry unnamed exports — name+exercise them (CI api-coverage-enforce would FAIL):\n%s", len(enforced), report)}
+}
+
+const (
+	coverStatusOK = iota
+	coverStatusTestsFailed
+	coverStatusPlumbingError
+)
+
+// scopedCoverFunc runs `go test -coverprofile` over pkgs and converts it to
+// `go tool cover -func` output. Returns the func-file path (caller owns the
+// temp dir cleanup via its parent), the combined test output, and a status
+// distinguishing TEST failures (a real floor finding) from PLUMBING errors
+// (fail-open, loudly). The per-invocation -timeout mirrors realGoUnitTest's
+// defense-in-depth so one hung package cannot wedge the whole check beyond
+// the ambient ctx.
+func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
+	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
+	if err != nil {
+		return "", err.Error(), coverStatusPlumbingError
+	}
+	profile := filepath.Join(tmpDir, "cover.out")
+	args := append([]string{"test", "-count=1", "-timeout", "300s", "-coverprofile", profile}, pkgs...)
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = moduleDir
+	cmd.Env = sanitizeEnv(os.Environ())
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return tmpDir + "/", string(out), coverStatusTestsFailed
+	}
+	funcOut := filepath.Join(tmpDir, "cover.func.txt")
+	cmd2 := exec.CommandContext(ctx, "go", "tool", "cover", "-func="+profile)
+	cmd2.Dir = moduleDir
+	cmd2.Env = sanitizeEnv(os.Environ())
+	fo, err := cmd2.Output()
+	if err != nil {
+		return tmpDir + "/", "go tool cover: " + err.Error(), coverStatusPlumbingError
+	}
+	if err := os.WriteFile(funcOut, fo, 0o644); err != nil {
+		return tmpDir + "/", err.Error(), coverStatusPlumbingError
+	}
+	return funcOut, "", coverStatusOK
 }
