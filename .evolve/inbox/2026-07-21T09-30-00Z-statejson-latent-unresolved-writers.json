@@ -1,0 +1,11 @@
+{
+  "id": "statejson-latent-unresolved-writers",
+  "title": "Latent cycle-999-class writers: core/reset.go SealCycle locks the UNRESOLVED path and failurelog.Record raw tmp+renames state-adjacent files with no symlink resolution",
+  "weight_hint": 0.87,
+  "created": "2026-07-21T09:30:00Z",
+  "why": "GO-REVIEWER MEDIUM on the statemap CAS/symlink fix (fix/statemap-cas-symlink-integrity): (1) core/reset.go:282 flock.WithPathLock on the unresolved statePath — every reachable call today passes the canonical dir so LATENT, but the cross-tree lock-unification guarantee does not cover SealCycle; (2) failurelog.Record (record.go:131,206-208) writes via atomicwrite.JSON raw tmp+rename with NO symlink resolution — if ever reached with a worktree-linked path it reproduces the cycle-999 sever verbatim.",
+  "how_to_apply": "Console-first eligible but latent (no live incidents): (1) export a small statemap.ResolveWriteTarget (with apicover naming test) and use it for SealCycle's lock path; (2) migrate failurelog's state-adjacent writes to statemap or teach atomicwrite an optional resolve-symlinks mode used by state-file writers; (3) sweep for other atomicwrite users targeting .evolve/ state files with worktree exposure. Regression pins mirror statemap_integrity_test.go's symlink cases.",
+  "evidence": "go-reviewer findings 2026-07-21 (statefix review); go/internal/core/reset.go:282; go/internal/failurelog/record.go:131,206-208; statemap.go resolveWriteTarget precedent.",
+  "files": ["go/internal/core/reset.go", "go/internal/failurelog/record.go", "go/internal/adapters/statemap/", "go/internal/atomicwrite/"],
+  "class": "shared-state-integrity"
+}
