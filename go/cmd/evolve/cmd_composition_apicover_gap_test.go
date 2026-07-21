@@ -54,6 +54,17 @@ import (
 // enforcing recipe) will make the Makefile-target run in this test also
 // fail, at which point this test's core assertion flips to green.
 func TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport(t *testing.T) {
+	// DISABLED until percycle-audit-apicover-newexport-parity (0.94) redesigns
+	// it: this reproduction MUTATES THE LIVE REPO TREE — it creates
+	// internal/apicoverreprofixture998 in-tree, shells out to `make -C go
+	// apicover` (which regenerates coverage.txt, poisoning the CI profile with
+	// a package the cleanup then deletes), and broke the `go` workflow's
+	// cover -func step on BOTH platforms (2026-07-21, commit 79ead521: "cover:
+	// cannot run go list: fork/exec ...: invalid argument"). The skip must sit
+	// BEFORE any side effect. The fix cycle must rebuild this against a
+	// throwaway COPY of the module (temp dir), never the live tree, and flip
+	// the core assertion to t.Fatalf as its regression pin.
+	t.Skip("KNOWN BUG reproduction disabled (percycle-audit-apicover-newexport-parity): mutates the live repo tree and poisons the CI coverage profile — redesign against a temp module copy in the fix cycle")
 	goRoot := apicoverGoRoot(t)
 	repoRoot := filepath.Dir(goRoot)
 
