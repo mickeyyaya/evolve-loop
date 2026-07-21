@@ -83,7 +83,13 @@ type CarryoverTodo struct {
 	Action         string `json:"action"`
 	Priority       string `json:"priority"`
 	FirstSeenCycle int    `json:"first_seen_cycle"`
-	CyclesUnpicked int    `json:"cycles_unpicked"`
+	// Deprecated (ADR-0072 S5): this counter was only ever written as 0 and
+	// never incremented in the real cycle-failure path — a dead field. The
+	// single source of truth for per-task failure memory is now the inbox item
+	// JSON's own "failure_count", bumped and consulted by
+	// inboxmover.ReleaseCycleProcessingWithQuarantine. Kept for wire-compat with
+	// existing state.json blobs; do not add new reads.
+	CyclesUnpicked int `json:"cycles_unpicked"`
 	// ExpiresAt (RFC3339) is the TTL stamp inherited from the FailedRecord that
 	// created this todo, mirroring failedApproaches. It lets the loop-start prune
 	// (failurelog.PruneExpiredCarryoverTodos) age the array out instead of letting

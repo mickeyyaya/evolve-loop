@@ -41,11 +41,16 @@ var (
 	ErrBadState = errors.New("inboxmover: invalid new_state")
 )
 
-// validStates is the set of allowed promote targets.
+// validStates is the set of allowed promote targets. "quarantine" is the
+// ADR-0072 S5 terminal state: a task that has failed task_retry_ceiling times
+// routes here (a sibling dir the triage scanner never walks) instead of being
+// released back to the inbox root every cycle, so a poison todo stops being
+// re-picked forever.
 var validStates = map[string]bool{
-	"processed": true,
-	"rejected":  true,
-	"retry":     true,
+	"processed":  true,
+	"rejected":   true,
+	"retry":      true,
+	"quarantine": true,
 }
 
 // Options shared by all subcommands.
@@ -340,8 +345,70 @@ func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, st
 	case "retry":
 		destDir := filepath.Join(inboxDir, "retry")
 		return destDir, filepath.Join(destDir, base)
+	case "quarantine":
+		// Flat sibling dir (no cycle-N subdir): quarantine is terminal, not
+		// per-cycle, and LoadDir skips subdirs so the item vanishes from triage.
+		destDir := filepath.Join(inboxDir, "quarantine")
+		return destDir, filepath.Join(destDir, base)
 	}
 	return "", ""
+}
+
+// ShouldQuarantine is the pure ADR-0072 S5 decision: quarantine a task once its
+// task-level failure count reaches the configured ceiling. A zero (or negative)
+// ceiling disables quarantine entirely, and a system-level failure NEVER
+// quarantines — the S3 floor halt takes precedence (AC4). The caller passes the
+// ceiling (FailureThresholds.TaskRetryCeiling, default 2) and the system-level
+// flag; inboxmover deliberately does not import internal/policy so the package
+// layering stays intact.
+func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
+	return ceiling > 0 && !systemLevelFailure && failureCount >= ceiling
+}
+
+// ReleaseFromQuarantine is the operator escape hatch for ADR-0072 S5: it moves
+// an item out of .evolve/inbox/quarantine/ back to the inbox root and resets its
+// failure_count to 0, so the next cycle's triage can re-pick it. Returns
+// ErrNotFound when no quarantined item carries taskID. Idempotent-safe: a
+// basename already present at the inbox root is left untouched (never clobbered)
+// and reported as ErrMvFailed. The counter reset keeps the item JSON the single
+// source of truth for task-level failure memory (no stale count strands it).
+func ReleaseFromQuarantine(opts Options, taskID string) (PromoteResult, error) {
+	opts.resolveOpts()
+	res := PromoteResult{}
+	if taskID == "" {
+		return res, fmt.Errorf("%w: release-from-quarantine requires task_id", ErrBadArgs)
+	}
+	qDir := filepath.Join(opts.InboxDir, "quarantine")
+	src, err := findFileByTaskID(qDir, taskID)
+	if err != nil {
+		return res, fmt.Errorf("%w: %s (not in quarantine)", ErrNotFound, taskID)
+	}
+	base := filepath.Base(src)
+	dest := filepath.Join(opts.InboxDir, base)
+	if _, statErr := os.Stat(dest); statErr == nil {
+		return res, fmt.Errorf("%w: %s already at inbox root", ErrMvFailed, base)
+	}
+	// Reset the failure counter before re-entry so a released item gets a fresh
+	// retry budget (best-effort — a rewrite failure must not block the release).
+	_ = updateItemJSON(src, func(m map[string]json.RawMessage) {
+		zero, _ := json.Marshal(0)
+		m["failure_count"] = zero
+		delete(m, "last_failure_reason")
+	})
+	if mvErr := os.Rename(src, dest); mvErr != nil {
+		return res, fmt.Errorf("%w: %v", ErrMvFailed, mvErr)
+	}
+	res.SrcPath = src
+	res.DestPath = dest
+	opts.logf("", "released from quarantine: %s → inbox/", base)
+	writeLedger(opts, LedgerEntry{
+		Action: "quarantine-release",
+		TaskID: taskID,
+		From:   ".evolve/inbox/quarantine/" + base,
+		To:     ".evolve/inbox/" + base,
+		Reason: "operator-quarantine-release",
+	})
+	return res, nil
 }
 
 // --- Reconciliation: retire-by-id (superseded) ----------------------------
@@ -493,6 +560,35 @@ func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
 // the ledger durably distinguishes a delivery-failure retry from an ordinary
 // residual drain (inbox-promotion-requires-landed-ship).
 func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (RecoverResult, error) {
+	return releaseCycleProcessing(opts, cycle, reason, nil)
+}
+
+// quarantinePolicy carries the ADR-0072 S5 decision inputs for a failure drain:
+// the task-level retry ceiling and whether this cycle's failure was
+// system-level (an S3 floor halt), which suppresses quarantine (AC4).
+type quarantinePolicy struct {
+	ceiling     int
+	systemLevel bool
+}
+
+// ReleaseCycleProcessingWithQuarantine is the ADR-0072 S5 failure-drain: it
+// releases processing/cycle-<cycle>/ like ReleaseCycleProcessingWithReason but
+// first increments each item's durable task-level failure_count — the single
+// source of truth that replaces the dead cyclestate.CyclesUnpicked counter —
+// and, once that count reaches `ceiling` on a task-level failure (systemLevel
+// false, honoring S3 precedence), routes the item to .evolve/inbox/quarantine/
+// instead of back to the inbox root, so a poison todo stops being re-picked
+// every cycle. Fail-open end to end: any per-item read/write error falls back
+// to a normal release so a bookkeeping fault never strands nor wrongly
+// quarantines an item. A ceiling <= 0 is exactly ReleaseCycleProcessingWithReason.
+func ReleaseCycleProcessingWithQuarantine(opts Options, cycle int, reason string, ceiling int, systemLevel bool) (RecoverResult, error) {
+	return releaseCycleProcessing(opts, cycle, reason, &quarantinePolicy{ceiling: ceiling, systemLevel: systemLevel})
+}
+
+// releaseCycleProcessing is the shared drain core. quar==nil is the plain
+// release-to-root behavior; a non-nil quar applies the S5 quarantine decision
+// per item before falling back to the release.
+func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
 	if reason == "" {
 		reason = "cycle-release"
 	}
@@ -521,15 +617,29 @@ func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (R
 		base := f.Name()
 		src := filepath.Join(cycleDir, base)
 		dest := filepath.Join(opts.InboxDir, base)
+		taskID := readTaskIDOrUnknown(src)
+
+		// ADR-0072 S5: bump the durable failure_count and quarantine at the
+		// ceiling instead of releasing back to root. Fail-open — a read/write
+		// error skips quarantine and falls through to the normal release.
+		if quar != nil {
+			if count, bumpErr := bumpFailureCount(src, reason); bumpErr == nil &&
+				ShouldQuarantine(count, quar.ceiling, quar.systemLevel) {
+				if pr, pErr := Promote(opts, taskID, "quarantine", PromoteOpts{Cycle: fmt.Sprintf("%d", cycle)}); pErr == nil && !pr.NoOp {
+					opts.logf("", "quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", base, count, quar.ceiling, cycle)
+					res.Recovered++
+					res.Paths = append(res.Paths, pr.DestPath)
+					continue
+				}
+			}
+		}
 
 		// Double-move race: a concurrent release already landed this file.
 		if _, statErr := os.Stat(dest); statErr == nil {
-			taskID := readTaskIDOrUnknown(src)
 			opts.logf("WARN: ", "release-cycle: %s already at inbox root (double-move for %s) — skipping", base, taskID)
 			continue
 		}
 
-		taskID := readTaskIDOrUnknown(src)
 		if mvErr := os.Rename(src, dest); mvErr != nil {
 			opts.logf("WARN: ", "release-cycle: mv failed for %s (leaving in processing/cycle-%d/): %v", base, cycle, mvErr)
 			continue
@@ -548,6 +658,60 @@ func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (R
 	}
 	opts.logf("", "release-cycle: %d file(s) released from cycle-%d", res.Recovered, cycle)
 	return res, nil
+}
+
+// bumpFailureCount increments the durable "failure_count" on an inbox item JSON
+// (the single source of truth for ADR-0072 S5 task-level failure memory) and
+// stamps the latest failure reason, preserving every other field. Returns the
+// new count. Atomic (write-tmp + rename) so a crash never leaves a half-written
+// item. Any parse/IO error is returned so the caller can fail open.
+func bumpFailureCount(path, reason string) (int, error) {
+	count := 0
+	err := updateItemJSON(path, func(m map[string]json.RawMessage) {
+		if raw, ok := m["failure_count"]; ok {
+			_ = json.Unmarshal(raw, &count)
+		}
+		count++
+		cb, _ := json.Marshal(count)
+		m["failure_count"] = cb
+		if reason != "" {
+			rb, _ := json.Marshal(reason)
+			m["last_failure_reason"] = rb
+		}
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// updateItemJSON reads an inbox item, applies mutate to its top-level field map
+// (preserving every field the loop does not touch), and writes it back
+// atomically (write-tmp + rename). Any parse/IO error is returned so callers can
+// fail open. mutate must not retain the map after returning.
+func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return err
+	}
+	mutate(m)
+	out, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
+	if err := os.WriteFile(tmp, out, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // --- Helpers ---------------------------------------------------------------
