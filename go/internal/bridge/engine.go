@@ -553,6 +553,28 @@ type llmCallLog struct {
 	Source     string          `json:"source"`
 	DurationMS int64           `json:"duration_ms"`
 	ExitCode   int             `json:"exit_code"`
+	// Tripwire is true when a non-claude launch exited 0, ran past the success
+	// threshold, and still resolved to source=none — a genuine unmeasured
+	// success that warrants a per-CLI collector (cycle-1005). Not omitempty: the
+	// false case must stay queryable for the future tokens-report CLI.
+	Tripwire bool `json:"tripwire"`
+}
+
+// tripwireSuccessThreshold is the wall-clock floor separating a genuine
+// unmeasured success from a quiet quota-abort: only launches that ran longer
+// than this can be real work worth building a collector for (cycle-1005).
+const tripwireSuccessThreshold = 60 * time.Second
+
+// cycleFromWorkspace best-effort derives the "cycle-N" segment from a workspace
+// path (e.g. .../.evolve/runs/cycle-1005). Returns "" when no such segment
+// exists so the caller can fail open rather than error.
+func cycleFromWorkspace(ws string) string {
+	for _, seg := range strings.Split(filepath.ToSlash(ws), "/") {
+		if strings.HasPrefix(seg, "cycle-") {
+			return seg
+		}
+	}
+	return ""
 }
 
 // recordTokenUsage attributes a completed Launch's token cost (token-telemetry
@@ -599,6 +621,26 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		// as unmeasured, never left to read as zero-cost.
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: %s (agent %s)\n", result.Warn, req.Agent)
 	}
+	// Telemetry tripwire (cycle-1005): the generic coverage WARN above fires on
+	// every uncovered launch, so a quiet quota-abort (exit 85, seconds long) and
+	// a genuine unmeasured success read identically. Escalate only the latter — a
+	// non-claude CLI that exited 0, ran past the success threshold, and still
+	// resolved to source=none — with a distinct TRIPWIRE line naming CLI+agent
+	// +cycle. Claude is the measured baseline (out of scope), and cycle
+	// derivation fails open (fires without the cycle rather than suppressing).
+	tripwire := code == 0 &&
+		end.Sub(start) > tripwireSuccessThreshold &&
+		result.Source == tokenusage.SourceNone &&
+		!strings.HasPrefix(strings.ToLower(req.CLI), "claude")
+	if tripwire {
+		cycle := cycleFromWorkspace(req.Workspace)
+		if cycle == "" {
+			cycle = "cycle-unknown"
+		}
+		_, _ = fmt.Fprintf(e.deps.Stderr,
+			"[engine] TRIPWIRE: non-claude launch cli=%s agent=%s %s exited 0 after %ds but token usage was unmeasured (source=none) — build a per-CLI usage collector\n",
+			req.CLI, req.Agent, cycle, int(end.Sub(start).Seconds()))
+	}
 	resp.Tokens = core.TokenUsage(result.Usage)
 	attempt := req.Attempt
 	if attempt <= 0 {
@@ -615,6 +657,7 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		Source:     string(result.Source),
 		DurationMS: end.Sub(start).Milliseconds(),
 		ExitCode:   code,
+		Tripwire:   tripwire,
 	}
 	line, err := json.Marshal(rec)
 	if err != nil {
