@@ -856,6 +856,14 @@ OuterLoop:
 			return cr.result, rerr
 		}
 
+		// Graduated remediation (2026-07-21): a configured deterministic gate
+		// that FAILed gets one bounded builder fix + a same-gate re-run BEFORE
+		// the verdict is recorded. Nothing downstream is bypassed — the same
+		// gate must pass and audit/EGPS/ship floors run unchanged.
+		if act, merr := cr.maybeRemediate(next, &dr); act == loopAbort {
+			return cr.result, merr
+		}
+
 		// End-of-iteration record + branch (success ledger, bindings, normalize,
 		// CompletedPhases persist, checkpoint, outcome record + cursor advance,
 		// retro/debugger non-verdict-driven branches) → recordAndBranch.

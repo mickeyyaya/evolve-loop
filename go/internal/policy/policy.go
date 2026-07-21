@@ -692,6 +692,11 @@ type WorkflowPolicy struct {
 	// and everything after it). Absent/nil = default ON; explicit false opts out.
 	CompactPrompts    *bool `json:"compact_prompts,omitempty"`
 	UniversalFallback *bool `json:"universal_fallback,omitempty"`
+	// RemediationRounds/RemediablePhases configure graduated remediation
+	// (workflow.remediation_rounds / workflow.remediable_phases).
+	RemediationRounds *int     `json:"remediation_rounds,omitempty"`
+	RemediablePhases  []string `json:"remediable_phases,omitempty"`
+	BuildFloor        *bool    `json:"build_floor,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -712,6 +717,22 @@ type WorkflowConfig struct {
 	// CompactPrompts mirrors WorkflowPolicy.CompactPrompts with the default applied.
 	// Default true: phase runners strip the on-demand reference tail before dispatch.
 	CompactPrompts bool
+	// BuildFloorEnforced (default true): the build deliverable is REJECTED
+	// while the changed packages' deterministic self-check fails (shift-left
+	// half of the 2026-07-21 directive) — the E2 correction ladder then fixes
+	// it in-phase. false restores the advisory-only selfcheck.
+	BuildFloorEnforced bool
+	// RemediationRounds bounds the graduated fix-forward ladder (operator
+	// directive 2026-07-21): when a phase listed in RemediablePhases returns a
+	// FAIL verdict, the orchestrator re-dispatches the builder ONCE per round
+	// with the gate's report as a correction directive, then re-runs the SAME
+	// gate. 0 disables. Default 1.
+	RemediationRounds int
+	// RemediablePhases lists the DETERMINISTIC gate phases eligible for
+	// graduated remediation. Judgment phases (audit, adversarial-review,
+	// premise-challenge) must never be listed — remediation is for mechanical,
+	// prescribed defects only. Default ["coverage-gate"].
+	RemediablePhases []string
 	// UniversalFallback (default true): when a phase's whole configured CLI chain
 	// (primary + cli_fallback) has no binary on this host, the runner discovers
 	// installed+authed CLIs via bridge.Doctor and appends the phase-allowlisted
@@ -735,6 +756,11 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		ConsensusAuditEnabled: true,
 		CompactPrompts:        true, // default ON: strips ~23 KB/cycle of reference tails
 		UniversalFallback:     true, // default ON: discover+route to an installed CLI when the configured chain is absent
+		// Graduated remediation (2026-07-21): default ON at 1 round for the
+		// coverage gate — the measured waste class (983/992/1007/1019/1020).
+		RemediationRounds:  1,
+		RemediablePhases:   []string{"coverage-gate"},
+		BuildFloorEnforced: true,
 	}
 	if p.Workflow == nil {
 		return c
@@ -771,6 +797,15 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	}
 	if p.Workflow.UniversalFallback != nil {
 		c.UniversalFallback = *p.Workflow.UniversalFallback
+	}
+	if p.Workflow.RemediationRounds != nil {
+		c.RemediationRounds = *p.Workflow.RemediationRounds
+	}
+	if p.Workflow.RemediablePhases != nil {
+		c.RemediablePhases = p.Workflow.RemediablePhases
+	}
+	if p.Workflow.BuildFloor != nil {
+		c.BuildFloorEnforced = *p.Workflow.BuildFloor
 	}
 	return c
 }

@@ -70,12 +70,13 @@ type cycleRun struct {
 	phaseTimings []phaseTimingEntry // appended via &cr.phaseTimings; read by RunCycle's exit defer (live header)
 
 	// loop-carried state-machine cursor (produced end of iter N, consumed start of iter N+1)
-	current       Phase  // SM cursor
-	lastVerdict   string // loop-carried verdict
-	scheduledNext Phase  // authoritative next-phase injection (retro/debugger/ship-recovery)
-	routingSeq    int    // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
-	recoveryDepth int    // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
-	replanDepth   int    // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
+	current           Phase         // SM cursor
+	lastVerdict       string        // loop-carried verdict
+	scheduledNext     Phase         // authoritative next-phase injection (retro/debugger/ship-recovery)
+	routingSeq        int           // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
+	remediationRounds map[Phase]int // graduated-remediation rounds used per gate phase (cyclerun_remediate.go); lazily initialized
+	recoveryDepth     int           // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
+	replanDepth       int           // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
 
 	// shipLease serializes the audit→ship critical section across lanes
 	// (cycle-778): acquired in recordAndBranch just before the audit-binding
