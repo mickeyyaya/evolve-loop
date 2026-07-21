@@ -27,6 +27,12 @@ type CycleResult struct {
 	// re-selecting the same inbox task. Nil ⇒ an ordinary task-level outcome
 	// (never-stop: retry/defer/quarantine as usual).
 	SystemFailure *SystemFailureSignal
+	// Remediations records graduated fix-forward rounds (operator directive
+	// 2026-07-21): each entry is "<gate>: round N -> <verdict>" for a
+	// deterministic gate that FAILed, received one bounded builder fix, and
+	// was re-run. Provenance only — the re-run verdict is what recorded; a
+	// remediated cycle is never a silent PASS.
+	Remediations []string
 }
 
 // SystemFailureSignal records a system-level failure classification (ADR-0072).

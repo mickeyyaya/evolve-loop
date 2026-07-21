@@ -31,11 +31,12 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	// re-dispatches up to the configured correction limit before aborting.
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
 		rin := ReviewInput{
-			Phase:       string(next),
-			Response:    dr.resp,
-			Workspace:   cr.cs.WorkspacePath,
-			Worktree:    dr.phaseWorktree,
-			ProjectRoot: cr.req.ProjectRoot,
+			Phase:           string(next),
+			WorktreeBaseSHA: cr.cs.WorktreeBaseSHA,
+			Response:        dr.resp,
+			Workspace:       cr.cs.WorkspacePath,
+			Worktree:        dr.phaseWorktree,
+			ProjectRoot:     cr.req.ProjectRoot,
 		}
 		rr := cr.o.reviewer.Review(cr.ctx, rin)
 		// Contract-correction retry: on a deliverable-contract reject,

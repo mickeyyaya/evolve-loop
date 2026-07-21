@@ -41,6 +41,27 @@ type selfCheckFailure struct {
 // the pass/fail branches without spawning `go test`.
 var buildSelfCheckRunner = realGoUnitTest
 
+// changedWorktreePathsSince lists paths changed relative to baseSHA (committed
+// work included — the build-floor reviewer's axis) plus untracked additions.
+func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string) []string {
+	var out []string
+	if diff, code, err := gitCapture(ctx, worktree, "diff", baseSHA, "--name-only"); err == nil && code == 0 {
+		for _, l := range strings.Split(diff, "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				out = append(out, l)
+			}
+		}
+	}
+	if oth, code, err := gitCapture(ctx, worktree, "ls-files", "--others", "--exclude-standard"); err == nil && code == 0 {
+		for _, l := range strings.Split(oth, "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				out = append(out, l)
+			}
+		}
+	}
+	return out
+}
+
 // changedGoTestPackages maps the cycle's changed repo paths to the unique,
 // sorted set of go-module package patterns to unit-test (e.g.
 // "go/internal/bridge/x.go" → "./internal/bridge"). Only paths under the go/

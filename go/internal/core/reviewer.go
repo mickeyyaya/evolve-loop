@@ -21,6 +21,12 @@ import "context"
 // resolved git-evidence challenge token (when CommitEvidence >= Shadow), so
 // reviewers don't have to re-discover any of these.
 type ReviewInput struct {
+	// WorktreeBaseSHA is the cycle's worktree base commit (CycleState
+	// .WorktreeBaseSHA) — deterministic reviewers diff against IT, not HEAD,
+	// because a committing builder (the mandated protocol) makes `git diff
+	// HEAD` empty until the post-review soft-reset re-exposes the work.
+	WorktreeBaseSHA string
+
 	Phase          string        // phase name ("tdd", "build", ...)
 	Response       PhaseResponse // the runner's PhaseResponse for the just-finished phase
 	Workspace      string        // absolute workspace dir (artifacts live here)
