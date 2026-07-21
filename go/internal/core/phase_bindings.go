@@ -352,7 +352,12 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 		// Deterministic false-green backstop: run the changed packages' unit
 		// tests AFTER the regen (so the tested tree matches what audit binds) and
 		// record ground-truth. Best-effort; never aborts — audit is the backstop.
-		o.buildSelfCheck(ctx, cs.ActiveWorktree)
+		// With the build-floor reviewer ENFORCED the same selfcheck already ran
+		// (base-diff scope) and wrote the artifact at the review seam — skip the
+		// duplicate go-test pass; the gofmt/regen normalizes above still ran.
+		if !o.workflowConfig.BuildFloorEnforced {
+			o.buildSelfCheck(ctx, cs.ActiveWorktree)
+		}
 	}
 }
 

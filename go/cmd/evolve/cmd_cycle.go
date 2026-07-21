@@ -560,6 +560,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// same seam. Each is gated independently (default enforce); both fail open on
 	// ambiguity. With both off, no reviewer is wired (noopReviewer; byte-identical).
 	var reviewers []core.DeliverableReviewer
+	// Build handoff floor (2026-07-21 shift-left): deterministic self-check
+	// REJECTS a red build deliverable so the E2 correction ladder fixes it
+	// in-phase; judgment phases still follow as the verdict layer. Chained
+	// FIRST because its rejection carries the exact defect list the ladder
+	// needs. It IS the expensive reviewer (real go-test per changed package) —
+	// the advisory post-build selfcheck skips its duplicate run when this
+	// floor is enforced, so each build pays the go-test cost exactly once.
+	if pol.WorkflowConfig().BuildFloorEnforced {
+		reviewers = append(reviewers, core.NewBuildFloorReviewer(core.DefaultBuildFloorChecks))
+	}
 	if cfg.EvalGate != config.StageOff {
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
 	}
