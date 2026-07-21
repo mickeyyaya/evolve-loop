@@ -1,7 +1,7 @@
 ---
 name: loop
 description: Use when the user invokes /evo:loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
-argument-hint: "[--cycles N | --resume] [strategy] [goal]"
+argument-hint: "(--resume | [--cycles N] [strategy] <goal>)"
 ---
 
 # Evolve Loop v22.7
@@ -41,6 +41,8 @@ The `find` expression locates the Go binary in either install layout (marketplac
 
 Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args.
 
+**A GOAL IS MANDATORY — prompt-and-wait before dispatch:** Before you run `evolve loop`, inspect `<args>`. If it contains NO goal (no positional goal text, no `--goal-text`/`--goal-hash`) and it is NOT a `--resume` or `--dry-run` invocation, you MUST ask the user to supply a one-line goal (via AskUserQuestion or a direct prompt) and WAIT for their answer BEFORE dispatching. **Never dispatch a goal-less `evolve loop`** — the binary rejects it with `rc=10` (`a goal is required …`), which is a re-prompt-the-user condition, not a terminal error. Only the cycle COUNT is optional (see below), never the goal.
+
 **Cycle count is optional:** omit `--cycles` and the advisor decides how many cycles the goal needs — completion-driven, stopping when the backlog drains, bounded by a safety cap. Pass `--cycles N` for a hard bound of exactly N cycles.
 
 **Resume after pause:** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
@@ -75,7 +77,7 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 | `1` | A cycle invocation failed (e.g., subagent crash, state.json unwritable) | Surface the specific cycle's stderr and stop — do NOT retry inline |
 | `2` | INTEGRITY BREACH: orchestrator silently skipped Scout/Builder/Auditor (no orchestrator-report.md, or report doesn't disclose the gap) — CRITICAL | Quote the exact ledger counts to the user; recommend inspecting `.evolve/runs/cycle-N/` to investigate; STOP |
 | `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
-| `10` | Bad arguments | Re-prompt with valid args |
+| `10` | Bad arguments — most often a MISSING GOAL (`a goal is required …`) | Re-prompt the user for a one-line goal (not a terminal error), then re-dispatch with the goal supplied |
 
 **Dispatch policy:** Configured in `.evolve/policy.json` under `dispatch.policy` (`off` / `verify` / `stop`; default: `verify`). Controls per-cycle ledger verification.
 
@@ -157,7 +159,8 @@ The following JSON block is the canonical state initialization for the evolve-lo
 }
 ```
 
-**Usage:** `/evo:loop [--cycles N] [strategy] [goal]`
+**Usage:** `/evo:loop [--cycles N] [strategy] <goal>` — a `<goal>` is REQUIRED
+(except with `--resume` or `--dry-run`); only the cycle COUNT is optional.
 (legacy bare positional integer = cycles; deprecation WARN emitted —
 prefer explicit `--cycles N`)
 
