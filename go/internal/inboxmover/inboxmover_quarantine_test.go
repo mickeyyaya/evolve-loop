@@ -152,3 +152,27 @@ func TestReleaseFromQuarantine_RoundTrips(t *testing.T) {
 		t.Error("expected ErrNotFound for absent id")
 	}
 }
+
+// TestShouldQuarantine_NamesThePredicate (apicover): the exported S5 decision
+// predicate, exercised over its whole contract — quarantine at/over the
+// ceiling for TASK-level failures only; system-level failures NEVER
+// quarantine (S3 halt precedence) regardless of count; zero/negative ceiling
+// disables quarantine.
+func TestShouldQuarantine_NamesThePredicate(t *testing.T) {
+	cases := []struct {
+		count, ceiling int
+		system         bool
+		want           bool
+	}{
+		{2, 3, false, false}, // below ceiling
+		{3, 3, false, true},  // at ceiling
+		{9, 3, false, true},  // over ceiling
+		{9, 3, true, false},  // system-level: S3 precedence, never quarantine
+		{9, 0, false, false}, // ceiling 0 = disabled
+	}
+	for _, tc := range cases {
+		if got := ShouldQuarantine(tc.count, tc.ceiling, tc.system); got != tc.want {
+			t.Errorf("ShouldQuarantine(%d,%d,%v)=%v, want %v", tc.count, tc.ceiling, tc.system, got, tc.want)
+		}
+	}
+}
