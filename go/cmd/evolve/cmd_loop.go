@@ -37,6 +37,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -627,10 +628,22 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				}
 				// Release all claimed inbox items back to inbox root on cycle failure
 				// so the next batch re-triages them (prevents permanent orphaning).
-				if _, relErr := inboxmover.ReleaseCycleProcessing(inboxmover.Options{
+				// ADR-0072 S5: a task that has now failed task_retry_ceiling times at
+				// the TASK level (build/audit/ship-gate) is quarantined instead of
+				// re-released, so a poison todo stops being re-picked every cycle.
+				// Transient infra and system/kernel breaches are NOT the task's fault
+				// (they take the S3 halt path), so they never quarantine here (AC4).
+				failPol := policy.DefaultSystemFailurePolicy()
+				if pol, polErr := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); polErr == nil {
+					if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
+						failPol = fp
+					}
+				}
+				systemLevel := !isTaskLevelFailure(class.Class)
+				if _, relErr := inboxmover.ReleaseCycleProcessingWithQuarantine(inboxmover.Options{
 					ProjectRoot: cfg.ProjectRoot,
 					Stderr:      stderr,
-				}, result.Cycle); relErr != nil {
+				}, result.Cycle, "cycle-failure-release", failPol.Thresholds.TaskRetryCeiling, systemLevel); relErr != nil {
 					fmt.Fprintf(stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, relErr)
 				}
 				// All-families quota exhaustion (cycle-656): the dispatch seam
@@ -902,6 +915,20 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // goal's remaining backlog the planning phases produced. ok is false when the
 // file is absent/unreadable/malformed, so the caller skips the completion check
 // rather than ever treating an unreadable state as "goal complete".
+// isTaskLevelFailure reports whether a cycle classification is a task-level
+// failure eligible for ADR-0072 S5 quarantine. Only genuine per-task defects
+// (build/audit/ship-gate) count; transient infrastructure and system/kernel
+// breaches are not the task's fault and take the S3 halt path, so they never
+// quarantine a todo (AC4 — S3 precedence over task quarantine).
+func isTaskLevelFailure(c cycleclassify.Classification) bool {
+	switch c {
+	case cycleclassify.ClassBuildFail, cycleclassify.ClassAuditFail, cycleclassify.ClassShipGateConfig:
+		return true
+	default:
+		return false
+	}
+}
+
 func readCarryoverCount(statePath string) (count int, ok bool) {
 	b, err := os.ReadFile(statePath)
 	if err != nil {

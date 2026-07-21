@@ -14,9 +14,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-func runInbox(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) >= 1 && args[0] == "quarantine" {
+		return runInboxQuarantine(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) < 1 || args[0] != "batches" {
-		fmt.Fprintln(stderr, "usage: evolve inbox batches [--json] [--max N]")
+		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine> ...")
 		return 10
 	}
 	asJSON := false
