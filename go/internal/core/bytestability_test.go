@@ -50,6 +50,7 @@ var additiveCycleStateKeys = []string{
 	"run_id",             // CA.5
 	"worktree_base_sha",  // cycle-156 resume parity
 	"audit_fail_reasons", // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
+	"failed_at",          // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

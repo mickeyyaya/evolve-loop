@@ -33,7 +33,7 @@ func TestDecideAfterRetro_EmitsRoutingDecisionArtifact(t *testing.T) {
 	o := advisoryOrchestrator(led, router.StaticPreset{})
 	ws := t.TempDir()
 
-	next, _, reason := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictFAIL, nil, router.RouteInput{})
+	next, _, reason, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictFAIL, nil, router.RouteInput{})
 
 	// Empty history, non-strict → adapter PROCEED → end (kernel default).
 	// The advisor agrees, so the operator-facing reason contract holds.
@@ -54,7 +54,7 @@ func TestDecideAfterRetro_PassArmShipsWithoutArtifact(t *testing.T) {
 	o := advisoryOrchestrator(led, router.StaticPreset{})
 	ws := t.TempDir()
 
-	next, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictPASS, nil, router.RouteInput{})
+	next, _, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictPASS, nil, router.RouteInput{})
 	if next != PhaseShip {
 		t.Errorf("next = %s, want ship (retro PASS recovers)", next)
 	}
@@ -83,7 +83,7 @@ func TestDecideAfterRetro_InsertClampedToLegalRetry(t *testing.T) {
 	o := advisoryOrchestrator(led, fixedNextStrategy{next: "fault-localization"})
 	ws := t.TempDir()
 
-	next, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 1, VerdictFAIL, nil, router.RouteInput{})
+	next, _, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 1, VerdictFAIL, nil, router.RouteInput{})
 	if next != PhaseTDD {
 		t.Errorf("next = %s, want tdd (insert clamped to legal SM edge)", next)
 	}
@@ -104,7 +104,7 @@ func TestDecideAfterRetro_ArbitraryIllegalPhaseClampsToBaseline(t *testing.T) {
 	o := advisoryOrchestrator(led, fixedNextStrategy{next: "made-up-phase"})
 	ws := t.TempDir()
 
-	next, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 1, VerdictFAIL, nil, router.RouteInput{})
+	next, _, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 1, VerdictFAIL, nil, router.RouteInput{})
 	if next != PhaseEnd {
 		t.Errorf("next = %s, want end (SM clamp must not upgrade proceed-to-end into a retry)", next)
 	}

@@ -338,7 +338,7 @@ func TestDecideAfterRetro(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{now: coverNow}
 
-	next, env, reason := o.decideAfterRetro(VerdictPASS, nil)
+	next, env, reason, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil)
 	if next != PhaseShip || !strings.Contains(reason, "retro-recovered") {
 		t.Errorf("PASS arm = (%s, %q), want ship/retro-recovered", next, reason)
 	}
@@ -346,7 +346,7 @@ func TestDecideAfterRetro(t *testing.T) {
 		t.Errorf("PASS arm should set no extra env, got %v", env)
 	}
 
-	next, _, reason = o.decideAfterRetro(VerdictFAIL, nil)
+	next, _, reason, _ = o.decideAfterRetro(CycleState{}, VerdictFAIL, nil)
 	if next != PhaseEnd || !strings.Contains(reason, "proceed") {
 		t.Errorf("non-strict FAIL arm = (%s, %q), want end/proceed", next, reason)
 	}

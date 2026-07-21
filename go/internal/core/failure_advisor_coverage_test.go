@@ -284,10 +284,10 @@ func TestRecoveryDecisionForensicsCoverage(t *testing.T) {
 	if got := o.decideAfterDebugger(PhaseResponse{Signals: map[string]interface{}{"debugger.action": "RERUN_PHASE", "debugger.rerun_phase": "ship"}}); got != PhaseAudit {
 		t.Fatalf("debugger rerun ship must clamp to audit, got %s", got)
 	}
-	if next, env, reason := o.decideAfterRetro(VerdictPASS, nil); next != PhaseShip || env != nil || !strings.Contains(reason, "retro-recovered") {
+	if next, env, reason, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil); next != PhaseShip || env != nil || !strings.Contains(reason, "retro-recovered") {
 		t.Fatalf("retro pass decision = %s %+v %q", next, env, reason)
 	}
-	if next, _, reason := o.decideAfterRetro(VerdictFAIL, nil); next != PhaseEnd || !strings.Contains(reason, "proceed") {
+	if next, _, reason, _ := o.decideAfterRetro(CycleState{}, VerdictFAIL, nil); next != PhaseEnd || !strings.Contains(reason, "proceed") {
 		t.Fatalf("retro fail with empty history decision = %s %q", next, reason)
 	}
 	st := &fakeStorage{}

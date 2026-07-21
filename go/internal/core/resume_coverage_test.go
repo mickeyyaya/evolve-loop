@@ -264,13 +264,13 @@ func TestDecideAfterRetro_AllBranches(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
 	// PASS verdict → ship branch
-	branch, _, _ := o.decideAfterRetro(VerdictPASS, nil)
+	branch, _, _, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil)
 	_ = branch // ship or end depending on state machine
 	// FAIL verdict → tdd or end
-	branch, _, _ = o.decideAfterRetro(VerdictFAIL, nil)
+	branch, _, _, _ = o.decideAfterRetro(CycleState{}, VerdictFAIL, nil)
 	_ = branch
 	// WARN verdict — also exercises a code path
-	branch, _, _ = o.decideAfterRetro(VerdictWARN, nil)
+	branch, _, _, _ = o.decideAfterRetro(CycleState{}, VerdictWARN, nil)
 	_ = branch
 }
 

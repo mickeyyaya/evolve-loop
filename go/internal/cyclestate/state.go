@@ -123,4 +123,10 @@ type CycleState struct {
 	// record and cycle finalization resumes without a false halt (the resume
 	// path already trusts cycle-state.json wholesale).
 	AuditFailReasons []string `json:"audit_fail_reasons,omitempty"`
+	// FailedAt: the cycle's failure history (mirrors State.FailedAt), carried on
+	// the per-cycle checkpoint so the ADR-0072 S4 evidence dossier can compose
+	// its non-progress counters (same-class recurrence, repeat count) from
+	// independent evidence at the retro-decision chokepoint. Additive omitempty;
+	// pre-S4 checkpoints decode/encode unchanged.
+	FailedAt []FailedRecord `json:"failed_at,omitempty"`
 }

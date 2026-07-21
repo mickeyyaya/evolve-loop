@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -40,13 +41,21 @@ import (
 // / bug-reproduction) is clamped to the legal retry target until the SM
 // opens that edge — kernel disposes, and the clamp is visible in the
 // artifact.
-func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string) {
-	// Deterministic baseline: branch, kernel-owned SetEnv, and the
-	// operator-facing reason contract ("proceed:"/"retry-with-fallback:"/…)
-	// that dashboards and scenario pins grep for.
-	detNext, extraEnv, detReason := o.decideAfterRetro(retroVerdict, history)
+func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string, *SystemFailureSignal) {
+	// Deterministic baseline: branch, kernel-owned SetEnv, the operator-facing
+	// reason contract ("proceed:"/"retry-with-fallback:"/…) that dashboards and
+	// scenario pins grep for, and the ADR-0072 S4 floor signal (non-nil ⇒ a
+	// floor category was detected — see decideAfterRetro).
+	detNext, extraEnv, detReason, sig := o.decideAfterRetro(cs, retroVerdict, history)
 	if retroVerdict == VerdictPASS {
-		return detNext, extraEnv, detReason // PASS recovers; not a failure branch
+		return detNext, extraEnv, detReason, nil // PASS recovers; not a failure branch
+	}
+	// ADR-0072 S4 (F1): the Go floor sits ABOVE the router. A floor category
+	// HALTS even when the routing strategy would propose a retry — "orchestrator
+	// decides, Go enforces floor". Enforced here, before o.strategy.Decide, so a
+	// routed tdd upgrade can never survive a floor category.
+	if sig != nil {
+		return PhaseEnd, nil, detReason, sig
 	}
 
 	in.Current = string(PhaseRetro)
@@ -77,25 +86,70 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	}
 	o.recordRoutingDecision(ctx, cycle, cs, seq, rdec)
 	if branch == detNext {
-		return branch, extraEnv, detReason // advisor agrees; keep the contract string
+		return branch, extraEnv, detReason, nil // advisor agrees; keep the contract string
 	}
-	return branch, extraEnv, "retro-routed: " + rdec.Reason
+	return branch, extraEnv, "retro-routed: " + rdec.Reason, nil
 }
 
-func (o *Orchestrator) decideAfterRetro(retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string) {
-	// retro PASS → ship; no failureadapter consultation.
+// applyFailureDecisionFloor is the ADR-0072 S4 Go floor at the retro-branch
+// chokepoint. It builds the evidence dossier, writes it for per-cycle forensics,
+// and returns a HALTING SystemFailureSignal when EITHER the deterministic dossier
+// candidate OR the orchestrator's own failure-decision.json classifies the cycle
+// into a floor category (verdict-incoherence / infra-systemic). A proposed retry
+// cannot survive a floor category — the deterministic candidate is checked first
+// (caught even with no orchestrator running), then the orchestrator's judgment.
+// Returns nil when no floor bites; the caller then routes / falls back normally.
+func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) *SystemFailureSignal {
+	d := buildFailureDossier(cs, retroVerdict, o.failurePolicy)
+	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
+
+	// (1) Deterministic dossier candidate — a broken pipeline cannot dodge it.
+	if d.FloorCandidate != "" && o.failurePolicy.IsFloor(d.FloorCandidate) {
+		return &SystemFailureSignal{
+			Category: d.FloorCandidate,
+			Level:    policy.LevelSystem,
+			Evidence: d.Evidence,
+			Halt:     true,
+		}
+	}
+	// (2) Orchestrator judgment — a floor-category classification halts even
+	// when its own proposed action is a retry (the F2-b cycle-1001 shape).
+	if dec, _ := readFailureDecision(cs.WorkspacePath); dec != nil && o.failurePolicy.IsFloor(dec.Category) {
+		ev := dec.Evidence
+		if ev == "" {
+			ev = dec.Justification
+		}
+		return &SystemFailureSignal{
+			Category: dec.Category,
+			Level:    policy.LevelSystem,
+			Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
+			Halt:     true,
+		}
+	}
+	return nil
+}
+
+func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string, sig *SystemFailureSignal) {
+	// retro PASS → ship; no failureadapter consultation, no floor (nothing failed).
 	if retroVerdict == VerdictPASS {
-		return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), nil, "retro-recovered: ship"
+		return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), nil, "retro-recovered: ship", nil
+	}
+	// ADR-0072 S4: the Go floor is the FIRST disposition of a failed cycle — a
+	// floor category (verdict-incoherence / infra-systemic) HALTS before any
+	// adapter or router branch, the non-bypassable "Go enforces floor" boundary
+	// that applies to every stage and the resume path alike.
+	if s := o.applyFailureDecisionFloor(cs, retroVerdict); s != nil {
+		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
 	}
 	entries := entriesFromRecords(history)
 	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
-		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseTDD), dec.SetEnv, "retry-with-fallback: " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseTDD), dec.SetEnv, "retry-with-fallback: " + dec.Reason, nil
 	case failureadapter.ActionBlockCode, failureadapter.ActionBlockOperatorAction:
-		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), nil, string(dec.Action) + ": " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), nil, string(dec.Action) + ": " + dec.Reason, nil
 	default: // ActionProceed
-		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), dec.SetEnv, "proceed: " + dec.Reason
+		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), dec.SetEnv, "proceed: " + dec.Reason, nil
 	}
 }
 

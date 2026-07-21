@@ -355,11 +355,17 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// deterministic decideAfterRetro, whereas the live loop additionally
 		// routes via decideAfterRetroRouted at advisory stage.
 		if o.successorStrategy(current) == phasespec.BranchingHistory {
-			branch, extraEnv, reason := o.decideAfterRetro(resp.Verdict, state.FailedAt)
+			cs.FailedAt = state.FailedAt // S4 dossier non-progress counters (additive)
+			branch, extraEnv, reason, sysFail := o.decideAfterRetro(cs, resp.Verdict, state.FailedAt)
 			for k, v := range extraEnv {
 				envSnap[k] = v
 			}
 			result.RetroDecision = reason
+			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
+			// a floor category halts + escalates rather than looping as task-level.
+			if sysFail != nil && result.SystemFailure == nil {
+				result.SystemFailure = sysFail
+			}
 			if branch == PhaseEnd {
 				break
 			}

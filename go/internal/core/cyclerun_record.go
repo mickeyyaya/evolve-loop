@@ -131,11 +131,16 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		var branch Phase
 		var extraEnv map[string]string
 		var reason string
+		var sysFail *SystemFailureSignal
+		// Carry the cross-cycle failure history onto the per-cycle checkpoint so
+		// the ADR-0072 S4 dossier composes its non-progress counters from live
+		// evidence (additive; keeps the judgment layer non-inert).
+		cr.cs.FailedAt = cr.state.FailedAt
 		if cr.o.cfg.Stage >= config.StageAdvisory {
 			// Failure floor Phase 3: the failure branch is advisor-
 			// decidable (clamped) and leaves a routing-decision artifact.
 			cr.routingSeq++
-			branch, extraEnv, reason = cr.o.decideAfterRetroRouted(cr.ctx, cr.cycle, cr.cs, cr.routingSeq, dr.resp.Verdict, cr.state.FailedAt, router.RouteInput{
+			branch, extraEnv, reason, sysFail = cr.o.decideAfterRetroRouted(cr.ctx, cr.cycle, cr.cs, cr.routingSeq, dr.resp.Verdict, cr.state.FailedAt, router.RouteInput{
 				Cfg:            cr.o.cfg,
 				Completed:      cr.cs.CompletedPhases,
 				Strict:         cr.workflowConfig.StrictAudit,
@@ -148,13 +153,20 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 				PSMASEnabled:   cr.workflowConfig.PSMASEnabled,
 			})
 		} else {
-			branch, extraEnv, reason = cr.o.decideAfterRetro(dr.resp.Verdict, cr.state.FailedAt)
+			branch, extraEnv, reason, sysFail = cr.o.decideAfterRetro(cr.cs, dr.resp.Verdict, cr.state.FailedAt)
 		}
 		for k, v := range extraEnv {
 			cr.envSnap[k] = v
 		}
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
 		cr.result.RetroDecision = reason
+		// ADR-0072 S4: a floor category classified at the retro chokepoint is a
+		// SYSTEM-level failure — mark it so the batch loop HALTS + escalates for
+		// pipeline diagnosis instead of re-selecting the same task. finalizeCycle
+		// sees SystemFailure already set and skips its own re-detection.
+		if sysFail != nil && cr.result.SystemFailure == nil {
+			cr.result.SystemFailure = sysFail
+		}
 		if branch == PhaseEnd {
 			return loopBreak, nil
 		}
