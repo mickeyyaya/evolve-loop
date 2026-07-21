@@ -8,12 +8,15 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -40,6 +43,38 @@ type TokensReport struct {
 	CacheHitRatio  float64               `json:"cache_hit_ratio"`
 	PhasesWithData int                   `json:"phases_with_data"`
 	PhasesRun      int                   `json:"phases_run"`
+	// TripwireCount/Tripwires surface the engine's telemetry-coverage tripwire
+	// (cycle-1005): a non-claude launch that exits 0, runs past the 60s success
+	// threshold, and resolves to source=none burned real tokens the resolver
+	// never measured. The engine records `"tripwire":true` in llm-calls.ndjson;
+	// this reporter reads and surfaces it so the miss shows up in the report,
+	// not just engine stderr.
+	TripwireCount int             `json:"tripwire_count"`
+	Tripwires     []TripwireEvent `json:"tripwires"`
+}
+
+// TripwireEvent is one surfaced telemetry-coverage tripwire — the CLI/agent/
+// phase/cycle of a non-claude success launch whose token usage went unmeasured.
+type TripwireEvent struct {
+	Cycle      int    `json:"cycle"`
+	CLI        string `json:"cli"`
+	Agent      string `json:"agent"`
+	Phase      string `json:"phase"`
+	DurationMS int64  `json:"duration_ms"`
+	ExitCode   int    `json:"exit_code"`
+}
+
+// llmCallTripwireRecord is the minimal decode shape for an llm-calls.ndjson
+// record — a local copy of the tripwire-relevant fields (matching engine
+// llmCallLog's json tags) so cmd/evolve need not import internal/bridge's
+// unexported record type (the wiring class that broke prior attempts).
+type llmCallTripwireRecord struct {
+	CLI        string `json:"cli"`
+	Agent      string `json:"agent"`
+	Phase      string `json:"phase"`
+	DurationMS int64  `json:"duration_ms"`
+	ExitCode   int    `json:"exit_code"`
+	Tripwire   bool   `json:"tripwire"`
 }
 
 func runTokens(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -138,6 +173,11 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	var cacheReadSum, cacheDenomSum int
 	for _, c := range cycles {
 		ws := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", c))
+		// Read tripwires before the phasetiming continue so a cycle with real
+		// tripwire hits but no/empty phase-timing data still surfaces them.
+		tws := readCycleTripwires(runsDir, c)
+		report.Tripwires = append(report.Tripwires, tws...)
+		report.TripwireCount += len(tws)
 		entries, err := phasetiming.Read(ws)
 		if err != nil {
 			continue
@@ -163,6 +203,54 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	}
 	report.Phases = rankPhasesByInputTokens(totals, counts)
 	return report
+}
+
+// readCycleTripwires streams a cycle's llm-calls.ndjson (bufio.Scanner, bounded
+// — not read-all-then-split) and returns the tripwire-flagged records as
+// TripwireEvents. A missing/unreadable file or a malformed line is skipped as
+// absent evidence, matching buildTokensReport's degrade-gracefully contract.
+func readCycleTripwires(runsDir string, cycle int) []TripwireEvent {
+	path := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle), "llm-calls.ndjson")
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	var out []TripwireEvent
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024) // tolerate long records
+	for sc.Scan() {
+		line := sc.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var rec llmCallTripwireRecord
+		if err := json.Unmarshal(line, &rec); err != nil {
+			continue
+		}
+		if !rec.Tripwire {
+			continue
+		}
+		out = append(out, TripwireEvent{
+			Cycle: cycle, CLI: rec.CLI, Agent: rec.Agent, Phase: rec.Phase,
+			DurationMS: rec.DurationMS, ExitCode: rec.ExitCode,
+		})
+	}
+	return out
+}
+
+// stripControlBytes removes control bytes (< 0x20 and 0x7f) from an
+// llm-calls.ndjson-sourced string before it reaches the TTY. A compromised
+// non-claude driver could embed ANSI escapes in its own record's CLI/agent/
+// phase fields to rewrite or hide the very tripwire line meant to expose it
+// (cycle-1010 audit F1); the --json path is unaffected (already safe).
+func stripControlBytes(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // rankPhasesByInputTokens sorts phases by summed InputTokens, highest first;
@@ -192,6 +280,7 @@ func addTokenUsage(a, b cyclestate.TokenUsage) cyclestate.TokenUsage {
 
 func renderTokensReport(w io.Writer, r TokensReport) {
 	fmt.Fprintf(w, "Token usage report — cycles %v\n\n", r.CyclesWalked)
+	renderTripwires(w, r)
 	if len(r.Phases) == 0 {
 		fmt.Fprintln(w, "(no token usage recorded in this window)")
 		fmt.Fprintf(w, "Coverage: %d/%d phases with token data\n", r.PhasesWithData, r.PhasesRun)
@@ -207,4 +296,21 @@ func renderTokensReport(w io.Writer, r TokensReport) {
 	fmt.Fprintf(w, "Wasted (FAIL verdicts): input=%d output=%d\n", r.WastedTokens.Input, r.WastedTokens.Output)
 	fmt.Fprintf(w, "Cache-hit ratio: %.1f%%\n", r.CacheHitRatio*100)
 	fmt.Fprintf(w, "Coverage: %d/%d phases with token data\n", r.PhasesWithData, r.PhasesRun)
+}
+
+// renderTripwires prints the telemetry-coverage tripwire section. It runs
+// unconditionally above the empty-phases early return so a cycle with tripwire
+// hits but no phase-timing data still surfaces the miss (cycle-1007 render-order
+// regression). Silent when no tripwire fired. CLI/agent/phase fields are
+// control-byte-stripped before hitting the TTY (F1).
+func renderTripwires(w io.Writer, r TokensReport) {
+	if r.TripwireCount == 0 {
+		return
+	}
+	fmt.Fprintf(w, "⚠️  TRIPWIRE: %d non-claude success launch(es) resolved to source=none — token usage unmeasured\n", r.TripwireCount)
+	for _, t := range r.Tripwires {
+		fmt.Fprintf(w, "  TRIPWIRE cycle=%d cli=%s agent=%s phase=%s dur=%dms exit=%d\n",
+			t.Cycle, stripControlBytes(t.CLI), stripControlBytes(t.Agent), stripControlBytes(t.Phase), t.DurationMS, t.ExitCode)
+	}
+	fmt.Fprintln(w)
 }
