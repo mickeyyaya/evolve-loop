@@ -1,0 +1,12 @@
+{
+  "id": "carryover-sweep-sweep-halt-guards",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "Halt-dispatch + guard-seam small items",
+  "items": [
+    "todo-generic-already-landed-utility",
+    "todo-guards-hermetic-home-seam",
+    "todo-multilane-halt-dossier-dedup",
+    "todo-swarm-manifest-errors-fail-loud"
+  ]
+}

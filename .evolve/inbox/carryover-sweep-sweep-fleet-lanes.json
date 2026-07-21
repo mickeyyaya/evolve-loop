@@ -1,0 +1,13 @@
+{
+  "id": "carryover-sweep-sweep-fleet-lanes",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "Fleet + lane provisioning small items",
+  "items": [
+    "todo-fleet-config-hot-reload-wave-boundary",
+    "todo-fleet-lane-provisioning-split",
+    "todo-loop-batch-chaining",
+    "todo-retro-bridge-timeout-width10",
+    "todo-scout-fleet-scope-injection"
+  ]
+}

@@ -68,6 +68,7 @@ var commands = []subcommand{
 	{Name: "campaign", Summary: "Multi-cycle campaign planner (study|replan|run|status)", Run: runCampaign},
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
 	{Name: "branches", Summary: "Audit/prune superseded orphan cycle-* branches (branches audit|prune)", Run: runBranches},
+	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "gc", Summary: "Reap orphaned tmux sessions whose creator PID is dead (gc [--dry-run])", Run: runGC},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},

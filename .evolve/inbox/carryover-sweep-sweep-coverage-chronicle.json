@@ -1,0 +1,13 @@
+{
+  "id": "carryover-sweep-sweep-coverage-chronicle",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "Coverage + chronicle pipeline small items",
+  "items": [
+    "todo-apicover-enforce-shared-helper",
+    "todo-chronicle-s1-build-index",
+    "todo-chronicle-s3-digest-wiring",
+    "todo-chronicle-shadow-enforce-flip",
+    "todo-gate-wiring-binding-tests"
+  ]
+}

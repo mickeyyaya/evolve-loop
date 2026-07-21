@@ -1,0 +1,13 @@
+{
+  "id": "carryover-sweep-sweep-tdd-inbox-gates",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "TDD/topn + inbox gate small items",
+  "items": [
+    "todo-archive-evaluate-batch-retry-parity",
+    "todo-dead-api-sweep-triage",
+    "todo-inbox-retirement-not-firing-on-ship",
+    "todo-tdd-topn-binding-gate",
+    "todo-wire-quota-reset-at-checkpoint"
+  ]
+}

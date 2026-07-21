@@ -1,0 +1,13 @@
+{
+  "id": "carryover-sweep-sweep-merge-rungs",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "Merge-rung orchestration small items",
+  "items": [
+    "todo-merge-rung1-package-graph-disjoint",
+    "todo-merge-rung2-scoped-merge-review",
+    "todo-rebase-orchestration-call-site",
+    "todo-retire-landed-inbox-item-merge-rung0",
+    "todo-rung0-dispatch-merge-tree-precheck"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "carryover-sweep-sweep-carryforward-dispatch",
+  "weight": 0.75,
+  "kind": "sweep",
+  "title": "Carryforward + dispatch small items",
+  "items": [
+    "todo-bridge-durable-completion-detection",
+    "todo-carryforward-real-cherrypick-filter",
+    "todo-centralize-wave-pool-halt-dispatch",
+    "todo-reconcile-carryforward-writer-enum",
+    "todo-wire-partitiongraph-dispatch"
+  ]
+}
