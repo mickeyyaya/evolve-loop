@@ -17,13 +17,15 @@ import (
 
 func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
 	calls := 0
-	r := NewBuildFloorReviewer(func(ctx context.Context, in ReviewInput) []string {
+	// Named binding exercises the exported check-engine type (apicover).
+	var checks BuildFloorCheckFn = func(ctx context.Context, in ReviewInput) []string {
 		calls++
 		if calls == 1 {
 			return []string{"./cmd/evolve: TestX FAIL (unit)", "gofmt: cmd_x.go"}
 		}
 		return nil
-	})
+	}
+	r := NewBuildFloorReviewer(checks)
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: "/wt", ProjectRoot: "/p"}
 	res := r.Review(context.Background(), in)
 	if res.Approve {
