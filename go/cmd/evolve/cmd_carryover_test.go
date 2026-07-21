@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
 // TestCarryoverSubcommandRegistered — the `carryover` command is wired into the
@@ -219,5 +221,53 @@ func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
 	surviving := readCarryoverIDs(t, statePath) // fatals if JSON is torn
 	if !surviving["todo-keep"] || surviving["todo-a"] || surviving["todo-b"] {
 		t.Fatalf("post-concurrency state wrong: %v", surviving)
+	}
+}
+
+// TestCarryoverApplyDecisions_PreservesStateSymlink is the cycle-999
+// regression pin: applying decisions through a WORKTREE-style symlinked
+// state.json must write THROUGH to the canonical target and leave the link
+// intact — the pre-fix hand-rolled temp+rename replaced the link with a
+// detached regular file, stranding the 135->14 convergence in a dead copy.
+func TestCarryoverApplyDecisions_PreservesStateSymlink(t *testing.T) {
+	canonicalDir := t.TempDir()
+	worktreeDir := t.TempDir()
+	canonical := filepath.Join(canonicalDir, "state.json")
+	seed := map[string]any{
+		"stateRevision": float64(3),
+		"carryoverTodos": []any{
+			map[string]any{"id": "keep-me"},
+			map[string]any{"id": "drop-me"},
+		},
+	}
+	raw, _ := json.Marshal(seed)
+	if err := os.WriteFile(canonical, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(worktreeDir, "state.json")
+	if err := os.Symlink(canonical, link); err != nil {
+		t.Fatal(err)
+	}
+
+	doc := carryoverDecisionsDoc{Decisions: []carryoverDecisionRow{
+		{ID: "drop-me", Decision: "drop", Reason: "superseded by regression pin"},
+	}}
+	res, err := applyCarryoverDecisions(link, doc)
+	if err != nil {
+		t.Fatalf("apply through symlink: %v", err)
+	}
+	if res.Before != 2 || res.After != 1 || res.Dropped != 1 {
+		t.Fatalf("res=%+v, want Before=2 After=1 Dropped=1", res)
+	}
+	if fi, _ := os.Lstat(link); fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("state.json symlink SEVERED by apply (the cycle-999 defect)")
+	}
+	got, err := statemap.ReadStateMap(canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr, _ := got["carryoverTodos"].([]any)
+	if len(arr) != 1 {
+		t.Fatalf("canonical not updated through link: %v", got["carryoverTodos"])
 	}
 }

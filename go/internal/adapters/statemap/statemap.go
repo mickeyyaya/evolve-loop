@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
@@ -56,13 +57,96 @@ func ReadStateMap(path string) (map[string]any, error) {
 	return m, nil
 }
 
+// resolveWriteTarget follows a symlink chain (bounded, dangling-tolerant) to
+// the FINAL write target. Rename-over-a-symlink replaces the LINK with a
+// regular file — exactly how worktree .evolve/state.json links to canonical
+// were severed and mutations stranded in detached copies (cycle-999/1000).
+// Writing through to the resolved target keeps the link intact and every
+// mutation visible on the canonical file.
+func resolveWriteTarget(path string) string {
+	const maxDepth = 8
+	cur := path
+	for i := 0; i < maxDepth; i++ {
+		fi, err := os.Lstat(cur)
+		if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+			return cur // regular file, missing (dangling tail), or unreadable
+		}
+		dst, err := os.Readlink(cur)
+		if err != nil {
+			return cur
+		}
+		if !filepath.IsAbs(dst) {
+			dst = filepath.Join(filepath.Dir(cur), dst)
+		}
+		cur = dst
+	}
+	return cur
+}
+
+// counterOf extracts a numeric counter key from m (JSON round-trips give
+// float64; in-process maps may carry int). ok=false when absent/non-numeric.
+func counterOf(m map[string]any, key string) (float64, bool) {
+	switch v := m[key].(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case json.Number:
+		f, err := v.Float64()
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// todosLen returns len(carryoverTodos) when present as an array, else -1.
+func todosLen(m map[string]any) int {
+	if arr, ok := m["carryoverTodos"].([]any); ok {
+		return len(arr)
+	}
+	return -1
+}
+
 // WriteStateMap atomically replaces path with the indented JSON of m via
 // tmp-file + rename. The 2-space indent matches jq's default output so diffs
 // against bash-written state.json files stay minimal. This is the UNLOCKED
 // primitive: callers that compose several read/writes under one lock (the
 // ship withStateLock pattern, the reset seal) call it inside their own held
 // flock.PathLock; standalone callers use UpdateStateMap.
+//
+// Two integrity floors (cycle-1001 lost-write / cycle-999 stranded-write):
+//   - symlink write-through: the rename lands on resolveWriteTarget(path), so
+//     a worktree's state.json link to canonical survives and the bytes reach
+//     the live file;
+//   - stateRevision CAS: when both the incoming map and the on-disk target
+//     carry a numeric stateRevision, an incoming revision BELOW the on-disk
+//     one is a stale writer and is refused with ErrStaleRevision — the lock
+//     serializes writers, this floor validates their freshness.
+//
+// A forensic tripwire WARNs (never blocks) when a write would shrink
+// carryoverTodos by more than half from >20 entries — the cycle-1001
+// signature — so a legal-but-suspicious mass drop is loud in the log.
 func WriteStateMap(path string, m map[string]any) error {
+	path = resolveWriteTarget(path)
+	if onDisk, err := ReadStateMap(path); err == nil {
+		// CAS floor on BOTH lineage counters: stateRevision is
+		// storage.UpdateState's EXCLUSIVE OCC audit trail (cyclestate CA.3 —
+		// statemap never bumps it, only compares), statemapRevision is this
+		// package's own counter bumped by UpdateStateMap. A stale snapshot is
+		// stale in whichever lineage it aged out of.
+		for _, key := range []string{"stateRevision", statemapRevisionKey} {
+			if diskRev, ok := counterOf(onDisk, key); ok {
+				if inRev, ok := counterOf(m, key); ok && inRev < diskRev {
+					return fmt.Errorf("%w (%s: incoming %v < on-disk %v at %s)", ErrStaleRevision, key, inRev, diskRev, path)
+				}
+			}
+		}
+		// oldN>20 with the key deleted (newN==-1) counts as a shrink-to-zero.
+		if oldN, newN := todosLen(onDisk), todosLen(m); oldN > 20 && (newN == -1 || newN < oldN/2) {
+			fmt.Fprintf(os.Stderr, "[statemap] WARN: write shrinks carryoverTodos %d -> %d at %s (cycle-1001 signature; allowed, but verify the writer)\n", oldN, newN, path)
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
 	}
@@ -113,20 +197,51 @@ var writeHooks = struct {
 }
 
 // UpdateStateMap performs a serialized, full-fidelity read-modify-write of
-// path. It holds flock.PathLock(path) — the "<path>.lock" sidecar advisory
-// lock shared with storage.UpdateState — across the WHOLE read→mutate→write, so
-// concurrent writers (goroutines or processes) serialize and no update is lost.
-// mutate receives the parsed map and edits it in place; it must be fast and
-// side-effect-free (it runs under the cross-process lock) and must NOT call
-// UpdateStateMap on the same path (the blocking flock would deadlock).
-// A malformed file aborts before the write, leaving it untouched.
+// path. The path is symlink-RESOLVED first and the lock is taken on the
+// RESOLVED path's sidecar — a worktree writer (through the .evolve/state.json
+// link) and a canonical writer therefore share ONE lock instead of racing on
+// two different lock files over the same data (the cross-tree half of the
+// cycle-1001 lost-write). It holds flock.PathLock across the WHOLE
+// read→mutate→write, so concurrent writers (goroutines or processes)
+// serialize and no update is lost.
+//
+// Every successful update advances stateRevision (seeded to 1 when absent)
+// and refreshes lastUpdated — the frozen-timestamp forensics of cycle-1001
+// showed some writers skipped both, making stale snapshots indistinguishable
+// from live state. mutate receives the parsed map and edits it in place; it
+// must be fast and side-effect-free (it runs under the cross-process lock)
+// and must NOT call UpdateStateMap on the same path (the blocking flock would
+// deadlock). A malformed file aborts before the write, leaving it untouched.
 func UpdateStateMap(path string, mutate func(map[string]any)) error {
+	path = resolveWriteTarget(path)
 	return flock.WithPathLock(path, func() error {
 		m, err := ReadStateMap(path)
 		if err != nil {
 			return err
 		}
 		mutate(m)
+		// Bump statemap's OWN lineage counter. stateRevision is deliberately
+		// untouched: it is storage.UpdateState's exclusive CA.3 audit trail
+		// ("a gap/repeat betrays a bypassing writer" — core/alloc.go even
+		// restores it before overwrites so only UpdateState's ++ moves it).
+		if rev, ok := counterOf(m, statemapRevisionKey); ok {
+			m[statemapRevisionKey] = rev + 1
+		} else {
+			m[statemapRevisionKey] = float64(1)
+		}
+		m["lastUpdated"] = nowFn().UTC().Format(time.RFC3339)
 		return WriteStateMap(path, m)
 	})
 }
+
+// nowFn seams time for tests.
+var nowFn = time.Now
+
+// statemapRevisionKey is statemap's own write-lineage counter — namespaced so
+// it can never be confused with storage.UpdateState's exclusive stateRevision
+// OCC audit trail (two independent counters, one CAS floor over both).
+const statemapRevisionKey = "statemapRevision"
+
+// ErrStaleRevision is returned when a write carries a lineage counter below
+// the on-disk value — a stale writer that must re-read, never clobber.
+var ErrStaleRevision = errors.New("statemap: stale stateRevision — on-disk state is newer; re-read before writing")
