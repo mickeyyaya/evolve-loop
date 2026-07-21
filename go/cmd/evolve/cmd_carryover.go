@@ -33,7 +33,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
 // carryoverApplyCeiling is the convergence target the inbox item names (135 → ~25).
@@ -185,16 +185,38 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		}
 	}
 
+	// Fail loud on a missing state file (an operator command applying against
+	// nothing is a path mistake, not an empty apply).
+	if _, err := os.Stat(statePath); err != nil {
+		return carryoverApplyResult{}, fmt.Errorf("read state %s: %w", statePath, err)
+	}
+
+	// Advisory pre-read: skip the write entirely (no revision/mtime churn)
+	// when no decision id is present. statemap.UpdateStateMap re-reads
+	// authoritatively under the CANONICAL lock, so this is purely a
+	// no-op-write optimization, never a correctness gate.
+	if pre, err := statemap.ReadStateMap(statePath); err == nil {
+		found := false
+		entries, _ := pre["carryoverTodos"].([]any)
+		for _, e := range entries {
+			if m, ok := e.(map[string]any); ok {
+				if id, _ := m["id"].(string); remove[id] != "" {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return carryoverApplyResult{Before: len(entries), After: len(entries)}, nil
+		}
+	}
+
+	// The locked RMW goes through statemap (cycle-999/1001 fixes): the path is
+	// symlink-resolved so a worktree link writes THROUGH to canonical and
+	// survives; the lock is taken on the resolved path (one lock per data
+	// file, cross-tree); stateRevision auto-bumps and a stale write is refused.
 	var res carryoverApplyResult
-	err := flock.WithPathLock(statePath, func() error {
-		raw, err := os.ReadFile(statePath)
-		if err != nil {
-			return fmt.Errorf("read state %s: %w", statePath, err)
-		}
-		var state map[string]any
-		if err := json.Unmarshal(raw, &state); err != nil {
-			return fmt.Errorf("parse state %s: %w", statePath, err)
-		}
+	err := statemap.UpdateStateMap(statePath, func(state map[string]any) {
 		entries, _ := state["carryoverTodos"].([]any)
 		res.Before = len(entries)
 		kept := make([]any, 0, len(entries))
@@ -215,28 +237,7 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 			}
 		}
 		res.After = len(kept)
-		if res.Dropped == 0 && res.Clustered == 0 {
-			return nil // nothing to do — skip the write (no mtime churn)
-		}
 		state["carryoverTodos"] = kept
-		return writeStateJSONAtomic(statePath, state)
 	})
 	return res, err
-}
-
-// writeStateJSONAtomic serialises state and replaces statePath atomically
-// (temp + rename), so a crash mid-write never leaves a truncated state.json.
-func writeStateJSONAtomic(statePath string, state map[string]any) error {
-	out, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal state: %w", err)
-	}
-	tmp := statePath + ".tmp"
-	if err := os.WriteFile(tmp, append(out, '\n'), 0o644); err != nil {
-		return fmt.Errorf("write temp state: %w", err)
-	}
-	if err := os.Rename(tmp, statePath); err != nil {
-		return fmt.Errorf("rename temp state: %w", err)
-	}
-	return nil
 }
