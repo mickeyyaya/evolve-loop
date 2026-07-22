@@ -100,7 +100,7 @@ func TestMinWidthRepair_GuardNotMetNeverInvokesLauncher(t *testing.T) {
 
 	handled := minWidthRepair(context.Background(),
 		policy.FleetConfig{Count: 1}, policy.FleetConfig{Count: 1},
-		preflight, planFn, launcher, 0, &stderr)
+		preflight, planFn, launcher, nil, 0, &stderr)
 
 	if handled {
 		t.Fatal("minWidthRepair must report handled=false when fleetCfg.Count<=1 — the repair is not eligible at all")
@@ -130,7 +130,7 @@ func TestMinWidthRepair_GuardMetDispatchesOneIsolatedLaneAndSignalsContinue(t *t
 
 	handled := minWidthRepair(context.Background(),
 		policy.FleetConfig{Count: 3}, policy.FleetConfig{Count: 1},
-		func() error { return nil }, planFn, launcher, 2, &stderr)
+		func() error { return nil }, planFn, launcher, nil, 2, &stderr)
 
 	if !handled {
 		t.Fatal("minWidthRepair must report handled=true when a candidate is dispatched — the caller must continue, not fall through to sequential")
@@ -161,7 +161,7 @@ func TestMinWidthRepair_EligibleButEmptyBacklogFallsBackToSequential(t *testing.
 
 	handled := minWidthRepair(context.Background(),
 		policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 1},
-		func() error { return nil }, planFn, launcher, 0, &stderr)
+		func() error { return nil }, planFn, launcher, nil, 0, &stderr)
 
 	if handled {
 		t.Fatal("an empty adapted backlog must report handled=false — true sequential fallback")
@@ -189,7 +189,7 @@ func TestMinWidthRepair_ForceDispatchErrorSurfacesAndFallsBack(t *testing.T) {
 
 	handled := minWidthRepair(context.Background(),
 		policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 1},
-		func() error { return refusal }, planFn, launcher, 0, &stderr)
+		func() error { return refusal }, planFn, launcher, nil, 0, &stderr)
 
 	if handled {
 		t.Fatal("a preflight refusal must report handled=false")

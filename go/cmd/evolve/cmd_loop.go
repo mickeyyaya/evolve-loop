@@ -484,7 +484,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		// both fire for one iteration.
 		if shouldRunPool(fleetCfg) {
 			poolLaunch := execCycleLaunch(waveBinPath, false, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
-			ran, _, results, perr := dispatchPoolIteration(ctx, fleetCfg, productionWavePreflight(cfg.ProjectRoot), productionPoolPlanFn(cfg, deps.Storage, fleetCfg.Count), poolLaunch, i)
+			ran, _, results, perr := dispatchPoolIteration(ctx, fleetCfg, productionWavePreflight(cfg.ProjectRoot), productionPoolPlanFn(cfg, deps.Storage, fleetCfg.Count, stderr), poolLaunch, i)
 			switch {
 			case perr != nil:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", i, perr)
@@ -524,7 +524,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			// through to the sequential path below.
 			waveCfg, wavePace := budgetAwareWaveConfig(ctx, fleetCfg, cfg.ProjectRoot, cfg.EvolveDir, deps.Storage, stderr)
 			launcher := productionWaveLauncher(waveCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
-			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, waveCfg.Count), launcher, i)
+			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, waveCfg.Count), launcher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i)
 			switch {
 			case werr != nil:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", i, werr)
@@ -583,7 +583,7 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				// sequential. minWidthRepair (cmd_loop_wave.go) owns the guard +
 				// WARN-vs-dispatch branching so the call-site wiring is unit-testable.
 				oneLauncher := productionWaveLauncher(fleetCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
-				if minWidthRepair(ctx, fleetCfg, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, fleetCfg.Count), oneLauncher, i, stderr) {
+				if minWidthRepair(ctx, fleetCfg, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, fleetCfg.Count), oneLauncher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i, stderr) {
 					continue
 				}
 			}

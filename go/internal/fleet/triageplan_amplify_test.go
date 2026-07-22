@@ -36,7 +36,7 @@ func specScopeUnion(t *testing.T, specs []CycleSpec) map[string]bool {
 // with duplicates or ships a "core,core,core" scope to a lane's triage.
 func TestPlanFromTriage_DuplicateFloorsNeverOverSchedule(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["core","core","audit","core"]}`)
-	specs, err := PlanFromTriage(decisionJSON, nil, 3)
+	specs, _, err := PlanFromTriage(decisionJSON, nil, 3, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestPlanFromTriage_DuplicateFloorsNeverOverSchedule(t *testing.T) {
 // floors+cards and over-schedules lanes triage never committed.
 func TestPlanFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge"]}`)
-	specs, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2)
+	specs, _, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestPlanFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 func TestPlanFromTriage_NonPositiveCountNeverPanicsOrOverSchedules(t *testing.T) {
 	for _, count := range []int{0, -1} {
 		t.Run(fmt.Sprintf("count=%d", count), func(t *testing.T) {
-			specs, err := PlanFromTriage([]byte(`{"committed_floors":["core","audit"]}`), nil, count)
+			specs, _, err := PlanFromTriage([]byte(`{"committed_floors":["core","audit"]}`), nil, count, nil)
 			if err != nil {
 				if len(specs) != 0 {
 					t.Errorf("error return carried %d specs, want 0 (never both)", len(specs))
@@ -119,7 +119,7 @@ func TestPlanFromTriage_WrongTypeDecisionFieldsRejected(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			specs, err := PlanFromTriage([]byte(tc.in), []string{"core"}, 2)
+			specs, _, err := PlanFromTriage([]byte(tc.in), []string{"core"}, 2, nil)
 			if err == nil {
 				t.Fatalf("PlanFromTriage(%s) returned nil error — wrong-typed decision JSON must reject, never guess or fall back", tc.in)
 			}
@@ -146,7 +146,7 @@ func TestPlanFromTriage_DegenerateDecisionBytesFailSafe(t *testing.T) {
 		{"empty-floors-null", []byte(`{"committed_floors":null}`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			specs, err := PlanFromTriage(tc.in, []string{"core"}, 2)
+			specs, _, err := PlanFromTriage(tc.in, []string{"core"}, 2, nil)
 			if err != nil {
 				if len(specs) != 0 {
 					t.Errorf("error return carried %d specs, want 0 (never both)", len(specs))
@@ -177,7 +177,7 @@ func TestPlanFromTriage_LargeScaleAllFloorsScheduledDisjoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal fixture: %v", err)
 	}
-	specs, err := PlanFromTriage(raw, nil, 4)
+	specs, _, err := PlanFromTriage(raw, nil, 4, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestPlanFromTriage_PathLikeFloorIDsSurviveVerbatim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal fixture: %v", err)
 	}
-	specs, err := PlanFromTriage(raw, nil, 3)
+	specs, _, err := PlanFromTriage(raw, nil, 3, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}

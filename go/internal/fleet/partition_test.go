@@ -352,7 +352,7 @@ func TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane(t *testing.T) 
 		{"id":"alpha","files":["go/internal/fleet/triageplan.go"]},
 		{"id":"beta","files":["go/internal/fleet/triageplan.go"]}
 	]}`)
-	specs, err := PlanFromTriage(decision, nil, 2)
+	specs, _, err := PlanFromTriage(decision, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}
@@ -372,7 +372,7 @@ func TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
 		{"id":"alpha","files":["go/internal/fleet/a.go"]},
 		{"id":"beta","files":["go/internal/fleet/b.go"]}
 	]}`)
-	specs, err := PlanFromTriage(decision, nil, 2)
+	specs, _, err := PlanFromTriage(decision, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
 // with no files[] stays an id-island, so file-less cards remain independent.
 func TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
 	decision := []byte(`{"top_n":[{"id":"gamma"},{"id":"delta"}]}`)
-	specs, err := PlanFromTriage(decision, nil, 2)
+	specs, _, err := PlanFromTriage(decision, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
 // own footprint, so distinct floors still spread.
 func TestPlanFromTriage_CommittedFloorsKeepIdIsland(t *testing.T) {
 	decision := []byte(`{"committed_floors":["pkg/one","pkg/two"]}`)
-	specs, err := PlanFromTriage(decision, nil, 2)
+	specs, _, err := PlanFromTriage(decision, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}

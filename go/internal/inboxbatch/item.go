@@ -34,6 +34,16 @@ type Item struct {
 	Files      []string `json:"files"`
 	ConnectsTo []string `json:"connects_to"`
 	Deps       []string `json:"deps"`
+	// Route is the ADR-0074 dispatch-authority field: "console-*" values mark
+	// the item operator-owned (never lane-dispatchable), "lane" is the explicit
+	// override for protected-files false positives. Empty = derive (see
+	// ConsoleRouted).
+	Route string `json:"route"`
+	// InjectedBy carries autofile provenance (retrofile, chronicle-escalation,
+	// …). ADR-0074 clamp: an agent-autofiled item may NOT lane-override a
+	// protected-surface derivation — agent-authored fields cannot widen agent
+	// authority (ADR-0073 clamp-parity vocabulary).
+	InjectedBy string `json:"injected_by"`
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`
@@ -120,6 +130,7 @@ func sanitizeItem(it *Item) bool {
 	}
 	it.ID = clean(it.ID)
 	it.Campaign = clean(it.Campaign)
+	it.Route = clean(it.Route)
 	for i := range it.Files {
 		it.Files[i] = clean(it.Files[i])
 	}

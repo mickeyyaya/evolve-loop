@@ -93,7 +93,7 @@ func TestPlanWaves_WaveLevelFileDisjoint(t *testing.T) {
 // co-schedule.
 func TestPlanFromTriage_WaveLevelFileDisjoint(t *testing.T) {
 	decision := []byte(`{"committed_floors":["bridge","core","bridge","audit"]}`)
-	specs, err := PlanFromTriage(decision, []string{"core"}, 3)
+	specs, _, err := PlanFromTriage(decision, []string{"core"}, 3, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}

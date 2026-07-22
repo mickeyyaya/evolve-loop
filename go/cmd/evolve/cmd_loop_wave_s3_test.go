@@ -6,7 +6,7 @@ package main
 // until Builder lands them — that compile failure IS the RED evidence:
 //
 //	type wavePlanFn func(ctx context.Context, waveIndex int) ([]byte, []string, error)
-//	dispatchIteration(ctx, fc, preflight func() error, planFn, launcher, waveIndex)
+//	dispatchIteration(ctx, fc, preflight func() error, planFn, launcher, nil, waveIndex)
 //
 // AC5 (reviewer note on PR #298): the loop's cancellable ctx must thread
 // through the PLAN path too — productionWavePlanFn currently minted
@@ -57,7 +57,7 @@ func TestDispatchIteration_CtxReachesPlanFn(t *testing.T) {
 		seen = ctx.Value(key)
 		return []byte(`{"committed_floors":["bridge","core"]}`), nil, nil
 	}
-	ran, _, _, err := dispatchIteration(ctx, waveEligibleFC(), passingPreflight, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(ctx, waveEligibleFC(), passingPreflight, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestDispatchIteration_CancelledCtxObservableInPlanFn(t *testing.T) {
 		}
 		return nil, nil, errors.New("plan ctx was not cancelled — cancellation did not propagate")
 	}
-	ran, _, _, err := dispatchIteration(ctx, waveEligibleFC(), passingPreflight, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(ctx, waveEligibleFC(), passingPreflight, planFn, launcher, nil, 0)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("dispatchIteration error = %v, want it to wrap context.Canceled from the plan path", err)
 	}
@@ -105,7 +105,7 @@ func TestDispatchIteration_PreflightRefusalNeverPlansNorLaunches(t *testing.T) {
 		t.Fatal("planFn must never run when the control-plane preflight refuses the wave")
 		return nil, nil, nil
 	}
-	ran, _, _, err := dispatchIteration(context.Background(), waveEligibleFC(), func() error { return refusal }, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(context.Background(), waveEligibleFC(), func() error { return refusal }, planFn, launcher, nil, 0)
 	if !errors.Is(err, refusal) {
 		t.Fatalf("dispatchIteration error = %v, want it to wrap the preflight refusal", err)
 	}
@@ -125,7 +125,7 @@ func TestDispatchIteration_PreflightCleanWaveProceeds(t *testing.T) {
 	planFn := func(ctx context.Context, waveIndex int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["bridge","core"]}`), nil, nil
 	}
-	ran, specs, _, err := dispatchIteration(context.Background(), waveEligibleFC(), passingPreflight, planFn, launcher, 0)
+	ran, specs, _, err := dispatchIteration(context.Background(), waveEligibleFC(), passingPreflight, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration with clean preflight: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestDispatchIteration_SequentialPathNeverRunsPreflight(t *testing.T) {
 		t.Fatal("planFn must never run on the sequential (Count==1) path")
 		return nil, nil, nil
 	}
-	ran, _, _, err := dispatchIteration(context.Background(), fc, preflight, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(context.Background(), fc, preflight, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration: %v", err)
 	}
