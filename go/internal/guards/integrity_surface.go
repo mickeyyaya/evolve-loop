@@ -72,6 +72,11 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/phase_advisor_guard_test.go", Rationale: "advisor routing guard pin"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard.go", Rationale: "staging-time backstop against compiled-binary commits (tracked-binary-in-acs-dir class fix)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},
+	// ADR-0074 S2 (operator-enrolled 2026-07-22, cycle-1034 salvage): the
+	// disposition gate grades the retro that grades failed cycles — a cycle
+	// able to edit it could route its own failure classification.
+	{Fragment: "/go/internal/core/disposition_gate.go", Rationale: "ADR-0074 disposition-contract gate (retro's verdict-on-the-verdict verifier + digest cross-check)"},
+	{Fragment: "/go/internal/core/disposition_gate_test.go", Rationale: "the disposition gate's own regression pins"},
 }
 
 // IsProtectedSurface reports whether path targets the pipeline integrity control
