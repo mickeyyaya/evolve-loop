@@ -66,6 +66,10 @@ type FailureThresholds struct {
 	// this many times in one batch ⇒ pipeline-blocker halt (identical failure
 	// identities cannot be distinct honest defects — the 862–899 signature).
 	IdenticalFingerprintHaltCeiling int `json:"identical_fingerprint_halt_ceiling,omitempty"`
+	// UnexplainedFailuresHaltCeiling: failures with NO machine-readable reason
+	// reaching this in one batch ⇒ diagnosability halt (batch-6 first-firing:
+	// three distinct reason-less failures shared one degenerate fingerprint).
+	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
 }
 
 // SystemFailurePolicy is the resolved decision policy.
@@ -95,7 +99,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryCodeAuditFail:   {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
 			CategoryIntentMalformed: {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -137,6 +141,9 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 		}
 		if c.Thresholds.IdenticalFingerprintHaltCeiling > 0 {
 			out.Thresholds.IdenticalFingerprintHaltCeiling = c.Thresholds.IdenticalFingerprintHaltCeiling
+		}
+		if c.Thresholds.UnexplainedFailuresHaltCeiling > 0 {
+			out.Thresholds.UnexplainedFailuresHaltCeiling = c.Thresholds.UnexplainedFailuresHaltCeiling
 		}
 		if c.OnTaskRetryCeiling != "" {
 			out.OnTaskRetryCeiling = c.OnTaskRetryCeiling

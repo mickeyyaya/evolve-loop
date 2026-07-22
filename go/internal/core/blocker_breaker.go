@@ -39,6 +39,12 @@ import (
 type BlockerBreakerConfig struct {
 	GuardClassCeiling           int
 	IdenticalFingerprintCeiling int
+	// UnexplainedCeiling halts when this many digests carry NO machine-
+	// readable failure reason (the degenerate empty-evidence bucket) — a
+	// diagnosability breakdown, deliberately named apart from the identical-
+	// fingerprint rule (batch-6: three DIFFERENT failures shared one empty
+	// fingerprint).
+	UnexplainedCeiling int
 }
 
 // BlockerVerdict is the breaker's decision. Halt=true means the batch must
@@ -55,6 +61,14 @@ type BlockerVerdict struct {
 // guardAbortClass is the failure_digest pre-class bucket that is never
 // task-legit (statemap severing, tree-guard aborts).
 const guardAbortClass = "guard-abort"
+
+// isUnexplainedDigest reports the degenerate empty-evidence digest: no reason
+// artifact existed, so phase and pre-class degraded to their unknown defaults.
+// These MUST NOT count as "identical" defects — distinct failures collapse
+// into this bucket by construction.
+func isUnexplainedDigest(d FailureDigest) bool {
+	return d.PreClass == "unknown" && strings.HasPrefix(d.Fingerprint, "|unknown|")
+}
 
 // EvaluateBlockerBreaker applies the two rules over a batch's failure digests.
 // Pure and deterministic: same digests + config in, same verdict out.
@@ -73,10 +87,24 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 			}
 		}
 	}
+	if cfg.UnexplainedCeiling > 0 {
+		var unexplained int
+		for _, d := range digests {
+			if isUnexplainedDigest(d) {
+				unexplained++
+			}
+		}
+		if unexplained >= cfg.UnexplainedCeiling {
+			return BlockerVerdict{
+				Halt: true, Rule: "unexplained-failures", Count: unexplained,
+				Reason: fmt.Sprintf("%d failures in one batch produced no machine-readable failure reason (ceiling %d) — a diagnosability breakdown: fix the missing reason-writers, then diagnose the underlying failures individually", unexplained, cfg.UnexplainedCeiling),
+			}
+		}
+	}
 	if cfg.IdenticalFingerprintCeiling > 0 {
 		counts := map[string]int{}
 		for _, d := range digests {
-			if d.Fingerprint == "" {
+			if d.Fingerprint == "" || isUnexplainedDigest(d) {
 				continue
 			}
 			counts[d.Fingerprint]++
