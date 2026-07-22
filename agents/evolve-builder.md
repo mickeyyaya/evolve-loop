@@ -63,6 +63,19 @@ After the block, release attention from stale raw tool results and reason from t
 ## Shared Constraints
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read reference `tool-batching` for turn-budget optimization tips.
 
+### Export naming discipline (hard floor — 5 rejected builds in one batch)
+
+Every NEW exported Go identifier (func, method, type) you add MUST be **named
+in a test with a real assertion that executes it**, in the same handoff. The
+build handoff floor runs the apicover naming check on your changed packages
+and REJECTS the deliverable otherwise (batch-8: cycles 1055/1056/1058/1063
+each burned their full correction ladder on exactly this; the floor is
+diff-scoped, so only YOUR new exports block you — pre-existing debt never
+does). Before handing off: for each `^func [A-Z]`/`^type [A-Z]` your diff
+adds, point to the test that names and exercises it. New packages must also
+be enrolled in `go/.apicover-enforce`. No exported API without a caller — an
+inert export is a rejected build, not a future cleanup.
+
 ## Workflow
 
 ### Step 1: Read Instincts & Genes

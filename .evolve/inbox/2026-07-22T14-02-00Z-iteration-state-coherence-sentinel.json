@@ -1,0 +1,17 @@
+{
+  "id": "iteration-state-coherence-sentinel",
+  "created_at": "2026-07-22T14:02:00Z",
+  "weight": 0.82,
+  "kind": "defect",
+  "priority": "medium",
+  "campaign": "pipeline-integrity",
+  "title": "Belt-and-braces: per-iteration canonical-state coherence check — a cycle-state claiming a live phase for a cycle this loop is not running gets WARN+reconciled (covers SIGKILL/external-writer residue the RunCycle epilogue cannot)",
+  "summary": "The cycle-1048 abnormal-exit epilogue (landed) guarantees seal+dossier on every RunCycle return path — but a SIGKILLed lane or external writer can still strand a stale in-flight record mid-batch. Add at the batch-iteration top (the blockerBreakerHalt chokepoint in cmd_loop.go): read canonical cycle-state; if unfinishedCycle(cs, last) is FALSE but cs.Phase names a live phase for a cycle number this loop is not currently dispatching, WARN loudly + mark phase=aborted (reuse the epilogue's state-floor semantics). Never touches a genuinely in-flight lane's state (per-run state files are separate; only the CANONICAL record is reconciled, and only between dispatches).",
+  "acceptance": [
+    "RED: seeded stale in-flight canonical state + iteration top → WARN emitted + phase reconciled to aborted; a genuinely resumable unfinished cycle (boot-guard shape) is NOT touched",
+    "go test -race; wiring test at the cmd_loop call site"
+  ],
+  "files": ["go/cmd/evolve/cmd_loop.go (iteration top)", "go/cmd/evolve/cmd_loop_control.go:178 (unfinishedCycle predicate)", "go/internal/core/cyclerun_epilogue.go (state-floor semantics to reuse)"],
+  "connects_to": ["cycle-1048 investigation", "blocker breaker (same chokepoint)"],
+  "source": "console ultrathink investigation 2026-07-22"
+}

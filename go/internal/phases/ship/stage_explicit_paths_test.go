@@ -63,6 +63,36 @@ func (c *porcelainCapture) runner() CmdRunner {
 
 // gitCallWith returns the first recorded git call whose args contain every
 // needle, or nil.
+// unscopedAddAll reports an `add -A` invocation WITHOUT an explicit pathspec
+// after `--` — the banned repo-wide sweep. `add -A -- <paths>` is the allowed
+// scoped form (stages adds/mods/deletions within the named paths only; plain
+// `add -- <staged-deleted>` is fatal rc=128 — the operator boundary-flow pin).
+func (c *porcelainCapture) unscopedAddAll() []string {
+	for _, call := range c.calls {
+		if len(call) < 2 || call[0] != "git" {
+			continue
+		}
+		args := call[1:]
+		hasAdd, hasA, pathAfterDashDash := false, false, false
+		for i, a := range args {
+			switch a {
+			case "add":
+				hasAdd = true
+			case "-A", "--all":
+				hasA = true
+			case "--":
+				if i+1 < len(args) {
+					pathAfterDashDash = true
+				}
+			}
+		}
+		if hasAdd && hasA && !pathAfterDashDash {
+			return call
+		}
+	}
+	return nil
+}
+
 func (c *porcelainCapture) gitCallWith(needles ...string) []string {
 	for _, call := range c.calls {
 		if call[0] != "git" {
@@ -156,8 +186,8 @@ func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
 		t.Fatalf("shipDirect(cycle): %v", err)
 	}
 
-	if call := cap.gitCallWith("add", "-A"); call != nil {
-		t.Errorf("RED: cycle ship staged with `git add -A` (%v) — must stage the declared path set explicitly (git_add_explicit_paths)", call)
+	if call := cap.unscopedAddAll(); call != nil {
+		t.Errorf("RED: cycle ship staged with an UNSCOPED `git add -A` (%v) — must stage the declared path set explicitly (git_add_explicit_paths); `-A -- <paths>` is the allowed SCOPED sweep (staged-deletion handling)", call)
 	}
 	pathspec, sawAdd := cap.addPathspec()
 	if !sawAdd {
@@ -190,7 +220,7 @@ func TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet(t *testing.T)
 		t.Fatalf("shipDirect(manual): %v", err)
 	}
 
-	if call := cap.gitCallWith("add", "-A"); call != nil {
+	if call := cap.unscopedAddAll(); call != nil {
 		t.Errorf("RED: manifest-empty fallback used `git add -A` (%v) — must fall back to the porcelain changed set", call)
 	}
 	pathspec, sawAdd := cap.addPathspec()
@@ -219,7 +249,7 @@ func TestShipDirect_NoWorkspacePath_StillStagesExplicitly(t *testing.T) {
 		t.Fatalf("shipDirect(manual, no workspace): %v", err)
 	}
 
-	if call := cap.gitCallWith("add", "-A"); call != nil {
+	if call := cap.unscopedAddAll(); call != nil {
 		t.Errorf("RED: workspace-less manual ship staged with `git add -A` (%v)", call)
 	}
 	pathspec, sawAdd := cap.addPathspec()
@@ -245,8 +275,8 @@ func TestShipDirect_NonReleaseClasses_NeverAddAll(t *testing.T) {
 			if err := shipDirect(context.Background(), opts, &RunResult{}, "main"); err != nil {
 				t.Fatalf("shipDirect(%s): %v", class, err)
 			}
-			if call := cap.gitCallWith("add", "-A"); call != nil {
-				t.Errorf("class %s still stages with `git add -A`: %v", class, call)
+			if call := cap.unscopedAddAll(); call != nil {
+				t.Errorf("class %s still stages with an UNSCOPED `git add -A`: %v", class, call)
 			}
 			if _, sawAdd := cap.addPathspec(); !sawAdd {
 				t.Errorf("class %s never staged anything", class)
