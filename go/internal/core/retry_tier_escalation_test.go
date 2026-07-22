@@ -1,124 +1,105 @@
 package core
 
-// retry_tier_escalation_test.go — RED contract for ADR-0076 slice D: an inbox
-// item with failure_count >= threshold routes its NEXT attempt's BUILD phase
-// to the deep tier. Raise-only via policy.TierRank (an advisor "top" proposal
-// is never lowered); the existing ClampPlanModelRouting envelope-Max clamp
-// runs AFTER the raise and still wins (pinned here through the real clamp).
-// Batches 6-8 evidence: hard items re-failed at the same tier across
-// attempts; deep-tier audit reliably caught what balanced-tier build could
-// not finish (ADR-0076 §context).
+// retry_tier_escalation_test.go — ADR-0076 slice D pins (adversarial-review
+// amended design): the escalation is a deterministic DISPATCH floor —
+// mode-independent, raise-only, clamped through the real envelope guardrail
+// (single-entry ClampPlanModelRouting — never a second clamp), driven by the
+// max failure_count across the cycle's scoped items (lane scope ∪ this
+// cycle's processing claims).
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-func planWithBuild(tier string) *router.PhasePlan {
-	return &router.PhasePlan{Entries: []router.PhasePlanEntry{
-		{Phase: "scout", Run: true},
-		{Phase: "build", Run: true, Tier: tier},
-		{Phase: "audit", Run: true, Tier: "top"},
-	}}
-}
-
-func TestRaiseBuildTierForRetry_RaisedAtThreshold(t *testing.T) {
-	plan := planWithBuild("balanced")
-	raised := raiseBuildTierForRetry(plan, 1, 1)
-	if !raised {
-		t.Fatal("failure_count == threshold must raise")
-	}
-	if got := plan.Entries[1].Tier; got != "deep" {
-		t.Fatalf("build tier must be raised to deep, got %q", got)
-	}
-	if plan.Entries[0].Tier != "" || plan.Entries[2].Tier != "top" {
-		t.Fatal("non-build entries must be untouched")
+func escalationRun(t *testing.T, root, scopeCSV string, reader func(string) int, threshold int) *cycleRun {
+	t.Helper()
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	o.failureCountFor = reader
+	o.failurePolicy = policy.DefaultSystemFailurePolicy()
+	o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures = threshold
+	return &cycleRun{
+		o:       o,
+		cycle:   77,
+		req:     CycleRequest{ProjectRoot: root},
+		ctxSnap: map[string]string{"fleet_scope": scopeCSV},
 	}
 }
 
-func TestRaiseBuildTierForRetry_BelowThresholdUnchanged(t *testing.T) {
-	plan := planWithBuild("balanced")
-	if raised := raiseBuildTierForRetry(plan, 0, 1); raised {
+func TestEscalatedBuildTier_RaisesAtThresholdEnvelopeless(t *testing.T) {
+	// No profiles on disk → universal envelope (Max=top) → deep passes.
+	cr := escalationRun(t, t.TempDir(), "item-a,item-b", func(id string) int {
+		return map[string]int{"item-a": 0, "item-b": 1}[id]
+	}, 1)
+	tier, raised := cr.escalatedBuildTier("")
+	if !raised || tier != "deep" {
+		t.Fatalf("max scoped failure_count at threshold must raise to deep, got (%q,%v)", tier, raised)
+	}
+}
+
+func TestEscalatedBuildTier_BelowThresholdOrDisabled(t *testing.T) {
+	cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 0 }, 1)
+	if _, raised := cr.escalatedBuildTier(""); raised {
 		t.Fatal("count below threshold must not raise")
 	}
-	if plan.Entries[1].Tier != "balanced" {
-		t.Fatal("plan must be unchanged below threshold")
+	cr = escalationRun(t, t.TempDir(), "item-a", func(string) int { return 9 }, 0)
+	if _, raised := cr.escalatedBuildTier(""); raised {
+		t.Fatal("threshold 0 disables (policy escape hatch)")
+	}
+	cr = escalationRun(t, t.TempDir(), "item-a", nil, 1)
+	if _, raised := cr.escalatedBuildTier(""); raised {
+		t.Fatal("nil reader (root not wired) must be a no-op")
 	}
 }
 
-func TestRaiseBuildTierForRetry_NeverLowersTopProposal(t *testing.T) {
-	plan := planWithBuild("top")
-	raiseBuildTierForRetry(plan, 3, 1)
-	if plan.Entries[1].Tier != "top" {
-		t.Fatalf("an advisor top proposal must never be lowered, got %q", plan.Entries[1].Tier)
+func TestEscalatedBuildTier_RaiseOnlyNeverLowers(t *testing.T) {
+	cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 5 }, 1)
+	if _, raised := cr.escalatedBuildTier("top"); raised {
+		t.Fatal("a top proposal must never be lowered")
+	}
+	if _, raised := cr.escalatedBuildTier("deep"); raised {
+		t.Fatal("already at the floor — no raise")
 	}
 }
 
-func TestRaiseBuildTierForRetry_EmptyTierRaised(t *testing.T) {
-	// A static plan carries no tier (omitempty wire form) — the raise must
-	// still apply so the retry benefits regardless of routing mode.
-	plan := planWithBuild("")
-	raiseBuildTierForRetry(plan, 2, 1)
-	if plan.Entries[1].Tier != "deep" {
-		t.Fatalf("empty tier must raise to deep, got %q", plan.Entries[1].Tier)
+func TestEscalatedBuildTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
+	// A build profile with envelope Max=balanced must pull the raise back to
+	// no-gain — via the REAL ClampPlanModelRouting, not a second clamp.
+	root := t.TempDir()
+	profDir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	prof := `{"model_tier_envelope":{"min":"fast","default":"balanced","max":"balanced"}}`
+	if err := os.WriteFile(filepath.Join(profDir, "builder.json"), []byte(prof), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cr := escalationRun(t, root, "item-a", func(string) int { return 3 }, 1)
+	if tier, raised := cr.escalatedBuildTier("balanced"); raised {
+		t.Fatalf("envelope Max=balanced must clamp the raise to no-gain, got %q", tier)
 	}
 }
 
-func TestRaiseBuildTierForRetry_ZeroThresholdDisables(t *testing.T) {
-	plan := planWithBuild("balanced")
-	if raised := raiseBuildTierForRetry(plan, 5, 0); raised {
-		t.Fatal("threshold 0 disables escalation (policy escape hatch)")
+func TestEscalationScopeIDs_UnionOfLaneScopeAndProcessingClaims(t *testing.T) {
+	root := t.TempDir()
+	proc := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-77")
+	if err := os.MkdirAll(proc, 0o755); err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestRaiseBuildTierForRetry_NilPlanSafe(t *testing.T) {
-	if raised := raiseBuildTierForRetry(nil, 2, 1); raised {
-		t.Fatal("nil plan (static routing) must be a safe no-op")
+	if err := os.WriteFile(filepath.Join(proc, "x.json"), []byte(`{"id":"claimed-item"}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
-}
-
-// The raise composes with the REAL envelope clamp: a profile whose Max is
-// balanced clamps the raised deep back down — Max still wins (ADR-0076 D).
-func TestRaiseBuildTierForRetry_EnvelopeMaxStillClamps(t *testing.T) {
-	plan := planWithBuild("balanced")
-	raiseBuildTierForRetry(plan, 1, 1)
-	profileFor := func(phase string) *profiles.Profile {
-		if phase != "build" {
-			return nil
-		}
-		return &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Default: "balanced", Max: "balanced"}}
+	if err := os.WriteFile(filepath.Join(proc, "bad.json"), []byte(`MALFORMED`), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	clamped, _ := router.ClampPlanModelRouting(plan, profileFor, nil)
-	if got := clamped.Entries[1].Tier; got != "balanced" {
-		t.Fatalf("envelope Max must clamp the raise back down, got %q", got)
-	}
-}
-
-func TestEscalateRetryTier_MaxCountAcrossScopeIDs(t *testing.T) {
-	plan := planWithBuild("balanced")
-	reader := func(id string) int {
-		return map[string]int{"item-a": 0, "item-b": 2}[id]
-	}
-	if raised := escalateRetryTier(plan, "item-a,item-b", reader, 1, 42); !raised {
-		t.Fatal("max failure_count across the scope must drive the raise")
-	}
-	if plan.Entries[1].Tier != "deep" {
-		t.Fatalf("got %q", plan.Entries[1].Tier)
-	}
-}
-
-func TestEscalateRetryTier_EmptyScopeOrNilReaderNoop(t *testing.T) {
-	plan := planWithBuild("balanced")
-	if escalateRetryTier(plan, "", func(string) int { return 9 }, 1, 42) {
-		t.Fatal("empty scope (sequential path without ids) must be a no-op")
-	}
-	if escalateRetryTier(plan, "item-a", nil, 1, 42) {
-		t.Fatal("nil reader (option not wired) must be a no-op")
-	}
-	if plan.Entries[1].Tier != "balanced" {
-		t.Fatal("plan must be untouched")
+	cr := escalationRun(t, root, "scope-item, scope-item ,", func(string) int { return 0 }, 1)
+	ids := cr.escalationScopeIDs()
+	want := map[string]bool{"scope-item": true, "claimed-item": true}
+	if len(ids) != 2 || !want[ids[0]] || !want[ids[1]] {
+		t.Fatalf("want deduped union {scope-item, claimed-item}, got %v", ids)
 	}
 }
 
@@ -128,10 +109,8 @@ func TestWithFailureCountReader_SetsAndIgnoresNil(t *testing.T) {
 	if o.failureCountFor == nil || o.failureCountFor("x") != 7 {
 		t.Fatal("reader not injected")
 	}
-	prev := o.failureCountFor
 	WithFailureCountReader(nil)(o)
 	if o.failureCountFor == nil {
 		t.Fatal("nil must be ignored, keeping the prior reader")
 	}
-	_ = prev
 }

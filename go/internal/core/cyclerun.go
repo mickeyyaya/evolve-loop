@@ -667,11 +667,6 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 			o.recordPlanRejections(ctx, cycle, cs, router.ValidatePlan(planIn, raw))
 			var clamps []router.Clamp
 			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
-			// ADR-0076 D: a retried item escalates its build tier BEFORE the
-			// model-routing clamp below, so the profile envelope Max still
-			// clamps the raise (raise-only; wave path — sequential cycles have
-			// no committed ids at plan time and no-op here by design).
-			escalateRetryTier(clampedPlan, ctxSnap["fleet_scope"], o.failureCountFor, o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures, cycle)
 			// MR4(a): re-validate every entry's {cli,tier} against its phase's
 			// guardrails + the live catalog, regardless of ModelRouting mode — even
 			// under advisory the clamped proposal is what gets LOGGED to

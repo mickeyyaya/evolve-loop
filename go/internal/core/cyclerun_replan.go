@@ -98,9 +98,6 @@ func (cr *cycleRun) postScoutReplan() {
 	// above): a nil/error re-plan is fail-open and must NOT consume a depth slot.
 	cr.replanDepth++
 	clamped, clamps := router.ClampPlanToFloorWith(in, raw, cr.o.resolvedShipFloor(), cr.cs.IntentRequired)
-	// ADR-0076 D at the post-scout re-plan seam: by now triage has committed
-	// ids (sequential path included), so the retry escalation applies here too.
-	escalateRetryTier(clamped, cr.ctxSnap["fleet_scope"], cr.o.failureCountFor, cr.o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures, cr.cycle)
 	cr.o.recordPhasePlanKind(cr.ctx, cr.cycle, cr.cs, clamped, clamps, "replan")
 
 	// WS2-S6 advisory flip (the one behavior change, opt-in): at
