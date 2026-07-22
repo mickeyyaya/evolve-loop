@@ -58,6 +58,14 @@ type FailureThresholds struct {
 	// TaskRetryCeiling: a task-level failure count reaching this ⇒ quarantine
 	// (stop re-picking the poison todo).
 	TaskRetryCeiling int `json:"task_retry_ceiling,omitempty"`
+	// GuardClassHaltCeiling: guard-abort-class failure digests in one batch
+	// reaching this ⇒ pipeline-blocker halt (guard aborts are pipeline
+	// machinery failing by construction — never task defects).
+	GuardClassHaltCeiling int `json:"guard_class_halt_ceiling,omitempty"`
+	// IdenticalFingerprintHaltCeiling: one exact failure fingerprint recurring
+	// this many times in one batch ⇒ pipeline-blocker halt (identical failure
+	// identities cannot be distinct honest defects — the 862–899 signature).
+	IdenticalFingerprintHaltCeiling int `json:"identical_fingerprint_halt_ceiling,omitempty"`
 }
 
 // SystemFailurePolicy is the resolved decision policy.
@@ -87,7 +95,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryCodeAuditFail:   {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
 			CategoryIntentMalformed: {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -123,6 +131,12 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 		}
 		if c.Thresholds.TaskRetryCeiling > 0 {
 			out.Thresholds.TaskRetryCeiling = c.Thresholds.TaskRetryCeiling
+		}
+		if c.Thresholds.GuardClassHaltCeiling > 0 {
+			out.Thresholds.GuardClassHaltCeiling = c.Thresholds.GuardClassHaltCeiling
+		}
+		if c.Thresholds.IdenticalFingerprintHaltCeiling > 0 {
+			out.Thresholds.IdenticalFingerprintHaltCeiling = c.Thresholds.IdenticalFingerprintHaltCeiling
 		}
 		if c.OnTaskRetryCeiling != "" {
 			out.OnTaskRetryCeiling = c.OnTaskRetryCeiling
