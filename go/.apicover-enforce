@@ -448,3 +448,13 @@
 # concurrent lane's sanctioned phase mint from a deliverable leak.
 # Graduated at package creation per the new-package graduation guard.
 ./internal/mintregistry
+
+# failure-disposition-router S3 (cycle-1062, new-package graduation): the
+# deterministic disposition floors (guard-abort / recurrence>=3 force console;
+# an advisory LLM route may raise, never lower) plus the intent staging writer
+# that appends .evolve/escalations/pending-actions.jsonl and NEVER writes
+# .evolve/inbox/ (a mid-flight inbox write races inboxmover.Claim's os.Rename).
+# Decision/Intent/Decide/StageIntent/LoadIntents/PendingActionsPath + the route
+# and action vocabulary are named+exercised by dispositionrouter_test.go +
+# apicover_named_test.go. Imports only stdlib + adapters/flock.
+./internal/dispositionrouter

@@ -127,6 +127,10 @@ type Policy struct {
 	// Swarm configures swarm dispatch stage and port allocation. Absent ⇒
 	// built-in defaults apply (Stage="shadow", PortBase=0).
 	Swarm *SwarmPolicy `json:"swarm,omitempty"`
+	// FailureDisposition configures the failure-disposition boundary applier
+	// (stage + escalation formula). Absent ⇒ built-in defaults apply
+	// (stage = chronicle.escalation, threshold=2, step=0.03, cap=0.99).
+	FailureDisposition *FailureDispositionPolicy `json:"failure_disposition,omitempty"`
 	// Gates configures persistent rollout stages for the contract, eval,
 	// triage-cap, and review gates. Absent ⇒ built-in defaults apply.
 	Gates *GatesPolicy `json:"gates,omitempty"`
