@@ -205,8 +205,11 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 			t.Errorf("routing_decision ledger entries=%d, want >=%d", n, s.Expect.RoutingLedgerMin)
 		}
 	}
-	if s.Expect.RetroPrefix != "" && !strings.HasPrefix(res.RetroDecision, s.Expect.RetroPrefix) {
-		t.Errorf("RetroDecision=%q, want prefix %q", res.RetroDecision, s.Expect.RetroPrefix)
+	// Contains, not HasPrefix: the disposition gate (cycle-1046 verdict-path
+	// wiring) prefixes a loud reason when a scenario fixture delivers no
+	// disposition.json — the branch decision marker must still be present.
+	if s.Expect.RetroPrefix != "" && !strings.Contains(res.RetroDecision, s.Expect.RetroPrefix) {
+		t.Errorf("RetroDecision=%q, want marker %q", res.RetroDecision, s.Expect.RetroPrefix)
 	}
 	if s.Expect.ProposeAt != nil {
 		if agent == nil {

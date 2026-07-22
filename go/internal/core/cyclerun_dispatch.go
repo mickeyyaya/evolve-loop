@@ -58,6 +58,13 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return dispatchResult{}, loopAbort, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 	}
+	if next == PhaseRetro {
+		// S1 assembler, verdict path (ADR-0074 I2; cycle-1046 live gap): the
+		// failure digest must exist BEFORE the retro agent runs — it is the
+		// identity the disposition gate cross-checks and the blocker breaker
+		// reads. Idempotent with the phase-error path in recordFailureLearning.
+		cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath)
+	}
 
 	// CB.1 (concurrency campaign W4): EVERY phase runs with cwd = the cycle
 	// worktree — not just the source writers (tdd/build, role-gate-permitted)
