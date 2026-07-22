@@ -106,6 +106,38 @@ Output path: `.evolve/runs/cycle-N/retrospective-report.md`. Required sections:
 <!-- machine-readable autofiler block: see "### Machine-readable preventive_actions" below the template -->
 ```
 
+### Required deliverable: disposition.json (ADR-0074 S2 contract)
+
+Every retrospective MUST also write `<workspace>/disposition.json` — the
+machine-consumed verdict-on-the-verdict. The Go disposition gate verifies it at
+retro completion (absent/malformed/out-of-vocabulary ⇒ loud gate reason in
+RetroDecision); the S3 router consumes it for routing and escalation.
+
+Schema (all fields required):
+
+```json
+{
+  "cycle": <int>,
+  "fingerprint": "<copy VERBATIM from failure-digest.json — never invent>",
+  "recurrence": <copy VERBATIM from failure-digest.json>,
+  "legitimacy": "legit-rejection | false-rejection | infra-failure | indeterminate",
+  "root_cause": {"layer": "task-code | pipeline-code | harness | infra | eval-contract", "summary": "<one sentence>"},
+  "salvage": {"worktree_has_value": <bool>, "pointer": "<path/branch when true — REQUIRED then>"},
+  "urgency": "P0 | P1 | P2 | P3",
+  "justification": "<evidence-backed, cite artifact paths>",
+  "routing": "inbox | carryover | console | drop",
+  "proposed_item": "<inbox item id/slug when routing=inbox, else empty>"
+}
+```
+
+Rules: `fingerprint` and `recurrence` come from the S1 assembler's
+`failure-digest.json` in the same workspace — the gate cross-checks them and
+rejects invented identities. `routing: console` means operator-owned
+(pipeline-integrity defects a lane cannot fix, or protected-surface work);
+`drop` is reserved for legit rejections needing no follow-up. If the preserved
+worktree holds PASS-worthy work, `salvage.worktree_has_value` MUST be true
+with a pointer (salvage floor — cycles 984/1000/1034 precedent).
+
 ### Machine-readable preventive_actions block (autofiler contract)
 
 When one or more preventive actions are *deferrable, scope-able work units*,
