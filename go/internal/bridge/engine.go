@@ -341,6 +341,84 @@ func (e *Engine) HasTokenResolver() bool {
 	return e.deps.TokenResolver != nil
 }
 
+// resolvedModel is the single source of the "auto" model default, shared by
+// the arg construction and token-usage attribution.
+func resolvedModel(m string) string {
+	if m == "" {
+		return "auto"
+	}
+	return m
+}
+
+// launchArgs is the pure construction of a Launch's bridge-CLI argument list
+// (extracted from Launch so flag emission is testable without driving a real
+// CLI). deps supplies the per-agent artifact budget; req.BudgetScale scales it
+// (ADR-0076 slice A).
+func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string, deps Deps) []string {
+	model := resolvedModel(req.Model)
+	args := []string{
+		"--cli=" + req.CLI,
+		"--profile=" + req.Profile,
+		"--model=" + model,
+		"--prompt-file=" + promptFile,
+		"--workspace=" + req.Workspace,
+		"--stdout-log=" + stdoutLog,
+		"--stderr-log=" + stderrLog,
+		"--artifact=" + req.ArtifactPath,
+	}
+	if req.Cycle > 0 {
+		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
+	}
+	if req.Agent != "" {
+		args = append(args, "--agent="+req.Agent)
+	}
+	// Per-phase artifact budget (retro's grown contract needs more than the
+	// 300s builtin). Indexed on the agent label; a nil map, an unlisted agent
+	// and an empty agent all yield 0 → no flag → builtin deadline.
+	if budget := scaledArtifactBudget(deps.PhaseArtifactTimeoutS[req.Agent], req.BudgetScale); budget > 0 {
+		args = append(args, "--artifact-timeout-s="+strconv.Itoa(budget))
+	}
+	if req.Worktree != "" {
+		args = append(args, "--worktree="+req.Worktree)
+	}
+	if req.RunID != "" {
+		// CB.5: run identity → run-scoped session names + per-run registry.
+		args = append(args, "--run-id="+req.RunID)
+	}
+	if req.ProjectRoot != "" {
+		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
+		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
+		// stays the single source of truth for Config construction.
+		args = append(args, "--project-root="+req.ProjectRoot)
+	}
+	if req.Completion != "" {
+		args = append(args, "--completion="+req.Completion)
+	}
+	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
+	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
+	// into a non-claude launch command.
+	if req.PermissionMode != "" {
+		args = append(args, "--permission-mode="+req.PermissionMode)
+	}
+	// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
+	// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
+	// Config.SessionName; resolveSession then uses the named-session path.
+	if req.SessionName != "" {
+		args = append(args, "--session-name="+req.SessionName)
+	}
+	// The in-process entry is the autonomous runner's trusted path: it is the
+	// bypass authority, so it enables --allow-bypass for the tmux safety gates
+	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
+	// use, not for the programmatic orchestrator). Harmless for headless
+	// drivers, which do not consult AllowBypass.
+	args = append(args, "--allow-bypass")
+	if len(req.ExtraFlags) > 0 {
+		args = append(args, "--")
+		args = append(args, req.ExtraFlags...)
+	}
+	return args
+}
+
 // Launch satisfies core.Bridge: the in-process entry the M7 adapter
 // cutover routes to. It maps a BridgeRequest onto the LaunchArgs pipeline
 // (materializing req.Prompt to a file, mirroring the bash bridge's
@@ -385,70 +463,8 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if stderrLog == "" {
 		stderrLog = filepath.Join(req.Workspace, agent+"-stderr.log")
 	}
-	model := req.Model
-	if model == "" {
-		model = "auto"
-	}
-	args := []string{
-		"--cli=" + req.CLI,
-		"--profile=" + req.Profile,
-		"--model=" + model,
-		"--prompt-file=" + promptFile,
-		"--workspace=" + req.Workspace,
-		"--stdout-log=" + stdoutLog,
-		"--stderr-log=" + stderrLog,
-		"--artifact=" + req.ArtifactPath,
-	}
-	if req.Cycle > 0 {
-		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
-	}
-	if req.Agent != "" {
-		args = append(args, "--agent="+req.Agent)
-	}
-	// Per-phase artifact budget (retro's grown contract needs more than the
-	// 300s builtin). Indexed on the agent label; a nil map, an unlisted agent
-	// and an empty agent all yield 0 → no flag → builtin deadline.
-	if budget := e.deps.PhaseArtifactTimeoutS[req.Agent]; budget > 0 {
-		args = append(args, "--artifact-timeout-s="+strconv.Itoa(budget))
-	}
-	if req.Worktree != "" {
-		args = append(args, "--worktree="+req.Worktree)
-	}
-	if req.RunID != "" {
-		// CB.5: run identity → run-scoped session names + per-run registry.
-		args = append(args, "--run-id="+req.RunID)
-	}
-	if req.ProjectRoot != "" {
-		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
-		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
-		// stays the single source of truth for Config construction.
-		args = append(args, "--project-root="+req.ProjectRoot)
-	}
-	if req.Completion != "" {
-		args = append(args, "--completion="+req.Completion)
-	}
-	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
-	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
-	// into a non-claude launch command.
-	if req.PermissionMode != "" {
-		args = append(args, "--permission-mode="+req.PermissionMode)
-	}
-	// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
-	// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
-	// Config.SessionName; resolveSession then uses the named-session path.
-	if req.SessionName != "" {
-		args = append(args, "--session-name="+req.SessionName)
-	}
-	// The in-process entry is the autonomous runner's trusted path: it is the
-	// bypass authority, so it enables --allow-bypass for the tmux safety gates
-	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
-	// use, not for the programmatic orchestrator). Harmless for headless
-	// drivers, which do not consult AllowBypass.
-	args = append(args, "--allow-bypass")
-	if len(req.ExtraFlags) > 0 {
-		args = append(args, "--")
-		args = append(args, req.ExtraFlags...)
-	}
+	model := resolvedModel(req.Model)
+	args := launchArgs(req, promptFile, stdoutLog, stderrLog, e.deps)
 
 	// Capture the cold-boot latency the tmux-REPL driver reports via OnBoot
 	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired

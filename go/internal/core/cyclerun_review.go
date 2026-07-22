@@ -44,7 +44,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		// "## Correction" directive (bounded by policy, default 2). This re-runs
 		// runner.Run directly (no
 		// bridge-timeout retry on corrections — see the design's scope note).
-		maxCorrections := cr.retryConfig.ContractCorrectionRetries
+		maxCorrections := cr.correctionLimitFor(next, cr.retryConfig.ContractCorrectionRetries)
 		// ADR-0045 I1: a correction re-dispatch is an interaction — every
 		// rung of ONE correction decision shares a DecisionID, and each
 		// re-dispatch records an outcome resolved by its verdict + the
