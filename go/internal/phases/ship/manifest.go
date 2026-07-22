@@ -119,24 +119,99 @@ func declaredManifest(workspacePath string) []string {
 	return out
 }
 
+// manifestCovers reports whether some manifest entry covers p — exactly, or as
+// a directory prefix. SSOT for the coverage predicate shared by the gate
+// (outOfManifest) and explicit staging (stagePathspec).
+func manifestCovers(manifest []string, p string) bool {
+	for _, m := range manifest {
+		if p == m || strings.HasPrefix(p, strings.TrimSuffix(m, "/")+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 // outOfManifest returns the changed paths not covered by the manifest, where
 // a manifest entry covers a changed path exactly or as a directory prefix.
 func outOfManifest(changed, manifest []string) []string {
 	var extras []string
 	for _, c := range changed {
-		covered := false
-		for _, m := range manifest {
-			if c == m || strings.HasPrefix(c, strings.TrimSuffix(m, "/")+"/") {
-				covered = true
-				break
-			}
-		}
-		if !covered {
+		if !manifestCovers(manifest, c) {
 			extras = append(extras, c)
 		}
 	}
 	sort.Strings(extras)
 	return extras
+}
+
+// porcelainChangedPaths parses `git status --porcelain` output into the sorted
+// set of repo-relative paths it names. A rename entry ("R  old -> new") yields
+// BOTH sides, so an explicit staging pathspec records the deletion as well as
+// the addition.
+func porcelainChangedPaths(out string) []string {
+	seen := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) <= 3 {
+			continue
+		}
+		for _, part := range strings.Split(line[3:], " -> ") {
+			if p := strings.Trim(strings.TrimSpace(part), `"`); p != "" {
+				seen[p] = true
+			}
+		}
+	}
+	return sortedKeys(seen)
+}
+
+// sortedKeys renders a path set as a sorted slice.
+func sortedKeys(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for p := range set {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// stagePathspec computes the explicit `git add -- <paths>` pathspec for a
+// non-release ship (cycle-1067, `ship-stage-explicit-paths`): the DECLARED
+// manifest, not `git add -A`, decides what a cycle/manual ship binds — so a
+// sibling lane's untracked leak (cycle-645) can no longer ride into the commit.
+//
+// The set is:
+//   - every declared entry that is a real file on disk (isFile) or that git
+//     reports as changed (so a DELETED declared path still stages its deletion);
+//   - plus every changed path the manifest covers by directory prefix (a new
+//     file under a declared directory is part of the declared change).
+//
+// Fallbacks — staging must never silently become a no-op, which would produce a
+// false clean exit / empty ship, and must never fall back to `-A`:
+//   - no manifest (no workspace, or no readable phase reports) → the full
+//     porcelain changed set;
+//   - a manifest that covers nothing that changed → likewise the changed set.
+func stagePathspec(manifest, changed []string, isFile func(string) bool) []string {
+	if len(manifest) == 0 {
+		return changed
+	}
+	changedSet := map[string]bool{}
+	for _, c := range changed {
+		changedSet[c] = true
+	}
+	staged := map[string]bool{}
+	for _, d := range manifest {
+		if changedSet[d] || isFile(d) {
+			staged[d] = true
+		}
+	}
+	for _, c := range changed {
+		if manifestCovers(manifest, c) {
+			staged[c] = true
+		}
+	}
+	if len(staged) == 0 {
+		return changed
+	}
+	return sortedKeys(staged)
 }
 
 // ManifestGateEnforce is the opts.ManifestGate value that switches the gate from
@@ -170,10 +245,8 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 	}
 	changedSet := map[string]bool{}
 	if out, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain", "-uall"); err == nil {
-		for _, line := range strings.Split(out, "\n") {
-			if len(line) > 3 {
-				changedSet[strings.Trim(strings.TrimSpace(line[3:]), `"`)] = true
-			}
+		for _, p := range porcelainChangedPaths(out) {
+			changedSet[p] = true
 		}
 	}
 	if out, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch); err == nil {

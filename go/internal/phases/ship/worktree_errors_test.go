@@ -35,8 +35,10 @@ func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
-	if err == nil || !strings.Contains(err.Error(), "git add -A failed") {
-		t.Fatalf("want 'git add -A failed' error, got %v", err)
+	// cycle-1067: explicit-path staging (stageExplicitPaths) dropped the `-A`
+	// from the message; the worktree stage-failure branch is unchanged.
+	if err == nil || !strings.Contains(err.Error(), "git add failed") {
+		t.Fatalf("want 'git add failed' error, got %v", err)
 	}
 }
 

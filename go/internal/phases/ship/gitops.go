@@ -225,11 +225,8 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 			}
 		} else {
 			_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
-			exit, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
-			if err != nil || exit != 0 {
-				return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
-					fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exit, err),
-					"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err))
+			if err := stageExplicitPaths(ctx, opts, res, ""); err != nil {
+				return err
 			}
 		}
 	}
@@ -371,11 +368,8 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 	if !opts.DryRun {
 		_ = discardBinaryChurn(ctx, opts, worktree)
-		exit, err := opts.run(ctx, "git", []string{"-C", worktree, "add", "-A"}, io.Discard, opts.Stderr)
-		if err != nil || exit != 0 {
-			return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
-				fmt.Sprintf("ship: worktree git add -A failed (rc=%d): %v", exit, err),
-				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", worktree)
+		if err := stageExplicitPaths(ctx, opts, res, worktree); err != nil {
+			return err
 		}
 	}
 
@@ -696,6 +690,58 @@ func maybeCreateRelease(ctx context.Context, opts *Options, res *RunResult) erro
 func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args ...string) (string, error) {
 	all := append([]string{"-C", dir}, args...)
 	return captureGitOutput(ctx, opts, all...)
+}
+
+// stageExplicitPaths stages a non-release ship (cycle/manual/trivial) as an
+// explicit `git add -- <paths>` instead of the `git add -A` sweep both call
+// sites used before cycle-1067 (`ship-stage-explicit-paths`). The pathspec is
+// stagePathspec(declared manifest, porcelain changed set) — see its doc for the
+// exact set and for why the fallbacks are the changed set and never `-A` nor
+// nothing. dir is the tree to stage in: "" for opts.ProjectRoot (shipDirect),
+// or the cycle worktree (shipFromWorktree).
+//
+// The `git add` call is issued even for an empty pathspec (git: "Nothing
+// specified, nothing added.", rc=0) so the staging step stays observable and a
+// clean tree keeps flowing into the staged-diff check that exits cleanly —
+// staging is never silently skipped.
+func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir string) error {
+	root := dir
+	var prefix []string
+	if dir == "" {
+		root = opts.ProjectRoot
+	} else {
+		prefix = []string{"-C", dir}
+	}
+
+	out, err := captureGitOutputAtDir(ctx, opts, root, "status", "--porcelain", "-uall")
+	if err != nil {
+		return err
+	}
+	changed := porcelainChangedPaths(out)
+
+	var manifest []string
+	if opts.WorkspacePath != "" {
+		manifest = declaredManifest(opts.WorkspacePath)
+	}
+	paths := stagePathspec(manifest, changed, func(rel string) bool {
+		fi, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+		return statErr == nil && fi.Mode().IsRegular()
+	})
+
+	args := make([]string, 0, len(prefix)+2+len(paths))
+	args = append(args, prefix...)
+	args = append(args, "add", "--")
+	args = append(args, paths...)
+	exit, runErr := opts.run(ctx, "git", args, io.Discard, opts.Stderr)
+	if runErr != nil || exit != 0 {
+		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+			fmt.Sprintf("ship: git add failed (rc=%d): %v", exit, runErr),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(runErr), "worktree", dir)
+	}
+	res.Logs = append(res.Logs, fmt.Sprintf(
+		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",
+		len(paths), len(manifest), len(changed)))
+	return nil
 }
 
 // stageReleaseSet stages the explicit release pathspec: the versionbump

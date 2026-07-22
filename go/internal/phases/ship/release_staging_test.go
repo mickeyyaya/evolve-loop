@@ -147,25 +147,15 @@ func TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary(t *testing.T) {
 	}
 }
 
-// TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll — the discriminator:
-// cycle ships keep today's exact behavior (churn discard + add -A), so the
-// release fix cannot leak unaudited binaries into cycle commits.
-func TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll(t *testing.T) {
-	cap := &stagingCapture{}
-	root := initReleaseStagingTree(t)
-	opts := releaseStagingOpts(root, ClassCycle, cap.runner())
-
-	if err := shipDirect(context.Background(), opts, &RunResult{}, "main"); err != nil {
-		t.Fatalf("shipDirect(cycle): %v", err)
-	}
-
-	if call := cap.gitCallWith("add", "-A"); call == nil {
-		t.Error("cycle ship must keep `git add -A` staging")
-	}
-	// The churn-discard path engaged: with the capture runner reporting
-	// go/evolve as untracked (empty ls-files output), discardBinaryChurn
-	// removes the file — the observable proof the discard ran for cycle.
-	if _, err := os.Stat(filepath.Join(root, "go", "evolve")); !os.IsNotExist(err) {
-		t.Error("cycle ship skipped discardBinaryChurn — unaudited binary churn would ride into cycle commits")
-	}
-}
+// TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll was the original
+// class discriminator: cycle ships kept churn discard + `git add -A` while
+// the release class went explicit. Cycle-1067 (`ship-stage-explicit-paths`)
+// removed `git add -A` from the cycle/manual paths too, so the `AddAll` half
+// of that contract no longer exists and the test name would be stale.
+//
+// The two halves now live in stage_explicit_paths_test.go:
+//   - churn discard for cycle → TestShipDirect_CycleClass_KeepsChurnDiscard
+//   - the class discriminator → the release set is versionbump+CHANGELOG+binary
+//     (TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary, above), while
+//     cycle/manual stage the DECLARED manifest
+//     (TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll).
