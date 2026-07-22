@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
 // FailureDigest is the stable failure identity written to
@@ -130,4 +132,21 @@ func readAuditFailReason(workspace string) (phase string, reasons []string) {
 func fingerprint(phase, preClass string, reasons []string) string {
 	sum := sha256.Sum256([]byte(phase + "\x00" + preClass + "\x00" + strings.Join(reasons, "\x00")))
 	return phase + "|" + preClass + "|" + hex.EncodeToString(sum[:])[:12]
+}
+
+// ensureFailureDigest is the single-source wiring shared by BOTH retro
+// dispatch paths (recordFailureLearning for phase errors; cyclerun dispatch
+// for verdict FAILs — cycle-1046 proved wiring only the first blinds the
+// disposition contract AND the blocker breaker for verdict-path failures).
+// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
+// failure only WARNs — retro must never be blocked by forensics plumbing.
+// Idempotent: identical artifacts yield an identical digest.
+func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace string) {
+	var rc RecurrenceCounter
+	if led, lerr := recurrence.Load(filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json")); lerr == nil {
+		rc = led
+	}
+	if _, derr := AssembleFailureDigest(cycle, workspace, rc); derr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: assemble failure digest (cycle %d): %v\n", cycle, derr)
+	}
 }

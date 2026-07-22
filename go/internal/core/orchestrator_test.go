@@ -602,8 +602,14 @@ func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
 			t.Errorf("tail[%d]=%s, want %s; full=%v", i, tail[i], p, got)
 		}
 	}
-	if res.RetroDecision != "retro-recovered: ship" {
-		t.Errorf("RetroDecision=%q, want retro-recovered: ship", res.RetroDecision)
+	// Disposition contract (cycle-1046 verdict-path wiring): fixtures carry no
+	// disposition.json, so the gate prefixes its loud reason — the branch
+	// decision must still be carried (suffix), and the gate must be audible.
+	if !strings.HasSuffix(res.RetroDecision, "retro-recovered: ship") {
+		t.Errorf("RetroDecision=%q, want retro-recovered: ship suffix", res.RetroDecision)
+	}
+	if !strings.Contains(res.RetroDecision, "disposition-gate:") {
+		t.Errorf("RetroDecision=%q must surface the disposition-gate reason when no disposition was delivered", res.RetroDecision)
 	}
 }
 
@@ -626,8 +632,8 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	if last != PhaseRetro {
 		t.Errorf("last phase=%s, want retro", last)
 	}
-	if !strings.HasPrefix(res.RetroDecision, "proceed:") {
-		t.Errorf("RetroDecision=%q, want proceed: prefix", res.RetroDecision)
+	if !strings.Contains(res.RetroDecision, "proceed:") {
+		t.Errorf("RetroDecision=%q, want proceed: marker", res.RetroDecision)
 	}
 	retroReqs := runners[PhaseRetro].(*fakeRunner).requests
 	if len(retroReqs) != 1 {
@@ -664,8 +670,8 @@ func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 	if last != PhaseRetro {
 		t.Errorf("last phase=%s, want retro (fluent proceed→end)", last)
 	}
-	if !strings.HasPrefix(res.RetroDecision, "proceed:") {
-		t.Errorf("RetroDecision=%q, want proceed: prefix", res.RetroDecision)
+	if !strings.Contains(res.RetroDecision, "proceed:") {
+		t.Errorf("RetroDecision=%q, want proceed: marker", res.RetroDecision)
 	}
 }
 
