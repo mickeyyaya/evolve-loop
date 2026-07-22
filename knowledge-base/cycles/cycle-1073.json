@@ -1,0 +1,19 @@
+{
+  "cycle": 1073,
+  "run_id": "01KY6126710TZMCW19ED70JAY9",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "PASS",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ]
+}
