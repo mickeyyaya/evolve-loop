@@ -118,21 +118,32 @@ func TestC1070_001_EmptyTopNBlocksAuthoredTDDFiles(t *testing.T) {
 	}
 }
 
-// TestC1070_002_OutOfLaneSlugBlocksTDD covers the non-empty-top_n case: TDD
-// claims a slug with zero overlap against the committed set — a certain
-// out-of-lane authoring, blocked at StageEnforce.
-func TestC1070_002_OutOfLaneSlugBlocksTDD(t *testing.T) {
+// TestC1070_002_OutOfLaneSlugAdvisoryTDD covers the non-empty-top_n case: TDD
+// claims a slug with zero overlap against the committed set.
+//
+// POLICY CHANGE 2026-07-23 (cycle-1073 tdd-topn-scope-gate): this case is now
+// an ADVISORY, not a block — the same conversion #348/cbd088a1 made for the
+// sibling build-side gate after cycles 916 + 1012 recorded two fatal
+// rejections that discarded CORRECT work over label drift between two
+// LLM-authored strings, with zero true-fraud catches. The lane exists BECAUSE
+// triage committed these ids, so the committed set is the binding authority.
+// The predicate is rebound (not deleted) to the advisory contract: approved,
+// with the drift still surfaced in a populated reason. The empty-top_n case
+// (001) stays fatal — there is no committed item the files could be a
+// differently-labelled response to.
+func TestC1070_002_OutOfLaneSlugAdvisoryTDD(t *testing.T) {
 	ws := t.TempDir()
 	writeTriage(t, ws, "committed-slug-a", "committed-slug-b")
 	writeTestReport(t, ws, "totally-other-slug", "go/acs/cycle1070/predicates_test.go")
 
 	res := reviewTDD(t, config.StageEnforce, ws)
-	if res.Approve {
-		t.Errorf("TDD claiming %q against committed {committed-slug-a, committed-slug-b} must be REJECTED at enforce; got Approve=true", "totally-other-slug")
+	if !res.Approve {
+		t.Errorf("label drift against a NON-EMPTY committed top_n must be advisory, not a block; got Approve=false reason=%q", res.Reason)
 	}
-	if !res.Approve && strings.TrimSpace(res.Reason) == "" {
-		t.Errorf("blocked review must carry a non-empty Reason; got %q", res.Reason)
-	}
+	// The drift is still surfaced through the reviewer's structured logf seam,
+	// which is not observable from outside the package; that half of the
+	// contract is pinned white-box by
+	// internal/topngate.TestTDDScopeGate_LabelDriftIsAdvisory.
 }
 
 // TestC1070_003_InLaneTDDIsApproved is the anti-overreach negative: the healthy

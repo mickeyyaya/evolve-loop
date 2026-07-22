@@ -90,17 +90,20 @@ func (tddScopeGate) name() string { return "topn-tdd-scope" }
 // appliesTo scopes the gate to the TDD phase's deliverable only.
 func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-// check blocks the two CERTAIN out-of-lane authorings and fails open on every
+// check blocks the ONE CERTAIN out-of-lane authoring and fails open on every
 // ambiguity (missing/unparseable report, no claimed slug, nothing authored):
 //
 //  1. empty committed top_n + a non-empty authored set — triage committed
-//     nothing, so the only compliant TDD deliverable is a no-op.
+//     nothing, so the only compliant TDD deliverable is a no-op. FATAL.
 //  2. non-empty committed top_n + an authored set claimed for a slug with zero
-//     overlap against it.
+//     overlap against it — ADVISORY, mirroring the build-side gate's
+//     label-drift carve-out (see topNBindingGate.check).
 //
-// Unlike the build-side gate's label-drift carve-out (see check above), an
-// authored set under an empty top_n is unambiguous: there is no committed item
-// the files could be a differently-labelled response to.
+// The two cases differ in kind, not degree: under an empty top_n there is no
+// committed item the authored files could be a differently-labelled response
+// to, so case 1 is unambiguous and stays fatal. Case 2 compares two
+// LLM-authored strings for equality against a set that is non-empty by
+// construction — the same false-rejection risk #348 closed one phase later.
 func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	topN, ok := readTopNSlugs(in.Workspace)
 	if !ok {
@@ -122,8 +125,17 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 			return "", false // in-lane → pass
 		}
 	}
-	return "TDD authored test file(s) {" + strings.Join(authored, ", ") + "} for task '" + claimed +
-		"' but triage committed {" + strings.Join(topN, ", ") + "} — out-of-lane authoring", true
+	// Label drift is ADVISORY here for the same reason it is on the build side
+	// (cycles 916 + 1012): the lane exists BECAUSE triage committed these ids, so
+	// the committed set — not the TDD report's prose — is the binding authority,
+	// and a differently-labelled RED scaffold for the committed item is correct
+	// work. The non-empty reason at block=false still routes through the
+	// reviewer's single structured logf seam. Real fraud protection (authored
+	// file-scope vs the committed item's declared scope) is the queued
+	// construction-level check.
+	return "label drift (advisory since 2026-07-23): TDD authored test file(s) {" + strings.Join(authored, ", ") +
+		"} labelled '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") +
+		"} — binding to the committed set", false
 }
 
 // readTDDScope reads <workspace>/test-report.md and returns the slug from its
