@@ -1302,6 +1302,12 @@ type GatesPolicy struct {
 	// "shadow", not "enforce": the inbox spec calls for shadow/warn BEFORE
 	// enforce so the budget is observed before it can block a cycle.
 	ReportSizeGate string `json:"report_size_gate,omitempty"`
+	// ManifestGate is the ship-bind tree-manifest reconciliation gate's rollout
+	// dial (internal/phases/ship/manifest.go, cycle-1064). Like ReportSizeGate it
+	// defaults to "shadow", not "enforce": out-of-manifest paths (the cross-lane
+	// untracked-leak shape) are LOGGED before the gate is allowed to block a
+	// cycle. "enforce" fails the ship closed with core.CodeManifestGate.
+	ManifestGate string `json:"manifest_gate,omitempty"`
 }
 
 // GatesConfig is the resolved gate configuration with defaults applied.
@@ -1312,6 +1318,7 @@ type GatesConfig struct {
 	ReviewGate     string
 	ReportSizeGate string
 	TopNGate       string
+	ManifestGate   string
 }
 
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
@@ -1323,6 +1330,7 @@ func (p Policy) GatesConfig() GatesConfig {
 		ReviewGate:     "off",
 		ReportSizeGate: "shadow", // shadow/warn first, per the Slice S1 inbox spec
 		TopNGate:       "enforce",
+		ManifestGate:   "shadow", // shadow-first, mirroring ReportSizeGate (cycle-1064)
 	}
 	if p.Gates == nil {
 		return c
@@ -1344,6 +1352,9 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.TopNGate != "" {
 		c.TopNGate = p.Gates.TopNGate
+	}
+	if p.Gates.ManifestGate != "" {
+		c.ManifestGate = p.Gates.ManifestGate
 	}
 	return c
 }

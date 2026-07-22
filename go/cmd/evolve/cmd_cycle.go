@@ -53,6 +53,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/topngate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
@@ -414,8 +415,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompact(br, prm, cfg.PhaseIO, cfg.CompactPrompts),
-		core.PhaseShip:         ship.NewWithDefaultRunnerStage(cfg.PhaseIO),
-		core.PhaseRetro:        retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
+		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
+		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
+		// unreachable short of a code edit before cycle-1064.
+		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate}),
+		core.PhaseRetro: retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.

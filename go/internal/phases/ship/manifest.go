@@ -31,11 +31,14 @@ import (
 //   1. DONE (2026-07-14): pathToken (below) now also extracts bare root-level
 //      filenames (CHANGELOG.md, go.mod) via an extension allow-list, so a legit
 //      root-file change is no longer a FALSE-BLOCK under enforce.
-//   2. use a dedicated core.CodeManifestGate (mirroring CodeCommitPrefixGate)
-//      instead of reusing CodeGitStageFailed, so the ledger/debugger can tell a
-//      manifest block from a real `git add` failure. (Still open — dormant until
-//      enforce is wired + activated; the enforce error path never fires in the
-//      default shadow mode.)
+//   2. DONE (cycle-1064): the enforce branch carries the dedicated
+//      core.CodeManifestGate (mirroring CodeCommitPrefixGate) instead of reusing
+//      CodeGitStageFailed, so the ledger/debugger can tell a manifest block from
+//      a real `git add` failure; router.shipLocalCodes routes it to the debugger.
+//   3. DONE (cycle-1064): policy.json `gates.manifest_gate` resolves through
+//      policy.GatesConfig() into ship.Config.ManifestGate → Options.ManifestGate,
+//      so enforce is operator-activatable without a code edit. Default stays
+//      "shadow" — behavior-preserving.
 
 // manifestReportFiles are the phase reports whose named paths constitute the
 // cycle's declared file manifest.
@@ -192,7 +195,7 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 	}
 	if manifestGateEnforced(opts.ManifestGate) {
 		// FAIL-CLOSED — see reconcileManifest's doc + the error string below.
-		return shipErr(core.CodeGitStageFailed, core.ShipClassPrecondition, core.StageAtomicShip,
+		return shipErr(core.CodeManifestGate, core.ShipClassPrecondition, core.StageAtomicShip,
 			fmt.Sprintf("ship: manifest-gate (enforce): refusing to commit %d path(s) no build/TDD report declared (likely a cross-lane untracked leak): %s", len(extras), strings.Join(extras, ", ")),
 			"out_of_manifest", strings.Join(extras, ","))
 	}

@@ -74,6 +74,7 @@ const (
 	CodeGitFleetRebaseConflict = shiperr.CodeGitFleetRebaseConflict
 	CodeGitPushRejected        = shiperr.CodeGitPushRejected
 	CodeCommitPrefixGate       = shiperr.CodeCommitPrefixGate
+	CodeManifestGate           = shiperr.CodeManifestGate
 	CodeWorktreeResolve        = shiperr.CodeWorktreeResolve
 	CodeIntegrityTreeDrift     = shiperr.CodeIntegrityTreeDrift
 
