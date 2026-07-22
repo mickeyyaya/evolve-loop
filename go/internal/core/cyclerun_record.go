@@ -169,6 +169,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 			cr.envSnap[k] = v
 		}
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
+		// S2 disposition gate, verdict path (mirrors recordFailureLearning's
+		// contract — cycle-1046 live gap): an absent/invalid disposition is
+		// surfaced loudly in RetroDecision, never silently recorded clean.
+		if gateErr := cr.o.finalizeRetroCompletion(cr.cs.WorkspacePath); gateErr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN retro: %v\n", gateErr)
+			reason = gateErr.Error() + "; " + reason
+		}
 		cr.result.RetroDecision = reason
 		// ADR-0072 S4: a floor category classified at the retro chokepoint is a
 		// SYSTEM-level failure — mark it so the batch loop HALTS + escalates for

@@ -324,13 +324,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	// identity the S2 disposition gate cross-checks and an input the agent reads).
 	// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
 	// failure only WARNs — retro learning is never blocked by forensics plumbing.
-	var rc RecurrenceCounter
-	if led, lerr := recurrence.Load(filepath.Join(retroReq.ProjectRoot, ".evolve", "recurrence-ledger.json")); lerr == nil {
-		rc = led
-	}
-	if _, derr := AssembleFailureDigest(fl.Cycle, fl.CycleState.WorkspacePath, rc); derr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: assemble failure digest: %v\n", derr)
-	}
+	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath)
 	retroStarted := o.now().UTC()
 	fl.CycleState.Phase = string(PhaseRetro)
 	fl.CycleState.PhaseStartedAt = retroStarted.Format(time.RFC3339)
