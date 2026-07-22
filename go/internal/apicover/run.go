@@ -17,6 +17,13 @@ type Config struct {
 	CoverPath  string   // optional `go tool cover -func` output file
 	RequireDoc bool     // also flag exported decls missing a godoc comment
 	Enforce    bool     // exit non-zero when uncovered/false-green symbols exist
+	// ChangedFilesByDir diff-scopes enforcement (cycle-1048: four PRE-EXISTING
+	// false-green core symbols floor-blocked every core-touching lane). Keyed
+	// by the Dirs entry; the inner set holds changed file basenames in that
+	// package. When set, violations in files OUTSIDE the change are reported
+	// under a PRE-EXISTING DEBT header and do NOT count toward the Enforce
+	// exit code. Nil = classic behavior (CI's repo-wide run is unchanged).
+	ChangedFilesByDir map[string]map[string]bool
 }
 
 // Run measures each configured directory and writes a per-package report to w.
@@ -79,6 +86,16 @@ func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
 			}
 		}
 		rep := Classify(syms, named, coverPct)
+		if changed, scoped := cfg.ChangedFilesByDir[dir]; scoped {
+			var pre []Symbol
+			rep, pre = splitPreExisting(rep, changed)
+			printReport(w, dir, rep, cfg.RequireDoc, syms)
+			if len(pre) > 0 {
+				printList(w, "PRE-EXISTING DEBT (files untouched by this change — WARN only, pay down separately):", pre)
+			}
+			totalProblems += len(rep.Uncovered) + len(rep.FalseGreens)
+			continue
+		}
 		printReport(w, dir, rep, cfg.RequireDoc, syms)
 		totalProblems += len(rep.Uncovered) + len(rep.FalseGreens)
 	}
@@ -175,4 +192,25 @@ func printIgnored(w io.Writer, syms []Symbol) {
 	for _, l := range lines {
 		fmt.Fprintln(w, l)
 	}
+}
+
+// splitPreExisting removes violations whose defining file is NOT in the
+// change set, returning them separately: a lane owns the hygiene of the files
+// it touches, never the debt of files it didn't (cycle-1048).
+func splitPreExisting(r Report, changed map[string]bool) (Report, []Symbol) {
+	var pre []Symbol
+	keep := func(in []Symbol) []Symbol {
+		out := in[:0]
+		for _, s := range in {
+			if changed[s.File] {
+				out = append(out, s)
+			} else {
+				pre = append(pre, s)
+			}
+		}
+		return out
+	}
+	r.Uncovered = keep(r.Uncovered)
+	r.FalseGreens = keep(r.FalseGreens)
+	return r, pre
 }

@@ -122,7 +122,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	// The apicover parity class (5 live instances: 3 main REDs, a console PR
 	// red, and cycle-1022's invisible audit override): an ENFORCED changed
 	// package with an unnamed export dies at HANDOFF, not at audit/CI.
-	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced)
+	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced, paths)
 	// Persist the artifact for the ACS toolchain gate (same producer contract
 	// as the advisory binding, which skips its duplicate run when the floor is
 	// enforced — one go-test pass per build, not two).
@@ -148,7 +148,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 // selfcheck (a test failure is returned as a floor failure, never silently
 // dropped), and every fail-open plumbing branch WARNs loudly (reviewer MED:
 // silence here would let a coverage-run flake vanish the naming check).
-func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string) []string {
+func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string, changedPaths []string) []string {
 	if len(enforced) == 0 {
 		return nil
 	}
@@ -156,6 +156,9 @@ func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []st
 	for _, p := range enforced {
 		dirs = append(dirs, filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
 	}
+	// Diff-scope (cycle-1048): only violations in files THIS change touched
+	// hard-fail; a touched package's pre-existing debt WARNs in the report.
+	changedByDir := changedFileBasenamesByDir(moduleDir, dirs, changedPaths)
 	// apicover's enforce contract is named-AND-executed — it needs a coverage
 	// profile or every named export reads as false-green. Generate one scoped
 	// to the enforced changed packages (their single test run this handoff).
@@ -175,7 +178,7 @@ func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []st
 		return nil
 	}
 	var buf strings.Builder
-	code, rerr := apicover.Run(ctx, apicover.Config{Enforce: true, Dirs: dirs, CoverPath: coverFunc}, &buf)
+	code, rerr := apicover.Run(ctx, apicover.Config{Enforce: true, Dirs: dirs, CoverPath: coverFunc, ChangedFilesByDir: changedByDir}, &buf)
 	if rerr != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN: apicover measurement failed (%v) — naming check skipped this handoff\n", rerr)
 		return nil
@@ -228,4 +231,26 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 		return tmpDir + "/", err.Error(), coverStatusPlumbingError
 	}
 	return funcOut, "", coverStatusOK
+}
+
+// changedFileBasenamesByDir maps each enforced package dir to the basenames of
+// the changed .go files inside it — the diff-scope filter apicover consumes.
+// changedPaths are worktree-relative; dirs are absolute under moduleDir's tree.
+func changedFileBasenamesByDir(moduleDir string, dirs []string, changedPaths []string) map[string]map[string]bool {
+	out := make(map[string]map[string]bool, len(dirs))
+	worktree := filepath.Dir(moduleDir) // moduleDir = <worktree>/go
+	for _, d := range dirs {
+		out[d] = map[string]bool{}
+	}
+	for _, p := range changedPaths {
+		if !strings.HasSuffix(p, ".go") {
+			continue
+		}
+		abs := filepath.Join(worktree, p)
+		d := filepath.Dir(abs)
+		if set, ok := out[d]; ok {
+			set[filepath.Base(p)] = true
+		}
+	}
+	return out
 }

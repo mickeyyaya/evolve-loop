@@ -340,7 +340,7 @@ func productionFreshnessProbe(projectRoot string) fleet.FreshnessProbeFn {
 // triagecap.SelectFleetWidthTopN with the kept lanes' files as seeds.
 func productionRefillFn(evolveDir string) fleet.RefillFn {
 	return func(exclude map[string]bool) (fleet.CycleSpec, bool) {
-		backlog := triagecap.ReadInboxBacklog(evolveDir)
+		backlog := triagecap.ReadInboxBacklog(evolveDir, guards.IsProtectedSurface)
 		sort.SliceStable(backlog, func(i, j int) bool { return backlog[i].Weight > backlog[j].Weight })
 		for _, c := range backlog {
 			if exclude[c.ID] {
@@ -483,7 +483,7 @@ func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 	// weight-sorted top-N, which could seed two lanes that collide on a shared
 	// file. The seam is single-sourced in triagecap (also the SelectFleetWidthTopN
 	// home) so this caller stays a thin adapter to the top_n decision shape.
-	reps := triagecap.SelectWaveSeedTopN(evolveDir, count)
+	reps := triagecap.SelectWaveSeedTopN(evolveDir, count, guards.IsProtectedSurface)
 	if len(reps) < 2 {
 		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(reps))
 	}
@@ -529,7 +529,7 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 	if len(committed) >= count {
 		return data // already fleet-width — no inbox read, no re-marshal.
 	}
-	widened := triagecap.WidenTopNToFleetWidth(committed, triagecap.ReadInboxBacklog(evolveDir), count)
+	widened := triagecap.WidenTopNToFleetWidth(committed, triagecap.ReadInboxBacklog(evolveDir, guards.IsProtectedSurface), count)
 	if len(widened) <= len(committed) {
 		return data // nothing disjoint to add — leave the decision as-is.
 	}
