@@ -18,7 +18,7 @@ func TestEnsureFailureDigest_WritesDigestWithoutLedger(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
 	root := t.TempDir() // no recurrence-ledger.json — fail-soft, recurrence 0
-	o.ensureFailureDigest(1046, root, ws)
+	o.ensureFailureDigest(1046, root, ws, "", "")
 	raw, err := os.ReadFile(filepath.Join(ws, "failure-digest.json"))
 	if err != nil {
 		t.Fatalf("digest must be written even with no ledger and no audit-fail-reason: %v", err)
@@ -34,9 +34,9 @@ func TestEnsureFailureDigest_Idempotent(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
 	root := t.TempDir()
-	o.ensureFailureDigest(7, root, ws)
+	o.ensureFailureDigest(7, root, ws, "", "")
 	first, _ := os.ReadFile(filepath.Join(ws, "failure-digest.json"))
-	o.ensureFailureDigest(7, root, ws)
+	o.ensureFailureDigest(7, root, ws, "", "")
 	second, _ := os.ReadFile(filepath.Join(ws, "failure-digest.json"))
 	if string(first) != string(second) {
 		t.Fatalf("digest must be deterministic/idempotent:\n%s\nvs\n%s", first, second)

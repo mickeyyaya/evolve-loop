@@ -324,7 +324,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	// identity the S2 disposition gate cross-checks and an input the agent reads).
 	// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
 	// failure only WARNs — retro learning is never blocked by forensics plumbing.
-	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath)
+	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
 	retroStarted := o.now().UTC()
 	fl.CycleState.Phase = string(PhaseRetro)
 	fl.CycleState.PhaseStartedAt = retroStarted.Format(time.RFC3339)

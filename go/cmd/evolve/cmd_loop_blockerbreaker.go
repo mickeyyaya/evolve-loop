@@ -36,6 +36,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 	v := core.EvaluateBlockerBreaker(digests, core.BlockerBreakerConfig{
 		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
 		IdenticalFingerprintCeiling: fp.Thresholds.IdenticalFingerprintHaltCeiling,
+		UnexplainedCeiling:          fp.Thresholds.UnexplainedFailuresHaltCeiling,
 	})
 	if !v.Halt {
 		return 0, false

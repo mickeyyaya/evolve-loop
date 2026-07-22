@@ -63,7 +63,7 @@ type preClassRule struct {
 var preClassRules = []preClassRule{
 	{"infra-error", []string{"infra teardown", "quota", "bridge", "teardown"}},
 	{"guard-abort", []string{"statemap severed", "guard aborted", "guard abort", "statemap"}},
-	{"gate-block", []string{"egps", "floor blocked", "red_count", "gate block", "blocked ship"}},
+	{"gate-block", []string{"egps", "floor blocked", "red_count", "gate block", "blocked ship", "handoff floor", "deliverable rejected", "deterministic check"}},
 	{"verdict-fail", []string{"failed to compile", "predicate", "verdict", "acs"}},
 }
 
@@ -141,7 +141,22 @@ func fingerprint(phase, preClass string, reasons []string) string {
 // Ledger load is fail-soft (nil counter → recurrence 0); a digest write
 // failure only WARNs — retro must never be blocked by forensics plumbing.
 // Idempotent: identical artifacts yield an identical digest.
-func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace string) {
+// fallbackPhase/fallbackReason are the caller's own evidence (failed phase +
+// error/verdict text), written INTO audit-fail-reason.json when no floor wrote
+// one — batch-6 cycles 1044/1045/1047 each failed differently with no reason
+// artifact, collapsed to one empty-evidence fingerprint, and false-tripped the
+// identical-fingerprint breaker rule. A floor-written artifact always wins;
+// the fallback never overwrites (F8: one evidence trail for humans + digest).
+func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fallbackPhase, fallbackReason string) {
+	reasonPath := filepath.Join(workspace, "audit-fail-reason.json")
+	if _, statErr := os.Stat(reasonPath); statErr != nil && fallbackReason != "" {
+		b, merr := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: fallbackPhase, Reasons: []string{fallbackReason}})
+		if merr == nil {
+			if werr := writeArtifactAtomically(reasonPath, b); werr != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN: write fallback fail-reason (cycle %d): %v\n", cycle, werr)
+			}
+		}
+	}
 	var rc RecurrenceCounter
 	if led, lerr := recurrence.Load(filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json")); lerr == nil {
 		rc = led
