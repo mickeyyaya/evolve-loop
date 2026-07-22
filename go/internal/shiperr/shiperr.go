@@ -127,8 +127,17 @@ const (
 	CodeGitFleetRebaseConflict ShipErrorCode = "GIT_FLEET_REBASE_CONFLICT"
 	CodeGitPushRejected        ShipErrorCode = "GIT_PUSH_REJECTED"
 	CodeCommitPrefixGate       ShipErrorCode = "COMMIT_PREFIX_GATE"
-	CodeWorktreeResolve        ShipErrorCode = "WORKTREE_RESOLVE"
-	CodeIntegrityTreeDrift     ShipErrorCode = "INTEGRITY_TREE_DRIFT"
+	// CodeManifestGate (cycle-1064): the ship-bind manifest gate refused to
+	// commit path(s) no build/TDD report declared — the cross-lane untracked-leak
+	// guard firing under enforce. Dedicated rather than reusing
+	// CodeGitStageFailed (a TRANSIENT, retry-friendly `git add` failure) so the
+	// ledger/debugger can tell an integrity-flavoured BLOCK from a flaky stage:
+	// re-running audit can never re-establish the precondition, only re-declaring
+	// the path in a phase report can. Mirrors CodeCommitPrefixGate, the sibling
+	// ship-local gate that already owns a code.
+	CodeManifestGate       ShipErrorCode = "MANIFEST_GATE"
+	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
+	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
 	// generic / fallthrough
 	CodeArgs    ShipErrorCode = "ARGS"

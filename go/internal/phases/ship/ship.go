@@ -32,13 +32,20 @@ type Config struct {
 	// parse (ADR-0050 §3.10 Slice 6). Zero value (StageOff) = byte-identical
 	// (prose parse). Set by the composition root (cmd_cycle.go) from cfg.PhaseIO.
 	PhaseIO config.Stage
+	// ManifestGate threads the policy.json `gates.manifest_gate` rollout dial
+	// (policy.GatesConfig().ManifestGate) into Options.ManifestGate for the
+	// ship-bind manifest reconciliation (cycle-1064). Raw resolved stage string,
+	// not a config.Stage, because manifest.go's seam is value-compared against
+	// ManifestGateEnforce. Zero value "" = shadow (byte-identical).
+	ManifestGate string
 }
 
 // Phase implements core.PhaseRunner for the ship stage.
 type Phase struct {
-	runner  CmdRunner
-	nowFn   func() time.Time
-	phaseIO config.Stage
+	runner       CmdRunner
+	nowFn        func() time.Time
+	phaseIO      config.Stage
+	manifestGate string
 }
 
 func New(c Config) *Phase {
@@ -46,7 +53,7 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO}
+	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -105,10 +112,12 @@ func NewWithDefaultRunnerStage(stage config.Stage) *Phase {
 	return New(Config{Runner: sysexec.DefaultRunner, PhaseIO: stage})
 }
 
-// runNative dispatches to the native Go ship implementation. Translates
-// PhaseRequest → Options, then RunResult → PhaseResponse.
-func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string, start time.Time) (core.PhaseResponse, error) {
-	opts := Options{
+// shipOptions is the PhaseRequest → Options translation, extracted from
+// runNative so the sole production construction site is directly testable
+// (cycle-1064: Options.ManifestGate was silently never assigned here, leaving
+// the manifest gate permanently shadow no matter what policy.json said).
+func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
+	return Options{
 		Class:         ClassCycle, // PhaseRunner only invokes for cycle commits
 		CommitMessage: msg,
 		ProjectRoot:   req.ProjectRoot,
@@ -117,8 +126,15 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:           req.Env,
 		PhaseIO:       p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
+		ManifestGate:  p.manifestGate,
 		Runner:        sysexec.DefaultRunner,
 	}
+}
+
+// runNative dispatches to the native Go ship implementation. Translates
+// PhaseRequest → Options, then RunResult → PhaseResponse.
+func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string, start time.Time) (core.PhaseResponse, error) {
+	opts := p.shipOptions(req, msg)
 	res, err := Run(ctx, opts)
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 

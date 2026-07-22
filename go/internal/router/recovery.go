@@ -38,6 +38,7 @@ const auditBindingPrefix = "AUDIT_BINDING_"
 var shipLocalCodes = map[string]bool{
 	"GIT_FF_MERGE_DIVERGED": true,
 	"COMMIT_PREFIX_GATE":    true,
+	"MANIFEST_GATE":         true,
 	"GIT_DETACHED_HEAD":     true,
 	"WORKTREE_RESOLVE":      true,
 }

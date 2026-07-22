@@ -44,6 +44,7 @@ func TestVocabularyWireStrings(t *testing.T) {
 		{CodeGitFleetRebaseConflict, "GIT_FLEET_REBASE_CONFLICT"},
 		{CodeGitPushRejected, "GIT_PUSH_REJECTED"},
 		{CodeCommitPrefixGate, "COMMIT_PREFIX_GATE"},
+		{CodeManifestGate, "MANIFEST_GATE"},
 		{CodeWorktreeResolve, "WORKTREE_RESOLVE"},
 		{CodeIntegrityTreeDrift, "INTEGRITY_TREE_DRIFT"},
 		{CodeArgs, "ARGS"},

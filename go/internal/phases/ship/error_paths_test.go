@@ -46,7 +46,9 @@ func TestShipDirect_GitAddFails_Errors(t *testing.T) {
 	opts := &Options{Class: ClassManual, CommitMessage: "msg", ProjectRoot: repo,
 		Runner: faultRunner("git add", 1, nil), Stdout: io.Discard, Stderr: io.Discard}
 	err := shipDirect(context.Background(), opts, &RunResult{}, "main")
-	if err == nil || !strings.Contains(err.Error(), "git add -A failed") {
+	// cycle-1067: the message lost its `-A` with the switch to explicit-path
+	// staging (stageExplicitPaths); the failure branch it pins is unchanged.
+	if err == nil || !strings.Contains(err.Error(), "git add failed") {
 		t.Fatalf("want git-add-failed error, got %v", err)
 	}
 }

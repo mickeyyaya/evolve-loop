@@ -524,6 +524,10 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 					lr.emitFatal(stdout, stderr, cfg, 0)
 					return rc
 				}
+				// Escalation boundary (failure-disposition-router S4) — same
+				// contract as the wave branch: apply staged intents only once
+				// the pool iteration's lanes have drained.
+				applyEscalationBoundary(cfg.EvolveDir, i, stderr)
 				continue
 			default:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", i)
@@ -584,6 +588,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 						fmt.Fprintf(stderr, "[loop] fleet: work-supply starvation after %d waves — self-filed %s\n", fleetCfg.StarvationK, p)
 					}
 				}
+				// Escalation boundary (failure-disposition-router S4): the wave
+				// has drained (dispatchIteration blocks on its lanes), so this is
+				// the safe moment to mutate the inbox — mid-flight it would race
+				// inboxmover.Claim's os.Rename.
+				applyEscalationBoundary(cfg.EvolveDir, i, stderr)
 				// Enforce-mode budget pacing: idle the affordable inter-wave gap
 				// before the next wave (0 in shadow / no floor pressure).
 				paceBeforeNextWave(ctx, wavePace, stderr)
@@ -887,6 +896,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if esc := goalStall.observe(nonShipping, result.FinalVerdict, goalStallThreshold); esc != nil {
 			handleGoalStall(cfg.EvolveDir, cfg.GoalHash, workspace, ranCycle, esc, goalStallThreshold, goalStallWeight, stderr)
 		}
+
+		// Escalation boundary (failure-disposition-router S4): apply the intents
+		// S3 staged during the cycle now that nothing is in flight — the only
+		// moment an inbox write cannot race inboxmover.Claim's os.Rename.
+		applyEscalationBoundary(cfg.EvolveDir, ranCycle, stderr)
 
 		// Cycle-budget completion: when the operator gave no explicit --cycles,
 		// the advisor decides — on a non-FAIL cycle, if the backlog the planning
