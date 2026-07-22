@@ -430,6 +430,11 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var goalStall goalStallTracker
 	goalStallThreshold, goalStallWeight := loadGoalStallConfig(cfg.EvolveDir)
 
+	// Pipeline-blocker breaker scope: only failures from THIS batch count
+	// (digests of cycles > batchStartCycle), so a historic blocker that was
+	// already fixed can never halt a fresh healthy run.
+	batchStartCycle, _ := readLastCycleNumber(context.Background(), deps.Storage)
+
 	for i := 0; i < effectiveMax; i++ {
 		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
 		if ctx.Err() != nil {
@@ -437,6 +442,17 @@ func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.StopReason = "signal"
 			lr.emit(stdout)
 			return 130
+		}
+		// Pipeline-blocker breaker (ADR-0072 extension): before dispatching
+		// ANOTHER cycle, check whether this batch's failure digests show a
+		// recurring blocker signature (guard-abort class, or one identical
+		// fingerprint over ceiling). A blocker poisons every following cycle —
+		// halt and escalate NOW rather than burn the rest of the batch
+		// (batch-5 lost six cycles to one class with every signal on disk).
+		if rc, halted := blockerBreakerHalt(cfg.EvolveDir, cfg.ProjectRoot, batchStartCycle, stderr); halted {
+			lr.StopReason = "pipeline_blocker_halt"
+			lr.emitFatal(stdout, stderr, cfg, 0)
+			return rc
 		}
 		// CLI-health canary (the per-cycle health seam): one cheap live probe
 		// per EXPIRED bench — recovered families rejoin dispatch, still-walled
