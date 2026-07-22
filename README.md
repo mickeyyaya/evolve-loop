@@ -8,6 +8,28 @@ The mental model is **CI/CD for AI-written code**. You hand it a goal — "add d
 
 Over 1,000 autonomous cycles in, the trust layer is structural, not aspirational: **typed routing authority** keeps operator-owned control-plane work out of autonomous lanes entirely (ADR-0074); a **build handoff floor** rejects a red build before it ever reaches review; **graduated remediation** fixes a correct implementation's minor defect in-phase instead of discarding the work; and a **failure-disposition contract** classifies every failed cycle — honest rejection, pipeline fault, or operator-owned — and routes it where it can actually be fixed. The full evidence trail lives in [knowledge-base/research/lessons-and-resolutions-2026-07.md](knowledge-base/research/lessons-and-resolutions-2026-07.md).
 
+### You steer, it drives
+
+The entire external surface is small enough to list — everything else the loop figures out on its own.
+
+**What you control:**
+
+- **One command**: `/evo:loop "add dark mode"` — optionally a strategy (`harden · repair · innovate · balanced`), a hard cycle bound (`--cycles N`), or `--resume` to pick a checkpointed run up exactly where it stopped.
+- **The backlog**: drop JSON todos into `.evolve/inbox/` — `weight` sets priority, `route` sets ownership (`"console-manual"` marks an item operator-owned so autonomous lanes structurally cannot draw it; `"lane"` overrides a false positive). Routing is enforced plumbing, not a prompt suggestion.
+- **Policy, not code**: `.evolve/policy.json` — fleet width (`fleet.count`), gate stages, budgets, model-tier pins. Zero feature flags.
+- **Per-phase model routing**: `--cli` / `--model` per agent when you want to pin who does what.
+- **Releases**: `evolve release X.Y.Z` (or `/evo:publish`) — preflight gates, changelog, atomic version bump, CI-verified publish, auto-rollback.
+- **Observability on demand**: `evolve doctor` (environment probes), `evolve inbox batches` (how the backlog will group), `evolve dossier` (per-cycle verdict records), `evolve cycle-health` (11-signal integrity fingerprint).
+
+**What the loop completes and figures out for you:**
+
+- Finds and scopes the work (scout → triage), batches related backlog items into one cycle, and re-weights recurring pain automatically.
+- Routes each phase to the right model and CLI, detects quota exhaustion from the real provider surface, and fails over across model families mid-run.
+- Writes failing tests before code, self-verifies the build at handoff (a red build never reaches review), and has a *different* model adversarially audit the result.
+- Ships only through deterministic gates — and when a correct implementation carries one minor gate defect, repairs it in-phase instead of discarding the work.
+- Classifies every failure (honest rejection / pipeline fault / operator-owned), salvages the preserved worktree so effort is never wasted, quarantines poison tasks that can't pass, and files the follow-up work into its own backlog.
+- Checkpoints every phase boundary so `--resume` always works, recovers orphaned state after crashes, and turns every failure into a durable lesson the next cycle reads.
+
 It works with Claude Code, Gemini CLI, and Codex CLI — and can route a different LLM to each stage of the work.
 
 > **Prefer to see it?** The same story — the moved bottleneck, the pillars, the self-caught incident — is laid out visually on the **[Evolve Loop landing page](https://mickeyyaya.github.io/evolve-loop/)** (flagship version: **[noir](https://mickeyyaya.github.io/evolve-loop/noir/)**).

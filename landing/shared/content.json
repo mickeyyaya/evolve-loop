@@ -714,6 +714,30 @@
         "label": "Resume",
         "command": "/evo:loop --resume",
         "note": "Picks a checkpointed run up exactly where it stopped — worktree and state intact, no work lost."
+      },
+      {
+        "n": "6",
+        "label": "Queue a backlog",
+        "command": "echo '{\"id\":\"fix-flaky-auth-test\",\"weight\":0.9}' > .evolve/inbox/fix-flaky-auth-test.json",
+        "note": "Drop JSON todos into .evolve/inbox/ — the loop drains them strictly by weight, batches related items into one cycle, and re-weights recurring pain automatically."
+      },
+      {
+        "n": "7",
+        "label": "Route the work",
+        "command": "\"route\": \"console-manual\"",
+        "note": "One field decides ownership: console-* marks an item operator-owned — autonomous lanes structurally cannot draw it (refused at plan time AND at claim). \"lane\" overrides a false positive. Routing is plumbing, not a prompt."
+      },
+      {
+        "n": "8",
+        "label": "Go wide",
+        "command": "policy.json → \"fleet\": {\"count\": 3}",
+        "note": "Parallel isolated lanes in their own git worktrees. Quota pressure shrinks the width gracefully — never below one isolated lane, never onto your main tree."
+      },
+      {
+        "n": "9",
+        "label": "Publish",
+        "command": "evolve release 22.7.0",
+        "note": "A self-healing release pipeline: preflight gates, changelog, atomic version bump, CI-verified publish, auto-rollback on failure. One command, no ceremony."
       }
     ],
     "setup": {
