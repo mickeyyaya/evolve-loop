@@ -271,6 +271,9 @@ gaming the metric. The target state is: **all remaining FAILs are ones we want.*
 | Batch 3 (…–1009) | 7 PASS / 7 FAIL | +1 operator-aborted; produced the 13-FAIL cluster analysis |
 | Batch 4 (…–1027) | 10 PASS / 4 FAIL | 3 of the 4 were operator mid-batch pollution → v22.7.0 |
 | Batch 5 (1028–1043) | 6 PASS / 7 FAIL | six of seven FAILs = ONE control-plane routing class (→ ADR-0074; all six worktrees salvaged, ~3 work items recovered whole); one operator-collateral empty draw; zero pipeline false-REDs |
+| Batch 6 (1044–1047) | 1 SALVAGED / 2 FAIL + blocker halt | first live BREAKER HALT (degenerate empty-fingerprint collision → PR #355); build floor + correction ladder + salvage all first-fired live |
+| Batch 7 (1048, stopped) | operator-stopped | RC1 floor blockade found (pre-existing false-greens blocking every core lane → PR #356 diff-scoping); wave-0 seed starvation (RC4) |
+| Batch 8 (1053–1068) | 7 PASS / 9 FAIL | all FAILs honest + fully evidenced; 5 = builder unnamed-exports (→ builder-doc directive); fingerprint collision caught live at 2-of-3 (PR #358); staged-deletion ship fatal fixed same-day (PR #359); max streak 3 |
 
 ## 7. Source index
 
