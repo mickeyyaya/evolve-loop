@@ -102,6 +102,36 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	return wt, nil
 }
 
+// CreateFrom provisions the cycle worktree seeded from startRef instead of
+// HEAD (ADR-0076 slice C adoption: the ref is a prior attempt's salvage
+// snapshot, so the new cycle resumes committed work through the STANDARD
+// provisioning path — no dirty-state adoption, no clean-HEAD bypass). The
+// reuse/validation semantics of Create do not apply: a continuation always
+// targets a NEW cycle number, so an existing directory is a stale collision
+// and is recreated.
+func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) (string, error) {
+	base := g.base(projectRoot)
+	if !filepath.IsAbs(base) {
+		return "", fmt.Errorf("worktree base must be absolute: %s", base)
+	}
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return "", fmt.Errorf("worktree base: %w", err)
+	}
+	rs := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle)
+	wt := rs.WorktreeDir(base)
+	if _, err := os.Stat(wt); err == nil {
+		_ = gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Run(context.Background(), "worktree", "remove", "--force", wt)
+		_ = os.RemoveAll(wt)
+	}
+	branch := rs.CycleBranch()
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
+	if err != nil || code != 0 {
+		return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
+	}
+	linkGuardDeps(wt, projectRoot, cycle)
+	return wt, nil
+}
+
 // linkGuardDeps makes the worktree self-sufficient for the trust-kernel
 // PreToolUse hooks. Those run `$CLAUDE_PROJECT_DIR/go/bin/evolve guard ...
 // --evolve-dir $CLAUDE_PROJECT_DIR/.evolve`, and Claude Code pins

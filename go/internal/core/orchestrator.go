@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
@@ -364,6 +365,12 @@ type Orchestrator struct {
 	// workflowConfig is resolved once from policy.json at the composition root.
 	workflowConfig policy.WorkflowConfig
 
+	// continuationFor resolves the ADR-0076 slice C continuation binding for a
+	// cycle's claimed scope (composition root: the inbox mover's processing
+	// claims). Nil (default) = continuations never adopt — byte-identical
+	// provisioning.
+	continuationFor func(projectRoot string, cycle int) *continuation.Continuation
+
 	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
 	// once from policy.json at the composition root (chronicle S3).
 	chronicle policy.ChronicleConfig
@@ -498,6 +505,16 @@ func WithRetryConfig(cfg policy.RetryConfig) Option {
 }
 
 // WithWorkflowConfig injects the resolved workflow policy.
+// WithContinuationResolver injects the claimed-scope continuation lookup
+// (ADR-0076 slice C). Nil is ignored — adoption stays off.
+func WithContinuationResolver(fn func(projectRoot string, cycle int) *continuation.Continuation) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.continuationFor = fn
+		}
+	}
+}
+
 func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
 	return func(o *Orchestrator) { o.workflowConfig = cfg }
 }
@@ -912,6 +929,14 @@ OuterLoop:
 			normalizeScoutGoalHash(cr.cs.WorkspacePath)
 			cr.postScoutReplan()
 		}
+		// ADR-0076 slice C: adoption is keyed to the ACTUAL claim — triage
+		// claims items into processing/cycle-N mid-cycle, so only AFTER the
+		// triage phase can the resolver see whether this cycle's scope
+		// carries preserved work (architect finding #1: resolving at
+		// provisioning time reads a dir that does not exist yet).
+		if next == PhaseTriage {
+			cr.adoptContinuationAfterTriage()
+		}
 	}
 
 	// ADR-0044 C1 chokepoint-escape guard: the bounded loop can exit by
@@ -932,7 +957,7 @@ OuterLoop:
 	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
 	// preserveWorktree is threaded back so the exit defer (registered above)
 	// observes it; cycleCompletedNormally is set only on a clean persist.
-	preserve, ferr := o.finalizeCycle(ctx, cr.cs, cr.cycle, cr.preCycleHEAD, &cr.result, &cr.state)
+	preserve, ferr := o.finalizeCycle(ctx, cr.cs, cr.cycle, cr.preCycleHEAD, cr.req.ProjectRoot, &cr.result, &cr.state)
 	if preserve {
 		cr.preserveWorktree = true
 	}
