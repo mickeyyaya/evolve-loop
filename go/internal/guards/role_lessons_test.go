@@ -32,16 +32,19 @@ func lessonsRole(t *testing.T, phase string) (*Role, string) {
 }
 
 func TestRole_RetroMayWriteLessonsCorpus(t *testing.T) {
-	r, root := lessonsRole(t, "retro")
-	d := r.Decide(context.Background(), lessonsGuardInput(filepath.Join(root, ".evolve", "instincts", "lessons", "cycle-7-lesson.yaml")))
+	r, _ := lessonsRole(t, "retro")
+	// Fixed non-/tmp path: Decide never stats the write path, and a t.TempDir()
+	// path would ride the /tmp always-safe allowance on Linux (the exact
+	// platform split that flunked PR #351's ubuntu job while macos passed).
+	d := r.Decide(context.Background(), lessonsGuardInput("/repo/.evolve/instincts/lessons/cycle-7-lesson.yaml"))
 	if !d.Allow {
 		t.Fatalf("retro must be allowed to write the lessons corpus, got deny: %s", d.Reason)
 	}
 }
 
 func TestRole_NonRetroDeniedLessonsCorpus(t *testing.T) {
-	r, root := lessonsRole(t, "build")
-	if d := r.Decide(context.Background(), lessonsGuardInput(filepath.Join(root, ".evolve", "instincts", "lessons", "cycle-7-lesson.yaml"))); d.Allow {
+	r, _ := lessonsRole(t, "build")
+	if d := r.Decide(context.Background(), lessonsGuardInput("/repo/.evolve/instincts/lessons/cycle-7-lesson.yaml")); d.Allow {
 		t.Fatal("non-retro phases must not ride the lessons allowance")
 	}
 }
