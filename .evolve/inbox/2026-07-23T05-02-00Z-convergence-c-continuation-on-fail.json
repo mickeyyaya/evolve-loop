@@ -1,0 +1,16 @@
+{
+  "id": "continuation-on-fail",
+  "created_at": "2026-07-23T05:02:00Z",
+  "weight": 0.96,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "convergence-2026-07",
+  "route": "console-salvage",
+  "routing_note": "Design-heavy core change (worktree lifecycle + carry-forward screen + resume semantics). Console leads the design + first implementation per ADR-0076; lanes may take well-scoped sub-slices after the seam lands.",
+  "title": "ADR-0076 C: continuation-on-fail — a FAILed cycle with a salvageable preserved worktree requeues as a CONTINUATION task binding that worktree; the next attempt resumes state + findings instead of restarting cold",
+  "summary": "THE deepest convergence lever: lanes currently restart cold per attempt (re-burn discovery, starve the same tail — role-lessons ×3, apicover-parity ×3). Design: on FAIL with preserved worktree, the disposition/salvage path stamps the requeued item with continuation:{worktree, base_sha, findings_ref}; cycle provisioning, when the claimed item carries continuation and the worktree is fresh (ClassifyFleetRebaseCandidate screen extended from LANDING to STARTING), reuses it and injects the failure findings into the build prompt. S5 ceilings bound attempts; audit verdicts are never resumed — work is, grades are not (ADR-0076 consequences).",
+  "acceptance": ["RED: FAILed cycle w/ preserved worktree → requeued item carries continuation binding", "RED: provisioning honors a valid continuation (reuses worktree, injects findings); stale/dirty-base continuation falls back to fresh + WARN", "RED: audit/adversarial verdicts never carried forward as grades", "go test -race; live wiring proof; apicover clean"],
+  "files": ["go/internal/core/ (provisioning + salvage stamp)", "go/internal/fleet/ (carry-forward screen extension)", "go/internal/inboxmover/ (continuation retry state)"],
+  "connects_to": ["ADR-0076", "failure-disposition-router (salvage field feeds this)", "ship-landed floor"],
+  "source": "ADR-0076 slice C (operator, 2026-07-23)"
+}

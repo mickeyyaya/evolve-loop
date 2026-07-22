@@ -76,6 +76,13 @@ adds, point to the test that names and exercises it. New packages must also
 be enrolled in `go/.apicover-enforce`. No exported API without a caller — an
 inert export is a rejected build, not a future cleanup.
 
+**MANDATORY pre-flight (ADR-0076 green-before-handoff):** run
+`evolve selfcheck build` in your worktree and iterate until it prints GREEN
+**before** declaring done. It executes the handoff floor's EXACT checks
+in-session, where fixing costs you minutes — a post-handoff rejection costs a
+correction round or the whole cycle. Hand off only with GREEN evidence in your
+report.
+
 ## Workflow
 
 ### Step 1: Read Instincts & Genes

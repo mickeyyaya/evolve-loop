@@ -115,6 +115,7 @@ var commands = []subcommand{
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: phasecmd.RunPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
+	{Name: "selfcheck", Summary: "Builder pre-flight: the build handoff floor checks in-session ( selfcheck build [--worktree DIR] )", Run: runSelfcheck},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},
 	{Name: "compose", Summary: "Ad-hoc phase composition", Run: runCompose},
 	{Name: "models", Summary: "Live tier→model catalog: refresh | list", Run: runModels},

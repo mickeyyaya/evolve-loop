@@ -1,0 +1,14 @@
+{
+  "id": "retry-tier-escalation",
+  "created_at": "2026-07-23T05:04:00Z",
+  "weight": 0.93,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "convergence-2026-07",
+  "title": "ADR-0076 D: recurrence-driven tier escalation — an item with failure_count >= 1 routes its NEXT build to the deep tier",
+  "summary": "Deep-tier audit reliably catches what balanced-tier build cannot finish on hard items; nothing escalates on retry, so hard items re-fail at the same tier. The failure counters exist (S5 chain, live since the claim rebinding: item JSON failure_count) and per-phase tier routing exists (advisor envelopes / per-agent overrides). Wire: at plan/claim time, an item with failure_count >= 1 sets the build phase tier floor to deep for that cycle (never lowers; envelope Max still clamps). Policy-configurable threshold (compiled default 1).",
+  "acceptance": ["RED: failure_count>=1 item → build tier deep in the resolved plan; count 0 → unchanged", "RED: envelope ceiling still clamps (Max wins)", "go test -race; wiring proof on the composed routing path; apicover clean"],
+  "files": ["go/internal/core/ (plan/routing)", "go/internal/inboxbatch/ or inboxmover (failure_count read)", "go/internal/policy/ (threshold)"],
+  "connects_to": ["ADR-0076", "S5 quarantine chain (counter source)", "tier ceiling clamp (Max=top)"],
+  "source": "ADR-0076 slice D (operator, 2026-07-23)"
+}
