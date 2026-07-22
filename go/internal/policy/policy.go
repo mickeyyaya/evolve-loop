@@ -742,9 +742,13 @@ type WorkflowPolicy struct {
 	UniversalFallback *bool `json:"universal_fallback,omitempty"`
 	// RemediationRounds/RemediablePhases configure graduated remediation
 	// (workflow.remediation_rounds / workflow.remediable_phases).
-	RemediationRounds *int     `json:"remediation_rounds,omitempty"`
-	RemediablePhases  []string `json:"remediable_phases,omitempty"`
-	BuildFloor        *bool    `json:"build_floor,omitempty"`
+	RemediationRounds *int `json:"remediation_rounds,omitempty"`
+	// SizeBudgetMultipliers scales per-cycle budgets (correction rounds, build
+	// artifact timeout) by the triage/scout cycle_size_estimate (ADR-0076 A).
+	// Per-key positive override; unmentioned keys keep compiled defaults.
+	SizeBudgetMultipliers map[string]float64 `json:"size_budget_multipliers,omitempty"`
+	RemediablePhases      []string           `json:"remediable_phases,omitempty"`
+	BuildFloor            *bool              `json:"build_floor,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -770,6 +774,12 @@ type WorkflowConfig struct {
 	// half of the 2026-07-21 directive) — the E2 correction ladder then fixes
 	// it in-phase. false restores the advisory-only selfcheck.
 	BuildFloorEnforced bool
+	// SizeBudgetMultipliers maps cycle_size_estimate → budget multiplier
+	// (ADR-0076 A). Compiled defaults: trivial/small 1.0, medium 1.25,
+	// large 1.5. A survivorship-hard backlog starves the verification tail
+	// under uniform budgets (batch-8: ~10-minute build windows incl.
+	// corrections on structural items).
+	SizeBudgetMultipliers map[string]float64
 	// RemediationRounds bounds the graduated fix-forward ladder (operator
 	// directive 2026-07-21): when a phase listed in RemediablePhases returns a
 	// FAIL verdict, the orchestrator re-dispatches the builder ONCE per round
@@ -806,9 +816,10 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		UniversalFallback:     true, // default ON: discover+route to an installed CLI when the configured chain is absent
 		// Graduated remediation (2026-07-21): default ON at 1 round for the
 		// coverage gate — the measured waste class (983/992/1007/1019/1020).
-		RemediationRounds:  1,
-		RemediablePhases:   []string{"coverage-gate"},
-		BuildFloorEnforced: true,
+		RemediationRounds:     1,
+		RemediablePhases:      []string{"coverage-gate"},
+		BuildFloorEnforced:    true,
+		SizeBudgetMultipliers: map[string]float64{"trivial": 1.0, "small": 1.0, "medium": 1.25, "large": 1.5},
 	}
 	if p.Workflow == nil {
 		return c
@@ -845,6 +856,11 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	}
 	if p.Workflow.UniversalFallback != nil {
 		c.UniversalFallback = *p.Workflow.UniversalFallback
+	}
+	for k, v := range p.Workflow.SizeBudgetMultipliers {
+		if v > 0 {
+			c.SizeBudgetMultipliers[k] = v
+		}
 	}
 	if p.Workflow.RemediationRounds != nil {
 		c.RemediationRounds = *p.Workflow.RemediationRounds
@@ -1748,3 +1764,8 @@ func (p Policy) PathsConfig() PathsConfig {
 	}
 	return *p.Paths
 }
+
+// MaxContractCorrectionRetries is the hard ceiling on build correction
+// re-dispatches — exported for the ADR-0076 size-budget scaler, which must
+// clamp its scaled limit to the same bound the resolver enforces.
+const MaxContractCorrectionRetries = maxContractCorrectionRetries

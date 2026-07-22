@@ -732,6 +732,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			ArtifactPath:        artifactPath,
 			Agent:               phase,
 			Cycle:               req.Cycle,
+			BudgetScale:         req.BudgetScale,
 			Env:                 req.Env,
 			PermissionMode:      permissionMode,
 			InteractivePolicy:   interactivePolicy,

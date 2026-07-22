@@ -40,6 +40,8 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			raw = unwrapPayload(raw)
 			sig.Triage = extractTriage(raw)
 			sig.foldGeneric("triage", raw)
+		} else {
+			sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
 		}
 	}
 	if done["build"] {
@@ -212,6 +214,41 @@ func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals 
 		*degraded = append(*degraded, "scout: report fallback stat: "+err.Error())
 		return ScoutSignals{}
 	}
+}
+
+// triageFromReportFallback derives TriageSignals from triage-report.md — the
+// artifact triage actually writes every cycle — when handoff-triage.json is
+// absent (handoffs extinct since ~cycle 215; same gap scoutFromReportFallback
+// closed for scout). Richer than scout's: it extracts the report header's
+// `cycle_size_estimate: <size>` line so RoutingSignals.CycleSize() carries a
+// real value on the live path (ADR-0076 slice A's budget signal). No size
+// vocabulary validation here — the multiplier lookup treats unknown sizes as
+// 1.0, so tolerance is safe and single-sourced at the consumer. Absence and
+// read-miss semantics mirror scoutFromReportFallback exactly.
+func triageFromReportFallback(workspace string, degraded *[]string) TriageSignals {
+	raw, err := os.ReadFile(filepath.Join(workspace, "triage-report.md"))
+	switch {
+	case err == nil && len(raw) > 0:
+		return TriageSignals{Present: true, CycleSize: reportHeaderValue(string(raw), "cycle_size_estimate:")}
+	case err == nil:
+		return TriageSignals{} // empty report: the phase did not really deliver
+	case os.IsNotExist(err):
+		return TriageSignals{} // clean absence
+	default:
+		*degraded = append(*degraded, "triage: report fallback read: "+err.Error())
+		return TriageSignals{}
+	}
+}
+
+// reportHeaderValue returns the trimmed value of the first report line starting
+// with prefix (e.g. "cycle_size_estimate:"), or "" when no line matches.
+func reportHeaderValue(md, prefix string) string {
+	for _, line := range strings.Split(md, "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), prefix); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
 }
 
 // auditFromACSVerdictFallback derives AuditSignals from acs-verdict.json — the

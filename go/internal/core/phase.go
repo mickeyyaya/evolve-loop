@@ -157,6 +157,10 @@ type PhaseRequest struct {
 	// PhaseRequest's JSON shape byte-identical.
 	ModelRoutingCLI  string `json:"model_routing_cli,omitempty"`
 	ModelRoutingTier string `json:"model_routing_tier,omitempty"`
+	// BudgetScale (ADR-0076 slice A) is the difficulty multiplier for this
+	// dispatch's artifact budget, set for the BUILD phase from the cycle's
+	// digest-resolved size estimate. 0/1 = unscaled (byte-identical dispatch).
+	BudgetScale float64 `json:"budget_scale,omitempty"`
 }
 
 // PhaseResponse is the output envelope from PhaseRunner.Run.
