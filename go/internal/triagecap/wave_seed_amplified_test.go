@@ -44,7 +44,7 @@ func c541ampWriteInboxTodo(t *testing.T, inboxDir, filename string, todo c541amp
 }
 
 func TestC541Amp_ReadInboxBacklog_MissingEvolveDir(t *testing.T) {
-	got := ReadInboxBacklog(filepath.Join(t.TempDir(), "does-not-exist"))
+	got := ReadInboxBacklog(filepath.Join(t.TempDir(), "does-not-exist"), nil)
 	if len(got) != 0 {
 		t.Fatalf("missing evolveDir must yield an empty backlog (best-effort), got %v", got)
 	}
@@ -52,7 +52,7 @@ func TestC541Amp_ReadInboxBacklog_MissingEvolveDir(t *testing.T) {
 
 func TestC541Amp_ReadInboxBacklog_EmptyInboxDir(t *testing.T) {
 	evolveDir, _ := c541ampInboxDir(t)
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 0 {
 		t.Fatalf("empty inbox dir must yield an empty backlog, got %v", got)
 	}
@@ -67,7 +67,7 @@ func TestC541Amp_ReadInboxBacklog_SkipsMalformedAndNonJSON(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inboxDir, "3-notes.txt"), []byte("not a todo at all"), 0o644); err != nil {
 		t.Fatalf("write non-json fixture: %v", err)
 	}
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 1 || got[0].ID != "valid-item" {
 		t.Fatalf("malformed JSON and non-.json files must be skipped best-effort, got %v", got)
 	}
@@ -77,7 +77,7 @@ func TestC541Amp_ReadInboxBacklog_SkipsEmptyIDTodos(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
 	c541ampWriteInboxTodo(t, inboxDir, "1-empty-id.json", c541ampInboxTodo{ID: "", Weight: 0.9, Files: []string{"a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "2-real.json", c541ampInboxTodo{ID: "real-item", Weight: 0.1, Files: []string{"b.go"}})
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 1 || got[0].ID != "real-item" {
 		t.Fatalf("empty-id todos must be skipped, got %v", got)
 	}
@@ -89,7 +89,7 @@ func TestC541Amp_ReadInboxBacklog_FilenameOrderTiesEqualWeight(t *testing.T) {
 	c541ampWriteInboxTodo(t, inboxDir, "b-second.json", c541ampInboxTodo{ID: "second", Weight: 0.5, Files: []string{"b.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "a-first.json", c541ampInboxTodo{ID: "first", Weight: 0.5, Files: []string{"a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "c-third.json", c541ampInboxTodo{ID: "third", Weight: 0.5, Files: []string{"c.go"}})
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 3 {
 		t.Fatalf("want 3 candidates, got %d: %v", len(got), got)
 	}
@@ -104,7 +104,7 @@ func TestC541Amp_ReadInboxBacklog_FilenameOrderTiesEqualWeight(t *testing.T) {
 func TestC541Amp_ReadInboxBacklog_ParsesWeightAndFilesFaithfully(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
 	c541ampWriteInboxTodo(t, inboxDir, "1.json", c541ampInboxTodo{ID: "full-item", Weight: 0.73, Files: []string{"pkg/a.go", "pkg/b.go"}})
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 1 {
 		t.Fatalf("want 1 candidate, got %d", len(got))
 	}
@@ -119,7 +119,7 @@ func TestC541Amp_ReadInboxBacklog_MissingWeightAndFilesFields(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inboxDir, "1.json"), []byte(`{"id":"bare-item"}`), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 1 || got[0].ID != "bare-item" || got[0].Weight != 0 || len(got[0].Files) != 0 {
 		t.Fatalf("missing weight/files must default to zero-value, not panic: %+v", got)
 	}
@@ -131,7 +131,7 @@ func TestC541Amp_ReadInboxBacklog_SkipsDirectoryMatchingGlob(t *testing.T) {
 		t.Fatalf("mkdir fixture: %v", err)
 	}
 	c541ampWriteInboxTodo(t, inboxDir, "1-real.json", c541ampInboxTodo{ID: "real-item", Weight: 0.4, Files: []string{"a.go"}})
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 1 || got[0].ID != "real-item" {
 		t.Fatalf("a directory entry matching *.json must be skipped, not panic: %v", got)
 	}
@@ -145,7 +145,7 @@ func TestC541Amp_ReadInboxBacklog_LargeInboxDirectory(t *testing.T) {
 			ID: fmt.Sprintf("item-%03d", i), Weight: float64(i), Files: []string{fmt.Sprintf("pkg%d/f.go", i)},
 		})
 	}
-	got := ReadInboxBacklog(evolveDir)
+	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != n {
 		t.Fatalf("want %d candidates from a large inbox, got %d", n, len(got))
 	}
@@ -157,7 +157,7 @@ func TestC541Amp_SelectWaveSeedTopN_DelegatesToReadInboxBacklogRegression(t *tes
 	c541ampWriteInboxTodo(t, inboxDir, "2-mid.json", c541ampInboxTodo{ID: "mid", Weight: 0.5, Files: []string{"pkg/b.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "3-colliding.json", c541ampInboxTodo{ID: "colliding", Weight: 0.8, Files: []string{"pkg/a.go"}})
 
-	got := SelectWaveSeedTopN(evolveDir, 2)
+	got := SelectWaveSeedTopN(evolveDir, 2, nil)
 	if len(got) != 2 {
 		t.Fatalf("want 2 disjoint lane representatives, got %d: %v", len(got), c541ampIDs(got))
 	}
