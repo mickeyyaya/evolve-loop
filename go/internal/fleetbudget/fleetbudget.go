@@ -149,6 +149,39 @@ func (cfg Config) budgetPlan(b binding, tp budgethistory.Throughput, dt time.Dur
 	return plan
 }
 
+// QuotaJoin (S8, token-telemetry) is one SHADOW observation pairing the binding
+// quota window with the measured token burn: "the tightest window has this much
+// headroom left, and a cycle costs about this many tokens". It is the evidence a
+// future token-aware admission control would need, accumulated now under a
+// zero-behavior-change contract — nothing in Plan reads it, and it is
+// deliberately NOT a field of BudgetPlan so it cannot leak into the decision.
+type QuotaJoin struct {
+	Family               string
+	RemainingFraction    float64
+	MedianTokensPerCycle int64
+	Reason               string
+}
+
+// ShadowJoin pairs the binding (tightest healthy) quota window with the measured
+// median tokens/cycle, returning ok=false when EITHER half is absent — no
+// healthy probed window, or no token evidence. Half a join is not a join: the
+// package's absent-evidence discipline forbids reporting the quotastate min seed
+// as "100% remaining" or joining against an unknown token count. Pure and
+// observation-only; callers log the result and MUST NOT feed it to Plan.
+func ShadowJoin(states []quotastate.QuotaState, tp budgethistory.Throughput) (QuotaJoin, bool) {
+	b := tightestHealthy(states)
+	if !b.found || tp.MedianTokensPerCycle <= 0 {
+		return QuotaJoin{}, false
+	}
+	return QuotaJoin{
+		Family:               b.family,
+		RemainingFraction:    b.rem,
+		MedianTokensPerCycle: tp.MedianTokensPerCycle,
+		Reason: fmt.Sprintf("%s %.0f%% remaining; median %d tokens/cycle over %d cycle(s)",
+			b.family, b.rem*100, tp.MedianTokensPerCycle, tp.SampleCount),
+	}, true
+}
+
 // tightestHealthy returns the tightest (min remaining) window across healthy
 // (non-exhausted, probed) families — the binding constraint. A probed state
 // parsed by quotastate.Parse carries a fraction per bucket, so found implies rem

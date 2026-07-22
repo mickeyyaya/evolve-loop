@@ -404,6 +404,12 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 	if fc.Budget == nil {
 		return fc, 0
 	}
+	// S8 shadow join: log the quota↔tokens observation on BOTH stages — it is a
+	// measurement, not a decision, so it is emitted before (and independently of)
+	// the sizing branch and never feeds fleetbudget.Config.
+	if join, ok := fleetbudget.ShadowJoin(states, tp); ok {
+		fmt.Fprintf(warn, "[budget] shadow-join: %s\n", join.Reason)
+	}
 	plan := fleetbudget.Plan(states, tp, fleetbudget.Config{
 		Count:          fc.Count,
 		Floor:          fc.MinLanes,

@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
@@ -44,6 +45,16 @@ type Throughput struct {
 	// median as "over N of M cycles".
 	MedianCostUSD   float64
 	CostSampleCount int
+	// MedianTokensPerCycle (S8, token-telemetry) is the NATIVE-unit twin of
+	// MedianCycleDurationMS: the median GROSS token count a cycle burns
+	// (input+output+cache_read+cache_write, per phasetiming.Rollup.TotalTokens).
+	// Tokens — not dollars — are the honest consumption unit on subscription
+	// CLIs, so this is the measurement the fleet quota join reads. It is
+	// OBSERVATION ONLY today: no sizing decision reads it (see
+	// fleetbudget.ShadowJoin). 0 means "unknown" — a legacy timing log written
+	// before the Tokens field, or no evidence at all — never a genuine zero
+	// burn, and never back-filled from cost or duration.
+	MedianTokensPerCycle int64
 }
 
 // Collect walks the run workspaces for the given cycles under projectRoot and
@@ -54,17 +65,25 @@ type Throughput struct {
 func Collect(projectRoot string, cycles []int) Throughput {
 	var durations []int64
 	var costs []float64
+	var tokens []int64
 	for _, c := range cycles {
 		ws := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", c))
 		entries, err := phasetiming.Read(ws)
 		if err != nil {
 			continue // absent/unreadable timing → absent evidence
 		}
-		total := phasetiming.Rollup(entries).TotalMS
-		if total <= 0 {
+		sum := phasetiming.Rollup(entries)
+		if sum.TotalMS <= 0 {
 			continue // no measurable pace — can't derive a rate from 0
 		}
-		durations = append(durations, total)
+		durations = append(durations, sum.TotalMS)
+		// Tokens are best-effort like cost: a cycle can have timing but no token
+		// evidence (a log written before the S4 Tokens field). A zero gross is
+		// ABSENT evidence, so it is skipped rather than folded in as a real 0 —
+		// a fabricated zero would drag the median of a mixed cohort down.
+		if gross := grossTokens(sum.TotalTokens); gross > 0 {
+			tokens = append(tokens, gross)
+		}
 		// Cost is display-only and strictly best-effort: a cycle can have timing
 		// but no event log (ErrNoLogs), which just shrinks the cost sample.
 		if sum, err := cyclecost.SummarizeCycle(ws, c); err == nil {
@@ -82,7 +101,16 @@ func Collect(projectRoot string, cycles []int) Throughput {
 	}
 	tp.MedianCostUSD = median(costs)
 	tp.CostSampleCount = len(costs)
+	tp.MedianTokensPerCycle = median(tokens)
 	return tp
+}
+
+// grossTokens sums a cycle's roll-up into the single native consumption number
+// the budget layer joins against. GROSS (all four fields) is deliberate: cache
+// reads and writes are billed quota, so dropping them would understate the burn
+// — the exact metric-definition ambiguity the S8 fixtures discriminate.
+func grossTokens(t cyclestate.TokenUsage) int64 {
+	return int64(t.Input) + int64(t.Output) + int64(t.CacheRead) + int64(t.CacheWrite)
 }
 
 // number bounds the generic median to the two numeric kinds budgethistory
