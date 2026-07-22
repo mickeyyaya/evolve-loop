@@ -13,7 +13,7 @@ import (
 // Phase-1 subset of scripts/guards/role-gate.sh rules:
 //   - build:        workspace_path + active_worktree
 //   - audit:        workspace_path only (audit-*.{md,json} go there)
-//   - learn/retrospective: workspace_path + .evolve/lessons/**
+//   - learn/retrospective: workspace_path + .evolve/instincts/lessons/**
 //   - other phases: workspace_path only
 //   - Always-safe:  /tmp/**, $HOME/.claude/**
 type Role struct {
@@ -77,6 +77,15 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 				"control-plane changes require human-gated `evolve ship --class manual` outside a cycle.",
 		}
 	}
+	// Retro lessons allowance — documented in this file's header since phase-1
+	// but implemented only now (cycles 1036/1041/1042 pinned the doc-only gap):
+	// the retrospective phase persists failure-lesson YAMLs to the durable
+	// corpus. Path-fragment anchored (the guard carries no project root; the
+	// fragment idiom mirrors IsProtectedSurface) and phase-scoped, AFTER the
+	// control-plane boundary above so no protected path can ride it.
+	if cs.Phase == "retro" && isLessonsCorpusPath(path) {
+		return core.GuardDecision{Allow: true}
+	}
 	if isUnderDir(path, cs.WorkspacePath) {
 		return core.GuardDecision{Allow: true}
 	}
@@ -88,6 +97,14 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 		Reason: "role guard: phase=" + cs.Phase + " may not write outside workspace " +
 			cs.WorkspacePath + " (path=" + path + "); pass --bypass to override in an emergency",
 	}
+}
+
+// isLessonsCorpusPath reports whether path targets the durable failure-lesson
+// corpus (.evolve/instincts/lessons/**), slash-normalized and case-folded like
+// IsProtectedSurface.
+func isLessonsCorpusPath(path string) bool {
+	p := strings.ToLower(filepath.ToSlash(path))
+	return strings.Contains(p, "/.evolve/instincts/lessons/")
 }
 
 func isAlwaysSafe(path string) bool {

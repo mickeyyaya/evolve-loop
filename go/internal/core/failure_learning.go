@@ -319,6 +319,18 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 
 	retroReq := fl.retroRequest(summary, todoID)
+	// S1 failure-digest assembler (ADR-0074 I2 wiring — was landed callerless by
+	// cycle-1034; the digest must exist BEFORE the retro agent runs: it is the
+	// identity the S2 disposition gate cross-checks and an input the agent reads).
+	// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
+	// failure only WARNs — retro learning is never blocked by forensics plumbing.
+	var rc RecurrenceCounter
+	if led, lerr := recurrence.Load(filepath.Join(retroReq.ProjectRoot, ".evolve", "recurrence-ledger.json")); lerr == nil {
+		rc = led
+	}
+	if _, derr := AssembleFailureDigest(fl.Cycle, fl.CycleState.WorkspacePath, rc); derr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: assemble failure digest: %v\n", derr)
+	}
 	retroStarted := o.now().UTC()
 	fl.CycleState.Phase = string(PhaseRetro)
 	fl.CycleState.PhaseStartedAt = retroStarted.Format(time.RFC3339)
@@ -364,7 +376,16 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		}
 	}
 	fl.Result.FinalVerdict = retroResp.Verdict
-	fl.Result.RetroDecision = "failure-learning: queued " + todoID
+	// Disposition gate (S2): a PASS retro must still deliver a valid
+	// disposition.json whose failure identity agrees with the S1 digest —
+	// otherwise the completion surfaces a loud gate reason instead of silently
+	// recording a clean outcome (retro cannot invent or omit the disposition).
+	if gateErr := o.finalizeRetroCompletion(fl.CycleState.WorkspacePath); gateErr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: %v\n", gateErr)
+		fl.Result.RetroDecision = "failure-learning: " + gateErr.Error()
+	} else {
+		fl.Result.RetroDecision = "failure-learning: queued " + todoID
+	}
 	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, phaseOutcomeFrom(PhaseRetro, retroResp, 1, "", fl.CycleState.PhaseStartedAt))
 	o.writeFailureLearningState(ctx, fl.State)
 }
