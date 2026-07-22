@@ -1,0 +1,18 @@
+{
+  "id": "inbox-console-worklist-view",
+  "created_at": "2026-07-22T12:00:00Z",
+  "weight": 0.7,
+  "kind": "feature",
+  "priority": "medium",
+  "campaign": "pipeline-integrity",
+  "title": "ADR-0074 F8: operator worklist surface for console-routed items — `evolve inbox` console section + a stable terminal triage bucket (not per-cycle 'deferred' churn)",
+  "summary": "Architect review of ADR-0074 (finding 8, LOW): console-routed items stay physically in .evolve/inbox (correct — single backlog view, no claim races) but the operator's own command hides the distinction: cmd_inbox.go classifies ALL items without PartitionConsole, and triage's completeness check re-buckets excluded items as 'deferred' every cycle — unbounded churn + prompt budget. Fix: (1) `evolve inbox` (and `evolve inbox batches`) renders a distinct 'console-routed (operator-owned)' section via inboxbatch.PartitionConsole(items, guards.IsProtectedSurface) with per-item reasons; (2) triage contract gains a stable `console_routed[]` terminal bucket so excluded items are accounted once, not re-deferred per cycle.",
+  "acceptance": [
+    "RED: evolve inbox output separates console-routed items with reasons (fixture with route field + protected-files derivation)",
+    "RED: triage completeness accounting accepts console_routed[] as a terminal bucket (no per-cycle re-deferral)",
+    "go test -race on touched pkgs PASS; apicover clean"
+  ],
+  "files": ["go/cmd/evolve/cmd_inbox.go", "go/internal/inboxbatch/", "agents/evolve-triage.md (bucket contract)"],
+  "connects_to": ["failure-disposition-router", "protected-surface-ac-operator-disposition"],
+  "source": "ADR-0074 strong review (architect agent), 2026-07-22"
+}

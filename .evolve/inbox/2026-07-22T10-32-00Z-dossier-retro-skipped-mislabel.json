@@ -1,0 +1,16 @@
+{
+  "id": "dossier-retro-skipped-mislabel",
+  "created_at": "2026-07-22T10:32:00Z",
+  "weight": 0.6,
+  "kind": "defect",
+  "priority": "low",
+  "title": "FAIL-cycle dossiers record skipped_phases: retro reason=FAIL while retrospective-report.md exists in the run dir — record-vs-disk incoherence in the dossier writer (likely the PASS-only memo phase mislabeled as retro)",
+  "summary": "Cycles 1028 and 1035 (both FAIL): knowledge-base/cycles/cycle-N.json says {phase: retro, reason: FAIL} under skipped_phases, yet .evolve/runs/cycle-N/ contains retrospective-report.md, retro-usage.json, retrospective-stdout.log — retro RAN. Either the dossier writer inverts the retro-fires-on-FAIL trigger in its skip bookkeeping, or the memo phase (which genuinely IS skipped on FAIL) is recorded under the name retro. A dossier that misstates which judgment phases executed poisons downstream consumers (recurrence analysis, the queued failure-disposition-router's assembler reads dossiers). Small fix + regression pin asserting a FAIL cycle's dossier records retro as EXECUTED when its artifacts exist and memo as the skipped phase.",
+  "acceptance": [
+    "RED: fixture FAIL cycle with retro artifacts → dossier must NOT list retro in skipped_phases (and lists memo skipped reason=FAIL if that is the real semantics)",
+    "go test -race on the dossier/coherence pkg PASS"
+  ],
+  "files": ["go/internal/coherence/", "go/internal/core/ (dossier writer)"],
+  "connects_to": ["failure-disposition-router (assembler trusts dossier phase records)"],
+  "source": "operator observation 2026-07-22 while classifying cycle-1035"
+}

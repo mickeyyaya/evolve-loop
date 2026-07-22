@@ -22,5 +22,7 @@
   "connects_to": [
     "C1 escape family (#309, cycle-terminal-path-escapes)",
     "warnship_apicover_ci_gap (local-vs-CI hermeticity class)"
-  ]
+  ],
+  "route": "console-manual",
+  "console_hold_note": "OPERATOR HOLD 2026-07-22 (cycle-1041, 5th burn of the control-plane class this batch; prose fences proven non-binding 2x on one item): held in .evolve/inbox/console/ \u2014 INVISIBLE to wave triage (subdir, maxdepth-1 readers) until PR #349's plan-time gate deploys at the batch boundary. Reverse: mv back to .evolve/inbox/ after the new binary is live; the gate then enforces routing as plumbing."
 }

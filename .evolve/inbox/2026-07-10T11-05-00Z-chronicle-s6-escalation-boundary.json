@@ -1,5 +1,6 @@
 {
   "id": "chronicle-s6-escalation-boundary",
+  "superseded_by": "failure-disposition-router (2026-07-22, weight 0.96): this item becomes that design's S4 boundary applier. Triage: do NOT build standalone — its race-proven constraints (boundary-only placement after dispatchIteration returns, flock.WithPathLock on inboxDir, per-cycle idempotency stamp, never-lower-weight, claimed-items-untouched) carry over VERBATIM into S4.",
   "title": "Chronicle S6: recurrence-driven weight escalation + auto-file, ONLY at the loop iteration boundary (shadow first)",
   "weight": 0.88,
   "kind": "feature",

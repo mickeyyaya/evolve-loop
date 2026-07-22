@@ -1,0 +1,56 @@
+{
+  "id": "failure-disposition-router",
+  "created_at": "2026-07-22T09:00:00Z",
+  "route": "console-salvage",
+  "routing_note": "DO NOT RE-DISPATCH TO LANES (operator, 2026-07-22). Cycle-1034 already built S1+S2 (failure_digest.go assembler + disposition_gate.go schema gate + tests + acs/cycle1034 predicates + disposition-contract-gate.md) and FAILed ONLY on the protected-surface tripwire: a new gate-shaped file must be enrolled in guards.ProtectedSurfaceManifest (integrity_surface.go), which is itself protected \u2014 operator-gated manual ship required, structurally impossible in-cycle. Work is preserved: worktree .evolve/worktrees/cycle-21f9f7ae-1034 (UNCOMMITTED) + operator snapshot cycle-1034-disposition-salvage.tar.gz in the console session scratchpad. Console session salvages at the batch boundary: review lane's S1+S2 + enroll disposition_gate.go in the manifest + land via commit-gate branch flow; S3/S4 then continue per spec. Re-drawing this in a lane would rebuild from scratch and hit the same wall (1019/1020 anti-pattern).",
+  "weight": 0.96,
+  "kind": "feature",
+  "priority": "high",
+  "campaign": "pipeline-integrity",
+  "title": "Automatic failed-cycle review: mandatory disposition contract on retro (legitimacy/root-cause/urgency/routing) + deterministic assembler/router/floors + boundary applier \u2014 closes the lesson-to-action gap and automates the console-vs-inbox routing decision the operator currently makes by hand",
+  "summary": "Operator-approved design 2026-07-22 (A+C hybrid, brainstormed with ultrathink). Every FAIL today yields a diagnosis (retro report + lesson YAML) but no DISPOSITION: nobody decides whether the verdict was legit or a pipeline false-FAIL, how urgent the cause is, and who fixes it (queued inbox task vs console \u2014 the console owns pipeline-integrity defects because a fixing lane rides the same broken machinery). Evidence: 238 lessons / 0 retro-originated inbox items; ~20 hand-classifications via the audit-fail-reason.json recipe in one week; auditor-PASS-vs-EGPS-FAIL recurred 3+ times with the lesson on file. Raw machinery exists but is INERT: go/internal/recurrence (Ledger/Escalator/Autofiler/EscalationPolicy.Target, landed cycle 661), FAILED_UNEXPLAINED injector seam (core/failure_decision.go + failure_learning.go), audit-fail-reason.json, dossier index.",
+  "architecture": {
+    "s1_assembler": "Deterministic Go, post-FAIL pre-retro: read audit-fail-reason.json + CycleResult.FailReasons + phase outcomes + dossier + preserved-worktree git state + infra signals; compute failure fingerprint (gate+reason-class+phase), recurrence count via recurrence.Ledger, pre-class bucket {infra-error|gate-block|guard-abort|verdict-fail|unknown}; write failure-digest.json as a retro input artifact.",
+    "s2_disposition_contract": "Retro phase (existing FAIL/WARN trigger \u2014 NO new phase) gains a MANDATORY disposition.json deliverable: {cycle, fingerprint, recurrence, legitimacy: legit-rejection|false-fail|ambiguous, root_cause:{layer: task-code|pipeline-infra|environment|flake, summary}, salvage:{worktree_has_value, pointer}, urgency: P0|P1|P2, justification, routing: none|inbox|console, proposed_item}. Go schema gate: retro CANNOT complete without a valid disposition (fail loud); fingerprint+recurrence are cross-checked against the assembler digest so the agent cannot invent identity. Agent-doc/contract change is config-only per phases_are_config_only.",
+    "s3_router": "Deterministic Go, post-retro. Floors FORCE routing regardless of LLM verdict: guard-abort/statemap/ship-class/gate-wiring fingerprints -> console; recurrence>=3 non-generic -> console; infra exhaustion (exit-85/teardown) -> infra-wait; legitimacy=ambiguous -> console at P2. LLM may raise urgency/routing, never lower a floor. Execution: console -> append-only .evolve/escalations/<ts>-<fingerprint>.json (new-file write, safe mid-batch) + notification hook on P0; inbox -> STAGE intent to .evolve/escalations/pending-actions.jsonl (NEVER write inbox mid-flight: inboxmover.Claim os.Rename race, chronicle-S6 proof); none -> ledger only. Always append fingerprint to recurrence ledger. HALT stays exactly ADR-0072 \u2014 this process never widens it.",
+    "s4_boundary_applier": "At loop-iteration boundary (no lanes in flight, cmd_loop after dispatchIteration returns, flock on inbox): consume staged intents -> file deduped weighted inbox items (dedup: same fingerprint never refiles while an item is open); wire recurrence.Escalator/Autofiler/EscalationPolicy.Target for weight bumps (never lowers, idempotent per-cycle stamp inside item JSON). This slice SUBSUMES chronicle-s6-escalation-boundary (0.88) and the injector half of retro-preventive-actions-autofile-inbox (0.86) \u2014 implement against those specs' race/idempotency constraints, do not duplicate.",
+    "config": "No feature flags: policy.json failure_disposition block (floor fingerprint classes, recurrence thresholds, weight band default 0.75 with recurrence hints, staged-file path), compiled defaults ON."
+  },
+  "routing_decision_rules": "console iff root_cause.layer=pipeline-infra AND (self-hosting trap: defect class rides ship/gates/state/worktree machinery a fixing lane would use, OR recurrence>=2, OR salvage.worktree_has_value=true); inbox for loop-fixable first-occurrence defects with pipeline still trustworthy; none for legit rejections (verdict did its job). Salvage floor: worktree_has_value=true forces worktree preservation + salvage pointer in the record (cycles 984/1000 precedent).",
+  "acceptance": [
+    "RED: TestDispositionGate_RetroFailsLoudWithoutValidDisposition",
+    "RED: TestDispositionGate_CrossChecksFingerprintAgainstDigest",
+    "RED: TestRouter_FloorsForceConsoleForGuardAbortClass and _ForRecurrenceGte3",
+    "RED: TestRouter_LLMMayRaiseNeverLowerForcedRouting",
+    "RED: TestRouter_InboxIntentStagedNeverWrittenMidFlight (race pin)",
+    "RED: TestRouter_ConsoleEscalationRecordShape (+ P0 notification hook)",
+    "RED: TestApplier_FilesDedupedItemAtBoundary (e2e fixture: FAIL dossier -> digest -> disposition -> staged -> applied; same fingerprint across two FAILs files once while open)",
+    "RED: TestApplier_WeightBumpIdempotentPerCycle (EscalationPolicy.Target, never lowers)",
+    "RED: TestAssembler_PreClassBucketsFromRealArtifacts (fixtures shaped from cycles 1028 egps-red, 999 statemap-severing, 949 predicate-compile)",
+    "go test -race on touched pkgs PASS; every NEW package enrolled in go/.apicover-enforce with named exports (recurred 5x)",
+    "ADR + full docs required (architecture change: ultrathink + strong review + cycle-docs floor)",
+    "gate-WIRING proof: live-path test that a FAIL in a real cycle run produces failure-digest.json and a schema-gated disposition (unit-green != live-green)"
+  ],
+  "evidence_update_2026-07-22": "Cycle-1035 is the live proof of BOTH gaps this item closes: (1) its retro emitted STRUCTURED preventive actions (ids, weight_hints, files, recurrence counts) that evaporated because go/internal/retrofile \u2014 landed cycle 657 for exactly this \u2014 has ZERO production callers (third inert-API instance after carryforward and LandPrefixes; S3/S4 must wire-or-replace retrofile WITH a live-path wiring proof, not assume it works); (2) the FAIL was a doomed-task recurrence (guard-phase-hook-inert, 3rd-4th burn) that a disposition with routing floors would have sent to console-manual after occurrence 2. Operator hand-executed the routing this time (guard-phase-hook-inert route:console-manual; protected-surface-ac bumped 0.90; retro-role-lessons hand-filed) \u2014 the LAST time this should need a human.",
+  "files": [
+    "go/internal/recurrence/ledger.go (wire inert Escalator/Autofiler/EscalationPolicy)",
+    "go/internal/retrofile/ (existing autofile pkg, ZERO callers \u2014 wire or replace in S3/S4)",
+    "go/internal/core/failure_decision.go + failure_learning.go (FAILED_UNEXPLAINED injector seam to extend)",
+    "go/internal/core/ (assembler + schema gate + router; new files)",
+    "go/cmd/evolve/cmd_loop.go (boundary applier call site, after dispatchIteration returns)",
+    "go/internal/policy/policy.go (failure_disposition block + compiled defaults)",
+    "agents/evolve-retrospective.md + retro deliverable contract (disposition.json section)"
+  ],
+  "supersedes": [
+    "retro-preventive-actions-autofile-inbox (injector half; keep its dedup spec)",
+    "chronicle-s6-escalation-boundary (becomes S4; keep its flock/idempotency/boundary-placement constraints verbatim)"
+  ],
+  "connects_to": [
+    "goal-stall-escalation (goal-layer signal, shares S4 autofile seam)",
+    "adr0072 S4/S5 (severity ladder unchanged; disposition feeds it evidence)",
+    "lesson_to_action_gap (memory: THE meta-defect this closes)"
+  ],
+  "source": "operator-approved brainstorm 2026-07-22 (console session); full spec mirrored in session scratchpad failure-disposition-router-design.md; docs/ copy lands at batch boundary",
+  "notes": "Weight 0.96: pipeline-integrity band \u2014 this is the machinery that stops future false-FAIL waste and automates the operator's hand-triage. Multi-slice item: triage may plan S1+S2 in one cycle and S3+S4 in the next; S4 MUST NOT land before S3's staging exists (applier with nothing to apply is fine; router filing inbox directly mid-flight is NOT).",
+  "console_hold_note": "OPERATOR HOLD 2026-07-22 (cycle-1041, 5th burn of the control-plane class this batch; prose fences proven non-binding 2x on one item): held in .evolve/inbox/console/ \u2014 INVISIBLE to wave triage (subdir, maxdepth-1 readers) until PR #349's plan-time gate deploys at the batch boundary. Reverse: mv back to .evolve/inbox/ after the new binary is live; the gate then enforces routing as plumbing."
+}

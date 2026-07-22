@@ -18,5 +18,7 @@
     "go/internal/core/worktree.go:212-221 (LeakRecoverablePhase \u2014 precedent pattern to mirror)",
     "go/internal/guards/role.go:83 (role guard's consumer of WorktreePhase)",
     "go/internal/core/phase_bindings.go:329-345 (normalizeBuildWorktree's comment asserting test-amplification already has worktree write scope)"
-  ]
+  ],
+  "route": "console-manual",
+  "console_hold_note": "OPERATOR HOLD 2026-07-22 (cycle-1041, 5th burn of the control-plane class this batch; prose fences proven non-binding 2x on one item): held in .evolve/inbox/console/ \u2014 INVISIBLE to wave triage (subdir, maxdepth-1 readers) until PR #349's plan-time gate deploys at the batch boundary. Reverse: mv back to .evolve/inbox/ after the new binary is live; the gate then enforces routing as plumbing."
 }

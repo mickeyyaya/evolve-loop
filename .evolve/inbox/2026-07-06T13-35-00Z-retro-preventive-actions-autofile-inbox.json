@@ -1,6 +1,7 @@
 {
   "id": "retro-preventive-actions-autofile-inbox",
   "created_at": "2026-07-06T13:35:00Z",
+  "superseded_by": "failure-disposition-router (2026-07-22, weight 0.96): the injector this item specifies becomes that design's S3/S4 (staged intents + boundary applier). Triage: do NOT build this standalone — consume failure-disposition-router instead; this item's dedup spec (same preventive action across consecutive FAILs files exactly once while open) carries over verbatim.",
   "weight": 0.86,
   "kind": "feature",
   "priority": "high",
