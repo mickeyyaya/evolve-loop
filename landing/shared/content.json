@@ -853,7 +853,7 @@
   "inboxLab": {
     "kicker": "Continuous development",
     "heading": "You never stop the loop. You feed it.",
-    "sub": "The queue is the steering wheel. While the loop runs, you drop a weighted JSON file into .evolve/inbox/ — triage reads the weights every cycle, picks the top of the queue, and everything else ages forward. No restart, no lost work, no waiting for a gap.",
+    "sub": "The queue is the steering wheel. While the loop runs, you drop a weighted JSON file into .evolve/inbox/ — triage reads the weights every cycle, picks the top of the queue, and everything else ages forward. No restart, no lost work, no waiting for a gap. And when a cycle's audit goes red — reality, not the exception — the failure is routed, not fatal: the retro classifies it, a lesson files back into the queue as its own todo, and the item returns re-weighted with its worktree preserved. Watch it happen below: every third cycle fails, and the queue only gets smarter.",
     "note": "Real schema, abbreviated: id, weight, title, kind, fix — plus acceptance[] criteria the auditor enforces.",
     "presets": [
       {
@@ -1007,6 +1007,18 @@
     "heading": "Failure is routed, not fatal.",
     "sub": "Every abnormal exit is classified and routed by a failure adapter: retry, re-route to another provider, re-pin, or reconcile. The queue survives, the evidence stays honest, and the loop continues.",
     "events": [
+      {
+        "label": "Audit verdict: FAIL — honest red",
+        "code": "red_count=1",
+        "verdict": "RETRY",
+        "steps": [
+          "The auditor grades the work red — the verdict stands (judgment phases are never remediated)",
+          "The retro classifies the failure: honest rejection, pipeline fault, or operator-owned — fingerprinted against the deterministic failure digest, never invented",
+          "A lesson and a follow-up todo auto-file back into the queue; the worktree is preserved for salvage",
+          "The item returns re-weighted; the next cycle draws the top of the queue"
+        ],
+        "outcome": "A failed cycle feeds the queue instead of stopping it."
+      },
       {
         "label": "Provider quota exhausted",
         "code": "rc=85",

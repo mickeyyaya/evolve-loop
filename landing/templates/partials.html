@@ -917,7 +917,7 @@
 
 {{define "inboxlab"}}
 <style>
-  .ixl{--x-acc:var(--accent,#0071e3);--x-acc-soft:var(--accent-soft,color-mix(in srgb,var(--x-acc) 14%,transparent));--x-ink:var(--ink,#161616);--x-mut:var(--muted,#7a7a7a);--x-bg:var(--surface,var(--bg,#fff));--x-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--x-disp:var(--serif,var(--display,inherit));--x-line:color-mix(in srgb,var(--x-ink) 14%,transparent);--x-line2:color-mix(in srgb,var(--x-ink) 26%,transparent);--x-surf:color-mix(in srgb,var(--x-ink) 3%,transparent);--x-ok:var(--ok,#16996a);--x-ok-soft:var(--ok-soft,color-mix(in srgb,var(--x-ok) 13%,transparent));max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
+  .ixl{--x-acc:var(--accent,#0071e3);--x-acc-soft:var(--accent-soft,color-mix(in srgb,var(--x-acc) 14%,transparent));--x-ink:var(--ink,#161616);--x-mut:var(--muted,#7a7a7a);--x-bg:var(--surface,var(--bg,#fff));--x-mono:var(--mono,ui-monospace,"SF Mono",Menlo,monospace);--x-disp:var(--serif,var(--display,inherit));--x-line:color-mix(in srgb,var(--x-ink) 14%,transparent);--x-line2:color-mix(in srgb,var(--x-ink) 26%,transparent);--x-surf:color-mix(in srgb,var(--x-ink) 3%,transparent);--x-ok:var(--ok,#16996a);--x-ok-soft:var(--ok-soft,color-mix(in srgb,var(--x-ok) 13%,transparent));--x-no:#d64545;--x-no-soft:color-mix(in srgb,var(--x-no) 13%,transparent);max-width:1080px;margin:0 auto;padding:clamp(64px,9vw,120px) 28px}
   .ixl-kicker{font-family:var(--x-mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--x-acc);margin:0}
   .ixl-h{font-family:var(--x-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--x-ink)}
   .ixl-sub{color:var(--x-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
@@ -955,11 +955,14 @@
   .ixl-strip .ph{border:1px solid var(--x-line2);border-radius:6px;padding:4px 8px;transition:all .25s}
   .ixl-strip .ph.on{border-color:var(--x-acc);color:var(--x-acc);background:var(--x-acc-soft)}
   .ixl-strip .ph.done{border-color:var(--x-ok);color:var(--x-ok);background:var(--x-ok-soft)}
+  .ixl-strip .ph.fail{border-color:var(--x-no);color:var(--x-no);background:var(--x-no-soft)}
   .ixl-strip .vd{margin-left:auto;font-weight:700;letter-spacing:.14em;color:var(--x-ok);opacity:0;transition:opacity .4s}
+  .ixl-strip .vd.fail{color:var(--x-no)}
   .ixl-strip .vd.show{opacity:1}
   .ixl-done{list-style:none;margin:11px 0 0;padding:11px 0 0;border-top:1px dashed var(--x-line2);min-height:20px}
   .ixl-done li{display:flex;gap:9px;align-items:center;font-family:var(--x-mono);font-size:.62rem;color:var(--x-mut);padding:3px 0}
   .ixl-done .ok{color:var(--x-ok);font-weight:700}
+  .ixl-done .no{color:var(--x-no);font-weight:700}
   .ixl-note{font-family:var(--x-mono);font-size:.62rem;color:var(--x-mut);margin-top:14px}
 </style>
 <section class="ixl" id="inboxlab">
@@ -1060,25 +1063,59 @@
     sortQueue();
     var pick = queue.children[0];
     pick.classList.add('pick');
-    strip.innerHTML = PHASES.map(function (p) { return '<span class="ph" data-ph="' + p + '">' + p + '</span>'; }).join('') + '<span class="vd">PASS ▸ processed/</span>';
+    // Reality: not every cycle passes. Every third audit goes red — and the
+    // FAIL is routed, not fatal (the same contract the recovery section
+    // documents): the retro classifies it, a lesson files back into the
+    // queue, the item returns re-weighted, the worktree is preserved. The
+    // queue survives; the loop continues.
+    var fail = cycle % 3 === 0;
+    var flow = fail ? ['scout', 'tdd', 'build', 'audit', 'retro'] : PHASES;
+    strip.innerHTML = flow.map(function (p) { return '<span class="ph" data-ph="' + p + '">' + p + '</span>'; }).join('') +
+      '<span class="vd' + (fail ? ' fail' : '') + '">' + (fail ? 'FAIL ▸ routed, not fatal' : 'PASS ▸ processed/') + '</span>';
     var phEls = [].slice.call(strip.querySelectorAll('.ph'));
     phEls.forEach(function (el, i) {
       step(function () {
-        if (i > 0) { phEls[i - 1].classList.remove('on'); phEls[i - 1].classList.add('done'); }
+        if (i > 0) {
+          var prev = phEls[i - 1];
+          prev.classList.remove('on');
+          prev.classList.add(fail && prev.dataset.ph === 'audit' ? 'fail' : 'done');
+        }
         el.classList.add('on');
       }, 500 + i * 520);
     });
     step(function () {
-      phEls[phEls.length - 1].classList.remove('on'); phEls[phEls.length - 1].classList.add('done');
+      var last = phEls[phEls.length - 1];
+      last.classList.remove('on'); last.classList.add('done');
       strip.querySelector('.vd').classList.add('show');
-      pick.classList.add('gone');
+      if (!fail) { pick.classList.add('gone'); }
     }, 500 + phEls.length * 520);
     step(function () {
       var li = document.createElement('li');
-      li.innerHTML = '<span class="ok">✓ cycle ' + cycle + '</span><span>' + esc(pick.dataset.id) + '</span><span>→ processed/cycle-' + cycle + '/</span>';
+      if (fail) {
+        // Retro output, exactly as shipped: item re-weighted back into the
+        // queue (recurrence escalation) + the lesson auto-filed as its own
+        // todo. Nothing leaves the system; the evidence stays honest.
+        var w0 = parseFloat(pick.dataset.w), w1 = Math.min(0.99, w0 + 0.03);
+        pick.classList.remove('pick');
+        pick.dataset.w = w1.toFixed(2);
+        pick.dataset.fails = (parseInt(pick.dataset.fails || '0', 10) + 1);
+        pick.querySelector('.ixl-w').textContent = w1.toFixed(2);
+        pick.querySelector('.ixl-age').textContent = 'failed ×' + pick.dataset.fails + ' · worktree kept';
+        if (!reduce) { pick.classList.remove('new'); void pick.offsetWidth; pick.classList.add('new'); }
+        li.innerHTML = '<span class="no">✗ cycle ' + cycle + '</span><span>' + esc(pick.dataset.id) + '</span><span>audit FAIL → retro classified → lesson filed · re-queued ' + w0.toFixed(2) + '→' + w1.toFixed(2) + '</span>';
+        var lesson = document.createElement('li');
+        lesson.dataset.id = 'auto-retro-c' + cycle; lesson.dataset.w = '0.58';
+        lesson.className = reduce ? '' : 'new';
+        lesson.innerHTML = '<span class="ixl-w">0.58</span><span class="ixl-id">auto-retro-c' + cycle + '</span><span class="ixl-kind">lesson</span><span class="ixl-age"></span>';
+        queue.appendChild(lesson);
+        sortQueue();
+      } else {
+        li.innerHTML = '<span class="ok">✓ cycle ' + cycle + '</span><span>' + esc(pick.dataset.id) + '</span><span>→ processed/cycle-' + cycle + '/</span>';
+        queue.removeChild(pick);
+      }
       done.insertBefore(li, done.firstChild);
-      queue.removeChild(pick);
       [].slice.call(queue.children).forEach(function (o) {
+        if (fail && o === pick) { return; }
         o.dataset.age = (parseInt(o.dataset.age || '0', 10) + 1);
         o.querySelector('.ixl-age').textContent = 'unpicked ×' + o.dataset.age;
       });
@@ -1103,8 +1140,9 @@
         if (userDriving) { return; }
         runCycle();
         // Delay derives from runCycle's own animation budget (1100 + N*520)
-        // plus a viewing pause, so a PHASES change can never outrun it.
-        autoTimer = setTimeout(function () { autoLoop((i + 1) % presets.length); }, 1100 + PHASES.length * 520 + 2100);
+        // plus a viewing pause. Budgeted for the FAIL flow's extra retro
+        // chip (PHASES.length + 1), so neither path can outrun it.
+        autoTimer = setTimeout(function () { autoLoop((i + 1) % presets.length); }, 1100 + (PHASES.length + 1) * 520 + 2100);
       }, 900);
     }, 900);
   }
