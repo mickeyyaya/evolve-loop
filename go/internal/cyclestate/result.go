@@ -33,6 +33,11 @@ type CycleResult struct {
 	// was re-run. Provenance only — the re-run verdict is what recorded; a
 	// remediated cycle is never a silent PASS.
 	Remediations []string
+	// FailReasons surfaces the floor-override explanations (the untruncated
+	// audit-fail-reason.json / CycleState.AuditFailReasons content) in the
+	// cycle summary and dossier — cycle-1022's lesson: the reason WAS recorded
+	// on disk while every operator-facing surface stayed silent.
+	FailReasons []string
 }
 
 // SystemFailureSignal records a system-level failure classification (ADR-0072).

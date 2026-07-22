@@ -84,6 +84,7 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		ACS:              acs,
 		AuditRan:         auditRan,
 		SubstantiveError: len(cs.AuditFailReasons) > 0,
+		FailReasons:      cs.AuditFailReasons,
 	})
 
 	// (2) The audit's SELF-declared failure envelope. Surfaced ALWAYS (even for

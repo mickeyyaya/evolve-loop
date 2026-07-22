@@ -2,24 +2,23 @@ package topngate
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-func TestNewReviewer_EnforceBlocksOutOfLaneBuild(t *testing.T) {
+func TestNewReviewer_EnforceApprovesLabelDrift(t *testing.T) {
+	// POLICY CHANGE 2026-07-22 (cycles 916 + 1012): label drift is advisory —
+	// even at enforce, a drifted label WARNs and passes; the committed set is
+	// the binding authority. See gate_test.go's advisory case for rationale.
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "statefile-rmw-flock-single-source")
 	writeBuildReport(t, ws, "fix-token-resolver-transcript-source")
 	r := NewReviewer(config.StageEnforce)
 	res := r.Review(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws})
-	if res.Approve {
-		t.Fatal("enforce must block a build report whose slug is outside triage top_n")
-	}
-	if res.Reason == "" {
-		t.Error("a blocked review must record a non-empty abort_reason (ADR-0044 C1)")
+	if !res.Approve {
+		t.Fatalf("label drift must approve (advisory); got reason=%q", res.Reason)
 	}
 }
 
@@ -66,15 +65,18 @@ func TestNewReviewer_NonBuildPhaseApproves(t *testing.T) {
 // gate now blocks BEFORE audit ever ran, instead of consuming a full
 // audit+ship phase pair on a cycle doomed from the build->audit transition.
 func TestReplayCycle640Shape(t *testing.T) {
+	// HISTORICAL REPLAY, updated 2026-07-22: cycle-640's wrong-lane build now
+	// passes with a loud WARN instead of a fatal block — the 916/1012
+	// evidence showed the fatal form discarded CORRECT work over label drift
+	// between two LLM strings, while the cycle-640 fraud class is covered by
+	// the queued scope-verification (deliverable files vs committed item
+	// scope), which catches REAL wrong-work regardless of its label.
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "statefile-rmw-flock-single-source")
 	writeBuildReport(t, ws, "fix-token-resolver-transcript-source")
 	r := NewReviewer(config.StageEnforce)
 	res := r.Review(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws})
-	if res.Approve {
-		t.Fatal("cycle-640 replay must be blocked at the build->audit transition, not allowed through to audit")
-	}
-	if !strings.Contains(res.Reason, "fix-token-resolver-transcript-source") {
-		t.Errorf("abort_reason must name the wrong-task slug so operators can diagnose without re-deriving it; got %q", res.Reason)
+	if !res.Approve {
+		t.Fatalf("label drift is advisory since 2026-07-22; got reason=%q", res.Reason)
 	}
 }
