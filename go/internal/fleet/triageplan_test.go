@@ -36,7 +36,7 @@ func scopeIDs(spec CycleSpec) map[string]bool {
 // specs. Kills a stub that returns `count` empty/identical specs.
 func TestPlanFromTriage_DisjointScopesAcrossLanes(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge","core","audit"]}`)
-	specs, err := PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestPlanFromTriage_DisjointScopesAcrossLanes(t *testing.T) {
 // committed-card target packages, not zero specs.
 func TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent(t *testing.T) {
 	decisionJSON := []byte(`{}`)
-	specs, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2)
+	specs, _, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent(t *testing.T) {
 // swallows the parse error and schedules `count` unscoped identical lanes.
 func TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses(t *testing.T) {
 	truncated := []byte(`{"committed_floors":[`)
-	specs, err := PlanFromTriage(truncated, []string{"core"}, 3)
+	specs, _, err := PlanFromTriage(truncated, []string{"core"}, 3, nil)
 	if err == nil {
 		t.Fatalf("PlanFromTriage(malformed) returned nil error — want an explicit parse error so the caller falls back to sequential with a WARN, never a silent guess")
 	}
@@ -107,7 +107,7 @@ func TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses(t *testing.T) {
 // matching PlanCycles' existing contract (partition.go:17-34).
 func TestPlanFromTriage_EmptyInputsNeverOverSchedule(t *testing.T) {
 	t.Run("empty-floors-and-empty-cards-yields-zero-specs", func(t *testing.T) {
-		specs, err := PlanFromTriage([]byte(`{"committed_floors":[]}`), nil, 3)
+		specs, _, err := PlanFromTriage([]byte(`{"committed_floors":[]}`), nil, 3, nil)
 		if err != nil {
 			t.Fatalf("PlanFromTriage returned error: %v", err)
 		}
@@ -116,7 +116,7 @@ func TestPlanFromTriage_EmptyInputsNeverOverSchedule(t *testing.T) {
 		}
 	})
 	t.Run("single-floor-count-three-yields-exactly-one-spec", func(t *testing.T) {
-		specs, err := PlanFromTriage([]byte(`{"committed_floors":["bridge"]}`), nil, 3)
+		specs, _, err := PlanFromTriage([]byte(`{"committed_floors":["bridge"]}`), nil, 3, nil)
 		if err != nil {
 			t.Fatalf("PlanFromTriage returned error: %v", err)
 		}
@@ -147,7 +147,7 @@ func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
 		"dropped": null,
 		"projected_by_orchestrator": true
 	}`)
-	specs, err := PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage(top_n-only production fixture) returned error: %v, want nil — a real committed-decision shape with no committed_floors must still plan, not error", err)
 	}
@@ -173,7 +173,7 @@ func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
 // through the top_n fallback path too (never pad unused lanes to fc.Count).
 func TestPlanFromTriage_SingleTopNCardCountFourYieldsOneLane(t *testing.T) {
 	decisionJSON := []byte(`{"top_n":[{"id":"fleet-policy-block","action":"x"}]}`)
-	specs, err := PlanFromTriage(decisionJSON, nil, 4)
+	specs, _, err := PlanFromTriage(decisionJSON, nil, 4, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}

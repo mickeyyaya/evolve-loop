@@ -33,7 +33,7 @@ func todoIDs(todos []Todo) map[string]bool {
 // but pinned here directly against the raw Todo backlog.
 func TestTodosFromTriage_FloorsBecomeDistinctTodos(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge","core","audit"]}`)
-	todos, err := TodosFromTriage(decisionJSON, nil)
+	todos, _, err := TodosFromTriage(decisionJSON, nil, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage returned error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestTodosFromTriage_FloorsBecomeDistinctTodos(t *testing.T) {
 // mirrors TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent's
 // fixture, pinned directly against TodosFromTriage.
 func TestTodosFromTriage_CardPackagesFallbackWhenFloorsAbsent(t *testing.T) {
-	todos, err := TodosFromTriage([]byte(`{}`), []string{"core", "audit"})
+	todos, _, err := TodosFromTriage([]byte(`{}`), []string{"core", "audit"}, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage returned error: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestTodosFromTriage_CardPackagesFallbackWhenFloorsAbsent(t *testing.T) {
 // mirrors TestPlanFromTriage_FloorsTakePrecedenceOverCards — cards must never
 // merge into a floors-derived backlog.
 func TestTodosFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
-	todos, err := TodosFromTriage([]byte(`{"committed_floors":["bridge"]}`), []string{"core", "audit"})
+	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":["bridge"]}`), []string{"core", "audit"}, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage returned error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestTodosFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 // count), which the spec-level test could not distinguish from a dedup that
 // happened later in PlanCycles instead of in TodosFromTriage.
 func TestTodosFromTriage_DuplicateFloorsCollapseToDistinctTodos(t *testing.T) {
-	todos, err := TodosFromTriage([]byte(`{"committed_floors":["core","core","audit","core"]}`), nil)
+	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":["core","core","audit","core"]}`), nil, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage returned error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestTodosFromTriage_DuplicateFloorsCollapseToDistinctTodos(t *testing.T) {
 // JSON must reject, never guess — mirrors
 // TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses.
 func TestTodosFromTriage_MalformedJSONRejectsWithNoTodos(t *testing.T) {
-	todos, err := TodosFromTriage([]byte(`{"committed_floors":[`), []string{"core"})
+	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":[`), []string{"core"}, nil)
 	if err == nil {
 		t.Fatalf("TodosFromTriage(malformed) returned nil error — want an explicit parse error, never a silent guess")
 	}
@@ -125,7 +125,7 @@ func TestTodosFromTriage_WrongTypeFieldsRejected(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			todos, err := TodosFromTriage([]byte(tc.in), []string{"core"})
+			todos, _, err := TodosFromTriage([]byte(tc.in), []string{"core"}, nil)
 			if err == nil {
 				t.Fatalf("TodosFromTriage(%s) returned nil error — wrong-typed decision JSON must reject", tc.in)
 			}
@@ -151,7 +151,7 @@ func TestTodosFromTriage_DegenerateBytesNeverPanicsOrPartialErrors(t *testing.T)
 		{"floors-null", []byte(`{"committed_floors":null}`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			todos, err := TodosFromTriage(tc.in, []string{"core"})
+			todos, _, err := TodosFromTriage(tc.in, []string{"core"}, nil)
 			if err != nil {
 				if len(todos) != 0 {
 					t.Errorf("error return carried %d todos, want 0 (never both)", len(todos))
@@ -180,7 +180,7 @@ func TestTodosFromTriage_LargeScaleAllFloorsSurviveDistinctly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal fixture: %v", err)
 	}
-	todos, err := TodosFromTriage(raw, nil)
+	todos, _, err := TodosFromTriage(raw, nil, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage returned error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestTodosFromTriage_TopNCardsBecomeTodos(t *testing.T) {
 		"dropped": null,
 		"projected_by_orchestrator": true
 	}`)
-	todos, err := TodosFromTriage(decisionJSON, nil)
+	todos, _, err := TodosFromTriage(decisionJSON, nil, nil)
 	if err != nil {
 		t.Fatalf("TodosFromTriage(top_n-only) returned error: %v, want nil", err)
 	}

@@ -72,7 +72,7 @@ func TestForceOneLaneDispatch_DispatchesIsolatedWaveWhenCandidateExists(t *testi
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core"]}`), nil, nil
 	}
-	ran, specs, results, err := forceOneLaneDispatch(context.Background(), func() error { return nil }, planFn, launcher, 0)
+	ran, specs, results, err := forceOneLaneDispatch(context.Background(), func() error { return nil }, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("forceOneLaneDispatch returned error: %v, want nil", err)
 	}
@@ -95,7 +95,7 @@ func TestForceOneLaneDispatch_EmptyBacklogStaysFalseNoLauncherInvoked(t *testing
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[]}`), nil, nil
 	}
-	ran, specs, _, err := forceOneLaneDispatch(context.Background(), func() error { return nil }, planFn, launcher, 0)
+	ran, specs, _, err := forceOneLaneDispatch(context.Background(), func() error { return nil }, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("forceOneLaneDispatch returned error: %v, want nil (a genuinely empty backlog is not an error)", err)
 	}
@@ -115,7 +115,7 @@ func TestForceOneLaneDispatch_PreflightRefusalNeverPlansNorLaunches(t *testing.T
 		planFnCalled = true
 		return []byte(`{"committed_floors":["core"]}`), nil, nil
 	}
-	ran, _, _, err := forceOneLaneDispatch(context.Background(), func() error { return refusal }, planFn, launcher, 0)
+	ran, _, _, err := forceOneLaneDispatch(context.Background(), func() error { return refusal }, planFn, launcher, nil, 0)
 	if err == nil {
 		t.Fatalf("forceOneLaneDispatch swallowed a preflight refusal — want a surfaced error")
 	}

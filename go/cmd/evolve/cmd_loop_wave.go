@@ -21,6 +21,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleetbudget"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -80,7 +82,7 @@ func shouldRunWave(fc policy.FleetConfig) bool {
 // the sequential (Count==1) path returns before it, so the production guard
 // (which shells git against the main checkout) costs sequential loops
 // nothing.
-func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
+func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
 	if !shouldRunWave(fc) {
 		return false, nil, nil, nil
 	}
@@ -91,7 +93,10 @@ func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight fun
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("wave %d: triage plan: %w", waveIndex, err)
 	}
-	specs, err = fleet.PlanFromTriage(decisionJSON, cardPackages, fc.Count)
+	// ADR-0074 plan-time gate: refusals (console-routed ids) are logged by the
+	// composition-root resolver wrapper the moment they fire, so the slice is
+	// safely discarded here.
+	specs, _, err = fleet.PlanFromTriage(decisionJSON, cardPackages, fc.Count, routed)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("wave %d: adapt triage plan: %w", waveIndex, err)
 	}
@@ -119,7 +124,7 @@ func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight fun
 // ran=false and NEITHER planFn NOR launcher invoked; a genuinely empty adapted
 // plan reports ran=false, err=nil so the caller falls back to TRUE sequential —
 // now the only case sequential is reserved for.
-func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
+func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
 	if err := preflight(); err != nil {
 		return false, nil, nil, fmt.Errorf("wave %d: control-plane preflight: %w", waveIndex, err)
 	}
@@ -128,7 +133,7 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 		return false, nil, nil, fmt.Errorf("wave %d: triage plan: %w", waveIndex, err)
 	}
 	// Cap at a single lane: this is the shrink-repair path, not a fan-out.
-	specs, err = fleet.PlanFromTriage(decisionJSON, cardPackages, 1)
+	specs, _, err = fleet.PlanFromTriage(decisionJSON, cardPackages, 1, routed)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("wave %d: adapt triage plan: %w", waveIndex, err)
 	}
@@ -137,6 +142,21 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 	}
 	results = launcher.Run(ctx, specs)
 	return true, specs, results, nil
+}
+
+// consoleRoutedResolver is the composition-root wiring of the ADR-0074
+// plan-time gate: a fresh inbox load per wave (mid-batch inbox changes must be
+// seen), the real protected-surface predicate, and a WARN the moment a
+// console-routed id is refused — the refusal must never be silent.
+func consoleRoutedResolver(projectRoot string, stderr io.Writer) fleet.RoutedFn {
+	base := inboxbatch.RoutedResolver(filepath.Join(projectRoot, ".evolve", "inbox"), guards.IsProtectedSurface)
+	return func(id string) (bool, string) {
+		routed, reason := base(id)
+		if routed {
+			fmt.Fprintf(stderr, "[fleet] WARN: plan-time gate refused console-routed item %q (%s) — operator-owned, worked at a batch boundary via manual ship (ADR-0074)\n", id, reason)
+		}
+		return routed, reason
+	}
 }
 
 // minWidthRepair is the extracted, independently-testable call-site wiring for
@@ -163,7 +183,7 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 //     (the only case true sequential fallback stays reserved for).
 //   - guard met, forceOneLaneDispatch errored: WARN "min-width repair failed"
 //     with the wrapped error surfaced, handled=false — never silently swallowed.
-func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, waveIndex int, stderr io.Writer) (handled bool) {
+func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int, stderr io.Writer) (handled bool) {
 	// Eligibility is the operator-asserted width alone: fleetCfg.Count>1 means
 	// the operator wanted a fleet, so BOTH the quota-shrunk shape (waveCfg.Count
 	// <=1) AND the empty-plan-at-full-capacity shape (waveCfg.Count>1 yet
@@ -174,7 +194,7 @@ func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, p
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty triage plan), falling back to sequential\n", waveIndex)
 		return false
 	}
-	ran1, _, results1, oerr := forceOneLaneDispatch(ctx, preflight, planFn, launcher, waveIndex)
+	ran1, _, results1, oerr := forceOneLaneDispatch(ctx, preflight, planFn, launcher, routed, waveIndex)
 	switch {
 	case oerr != nil:
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d min-width repair failed, falling back to sequential: %v\n", waveIndex, oerr)
