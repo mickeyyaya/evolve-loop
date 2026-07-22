@@ -72,6 +72,14 @@ type Deps struct {
 	BootTimeoutS       int
 	ArtifactTimeoutS   int
 	ArtifactMaxExtends int
+	// PhaseArtifactTimeoutS is the policy-resolved per-phase artifact-wait
+	// budget (seconds) keyed on agent label (BridgeRequest.Agent), from
+	// BridgePolicy.PhaseArtifactTimeouts(). Launch emits a matching positive
+	// entry as --artifact-timeout-s so it reaches Config through the same arg
+	// vector as every other launch field. A nil/empty map, an unlisted agent,
+	// or a non-positive entry all fail open to Config.ArtifactTimeoutS=0 →
+	// Deps.ArtifactTimeoutS → the 300s builtin.
+	PhaseArtifactTimeoutS map[string]int
 	// Stdout/Stderr are the bridge's own diagnostic streams (NOT the
 	// inner CLI's stdout/stderr — a driver redirects those to the log
 	// files named in Config). Drivers write their `[driver] ...` notes
@@ -396,6 +404,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	if req.Agent != "" {
 		args = append(args, "--agent="+req.Agent)
+	}
+	// Per-phase artifact budget (retro's grown contract needs more than the
+	// 300s builtin). Indexed on the agent label; a nil map, an unlisted agent
+	// and an empty agent all yield 0 → no flag → builtin deadline.
+	if budget := e.deps.PhaseArtifactTimeoutS[req.Agent]; budget > 0 {
+		args = append(args, "--artifact-timeout-s="+strconv.Itoa(budget))
 	}
 	if req.Worktree != "" {
 		args = append(args, "--worktree="+req.Worktree)

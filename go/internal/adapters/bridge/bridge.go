@@ -133,8 +133,12 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
 		ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
 		ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
-		ScrollbackLines:    a.bridgeConfig.ScrollbackLines,
-		TokenResolver:      tokenusage.DefaultResolver(configRoot(env)),
+		// Per-phase artifact budgets (compiled retro=900 + operator overrides).
+		// Resolved here, at the production root, so every phase launch that
+		// goes through this Adapter carries them.
+		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
+		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
+		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
 	}
 }
 

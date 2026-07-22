@@ -119,6 +119,17 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		cycle, _ = strconv.Atoi(raw.cycle) // non-numeric → 0, matching bash's permissive default
 	}
 
+	// Per-phase artifact budget (Deps.PhaseArtifactTimeoutS → Engine.Launch).
+	// Permissive like --cycle: a non-numeric or non-positive value resolves 0,
+	// which falls through to the built-in deadline rather than failing the
+	// launch or installing a negative one.
+	artifactTimeoutS := 0
+	if raw.artifactTimeoutS != "" {
+		if n, err := strconv.Atoi(raw.artifactTimeoutS); err == nil && n > 0 {
+			artifactTimeoutS = n
+		}
+	}
+
 	// Realize the launch intent against this CLI's manifest (ADR-0022). The
 	// *-tmux drivers build their launch command from this rather than
 	// constructing model/permission flags inline, so a claude-origin profile's
@@ -162,6 +173,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		ExtraFlags:       raw.extra,
 		Realization:      RealizeFor(raw.cli, intent),
 		AnthropicBaseURL: raw.anthropicBaseURL,
+		ArtifactTimeoutS: artifactTimeoutS,
 	}
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
@@ -224,7 +236,7 @@ type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion                            string
 	permissionMode, sessionName, streamOutput, runID                           string
-	anthropicBaseURL                                                           string
+	anthropicBaseURL, artifactTimeoutS                                         string
 	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
@@ -303,6 +315,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
 		"--anthropic-base-url": &r.anthropicBaseURL,
+		"--artifact-timeout-s": &r.artifactTimeoutS,
 	}
 
 	for i := 0; i < len(args); i++ {

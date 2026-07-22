@@ -244,8 +244,10 @@ func TestPolicy_QuotaResetConfig(t *testing.T) {
 // counts the type coverage, not just the method.
 func TestPolicy_ConfigAccessors(t *testing.T) {
 	// BridgeConfig: absent ⇒ zero value (each subsystem uses its .evolve dir).
+	// DeepEqual rather than !=: BridgePolicy carries the PhaseArtifactTimeoutS
+	// map, so the struct is no longer comparable. Same assertion, same strength.
 	var bridge BridgePolicy = (Policy{}).BridgeConfig()
-	if bridge != (BridgePolicy{}) {
+	if !reflect.DeepEqual(bridge, BridgePolicy{}) {
 		t.Errorf("absent Bridge must yield zero BridgePolicy, got %+v", bridge)
 	}
 

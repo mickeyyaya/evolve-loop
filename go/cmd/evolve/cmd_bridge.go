@@ -26,7 +26,8 @@ Subcommands:
               --prompt-file=PATH --workspace=DIR --stdout-log=PATH
               --stderr-log=PATH --artifact=PATH [--cycle=N] [--agent=NAME]
               [--worktree=DIR] [--permission-mode=M] [--allow-bypass]
-              [--stream-output] [--session-name=NAME] [-- <inner-cli flags>] )
+              [--stream-output] [--session-name=NAME] [--artifact-timeout-s=N]
+              [-- <inner-cli flags>] )
   probe     Detect available CLIs + capability tiers (JSON)
   send      Queue a live command for an already-running agent
             ( bridge send --workspace=DIR --agent=NAME

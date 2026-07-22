@@ -583,9 +583,53 @@ type BridgePolicy struct {
 	ArtifactTimeoutS   int `json:"artifact_timeout_s,omitempty"`
 	ArtifactMaxExtends int `json:"artifact_max_extends,omitempty"`
 	ScrollbackLines    int `json:"scrollback_lines,omitempty"`
+	// PhaseArtifactTimeoutS overrides the artifact-wait budget for individual
+	// phases, keyed on bridge AGENT LABEL. Positive values only; see
+	// PhaseArtifactTimeouts for the merge rules. Absent/empty = compiled
+	// defaults only.
+	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	// AnthropicBaseURL is the operator override for the Anthropic API base URL
 	// (proxy mode). Replaces EVOLVE_ANTHROPIC_BASE_URL env read. Empty = no proxy.
 	AnthropicBaseURL string `json:"anthropic_base_url,omitempty"`
+}
+
+// defaultPhaseArtifactTimeoutS is the compiled per-phase artifact-wait budget
+// (seconds), keyed on the bridge AGENT LABEL — the vocabulary
+// core.BridgeRequest.Agent carries and Engine.Launch dispatches with.
+// internal/phases/retro launches Agent:"retrospective", so a map keyed only on
+// the core phase name "retro" would be unit-green and live-dead; both
+// vocabularies carry the budget because the phase-name/agent-label skew is
+// permanent.
+//
+// retro=900s: the grown retro contract (report + preventive_actions +
+// disposition.json) no longer fits the 300s builtin — cycle-1048's retro was
+// ctx-canceled at ~608s mid-authoring, losing the artifact entirely. Every
+// other phase deliberately stays on the builtin so global hang detection is not
+// weakened to fix one phase.
+var defaultPhaseArtifactTimeoutS = map[string]int{
+	"retrospective": 900,
+	"retro":         900,
+}
+
+// PhaseArtifactTimeouts resolves the per-phase artifact-wait budgets in
+// seconds, keyed on bridge agent label: the compiled defaults merged with the
+// operator's phase_artifact_timeout_s overrides. Overrides are positive-only —
+// a zero or negative entry is rejected rather than applied, so it can neither
+// lower a compiled default nor yield a negative deadline. A phase with no entry
+// resolves 0, the bridge's "use the built-in default" sentinel (300s), and the
+// global ArtifactTimeoutS is never read or written here. Returns a fresh map on
+// every call so a mutating caller cannot poison later resolutions.
+func (p BridgePolicy) PhaseArtifactTimeouts() map[string]int {
+	out := make(map[string]int, len(defaultPhaseArtifactTimeoutS)+len(p.PhaseArtifactTimeoutS))
+	for phase, budget := range defaultPhaseArtifactTimeoutS {
+		out[phase] = budget
+	}
+	for phase, budget := range p.PhaseArtifactTimeoutS {
+		if budget > 0 {
+			out[phase] = budget
+		}
+	}
+	return out
 }
 
 // BridgeConfig returns the configured bridge policy. Zero int fields mean
