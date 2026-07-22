@@ -26,7 +26,7 @@ type reviewer struct {
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	return &reviewer{
 		stage: stage,
-		gates: []gate{topNBindingGate{}},
+		gates: []gate{topNBindingGate{}, tddScopeGate{}},
 		logf:  func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 	}
 }

@@ -11,6 +11,7 @@
 package topngate
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,7 @@ import (
 const (
 	triageReportName = "triage-report.md"
 	buildReportName  = "build-report.md"
+	tddReportName    = "test-report.md"
 )
 
 // gate is one structural inter-phase check. appliesTo selects the phase whose
@@ -72,6 +74,103 @@ func (topNBindingGate) check(in core.ReviewInput) (string, bool) {
 	// real fraud protection (deliverable file-scope vs the committed item's
 	// declared scope) is the queued construction-level check.
 	return "label drift (advisory since 2026-07-22): build-report labels its task '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") + "} — binding to the committed set", false
+}
+
+// tddScopeGate binds the TDD phase's AUTHORED set to triage's ## top_n
+// commitment (inbox tdd-topn-binding-gate; cycle-660, 3rd recurrence). The
+// defect: triage commits an empty ## top_n, TDD reads scout-report.md instead
+// of triage-report.md and still authors RED scaffolds for a slug triage
+// explicitly declined; build then honours the empty top_n correctly and chokes
+// on the orphan scaffolds. topNBindingGate covers build->audit; this covers
+// triage->TDD, the transition one phase earlier.
+type tddScopeGate struct{}
+
+func (tddScopeGate) name() string { return "topn-tdd-scope" }
+
+// appliesTo scopes the gate to the TDD phase's deliverable only.
+func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
+
+// check blocks the two CERTAIN out-of-lane authorings and fails open on every
+// ambiguity (missing/unparseable report, no claimed slug, nothing authored):
+//
+//  1. empty committed top_n + a non-empty authored set — triage committed
+//     nothing, so the only compliant TDD deliverable is a no-op.
+//  2. non-empty committed top_n + an authored set claimed for a slug with zero
+//     overlap against it.
+//
+// Unlike the build-side gate's label-drift carve-out (see check above), an
+// authored set under an empty top_n is unambiguous: there is no committed item
+// the files could be a differently-labelled response to.
+func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
+	topN, ok := readTopNSlugs(in.Workspace)
+	if !ok {
+		return "", false // no triage-report.md → nothing to bind against → fail open
+	}
+	claimed, authored, ok := readTDDScope(in.Workspace)
+	if !ok || len(authored) == 0 {
+		return "", false // no deliverable, or TDD authored nothing → fail open / no-op PASS
+	}
+	if len(topN) == 0 {
+		return "triage committed an EMPTY ## top_n so the TDD phase must author nothing, but test-report.md claims '" +
+			claimed + "' and declares authored test file(s) {" + strings.Join(authored, ", ") + "}", true
+	}
+	if claimed == "" {
+		return "", false // authored files but no parseable claim → ambiguous → fail open
+	}
+	for _, s := range topN {
+		if s == claimed {
+			return "", false // in-lane → pass
+		}
+	}
+	return "TDD authored test file(s) {" + strings.Join(authored, ", ") + "} for task '" + claimed +
+		"' but triage committed {" + strings.Join(topN, ", ") + "} — out-of-lane authoring", true
+}
+
+// readTDDScope reads <workspace>/test-report.md and returns the slug from its
+// "## Task: <slug>" header plus the test files declared by the "## Handoff to
+// Builder" fenced JSON's testFiles[]. ok is false when the file is
+// absent/unreadable (callers fail open).
+func readTDDScope(workspace string) (slug string, testFiles []string, ok bool) {
+	body, ok := readWorkspaceFile(workspace, tddReportName)
+	if !ok {
+		return "", nil, false
+	}
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## Task:") {
+			slug = strings.TrimSpace(strings.TrimPrefix(trimmed, "## Task:"))
+			break
+		}
+	}
+	return slug, handoffTestFiles(body), true
+}
+
+// handoffTestFiles returns the testFiles[] of the first fenced block in body
+// that parses as JSON carrying a non-empty testFiles array. The handoff JSON is
+// authoritative over the markdown "Test Files Written" table, which can be
+// empty while the handoff is not. Non-JSON fences (RED run output) are skipped.
+func handoffTestFiles(body string) []string {
+	var block []string
+	inFence := false
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			if inFence {
+				var payload struct {
+					TestFiles []string `json:"testFiles"`
+				}
+				if err := json.Unmarshal([]byte(strings.Join(block, "\n")), &payload); err == nil && len(payload.TestFiles) > 0 {
+					return payload.TestFiles
+				}
+				block = nil
+			}
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			block = append(block, line)
+		}
+	}
+	return nil
 }
 
 // readTopNSlugs reads <workspace>/triage-report.md and returns the slugs listed

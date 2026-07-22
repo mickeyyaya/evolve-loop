@@ -603,6 +603,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// builder-task-binding-topn-gate, 8th recurrence). Chained after the
 		// contract gate: well-formedness first, task-identity binding second.
 		// Fails open on ambiguity (missing report, empty top_n).
+		// The same reviewer also carries the triage->TDD scope clamp (inbox
+		// tdd-topn-binding-gate, cycle-660): a TDD deliverable that authors
+		// test files under an empty or non-overlapping ## top_n is aborted one
+		// phase earlier, before the orphan scaffolds reach build.
 		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
 	if len(reviewers) > 0 {
