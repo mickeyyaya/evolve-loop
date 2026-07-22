@@ -6,6 +6,8 @@
 
 The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and, optionally, a number of cycles; leave the count off and the advisor decides how many the work needs. It runs unattended: it finds the work, plans it, writes it, has a *different* model adversarially review it, ships only what passes deterministic checks, and turns every failure into a durable lesson the next cycle reads automatically.
 
+Over 1,000 autonomous cycles in, the trust layer is structural, not aspirational: **typed routing authority** keeps operator-owned control-plane work out of autonomous lanes entirely (ADR-0074); a **build handoff floor** rejects a red build before it ever reaches review; **graduated remediation** fixes a correct implementation's minor defect in-phase instead of discarding the work; and a **failure-disposition contract** classifies every failed cycle — honest rejection, pipeline fault, or operator-owned — and routes it where it can actually be fixed. The full evidence trail lives in [knowledge-base/research/lessons-and-resolutions-2026-07.md](knowledge-base/research/lessons-and-resolutions-2026-07.md).
+
 It works with Claude Code, Gemini CLI, and Codex CLI — and can route a different LLM to each stage of the work.
 
 > **Prefer to see it?** The same story — the moved bottleneck, the pillars, the self-caught incident — is laid out visually on the **[Evolve Loop landing page](https://mickeyyaya.github.io/evolve-loop/)** (flagship version: **[noir](https://mickeyyaya.github.io/evolve-loop/noir/)**).
