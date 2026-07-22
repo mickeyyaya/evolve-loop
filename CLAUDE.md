@@ -15,7 +15,7 @@ Bypass = "don't ask the user", NOT "skip integrity checks". Mandatory (full text
 
 1. Continue all cycles without pausing; never ask "should I continue?".
 2. FULL pipeline every cycle — real `scout-report.md` / `build-report.md` / `audit-report.md`.
-3. Phase gate at every transition (Go orchestrator + `evolve guard phase`).
+3. Phase order enforced at every transition by the Go orchestrator state machine (`go/internal/core`); `evolve guard phase` is a complementary in-process-`Agent`-dispatch backstop being rewired to the Agent/Task tool per ADR-0074 (currently a wired no-op pending operator apply).
 4. Never fabricate cycle numbers (CRITICAL violation).
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`); in-process `Agent` is denied.
 6. OS sandboxing wraps subprocesses (`EVOLVE_SANDBOX=1`; EPERM fallback auto-enabled when nested).

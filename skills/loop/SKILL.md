@@ -85,7 +85,7 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 ---
 
-> **Trust boundary (v8.13.1, v12.1-updated)**: enforced by THREE PreToolUse kernel hooks running as native Go: `evolve guard ship` (only `evolve ship` can perform git commit/push/gh release), `evolve guard role` (Edit/Write must match the active phase's path allowlist), `evolve guard phase` (`evolve subagent run` invocations must follow Scout→Builder→Auditor sequence per `.evolve/cycle-state.json`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration remains supported but the hooks apply equally to it.
+> **Trust boundary (v8.13.1, v12.1-updated)**: enforced by THREE PreToolUse kernel hooks running as native Go: `evolve guard ship` (only `evolve ship` can perform git commit/push/gh release), `evolve guard role` (Edit/Write must match the active phase's path allowlist), `evolve guard phase` (denies the in-process `Agent`/`Task` dispatch tool while a cycle is active per `.evolve/cycle-state.json`, forcing phase agents through the native bridge — NOTE: currently a wired no-op, rewire to the `Agent|Task` matcher pending per ADR-0074; phase ORDER itself is enforced by the Go state machine, `go/internal/core`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration remains supported but the hooks apply equally to it.
 
 > **v8.13.2 / v12.0.0**: self-healing release pipeline. For version-bump releases use `evolve release <version>` (native Go). The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `evolve ship`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
@@ -255,7 +255,7 @@ Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-
 
 For each cycle:
 1. Claim cycle number (OCC protocol)
-2. **Phase transitions are enforced by `evolve guard phase`** (PreToolUse hook in `.claude/settings.json`) plus the in-process Go orchestrator's state machine. Operators do not invoke a separate phase-gate command; the kernel layer enforces it automatically.
+2. **Phase transitions (ORDER) are enforced by the in-process Go orchestrator's state machine** (`go/internal/core`). `evolve guard phase` (PreToolUse hook in `.claude/settings.json`) is a complementary backstop that denies the in-process `Agent`/`Task` dispatch tool during a cycle — currently a wired no-op pending the ADR-0074 rewire to the `Agent|Task` matcher. Operators do not invoke a separate phase-gate command; the state machine enforces order automatically.
 3. Intent (v8.19.1+, always for /evo:loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
 4. **Subagents are dispatched by the Go orchestrator** (`go/internal/core/orchestrator.go`) via the `bridge` adapter, which spawns the configured CLI (`claude -p`, `gemini`, or the agy/codex adapter) and feeds the per-phase agent prompt from `agents/<name>.md`. The kernel still enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes tamper-evident ledger entries. The `evolve subagent run <agent> <cycle> <workspace>` CLI is available for manual single-phase dispatch (used by `evolve serve-phase` and the cross-CLI consensus harness). The bash `subagent-run.sh` path was removed in v12.0.0.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
@@ -271,7 +271,7 @@ Instead of running the loop from inside this skill's prompt, the native binary's
 3. Spawns the orchestrator subagent (via the Go subagent runner under `.evolve/profiles/orchestrator.json`; Edit/Write/git ops still blocked at the kernel hook layer — hooks are unchanged).
 4. Clears cycle-state on exit.
 
-The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine; the `evolve guard phase` PreToolUse hook reads cycle-state to validate that the next subagent invocation matches the expected order.
+The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases via the native state machine, which is the authoritative phase-ORDER enforcer; the `evolve guard phase` PreToolUse hook reads cycle-state to deny the in-process `Agent`/`Task` dispatch tool during a live cycle (pending the ADR-0074 rewire; currently wired under `Bash` only, so inert).
 
 Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs.
 
