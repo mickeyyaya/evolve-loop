@@ -1,0 +1,168 @@
+{
+  "cycle": 1063,
+  "run_id": "01KY5E1JD08R8G11PRH9ZHRW1B",
+  "goal": "Drain the inbox strictly by weight on the hardened stack (diff-scoped floor + seed backfill + unskippable epilogue all live). Structural band first: retro-artifact-budget-perphase, ship-landed verification floor, disposition router S3+S4 (wire retrofile + recurrence escalation with live-path proofs), iteration-state-coherence-sentinel, pre-dispatch AC authoring guard. Then the token-efficiency stack. Every fix: TDD red-first, regression test, adversarial audit, wiring proof in the composed path. No inert API. Tests must NEVER mutate the live repo tree.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 110861,
+      "started_at": "2026-07-22T17:31:36Z",
+      "ended_at": "2026-07-22T17:33:27Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 5729,
+        "cache_read": 320182,
+        "cache_write": 37969
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 71588,
+      "started_at": "2026-07-22T17:33:27Z",
+      "ended_at": "2026-07-22T17:34:39Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1377,
+        "cache_read": 198552,
+        "cache_write": 33110
+      }
+    },
+    {
+      "name": "architecture-design",
+      "verdict": "PASS",
+      "duration_ms": 592283,
+      "started_at": "2026-07-22T17:34:39Z",
+      "ended_at": "2026-07-22T17:44:31Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 71,
+        "output": 33363,
+        "cache_read": 4615507,
+        "cache_write": 139714
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 325901,
+      "started_at": "2026-07-22T17:44:31Z",
+      "ended_at": "2026-07-22T17:49:58Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 21774,
+        "cache_read": 1264288,
+        "cache_write": 77842
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 42432,
+      "started_at": "2026-07-22T17:49:58Z",
+      "ended_at": "2026-07-22T18:01:17Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 223433,
+      "started_at": "2026-07-22T18:01:17Z",
+      "ended_at": "2026-07-22T18:05:00Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 32,
+        "output": 13259,
+        "cache_read": 933127,
+        "cache_write": 55177
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1063",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1366498,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "architecture-design",
+    "longest_ms": 592283,
+    "by_archetype_ms": {
+      "build": 42432,
+      "control": 223433,
+      "plan": 1100633
+    },
+    "total_tokens": {
+      "input": 159,
+      "output": 75502,
+      "cache_read": 7331656,
+      "cache_write": 343812
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 32,
+        "output": 13259,
+        "cache_read": 933127,
+        "cache_write": 55177
+      },
+      "plan": {
+        "input": 127,
+        "output": 62243,
+        "cache_read": 6398529,
+        "cache_write": 288635
+      }
+    },
+    "wasted_tokens": {
+      "input": 32,
+      "output": 13259,
+      "cache_read": 933127,
+      "cache_write": 55177
+    },
+    "cache_hit_ratio": 0.9999783136917666
+  }
+}
