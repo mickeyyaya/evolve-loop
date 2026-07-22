@@ -2,6 +2,7 @@
 
 > **Read [AGENTS.md](AGENTS.md) first** — cross-CLI invariants + the 12 Core Agent Rules. This file is the Claude Code overlay (digest).
 > **Full runtime detail — env-var table, operator commands, ship classes, publishing pipeline — lives in [docs/operations/runtime-reference.md](docs/operations/runtime-reference.md).** Read it before touching loop behavior, flags, gates, or releases. Release notes: [CHANGELOG.md](CHANGELOG.md).
+> **Operating policy (canonical, environment-independent): [docs/operations/operating-policy.md](docs/operations/operating-policy.md)** — pipeline issues are fixed console-first at maximum reasoning; routing is typed plumbing; salvage before requeue; wiring proofs mandatory. The repo, not session memory, is the source of truth for these rules.
 
 ## Session conventions
 

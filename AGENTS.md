@@ -1,6 +1,8 @@
 # AGENTS.md — Cross-CLI Canonical Instructions
 
 > **Read this file first if you are an AI agent (Claude Code, Codex CLI, Gemini CLI, or generic) working in this repository.** It is the source-of-truth for cross-CLI invariants. CLI-specific runtime details live in companion files: [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md). All three reference back to this document.
+>
+> **Operating policy (canonical):** [docs/operations/operating-policy.md](docs/operations/operating-policy.md) carries the environment-independent process rules — pipeline-integrity handling (console-first, maximum reasoning), queue/routing authority, engineering standards, failure-handling contract, release policy — each with the incident evidence behind it. A clean environment inherits the full policy from the repo alone; session memory is only an advisory mirror.
 
 ## What evolve-loop is
 
