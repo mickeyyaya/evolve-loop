@@ -26,8 +26,8 @@
     "Edit(.evolve/runs/cycle-*/triage-report.md)",
     "Write(.evolve/runs/cycle-*/triage-decision.json)",
     "Edit(.evolve/runs/cycle-*/triage-decision.json)",
-    "Bash(inbox-mover.sh:*)",
-    "Bash(inbox-mover.sh claim:*)",
+    "Bash(evolve inbox-mover:*)",
+    "Bash(evolve inbox-mover claim:*)",
     "WebSearch",
     "WebFetch",
     "Bash(scripts/research/kb-search.sh:*)"

@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // Sentinel errors.
@@ -39,6 +40,10 @@ var (
 	ErrMvFailed = errors.New("inboxmover: mv failed")
 	ErrBadArgs  = errors.New("inboxmover: bad arguments")
 	ErrBadState = errors.New("inboxmover: invalid new_state")
+	// ErrConsoleRouted refuses the lane handoff of an operator-owned item
+	// (ADR-0074 I1): route:"console-*" or a protected fix surface. Prompts
+	// advise; Claim enforces — a triage LLM naming the item cannot move it.
+	ErrConsoleRouted = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
 )
 
 // validStates is the set of allowed promote targets. "quarantine" is the
@@ -71,6 +76,12 @@ type Options struct {
 	// regresses existing Promote behavior. Consulted ONLY when a
 	// processed-promotion carries a non-empty CommitSHA.
 	IsLandedFn func(sha string) (bool, error)
+
+	// IsProtectedPath is the control-plane membership predicate for the
+	// ADR-0074 claim floor (guards.IsProtectedSurface at composition roots).
+	// nil disables only the files-derived rule; an explicit route:"console-*"
+	// field always refuses the claim.
+	IsProtectedPath func(path string) bool
 }
 
 // LedgerEntry is the NDJSON line written for each lifecycle transition.
@@ -161,6 +172,10 @@ func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
 		opts.logf("WARN: ", "claim: task '%s' not found in %s", taskID, opts.InboxDir)
 		return res, fmt.Errorf("%w: %s", ErrNotFound, taskID)
 	}
+	if reason := consoleRoutedReason(src, opts.IsProtectedPath); reason != "" {
+		opts.logf("WARN: ", "claim: task '%s' REFUSED — %s (operator-owned; lanes must not draw it)", taskID, reason)
+		return res, fmt.Errorf("%w: %s (%s)", ErrConsoleRouted, taskID, reason)
+	}
 	base := filepath.Base(src)
 	destDir := filepath.Join(opts.InboxDir, "processing", "cycle-"+cycle)
 	dest := filepath.Join(destDir, base)
@@ -184,6 +199,27 @@ func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
 		Reason: "triage-claim",
 	})
 	return res, nil
+}
+
+// consoleRoutedReason parses the item at path and consults the SSOT routing
+// classifier (inboxbatch.ConsoleRouted). Empty reason = dispatchable. A
+// malformed body is fail-open (empty) — routing enforcement must never brick
+// claiming, matching LoadDir's tolerance; the parse failure is the item
+// author's defect and surfaces through LoadDir's warnings elsewhere.
+func consoleRoutedReason(path string, isProtected func(string) bool) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var it inboxbatch.Item
+	if json.Unmarshal(raw, &it) != nil {
+		return ""
+	}
+	routed, reason := inboxbatch.ConsoleRouted(it, isProtected)
+	if !routed {
+		return ""
+	}
+	return reason
 }
 
 // --- Subcommand: promote ---------------------------------------------------

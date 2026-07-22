@@ -32,8 +32,11 @@ func TestNewReviewer_Named(t *testing.T) {
 	writeBuildReport(t, ws, "fix-token-resolver-transcript-source")
 	in := core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws}
 
-	if res := enforce.Review(context.Background(), in); res.Approve || res.Reason == "" {
-		t.Errorf("enforce reviewer must block the out-of-lane build with a reason; got Approve=%v reason=%q", res.Approve, res.Reason)
+	// Advisory since 2026-07-22: label drift approves at every stage (see
+	// reviewer_test.go rationale); the apicover contract here is the NAMED
+	// exercise of the reviewer types, not the old fatal policy.
+	if res := enforce.Review(context.Background(), in); !res.Approve {
+		t.Errorf("enforce reviewer approves label drift (advisory); got reason=%q", res.Reason)
 	}
 
 	var shadow core.DeliverableReviewer = NewReviewer(config.StageShadow)

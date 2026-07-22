@@ -35,6 +35,10 @@ type VerdictInputs struct {
 	// cycles-930/931/932 false-HALT was this field left unpopulated at the sole
 	// call site while the explanation sat in the response diagnostics.
 	SubstantiveError bool
+	// FailReasons carries the override explanations themselves (untruncated) —
+	// cycle-1022: SubstantiveError=true proved a reason EXISTED while every
+	// operator surface stayed silent about WHAT it was.
+	FailReasons []string
 	// DeliverableValid: the on-disk audit-report passed the FULL deliverable.Verify
 	// chain (challenge-token + required sections + ADR-0039 failure-context), NOT
 	// the cheap ParseVerdictSentinel read. It DOWNGRADES the forgery signature to a

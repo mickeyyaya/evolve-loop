@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -14,6 +15,8 @@ import (
 //	0  — success (or promote no-op for ship.sh compat)
 //	1  — not-found / bad args (claim only)
 //	2  — mv failed (claim only)
+//	3  — console-routed refusal (claim only; ADR-0074 — the item is
+//	     operator-owned and must not be drawn by a lane)
 func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		printInboxMoverUsage(stderr)
@@ -23,8 +26,9 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	rest := args[1:]
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := inboxmover.Options{
-		ProjectRoot: projectRoot,
-		Stderr:      stderr,
+		ProjectRoot:     projectRoot,
+		Stderr:          stderr,
+		IsProtectedPath: guards.IsProtectedSurface,
 	}
 
 	switch subcmd {
@@ -45,6 +49,9 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		if errors.Is(err, inboxmover.ErrMvFailed) {
 			return 2
+		}
+		if errors.Is(err, inboxmover.ErrConsoleRouted) {
+			return 3
 		}
 		fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
 		return 1

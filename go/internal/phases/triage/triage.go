@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -113,14 +114,27 @@ func inboxBatchesSection(projectRoot string) string {
 	if err != nil || len(items) == 0 {
 		return ""
 	}
-	rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(items, inboxbatch.Config{}))
-	if rendered == "" {
-		return ""
+	// ADR-0074 I1: console-routed items (route:"console-*" or a protected fix
+	// surface) are operator-owned — lanes must never see them as selectable.
+	// The exclusion is loud (ids listed) so triage knows the work exists;
+	// inboxmover.Claim is the enforcement backstop if a pick slips through.
+	dispatchable, console, _ := inboxbatch.PartitionConsole(items, guards.IsProtectedSurface)
+	var sect strings.Builder
+	if rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(dispatchable, inboxbatch.Config{})); rendered != "" {
+		sect.WriteString("- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
+			"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
+			"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
+			rendered)
 	}
-	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
-		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
-		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
-		rendered
+	if len(console) > 0 {
+		ids := make([]string, len(console))
+		for i, it := range console {
+			ids[i] = it.ID
+		}
+		fmt.Fprintf(&sect, "- console_routed_excluded: %d operator-owned item(s) NOT selectable (route/protected fix surface; the claim floor refuses them): %s\n",
+			len(console), strings.Join(ids, ", "))
+	}
+	return sect.String()
 }
 
 func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {

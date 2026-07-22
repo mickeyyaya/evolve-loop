@@ -100,7 +100,7 @@ func TestMinWidthRepair_EmptyPlanAtFullCapacityRepairsNotSequential(t *testing.T
 
 	handled := minWidthRepair(context.Background(),
 		policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 2},
-		func() error { return nil }, planFn, launcher, 0, &stderr)
+		func() error { return nil }, planFn, launcher, nil, 0, &stderr)
 
 	if !handled {
 		t.Fatal("empty-plan-at-full-capacity (waveCfg.Count>1) must repair to one isolated lane, not fall through to sequential")

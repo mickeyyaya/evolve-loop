@@ -102,7 +102,7 @@ func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 
 	seenAcrossWaves := map[string]bool{}
 	for wave := 0; wave < 2; wave++ {
-		ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, wave)
+		ran, specs, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, nil, wave)
 		if err != nil {
 			t.Fatalf("wave %d: dispatchIteration returned error: %v", wave, err)
 		}
@@ -139,7 +139,7 @@ func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 		t.Fatal("planFn must never be called when the wave path is not taken (Count==1)")
 		return nil, nil, nil
 	}
-	ran, specs, results, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
+	ran, specs, results, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, nil, 0)
 	if err != nil {
 		t.Fatalf("dispatchIteration returned error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) 
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[`), nil, nil // truncated JSON
 	}
-	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, nil, 0)
 	if err == nil {
 		t.Fatalf("dispatchIteration(malformed triage plan) returned nil error — want an explicit error so the caller WARNs and falls back to sequential")
 	}
@@ -186,7 +186,7 @@ func TestDispatchIteration_PlanFnErrorFallsBackSequential(t *testing.T) {
 	launcher := &fakeWaveLauncher{}
 	wantErr := errors.New("triage phase failed")
 	planFn := func(context.Context, int) ([]byte, []string, error) { return nil, nil, wantErr }
-	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, 0)
+	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, nil, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("dispatchIteration error = %v, want it to wrap %v", err, wantErr)
 	}

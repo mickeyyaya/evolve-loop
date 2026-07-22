@@ -184,3 +184,35 @@ func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
 		t.Fatalf("PhasesRun must record the remediation fix dispatch; got %v", res.PhasesRun)
 	}
 }
+
+// diagRunner returns a FAIL with error-severity diagnostics — the audit
+// in-process override shape (cycle-1022).
+type diagRunner struct{ name Phase }
+
+func (r *diagRunner) Name() string { return string(r.name) }
+func (r *diagRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	return PhaseResponse{Phase: string(r.name), Verdict: VerdictFAIL, ArtifactsDir: req.Workspace,
+		Diagnostics: []Diagnostic{{Severity: "error", Message: "apicover -enforce flagged 1 line(s) — unnamed export"}}}, nil
+}
+
+// TestFailReasonsSurfaceInResult pins the cycle-1022 lesson: a floor-override
+// FAIL's explanation must reach the RESULT (summary + dossier surfaces), not
+// just workspace artifacts and orchestrator memory.
+func TestFailReasonsSurfaceInResult(t *testing.T) {
+	runners := buildRunners(nil)
+	runners[PhaseAudit] = &diagRunner{name: PhaseAudit}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	found := false
+	for _, r := range res.FailReasons {
+		if strings.Contains(r, "apicover") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("FailReasons must surface the override explanation; got %v", res.FailReasons)
+	}
+}

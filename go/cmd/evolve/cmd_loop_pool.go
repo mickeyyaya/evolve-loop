@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -76,13 +77,16 @@ func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight
 // fleet.TodosFromTriage (the SAME parse fleet.PlanFromTriage uses to partition
 // the wave path). Single-sourcing the decision→todos parse keeps the pool and
 // wave schedulers reading identical committed work.
-func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int) poolPlanFn {
+func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) poolPlanFn {
 	wavePlan := productionWavePlanFn(cfg, storage, count)
 	return func(ctx context.Context, waveIndex int) ([]fleet.Todo, error) {
 		decisionJSON, cardPackages, err := wavePlan(ctx, waveIndex)
 		if err != nil {
 			return nil, err
 		}
-		return fleet.TodosFromTriage(decisionJSON, cardPackages)
+		// ADR-0074 plan-time gate, pool scheduler: same resolver, fresh per
+		// plan call; refusals WARN inside the resolver wrapper.
+		todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, consoleRoutedResolver(cfg.ProjectRoot, stderr))
+		return todos, err
 	}
 }

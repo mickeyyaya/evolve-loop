@@ -224,7 +224,10 @@ For each `.evolve/inbox/*.json` (maxdepth 1):
    record in `escalate_block[]`; proceed to next file.
 
 4. **Claim the file** (atomic hand-off to this cycle):
-   `bash inbox-mover.sh claim "$id" "$CYCLE"`
+   `evolve inbox-mover claim "$id" "$CYCLE"`
+   Exit 3 = console-routed refusal (ADR-0074): the item is operator-owned —
+   record it in `escalate_block[]` with reason "console-routed" and do NOT
+   select it into `top_n`.
    If claim exits non-zero: log WARN in `## Inbox Errors`, skip this file (another
    cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
 

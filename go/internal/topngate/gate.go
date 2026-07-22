@@ -62,10 +62,16 @@ func (topNBindingGate) check(in core.ReviewInput) (string, bool) {
 			return "", false // in-lane → pass
 		}
 	}
-	// CERTAIN out-of-lane build: name both the claimed slug and the committed
-	// top_n set so an operator can diagnose the divergence without re-deriving
-	// it (cycle-640 lesson: the retro had to reconstruct which lane won).
-	return "build claims task '" + claimed + "' outside triage top_n {" + strings.Join(topN, ", ") + "}", true
+	// Label drift is ADVISORY, not fatal (2026-07-22, cycles 916 + 1012): both
+	// recorded rejections discarded CORRECT work whose report merely described
+	// the committed task under a different label — two LLM outputs string-
+	// compared. The dispatch is plan-driven by construction (the lane exists
+	// BECAUSE triage committed these ids), so the binding authority is the
+	// committed set, not the prose. The non-empty reason with block=false
+	// routes through the reviewer's single structured logf seam (testable);
+	// real fraud protection (deliverable file-scope vs the committed item's
+	// declared scope) is the queued construction-level check.
+	return "label drift (advisory since 2026-07-22): build-report labels its task '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") + "} — binding to the committed set", false
 }
 
 // readTopNSlugs reads <workspace>/triage-report.md and returns the slugs listed

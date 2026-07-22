@@ -52,16 +52,25 @@ func TestTopNBindingGate(t *testing.T) {
 		}
 	})
 
-	t.Run("out-of-lane slug is a certain block naming both slugs", func(t *testing.T) {
+	t.Run("out-of-lane slug is ADVISORY: WARN + pass (2026-07-22)", func(t *testing.T) {
+		// POLICY CHANGE (operator-directed, cycles 916 + 1012): both recorded
+		// fatal rejections discarded CORRECT work whose report merely labeled
+		// the committed task differently — two LLM strings compared. The lane
+		// is plan-driven by construction, so label drift WARNs loudly and the
+		// binding authority is the committed set. Scope-based fraud
+		// verification is the queued construction-level replacement.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "statefile-rmw-flock-single-source")
 		writeBuildReport(t, ws, "fix-token-resolver-transcript-source")
 		reason, block := topNBindingGate{}.check(core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws})
-		if !block {
-			t.Fatalf("out-of-lane slug must block; got reason=%q block=%v", reason, block)
+		if block {
+			t.Fatalf("label drift must never block; got reason=%q", reason)
 		}
-		if !strings.Contains(reason, "fix-token-resolver-transcript-source") || !strings.Contains(reason, "statefile-rmw-flock-single-source") {
-			t.Errorf("reason must name both the claimed slug and the top_n set (operator diagnosis, cycle-640 lesson); got %q", reason)
+		// The reason is POPULATED (block=false) so the reviewer's single
+		// structured logf seam emits the advisory — testable, unlike a raw
+		// stderr write inside the gate.
+		if !strings.Contains(reason, "label drift") || !strings.Contains(reason, "fix-token-resolver-transcript-source") || !strings.Contains(reason, "statefile-rmw-flock-single-source") {
+			t.Fatalf("advisory reason must name the drift and both slug sets; got %q", reason)
 		}
 	})
 

@@ -49,25 +49,34 @@ type triageDecision struct {
 // path IS its footprint), so they keep the id-as-file island. Every source
 // falls back to []string{id} when no files are declared — file-less work stays
 // an independent island, preserving today's spread for those inputs exactly.
-func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int) ([]CycleSpec, error) {
-	todos, err := TodosFromTriage(decisionJSON, cardPackages)
+func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int, routed RoutedFn) ([]CycleSpec, []string, error) {
+	todos, refused, err := TodosFromTriage(decisionJSON, cardPackages, routed)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	specs, _ := PlanCycles(todos, count)
-	return specs, nil
+	return specs, refused, nil
 }
+
+// RoutedFn is the ADR-0074 plan-time routing authority: id → (console-routed,
+// reason). The triage-decision top_n is the load-bearing selection→dispatch
+// handoff, so enforcement lives HERE (both schedulers + the wave-seed fallback
+// single-source this parse) rather than in prompts, which only advise.
+// Composition roots pass inboxbatch.RoutedResolver; nil = no routing context
+// (unit tests) — everything dispatchable. Unknown ids are dispatchable by the
+// resolver's contract (scout-originated work has no inbox item).
+type RoutedFn func(id string) (routed bool, reason string)
 
 // TodosFromTriage parses a triage-decision.json (+ optional cardPackages
 // fallback) into the disjoint-aware Todo backlog PlanFromTriage partitions.
 // Exported so the rolling-pool dispatch path (cmd_loop_pool.go) rolls the SAME
 // backlog through fleet.RunPool that the wave path partitions statically —
 // single-sourcing the decision→todos parse across both schedulers.
-func TodosFromTriage(decisionJSON []byte, cardPackages []string) ([]Todo, error) {
+func TodosFromTriage(decisionJSON []byte, cardPackages []string, routed RoutedFn) (todos []Todo, refused []string, err error) {
 	var decision triageDecision
 	if len(decisionJSON) > 0 {
 		if err := json.Unmarshal(decisionJSON, &decision); err != nil {
-			return nil, fmt.Errorf("fleet: parse triage-decision.json: %w", err)
+			return nil, nil, fmt.Errorf("fleet: parse triage-decision.json: %w", err)
 		}
 	}
 	// sources preserves the historic precedence (committed_floors, then
@@ -95,17 +104,25 @@ func TodosFromTriage(decisionJSON []byte, cardPackages []string) ([]Todo, error)
 		}
 	}
 	seen := make(map[string]bool, len(sources))
-	todos := make([]Todo, 0, len(sources))
+	todos = make([]Todo, 0, len(sources))
 	for _, src := range sources {
 		if src.id == "" || seen[src.id] {
 			continue
 		}
 		seen[src.id] = true
+		// ADR-0074 plan-time gate: a console-routed (operator-owned) id must
+		// never become a lane todo — refused loudly, never silently dropped.
+		if routed != nil {
+			if r, reason := routed(src.id); r {
+				refused = append(refused, src.id+": "+reason)
+				continue
+			}
+		}
 		files := src.files
 		if len(files) == 0 {
 			files = []string{src.id}
 		}
 		todos = append(todos, Todo{ID: src.id, Files: files})
 	}
-	return todos, nil
+	return todos, refused, nil
 }
