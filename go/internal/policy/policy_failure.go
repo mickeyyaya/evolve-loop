@@ -70,6 +70,12 @@ type FailureThresholds struct {
 	// reaching this in one batch ⇒ diagnosability halt (batch-6 first-firing:
 	// three distinct reason-less failures shared one degenerate fingerprint).
 	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
+	// BuildDeepEscalateAtFailures: an item whose failure_count has reached
+	// this routes its NEXT build to the deep tier (ADR-0076 D — retrying a
+	// hard item at the same tier re-fails identically). Raise-only; envelope
+	// Max still clamps. 0 keeps the compiled default (per-threshold merge
+	// convention); disable via the core escalation seam, not this knob.
+	BuildDeepEscalateAtFailures int `json:"build_deep_escalate_at_failures,omitempty"`
 }
 
 // SystemFailurePolicy is the resolved decision policy.
@@ -99,7 +105,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryCodeAuditFail:   {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
 			CategoryIntentMalformed: {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, BuildDeepEscalateAtFailures: 1},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -144,6 +150,9 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 		}
 		if c.Thresholds.UnexplainedFailuresHaltCeiling > 0 {
 			out.Thresholds.UnexplainedFailuresHaltCeiling = c.Thresholds.UnexplainedFailuresHaltCeiling
+		}
+		if c.Thresholds.BuildDeepEscalateAtFailures > 0 {
+			out.Thresholds.BuildDeepEscalateAtFailures = c.Thresholds.BuildDeepEscalateAtFailures
 		}
 		if c.OnTaskRetryCeiling != "" {
 			out.OnTaskRetryCeiling = c.OnTaskRetryCeiling

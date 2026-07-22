@@ -857,3 +857,34 @@ func strPtr(s string) *string {
 	}
 	return &s
 }
+
+// ReadFailureCount resolves taskID across the inbox root and processing/
+// cycle-* dirs and returns its durable failure_count (written by
+// bumpFailureCount on FAIL release). (0,false) = item not found; (0,true) =
+// item present, never failed. Read-only; malformed JSON reads as not-found
+// (the tolerant-reader convention).
+func ReadFailureCount(opts Options, taskID string) (int, bool) {
+	opts.resolveOpts()
+	dirs := []string{opts.InboxDir}
+	if procs, err := filepath.Glob(filepath.Join(opts.InboxDir, "processing", "cycle-*")); err == nil {
+		dirs = append(dirs, procs...)
+	}
+	for _, d := range dirs {
+		path, err := findFileByTaskID(d, taskID)
+		if err != nil {
+			continue
+		}
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			continue
+		}
+		var doc struct {
+			FailureCount int `json:"failure_count"`
+		}
+		if json.Unmarshal(raw, &doc) != nil {
+			continue
+		}
+		return doc.FailureCount, true
+	}
+	return 0, false
+}
