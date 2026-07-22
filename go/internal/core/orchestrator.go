@@ -752,6 +752,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	// return) may leave the ship-window lease held — siblings would wait out
 	// the full TTL. Idempotent; the normal release happens in recordAndBranch.
 	defer cr.releaseShipWindow()
+	// Cycle-1048: no exit path may leave a started cycle without its evidence
+	// trail (dossier + digest + coherent state) — see cyclerun_epilogue.go.
+	defer cr.abnormalEpilogue()
 
 	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
 	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle
