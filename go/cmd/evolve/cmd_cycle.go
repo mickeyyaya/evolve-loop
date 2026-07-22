@@ -28,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -638,6 +639,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
+	// ADR-0076 D: the retry-tier-escalation failure-count read seam, backed by
+	// the durable per-item counter the S5 chain maintains.
+	opts = append(opts, core.WithFailureCountReader(func(id string) int {
+		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
+		return n
+	}))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	// ADR-0072 system-failure decision policy. A malformed failure_policy block
