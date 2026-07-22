@@ -727,10 +727,34 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		fi, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
 		return statErr == nil && fi.Mode().IsRegular()
 	})
+	// A fully-staged deletion ("D " — index staged, worktree side clean) has
+	// NOTHING left to stage, and naming it in the pathspec is fatal rc=128
+	// ("did not match any files": the file exists in neither worktree nor
+	// index-as-file). The operator boundary flow produces exactly this shape
+	// (stage explicit paths incl. deletions → commit-gate → ship re-stages).
+	// Unstaged deletions (" D") stay in the pathspec — `add` records those.
+	stagedDeleted := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "D ") && len(line) > 3 {
+			stagedDeleted[strings.TrimSpace(line[3:])] = true
+		}
+	}
+	kept := paths[:0]
+	for _, p := range paths {
+		if !stagedDeleted[p] {
+			kept = append(kept, p)
+		}
+	}
+	paths = kept
 
-	args := make([]string, 0, len(prefix)+2+len(paths))
+	args := make([]string, 0, len(prefix)+3+len(paths))
 	args = append(args, prefix...)
-	args = append(args, "add", "--")
+	// `-A` WITH a pathspec is a SCOPED sweep (never repo-wide): within these
+	// paths it stages adds, modifications, and deletions idempotently. Plain
+	// `add -- <path>` fatals rc=128 on an already-staged deletion — the exact
+	// operator boundary flow (stage explicit paths → commit-gate → ship
+	// re-stages), which broke every boundary ship after this rework landed.
+	args = append(args, "add", "-A", "--")
 	args = append(args, paths...)
 	exit, runErr := opts.run(ctx, "git", args, io.Discard, opts.Stderr)
 	if runErr != nil || exit != 0 {
