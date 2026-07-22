@@ -1,0 +1,18 @@
+{
+  "id": "continuation-create-reuse-snapshot-base-guard",
+  "title": "Guard gitWorktree.Create same-cycle reuse against a committed salvage snapshot becoming the normalize base",
+  "kind": "hardening",
+  "priority": "low",
+  "weight": 0.55,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/core/worktree.go",
+    "go/internal/core/cyclerun.go"
+  ],
+  "connects_to": [
+    "adr-0076-continuation-on-fail"
+  ],
+  "route": "lane",
+  "injected_by": "console-architect-review",
+  "notes": "ADR-0076 slice C architect finding #3 (LOW): slice C changed preserved-worktree state from dirty to committed. If Create (not CreateFrom) ever reuses a preserved worktree for the SAME cycle number (resume/reset edge), ensureCleanWorktree sees clean HEAD=snapshot and WorktreeBaseSHA becomes the snapshot, so normalizeWorktreeToBase will not re-expose the salvaged work for audit. Cycle numbers are not normally reused, but add a guard: on Create reuse, detect a salvage-snapshot HEAD (commit subject marker 'salvage snapshot (ADR-0076 continuation-on-fail)') and record base as the snapshot's first non-salvage ancestor, or WARN loudly."
+}

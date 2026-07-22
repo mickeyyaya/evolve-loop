@@ -2,17 +2,30 @@
   "id": "dead-api-sweep",
   "created_at": "2026-07-08T00:50:00Z",
   "weight": 0.68,
-  "title": "deadcode analysis: ~168 non-test-seam functions unreachable from cmd/evolve — including whole dormant subsystems (bridge/channel Supervisor, core PlanJudge, deliverable constructor family, checkpoint appliers, sandbox bwrap) each carrying permanent apicover test tax",
+  "title": "deadcode analysis: ~168 non-test-seam functions unreachable from cmd/evolve \u2014 including whole dormant subsystems (bridge/channel Supervisor, core PlanJudge, deliverable constructor family, checkpoint appliers, sandbox bwrap) each carrying permanent apicover test tax",
   "kind": "refactor",
   "priority": "medium",
-  "summary": "golang.org/x/tools deadcode from the ./cmd/evolve entrypoint reports 186 unreachable funcs; ~168 after excluding legitimate test seams (Fake*, withHooks, ForTesting). Clusters: bridge/channel/supervisor.go (whole Supervisor: Ask/awaitReply/collectSpan...), core/phase_judge.go (PlanJudge — known unwired), deliverable NewReviewer*/NewVerifier* constructor variants, checkpoint ComposeChecked/ApplyToStateFile/RecordPhaseIntegrity, adapters/sandbox GenerateBwrapArgv/New/Exec, core WithMaxPhaseIterations/WithWorktreeProvisioner/ApplyDefectsAsCarryoverTodos, cyclecost.ParseEventsLog (superseded by sidecar-preferred S7), changedpkgs.FromGit, verdict helpers. Full list preserved in the scan session; regenerate with: ~/go/bin/deadcode ./cmd/evolve (run in go/).",
+  "summary": "golang.org/x/tools deadcode from the ./cmd/evolve entrypoint reports 186 unreachable funcs; ~168 after excluding legitimate test seams (Fake*, withHooks, ForTesting). Clusters: bridge/channel/supervisor.go (whole Supervisor: Ask/awaitReply/collectSpan...), core/phase_judge.go (PlanJudge \u2014 known unwired), deliverable NewReviewer*/NewVerifier* constructor variants, checkpoint ComposeChecked/ApplyToStateFile/RecordPhaseIntegrity, adapters/sandbox GenerateBwrapArgv/New/Exec, core WithMaxPhaseIterations/WithWorktreeProvisioner/ApplyDefectsAsCarryoverTodos, cyclecost.ParseEventsLog (superseded by sidecar-preferred S7), changedpkgs.FromGit, verdict helpers. Full list preserved in the scan session; regenerate with: ~/go/bin/deadcode ./cmd/evolve (run in go/).",
   "root_cause": "Features landed dormant or were superseded without a removal pass; the apicover gate then forces name-tests for exports nobody calls, compounding maintenance cost.",
-  "fix": "Case-by-case triage sweep, batched by package: for each cluster decide WIRE (a tracked plan exists to activate it — e.g. PlanJudge if the advisor roadmap still wants it) or DELETE (with its tests). Deletion is the default absent a concrete activation plan (YAGNI); dormant-by-design code kept must gain a doc comment naming the activating campaign. Regenerate the deadcode list at cycle start (do NOT trust the counts above blindly — reachability may have changed).",
+  "fix": "Case-by-case triage sweep, batched by package: for each cluster decide WIRE (a tracked plan exists to activate it \u2014 e.g. PlanJudge if the advisor roadmap still wants it) or DELETE (with its tests). Deletion is the default absent a concrete activation plan (YAGNI); dormant-by-design code kept must gain a doc comment naming the activating campaign. Regenerate the deadcode list at cycle start (do NOT trust the counts above blindly \u2014 reachability may have changed).",
   "acceptance": [
     "Regenerated deadcode list attached to the build report; every cluster dispositioned WIRE/DELETE/KEEP-with-named-campaign",
     "Deleted exports remove their apicover tests in the same commit; repo-wide go build/test/vet green",
-    "Net deadcode count reduced ≥60% of the non-seam baseline (~168 → ≤67); no behavior change (suite green, no regression)"
+    "Net deadcode count reduced \u226560% of the non-seam baseline (~168 \u2192 \u226467); no behavior change (suite green, no regression)"
   ],
-  "files": ["go/internal/bridge/channel/supervisor.go", "go/internal/core/phase_judge.go", "go/internal/deliverable/", "go/internal/checkpoint/", "go/internal/adapters/sandbox/sandbox.go", "go/internal/cyclecost/cyclecost.go", "go/internal/changedpkgs/changedpkgs.go"],
-  "connects_to": ["apicover gate (test-tax rationale)", "decoupling_campaign (smaller surfaces to split)", "token-telemetry S7 (cyclecost.ParseEventsLog supersession)"]
+  "files": [
+    "go/internal/bridge/channel/supervisor.go",
+    "go/internal/core/phase_judge.go",
+    "go/internal/deliverable/",
+    "go/internal/checkpoint/",
+    "go/internal/adapters/sandbox/sandbox.go",
+    "go/internal/cyclecost/cyclecost.go",
+    "go/internal/changedpkgs/changedpkgs.go"
+  ],
+  "connects_to": [
+    "apicover gate (test-tax rationale)",
+    "decoupling_campaign (smaller surfaces to split)",
+    "token-telemetry S7 (cyclecost.ParseEventsLog supersession)"
+  ],
+  "notes": " [FRESHNESS 2026-07-23] Regenerate the report FIRST: recurrence/retrofile + carryforward clusters have since gone live; PlanJudge still dead."
 }

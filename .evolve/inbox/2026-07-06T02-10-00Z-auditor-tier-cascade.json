@@ -1,7 +1,7 @@
 {
   "id": "auditor-tier-cascade",
   "created_at": "2026-07-06T02:10:00Z",
-  "weight": 0.87,
+  "weight": 0.84,
   "title": "Auditor tier cascade (FrugalGPT pattern): cheap-tier first audit pass, escalate to deep-tier ONLY on uncertainty/flags - audit family is the measured token hog (~59% of agentic-SWE pipeline tokens)",
   "kind": "feature",
   "priority": "medium",
@@ -25,5 +25,5 @@
     "per-phase-effort-routing (effort dial composes: cheap pass can also be low-effort)",
     "difficulty-conditioned-phase-budgets (same difficulty signal can gate the cascade)"
   ],
-  "notes": "Injected 2026-07-06 completing full-report queueing (operator: 'why don't we queue all of them?'). Weight 0.84: targets the measured worst offender but touches audit-integrity surface, so shadow-first. Evidence: FrugalGPT 2305.05176 (50-98% cost cut), Tokenomics 2601.14470 (59.4% review share), RouteLLM (85% cost cut retaining 95% quality)."
+  "notes": "Injected 2026-07-06 completing full-report queueing (operator: 'why don't we queue all of them?'). Weight 0.84: targets the measured worst offender but touches audit-integrity surface, so shadow-first. Evidence: FrugalGPT 2305.05176 (50-98% cost cut), Tokenomics 2601.14470 (59.4% review share), RouteLLM (85% cost cut retaining 95% quality). [REBAND 2026-07-23] 0.87->0.84: a token-efficiency audit-cost feature (priority=medium), not a pipeline-integrity class; sits just below the reserved band."
 }

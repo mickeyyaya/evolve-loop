@@ -18,5 +18,6 @@
     "triage-batch-density-homogeneous-small-items",
     "optional-phase-ev-gating-by-cycle-class",
     "codegraph-blast-radius-context-for-scout-audit-review"
-  ]
+  ],
+  "notes": " [MERGE 2026-07-23] Absorbs triage-batch-density-homogeneous-small-items as the degenerate/fallback path: when no unifying design exists, commit the homogeneous small-item group as one cycle."
 }

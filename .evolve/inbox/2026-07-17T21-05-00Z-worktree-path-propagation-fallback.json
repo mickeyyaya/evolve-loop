@@ -1,7 +1,7 @@
 {
   "id": "worktree-path-propagation-fallback",
   "created_at": "2026-07-17T21:05:00Z",
-  "weight": 0.86,
+  "weight": 0.6,
   "title": "WORKTREE_PATH degrades to ProjectRoot (repo root) on the tmux phase path \u2014 req.Worktree \u2260 the actual cycle worktree; audit every consumer of BridgeRequest.Worktree for silent mis-scoping",
   "kind": "bug",
   "priority": "low",
@@ -19,5 +19,6 @@
   ],
   "connects_to": [
     "the ArtifactPath-primary attribution fix (this made the mis-propagation visible)"
-  ]
+  ],
+  "notes": " [REBAND 2026-07-23] 0.86->0.60: priority=low investigation into a degraded-path fallback; not a pipeline-integrity class."
 }

@@ -10,5 +10,6 @@
     "go/internal/core/mergerung2.go",
     "go/internal/core/composition_scoped_review.go"
   ],
-  "class": "lost-work-salvage"
+  "class": "lost-work-salvage",
+  "notes": " [VERIFY 2026-07-23] Before re-deriving, check whether 6459f9ae/c0eabef6 subsume the ~8-line mergerung2.go delta; branch cycle-21f9f7ae-948 still holds 12bab1df unlanded."
 }

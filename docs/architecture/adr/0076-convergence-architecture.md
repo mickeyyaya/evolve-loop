@@ -1,7 +1,9 @@
 # ADR-0076: Convergence architecture — from inspect-and-restart to build-in-and-continue
 
-- **Status:** Accepted (operator, 2026-07-23); slice B implemented with this ADR,
-  slices A/C/D queued top-band as the `convergence-2026-07` campaign
+- **Status:** Accepted (operator, 2026-07-23); ALL FOUR slices implemented —
+  B with this ADR (`70314e26`), D/A/C directly in the console with adversarial
+  amendments (PRs #360, #361, #362; each first design carried an I2 dead link
+  the review caught — see `knowledge-base/research/lessons-and-resolutions-2026-07.md` §6b)
 - **Context evidence:** batches 6–8 (cycles 1044–1068)
 
 ## Context

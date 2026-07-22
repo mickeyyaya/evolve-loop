@@ -19,5 +19,6 @@
     "model_governance_campaign"
   ],
   "source": "operator-injection 2026-07-18: user root-caused why the loop cannot complete despite the fallback policy \u2014 audit is a single (claude,deep,fable) point; the model-within-tier axis is unwired though the catalog chain (fable,opus,sonnet) is authored. User directive: 'deep level model could use opus as fable's fallback option.' Immediate unblock (catalog deep\u2192opus) applied live; this is the durable wiring.",
-  "created_at": "2026-07-18T09:30:00Z"
+  "created_at": "2026-07-18T09:30:00Z",
+  "notes": " [SLEEPER 2026-07-23] A finished, reviewed implementation exists at 42f987fa on feat/within-tier-model-fallback \u2014 landing = SALVAGE that branch, not a rebuild. (v22.4.0 #331 was the TIER axis, a different feature.)"
 }

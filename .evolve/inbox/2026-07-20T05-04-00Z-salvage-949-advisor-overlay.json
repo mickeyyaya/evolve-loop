@@ -10,5 +10,6 @@
     "go/internal/core",
     "go/internal/phases/runner/runner.go"
   ],
-  "class": "lost-work-salvage"
+  "class": "lost-work-salvage",
+  "notes": " [VERIFY 2026-07-23] Advisor site IS live (phase_advisor.go ResolveOverlays). Verify FailureAdvisor.Advise + PlanJudge.GradePlan route through it (PlanJudge unwired per dead-api-sweep; core.WithJudgeModel absent). Close if all three covered."
 }

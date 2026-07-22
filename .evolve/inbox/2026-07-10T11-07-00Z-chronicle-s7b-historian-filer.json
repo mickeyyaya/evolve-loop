@@ -13,9 +13,19 @@
     "RED: TestFileHistorianActions_CapsAtThreePerBatch",
     "go test -race PASS; apicover clean"
   ],
-  "files": ["go/internal/chronicle/historian_actions.go", "go/internal/chronicle/historian_actions_test.go", "go/cmd/evolve/cmd_loop_historian.go (filer call)"],
-  "deps": ["chronicle-s7a-historian-shadow"],
-  "connects_to": ["retro-preventive-actions-autofile-inbox", "chronicle-s6-escalation-boundary"],
+  "files": [
+    "go/internal/chronicle/historian_actions.go",
+    "go/internal/chronicle/historian_actions_test.go",
+    "go/cmd/evolve/cmd_loop_historian.go (filer call)"
+  ],
+  "deps": [
+    "chronicle-s7a-historian-shadow"
+  ],
+  "connects_to": [
+    "retro-preventive-actions-autofile-inbox",
+    "chronicle-s6-escalation-boundary"
+  ],
   "source": "approved plan 2026-07-10 (failure mode 5 mitigation)",
-  "created_at": "2026-07-10T11:07:00Z"
+  "created_at": "2026-07-10T11:07:00Z",
+  "notes": " [SCOPE 2026-07-23] Implement against the landed S4 boundary applier (recurrence.ApplyBoundary) \u2014 no second filer; clamp/namespace rules carry over."
 }

@@ -12,5 +12,6 @@
     "go/internal/phases/scout",
     "go/internal/phases/audit"
   ],
-  "class": "efficiency-feature"
+  "class": "efficiency-feature",
+  "notes": " [MERGE 2026-07-23] Absorbs tokenopt-repo-map-artifact: the budget-capped repo symbol map is the prompt-injection PROJECTION of this codegraph index \u2014 one AST index, two consumers, never two."
 }

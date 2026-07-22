@@ -11,5 +11,6 @@
     "go/cmd/apicover/main.go",
     "go/.apicover-enforce"
   ],
-  "class": "warnship-apicover-ci-gap"
+  "class": "warnship-apicover-ci-gap",
+  "notes": " [MERGE 2026-07-23] Absorbs percycle-apicover-gate-missed-new-exports-fleet-rebase-path; carried AC: after fleet-rebase, re-derive the changed-set from the REBASED worktree before the apicover audit \u2014 per-package hard-fail cannot fire on an empty changed-set."
 }

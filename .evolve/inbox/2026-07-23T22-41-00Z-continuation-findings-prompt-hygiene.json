@@ -1,0 +1,18 @@
+{
+  "id": "continuation-findings-prompt-hygiene",
+  "title": "Sanitize/structure the prior-attempt findings block injected into the build prompt",
+  "kind": "hardening",
+  "priority": "low",
+  "weight": 0.5,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/core/continuation_stamp.go",
+    "go/internal/phases/build/build.go"
+  ],
+  "connects_to": [
+    "adr-0076-continuation-on-fail"
+  ],
+  "route": "lane",
+  "injected_by": "console-architect-review",
+  "notes": "ADR-0076 slice C architect finding #4 (LOW, note-only): readContinuationFindings injects failure-digest.json verbatim (8KB cap + TrimSpace) into build's ComposePrompt. Content is pipeline-self-produced and the kernel floor is deterministic, so no gate bypass \u2014 but add the same control-character hygiene the inboxbatch sanitizer applies, and prefer rendering the digest's structured fields over raw JSON."
+}

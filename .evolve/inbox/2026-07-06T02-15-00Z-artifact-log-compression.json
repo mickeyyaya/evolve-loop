@@ -1,7 +1,7 @@
 {
   "id": "artifact-log-compression",
   "created_at": "2026-07-06T02:15:00Z",
-  "weight": 0.80,
+  "weight": 0.8,
   "title": "Deterministic compression of bulky low-density artifact sections (test logs, build output, diffs) before prompt injection - LLMLingua-2 finding applied as a Go-native filter at conservative 2-4x (dedup repeated stack frames, collapse pass-noise, keep failures verbatim)",
   "kind": "feature",
   "priority": "medium",
@@ -24,5 +24,5 @@
     "observation-masking-stale-tool-eviction (sibling: stale vs bulky-current split the same problem)",
     "report-size-contracts-jit-artifacts (compressed logs shrink the on-disk detail phases JIT-read)"
   ],
-  "notes": "Injected 2026-07-06 completing full-report queueing. Weight 0.80: solid evidence + fully deterministic, ranked under the masking/prefix/contract levers because it overlaps their savings surface. Evidence: LLMLingua-2 (2-5x, ACL Findings 2024 + 2026 field reports), SWE-Pruner 2601.16746 (23-38% via tool-output interception), lossless meta-token compression 2506.00307 (two-tier policy)."
+  "notes": "Injected 2026-07-06 completing full-report queueing. Weight 0.80: solid evidence + fully deterministic, ranked under the masking/prefix/contract levers because it overlaps their savings surface. Evidence: LLMLingua-2 (2-5x, ACL Findings 2024 + 2026 field reports), SWE-Pruner 2601.16746 (23-38% via tool-output interception), lossless meta-token compression 2506.00307 (two-tier policy). [MERGE 2026-07-23] Absorbs tokenopt-tool-output-compression-hook: same deterministic compressor core (collapse pass-noise, dedup frames, failures verbatim) with a second injection point at the tool-output hook."
 }

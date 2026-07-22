@@ -275,6 +275,20 @@ gaming the metric. The target state is: **all remaining FAILs are ones we want.*
 | Batch 7 (1048, stopped) | operator-stopped | RC1 floor blockade found (pre-existing false-greens blocking every core lane → PR #356 diff-scoping); wave-0 seed starvation (RC4) |
 | Batch 8 (1053–1068) | 7 PASS / 9 FAIL | all FAILs honest + fully evidenced; 5 = builder unnamed-exports (→ builder-doc directive); fingerprint collision caught live at 2-of-3 (PR #358); staged-deletion ship fatal fixed same-day (PR #359); max streak 3 |
 
+## 6b. Convergence implementation addendum (2026-07-22/23, console — ADR-0076 slices D/A/C)
+
+The three queued convergence slices were implemented directly in the console (operator directive: top priority, strict TDD + repo design patterns), each surviving an adversarial review that materially changed the design. The reviews earned their cost — every slice's FIRST design contained a dead link that unit tests alone would have shipped green:
+
+| Slice | First design's fatal flaw | What the review forced |
+|---|---|---|
+| D (retry tier escalation, PR #360) | Plan-time tier raise was dispatch-inert: the live registry runs `model_routing=static`, so the raised plan entry never projected onto the dispatch | Mode-independent deterministic DISPATCH-time floor (`escalatedBuildTier`), clamped through the real envelope guardrail on a single-entry plan |
+| A (difficulty budgets, PR #361) | Consumed `cs.CycleSizeEstimate` — a field that does not exist; handoff JSONs extinct since ~cycle 215 → every multiplier silently 1.0 | `triageFromReportFallback` parses `cycle_size_estimate:` from triage-report.md, the artifact triage actually writes |
+| C (continuation-on-fail, PR #362) | Resolved the continuation at worktree-provisioning time — before triage CLAIMS items, `processing/cycle-N` does not exist → adoption never fires | Post-triage adoption seam keyed to the ACTUAL claim; composed test drives the production resolver + real claim, negative-probed |
+
+**The transferable lesson (the I2 invariant, third confirmation):** a mechanism is not "implemented" until a composed-path test proves the live pipeline executes it — every one of these flaws lived precisely in the gap between a green unit test and the production call order. Corollary discovered en route: mock resolvers and hand-seeded fixture dirs reproduce the DESIGNER's assumption, not the pipeline's ordering; the fix-proving test must construct its inputs through the same production writers the pipeline uses.
+
+Secondary lessons: (1) the persona docs carry a hard combined-line budget (751) and the go CI workflow is path-filtered — a doc-only commit reddened main invisibly for two runs; compress prompt additions, never raise a size floor. (2) PR merge-ref CI snapshots main at run creation and `gh run rerun` reuses the stale ref — after a dependency merges, push a real commit to re-evaluate. (3) Never merge PRs into origin/main mid-batch while lanes are shipping (cycle-1067's GIT_PUSH_REJECTED was operator-inflicted).
+
 ## 7. Source index
 
 - `knowledge-base/research/campaign-retrospective-cycles-215-231-2026-06-06.md` — the unifying diagnosis

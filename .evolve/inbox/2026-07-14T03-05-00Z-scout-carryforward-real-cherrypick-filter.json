@@ -24,5 +24,6 @@
   ],
   "source": "cycle-826 audit (Opus) 2026-07-14: independent cherry-pick dry-run refuted scout merge-tree-clean premise (6 conflicts); cd409fed already re-landed via cycle-769",
   "created_at": "2026-07-14T03:05:00Z",
-  "operator_note": "PRIORITIZED: cycle-826 root cause \u2014 one of the 3 width-2 verdict-storm failures. Bare `git merge-tree` mis-selects superseded orphans, wasting operator-prioritized rebase cycles at width>=2. \u2014 2026-07-14 operator prioritization (post fix-#3 landing 34a2151e; width-1, hardening cross-lane safety before re-climbing to width>=2)"
+  "operator_note": "PRIORITIZED: cycle-826 root cause \u2014 one of the 3 width-2 verdict-storm failures. Bare `git merge-tree` mis-selects superseded orphans, wasting operator-prioritized rebase cycles at width>=2. \u2014 2026-07-14 operator prioritization (post fix-#3 landing 34a2151e; width-1, hardening cross-lane safety before re-climbing to width>=2)",
+  "notes": " [VERIFY 2026-07-23] Deterministic mechanism landed (cycle-960: CarryforwardCandidateLandable + prune_superseded_orphans + cmd_branches CLI). Remaining delta ONLY: wire scout/triage contract to consume it during selection."
 }
