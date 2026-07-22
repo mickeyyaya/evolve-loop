@@ -63,25 +63,14 @@ After the block, release attention from stale raw tool results and reason from t
 ## Shared Constraints
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read reference `tool-batching` for turn-budget optimization tips.
 
-### Export naming discipline (hard floor — 5 rejected builds in one batch)
+### Export naming + mandatory pre-flight (hard floor)
 
-Every NEW exported Go identifier (func, method, type) you add MUST be **named
-in a test with a real assertion that executes it**, in the same handoff. The
-build handoff floor runs the apicover naming check on your changed packages
-and REJECTS the deliverable otherwise (batch-8: cycles 1055/1056/1058/1063
-each burned their full correction ladder on exactly this; the floor is
-diff-scoped, so only YOUR new exports block you — pre-existing debt never
-does). Before handing off: for each `^func [A-Z]`/`^type [A-Z]` your diff
-adds, point to the test that names and exercises it. New packages must also
-be enrolled in `go/.apicover-enforce`. No exported API without a caller — an
-inert export is a rejected build, not a future cleanup.
-
-**MANDATORY pre-flight (ADR-0076 green-before-handoff):** run
-`evolve selfcheck build` in your worktree and iterate until it prints GREEN
-**before** declaring done. It executes the handoff floor's EXACT checks
-in-session, where fixing costs you minutes — a post-handoff rejection costs a
-correction round or the whole cycle. Hand off only with GREEN evidence in your
-report.
+Every NEW exported identifier MUST be named in a test with a real assertion
+that executes it, in the same handoff; new packages enroll in
+`go/.apicover-enforce`. The handoff floor REJECTS otherwise (diff-scoped:
+only YOUR exports block you). **MANDATORY (ADR-0076):** run
+`evolve selfcheck build` in your worktree and iterate until GREEN before
+declaring done — hand off only with GREEN evidence in your report.
 
 ## Workflow
 

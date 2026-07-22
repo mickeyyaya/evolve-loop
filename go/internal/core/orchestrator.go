@@ -368,6 +368,11 @@ type Orchestrator struct {
 	// once from policy.json at the composition root (chronicle S3).
 	chronicle policy.ChronicleConfig
 
+	// failureCountFor reads an inbox item's durable failure_count (ADR-0076 D
+	// retry tier escalation). Wired at the composition root from
+	// inboxmover.ReadFailureCount; nil = escalation disabled (safe no-op).
+	failureCountFor func(id string) int
+
 	// failurePolicy is the resolved system-failure DECISION policy (ADR-0072):
 	// the category→action map + Go-enforced floor. Resolved once from
 	// policy.json at the composition root; absent ⇒ compiled defaults.
@@ -502,6 +507,16 @@ func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
 // compiled default (digest=shadow).
 func WithChronicleConfig(cfg policy.ChronicleConfig) Option {
 	return func(o *Orchestrator) { o.chronicle = cfg }
+}
+
+// WithFailureCountReader injects the item failure-count read seam (ADR-0076
+// D). Nil is ignored, preserving any prior reader (the WithKB idiom).
+func WithFailureCountReader(fn func(id string) int) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.failureCountFor = fn
+		}
+	}
 }
 
 // WithFailurePolicy injects the resolved system-failure decision policy

@@ -143,6 +143,16 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}
 		}
 	}
+	// ADR-0076 D (deterministic escalation floor — applied AFTER the mode-
+	// gated projection and INDEPENDENT of it, review finding D1: the live
+	// registry runs model_routing=static and a policy floor must still fire):
+	// a retried scoped item raises the build dispatch tier to deep, clamped
+	// through the same envelope guardrail as the routing clamp.
+	if next == PhaseBuild {
+		if tier, raised := cr.escalatedBuildTier(phaseReq.ModelRoutingTier); raised {
+			phaseReq.ModelRoutingTier = tier
+		}
+	}
 	// ADR-0050 Phase 3.7: at advisory+, serve the build phase's upstream
 	// build-plan via the typed envelope (read once here at the seam) instead of
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
