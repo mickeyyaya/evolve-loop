@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -102,14 +103,28 @@ func extractReportPaths(md string) []string {
 // reconciliation (no manifest ≠ empty manifest).
 func declaredManifest(workspacePath string) []string {
 	seen := map[string]bool{}
-	for _, f := range manifestReportFiles {
-		b, err := os.ReadFile(filepath.Join(workspacePath, f))
-		if err != nil {
-			continue
+	fold := func(ws string) {
+		for _, f := range manifestReportFiles {
+			b, err := os.ReadFile(filepath.Join(ws, f))
+			if err != nil {
+				continue
+			}
+			for _, p := range extractReportPaths(string(b)) {
+				seen[p] = true
+			}
 		}
-		for _, p := range extractReportPaths(string(b)) {
-			seen[p] = true
-		}
+	}
+	fold(workspacePath)
+	// ADR-0076 slice C: a continuation cycle re-exposes the PRIOR attempt's
+	// files at ship time, but this cycle's reports declare only what the
+	// resuming builder re-touched. The adoption seam copies the continuation
+	// manifest into this workspace; union the prior attempt's declarations
+	// (sibling run dir, keyed by its cycle) so enforce mode never fails closed
+	// on legitimately resumed work. One hop only — a re-FAILed continuation's
+	// next manifest points at the latest attempt, whose reports accumulate the
+	// same union at ITS ship.
+	if c, ok, _ := continuation.ReadManifest(workspacePath); ok && c.Cycle > 0 {
+		fold(filepath.Join(filepath.Dir(workspacePath), fmt.Sprintf("cycle-%d", c.Cycle)))
 	}
 	out := make([]string, 0, len(seen))
 	for p := range seen {

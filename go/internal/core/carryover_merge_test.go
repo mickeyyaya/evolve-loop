@@ -85,7 +85,7 @@ func TestRunCycle_MergesMemoCarryoverTodosIntoState(t *testing.T) {
 
 	// finalizeCycle is RunCycle's post-loop terminal segment: it persists the
 	// cycle-end state via persistCycleEndState. The memo-todo merge belongs here.
-	if _, err := o.finalizeCycle(context.Background(), cs, 667, "same-head", result, state); err != nil {
+	if _, err := o.finalizeCycle(context.Background(), cs, 667, "same-head", "", result, state); err != nil {
 		t.Fatalf("finalizeCycle: %v", err)
 	}
 

@@ -206,7 +206,7 @@ func (cr *cycleRun) recordChokepointEscape(reason string) {
 // reads this AFTER finalizeCycle returns, so it MUST be threaded back to
 // RunCycle's frame (the R2 late-visibility contract); a persist error preserves
 // nothing extra here, the defer's !cycleCompletedNormally clause covers it.
-func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle int, preCycleHEAD string, result *CycleResult, state *State) (preserveWorktree bool, err error) {
+func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle int, preCycleHEAD, projectRoot string, result *CycleResult, state *State) (preserveWorktree bool, err error) {
 	postCycleHEAD, _ := o.gitHEAD()
 	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
 
@@ -260,6 +260,15 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// raw FAIL. L3 gc (internal/gc) reclaims preserved worktrees on retention;
 	// `evolve cycle reset` / `evolve loop --resume` reclaim them explicitly.
 	preserveWorktree = preserveOnVerdict(result.FinalVerdict)
+
+	// ADR-0076 slice C: a preserved (FAILed) worktree is snapshot-committed and
+	// its continuation manifest stamped NOW — while the worktree is live and
+	// before the inbox release reads the workspace. Best-effort + loud; a
+	// system-failure halt still stamps (the preserved work is exactly what the
+	// next attempt should resume once the pipeline is healthy again).
+	if preserveWorktree {
+		o.stampContinuationManifest(ctx, cs, cycle, projectRoot)
+	}
 
 	// chronicle-s4: close the PASS-branch learning orphan. evolve-memo and the
 	// retro path both write <workspace>/carryover-todos.json but nothing read it;

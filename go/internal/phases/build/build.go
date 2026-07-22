@@ -46,6 +46,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.BuildPlan != "" {
 		fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
 	}
+	// ADR-0076 slice C: an adopted continuation resumes a prior attempt's
+	// preserved work — hand the builder that attempt's failure findings so it
+	// finishes what remains instead of rediscovering it. Absent key ⇒
+	// byte-identical legacy prompt.
+	if findings := req.Context["continuation_findings"]; findings != "" {
+		fmt.Fprintf(&b, "\n\n## Prior Attempt Findings\nThis worktree RESUMES a prior attempt's preserved work — do not restart or discard it. The prior attempt failed with the findings below; resume, complete the remaining gaps they describe, and re-verify the whole change.\n\n%s", findings)
+	}
 	return b.String()
 }
 

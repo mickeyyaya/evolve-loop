@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
 // Item is the structured view of one .evolve/inbox/*.json entry. Fields are
@@ -44,6 +46,11 @@ type Item struct {
 	// protected-surface derivation — agent-authored fields cannot widen agent
 	// authority (ADR-0073 clamp-parity vocabulary).
 	InjectedBy string `json:"injected_by"`
+	// Continuation (ADR-0076 slice C) binds a FAILed cycle's preserved,
+	// snapshot-committed work to this item so the next attempt resumes instead
+	// of restarting cold. Machine-consumed only (never rendered into the triage
+	// prompt); validated at adoption time, tolerant here. Nil = fresh start.
+	Continuation *continuation.Continuation `json:"continuation,omitempty"`
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`

@@ -25,6 +25,7 @@ import (
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
@@ -644,6 +645,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	opts = append(opts, core.WithFailureCountReader(func(id string) int {
 		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
 		return n
+	}))
+	// ADR-0076 C: continuation-on-fail resolve seam — the orchestrator adopts a
+	// prior FAILed attempt's salvage snapshot when this cycle's claimed scope
+	// carries one (validated in-orchestrator against live git state).
+	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int) *continuation.Continuation {
+		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)
 	}))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))

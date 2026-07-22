@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"io"
 	"os"
 	"path/filepath"
@@ -644,6 +645,18 @@ func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quaran
 		return res, nil
 	}
 
+	// ADR-0076 slice C: when the FAILed cycle preserved salvageable work, its
+	// workspace carries a continuation manifest; stamp it onto each released
+	// item IN the release pass (transactional — a separate stamping pass could
+	// be lost between crash and re-claim). Missing manifest ⇒ no-op; a corrupt
+	// one is loud but never blocks the release itself.
+	var contStamp *continuation.Continuation
+	if c, ok, merr := continuation.ReadManifest(filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))); merr != nil {
+		opts.logf("WARN: ", "release-cycle: continuation manifest unreadable for cycle %d: %v (items release unstamped)", cycle, merr)
+	} else if ok {
+		contStamp = &c
+	}
+
 	files, _ := os.ReadDir(cycleDir)
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 	for _, f := range files {
@@ -661,6 +674,9 @@ func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quaran
 		if quar != nil {
 			if count, bumpErr := bumpFailureCount(src, reason); bumpErr == nil &&
 				ShouldQuarantine(count, quar.ceiling, quar.systemLevel) {
+				// Quarantine is terminal parking — shed any continuation stamp
+				// so an operator revival starts fresh (ADR-0076 slice C).
+				_ = updateItemJSON(src, func(m map[string]json.RawMessage) { delete(m, "continuation") })
 				if pr, pErr := Promote(opts, taskID, "quarantine", PromoteOpts{Cycle: fmt.Sprintf("%d", cycle)}); pErr == nil && !pr.NoOp {
 					opts.logf("", "quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", base, count, quar.ceiling, cycle)
 					res.Recovered++
@@ -676,6 +692,14 @@ func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quaran
 			continue
 		}
 
+		if contStamp != nil {
+			if serr := updateItemJSON(src, func(m map[string]json.RawMessage) {
+				cb, _ := json.Marshal(contStamp)
+				m["continuation"] = cb
+			}); serr != nil {
+				opts.logf("WARN: ", "release-cycle: continuation stamp failed for %s: %v (releasing unstamped)", base, serr)
+			}
+		}
 		if mvErr := os.Rename(src, dest); mvErr != nil {
 			opts.logf("WARN: ", "release-cycle: mv failed for %s (leaving in processing/cycle-%d/): %v", base, cycle, mvErr)
 			continue

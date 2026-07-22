@@ -458,3 +458,4 @@
 # and action vocabulary are named+exercised by dispositionrouter_test.go +
 # apicover_named_test.go. Imports only stdlib + adapters/flock.
 ./internal/dispositionrouter
+./internal/continuation
