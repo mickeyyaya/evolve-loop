@@ -165,3 +165,44 @@ func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fa
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: assemble failure digest (cycle %d): %v\n", cycle, derr)
 	}
 }
+
+// verdictFailDistinguisher extracts per-failure content for the verdict-path
+// fallback reason so distinct failures never share a fingerprint (cycles
+// 1054/1060: a constant fallback string collided two different tasks' audit
+// FAILs — a third would have false-tripped the identical-fingerprint breaker
+// rule). Layered, best-effort, deterministic: committed task ids first, then
+// the audit report's first defect-ish line. STABLE across recurrences of the
+// same defect (never cycle numbers — those would blind the breaker to real
+// repeats). Empty when no artifact offers content (documented residual).
+func verdictFailDistinguisher(workspace string) string {
+	if raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json")); err == nil {
+		var d struct {
+			TopN []struct {
+				ID string `json:"id"`
+			} `json:"top_n"`
+		}
+		if json.Unmarshal(raw, &d) == nil && len(d.TopN) > 0 {
+			ids := make([]string, 0, len(d.TopN))
+			for _, c := range d.TopN {
+				if c.ID != "" {
+					ids = append(ids, c.ID)
+				}
+			}
+			if len(ids) > 0 {
+				return "tasks=" + strings.Join(ids, ",")
+			}
+		}
+	}
+	if raw, err := os.ReadFile(filepath.Join(workspace, "audit-report.md")); err == nil {
+		for _, line := range strings.Split(string(raw), "\n") {
+			t := strings.TrimSpace(line)
+			if strings.HasPrefix(t, "- D") || strings.HasPrefix(t, "- **D") {
+				if len(t) > 160 {
+					t = t[:160]
+				}
+				return "defect=" + t
+			}
+		}
+	}
+	return ""
+}

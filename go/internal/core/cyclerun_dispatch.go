@@ -63,8 +63,13 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		// failure digest must exist BEFORE the retro agent runs — it is the
 		// identity the disposition gate cross-checks and the blocker breaker
 		// reads. Idempotent with the phase-error path in recordFailureLearning.
-		cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath,
-			string(cr.current), fmt.Sprintf("phase %s verdict FAIL routed to retro (agent-graded; see the %s report artifact)", cr.current, cr.current))
+		reason := fmt.Sprintf("phase %s verdict FAIL routed to retro (agent-graded; see the %s report artifact)", cr.current, cr.current)
+		if d := verdictFailDistinguisher(cr.cs.WorkspacePath); d != "" {
+			// Fold per-failure content into the fingerprint input so distinct
+			// failures never collide (cycles 1054/1060 false-identical pin).
+			reason += " " + d
+		}
+		cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath, string(cr.current), reason)
 	}
 
 	// CB.1 (concurrency campaign W4): EVERY phase runs with cwd = the cycle
