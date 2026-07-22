@@ -1,0 +1,152 @@
+{
+  "cycle": 1058,
+  "run_id": "01KY532XN8NT11APJG0R50ZDB9",
+  "goal": "Drain the inbox strictly by weight on the hardened stack (diff-scoped floor + seed backfill + unskippable epilogue all live). Structural band first: retro-artifact-budget-perphase, ship-landed verification floor, disposition router S3+S4 (wire retrofile + recurrence escalation with live-path proofs), iteration-state-coherence-sentinel, pre-dispatch AC authoring guard. Then the token-efficiency stack. Every fix: TDD red-first, regression test, adversarial audit, wiring proof in the composed path. No inert API. Tests must NEVER mutate the live repo tree.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 113236,
+      "started_at": "2026-07-22T14:20:53Z",
+      "ended_at": "2026-07-22T14:22:46Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2299,
+        "cache_read": 322223,
+        "cache_write": 39432
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 226860,
+      "started_at": "2026-07-22T14:22:47Z",
+      "ended_at": "2026-07-22T14:26:34Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 323821,
+      "started_at": "2026-07-22T14:26:34Z",
+      "ended_at": "2026-07-22T14:31:58Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 47,
+        "output": 19521,
+        "cache_read": 1712943,
+        "cache_write": 70970
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 42091,
+      "started_at": "2026-07-22T14:31:58Z",
+      "ended_at": "2026-07-22T14:37:44Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 188726,
+      "started_at": "2026-07-22T14:37:44Z",
+      "ended_at": "2026-07-22T14:40:53Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 21,
+        "output": 9898,
+        "cache_read": 599092,
+        "cache_write": 47552
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1058",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 894734,
+    "phase_count": 5,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 323821,
+    "by_archetype_ms": {
+      "build": 42091,
+      "control": 188726,
+      "plan": 663917
+    },
+    "total_tokens": {
+      "input": 80,
+      "output": 31718,
+      "cache_read": 2634258,
+      "cache_write": 157954
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 21,
+        "output": 9898,
+        "cache_read": 599092,
+        "cache_write": 47552
+      },
+      "plan": {
+        "input": 59,
+        "output": 21820,
+        "cache_read": 2035166,
+        "cache_write": 110402
+      }
+    },
+    "wasted_tokens": {
+      "input": 21,
+      "output": 9898,
+      "cache_read": 599092,
+      "cache_write": 47552
+    },
+    "cache_hit_ratio": 0.9999696318391945
+  }
+}
