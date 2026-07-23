@@ -66,15 +66,27 @@ func (r *buildFloorReviewer) Review(ctx context.Context, in ReviewInput) ReviewR
 	return ReviewResult{Approve: false, Retry: true, Reason: reason}
 }
 
-// DefaultBuildFloorChecks is the production deterministic engine: it reuses
-// the EXACT selfcheck machinery the advisory post-build binding runs
+// DefaultBuildFloorChecks is the production deterministic engine: the
+// changed-package selfcheck engine plus every check that must run REGARDLESS
+// of the changed set. RemovalClaimFailures is deliberately composed OUTSIDE
+// changedPackageFloorChecks: that engine returns early when the diff yields no
+// Go test packages, and a build whose only claim is "I deleted X" derives
+// exactly zero packages — the early return is the precise blind spot a false
+// removal claim would hide behind (cycle-660).
+func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
+	out := RemovalClaimFailures(ctx, in)
+	return append(out, changedPackageFloorChecks(ctx, in)...)
+}
+
+// changedPackageFloorChecks reuses the EXACT selfcheck machinery the advisory
+// post-build binding runs
 // (changedWorktreePaths → changedGoTestPackages → runBuildSelfCheck with the
 // real go-test runner) — the flip from advisory to rejecting is the whole
 // change (the cycle-1008 smoking gun: the artifact recorded the failure and
 // nothing acted on it). Returns one line per failing package. Any inability
 // to run (no worktree, no packages) is GREEN — fail-open, downstream gates
 // stay armed.
-func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
+func changedPackageFloorChecks(ctx context.Context, in ReviewInput) []string {
 	if in.Worktree == "" {
 		return nil
 	}

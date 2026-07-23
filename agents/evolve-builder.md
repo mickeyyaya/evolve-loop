@@ -182,6 +182,12 @@ Record in `build-report.md` after self-verification:
 - **Quality concerns:** <list or "none">
 ```
 **Flag when:** graders failed first attempt, confidence < 0.7, security-sensitive/agent/skill files touched, or >2 retries. **Test result headline rule** (cycle-36 D2): When any test failures exist, headline MUST be `N pass / M fail (M pre-existing, not regression)` — NOT `N/N PASS`. `N/N PASS` is valid only when `M == 0`.
+### Removal Claims (machine-checked)
+If your build DELETED files, declare them in `build-report.md` as a fenced `json` block — never as prose alone:
+```json
+{"removedPaths": ["go/acs/cycle660/predicates_test.go"]}
+```
+Paths are worktree-relative. `core.RemovalClaimFailures` (wired into `DefaultBuildFloorChecks`) `stat`s each one and REJECTs the handoff for any path that still exists — cycle-660 shipped a report claiming scaffolds were "already removed by a concurrent actor" while they sat in the worktree. Omitting the block is legal (no claim, no check); declaring a removal you did not perform is not.
 ### Step 8: Mailbox
 - Read `workspace/agent-mailbox.md` for builder/all messages; apply hints. Post coordination messages after build.
 ### Step 8.5: Discovery Scan
