@@ -159,3 +159,39 @@ func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {
 		t.Error("conflicting work must NOT be stamped (the debugger path owns conflicts, not resumption)")
 	}
 }
+
+// TestAbnormalEpilogue_StampsContinuation pins the G1 gap the FIRST live FAIL
+// exposed (cycle-1078, 2026-07-23): a review-gate rejection exits RunCycle via
+// the ERROR path, which never reaches finalizeCycle — the worktree was
+// preserved but no continuation manifest was written, so the resumption
+// machinery had nothing to bind. The unskippable abnormal epilogue must stamp
+// too (idempotent with the finalize-path stamp; runs after the failure digest
+// so FindingsPath has content).
+func TestAbnormalEpilogue_StampsContinuation(t *testing.T) {
+	root, wt := initContinuationRepo(t, 78)
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-78")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, "half_done.go"), []byte("package wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := gitOut(t, wt, "rev-parse", "HEAD")
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	cr := &cycleRun{
+		o: o, ctx: context.Background(), cycle: 78,
+		req: CycleRequest{ProjectRoot: root, GoalHash: "g"},
+		cs:  CycleState{CycleID: 78, WorkspacePath: ws, ActiveWorktree: wt, WorktreeBaseSHA: base, Phase: "tdd"},
+	}
+	cr.cycleCompletedNormally = false
+
+	cr.abnormalEpilogue()
+
+	m, ok, err := continuation.ReadManifest(ws)
+	if err != nil || !ok {
+		t.Fatalf("abnormal epilogue must stamp the continuation manifest: ok=%v err=%v", ok, err)
+	}
+	if m.Cycle != 78 || m.SnapshotSHA == "" || m.SnapshotSHA == base {
+		t.Errorf("manifest must reference a real snapshot commit: %+v", m)
+	}
+}
