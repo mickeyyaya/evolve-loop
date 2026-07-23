@@ -80,6 +80,11 @@ type loopConfig struct {
 	SkipPreflight     bool `json:"skip_preflight,omitempty"`
 	SkipPreflightBoot bool `json:"skip_preflight_boot,omitempty"`
 	BypassPolicy      bool `json:"bypass_policy,omitempty"`
+	// ChainMode is the resolved batch-chaining opt-in: the --until-inbox-empty
+	// CLI parameter ORed with policy.json chain.enabled. When set, runLoop
+	// drives runLoopBatch repeatedly at the batch boundary (cmd_loop_chain.go)
+	// instead of returning after one batch and waiting for an operator relaunch.
+	ChainMode bool `json:"chain_mode,omitempty"`
 	// PerAgentCLI / PerAgentModel are the parsed `--cli` / `--model`
 	// repeatable launch flags (Workstream G2). Each entry maps a profile
 	// agent name (e.g. "auditor", "tdd-engineer") to the CLI / model that
@@ -114,12 +119,37 @@ func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
 	lr.emit(stdout)
 }
 
-func runLoop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+// runLoop is the `evolve loop` entry point. It parses once, resolves chain
+// mode (CLI parameter ORed with policy.json chain.enabled), and then either
+// runs exactly ONE batch — byte-identical to the pre-chain contract — or hands
+// off to the outer chaining loop in cmd_loop_chain.go. Chaining is never
+// entered implicitly: an absent flag and an absent policy block both leave it
+// off.
+func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfg, rc := parseLoopArgs(args, stderr)
 	if rc != 0 {
 		return rc
 	}
+	chainCfg := loadChainConfig(cfg.EvolveDir)
+	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled
 
+	// --dry-run only prints the resolved config (which now carries chain_mode),
+	// and --resume is a single-cycle protocol that reads its own checkpoint —
+	// neither chains. Say so rather than silently ignoring the operator's ask.
+	if cfg.ChainMode && cfg.Resume {
+		fmt.Fprintln(stderr, "[chain] --resume runs a single batch; chaining is not applied to a resumed cycle — relaunch with --until-inbox-empty once it completes")
+	}
+	if cfg.ChainMode && !cfg.DryRun && !cfg.Resume {
+		return runLoopChain(cfg, chainCfg, stdin, stdout, stderr)
+	}
+	return runLoopBatch(cfg, stdin, stdout, stderr)
+}
+
+// runLoopBatch runs exactly one batch of cycles: the historical runLoop body,
+// unchanged apart from taking an already-parsed config (the chain loop reuses
+// the SAME config value for every batch, which is what keeps fleet width and
+// every other per-batch setting identical across the chain).
+func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// First-run onboarding nudge (non-blocking; defaults work without setup).
 	maybePrintSetupNudge(stderr, cfg.EvolveDir)
 

@@ -32,6 +32,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		skipPreflight     bool
 		skipPreflightBoot bool
 		bypassPolicy      bool
+		untilInboxEmpty   bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
@@ -47,6 +48,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
 	fs.BoolVar(&skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
 	fs.BoolVar(&skipPreflightBoot, "skip-preflight-boot", false, "run cheap checks but skip the real bridge-boot probe (CI/offline)")
+	fs.BoolVar(&untilInboxEmpty, "until-inbox-empty", false, "chain batches: after each batch, start another until the inbox drains (bounded by policy.json chain.max_batches; .evolve/loop-stop brakes it)")
 	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 
 	// WS-G2 repeatable per-agent overrides:
@@ -180,6 +182,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		SkipPreflight:     skipPreflight,
 		SkipPreflightBoot: skipPreflightBoot,
 		BypassPolicy:      bypassPolicy,
+		ChainMode:         untilInboxEmpty,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}, 0

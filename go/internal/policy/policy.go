@@ -193,6 +193,10 @@ type Policy struct {
 	// concurrency, and the todo-source strategy. Absent ⇒ Count=1 —
 	// byte-identical to today's single-cycle sequential execution.
 	Fleet *FleetPolicy `json:"fleet,omitempty"`
+	// Chain configures batch chaining for `evolve loop --until-inbox-empty`
+	// (cycle 1075). Absent ⇒ chaining off with the compiled max_batches cap.
+	// See policy_chain.go.
+	Chain *ChainPolicy `json:"chain,omitempty"`
 	// GoalStall configures the goal-stall escalation: after N consecutive
 	// empty/blocked (non-shipping) cycles on the SAME goal, the loop stops
 	// blindly re-dispatching it and self-files a weighted inbox todo naming the
