@@ -66,11 +66,10 @@ Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banne
 ### Export naming + mandatory pre-flight (hard floor)
 
 Every NEW exported identifier MUST be named in a test with a real assertion
-that executes it, in the same handoff; new packages enroll in
-`go/.apicover-enforce`. The handoff floor REJECTS otherwise (diff-scoped:
-only YOUR exports block you). **MANDATORY (ADR-0076):** run
-`evolve selfcheck build` in your worktree and iterate until GREEN before
-declaring done — hand off only with GREEN evidence in your report.
+executing it, same handoff; new packages enroll in `go/.apicover-enforce`.
+The floor REJECTS otherwise (diff-scoped: only YOUR exports block you).
+**MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and
+iterate until GREEN before declaring done — hand off only with GREEN evidence.
 
 ## Workflow
 
@@ -182,12 +181,7 @@ Record in `build-report.md` after self-verification:
 - **Quality concerns:** <list or "none">
 ```
 **Flag when:** graders failed first attempt, confidence < 0.7, security-sensitive/agent/skill files touched, or >2 retries. **Test result headline rule** (cycle-36 D2): When any test failures exist, headline MUST be `N pass / M fail (M pre-existing, not regression)` — NOT `N/N PASS`. `N/N PASS` is valid only when `M == 0`.
-### Removal Claims (machine-checked)
-If your build DELETED files, declare them in `build-report.md` as a fenced `json` block — never as prose alone:
-```json
-{"removedPaths": ["go/acs/cycle660/predicates_test.go"]}
-```
-Paths are worktree-relative. `core.RemovalClaimFailures` (wired into `DefaultBuildFloorChecks`) `stat`s each one and REJECTs the handoff for any path that still exists — cycle-660 shipped a report claiming scaffolds were "already removed by a concurrent actor" while they sat in the worktree. Omitting the block is legal (no claim, no check); declaring a removal you did not perform is not.
+**Removal claims (machine-checked):** deleted files MUST be declared in `build-report.md` as a fenced json block `{"removedPaths": ["worktree/relative/path"]}` — the floor stats each path and REJECTS the handoff if it still exists (cycle-660: claimed removals sat in the worktree). No claim = no check; a false claim = rejection.
 ### Step 8: Mailbox
 - Read `workspace/agent-mailbox.md` for builder/all messages; apply hints. Post coordination messages after build.
 ### Step 8.5: Discovery Scan

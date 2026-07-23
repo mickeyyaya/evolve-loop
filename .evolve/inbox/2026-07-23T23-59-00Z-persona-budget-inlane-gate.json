@@ -1,0 +1,13 @@
+{
+  "id": "persona-budget-inlane-gate",
+  "title": "Persona size budget must gate IN-LANE when agents/*.md change — not redden main post-ship",
+  "kind": "pipeline-integrity",
+  "priority": "high",
+  "weight": 0.9,
+  "campaign": "convergence-2026-07",
+  "files": ["go/internal/prompts/persona_stopcriterion_dedupe_test.go", "go/internal/core/build_floor_reviewer.go", "go/internal/ciparity/ciparity.go"],
+  "connects_to": ["warnship-apicover-ci-gap", "acs-predicate-compile-gate-at-build-exit"],
+  "route": "lane",
+  "injected_by": "console-batch11-triage",
+  "notes": "THIRD instance of the per-cycle-gate ≠ repo-wide-gate class (warnship-apicover-ci-gap lineage): TestPersonaStopCriterionDedupe_CombinedLineCountReduced pins a 751-line combined budget on agents/evolve-{scout,builder,auditor}.md, but agents/*.md is not a Go package, so a lane growing a persona doc passes its diff-scoped ACS and reddens main's go workflow post-ship (2026-07-23: slice-B additions did it, then cycle-107x removal-claims did it again same day; both fixed console-first by compression). Fix the CLASS: when the cycle diff touches agents/evolve-*.md, run the internal/prompts package tests as part of the build floor (DefaultBuildFloorChecks entry keyed on changed paths → evolve selfcheck build inherits it), so the builder sees the budget breach in-session and compresses before handoff."
+}
