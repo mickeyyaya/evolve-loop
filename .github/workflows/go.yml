@@ -6,11 +6,13 @@ on:
     paths:
       - 'go/**'
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
+      - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.github/workflows/go.yml'
   pull_request:
     paths:
       - 'go/**'
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
+      - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.github/workflows/go.yml'
 
 permissions:
