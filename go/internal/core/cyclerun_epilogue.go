@@ -38,6 +38,12 @@ func (cr *cycleRun) abnormalEpilogue() {
 		[]SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase " + cr.cs.Phase}}); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)
 	}
+	// ADR-0076 slice C (G1, cycle-1078): error-path aborts never reach
+	// finalizeCycle, so the preserved worktree would carry no continuation
+	// manifest and the resumption machinery would have nothing to bind. Stamp
+	// here too — after the failure digest above, so FindingsPath has content.
+	// Idempotent with the finalize-path stamp; no-op when no worktree exists.
+	cr.o.stampContinuationManifest(epilogueCtx, cr.cs, cr.cycle, cr.req.ProjectRoot)
 	// State floor: the canonical record must never claim a live phase for a
 	// dead cycle (the two-hour stale phase=retro residue).
 	cr.cs.Phase = "aborted"
