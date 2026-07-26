@@ -747,6 +747,7 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		}
 	}
 	paths = kept
+	paths = dropIgnoredPaths(ctx, opts, res, root, paths)
 
 	args := make([]string, 0, len(prefix)+3+len(paths))
 	args = append(args, prefix...)
@@ -780,6 +781,56 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",
 		len(paths), len(manifest), len(changed)))
 	return nil
+}
+
+// dropIgnoredPaths removes pathspec entries git refuses to stage: a declared
+// path matched by .gitignore makes `git add` exit 1 ("The following paths are
+// ignored by one of your .gitignore files") even though it stages the other
+// paths first. Cycle-1101: the eval-quality contract puts the cycle's
+// `.evolve/evals/<slug>.md` in every test-report, .evolve/* is ignored BY
+// DESIGN (runtime state, never committed), so every green cycle's declared
+// manifest carried a refusal — a deterministic ship-killer. `check-ignore`
+// rc 0 lists the ignored subset one-per-line; rc 1 means none (both are
+// success for captureGitOutput). NOT `-z`: that flag is stdin-mode-only
+// (`fatal: -z only makes sense with --stdin`, rc=128 — adversarial review
+// caught the probe failing open on EVERY ship). Newline parsing is safe:
+// pathToken's charset (manifest.go) cannot produce spaces, quotes, or
+// newlines, so git never C-quotes these paths. A broken probe fails OPEN with
+// the full set and a loud log: the probe must never block ship — if the
+// refusal survives, the add's own stderr now travels in the ship error.
+func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root string, paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+	probe := append([]string{"check-ignore", "--"}, paths...)
+	out, err := captureGitOutputAtDir(ctx, opts, root, probe...)
+	if err != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf(
+			"[ship] WARN: check-ignore probe failed (%v) — staging the full declared set", err))
+		return paths
+	}
+	ignored := map[string]bool{}
+	for _, p := range strings.Split(out, "\n") {
+		if p = strings.TrimSpace(p); p != "" {
+			ignored[p] = true
+		}
+	}
+	if len(ignored) == 0 {
+		return paths
+	}
+	kept := make([]string, 0, len(paths))
+	var dropped []string
+	for _, p := range paths {
+		if ignored[p] {
+			dropped = append(dropped, p)
+			continue
+		}
+		kept = append(kept, p)
+	}
+	res.Logs = append(res.Logs, fmt.Sprintf(
+		"[ship] dropped %d gitignored declared path(s) from staging: %s",
+		len(dropped), strings.Join(dropped, " ")))
+	return kept
 }
 
 // stageReleaseSet stages the explicit release pathspec: the versionbump

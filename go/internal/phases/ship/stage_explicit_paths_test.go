@@ -38,6 +38,11 @@ import (
 type porcelainCapture struct {
 	calls     [][]string
 	porcelain string
+	// ignored: paths `git check-ignore` reports as gitignored (one per line,
+	// matching production's argv mode — `-z` is stdin-only). checkIgnoreRC !=
+	// 0 forces that exit code for the probe (broken-probe fail-open test).
+	ignored       []string
+	checkIgnoreRC int
 }
 
 func (c *porcelainCapture) runner() CmdRunner {
@@ -56,6 +61,23 @@ func (c *porcelainCapture) runner() CmdRunner {
 				_, _ = io.WriteString(stdout, c.porcelain)
 			}
 			return 0, nil
+		case slices.Contains(args, "check-ignore"):
+			if c.checkIgnoreRC != 0 {
+				return c.checkIgnoreRC, nil
+			}
+			var hit bool
+			for _, p := range c.ignored {
+				if slices.Contains(args, p) {
+					if stdout != nil {
+						_, _ = io.WriteString(stdout, p+"\n")
+					}
+					hit = true
+				}
+			}
+			if hit {
+				return 0, nil
+			}
+			return 1, nil // none ignored
 		}
 		return 0, nil
 	}
