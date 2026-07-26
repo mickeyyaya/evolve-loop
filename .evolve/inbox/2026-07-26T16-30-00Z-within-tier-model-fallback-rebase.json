@@ -1,0 +1,13 @@
+{
+  "id": "within-tier-model-fallback-rebase",
+  "title": "Re-land within-tier model failover (Fable 5 → Opus on exit-85) across the post-#361 engine refactor",
+  "kind": "feature",
+  "priority": "medium",
+  "weight": 0.68,
+  "campaign": "exhaustion-2026-07",
+  "files": ["go/internal/bridge/engine.go", "go/internal/bridge/model_failover.go", "go/internal/modelcatalog/catalog.go"],
+  "connects_to": ["exhaustion-regex-anchor-hardening"],
+  "route": "lane",
+  "injected_by": "console-2026-07-26-salvage-review",
+  "notes": "PR #334 (branch feat/within-tier-model-fallback, worktree evolve-loop-modelfallback) implements within-tier model failover — on a per-model exit-85 wall, retry the SAME tier's next model (Fable 5 → Opus) before falling a tier — with model_failover.go + DispatchModelChain in modelcatalog. It went CONFLICTING after #361's Engine.Launch extraction (BudgetScale threading, launchArgs) rewrote engine.go. The design and tests are the reference; re-implement against current engine structure rather than textual rebase. Complements the landed cross-tier fallback (#331 fable/opus→sonnet): within-tier preserves capability class before degrading. Note the 2026-07-26 weekly-wall lesson: WEEKLY limits wall ALL models on the account — within-tier failover only helps per-MODEL walls, so the failover trigger must distinguish per-model vs account-wide wording (see manifest_exhaustion_wording_test.go branches) and skip futile within-tier retries on weekly walls. Close/supersede PR #334 when landed."
+}

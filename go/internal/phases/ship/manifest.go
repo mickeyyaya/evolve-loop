@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -85,10 +86,24 @@ func extractReportPaths(md string) []string {
 		if start > 0 && isPathContinuationByte(md[start-1]) {
 			continue
 		}
-		m := strings.Trim(md[start:end], ".")
-		if m != "" {
-			seen[m] = true
+		// Trailing dots are sentence punctuation. Leading "./" is the explicit
+		// relative prefix ("$ ./go/bin/evolve selfcheck build" — the slice-B
+		// pre-flight line every build-report carries) and normalizes to the
+		// repo-relative path. A blind Trim(m, ".") here turned that token into
+		// the ABSOLUTE pathspec "/go/bin/evolve" → `git add` fatal rc=128
+		// ("Invalid path '/go'") → cycle-1098's audited-PASS work stranded.
+		m := strings.TrimRight(md[start:end], ".")
+		for strings.HasPrefix(m, "./") {
+			m = m[2:]
 		}
+		// A residual leading ".." is either a repo escape ("../x") or ellipsis
+		// punctuation glued to a token ("...x/y.go", "..foo/bar") — never a
+		// declarable repo path. Dropping beats the old blind Trim, which
+		// mangled these into plausible-but-wrong entries.
+		if strings.HasPrefix(m, "..") || !isRepoRelative(m) {
+			continue // absolute or repo-escaping — never a manifest entry
+		}
+		seen[m] = true
 	}
 	out := make([]string, 0, len(seen))
 	for p := range seen {
@@ -132,6 +147,23 @@ func declaredManifest(workspacePath string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// isRepoRelative reports whether p can be handed to git as a repo-relative
+// pathspec. Absolute ("/go/evolve") and repo-escaping ("../x", including
+// interior escapes like "a/../../etc/x" — git: "is outside repository",
+// rc=128) entries are the cycle-1098 `git add` fatal class: git canonicalizes
+// them against the FILESYSTEM, not the repo root. The check runs on the
+// path.Clean'd form so interior ".." segments cannot smuggle an escape past a
+// prefix test. SSOT for the extraction filter (extractReportPaths) and the
+// staging seam (stagePathspec).
+func isRepoRelative(p string) bool {
+	if p == "" || strings.HasPrefix(p, "/") {
+		return false
+	}
+	c := path.Clean(p)
+	return c != "" && c != "." && !strings.HasPrefix(c, "/") &&
+		c != ".." && !strings.HasPrefix(c, "../")
 }
 
 // manifestCovers reports whether some manifest entry covers p — exactly, or as
@@ -214,10 +246,21 @@ func stagePathspec(manifest, changed []string, isFile func(string) bool) []strin
 	}
 	staged := map[string]bool{}
 	for _, d := range manifest {
+		// Defense in depth vs extractReportPaths' own filter: a manifest entry
+		// from an older serialized source (a pre-fix continuation union) must
+		// still never reach git argv as an absolute/escaping pathspec — the
+		// isFile probe resolves such entries INSIDE root (filepath.Join swallows
+		// the leading slash), so it cannot be the guard.
+		if !isRepoRelative(d) {
+			continue
+		}
 		if changedSet[d] || isFile(d) {
 			staged[d] = true
 		}
 	}
+	// changed comes from `git status --porcelain` at the tree root — always
+	// repo-relative by construction (same trust the len==0 and empty-staged
+	// fallbacks below already place in it), so no isRepoRelative re-check.
 	for _, c := range changed {
 		if manifestCovers(manifest, c) {
 			staged[c] = true

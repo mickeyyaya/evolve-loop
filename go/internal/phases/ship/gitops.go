@@ -12,6 +12,7 @@
 package ship
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -756,11 +757,24 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	// re-stages), which broke every boundary ship after this rework landed.
 	args = append(args, "add", "-A", "--")
 	args = append(args, paths...)
-	exit, runErr := opts.run(ctx, "git", args, io.Discard, opts.Stderr)
+	// Tee stderr into a bounded buffer so the failure REASON travels in the
+	// ship error (failure digest, retro, escalation report) — cycle-1098's
+	// `fatal: Invalid path '/go'` was only visible in the lane log while the
+	// error said `git add failed (rc=128): <nil>`.
+	var errTail bytes.Buffer
+	stderr := io.Writer(&errTail)
+	if opts.Stderr != nil {
+		stderr = io.MultiWriter(opts.Stderr, &errTail)
+	}
+	exit, runErr := opts.run(ctx, "git", args, io.Discard, stderr)
 	if runErr != nil || exit != 0 {
+		tail := strings.TrimSpace(errTail.String())
+		if len(tail) > 300 {
+			tail = "…" + tail[len(tail)-300:]
+		}
 		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship: git add failed (rc=%d): %v", exit, runErr),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(runErr), "worktree", dir)
+			fmt.Sprintf("ship: git add failed (rc=%d): %v: %s", exit, runErr, tail),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(runErr), "git_stderr", tail, "worktree", dir)
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf(
 		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",

@@ -1,0 +1,13 @@
+{
+  "id": "gitstage-deterministic-classification",
+  "title": "GIT_STAGE_FAILED is always classified transient — deterministic pathspec fatals burn the retry budget",
+  "kind": "pipeline-integrity",
+  "priority": "medium",
+  "weight": 0.74,
+  "campaign": "convergence-2026-07",
+  "files": ["go/internal/phases/ship/gitops.go", "go/internal/core/ship_recovery.go", "go/internal/shiperr/shiperr.go"],
+  "connects_to": ["continuation-nonclaim-scope-binding"],
+  "route": "lane",
+  "injected_by": "console-2026-07-27-pathspec-fix",
+  "notes": "Cycle-1098 (2026-07-27): stageExplicitPaths fed git an absolute pathspec ('/go/bin/evolve' from report-token mangling, root-cause fixed console-first the same day) and git fataled rc=128 deterministically. shipErr hardcodes core.ShipClassTransient for GIT_STAGE_FAILED, so recovery retried the byte-identical add twice (budget 2) before aborting — pure burn, and the failure-digest recorded a 'transient' that was nothing of the sort. Design a classification seam: rc=128 with stderr matching git's deterministic fatals (Invalid path, is outside repository, pathspec ... did not match) => config/deterministic class (no retry, straight to retro with the git_stderr field the same fix added); genuine transient shapes (index.lock contention: 'Unable to create .../index.lock', 'File exists') stay transient. Pin both classes with fixtures from real git stderr. Do NOT regex-classify on the message the Go code composes — classify on the captured git_stderr."
+}
