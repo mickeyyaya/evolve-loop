@@ -66,26 +66,58 @@ func loadChainConfig(evolveDir string) policy.ChainConfig {
 }
 
 // inboxPendingCount counts unclaimed inbox items — the `*.json` files directly
-// under .evolve/inbox. Lifecycle subdirectories (processing/, processed/,
-// consumed/, quarantine/, …) are not pending work and are skipped. A MISSING
-// inbox is legitimately zero pending; any other read error is returned so the
-// caller stops loudly rather than chaining on a guess.
-func inboxPendingCount(evolveDir string) (int, error) {
-	ents, err := os.ReadDir(filepath.Join(evolveDir, "inbox"))
+// under .evolve/inbox that actually PARSE as an inbox item. Lifecycle
+// subdirectories (processing/, processed/, consumed/, quarantine/, …) and
+// non-json files are not pending work and stay invisible. A root-level `*.json`
+// that is not an item (truncated, 0-byte, a top-level array, no `id`) is
+// returned by NAME in skipped rather than counted: counting it would pin
+// pending>0 permanently and burn the chain to max_batches consuming nothing,
+// and swallowing it would hide a real item lost to a typo. A MISSING inbox is
+// legitimately zero pending; any other read error is returned so the caller
+// stops loudly rather than chaining on a guess.
+//
+// The skip list is RETURNED, not printed, so this stays a pure function and the
+// operator diagnostic lives at the call site (runLoopChain).
+func inboxPendingCount(evolveDir string) (int, []string, error) {
+	dir := filepath.Join(evolveDir, "inbox")
+	ents, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, nil
+			return 0, nil, nil
 		}
-		return 0, fmt.Errorf("read inbox: %w", err)
+		return 0, nil, fmt.Errorf("read inbox: %w", err)
 	}
 	n := 0
+	var skipped []string
 	for _, e := range ents {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
 			continue
 		}
-		n++
+		if isInboxItemFile(filepath.Join(dir, e.Name())) {
+			n++
+			continue
+		}
+		skipped = append(skipped, e.Name())
 	}
-	return n, nil
+	return n, skipped, nil
+}
+
+// isInboxItemFile reports whether a root-level `*.json` is a real inbox item: a
+// JSON OBJECT carrying a non-empty `id` (the field every inbox consumer keys
+// on). Deliberately shallow — the chain only needs "is this pending work", not
+// full schema validation, and a stricter check here would silently drop items
+// the real consumers accept.
+func isInboxItemFile(path string) bool {
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(buf, &doc); err != nil {
+		return false
+	}
+	id, _ := doc["id"].(string)
+	return strings.TrimSpace(id) != ""
 }
 
 // chainBrakeEngaged reports whether the operator dropped the `.evolve/loop-stop`
@@ -99,12 +131,22 @@ func chainBrakeEngaged(evolveDir string) bool {
 // the reason when it may not. Pure, so the precedence between the three
 // pre-batch stop conditions is testable without running a batch: the operator
 // brake outranks everything (it is an explicit instruction), then a drained
-// inbox (the success exit), then the runaway cap.
+// inbox AFTER at least one batch (the success exit), then the runaway cap.
+//
+// The `n > 0` scope on the drained-inbox exit is the min-one-batch guarantee:
+// a drained inbox is a CONTINUE condition ("we finished the work"), not a START
+// condition ("there was never any work"). Without it, opting into chaining is
+// silently WEAKER than the pre-chain contract, where `evolve loop` always ran
+// one batch — a chain launched against an already-drained inbox returned rc=0
+// having run zero cycles. The allowance is deliberately narrow: it is outranked
+// by the brake (an explicit operator instruction is never overridden by a
+// contract default) and it never widens the cap, which stays an exact ceiling
+// (a non-positive cap still runs nothing — no cap+1).
 func chainStartDecision(n, maxBatches, inboxPending int, brake bool) (reason string, stop bool) {
 	switch {
 	case brake:
 		return "chain_operator_brake", true
-	case inboxPending == 0:
+	case inboxPending == 0 && n > 0:
 		return "chain_inbox_empty", true
 	case n >= maxBatches:
 		return "chain_max_batches", true
@@ -141,12 +183,18 @@ func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout
 	exit := 0
 
 	for n := 0; ; n++ {
-		pending, err := inboxPendingCount(cfg.EvolveDir)
+		pending, skipped, err := inboxPendingCount(cfg.EvolveDir)
 		if err != nil {
 			fmt.Fprintf(stderr, "[chain] cannot read the inbox (%v) — stopping the chain rather than looping blind\n", err)
 			res.StopReason = "chain_inbox_unreadable"
 			exit = 2
 			break
+		}
+		// Fail loudly: a root-level *.json that is not an item is usually a real
+		// todo lost to a typo. Named BEFORE the stop decision so the operator
+		// sees it even on the boundary that ends the chain.
+		for _, name := range skipped {
+			fmt.Fprintf(stderr, "[chain] skipping .evolve/inbox/%s — not a valid inbox item (no parseable object with an `id`); it is NOT counted as pending work\n", name)
 		}
 		if reason, stop := chainStartDecision(n, cc.MaxBatches, pending, chainBrakeEngaged(cfg.EvolveDir)); stop {
 			res.StopReason = reason

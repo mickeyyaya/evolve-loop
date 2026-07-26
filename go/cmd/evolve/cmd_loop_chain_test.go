@@ -121,21 +121,17 @@ func TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_EmptyInboxExitsWithoutRunningABatch — AC1 edge case: a chain
-// launched against an already-empty inbox must not run a batch at all.
-func TestRunLoopChain_EmptyInboxExitsWithoutRunningABatch(t *testing.T) {
-	cfg := chainTestEnv(t, 0, "")
-	seen := stubBatches(t, func(int, loopConfig) int { return 0 })
-
-	rc, res, _ := runChain(t, cfg, policy.ChainConfig{Enabled: true, MaxBatches: 10})
-
-	if len(*seen) != 0 {
-		t.Fatalf("empty inbox must run zero batches, ran %d", len(*seen))
-	}
-	if rc != 0 || res.StopReason != "chain_inbox_empty" {
-		t.Errorf("got rc=%d reason=%q, want rc=0 chain_inbox_empty", rc, res.StopReason)
-	}
-}
+// The cycle-1075 test TestRunLoopChain_EmptyInboxExitsWithoutRunningABatch
+// asserted the OPPOSITE of today's contract: that a chain launched against an
+// already-drained inbox runs ZERO batches. Cycle 1098 (`chain-min-one-batch`)
+// judged that a defect — opting into chaining was silently weaker than the
+// pre-chain contract, where `evolve loop` always ran one batch — so the
+// behaviour it pinned is deliberately reversed, not merely relaxed. Its
+// coverage is not lost: the drained-inbox launch is now pinned by
+// TestRunLoopChain_DrainedInboxRunsExactlyOneBatch (exactly one batch, rc=0,
+// chain_inbox_empty) in cmd_loop_chain_minbatch_test.go, and the zero-batch
+// outcome it guarded survives for the case that still means it —
+// TestRunLoopChain_PreEngagedBrakeRunsZeroBatchesOnDrainedInbox.
 
 // TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching — AC2. rc=5 is the
 // batch's QUOTA-PAUSE contract (derived from core.allFamiliesQuotaExhausted).
@@ -160,7 +156,7 @@ func TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching(t *testing.T) {
 	if !strings.Contains(stderr, "DEFERRING, not relaunching") || !strings.Contains(stderr, "evolve loop --resume") {
 		t.Errorf("quota stop must announce the deferral + resume path; stderr=%s", stderr)
 	}
-	if n, _ := inboxPendingCount(cfg.EvolveDir); n != 3 {
+	if n, _, _ := inboxPendingCount(cfg.EvolveDir); n != 3 {
 		t.Errorf("quota deferral must leave the inbox untouched, pending=%d want 3", n)
 	}
 }
@@ -324,16 +320,18 @@ func TestChainContinueDecision(t *testing.T) {
 }
 
 // TestInboxPendingCount pins that only unclaimed top-level todos count, and
-// that a missing inbox is zero rather than an error.
+// that a missing inbox is zero rather than an error. Cycle 1098 added the third
+// return value (the skip list); well-formed fixtures must produce NO skips —
+// shape validation must not start rejecting real items.
 func TestInboxPendingCount(t *testing.T) {
 	cfg := chainTestEnv(t, 4, "")
-	n, err := inboxPendingCount(cfg.EvolveDir)
-	if err != nil || n != 4 {
-		t.Fatalf("inboxPendingCount = (%d,%v), want (4,nil) — subdirs and non-json files must not count", n, err)
+	n, skipped, err := inboxPendingCount(cfg.EvolveDir)
+	if err != nil || n != 4 || len(skipped) != 0 {
+		t.Fatalf("inboxPendingCount = (%d,%v,%v), want (4,[],nil) — subdirs and non-json files must not count, and valid items must not be skipped", n, skipped, err)
 	}
-	n, err = inboxPendingCount(filepath.Join(t.TempDir(), "nope"))
-	if err != nil || n != 0 {
-		t.Fatalf("missing inbox = (%d,%v), want (0,nil)", n, err)
+	n, skipped, err = inboxPendingCount(filepath.Join(t.TempDir(), "nope"))
+	if err != nil || n != 0 || len(skipped) != 0 {
+		t.Fatalf("missing inbox = (%d,%v,%v), want (0,[],nil)", n, skipped, err)
 	}
 }
 
