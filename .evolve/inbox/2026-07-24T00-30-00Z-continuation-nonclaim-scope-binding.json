@@ -1,0 +1,13 @@
+{
+  "id": "continuation-nonclaim-scope-binding",
+  "title": "Continuation-on-fail must also bind wave-planner/carryover scopes — cycle-1078 had no inbox item to stamp",
+  "kind": "pipeline-integrity",
+  "priority": "high",
+  "weight": 0.91,
+  "campaign": "convergence-2026-07",
+  "files": ["go/internal/core/continuation_stamp.go", "go/internal/inboxmover/continuation_resolve.go", "go/cmd/evolve/cmd_loop_wave.go"],
+  "connects_to": ["adr-0076-continuation-on-fail", "continuation-create-reuse-snapshot-base-guard"],
+  "route": "lane",
+  "injected_by": "console-batch11-triage",
+  "notes": "G2 from the first live FAIL under the convergence stack (cycle-1078, 2026-07-23): the failing lane's scope (chain-boundary-loop) came from the wave planner / carryoverTodos, NOT an inbox claim — no item file exists in .evolve/inbox, so the FAIL-release stamping has no target and ResolveContinuation can never bind the preserved snapshot to a future attempt. Slice C currently covers ONLY inbox-claimed scopes. Design the extension: (a) persist the continuation binding keyed by the SCOPE ID (lane-scope todo ids) in a small root-owned registry (or stamp into the carryoverTodos entry in state.json through the existing serialized RMW), and (b) teach the post-triage adoption seam to also resolve by the cycle's lane-scope ids when no processing claim carries a stamp. Keep the single continuation schema (internal/continuation); do NOT fork a second manifest format. The G1 half (error-path stamping) is implemented and CI-green in PR #363 — verify it is merged before assuming G1 on main; this item is ONLY the non-claim binding and does not depend on #363 landing first."
+}
