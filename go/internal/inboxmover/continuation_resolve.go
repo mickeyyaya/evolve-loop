@@ -50,3 +50,34 @@ func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
 	}
 	return nil
 }
+
+// ResolveContinuationForScope is the composition root's lookup once a cycle's
+// scope identity can come from either class (ADR-0076 slice C, G2). Inbox
+// claims are tried FIRST — G1's semantics are untouched, and a claim that
+// carries a stamp always wins — then the scope-id-keyed registry over scopeIDs
+// in the order the lane declares them (deterministic, so a re-run resolves the
+// same binding). A claim merely EXISTING never suppresses the fallback; only a
+// stamped one does. An entry with no snapshot ref is not resumable work, so it
+// is not a binding. A corrupt registry degrades to nil (fresh start) with a
+// loud line — the orchestrator must never crash mid-cycle over a salvage index.
+func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *continuation.Continuation {
+	if c := ResolveContinuation(opts, cycle); c != nil {
+		return c
+	}
+	opts.resolveOpts()
+	for _, id := range scopeIDs {
+		if strings.TrimSpace(id) == "" {
+			continue
+		}
+		c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
+		if err != nil {
+			fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d continuation registry unreadable (%v) — no lane-scope binding resolved\n", cycle, err)
+			return nil
+		}
+		if ok && c.SnapshotSHA != "" {
+			resolved := c
+			return &resolved
+		}
+	}
+	return nil
+}

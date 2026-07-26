@@ -366,10 +366,11 @@ type Orchestrator struct {
 	workflowConfig policy.WorkflowConfig
 
 	// continuationFor resolves the ADR-0076 slice C continuation binding for a
-	// cycle's claimed scope (composition root: the inbox mover's processing
-	// claims). Nil (default) = continuations never adopt — byte-identical
-	// provisioning.
-	continuationFor func(projectRoot string, cycle int) *continuation.Continuation
+	// cycle's scope — claimed (the inbox mover's processing claims) or, for a
+	// lane whose scope came from the wave planner, the pinned lane-scope todo
+	// ids handed in as scopeIDs. Nil (default) = continuations never adopt —
+	// byte-identical provisioning.
+	continuationFor func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation
 
 	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
 	// once from policy.json at the composition root (chronicle S3).
@@ -505,9 +506,10 @@ func WithRetryConfig(cfg policy.RetryConfig) Option {
 }
 
 // WithWorkflowConfig injects the resolved workflow policy.
-// WithContinuationResolver injects the claimed-scope continuation lookup
-// (ADR-0076 slice C). Nil is ignored — adoption stays off.
-func WithContinuationResolver(fn func(projectRoot string, cycle int) *continuation.Continuation) Option {
+// WithContinuationResolver injects the scope continuation lookup (ADR-0076
+// slice C): claimed scopes first, then the cycle's pinned lane-scope todo ids.
+// Nil is ignored — adoption stays off.
+func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation) Option {
 	return func(o *Orchestrator) {
 		if fn != nil {
 			o.continuationFor = fn

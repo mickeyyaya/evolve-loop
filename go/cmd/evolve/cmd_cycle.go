@@ -647,10 +647,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		return n
 	}))
 	// ADR-0076 C: continuation-on-fail resolve seam — the orchestrator adopts a
-	// prior FAILed attempt's salvage snapshot when this cycle's claimed scope
-	// carries one (validated in-orchestrator against live git state).
-	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int) *continuation.Continuation {
-		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)
+	// prior FAILed attempt's salvage snapshot when this cycle's scope carries
+	// one (validated in-orchestrator against live git state). Claimed scopes
+	// resolve from the processing claims; a lane whose scope came from the wave
+	// planner instead resolves from its pinned lane-scope todo ids (G2).
+	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
+		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, cycle, scopeIDs)
 	}))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))

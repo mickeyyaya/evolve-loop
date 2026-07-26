@@ -162,9 +162,9 @@ func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
 // productionResolver mirrors the composition root's closure (cmd_cycle.go)
 // byte-for-byte: the REAL inboxmover.ResolveContinuation over processing
 // claims — the composed-path proof the mock resolver could not give.
-func productionResolver(t *testing.T) func(string, int) *continuation.Continuation {
+func productionResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
-	return func(root string, cycle int) *continuation.Continuation {
+	return func(root string, cycle int, _ []string) *continuation.Continuation {
 		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)
 	}
 }

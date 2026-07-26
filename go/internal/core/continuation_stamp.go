@@ -92,7 +92,34 @@ func (o *Orchestrator) stampContinuationManifest(ctx context.Context, cs CycleSt
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: %v\n", cycle, err)
 		return
 	}
+	registerLaneScopeBinding(cs.WorkspacePath, projectRoot, m, cycle)
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: preserved work snapshot %s (branch %s) stamped for resumption\n", cycle, sha[:12], m.Branch)
+}
+
+// registerLaneScopeBinding is the non-claim half of the produce side (G2). A
+// lane whose scope came from the wave planner has no inbox item to stamp, so
+// the manifest is ALSO registered under each of the lane's pinned todo ids —
+// the only durable identity such a scope has. It rides the caller's Clean gate
+// (unresumable work never reaches here), a cycle with no lane-scope pin
+// registers nothing (no phantom keys), blank ids are skipped
+// (materializeLaneScope splits an empty env scope into [""]), and every failure
+// is a WARN: salvage bookkeeping must never fail cycle finalization.
+func registerLaneScopeBinding(workspace, projectRoot string, m continuation.Continuation, cycle int) {
+	ls := loadLaneScope(workspace)
+	if ls == nil {
+		return
+	}
+	for _, id := range ls.TodoIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if err := continuation.WriteRegistryEntry(projectRoot, id, m); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: lane-scope binding for %q not registered: %v\n", cycle, id, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: registered lane-scope binding %q → %s\n", cycle, id, m.SnapshotSHA[:12])
+	}
 }
 
 // validateContinuation re-screens a stamped continuation at adopt time: the
@@ -159,7 +186,11 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	if cr.o.continuationFor == nil {
 		return
 	}
-	c := cr.o.continuationFor(cr.req.ProjectRoot, cr.cycle)
+	var scopeIDs []string
+	if ls := loadLaneScope(cr.cs.WorkspacePath); ls != nil {
+		scopeIDs = ls.TodoIDs
+	}
+	c := cr.o.continuationFor(cr.req.ProjectRoot, cr.cycle, scopeIDs)
 	if c == nil {
 		return
 	}
