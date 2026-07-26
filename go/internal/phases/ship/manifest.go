@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -191,10 +192,39 @@ func outOfManifest(changed, manifest []string) []string {
 	return extras
 }
 
+// unquoteGitPath decodes one C-quoted path token from git's output into the
+// literal on-disk path. SSOT for every reader that classifies paths out of git
+// output (porcelainChangedPaths here, dropIgnoredPaths' ignored set in
+// gitops.go) — the isRepoRelative/manifestCovers shared-helper pattern.
+//
+// git quotes a path (core.quotePath, default true) whenever it contains a
+// non-ASCII byte, a quote, a backslash, or a control char, escaping the payload
+// with the SAME grammar Go string literals use: `\\`, `\"`, `\t`/`\n`/`\r`/…,
+// and per-BYTE octal `\NNN` (`café.txt` → `"caf\303\251.txt"`, two escapes for
+// one rune). strconv.Unquote is therefore the exact decoder, not an
+// approximation. Cycle-1108: leaving it undecoded yielded the 15-byte literal
+// `caf\303\251.txt`, a path that exists on no disk — it matched no manifest
+// entry and staged nothing.
+//
+// Decoding is CONDITIONAL on the token being wrapped in quotes on both ends:
+// an unquoted token is a path git did not escape, so its backslashes are
+// literal (`not\quoted.txt`) and touching it would corrupt the common case. A
+// token that fails to decode is likewise returned verbatim — never dropped.
+func unquoteGitPath(tok string) string {
+	if len(tok) < 2 || tok[0] != '"' || tok[len(tok)-1] != '"' {
+		return tok
+	}
+	if p, err := strconv.Unquote(tok); err == nil {
+		return p
+	}
+	return tok
+}
+
 // porcelainChangedPaths parses `git status --porcelain` output into the sorted
 // set of repo-relative paths it names. A rename entry ("R  old -> new") yields
 // BOTH sides, so an explicit staging pathspec records the deletion as well as
-// the addition.
+// the addition. Quoted entries are decoded (unquoteGitPath) so a non-ASCII path
+// is classified as the file that exists on disk.
 func porcelainChangedPaths(out string) []string {
 	seen := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
@@ -202,7 +232,7 @@ func porcelainChangedPaths(out string) []string {
 			continue
 		}
 		for _, part := range strings.Split(line[3:], " -> ") {
-			if p := strings.Trim(strings.TrimSpace(part), `"`); p != "" {
+			if p := unquoteGitPath(strings.TrimSpace(part)); p != "" {
 				seen[p] = true
 			}
 		}

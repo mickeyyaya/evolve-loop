@@ -693,6 +693,17 @@ func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args 
 	return captureGitOutput(ctx, opts, all...)
 }
 
+// rawPathRead prefixes a path-REPORTING git read with `-c core.quotePath=false`
+// so git emits non-ASCII paths raw instead of octal-escaped — the zero-parsing
+// half of the cycle-1108 fix, with unquoteGitPath (manifest.go) covering the
+// residue that flag does not suppress (embedded quotes, backslashes, control
+// chars, which stay C-quoted regardless). Config args are only legal BEFORE the
+// subcommand, which is where this puts them (captureGitOutputAtDir's own -C is
+// a global option too, so either order is accepted by git).
+func rawPathRead(args ...string) []string {
+	return append([]string{"-c", "core.quotePath=false"}, args...)
+}
+
 // stageExplicitPaths stages a non-release ship (cycle/manual/trivial) as an
 // explicit `git add -- <paths>` instead of the `git add -A` sweep both call
 // sites used before cycle-1067 (`ship-stage-explicit-paths`). The pathspec is
@@ -714,7 +725,7 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		prefix = []string{"-C", dir}
 	}
 
-	out, err := captureGitOutputAtDir(ctx, opts, root, "status", "--porcelain", "-uall")
+	out, err := captureGitOutputAtDir(ctx, opts, root, rawPathRead("status", "--porcelain", "-uall")...)
 	if err != nil {
 		return err
 	}
@@ -737,7 +748,9 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	stagedDeleted := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
 		if strings.HasPrefix(line, "D ") && len(line) > 3 {
-			stagedDeleted[strings.TrimSpace(line[3:])] = true
+			// unquoteGitPath: the key is compared against the DECODED paths
+			// stagePathspec produced, so a quoted entry must decode too.
+			stagedDeleted[unquoteGitPath(strings.TrimSpace(line[3:]))] = true
 		}
 	}
 	kept := paths[:0]
@@ -793,16 +806,21 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 // rc 0 lists the ignored subset one-per-line; rc 1 means none (both are
 // success for captureGitOutput). NOT `-z`: that flag is stdin-mode-only
 // (`fatal: -z only makes sense with --stdin`, rc=128 — adversarial review
-// caught the probe failing open on EVERY ship). Newline parsing is safe:
-// pathToken's charset (manifest.go) cannot produce spaces, quotes, or
-// newlines, so git never C-quotes these paths. A broken probe fails OPEN with
-// the full set and a loud log: the probe must never block ship — if the
-// refusal survives, the add's own stderr now travels in the ship error.
+// caught the probe failing open on EVERY ship). Newline parsing stays safe
+// (git never puts a bare newline in this output — it C-quotes such a path
+// instead), but cycle-1108 falsified this comment's older premise that git
+// never quotes here at all: the pathspec is the DECLARED manifest, whose
+// entries are arbitrary repo paths, so a non-ASCII or quote-bearing one comes
+// back C-quoted and matched nothing — the ignored path then rode into `git add`
+// and reproduced the cycle-1101 rc=1 ship-killer. Hence the raw-path read plus
+// unquoteGitPath on every probe line. A broken probe fails OPEN with the full
+// set and a loud log: the probe must never block ship — if the refusal
+// survives, the add's own stderr now travels in the ship error.
 func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root string, paths []string) []string {
 	if len(paths) == 0 {
 		return paths
 	}
-	probe := append([]string{"check-ignore", "--"}, paths...)
+	probe := rawPathRead(append([]string{"check-ignore", "--"}, paths...)...)
 	out, err := captureGitOutputAtDir(ctx, opts, root, probe...)
 	if err != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf(
@@ -811,7 +829,11 @@ func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root s
 	}
 	ignored := map[string]bool{}
 	for _, p := range strings.Split(out, "\n") {
-		if p = strings.TrimSpace(p); p != "" {
+		// Decode ONLY genuinely quoted lines: an unquoted line is git naming a
+		// path literally, and fuzzy-matching it against a different declared
+		// path would silently under-stage the ship — strictly worse than the
+		// refusal this filter exists to prevent.
+		if p = unquoteGitPath(strings.TrimSpace(p)); p != "" {
 			ignored[p] = true
 		}
 	}
