@@ -68,14 +68,40 @@ func (r *buildFloorReviewer) Review(ctx context.Context, in ReviewInput) ReviewR
 
 // DefaultBuildFloorChecks is the production deterministic engine: the
 // changed-package selfcheck engine plus every check that must run REGARDLESS
-// of the changed set. RemovalClaimFailures is deliberately composed OUTSIDE
-// changedPackageFloorChecks: that engine returns early when the diff yields no
-// Go test packages, and a build whose only claim is "I deleted X" derives
-// exactly zero packages — the early return is the precise blind spot a false
-// removal claim would hide behind (cycle-660).
+// of the changed set. RemovalClaimFailures and personaBudgetFailures are
+// deliberately composed OUTSIDE changedPackageFloorChecks: that engine returns
+// early when the diff yields no Go test packages, and both of their triggering
+// diffs derive exactly zero packages — a build whose only claim is "I deleted
+// X" (cycle-660), and a lane whose only change is an agents/evolve-*.md
+// persona doc (cycle-1101). The early return is the precise blind spot each
+// would otherwise hide behind.
+//
+// The changed-path set is derived ONCE here and passed down: the two path-
+// driven engines must adjudicate the same diff, and one `git diff` per handoff
+// is the standing floor rule.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out := RemovalClaimFailures(ctx, in)
-	return append(out, changedPackageFloorChecks(ctx, in)...)
+	paths := changedFloorPaths(ctx, in)
+	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
+	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
+}
+
+// changedFloorPaths derives the lane's changed repo paths for the floor.
+//
+// Diff against the CYCLE BASE, not HEAD: the builder's mandated protocol
+// COMMITS its work, so at review time (before the post-record soft-reset)
+// `git diff HEAD` is empty and a HEAD-based floor approves vacuously — the
+// reviewer-caught near-no-op. Base-diff sees committed AND uncommitted work;
+// an empty base falls back to the HEAD-based derivation (degraded
+// provisioning, where the builder could not have committed).
+func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
+	if in.Worktree == "" {
+		return nil
+	}
+	if in.WorktreeBaseSHA != "" {
+		return changedWorktreePathsSince(ctx, in.Worktree, in.WorktreeBaseSHA)
+	}
+	return changedWorktreePaths(ctx, in.Worktree)
 }
 
 // changedPackageFloorChecks reuses the EXACT selfcheck machinery the advisory
@@ -86,7 +112,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 // nothing acted on it). Returns one line per failing package. Any inability
 // to run (no worktree, no packages) is GREEN — fail-open, downstream gates
 // stay armed.
-func changedPackageFloorChecks(ctx context.Context, in ReviewInput) []string {
+func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []string) []string {
 	if in.Worktree == "" {
 		return nil
 	}
@@ -94,18 +120,8 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput) []string {
 	// both are test-outcome-neutral today and the failure direction of any
 	// future sensitivity is a spurious REJECT (one extra ladder round), never
 	// a false approve.
-	// Diff against the CYCLE BASE, not HEAD: the builder's mandated protocol
-	// COMMITS its work, so at review time (before the post-record soft-reset)
-	// `git diff HEAD` is empty and a HEAD-based floor approves vacuously —
-	// the reviewer-caught near-no-op. Base-diff sees committed AND uncommitted
-	// work; empty base falls back to the HEAD-based derivation (degraded
-	// provisioning, where the builder could not have committed).
-	var paths []string
-	if in.WorktreeBaseSHA != "" {
-		paths = changedWorktreePathsSince(ctx, in.Worktree, in.WorktreeBaseSHA)
-	} else {
-		paths = changedWorktreePaths(ctx, in.Worktree)
-	}
+	// paths comes from changedFloorPaths (cycle-base diff, HEAD fallback) —
+	// see its doc for why the base axis is load-bearing.
 	pkgs := changedGoTestPackages(paths)
 	if len(pkgs) == 0 {
 		return nil
