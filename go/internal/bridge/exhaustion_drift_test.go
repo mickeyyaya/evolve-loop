@@ -57,3 +57,74 @@ func TestClaudeTmuxDriftProbe_MatchesRealWall(t *testing.T) {
 		t.Errorf("drift_probe_regex %q false-matched a benign working pane", probe)
 	}
 }
+
+// Every tmux CLI that ships an exhausted_regex must also ship a drift_probe_regex:
+// the watcher is fail-OPEN, so an unconfigured CLI has NO drift diagnostic at all —
+// the same silent-burn class the alarm exists to prevent, one level up. This drives
+// the real warnExhaustionRegexDrift against each newly-armed CLI's own shipped
+// patterns, asserting the full firing condition (probe ∧ ¬exhausted): fire on a
+// drifted wall, silence on a wall exhausted_regex already catches, silence on a
+// benign pane. Subtest names carry the CLI so per-CLI coverage is greppable.
+func TestDriftProbeArmedPerCLI(t *testing.T) {
+	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
+	cases := []struct {
+		cli string
+		// driftedPane: a plausible future wall wording exhausted_regex misses.
+		driftedPane string
+		// matchedWall: a wall exhausted_regex DOES catch — no drift to report.
+		matchedWall string
+		benignPane  string
+	}{
+		{
+			cli:         "codex-tmux",
+			driftedPane: "You've hit your usage limit for this week.",
+			matchedWall: "Usage limit reached for this account.",
+			benignPane:  "Applying patch to usageclassify.go; 2 hunks staged.",
+		},
+		{
+			cli:         "agy-tmux",
+			driftedPane: "You are out of credits. Upgrade to continue.",
+			matchedWall: "quota exceeded for this billing period",
+			benignPane:  "Running tests... 42/50 passing, still working.",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.cli, func(t *testing.T) {
+			if probe := manifestDriftProbePattern(tc.cli); probe == "" {
+				t.Fatalf("%s has no controls.usage.drift_probe_regex — the drift alarm is inert for this CLI", tc.cli)
+			}
+			m, err := LoadManifest(tc.cli)
+			if err != nil {
+				t.Fatalf("cannot load %s manifest: %v", tc.cli, err)
+			}
+			exhausted := manifestExhaustedPattern(m)
+			if exhausted == "" {
+				t.Fatalf("%s has no controls.usage.exhausted_regex — nothing to drift-guard", tc.cli)
+			}
+			// Guard the premise of the positive case: if exhausted_regex already
+			// matched the "drifted" pane there would be no gap to detect and the
+			// fire assertion below would be vacuous.
+			if matchExhausted(exhausted, tc.driftedPane) {
+				t.Fatalf("%s exhausted_regex already matches %q — the drifted fixture no longer models a drift", tc.cli, tc.driftedPane)
+			}
+
+			panes := []struct {
+				name, pane string
+				wantDrift  bool
+			}{
+				{"drifted wall exhausted_regex misses -> DRIFT fires", tc.driftedPane, true},
+				{"wall exhausted_regex DOES match -> no drift", tc.matchedWall, false},
+				{"benign working pane -> no drift", tc.benignPane, false},
+			}
+			for _, p := range panes {
+				t.Run(p.name, func(t *testing.T) {
+					var buf bytes.Buffer
+					warnExhaustionRegexDrift(&buf, "[test]", tc.cli, p.pane, exhausted)
+					if got := strings.Contains(buf.String(), driftMarker); got != p.wantDrift {
+						t.Errorf("%s: drift alarm fired=%v, want %v — pane=%q output=%q", tc.cli, got, p.wantDrift, p.pane, buf.String())
+					}
+				})
+			}
+		})
+	}
+}
