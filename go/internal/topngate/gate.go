@@ -23,6 +23,7 @@ const (
 	triageReportName = "triage-report.md"
 	buildReportName  = "build-report.md"
 	tddReportName    = "test-report.md"
+	scoutReportName  = "scout-report.md"
 )
 
 // gate is one structural inter-phase check. appliesTo selects the phase whose
@@ -122,7 +123,11 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	}
 	for _, s := range topN {
 		if s == claimed {
-			return "", false // in-lane → pass
+			// In-lane by label. The construction-level check runs ALONGSIDE the
+			// label check on exactly this path (cycle-1111): the label proves
+			// nothing about what was actually authored, so compare the authored
+			// files against the committed item's declared scope. Advisory only.
+			return fileScopeAdvisory(in.Workspace, claimed, authored), false
 		}
 	}
 	// Label drift is ADVISORY here for the same reason it is on the build side
@@ -130,12 +135,102 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	// the committed set — not the TDD report's prose — is the binding authority,
 	// and a differently-labelled RED scaffold for the committed item is correct
 	// work. The non-empty reason at block=false still routes through the
-	// reviewer's single structured logf seam. Real fraud protection (authored
-	// file-scope vs the committed item's declared scope) is the queued
-	// construction-level check.
+	// reviewer's single structured logf seam. (Out-of-lane labels keep reporting
+	// label drift; the file-scope advisory below covers the in-lane path.)
 	return "label drift (advisory since 2026-07-23): TDD authored test file(s) {" + strings.Join(authored, ", ") +
 		"} labelled '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") +
 		"} — binding to the committed set", false
+}
+
+// fileScopeAdvisory compares the files TDD actually authored against the file
+// scope the committed item declares in scout-report.md, and returns a non-empty
+// ADVISORY reason only when both sets are non-empty and share nothing. Every
+// ambiguity — no scout-report.md, the committed slug absent from it, no
+// declared scope, nothing authored — returns "" (fail open), matching this
+// gate family's convention. It is advisory rather than fatal because a
+// legitimate deliverable can touch a shared helper or an incidental file that
+// scout never named; shadow evidence decides whether it ever becomes fatal.
+func fileScopeAdvisory(workspace, slug string, authored []string) string {
+	declared := readScoutTargetFiles(workspace, slug)
+	if len(declared) == 0 || len(authored) == 0 {
+		return ""
+	}
+	for _, a := range authored {
+		for _, d := range declared {
+			if pathsOverlap(a, d) {
+				return "" // ANY overlap is in-scope
+			}
+		}
+	}
+	return "file scope drift (advisory): TDD authored test file(s) {" + strings.Join(authored, ", ") +
+		"} but the committed item '" + slug + "' declares targetFiles {" + strings.Join(declared, ", ") +
+		"} — zero path overlap"
+}
+
+// pathsOverlap reports whether two declared paths cover the same scope: the
+// same file, or two files in the same directory. Directory-level equality is
+// load-bearing, not slack — scout names the PRODUCTION file (gate.go) while TDD
+// authors its sibling (gate_test.go), so an exact-equality rule would fire on
+// every healthy cycle and make the advisory worthless.
+func pathsOverlap(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	return a == b || filepath.Dir(a) == filepath.Dir(b)
+}
+
+// readScoutTargetFiles returns the paths declared by the "- **targetFiles:**"
+// line inside scout-report.md's "### Task N: <slug>" block whose slug equals
+// the given one — never a sibling task's line. It returns nil when the report
+// is absent, the slug is not described, or the block declares no targetFiles
+// (callers fail open). Paths are the backticked tokens of the line; the
+// trailing prose annotations scout writes beside them are ignored.
+func readScoutTargetFiles(workspace, slug string) []string {
+	body, ok := readWorkspaceFile(workspace, scoutReportName)
+	if !ok {
+		return nil
+	}
+	current := ""
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "### "):
+			current = taskHeaderSlug(trimmed)
+			continue
+		case strings.HasPrefix(trimmed, "## "):
+			current = "" // a section boundary ends the task block
+			continue
+		}
+		if current != slug || !strings.HasPrefix(trimmed, "- **targetFiles:**") {
+			continue
+		}
+		if paths := backtickedPaths(trimmed); len(paths) > 0 {
+			return paths
+		}
+	}
+	return nil
+}
+
+// taskHeaderSlug extracts the slug from a "### Task N: <slug>" header, or ""
+// when the header carries no slug (matching agents/evolve-scout.md's
+// ## Selected Tasks shape).
+func taskHeaderSlug(trimmed string) string {
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "### "))
+	i := strings.Index(rest, ":")
+	if i < 0 {
+		return ""
+	}
+	return strings.TrimSpace(rest[i+1:])
+}
+
+// backtickedPaths returns the `backtick-quoted` tokens of a line in order.
+func backtickedPaths(line string) []string {
+	var paths []string
+	parts := strings.Split(line, "`")
+	for i := 1; i < len(parts); i += 2 { // odd indices are the quoted spans
+		if p := strings.TrimSpace(parts[i]); p != "" {
+			paths = append(paths, p)
+		}
+	}
+	return paths
 }
 
 // readTDDScope reads <workspace>/test-report.md and returns the slug from its
