@@ -42,21 +42,38 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 	}
 
 	// The quota WALL — must match (each is a real capture / a plausible sibling).
+	//
+	// SELF-TRIGGER GUARD: every wall fixture is built by concatenation ("li"+"mit")
+	// so the literal wall text never appears on one source line. An agent that
+	// Reads this file gets a cat-n rendering (digit+tab prefix, NOT a diff line),
+	// which stripAgentDiffLines does NOT strip — a verbatim fixture would then
+	// match the live exhausted_regex through the persistence gate (2 consecutive
+	// 2s observations) and exit-85 a healthy session reviewing this very file.
 	walls := []string{
 		// Exact string captured in cycle-910/911 final_pane. The per-model wall
 		// ALWAYS carries its "/usage-credits" companion on the same line — the
 		// regex requires it (see the notWalls rationale), so every real-wall
 		// fixture must include it too:
-		"You've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.",
+		"You've reached your Fable 5 li" + "mit. Run /usage-cre" + "dits to continue or switch models with /model.",
 		// Same wall on other models, incl. the "You have" contraction-free form
 		// and a version-numbered model name:
-		"You've reached your Opus limit. Run /usage-credits to continue or switch models with /model.",
-		"You have reached your Opus 4.8 limit. Run /usage-credits to continue.",
+		"You've reached your Opus li" + "mit. Run /usage-cre" + "dits to continue or switch models with /model.",
+		"You have reached your Opus 4.8 li" + "mit. Run /usage-cre" + "dits to continue.",
 		// Legacy wordings — parity: these matched before and must keep matching:
-		"reached your usage limit",
-		"reached your weekly limit",
-		"usage limit reached",
-		"You've reached your usage limit — upgrade to continue.",
+		"reached your usage li" + "mit",
+		"reached your weekly li" + "mit",
+		"usage li" + "mit reached",
+		"You've reached your usage li" + "mit — upgrade to continue.",
+		// Exact string captured in cycle-1096 tmux-final-scrollback.txt
+		// (2026-07-23, batch-11 tail): the weekly wall drifted from "reached"
+		// to "hit", slipped past the regex, and cycles 1077–1096 each burned
+		// ~40 min at the 600s artifact-wait (exit 81, never 85) against a dead
+		// provider — the FOURTH wording-drift instance of this class. The
+		// "/usage-credits" companion renders on the NEXT pane line, so the
+		// weekly branch cannot require same-line adjacency:
+		"You've hit your weekly li" + "mit · resets Jul 26 at 9pm (Asia/Taipei)",
+		// Same wall, usage-window sibling:
+		"You've hit your usage li" + "mit · resets tomorrow at 9am",
 	}
 	for _, w := range walls {
 		if !re.MatchString(w) {
@@ -65,9 +82,11 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 	}
 
 	// NOT a wall — must NOT match. Matching any of these would fast-fail a
-	// WORKING agent (the cycle-254/255/314/641 false-FAIL sin). The pane is
-	// scanned RAW at the stop-review checkpoint (driver_tmux_repl.go:669) with
-	// no diff/prose stripping, so a false match kills a healthy agent. Two-round
+	// WORKING agent (the cycle-254/255/314/641 false-FAIL sin). The stop-review
+	// checkpoint scans the pane through strippedForExhaustionScan (unified-diff
+	// +/- lines removed, driver_tmux_repl.go), but NON-diff renderings — Read-tool
+	// cat-n output, plain prose, log lines — reach the regex unstripped, so a
+	// false match on those kills a healthy agent. Two-round
 	// review hardened the per-model branch: it requires BOTH Claude Code's
 	// second-person chrome ("you(?:.?ve| have) reached your … limit") AND the
 	// wall-specific "/usage-credits" companion adjacent on the same line — so
@@ -96,6 +115,13 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 		"You've reached your Sonnet 5 limit.",
 		// the wildcard pattern text itself must not self-match (the anchor prevents it):
 		"reached your .{1,40}? limit",
+		// "hit" verb in ordinary prose — (usage|weekly) noun restriction must
+		// keep these out, same envelope as the legacy "reached" branch:
+		"the retry loop hit your rate limit, backing off",
+		"you hit your context limit mid-review",
+		"the build hit your token limit and truncated",
+		// soft weekly warning — still has quota:
+		"You're approaching your weekly limit.",
 	}
 	for _, n := range notWalls {
 		if re.MatchString(n) {

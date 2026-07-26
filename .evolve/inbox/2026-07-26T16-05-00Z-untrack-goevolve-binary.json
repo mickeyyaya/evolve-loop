@@ -1,0 +1,13 @@
+{
+  "id": "untrack-goevolve-binary",
+  "title": "Untrack the 19MB go/evolve committed binary — binaryguard + ship stageBinaryGuard already refuse to re-commit it",
+  "kind": "maintenance",
+  "priority": "medium",
+  "weight": 0.6,
+  "campaign": "one-binary",
+  "files": ["go/evolve", ".gitignore", "go/internal/binaryguard/binaryguard.go", "go/internal/phases/ship/gitops.go"],
+  "connects_to": ["one-binary-campaign"],
+  "route": "lane",
+  "injected_by": "console-2026-07-26-quota-drift-fix",
+  "notes": "Contradiction found 2026-07-26: go/evolve is a TRACKED 19MB Mach-O (last refreshed by cycle commit 7727d4a9 / release a312a60f), but commitgate's binaryguard (commitgate.go:152) and ship's stageBinaryGuard (gitops.go:238) now hard-refuse any staged compiled executable, self-describing the original commit as 'a stray go build output'. Net effect: every rebuild leaves go/evolve permanently dirty and manual-class commits must restore it to HEAD first (operator friction, and the committed copy goes stale — it was 3 days/4 releases behind go/bin/evolve when found). Decide + execute: (a) git rm --cached go/evolve + .gitignore entry + doc note pointing consumers at go/bin/evolve (hooks already prefer go/bin/evolve, falling back to go/evolve), auditing plugin packaging/release pipeline + installer + docs for any dependence on the committed binary path first; or (b) if packaging truly needs a committed binary, exempt the path in binaryguard and wire a rebuild-freshness check instead. Option (a) preferred per repo-bloat and the guards' own policy text."
+}
