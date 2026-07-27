@@ -46,6 +46,23 @@ func recoveryStageFromEnv(deps Deps) string {
 	return channel.ResolveStage(deps.RecoveryStage)
 }
 
+// fatalPaneClassifies reports whether the C2 classification path is live for
+// this detector/stage pair.
+//
+// "" is treated as "off": recoveryStageFromEnv never returns "" (unset →
+// "shadow"), but a direct caller passing the zero value must not silently
+// enable a kill-path. Same posture for a nil detector — Detect is
+// nil-receiver-safe, but the safety belongs visibly at THIS boundary, not
+// buried in the callee.
+//
+// Single-sourced because fatalPaneGate (fatalpane_persistence.go) must make the
+// SAME call to decide whether to observe at all: if the two drifted, the gate
+// would bank a persistence streak on a path this seam considers disabled, and a
+// later stage flip would cash it in on its first enforce checkpoint.
+func fatalPaneClassifies(det *recovery.FatalPaneDetector, stage string) bool {
+	return det != nil && stage != "off" && stage != ""
+}
+
 // fatalPaneVerdict consults the fatal-pane registry for one stop-review
 // checkpoint. It returns (verdict, true) when enforcement preempts the
 // reviewer — the caller skips StopReviewer.Review and applies the verdict —
@@ -53,12 +70,7 @@ func recoveryStageFromEnv(deps Deps) string {
 // busy pane, or no match). Shadow logs the would-be action to stderr so the
 // soak leaves an auditable trail without changing behavior.
 func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage string, rec *interaction.Recorder, stderr io.Writer, pfx string) (ReviewVerdict, bool) {
-	// "" treated as "off": recoveryStageFromEnv never returns "" (unset →
-	// "shadow"), but a direct caller passing the zero value must not silently
-	// enable a kill-path. Same posture for a nil detector — Detect is
-	// nil-receiver-safe, but the safety belongs visibly at THIS boundary,
-	// not buried in the callee.
-	if det == nil || stage == "off" || stage == "" {
+	if !fatalPaneClassifies(det, stage) {
 		return ReviewVerdict{}, false
 	}
 	cause, sig, ok := det.Detect(ev.StdoutTail)

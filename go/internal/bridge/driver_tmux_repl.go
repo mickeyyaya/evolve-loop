@@ -520,6 +520,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// Its OWN gate (not shared with the fast-poll's) — the two loops observe at
 	// different cadences and must each confirm on their own consecutive frames.
 	checkpointExhaustGate := newExhaustionGate()
+	// Persistence guard for the ADR-0044 C2 fatal-pane fast-fail
+	// (fatalpane_persistence.go) — same shape, same reason: the detector matches
+	// substrings against the RAW pane, so a working agent quoting a fatal
+	// signature must not be killed for one frame. Loop-scoped like the gate
+	// above: a per-checkpoint instance could never accumulate a streak.
+	checkpointFatalGate := newFatalPaneGate()
 	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
 	// baseline (no extra capture, no fixture-frame drift): the prompt was
 	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
@@ -728,11 +734,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// bridge's own nudge echoed into them, so the legacy
 			// extend-while-progressing flow burned the full maxExtends
 			// backstop on REPLs that no longer existed.
-			// fatalPaneVerdict RECORDS a C2 evidence outcome on every
-			// matching call (R8.3) — it must be called exactly once per
-			// stop-review checkpoint, never retried for the same event, or
-			// the soak's C2 counts inflate silently.
-			v, preempted := fatalPaneVerdict(fatalDet, lastEv, recoveryStage, irec, deps.Stderr, pfx)
+			// Persistence-gated (fatalpane_persistence.go): the match must be
+			// present on consecutive checkpoints before it can preempt, so a
+			// working agent that renders fatal-shaped text for one frame is
+			// never killed for it, while a parked pane still exits one
+			// checkpoint later than before.
+			// The gate RECORDS a C2 evidence outcome on every gate-crossed
+			// call (R8.3) — it must be called exactly once per stop-review
+			// checkpoint, never retried for the same event, or the soak's C2
+			// counts inflate silently.
+			v, preempted := checkpointFatalGate.verdict(fatalDet, lastEv, recoveryStage, irec, deps.Stderr, pfx)
 			if !preempted {
 				v = reviewer.Review(lastEv)
 			}
