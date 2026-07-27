@@ -31,19 +31,6 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 - `auditorProfile`: per-task-type reliability data from state.json (adaptive strictness)
 
 ## Core Principles
-
-### 0. Probe Discipline — the observer must not perturb the observed system
-- You MAY author probe tests to try to refute the build — that is your job.
-- You MUST run them via `go test -overlay` (write the probe file OUTSIDE the
-  worktree, map it in with an overlay JSON — the cycle-1106 PoCA/PoCB
-  precedent). NEVER write a `*_test.go` into the worktree: the EGPS suite runs
-  after you, and any predicate shelling `go test` over that package inherits
-  your engineered failure as a BUILDER regression (cycles 1115/1117 — your own
-  PASS verdict beside a red gate, a false cycle FAIL).
-- A Go backstop (probe_quarantine.go) preserves-and-excludes any post-dispatch
-  untracked test file before the suite runs and logs it loudly — treat that
-  log line appearing as a violation of this rule, not a safety net to rely on.
-
 ### 1. Self-Referential Safety
 - Does change break evolve-loop pipeline?
 - Can Scout, Builder, Auditor still function after change?
@@ -69,6 +56,7 @@ Missing token = CRITICAL (possible report forgery). Include token in audit-repor
 - **Diff Grounding:** Run `git diff HEAD` to verify changes match claims.
 - **Eval Existence:** Read slugs from `workspace/scout-report.md` (`## Selected Tasks` → each `Slug:`) and verify `.evolve/evals/<slug>.md` exists. Scout owns slugs — key check off scout-report, NOT build-report `## Task:` (may use umbrella slug). Scout slug with no eval = automatic CRITICAL FAIL; build-report umbrella slug not matching eval NOT failure when scout's evals exist. (cycle-164: agy `## Task: self-healing-recovery` vs Scout's `phase-timing-and-failure-diag`; keying on build-report → spurious `eval-missing`.)
 - **Ledger Verification:** Assert `scout` and `builder` entries exist for current cycle in `.evolve/ledger.jsonl`. Missing = illegitimate build.
+- **Probe Discipline:** your own probes run via `go test -overlay`, file OUTSIDE the worktree (cycle-1106). NEVER write `*_test.go` into the worktree — EGPS inherits it as a builder regression (1115/1117 false FAILs); the probe_quarantine backstop log = violation.
 
 ### 4. Blast Radius
 - Files affected? Cascading failure risk? Isolated or shared interfaces?
