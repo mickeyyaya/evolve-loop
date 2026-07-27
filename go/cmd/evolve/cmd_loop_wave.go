@@ -474,30 +474,49 @@ func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int) waveP
 	}
 }
 
-// seedWavePlanFromInbox synthesizes a triage-decision.json (top_n[].id) from the
-// top-`count` inbox todos (by weight) so the wave planner (fleet.PlanFromTriage)
-// can partition them into disjoint lanes without a prior cycle's decision. count
-// is the caller's already-resolved wave width (clamped to >= 2 here); requires
-// >= 2 todos to fill >= 2 lanes — fewer returns an error so the caller falls back
-// to sequential (one item cannot run 2-wide anyway).
+// seedWavePlanFromInbox synthesizes a triage-decision.json (top_n[].id+files)
+// from the inbox backlog so the wave planner (fleet.PlanFromTriage) can
+// partition it into disjoint lanes without a prior cycle's decision. count is
+// the caller's already-resolved wave width (clamped to >= 2 here); requires
+// >= 2 disjoint LANES to fill a wave — fewer returns an error so the caller
+// falls back to sequential (one lane cannot run 2-wide anyway).
 func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 	if count < 2 {
 		count = 2
 	}
-	// SelectWaveSeedTopN packs the inbox backlog into up to `count` mutually
-	// file-disjoint lane reps (highest weight first) — replacing the raw
-	// weight-sorted top-N, which could seed two lanes that collide on a shared
-	// file. The seam is single-sourced in triagecap (also the SelectFleetWidthTopN
-	// home) so this caller stays a thin adapter to the top_n decision shape.
-	reps := triagecap.SelectWaveSeedTopN(evolveDir, count, guards.IsProtectedSurface)
-	if len(reps) < 2 {
-		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(reps))
+	// SelectWaveSeedMenus packs the backlog into up to `count` mutually
+	// file-disjoint lanes, each deepened with its same-file cluster mates
+	// (fleet-lane-batch-menu). The wave-width gate counts MENUS, not flattened
+	// ids — a single 4-item cluster still (correctly) fails to fill a 2-lane
+	// wave. Cards carry files so PlanFromTriage's Partition re-derives the
+	// same clustering; the previous file-less flatten let it treat every card
+	// as an independent island and spread a same-file pair across two
+	// concurrent lanes. The menu cap deliberately reuses the compiled
+	// inboxbatch.DefaultMaxItems: the one production Classify call
+	// (phases/triage) also runs on the zero-value Config, so the compiled
+	// default IS the batching cap's single source today — if MaxItems ever
+	// gets policy-wired, thread the same resolved value here.
+	menus := triagecap.SelectWaveSeedMenus(evolveDir, count, inboxbatch.DefaultMaxItems, guards.IsProtectedSurface)
+	if len(menus) < 2 {
+		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(menus))
 	}
-	topN := make([]map[string]string, 0, len(reps))
-	for _, r := range reps {
-		topN = append(topN, map[string]string{"id": r.ID})
+	return json.Marshal(map[string]any{"top_n": menuCards(menus)})
+}
+
+// menuCards flattens lane menus into top_n cards, files preserved — the shape
+// fleet.PlanFromTriage re-partitions into the same lanes.
+func menuCards(menus [][]triagecap.FleetCandidate) []map[string]any {
+	var topN []map[string]any
+	for _, menu := range menus {
+		for _, c := range menu {
+			card := map[string]any{"id": c.ID}
+			if len(c.Files) > 0 {
+				card["files"] = c.Files
+			}
+			topN = append(topN, card)
+		}
 	}
-	return json.Marshal(map[string]any{"top_n": topN})
+	return topN
 }
 
 // widenNarrowDecision is the thin main-package adapter that turns a present-but-
@@ -513,7 +532,8 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 		return data
 	}
 	var decision struct {
-		TopN []struct {
+		CommittedFloors []string `json:"committed_floors"`
+		TopN            []struct {
 			ID    string   `json:"id"`
 			Files []string `json:"files"`
 		} `json:"top_n"`
@@ -526,6 +546,14 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 	if json.Unmarshal(data, &decision) != nil {
 		return data
 	}
+	// A decision carrying committed_floors passes through byte-identical
+	// (diff-review HIGH-1): fleet.TodosFromTriage dispatches floors FIRST and
+	// ignores top_n entirely, so widening/deepening top_n cannot change the
+	// wave — while the {"top_n":...}-only re-marshal below would silently DROP
+	// the floors and flip the planner onto the top_n source.
+	if len(decision.CommittedFloors) > 0 {
+		return data
+	}
 	committed := make([]triagecap.FleetCandidate, 0, len(decision.TopN))
 	for _, c := range decision.TopN {
 		if c.ID != "" {
@@ -533,19 +561,21 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 		}
 	}
 	if len(committed) >= count {
-		return data // already fleet-width — no inbox read, no re-marshal.
+		return data // already fleet-width — committed intent is authoritative; no inbox read, no re-marshal.
 	}
-	widened := triagecap.WidenTopNToFleetWidth(committed, triagecap.ReadInboxBacklog(evolveDir, guards.IsProtectedSurface), count)
-	if len(widened) <= len(committed) {
-		return data // nothing disjoint to add — leave the decision as-is.
-	}
-	topN := make([]map[string]any, 0, len(widened))
-	for _, w := range widened {
-		card := map[string]any{"id": w.ID}
-		if len(w.Files) > 0 {
-			card["files"] = w.Files
-		}
-		topN = append(topN, card)
+	backlog := triagecap.ReadInboxBacklog(evolveDir, guards.IsProtectedSurface)
+	widened := triagecap.WidenTopNToFleetWidth(committed, backlog, count)
+	// Deepen each widened lane with its pending same-file cluster mates
+	// (fleet-lane-batch-menu) — the mid-batch primary path must amortize a
+	// lane's worktree/build/audit across its cluster exactly like the fresh
+	// inbox seed does, or menus only ever engage on the first wave. The cap
+	// mirrors the seed call site: compiled inboxbatch.DefaultMaxItems is the
+	// batching cap's single source today — if MaxItems ever gets policy-wired,
+	// thread the same resolved value into BOTH call sites.
+	menus := triagecap.ExpandWithClusterMates(widened, backlog, inboxbatch.DefaultMaxItems)
+	topN := menuCards(menus)
+	if len(topN) <= len(committed) {
+		return data // nothing disjoint to add, no mates to deepen with — leave the decision as-is.
 	}
 	out, err := json.Marshal(map[string]any{"top_n": topN})
 	if err != nil {

@@ -14,6 +14,9 @@ package fleet
 import (
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // TaskFreshness is one task id re-resolved at dispatch time.
@@ -101,8 +104,67 @@ func filterScope(s CycleSpec, probe FreshnessProbeFn, warn io.Writer) (CycleSpec
 	if len(live) == len(s.Scope) {
 		return s, nil // all fresh — pass through unchanged
 	}
+	stale := make(map[string]bool, len(skips))
+	for _, sk := range skips {
+		stale[sk.TaskID] = true
+	}
 	s.Scope = live
+	// The launcher passes s.Env verbatim and the lane pins lane-scope.json
+	// from Env[FleetScopeKey], not from Scope — a pruned spec whose env still
+	// carried the stale CSV would hand every phase the dead id as
+	// authoritative fleet scope. Rebuild the CSV on a COPY (the input spec's
+	// map is shared with the caller).
+	if _, ok := s.Env[ipcenv.FleetScopeKey]; ok {
+		env := make(map[string]string, len(s.Env))
+		for k, v := range s.Env {
+			env[k] = v
+		}
+		env[ipcenv.FleetScopeKey] = strings.Join(live, ",")
+		s.Env = env
+	}
+	// Same desync one field over (diff-review HIGH-2): the combined contract
+	// is the lane's goal PROSE — leaving a pruned todo's "[id] objective" line
+	// in place instructs the lane to deliver work the gate just ruled dead.
+	s.OutputContract = dropStaleContractLines(s.OutputContract, stale)
 	return s, skips
+}
+
+// dropStaleContractLines removes pruned ids' objectives from a combined
+// multi-todo contract (fleet.combinedContract's labeled format). A todo's own
+// contract text may span lines and only its FIRST line carries the "[id] "
+// label, so an unlabeled line inherits the fate of the label above it — the
+// continuation lines fall with their todo (re-review MEDIUM-A). A single-todo
+// contract carries no label at all — but a single-todo spec that prunes its id
+// empties the whole scope and frees the lane, so the unlabeled shape never
+// reaches a launch.
+func dropStaleContractLines(contract string, stale map[string]bool) string {
+	if contract == "" || len(stale) == 0 {
+		return contract
+	}
+	var kept []string
+	dropping := false
+	for _, line := range strings.Split(contract, "\n") {
+		if id, labeled := contractLineID(line); labeled {
+			dropping = stale[id]
+		}
+		if dropping {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+// contractLineID extracts the todo id from a "[id] objective" contract line.
+func contractLineID(line string) (string, bool) {
+	if !strings.HasPrefix(line, "[") {
+		return "", false
+	}
+	end := strings.Index(line, "] ")
+	if end <= 1 {
+		return "", false
+	}
+	return line[1:end], true
 }
 
 // ClassifyEmptyScopeBuild maps a lane build outcome to its final verdict.

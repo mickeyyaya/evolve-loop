@@ -53,12 +53,43 @@ func Classify(items []Item, cfg Config) []Batch {
 	}
 
 	uf := newUnionFind(len(items))
+	// Campaign is a PARTITION, not a signal: the operator's campaign field is
+	// the explicit "this is one initiative" declaration, so an inferred edge
+	// (file-area, dep, connects) must never merge two DISTINCT non-empty
+	// campaigns — measured live (2026-07-28), area chains fused 17 campaigns
+	// into one ~37-item cluster serialized over 9 "run the previous batch
+	// first" batches. clusterCampaign tracks each ROOT's campaign claim so the
+	// guard holds transitively too: a campaign-less item may join a campaign's
+	// cluster, but can never become the bridge that unions two campaigns. A
+	// blocked cross-campaign dep still executes in order — the dispatch
+	// freshness gate holds a lane until its deps land; only co-batching is
+	// prevented.
+	clusterCampaign := make([]string, len(items))
+	for i, it := range items {
+		clusterCampaign[i] = strings.TrimSpace(it.Campaign)
+	}
 	reasons := map[int][]string{} // root → binding signals (dedup'd on emit)
-	for _, r := range rules {
-		for _, e := range r.Edges(items) {
-			uf.union(e.A, e.B)
-			reasons[uf.find(e.A)] = append(reasons[uf.find(e.A)], e.Reason)
+	// The guard makes union outcomes order-dependent (which cluster a
+	// campaign-less bridge joins depends on which edge unions first) and two
+	// rules emit from map iteration, so edges are sorted into one canonical
+	// order first — Classify's determinism contract now rests on this.
+	for _, e := range sortedRuleEdges(rules, items) {
+		ra, rb := uf.find(e.A), uf.find(e.B)
+		if ra != rb {
+			ca, cb := clusterCampaign[ra], clusterCampaign[rb]
+			if ca != "" && cb != "" && ca != cb {
+				continue // two initiatives never merge on an inferred signal
+			}
+			uf.union(ra, rb)
+			// The merged root is ra or rb, so its claim is ca or cb; when that
+			// claim is empty the other side's claim transfers (the guard above
+			// rules out two DIFFERENT non-empty claims, and equal claims skip
+			// via the non-empty check) — correct under any union root choice.
+			if merged := uf.find(ra); clusterCampaign[merged] == "" {
+				clusterCampaign[merged] = ca + cb
+			}
 		}
+		reasons[uf.find(e.A)] = append(reasons[uf.find(e.A)], e.Reason)
 	}
 
 	// Collect clusters; re-root the reason lists (unions after an emit can
@@ -122,6 +153,26 @@ func Classify(items []Item, cfg Config) []Batch {
 		batches = append(batches, co.chunks...)
 	}
 	return batches
+}
+
+// sortedRuleEdges collects every rule's edges into one canonical (A, B,
+// Reason) order. Connectivity alone is order-independent, but the campaign
+// partition guard is not — see the Classify union loop.
+func sortedRuleEdges(rules []Rule, items []Item) []Edge {
+	var edges []Edge
+	for _, r := range rules {
+		edges = append(edges, r.Edges(items)...)
+	}
+	sort.Slice(edges, func(i, j int) bool {
+		if edges[i].A != edges[j].A {
+			return edges[i].A < edges[j].A
+		}
+		if edges[i].B != edges[j].B {
+			return edges[i].B < edges[j].B
+		}
+		return edges[i].Reason < edges[j].Reason
+	})
+	return edges
 }
 
 // topoOrder returns member indices with every dep before its dependent
