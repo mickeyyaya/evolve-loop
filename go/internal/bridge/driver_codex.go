@@ -45,7 +45,9 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	resolved := mapCodexModel(cfg.Model)
 	args := []string{"exec", "--output-last-message", cfg.Artifact}
 	switch {
-	case resolved == "" || resolved == "auto":
+	case resolved == "" || isUnresolvedModelToken(resolved):
+		// Was `resolved == "auto"`; widened to the shared vocabulary so an
+		// untranslated TIER name is omitted here too, not just the sentinel.
 		fmt.Fprintf(deps.Stderr, "[codex] model='%s' → omitting -m (codex picks default)\n", cfg.Model)
 	case isCodexModelName(resolved):
 		args = []string{"exec", "-m", resolved, "--output-last-message", cfg.Artifact}

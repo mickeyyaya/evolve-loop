@@ -168,9 +168,12 @@ func TestC517_006_MaxQualityPresetRecommendsTop(t *testing.T) {
 // TestC517_007_TierModelsForSurfacesTop (AC-7, positive, RED): tierModelsFor
 // must surface a "top" key (identity fallback) for every CLI so onboarding
 // can document/report it. Drives internal/setup
-// TestTierModelsFor_IncludesTopIdentityFallback.
+// TestTierModelsFor_TopResolvesToModelNotTierName (renamed 2026-07-27 with
+// operator sign-off: claude-tmux.json now declares "top", so pinning the
+// literal tier name as claude's model would pin a fatal-launch defect; the
+// identity fallback stays pinned there on a manifest-less CLI).
 func TestC517_007_TierModelsForSurfacesTop(t *testing.T) {
-	out, code := runGoTest(t, "TestTierModelsFor_IncludesTopIdentityFallback", setupPkg)
+	out, code := runGoTest(t, "TestTierModelsFor_TopResolvesToModelNotTierName", setupPkg)
 	requireTestsRan(t, out, 1)
 	if code != 0 {
 		t.Errorf("tierModelsFor does not surface a \"top\" key (exit=%d) — abstractTiers must include \"top\"\n%s", code, out)

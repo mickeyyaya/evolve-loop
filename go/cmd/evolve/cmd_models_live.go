@@ -53,7 +53,11 @@ func makeCatalogRefresher(projectRoot, evolveDir string, autoRefresh bool) func(
 		if err != nil {
 			return err
 		}
-		return modelcatalog.Write(evolveDir, fresh)
+		// Same seam as `evolve models refresh`. This path previously called
+		// Write directly and silently destroyed operator-authored
+		// tier_fallbacks on every cycle-start refresh.
+		_, cerr := modelcatalog.Commit(evolveDir, fresh, os.Stderr)
+		return cerr
 	}
 }
 

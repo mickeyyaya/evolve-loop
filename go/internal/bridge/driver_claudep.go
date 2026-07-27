@@ -7,6 +7,57 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// claudePArgs builds the `claude -p` argv from cfg and the prepared prompt.
+// Pure — extracted from Launch so flag emission is testable without driving a
+// real CLI (the same seam as engine.launchArgs).
+//
+// omittedModel is the model value that was SUPPRESSED, empty when none was.
+// An unresolved vocabulary token (isUnresolvedModelToken) must not be sent:
+// `claude -p --model top` fails exactly like the cycle-262 `--model auto`
+// incident, and this driver builds its own argv, so the realizer's guard never
+// saw it. An empty cfg.Model is "nothing requested" rather than "a request we
+// refused", so it emits no flag and reports no suppression.
+func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string) {
+	args = []string{"-p", prompt}
+	switch {
+	case cfg.Model == "":
+	case isUnresolvedModelToken(cfg.Model):
+		omittedModel = cfg.Model
+	default:
+		args = append(args, "--model", cfg.Model)
+	}
+	if cfg.PermissionMode != "" {
+		// v0.2 pass-through; bin/bridge already validated the value.
+		args = append(args, "--permission-mode", cfg.PermissionMode)
+	}
+	if cfg.StreamOutput {
+		// --verbose is required by claude when combining stream-json with -p.
+		args = append(args, "--output-format", "stream-json", "--include-partial-messages", "--verbose")
+	}
+	if len(cfg.AllowedTools) > 0 {
+		args = append(args, "--allowedTools")
+		args = append(args, cfg.AllowedTools...)
+	}
+	// Inner-CLI pass-through flags (the bash `--` separator): --bare,
+	// --strict-mcp-config, --setting-sources, etc. from the adapter.
+	// Profile raw flags (extra_flags_by_cli["claude-p"]) realized per-CLI,
+	// then the direct `--` pass-through. Uniform with the tmux drivers.
+	args = append(args, cfg.Realization.LaunchFlags...)
+	args = append(args, cfg.ExtraFlags...)
+	return args, omittedModel
+}
+
+// effectiveModelLabel reports the model the CLI will actually run under, for
+// logging. A suppressed model must never be logged as if it were dispatched —
+// that is how an adversarial-audit tier silently degrades to the account
+// default while the log still claims the requested tier.
+func effectiveModelLabel(requested, omitted string) string {
+	if omitted != "" {
+		return ""
+	}
+	return requested
+}
+
 // claudePDriver is the headless `claude -p` driver — the Go port of
 // drivers/claude-p.sh. It forwards --permission-mode straight into the
 // claude argv (claude is the only CLI that supports it).
@@ -36,31 +87,16 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		return ExitBadFlags, err
 	}
 
-	args := []string{"-p", prompt, "--model", cfg.Model}
-	if cfg.PermissionMode != "" {
-		// v0.2 pass-through; bin/bridge already validated the value.
-		args = append(args, "--permission-mode", cfg.PermissionMode)
-	}
-	if cfg.StreamOutput {
-		// --verbose is required by claude when combining stream-json with -p.
-		args = append(args, "--output-format", "stream-json", "--include-partial-messages", "--verbose")
-	}
+	args, omittedModel := claudePArgs(cfg, prompt)
 	if cfg.SessionName != "" {
 		fmt.Fprintf(deps.Stderr, "[claude-p] NOTE: --session-name='%s' is no-op for this driver (single-shot process). Use --cli=claude-tmux for named/resumable sessions.\n", cfg.SessionName)
 	}
-	if len(cfg.AllowedTools) > 0 {
-		args = append(args, "--allowedTools")
-		args = append(args, cfg.AllowedTools...)
+	if omittedModel != "" {
+		fmt.Fprintf(deps.Stderr, "[claude-p] model='%s' is an unresolved tier token → omitting --model (claude picks its default)\n", omittedModel)
 	}
-	// Inner-CLI pass-through flags (the bash `--` separator): --bare,
-	// --strict-mcp-config, --setting-sources, etc. from the adapter.
-	// Profile raw flags (extra_flags_by_cli["claude-p"]) realized per-CLI,
-	// then the direct `--` pass-through. Uniform with the tmux drivers.
-	args = append(args, cfg.Realization.LaunchFlags...)
-	args = append(args, cfg.ExtraFlags...)
 
 	fmt.Fprintf(deps.Stderr, "[claude-p] cycle=%d agent=%s model=%s artifact=%s permission_mode=%s\n",
-		cfg.Cycle, cfg.Agent, cfg.Model, cfg.Artifact, orDefault(cfg.PermissionMode, "(default)"))
+		cfg.Cycle, cfg.Agent, orDefault(effectiveModelLabel(cfg.Model, omittedModel), "(cli default)"), cfg.Artifact, orDefault(cfg.PermissionMode, "(default)"))
 
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {

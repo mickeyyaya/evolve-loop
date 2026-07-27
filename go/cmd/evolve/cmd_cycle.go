@@ -626,6 +626,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// inside the closure). Opt out via policy.json "catalog":{"auto_refresh":false}.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, *pol.CatalogConfig().AutoRefresh)))
 
+	// Catalog-resolvability gate for advisor model routing (cycle-440 MR4a).
+	// router.ClampPlanModelRouting clears a proposed {cli,tier} that cannot
+	// resolve to a model; without this injection o.modelCatalogLookup is nil
+	// and that gate silently does nothing.
+	opts = append(opts, core.WithModelCatalogLookup(resolveModelTier))
+
 	// Runtime operator-directives provider: the ONLY place that resolves directives
 	// config (home dir + runscope lane + file paths). The orchestrator stays
 	// config-agnostic and just consumes the snapshot each cycle.

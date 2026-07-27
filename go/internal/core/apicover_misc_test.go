@@ -371,3 +371,24 @@ func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 		t.Errorf("checkpointer CycleState.CycleID=%d, want 10", lastCS.CycleID)
 	}
 }
+
+// --- Orchestrator.ModelCatalogLookupWired ---------------------------------
+
+// TestOrchestrator_ModelCatalogLookupWired covers the ModelCatalogLookupWired
+// method (named AND executed >0%): true when WithModelCatalogLookup injected a
+// resolver, false on a bare orchestrator. The accessor exists because
+// router.ClampPlanModelRouting short-circuits on a nil lookup, so an unwired
+// resolvability gate is indistinguishable from a passing one at runtime — the
+// composition root proves its wiring through this seam.
+func TestOrchestrator_ModelCatalogLookupWired(t *testing.T) {
+	t.Parallel()
+	bare := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	if bare.ModelCatalogLookupWired() {
+		t.Error("bare orchestrator must report ModelCatalogLookupWired()=false — a nil lookup makes the clamp's catalog gate a no-op")
+	}
+	wired := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
+		WithModelCatalogLookup(func(cli, tier string) (string, bool) { return "opus", true }))
+	if !wired.ModelCatalogLookupWired() {
+		t.Error("orchestrator with WithModelCatalogLookup must report ModelCatalogLookupWired()=true")
+	}
+}

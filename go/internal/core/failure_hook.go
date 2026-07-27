@@ -55,6 +55,15 @@ func WithFailureAdviser(a FailureAdviser) Option {
 // advise→promote path the flip exists to activate).
 func (o *Orchestrator) FailureAdviserWired() bool { return o.failureAdviser != nil }
 
+// ModelCatalogLookupWired reports whether the composition root bound the model
+// resolvability lookup consulted by router.ClampPlanModelRouting. The clamp
+// short-circuits on a nil lookup, so an unwired gate is indistinguishable from
+// a passing one at runtime — this seam lets the composition root prove, in a
+// real (non-fake) test, that its wiring actually reaches production. Same
+// observability pattern as FailureAdviserWired above and
+// CompositionFastPathWired (composition_carryforward.go).
+func (o *Orchestrator) ModelCatalogLookupWired() bool { return o.modelCatalogLookup != nil }
+
 // fatalSignaturesDir is where validated promotions persist, relative to the
 // project root (the same dir the tmux driver replays at boot).
 func fatalSignaturesDir(projectRoot string) string {

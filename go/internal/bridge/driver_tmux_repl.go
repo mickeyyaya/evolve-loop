@@ -154,7 +154,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	scrollbackFile := filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
 	artifactScrollback := defaultIfZero(deps.ScrollbackLines, tmuxArtifactScrollback)
-	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", pfx, lp.session, cfg.Model, workingDir)
+	if omitted := cfg.Realization.ModelOmitted; omitted != "" {
+		fmt.Fprintf(deps.Stderr, "%s model='%s' is an unresolved tier token → no --model sent; this pane runs the CLI's OWN default, not the requested tier\n", pfx, omitted)
+	}
+	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", pfx, lp.session,
+		orDefault(effectiveModelLabel(cfg.Model, cfg.Realization.ModelOmitted), "(cli default)"), workingDir)
 	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named, artifactScrollback)
 
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.

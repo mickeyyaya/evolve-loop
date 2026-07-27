@@ -1,6 +1,11 @@
 package bridge
 
-import "strings"
+import (
+	"slices"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+)
 
 // realizer.go — the Go engine half of the hybrid Realizer (ADR-0022). The
 // per-CLI mapping data lives declaratively in each manifest's `params` table;
@@ -22,6 +27,31 @@ type ParamSpec struct {
 	From     string              `json:"from,omitempty"`     // "model_tier_map" (canonical) | "tier_alias" (deprecated) → resolve via Manifest.ModelTierMap
 	Template string              `json:"template,omitempty"` // repl: "/model {alias}"
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
+}
+
+// unresolvedModelTokens is the closed vocabulary that never names a model on
+// ANY CLI: the "auto" resolve-me sentinel (ADR-0044 C2/D3, cycle-262), every
+// canonical tier, and "high" (the input alias of "deep", translateV1TierKey).
+// A value still in this set after Manifest.ModelTierMap translation means the
+// manifest declared no entry for the tier and the fallback ladder left the tier
+// NAME in place — translateV1TierKey passes unknown keys through verbatim,
+// which is what lets one reach an emit point at all.
+//
+// Derived from modelcatalog.CanonicalTiers so the tier vocabulary has exactly
+// one source: a tier added there is covered here, in every driver, and in the
+// tests that sweep this var — with no parallel list to keep in sync.
+//
+// Note what is deliberately ABSENT: haiku/sonnet/opus. translateV1TierKey maps
+// them as legacy tier aliases, but they are also real claude model ids, so
+// suppressing them would disable model routing outright.
+var unresolvedModelTokens = append([]string{"auto", "high"}, modelcatalog.CanonicalTiers...)
+
+// isUnresolvedModelToken reports whether a resolved model value is vocabulary
+// rather than a concrete model id. Every builder of a model argument — the
+// realizer's flag/repl channels and each headless driver's own argv — consults
+// this one predicate, so the guard is genuinely matrix-wide.
+func isUnresolvedModelToken(resolved string) bool {
+	return slices.Contains(unresolvedModelTokens, resolved)
 }
 
 // permissionIntent maps a profile's claude-style permission_mode string onto
@@ -196,16 +226,19 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 			}
 		}
 	}
-	// ModelFlagPolicy (ADR-0044 C2 / D3): "auto" is the loop's resolve-me
-	// sentinel, never a valid concrete model for ANY CLI. When resolution
-	// leaves the sentinel intact (cycle-262: retro was dispatched with no
-	// concrete model assigned, and `claude --model auto` boots into the fatal
-	// "There's an issue with the selected model (auto)" pane), omit the model
-	// param entirely — the CLI's own default model is always preferable to a
-	// fatal boot. The realizer is the single emit point for every flag/repl
-	// CLI, so this one guard is matrix-wide; the headless codex driver keeps
-	// its own equivalent (driver_codex.go omit-on-auto) for the exec path.
-	if param == "model_tier" && resolved == "auto" {
+	// ModelFlagPolicy (ADR-0044 C2 / D3, generalized): a vocabulary token here
+	// means model_tier_map translation fell through, so the value names no
+	// model on any CLI and `<cli> --model <token>` is the cycle-262 fatal boot.
+	// Omit the param — the CLI's own default always beats a fatal boot. This is
+	// the emit point for every flag/repl CLI; the headless drivers guard their
+	// own argv against the same vocabulary (claudePArgs, driver_codex.go).
+	if param == "model_tier" && isUnresolvedModelToken(resolved) {
+		// Record the suppression so the driver's launch line can report the
+		// model the CLI will ACTUALLY run under. Silently omitting the flag
+		// while the log still prints the requested tier is how an
+		// adversarial-audit tier degrades to the account default with the only
+		// telemetry claiming otherwise.
+		r.ModelOmitted = resolved
 		return
 	}
 	switch spec.Channel {
