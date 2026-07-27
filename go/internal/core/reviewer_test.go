@@ -38,7 +38,7 @@ func TestOrchestrator_NoopReviewer_IsByteIdentical(t *testing.T) {
 	// Explicitly NO WithReviewer call.
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestOrchestrator_ReviewerApproves_CycleAdvances(t *testing.T) {
 	rev := &recordingReviewer{default_: ReviewResult{Approve: true}}
 	o := NewOrchestrator(st, led, buildRunners(nil), WithReviewer(rev))
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestOrchestrator_ReviewerRejects_CycleAborts(t *testing.T) {
 	}
 	o := NewOrchestrator(st, led, buildRunners(nil), WithReviewer(rev))
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err == nil {
 		t.Fatal("expected RunCycle to abort on reviewer rejection; got nil")
 	}
@@ -167,7 +167,7 @@ func TestCorrectionLoop_RejectThenApprove(t *testing.T) {
 	auditR := runners[PhaseAudit].(*fakeRunner)
 	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle should proceed after one correction; got %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCorrectionLoop_ExhaustsThenAborts(t *testing.T) {
 	buildR := runners[PhaseBuild].(*fakeRunner)
 	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err == nil {
 		t.Fatal("expected abort after corrections exhausted; got nil")
 	}
@@ -264,7 +264,7 @@ func TestCorrectionLoop_NonCanonicalVerdictAborts(t *testing.T) {
 	runners[PhaseBuild] = &sequencedRunner{name: "build", verdicts: []string{VerdictPASS, ""}}
 	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err == nil {
 		t.Fatal("expected abort on a non-canonical correction verdict; got nil")
 	}
@@ -290,7 +290,7 @@ func TestCorrectionLoop_DisabledIsImmediateAbort(t *testing.T) {
 	o := NewOrchestrator(st, led, runners, WithReviewer(rev), WithRetryConfig(retryCfg))
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 		Env:         map[string]string{},
 	})
@@ -322,7 +322,7 @@ func TestOrchestrator_ReviewerSkippedPhasesNotConsulted(t *testing.T) {
 	runners := buildRunners(map[Phase]string{PhaseBuildPlanner: VerdictSKIPPED})
 	o := NewOrchestrator(st, led, runners, WithReviewer(rev))
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}

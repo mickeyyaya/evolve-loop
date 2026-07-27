@@ -28,7 +28,7 @@ func TestCycleLoop_PostScoutHookFiresOncePreBuild(t *testing.T) {
 	t.Cleanup(func() { postScoutReplanProbe = prev })
 
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 

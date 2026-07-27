@@ -24,7 +24,7 @@ func TestOrchestrator_WithDirectivesProvider_SnapshotStampThread(t *testing.T) {
 		return want
 	}))
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestOrchestrator_WithDirectivesProvider_EmptySetNoStamp(t *testing.T) {
 		return directives.Set{}
 	}))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	for _, e := range led.entries {

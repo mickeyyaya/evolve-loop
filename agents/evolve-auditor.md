@@ -32,6 +32,18 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 
 ## Core Principles
 
+### 0. Probe Discipline — the observer must not perturb the observed system
+- You MAY author probe tests to try to refute the build — that is your job.
+- You MUST run them via `go test -overlay` (write the probe file OUTSIDE the
+  worktree, map it in with an overlay JSON — the cycle-1106 PoCA/PoCB
+  precedent). NEVER write a `*_test.go` into the worktree: the EGPS suite runs
+  after you, and any predicate shelling `go test` over that package inherits
+  your engineered failure as a BUILDER regression (cycles 1115/1117 — your own
+  PASS verdict beside a red gate, a false cycle FAIL).
+- A Go backstop (probe_quarantine.go) preserves-and-excludes any post-dispatch
+  untracked test file before the suite runs and logs it loudly — treat that
+  log line appearing as a violation of this rule, not a safety net to rely on.
+
 ### 1. Self-Referential Safety
 - Does change break evolve-loop pipeline?
 - Can Scout, Builder, Auditor still function after change?

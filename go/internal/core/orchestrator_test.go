@@ -160,7 +160,7 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 	o := NewOrchestrator(st, led, runners)
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		GoalHash:    "goal-1",
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 		"EVOLVE_BUILD_MODEL": "sonnet",
 	}
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 		Env:         envIn,
 	})
@@ -245,7 +245,7 @@ func TestOrchestrator_CycleEnv_IsCopied(t *testing.T) {
 	o := NewOrchestrator(st, led, runners)
 
 	envIn := map[string]string{"EVOLVE_CLI": "codex"}
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", Env: envIn})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), Env: envIn})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestOrchestrator_AuditFAIL_RoutesThroughRetro(t *testing.T) {
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictFAIL})
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestOrchestrator_AcquiresAndReleasesLock(t *testing.T) {
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestOrchestrator_LockErrorFailsFast(t *testing.T) {
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if !errors.Is(err, ErrLockHeld) {
 		t.Errorf("err=%v, want ErrLockHeld", err)
 	}
@@ -322,7 +322,7 @@ func TestOrchestrator_MissingRunnerErrors(t *testing.T) {
 	}
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("expected error for missing scout runner")
 	}
@@ -334,7 +334,7 @@ func TestOrchestrator_AdvancesLastCycleNumber(t *testing.T) {
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestOrchestrator_ReadStateError(t *testing.T) {
 	st := &fakeStorage{failOnReadState: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("ReadState error must propagate")
 	}
@@ -357,7 +357,7 @@ func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
 	st := &fakeStorage{failOnWriteCS: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("initial WriteCycleState error must propagate")
 	}
@@ -369,7 +369,7 @@ func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
 	st := &fakeStorage{writeCSFailAt: 2}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("mid-phase WriteCycleState error must propagate")
 	}
@@ -380,7 +380,7 @@ func TestOrchestrator_WriteCycleStatePostPhaseError(t *testing.T) {
 	st := &fakeStorage{writeCSFailAt: 3}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("post-phase WriteCycleState error must propagate")
 	}
@@ -390,7 +390,7 @@ func TestOrchestrator_LedgerAppendError(t *testing.T) {
 	st := &fakeStorage{}
 	led := &fakeLedger{failOnAppend: true}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("ledger append error must propagate")
 	}
@@ -400,7 +400,7 @@ func TestOrchestrator_FinalWriteStateError(t *testing.T) {
 	st := &fakeStorage{failOnWriteState: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("final WriteState error must propagate")
 	}
@@ -420,7 +420,7 @@ func TestOrchestrator_RunnerErrorPropagates(t *testing.T) {
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &erroringRunner{name: "scout"}
 	o := NewOrchestrator(st, led, runners)
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("runner error must propagate")
 	}
@@ -440,7 +440,7 @@ func TestOrchestrator_NonCanonicalVerdictRejected(t *testing.T) {
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &badVerdictRunner{name: "scout"}
 	o := NewOrchestrator(st, led, runners)
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatal("non-canonical verdict must be rejected")
 	}
@@ -452,7 +452,7 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
 	}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		Env:         map[string]string{},
 	})
 	if err != nil {
@@ -545,7 +545,7 @@ func TestOrchestrator_IntentGate_ContextOverrideRunsIntent(t *testing.T) {
 	o := NewOrchestrator(st, led, runners)
 
 	_, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		Context:     map[string]string{"intent_required": "true"},
 	})
 	if err != nil {
@@ -586,7 +586,7 @@ func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
 	})
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	})
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -661,7 +661,7 @@ func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 	})
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
@@ -710,7 +710,7 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
 	o := NewOrchestrator(st, led, runners)
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle should self-heal the transient timeout, got: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 99}
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatalf("RunCycle should abort after exhausting retries")
 	}
@@ -758,7 +758,7 @@ func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: errors.New("deterministic boom"), failUntil: 99}
 	o := NewOrchestrator(st, led, runners)
 
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"})
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 	if err == nil {
 		t.Fatalf("RunCycle should abort on a non-timeout error")
 	}

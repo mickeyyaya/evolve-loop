@@ -24,7 +24,7 @@ func TestRun_InlinePrompt_NoDiskFile(t *testing.T) {
 	emptyLoader := prompts.NewFromFS(fstest.MapFS{}) // any disk read would error
 	phase := New(spec, Config{Bridge: fb, Prompts: emptyLoader, PromptBody: "INLINE PERSONA"})
 
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/p", Workspace: t.TempDir()})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
 	if err != nil {
 		t.Fatalf("inline-prompt spec phase must not read disk; got %v", err)
 	}
@@ -46,7 +46,7 @@ func TestRun_NoInline_LoadsFromDisk(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "# ok\n"}
 	phase := New(spec, Config{Bridge: fb, Prompts: fakePrompts("evolve-disk-phase", "DISK PERSONA")})
 
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/p", Workspace: t.TempDir()})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

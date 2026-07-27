@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,17 @@ type Result struct {
 	IsRegression    bool   `json:"is_regression"`
 	IsRedTeam       bool   `json:"is_red_team,omitempty"`
 	EvidenceExcerpt string `json:"evidence_excerpt,omitempty"`
+	// FailingTests names the `--- FAIL:` tests found in this predicate's
+	// output — for a meta-predicate that shells an inner `go test`, these are
+	// the INNER failures, the exact identity the excerpt cap used to destroy
+	// (cycles 1107/1116/1123: head-truncated evidence left no failing test
+	// name anywhere on disk, making their false reds permanently
+	// unconfirmable). Deduped, bounded by maxFailingTests.
+	FailingTests []string `json:"failing_tests,omitempty"`
+	// EvidenceNote records WHY no failing test could be named on a red
+	// (compile failure, timeout, signal) — a red must never be a
+	// content-free exit code.
+	EvidenceNote string `json:"evidence_note,omitempty"`
 	// Flaky marks a predicate that was RED on the first run and GREEN on the
 	// single bounded retry (cycle-468): value "passed-on-retry". Visible in
 	// the wire JSON so a flake is never silently absorbed; the first-run
@@ -149,6 +161,7 @@ func Run(opts Options) (Verdict, error) {
 	if gErr != nil {
 		return Verdict{}, gErr
 	}
+	demoteWarnings := demoteOutOfScope(goResults, opts)
 	for _, r := range goResults {
 		v.record(r)
 	}
@@ -163,7 +176,7 @@ func Run(opts Options) (Verdict, error) {
 	} else {
 		v.Verdict = "FAIL"
 	}
-	v.Warnings = warningsFromFlaky(v.Results)
+	v.Warnings = append(warningsFromFlaky(v.Results), demoteWarnings...)
 	return v, nil
 }
 
@@ -515,7 +528,20 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 			r.EvidenceExcerpt = excerpt(a.output.String())
 		case "red":
 			r.ExitCode = 1
-			r.EvidenceExcerpt = excerpt(a.output.String())
+			full := a.output.String()
+			r.EvidenceExcerpt = excerpt(full)
+			// Extract inner failing-test identity from the FULL output,
+			// before the excerpt cap can destroy it. The predicate's own
+			// name is excluded — it is already the ACID; the inner names
+			// are the diagnosis.
+			for _, name := range extractFailingTests(full) {
+				if name != a.test {
+					r.FailingTests = append(r.FailingTests, name)
+				}
+			}
+			if len(r.FailingTests) == 0 && !strings.Contains(full, "--- FAIL: "+a.test) {
+				r.EvidenceNote = "no `--- FAIL:` marker in output — compile failure, timeout, or signal; see excerpt tail"
+			}
 		}
 		out = append(out, r)
 	}
@@ -566,12 +592,51 @@ func changedPackagesForCycle(projectRoot string, cycle int) []string {
 	return nil
 }
 
+// excerptHead is the slice of evidenceMax kept from the FRONT of over-limit
+// output: a predicate's own t.Fatalf line — the author's diagnosis with its
+// file:line — prints first. The remainder comes from the TAIL, where go test
+// accumulates `--- FAIL:` detail; pure head-truncation left cycles
+// 1107/1116/1123 with reds whose failing test name survives nowhere on disk.
+const excerptHead = 200
+
+// excerpt caps s at ~evidenceMax as head+"…"+tail (see excerptHead). Both cut
+// points are re-anchored to valid UTF-8 so a mid-rune slice cannot leak
+// mojibake into the verdict JSON.
 func excerpt(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) <= evidenceMax {
 		return s
 	}
-	return s[:evidenceMax] + "…"
+	head := strings.ToValidUTF8(s[:excerptHead], "")
+	tail := strings.ToValidUTF8(s[len(s)-(evidenceMax-excerptHead):], "")
+	return head + "…" + tail
+}
+
+// maxFailingTests bounds Result.FailingTests so a mass failure cannot bloat
+// the verdict JSON; the excerpt tail still shows the overflow.
+const maxFailingTests = 8
+
+// failLineRE matches a go-test failure marker at any nesting depth — including
+// inner-subprocess output a meta-predicate t.Logf'd as free-form text.
+var failLineRE = regexp.MustCompile(`--- FAIL: (\S+)`)
+
+// extractFailingTests returns the deduped, order-preserving, bounded list of
+// test names behind every `--- FAIL:` in s.
+func extractFailingTests(s string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range failLineRE.FindAllStringSubmatch(s, -1) {
+		name := m[1]
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+		if len(out) == maxFailingTests {
+			break
+		}
+	}
+	return out
 }
 
 var (

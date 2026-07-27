@@ -120,7 +120,7 @@ func TestAbortCleanupPreservesWorktreeDiff(t *testing.T) {
 	wt := &fakeWorktree{path: "/tmp/wt/cycle-1"}
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(wt))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err == nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err == nil {
 		t.Fatal("a fatal build phase must abort the cycle with an error")
 	}
 	if len(wt.cleaned) != 0 {

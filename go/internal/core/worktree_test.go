@@ -128,7 +128,7 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 	wt := &fakeWorktree{path: "/tmp/wt/cycle-10"}
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(wt))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 
@@ -165,7 +165,7 @@ func TestOrchestrator_WorktreeProvisionFailure_BestEffort(t *testing.T) {
 	wt := &fakeWorktree{createErr: errors.New("git worktree add failed")}
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(wt))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("RunCycle should not fail on best-effort worktree error: %v", err)
 	}
 	if len(wt.cleaned) != 0 {
