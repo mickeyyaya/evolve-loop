@@ -25,6 +25,12 @@ package setup
 //
 // RED today: every test below fails against the current 3-tier-only
 // implementation. Do NOT modify this file — implement the seam.
+//
+// AMENDED 2026-07-27 (operator sign-off, model-tier-safety) — the ONE exception
+// to "Do NOT modify" above: TestTierModelsFor_IncludesTopIdentityFallback pinned
+// claude top→"top", now known to be a live fatal launch. Renamed to
+// TestTierModelsFor_TopResolvesToModelNotTierName; see its doc for the contract
+// (both halves preserved).
 
 import "testing"
 
@@ -83,16 +89,35 @@ func TestRecommend_MaxQualityBiasesToTop(t *testing.T) {
 	}
 }
 
-// TestTierModelsFor_IncludesTopIdentityFallback (AC, positive): tierModelsFor
-// must resolve a "top" entry for every CLI, even before any bridge manifest
-// declares a native model for it — the SAME identity-fallback contract
-// fast/balanced/deep already get when a manifest lacks the entry (claude's
-// tier_aliases are empty, so its map is pure identity — the exact fixture
-// TestTierModelsFor already uses for fast/balanced/deep).
-func TestTierModelsFor_IncludesTopIdentityFallback(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+// TestTierModelsFor_TopResolvesToModelNotTierName (AC, positive + negative):
+// tierModelsFor must resolve a "top" entry for every CLI — abstractTiers must
+// include "top" or onboarding can never document/report it. Both halves of
+// that contract are pinned:
+//
+//   - a family whose manifest declares the tier resolves to a real MODEL id;
+//   - the identity fallback survives for a base with NO manifest, which is the
+//     only case where echoing the tier name is a feature rather than a latent
+//     `--model <tier>` fatal launch (bridge.isUnresolvedModelToken is the sink
+//     guard that makes even that case non-fatal).
+//
+// Hermetic without a catalog seam: the test binary's cwd is this package dir,
+// which contains no .evolve, so paths.ResolveFromEnv finds no catalog to
+// overlay. (The former t.Setenv("EVOLVE_MODEL_CATALOG_DIR") here was inert —
+// that env read was replaced by fn-var DI in cycle-17 and acs/cycle17 asserts
+// it has no reader; the real seam is bridge.SetModelCatalogDirFn.)
+func TestTierModelsFor_TopResolvesToModelNotTierName(t *testing.T) {
 	claude := tierModelsFor("claude")
-	if claude["top"] != "top" {
-		t.Errorf(`tierModelsFor("claude")["top"] = %q, want "top" (identity fallback — abstractTiers must include "top")`, claude["top"])
+	if claude["top"] != "opus" {
+		t.Errorf(`tierModelsFor("claude")["top"] = %q, want "opus" — a family whose manifest declares the tier must resolve a real model id, `+
+			`not the tier NAME (claude-tmux.json declares "top": "opus"; echoing "top" here is the value that reaches `+
+			`Catalog.Lookup as "resolvable" and the CLI as --model top)`, claude["top"])
+	}
+
+	// Negative / anti-degenerate: the identity fallback itself is still pinned,
+	// on a base that genuinely has no manifest to declare anything.
+	unknown := tierModelsFor("nosuchcli")
+	if unknown["top"] != "top" {
+		t.Errorf(`tierModelsFor("nosuchcli")["top"] = %q, want "top" (identity fallback — abstractTiers must include "top", `+
+			`and a CLI with no manifest has nothing to resolve against)`, unknown["top"])
 	}
 }

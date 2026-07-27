@@ -13,9 +13,63 @@ import (
 // FileName is the catalog's basename inside the .evolve directory.
 const FileName = "model-catalog.json"
 
+// PrevFileName is the basename of the copy Write retains of the catalog it is
+// about to overwrite. The live catalog is gitignored and partly hand-authored
+// (it can hold entries no picker parser is able to regenerate), so an atomic
+// rename with nothing retained makes a single bad refresh unrecoverable.
+// Rollback is `cp model-catalog.prev.json model-catalog.json`.
+const PrevFileName = "model-catalog.prev.json"
+
 // pathFor returns the catalog file path under evolveDir.
 func pathFor(evolveDir string) string {
 	return filepath.Join(evolveDir, FileName)
+}
+
+// prevPathFor returns the retained-previous-catalog path under evolveDir.
+func prevPathFor(evolveDir string) string {
+	return filepath.Join(evolveDir, PrevFileName)
+}
+
+// retainPrevious best-effort copies the catalog currently on disk to
+// PrevFileName. Every failure is swallowed: retention is a rollback
+// convenience and must NEVER block the write that matters (a missing prior on
+// the first write is the common case, not an error).
+//
+// Temp+rename, matching Write, for three reasons a plain WriteFile gets wrong:
+//   - ATOMICITY: fleet lanes are separate processes sharing one .evolve, so
+//     concurrent refreshes would interleave into a torn .prev — and a torn
+//     .prev turns the documented rollback into a second outage.
+//   - SYMLINKS: WriteFile writes THROUGH a pre-existing symlink at the
+//     retention path; Rename replaces it. This is the only write in the
+//     package that a planted link could otherwise redirect.
+//   - MODE: os.CreateTemp yields 0600 and Rename preserves it, so the copy
+//     inherits the live catalog's owner-only access instead of widening it.
+//
+// os.CreateTemp is called DIRECTLY rather than through the createTemp package
+// var: that seam exists so store's failure-injection tests can drive Write's
+// error paths, and retention must not consume it.
+func retainPrevious(evolveDir string) {
+	raw, err := os.ReadFile(pathFor(evolveDir))
+	if err != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(evolveDir, PrevFileName+".*.tmp")
+	if err != nil {
+		return
+	}
+	name := tmp.Name()
+	if _, werr := tmp.Write(raw); werr != nil {
+		_ = tmp.Close()
+		_ = os.Remove(name)
+		return
+	}
+	if cerr := tmp.Close(); cerr != nil {
+		_ = os.Remove(name)
+		return
+	}
+	if rerr := os.Rename(name, prevPathFor(evolveDir)); rerr != nil {
+		_ = os.Remove(name)
+	}
 }
 
 type tempFile interface {
@@ -86,6 +140,9 @@ func Write(evolveDir string, c Catalog) error {
 		cleanup()
 		return fmt.Errorf("modelcatalog: close temp: %w", err)
 	}
+	// Retain the outgoing catalog only once the replacement is fully written
+	// and about to land — a failed marshal/write must not rotate .prev.
+	retainPrevious(evolveDir)
 	if err := os.Rename(tmpName, pathFor(evolveDir)); err != nil {
 		cleanup()
 		return fmt.Errorf("modelcatalog: rename: %w", err)

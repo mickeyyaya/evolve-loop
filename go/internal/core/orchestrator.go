@@ -604,13 +604,16 @@ func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 	return func(o *Orchestrator) { o.catalogRefresh = fn }
 }
 
-// WithModelCatalogLookup injects the live model-catalog resolvability check
-// (cycle-440 MR4a) consulted by router.ClampPlanModelRouting: (cli,tier)→
-// (model,ok). Nil (default) skips the catalog-resolvability gate — the plan's
-// guardrail validation (allowed_clis/model_tier_envelope) still applies. The
-// composition root wires modelcatalog.Catalog.Lookup so core stays a leaf and
-// never imports modelcatalog directly (dependency inversion, mirroring
-// catalogRefresh above).
+// WithModelCatalogLookup injects the model resolvability check (cycle-440
+// MR4a) consulted by router.ClampPlanModelRouting: (cli,tier)→(model,ok).
+// Nil (default) skips the resolvability gate — the plan's guardrail validation
+// (allowed_clis/model_tier_envelope) still applies.
+//
+// The composition root wires the manifest-backed resolver (cmd/evolve/
+// model_tier_resolver.go, which documents why not Catalog.Lookup) so core
+// stays a leaf and never imports bridge or modelcatalog (dependency
+// inversion, mirroring catalogRefresh above). ModelCatalogLookupWired
+// (failure_hook.go) lets that wiring be proven in a real test.
 func WithModelCatalogLookup(fn func(cli, tier string) (string, bool)) Option {
 	return func(o *Orchestrator) { o.modelCatalogLookup = fn }
 }

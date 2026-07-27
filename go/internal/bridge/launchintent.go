@@ -39,4 +39,10 @@ type Realization struct {
 	REPLInput   []string
 	Ephemeral   bool   // controller: kill the session on exit
 	SessionName string // controller: named/resumable session ("" = unnamed)
+	// ModelOmitted is the model value the realizer SUPPRESSED because it was
+	// still an abstract vocabulary token (isUnresolvedModelToken) rather than a
+	// concrete model id — empty when nothing was suppressed. Drivers log it so
+	// a launch that silently fell back to the CLI's own default cannot be
+	// reported as if the requested tier had been dispatched.
+	ModelOmitted string
 }

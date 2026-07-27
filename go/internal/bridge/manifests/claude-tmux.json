@@ -24,7 +24,8 @@
   "model_tier_map": {
     "fast": "haiku",
     "balanced": "sonnet",
-    "deep": "opus"
+    "deep": "opus",
+    "top": "opus"
   },
   "params": {
     "permission": {
