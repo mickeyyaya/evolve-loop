@@ -810,7 +810,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// drifted ahead of the pattern — surface it now so the NEXT drift is caught
 		// in one cycle, not eight (as the per-model wording change was). Diagnostic
 		// only; the exit-81 verdict stands.
-		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, lastGoodPane, paneProfile.ExhaustedRegex)
+		// Scanned on the SAME agent-stripped pane as the primary detector above
+		// (strippedForExhaustionScan, line ~704): an alarm that scans the raw pane
+		// fires on wall-shaped text the agent merely wrote or echoed, which the real
+		// regex correctly ignored — an operator chasing a regex that is working.
+		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedForExhaustionScan(lastGoodPane, ar.injectedPrompt), paneProfile.ExhaustedRegex)
 		return ExitArtifactTimeout, nil
 	}
 
