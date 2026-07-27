@@ -65,12 +65,27 @@ type fileAreaRule struct{}
 
 const areaDepth = 3
 
-// hubAreaMaxItems is the discriminative-signal cutoff: an area referenced by
+// hubAreaMaxItems is the discriminative-signal CEILING: an area referenced by
 // more items than this is a HUB (go/internal/core appears in half the real
 // backlog) and binds nothing — the inverse-document-frequency idea. Without
 // it, real-backlog validation fused 55 of 61 items into one cluster through
 // the core hub.
 const hubAreaMaxItems = 5
+
+// minAreaDepth is the discriminative FLOOR — the same argument as
+// hubAreaMaxItems applied from below. A path whose directory is a single
+// top-level segment ("agents", "skills", "go") names a BAG of unrelated files,
+// not a unit of work: one worktree, one build and one audit cannot meaningfully
+// carry "everything that touches agents/". Such an area binds nothing.
+//
+// Without this floor, every persona file in the repo collapsed to the area
+// "agents" and every top-level skill file to "skills". Measured on the 84-item
+// backlog (2026-07-27), two "agents" edges chained three unrelated campaigns
+// (chronicle-2026-07 <-> pipeline-integrity <-> convergence-2026-07) into a
+// single 43-item cluster — 51% of the backlog, chunked into 11 batches each
+// marked "run the previous batch first". These shallow areas slip UNDER
+// hubAreaMaxItems, so the ceiling alone never caught them.
+const minAreaDepth = 2
 
 func (fileAreaRule) Edges(items []Item) []Edge {
 	byArea := map[string][]int{}
@@ -98,13 +113,24 @@ func (fileAreaRule) Edges(items []Item) []Edge {
 }
 
 // fileArea reduces a file path to its grouping area: the containing directory,
-// capped at areaDepth segments. A bare filename (no directory) has no area.
+// capped at areaDepth segments and required to be at least minAreaDepth deep.
+// A bare filename (no directory) and a bare top-level directory both have no
+// area — see minAreaDepth for why shallow areas must not bind.
 func fileArea(f string) string {
-	dir := path.Dir(strings.TrimSpace(f))
+	f = strings.TrimSpace(f)
+	dir := path.Dir(f)
+	// An item may name a directory ("go/internal/acssuite/"); path.Dir would
+	// climb out of it, so keep the directory itself as the area.
+	if strings.HasSuffix(f, "/") {
+		dir = strings.TrimSuffix(f, "/")
+	}
 	if dir == "." || dir == "/" || dir == "" {
 		return ""
 	}
 	seg := strings.Split(dir, "/")
+	if len(seg) < minAreaDepth {
+		return "" // top-level bag, not a unit of work
+	}
 	if len(seg) > areaDepth {
 		seg = seg[:areaDepth]
 	}
