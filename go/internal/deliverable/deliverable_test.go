@@ -76,6 +76,44 @@ func TestVerify_MissingSection_NamesIt(t *testing.T) {
 	}
 }
 
+// A sentinel-declared FAIL/WARN buys a phase nothing: verifyMarkdown runs the
+// required-Sections loop unconditionally, ahead of and independent of the
+// verdict/failure-context block, with no early return between them. So "I am
+// reporting FAIL, therefore I need not write the real report" is not — and must
+// never become — a legal reading of the contract. The body is owed on every
+// verdict. This locks that ordering against a future short-circuit.
+func TestVerify_WarnOrFailSentinel_StillRequiresSections(t *testing.T) {
+	for _, verdict := range []string{"FAIL", "WARN"} {
+		sentinel := `<!-- evolve-verdict: {"phase":"build","verdict":"` + verdict + `"} -->` + "\n"
+
+		ws := t.TempDir()
+		writeFile(t, ws, "build-report.md", sentinel)
+		res, err := Verify("build", phasecontract.Roots{Workspace: ws})
+		if err != nil {
+			t.Fatalf("verdict %s: unexpected error: %v", verdict, err)
+		}
+		if res.OK {
+			t.Errorf("verdict %s: sentinel-only report accepted as well-formed; a %s verdict must not waive the report body", verdict, verdict)
+		} else if !hasCode(res, CodeMissingSection) {
+			t.Errorf("verdict %s: want %s, got %+v", verdict, CodeMissingSection, res.Violations)
+		}
+
+		// Control: the check must key off the sections, not off the verdict — the
+		// same FAIL/WARN report WITH its required section is not missing_section.
+		// (Other violations may still fire, e.g. failure_context_missing; only
+		// the section verdict is under test here.)
+		ws2 := t.TempDir()
+		writeFile(t, ws2, "build-report.md", sentinel+"\n# Build Report\n\n## Changes\n- foo.go\n")
+		res2, err := Verify("build", phasecontract.Roots{Workspace: ws2})
+		if err != nil {
+			t.Fatalf("verdict %s (control): unexpected error: %v", verdict, err)
+		}
+		if hasCode(res2, CodeMissingSection) {
+			t.Errorf("verdict %s: report WITH its required section must not be flagged %s; got %+v", verdict, CodeMissingSection, res2.Violations)
+		}
+	}
+}
+
 func TestVerify_StrayInWorktree(t *testing.T) {
 	ws, wt := t.TempDir(), t.TempDir()
 	// Agent wrote the report into the worktree root instead of the workspace.
