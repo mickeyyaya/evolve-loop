@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
@@ -130,8 +131,41 @@ func readAuditFailReason(workspace string) (phase string, reasons []string) {
 // never collapse to one id. No timestamp/random seed — identical artifacts always
 // yield the identical fingerprint.
 func fingerprint(phase, preClass string, reasons []string) string {
-	sum := sha256.Sum256([]byte(phase + "\x00" + preClass + "\x00" + strings.Join(reasons, "\x00")))
+	normalized := make([]string, 0, len(reasons))
+	for _, r := range reasons {
+		normalized = append(normalized, normalizeReasonForFingerprint(r))
+	}
+	sum := sha256.Sum256([]byte(phase + "\x00" + preClass + "\x00" + strings.Join(normalized, "\x00")))
 	return phase + "|" + preClass + "|" + hex.EncodeToString(sum[:])[:12]
+}
+
+// narrativeVerdictToken matches the audit phase's verdict-conflict record token
+// `narrative=<canonical verdict>` (phases/audit/audit.go). Anchored to the
+// literal prefix and the four-value enum, so no other reason text can match.
+var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
+
+// normalizeReasonForFingerprint projects a reason onto its DEFECT IDENTITY,
+// dropping tokens that are load-bearing for a human reader but pure noise for
+// identity. Display and identity are two projections of the one reason string:
+// the digest, the dossier and audit-fail-reason.json all keep the reason
+// verbatim — only the hash input is normalized.
+//
+// Today that is exactly one token. The audit verdict-conflict record names the
+// auditor's own verdict (`narrative=PASS|WARN|SKIPPED`); three canonical values
+// are reachable for ONE recurring defect — the same gate red on three retries —
+// which would split it into three fingerprint buckets against
+// IdenticalFingerprintCeiling=3 and stop the identical-fingerprint breaker from
+// ever halting the batch (cycle-1127 audit C1). Bounding the value (IsVerdict)
+// makes it finite but not STABLE; the cycle-1124 lesson requires both. Same
+// principle as egpsRedIDCycleTokens stripping cycle numbers from ac_ids — with
+// the normalization at the hash boundary instead of the message, because here
+// the varying token is the very fact the operator needs to see.
+//
+// Deliberately narrow: the defect-identifying content of the same reason set
+// (which gate, which predicate) is untouched, so two DIFFERENT defects never
+// collapse into one fingerprint.
+func normalizeReasonForFingerprint(reason string) string {
+	return narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
 }
 
 // ensureFailureDigest is the single-source wiring shared by BOTH retro

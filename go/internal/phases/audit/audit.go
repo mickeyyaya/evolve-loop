@@ -130,10 +130,29 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	verdict, verdictFound := extractAuditVerdict(artifact, h.phaseIO)
+	// narrative is the auditor's OWN verdict, captured BEFORE any gate override
+	// below can overwrite it. The override is correct — a deterministic gate must
+	// outrank prose (cycles 339-341) — but silently discarding the disagreement
+	// leaves an operator unable to tell a genuine defect from a POISONED
+	// predicate the auditor itself read as clean (cycles 1107/1116/1117).
+	narrative := verdict
 	if !verdictFound {
 		verdict = core.VerdictFAIL
 	}
 	var diags []core.Diagnostic
+	// overrodeBy names each gate that ACTUALLY forced verdict=FAIL this call —
+	// the single source of truth for "was the narrative overridden?". Keying the
+	// conflict record off this list (not off "a gate diagnostic exists") is what
+	// keeps the fail-OPEN paths silent: a gate that could not RUN emits a warning
+	// and leaves the verdict alone, so it never appears here. Labels are a fixed
+	// vocabulary, never offender text — the record is a fingerprint input
+	// (failure_digest.go → blocker_breaker.go identical-fingerprint), and the
+	// offender detail already rides each gate's own error diagnostic beside it.
+	var overrodeBy []string
+	overrode := func(gate string) {
+		overrodeBy = append(overrodeBy, gate)
+		verdict = core.VerdictFAIL
+	}
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
 	// Probe quarantine runs UNCONDITIONALLY — before the verdict-exists gate.
@@ -162,19 +181,29 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	}
 
 	redCount, redIDs, shipEligible, acsErr := readACSVerdict(verdictPath)
-	if acsErr != nil {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  fmt.Sprintf("acs-verdict.json: %s", acsErr.Error()),
-		})
-		verdict = core.VerdictFAIL
-	} else if redCount > 0 {
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  egpsRedMessage(redCount, redIDs),
-		})
-		verdict = core.VerdictFAIL
-	} else if shipEligible != nil && !*shipEligible {
+	// egpsOverride is the one-line reason of whichever EGPS branch forces FAIL —
+	// "" means no override happened. Selecting the reason first (instead of
+	// appending inside each branch) makes the override single-exit: exactly one
+	// gate diagnostic, one `verdict = FAIL`. egpsLabel is that branch's stable
+	// name for the conflict record (distinct per branch, so two different EGPS
+	// reasons never collapse to one fingerprint).
+	// egpsBlocked — NOT `egpsOverride != ""`. The decision to fail a
+	// ship-blocking gate must never ride on message FORMATTING: a future message
+	// builder that returned "" would silently convert an EGPS red into a
+	// non-FAIL (fail-OPEN). The bool is set in the same arm that selects the
+	// reason, so the two cannot drift.
+	var egpsBlocked bool
+	var egpsOverride, egpsLabel string
+	switch {
+	case acsErr != nil:
+		egpsBlocked = true
+		egpsOverride = fmt.Sprintf("acs-verdict.json: %s", acsErr.Error())
+		egpsLabel = "EGPS acs-verdict.json unreadable"
+	case redCount > 0:
+		egpsBlocked = true
+		egpsOverride = egpsRedMessage(redCount, redIDs)
+		egpsLabel = "EGPS red_count>0"
+	case shipEligible != nil && !*shipEligible:
 		// The authoritative acssuite SSOT (ship_eligible) can say do-not-ship even
 		// when red_count happens to be 0 (a pre-staged/agent-written verdict, or a
 		// future acssuite that gates on more than the red count). red_count alone is
@@ -183,11 +212,13 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		// this cycle, shipEligible==nil) is untouched: back-compat, never a
 		// spurious FAIL. This gate is symmetric to the timeout-reconcile path — both
 		// route through this same Classify block, no duplicate branch.
-		diags = append(diags, core.Diagnostic{
-			Severity: "error",
-			Message:  "EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it",
-		})
-		verdict = core.VerdictFAIL
+		egpsBlocked = true
+		egpsOverride = "EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it"
+		egpsLabel = "EGPS ship_eligible=false"
+	}
+	if egpsBlocked {
+		diags = append(diags, core.Diagnostic{Severity: "error", Message: egpsOverride})
+		overrode(egpsLabel)
 	}
 
 	// gofmt CI-parity gate: a cycle whose worktree has any non-gofmt-s-clean
@@ -209,7 +240,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 				Severity: "error",
 				Message:  fmt.Sprintf("gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. Run `gofmt -w -s .` in go/. Offenders: %s", len(dirty), strings.Join(dirty, ", ")),
 			})
-			verdict = core.VerdictFAIL
+			overrode("gofmt")
 		}
 	}
 
@@ -231,7 +262,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 				Severity: "error",
 				Message:  fmt.Sprintf("skill projection drift: %d artifact(s) stale vs their SSOTs (SKILL.md phase-facts and/or commands/ stubs) — CI TestSkills_NoDrift would FAIL. Run `evolve skills generate`. Drifted: %s", len(drift), strings.Join(drift, ", ")),
 			})
-			verdict = core.VerdictFAIL
+			overrode("skills-drift")
 		}
 	}
 
@@ -254,7 +285,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 				Severity: "error",
 				Message:  fmt.Sprintf(failTmpl, len(offenders), strings.Join(offenders, "; ")),
 			})
-			verdict = core.VerdictFAIL
+			overrode(name)
 		}
 	}
 	applyCIGate(h.goVetCheck, "go vet gate",
@@ -267,6 +298,59 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
 	applyCIGate(h.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
 		"%d new go/internal/<pkg>(s) changed this cycle are absent from .apicover-enforce — the apicover -enforce gate silently skips them (new-package blind spot). Add each to go/.apicover-enforce + an apicover_named_test.go before ship. Offenders: %s")
+
+	// Auditor-vs-gate coherence record — ONE per Classify call, emitted here so
+	// it covers EVERY gate above rather than the EGPS block alone (inbox item
+	// `verdict-coherence-auditor-vs-egps`, 4th recurrence: cycles 87/352/456).
+	// The gate keeps outranking prose — nothing above is softened — but the
+	// disagreement is now durable: error severity IS the wiring, since
+	// errorSeverityMessages (core/system_failure.go) keys off Severity=="error",
+	// so the record rides the existing AuditFailReasons → <phase>-fail-reason.json
+	// → dossier SubstantiveError chain with no new plumbing.
+	//
+	// core.IsVerdict bounds `narrative` to the four canonical verdicts. It is
+	// agent-controlled (the evolve-verdict sentinel's JSON `verdict` field is not
+	// enum-checked by ParseVerdictSentinelFull, which rejects only ""), and this
+	// string becomes a sha256 failure-fingerprint input: an unbounded value would
+	// vary per retry and blind the identical-fingerprint blocker breaker, the same
+	// stability invariant egpsRedIDCycleTokens exists to protect. It also keeps
+	// the record single-line, so an injected "\n OPERATOR: ..." cannot forge an
+	// extra reason line in the dossier or in retro/failure-adapter prompts.
+	//
+	// BOUNDED is necessary but NOT sufficient (cycle-1127 audit C1): three
+	// canonical non-FAIL narratives are reachable, so one recurring defect would
+	// still split into three fingerprint buckets against a ceiling of 3. The
+	// exact verdict cannot be dropped here — carrying it into the dossier IS
+	// this record's purpose, and a warning-severity copy is discarded by
+	// errorSeverityMessages — so STABILITY is restored one layer down, where it
+	// belongs: core.fingerprint normalizes the `narrative=<verdict>` token out
+	// of the hash input while the operator-facing reason keeps it verbatim
+	// (display vs identity projections of one source). Keep the literal
+	// "narrative=" prefix in the format string — that token is the seam
+	// core.normalizeReasonForFingerprint matches on.
+	//
+	// Silent by construction on every coherent case: no override (fail-OPEN or
+	// green gate) ⇒ overrodeBy empty; no parseable/valid narrative ⇒ nothing to
+	// disagree with; narrative already FAIL ⇒ auditor and machine agree.
+	// The strict_audit WARN→FAIL promotion below is deliberately NOT a conflict:
+	// it is a policy re-grade of a verdict the auditor already declined to pass,
+	// not a mechanical gate contradicting a clean read.
+	if verdictFound && core.IsVerdict(narrative) && narrative != core.VerdictFAIL && len(overrodeBy) > 0 {
+		diags = append(diags, core.Diagnostic{
+			Severity: "error",
+			// Neutral by construction: it states WHO said WHAT and stops. The
+			// earlier draft asserted the auditor "read the cycle as clean" (false
+			// for WARN, meaningless for SKIPPED) and appended a fixed exculpatory
+			// "may be a poisoned gate rather than a real regression" sentence —
+			// which handed the audited agent a standing lever over the operator's
+			// "why did this cycle fail" surface. The reader draws the inference
+			// from the evidence beside it.
+			Message: fmt.Sprintf("verdict-conflict: auditor narrative=%s but %d deterministic gate(s) forced FAIL [%s] — "+
+				"the gate outranks the narrative (ship policy unchanged); both readings are recorded so the "+
+				"disagreement is weighable. Gate detail is in the error diagnostics beside this one.",
+				narrative, len(overrodeBy), strings.Join(overrodeBy, ", ")),
+		})
+	}
 
 	if verdict == core.VerdictWARN && policy.StrictAuditFor(req.ProjectRoot) {
 		verdict = core.VerdictFAIL
