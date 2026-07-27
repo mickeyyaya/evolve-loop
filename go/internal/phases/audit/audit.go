@@ -136,6 +136,17 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	var diags []core.Diagnostic
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
+	// Probe quarantine runs UNCONDITIONALLY — before the verdict-exists gate.
+	// genVerdict is skipped when the auditor pre-wrote acs-verdict.json (the
+	// persona instructs exactly that), and a quarantine reachable only through
+	// genVerdict would be bypassed with it (review M8). Unconditional also
+	// means UNCOUPLED from the genVerdict hook being wired — a config path
+	// with no generator must not silently lose the quarantine with it.
+	// Degrades open on its own (no worktree / git failure → loud log).
+	if qErr := quarantineProbesForRequest(req); qErr != nil {
+		diags = append(diags, core.Diagnostic{Severity: "warning",
+			Message: fmt.Sprintf("probe quarantine: %s", qErr.Error())})
+	}
 	// Generate acs-verdict.json when absent and a generator is wired.
 	// Pre-staged files (operator/CI) are honored untouched. If generation
 	// writes nothing (zero predicates), the missing-file FAIL floor holds.
@@ -543,6 +554,9 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	if root == "" {
 		root = req.ProjectRoot
 	}
+	// Probe quarantine runs in Classify (before the verdict-exists gate), not
+	// here — a pre-staged acs-verdict.json skips this function entirely and
+	// must not skip the quarantine with it (review M8).
 	// Discover predicate FILES from the worktree (Root), but resolve `.evolve/`
 	// runtime data (history, baselines, current build-report) to the MAIN project
 	// root via EVOLVE_PROJECT_ROOT — those live in main, not the worktree, so a

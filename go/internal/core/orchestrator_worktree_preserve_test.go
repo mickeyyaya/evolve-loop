@@ -51,7 +51,7 @@ func TestOrchestrator_ShipFailureAborts_PreservesWorktree(t *testing.T) {
 	wt := &fakeWorktree{path: "/tmp/wt/cycle-1"}
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(wt))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err == nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err == nil {
 		t.Fatal("integrity ship failure must abort the cycle")
 	}
 	if len(wt.cleaned) != 0 {
@@ -72,7 +72,7 @@ func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
 	wt := &fakeWorktree{path: "/tmp/wt/cycle-1"}
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(wt))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("transient ship failure should recover: %v", err)
 	}
 	if ship.calls != 2 {

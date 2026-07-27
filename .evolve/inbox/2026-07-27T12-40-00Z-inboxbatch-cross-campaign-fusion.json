@@ -1,0 +1,24 @@
+{
+  "id": "inboxbatch-cross-campaign-fusion",
+  "title": "Batch clustering still fuses 27 items across 18 campaigns \u2014 the area floor halved it, a second bridge class remains",
+  "kind": "pipeline-integrity",
+  "priority": "medium",
+  "weight": 0.82,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/inboxbatch/rules.go"
+  ],
+  "connects_to": [
+    "inbox-console-worklist-view"
+  ],
+  "route": "lane",
+  "injected_by": "console-2026-07-27-batching-review",
+  "evidence": "Measured on the live 84-item backlog. BEFORE minAreaDepth: 33 clusters, largest 43 items (51% of backlog) chunked into 11 batches each 'run the previous batch first'. AFTER: 37 clusters, largest 27 items (32%), reasons still listing 18 campaigns ('campaign docs-code-alignment-2026-07, campaign loop-reliability-2026-07, campaign pipeline-integrity, +15 more'). Members incl. artifact-name-ssot-retro-backfill, quota-pause-wakeat-unpopulated, guards-role-hermetic-home, docs-drift-sweep-2026-07, dead-api-sweep \u2014 no shared concern.",
+  "notes": "campaignRule binds same-campaign items; fileAreaRule then bridges DIFFERENT campaigns whenever two items share a 2-3 segment area with <=hubAreaMaxItems(5) references, and union-find merges transitively. The minAreaDepth floor (landed 2026-07-27) removed the worst offenders (bare 'agents'/'skills'/'go') and split the convergence campaign into its own clean 11-item cluster, but the ceiling of 5 is still permissive enough for a chain of small shared areas to fuse 18 campaigns. A 27-item cluster chunks into 7 sequential batches marked 'run the previous batch first' = a 7-cycle serialized chain for unrelated work. Options: (a) treat campaign as a PARTITION \u2014 fileArea/dep edges may bind within a campaign but never merge two distinct non-empty campaigns (campaign is the operator's explicit 'this is one initiative' declaration and should dominate an inferred file signal); (b) lower hubAreaMaxItems; (c) cap cluster size directly and split by weight. (a) is preferred: it makes the operator's declaration authoritative and is a small, testable change to Classify's union step.",
+  "acceptance": [
+    "RED first: two items in DIFFERENT non-empty campaigns sharing one file area are NOT clustered; two items in the SAME campaign sharing nothing still are.",
+    "On the live backlog the largest cluster holds items from at most ONE non-empty campaign.",
+    "Items with no campaign keep clustering on file-area/dep as today (no regression to batch 27's go/internal/subagent grouping).",
+    "cd go && go test -race ./internal/inboxbatch/... N/N PASS."
+  ]
+}

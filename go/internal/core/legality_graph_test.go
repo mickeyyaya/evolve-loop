@@ -85,7 +85,7 @@ func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 	o := NewOrchestrator(st, led, buildRunners(nil),
 		WithRouting(cfg, router.StaticPreset{}),
 		WithCatalog(ref.Catalog))
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if !errors.Is(err, ErrUnsafeConfig) {
 		t.Fatalf("RunCycle must fail closed on an unsafe legality graph; got err=%v", err)
 	}
@@ -112,7 +112,7 @@ func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
 	o := NewOrchestrator(st, led, buildRunners(nil),
 		WithRouting(cfg, router.StaticPreset{}),
 		WithCatalog(ref.Catalog))
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("the reference config is safe and must run; got err=%v", err)
 	}
 }

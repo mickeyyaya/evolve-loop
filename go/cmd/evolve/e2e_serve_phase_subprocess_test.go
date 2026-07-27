@@ -61,7 +61,7 @@ func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
 
 	req := core.PhaseRequest{
 		Cycle:       42,
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		Workspace:   "/tmp/w",
 		GoalHash:    "deadbeef",
 	}

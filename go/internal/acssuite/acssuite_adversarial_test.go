@@ -117,11 +117,22 @@ func TestExcerpt_AllBranches(t *testing.T) {
 			t.Errorf("at-limit string must be returned verbatim")
 		}
 	})
-	t.Run("string over limit gets truncated with ellipsis", func(t *testing.T) {
-		long := strings.Repeat("x", evidenceMax+50)
+	t.Run("string over limit gets tail-truncated with leading ellipsis", func(t *testing.T) {
+		// AMENDED with the tail-anchoring fix (false-red hardening, 2026-07-27):
+		// the ellipsis moved from suffix to PREFIX because excerpt now keeps the
+		// END of over-limit output — go-test failure detail accumulates at the
+		// tail, and head-keeping is what destroyed the failing-test identity of
+		// cycles 1107/1116/1123. Same truncation-marker contract, opposite anchor.
+		long := "HEAD" + strings.Repeat("x", evidenceMax+50) + "TAIL"
 		got := excerpt(long)
-		if !strings.HasSuffix(got, "…") {
-			t.Errorf("over-limit excerpt must end with ellipsis; got suffix %q", got[max(0, len(got)-5):])
+		if !strings.Contains(got, "…") {
+			t.Errorf("over-limit excerpt must carry the truncation marker; got %q", got[:min(24, len(got))])
+		}
+		if !strings.HasPrefix(got, "HEAD") {
+			t.Errorf("over-limit excerpt must retain the START (the predicate's own t.Fatalf diagnosis prints first); got prefix %q", got[:min(8, len(got))])
+		}
+		if !strings.HasSuffix(got, "TAIL") {
+			t.Errorf("over-limit excerpt must retain the END (--- FAIL detail accumulates at the tail); got suffix %q", got[max(0, len(got)-8):])
 		}
 	})
 }

@@ -7,6 +7,19 @@ description: Use when authoring evals/predicates (Scout, TDD-Engineer), framing 
 
 > Canonical methodology reference. Derived from Google's [Adversarial Testing for Generative AI](https://developers.google.com/machine-learning/guides/adv-testing), mapped onto this repo's existing inward-facing adversarial machinery (mutation testing, adversarial auditor, EGPS exit-code grounding). Referenced by: `agents/evolve-scout.md` (§eval integrity), `agents/evolve-tdd-engineer.md` (test diversity), `agents/evolve-auditor.md` (input categories), `go/internal/core/router_proposer.go` (`buildRoutingPrompt`), `acs/red-team/`. This file is the single source of truth — those consumers reference it, they do not re-derive it.
 
+## Probe discipline (RIGID — the observer must not perturb the observed system)
+
+You MAY author throwaway probe tests to attack the build — but NEVER write a
+`*_test.go` into the worktree. The EGPS suite runs after you; any predicate
+shelling `go test` over that package inherits your engineered failure as a
+BUILDER regression (cycles 1115/1117: a false cycle FAIL beside a PASS-grade
+review). Run probes via `go test -overlay` with the probe file OUTSIDE the
+worktree (the cycle-1106 PoCA/PoCB precedent). Deleting the probe afterwards is
+NOT sufficient — a crash or kill between write and delete leaves it to poison
+the gate, and the audit-phase backstop (probe_quarantine.go) only anchors at
+AUDIT dispatch, so your earlier-phase probe would be misclassified as builder
+work.
+
 ## Table of Contents
 
 1. [Methodology overview (4 phases)](#1-methodology-overview)

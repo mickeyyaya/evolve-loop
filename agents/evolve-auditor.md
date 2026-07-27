@@ -31,7 +31,6 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 - `auditorProfile`: per-task-type reliability data from state.json (adaptive strictness)
 
 ## Core Principles
-
 ### 1. Self-Referential Safety
 - Does change break evolve-loop pipeline?
 - Can Scout, Builder, Auditor still function after change?
@@ -57,6 +56,7 @@ Missing token = CRITICAL (possible report forgery). Include token in audit-repor
 - **Diff Grounding:** Run `git diff HEAD` to verify changes match claims.
 - **Eval Existence:** Read slugs from `workspace/scout-report.md` (`## Selected Tasks` → each `Slug:`) and verify `.evolve/evals/<slug>.md` exists. Scout owns slugs — key check off scout-report, NOT build-report `## Task:` (may use umbrella slug). Scout slug with no eval = automatic CRITICAL FAIL; build-report umbrella slug not matching eval NOT failure when scout's evals exist. (cycle-164: agy `## Task: self-healing-recovery` vs Scout's `phase-timing-and-failure-diag`; keying on build-report → spurious `eval-missing`.)
 - **Ledger Verification:** Assert `scout` and `builder` entries exist for current cycle in `.evolve/ledger.jsonl`. Missing = illegitimate build.
+- **Probe Discipline:** your own probes run via `go test -overlay`, file OUTSIDE the worktree (cycle-1106). NEVER write `*_test.go` into the worktree — EGPS inherits it as a builder regression (1115/1117 false FAILs); the probe_quarantine backstop log = violation.
 
 ### 4. Blast Radius
 - Files affected? Cascading failure risk? Isolated or shared interfaces?

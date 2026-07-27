@@ -35,7 +35,7 @@ func TestOrchestrator_NoopObserver_IsByteIdentical(t *testing.T) {
 	// Explicitly NO WithObserver call.
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestOrchestrator_WithObserver_StartsAndCancelsPerPhase(t *testing.T) {
 	o := NewOrchestrator(st, led, buildRunners(nil), WithObserver(obs))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p", GoalHash: "g",
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -114,7 +114,7 @@ func TestOrchestrator_WithNilObserver_FallsBackToNoop(t *testing.T) {
 	o := NewOrchestrator(st, led, buildRunners(nil), WithObserver(nil))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p", GoalHash: "g",
+		ProjectRoot: t.TempDir(), GoalHash: "g",
 	})
 	if err != nil {
 		t.Fatalf("RunCycle with WithObserver(nil): %v (should fall back to noopObserver)", err)

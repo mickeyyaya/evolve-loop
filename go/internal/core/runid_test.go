@@ -104,7 +104,7 @@ func TestRunCycle_ThreadsRunIDEverywhere(t *testing.T) {
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 

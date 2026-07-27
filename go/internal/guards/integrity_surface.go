@@ -47,6 +47,7 @@ type ProtectedSurfaceEntry struct {
 var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/acs/regression/", Rationale: "standing deterministic gates"},
 	{Fragment: "/go/internal/acssuite/", Rationale: "the gate runner"},
+	{Fragment: "/go/internal/phases/audit/probe_quarantine", Rationale: "the gate runner's input filter — decides which files the EGPS suite is allowed to see"},
 	{Fragment: "/go/internal/guards/", Rationale: "the guards (incl. this manifest + role.go)"},
 	{Fragment: "/go/internal/flagregistry/registry_table.go", Rationale: "the campaign metric SSOT"},
 	{Fragment: "/go/internal/flagregistry/registry_ceiling_test.go", Rationale: "the ceiling ratchet gate"},

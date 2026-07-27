@@ -352,7 +352,7 @@ func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 	}
 
 	o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, buildRunners(nil))
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}

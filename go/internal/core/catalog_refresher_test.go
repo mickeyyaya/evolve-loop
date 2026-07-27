@@ -20,7 +20,7 @@ func TestOrchestrator_WithCatalogRefresher_CalledOnceBestEffort(t *testing.T) {
 		return errors.New("refresh boom") // best-effort: must not abort the cycle
 	}))
 
-	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p", GoalHash: "g"})
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("RunCycle must not fail on refresher error: %v", err)
 	}

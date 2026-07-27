@@ -17,7 +17,7 @@ func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: "/tmp/p",
+		ProjectRoot: t.TempDir(),
 		Env:         map[string]string{"EVOLVE_FLEET": "1"},
 	}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -32,7 +32,7 @@ func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 func TestRunCycle_Default_AcquiresGlobalLock(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: "/tmp/p"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	if st.lockCount != 1 {

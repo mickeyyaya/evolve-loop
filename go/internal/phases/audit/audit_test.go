@@ -603,7 +603,7 @@ func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixtures.FixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
 
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 148, ProjectRoot: "/tmp/p", Workspace: ws})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 148, ProjectRoot: t.TempDir(), Workspace: ws})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -624,7 +624,7 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: body, resp: core.BridgeResponse{CostUSD: 0.3}}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# body"), NowFn: fixtures.FixedClock(time.Unix(1_700_000_000, 0), 60*time.Millisecond)})
 
-	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/p", Workspace: ws})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: t.TempDir(), Workspace: ws})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

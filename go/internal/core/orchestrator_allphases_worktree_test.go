@@ -156,7 +156,7 @@ func TestCB1_ResumePathCarriesWorktree(t *testing.T) {
 func TestCB1_FailureLearningRetroCarriesWorktree(t *testing.T) {
 	t.Parallel()
 	fl := failureLearningRequest{
-		CycleRequest: CycleRequest{ProjectRoot: "/tmp/p"},
+		CycleRequest: CycleRequest{}, // retroRequest only copies the field; no I/O — a TempDir here is ceremony
 		Cycle:        7,
 		Failed:       PhaseBuild,
 		Err:          context.DeadlineExceeded,
