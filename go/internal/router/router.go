@@ -515,6 +515,20 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 	// whole-cycle selection, clamped by the floor rather than capped.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil {
 		runs := planRuns(in.Plan, phase)
+		// A declarative skip_when (phase-catalog routing block / policy.json —
+		// CONFIG, never a Go literal about cycle class) gates the advisor's
+		// plan. Without this the plan won unconditionally for every
+		// non-mandatory phase, so a trivial-class cycle still burned the
+		// measured 0.83M-1.67M cache-read tokens per advisor-inserted optional
+		// (knowledge-base/research/token-usage-history-2026-07-20.md). Floor
+		// phases are excluded: `ship ⇒ build ∧ audit ∧ (tdd unless trivial)` is
+		// non-configurable, so a skip_when aimed at one must never become a
+		// floor bypass. The skip is RECORDED (returned optional==true → walk
+		// appends to SkipPhases) so the routing-plan artifact cites it rather
+		// than silently dropping the phase.
+		if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, in.Cfg.Triggers[phase]) {
+			return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
+		}
 		if runs && enable == config.EnableOff {
 			// The (clamped) plan runs a phase the operator disabled via EnableOff.
 			// The integrity floor or the advisor overrides the operator's off;
@@ -541,12 +555,22 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 	}
 }
 
-// triggerFires evaluates a RoutingBlock's insert_when (OR) minus skip_when (OR).
-func triggerFires(sig RoutingSignals, block config.RoutingBlock) bool {
+// skipWhenFires reports whether any of a RoutingBlock's skip_when clauses hold.
+// Shared by the trigger path and the advisor-plan gate so both read the same
+// declarative veto.
+func skipWhenFires(sig RoutingSignals, block config.RoutingBlock) bool {
 	for _, c := range block.SkipWhen {
 		if evalCondition(sig, c) {
-			return false
+			return true
 		}
+	}
+	return false
+}
+
+// triggerFires evaluates a RoutingBlock's insert_when (OR) minus skip_when (OR).
+func triggerFires(sig RoutingSignals, block config.RoutingBlock) bool {
+	if skipWhenFires(sig, block) {
+		return false
 	}
 	for _, c := range block.InsertWhen {
 		if evalCondition(sig, c) {

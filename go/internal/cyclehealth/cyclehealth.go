@@ -32,6 +32,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Severity classifies a single anomaly's blocking force.
@@ -148,8 +150,9 @@ func signalNames() []string {
 
 // requiredArtifacts is the minimum file set a completed cycle must
 // produce. Missing files are fatal because downstream phases depend
-// on them.
-var requiredArtifacts = []string{"scout-report.md", "build-report.md", "audit-report.md"}
+// on them. Sourced from the phasecontract registry (the same place the
+// agents are told to write) so this list cannot drift from the contracts.
+var requiredArtifacts = phasecontract.RequiredArtifacts()
 
 func checkWorkspaceArtifacts(opts Options) []Anomaly {
 	var out []Anomaly
@@ -199,8 +202,9 @@ type ledgerEntry struct {
 }
 
 // requiredRoles is the set of subagent roles whose ledger entries are
-// expected for a completed cycle. Missing roles are fatal.
-var requiredRoles = []string{"scout", "builder", "auditor"}
+// expected for a completed cycle. Missing roles are fatal. Single-sourced
+// from phasecontract — ledgerverify and redteamcheck read the same accessor.
+var requiredRoles = phasecontract.RequiredRoles()
 
 func loadLedger(workspace string) ([]ledgerEntry, error) {
 	// The ledger may live at <workspace>/ledger.jsonl or at the project

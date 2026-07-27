@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"os"
 	"sort"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // ledgerEntry is the subset of a ledger line the red-team checks read.
@@ -105,7 +107,9 @@ func LedgerRoleCompleteness(ledgerPath string) (skip bool, err error) {
 		}
 	}
 	var missing []string
-	for _, role := range []string{"scout", "builder", "auditor"} {
+	// Role vocabulary from the phasecontract registry, not an inline literal:
+	// a role added there is enforced here without a second edit.
+	for _, role := range phasecontract.RequiredRoles() {
 		if !have[role] {
 			missing = append(missing, role)
 		}

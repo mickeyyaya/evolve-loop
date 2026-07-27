@@ -166,6 +166,23 @@ var contracts = map[string]Contract{
 		Kind: KindJSON, RequiredKeys: []string{"cycle_id", "phase"},
 		WriteTarget: TargetEvolveDir,
 	},
+	// retro and build-planner have real artifacts and real backfill paths but
+	// were absent from this registry, so their filenames were declared only in
+	// backfill.phaseHeaders and core.backfillArtifactPath — two independent
+	// vocabularies with nothing pinning them together. Registered with nil
+	// Sections/Verdicts: the contract gate gains location/well-formedness for
+	// these phases without inventing section requirements they never emitted
+	// (which would false-block at enforce).
+	"retro": {
+		Phase: "retro", AgentName: "retrospective", ArtifactName: "retrospective-report.md",
+		Kind: KindMarkdown, Sections: nil, Verdicts: nil,
+		WriteTarget: TargetWorkspace,
+	},
+	"build-planner": {
+		Phase: "build-planner", AgentName: "build-planner", ArtifactName: "build-plan.md",
+		Kind: KindMarkdown, Sections: nil, Verdicts: nil,
+		WriteTarget: TargetWorkspace,
+	},
 	// ship is a native host-side phase (not an LLM agent): its deliverable is
 	// the pushed commit, not a file. NoArtifact makes the contract gate resolve
 	// it explicitly (PASS) instead of fail-open-on-unknown — the real ship
@@ -219,6 +236,41 @@ func For(phase string) (Contract, bool) {
 	}
 	c, ok := contracts[phase]
 	return c, ok
+}
+
+// requiredPhases is the SSOT for "what a completed cycle must have produced":
+// the three spine phases every cycle ledgers and whose reports every downstream
+// completeness consumer requires. Roles and artifact names are DERIVED from
+// these phases' registry contracts (AgentName / ArtifactName) rather than
+// re-typed, so cyclehealth, redteamcheck and ledgerverify cannot drift from the
+// registry — four independent declarations of the same vocabulary were one
+// disease, not four bugs (campaign_retrospective_215_231).
+var requiredPhases = []string{"scout", "build", "audit"}
+
+// RequiredRoles returns the canonical subagent roles whose ledger entries every
+// completed cycle must carry, derived from the registry's AgentName vocabulary
+// (scout → "scout", build → "builder", audit → "auditor").
+func RequiredRoles() []string {
+	out := make([]string, 0, len(requiredPhases))
+	for _, p := range requiredPhases {
+		if c, ok := contracts[p]; ok {
+			out = append(out, c.AgentName)
+		}
+	}
+	return out
+}
+
+// RequiredArtifacts returns the report filenames a completed cycle must have
+// written, derived from the same registry entries as RequiredRoles so the role
+// and artifact halves of "complete" can never disagree.
+func RequiredArtifacts() []string {
+	out := make([]string, 0, len(requiredPhases))
+	for _, p := range requiredPhases {
+		if c, ok := contracts[p]; ok && c.ArtifactName != "" {
+			out = append(out, c.ArtifactName)
+		}
+	}
+	return out
 }
 
 // Contracts returns every registered contract (stable order not guaranteed;

@@ -39,7 +39,13 @@
         "value": 0
       }
     ],
-    "skip_when": null
+    "skip_when": [
+      {
+        "field": "cycle_size",
+        "op": "eq",
+        "value": "trivial"
+      }
+    ]
   },
   "gates": {},
   "after": "build"

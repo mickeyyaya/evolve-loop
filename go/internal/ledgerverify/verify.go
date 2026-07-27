@@ -36,6 +36,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Ledger entry kinds that represent a completed phase/agent run. Both
@@ -49,8 +50,10 @@ const (
 )
 
 // Roles required for every cycle (pre-intent, pre-memo gates). Canonical
-// names; canonicalRole maps both ledger vocabularies onto these.
-var requiredRoles = []string{"scout", "builder", "auditor"}
+// names; canonicalRole maps both ledger vocabularies onto these. Sourced from
+// phasecontract so cyclehealth, redteamcheck and this verifier share ONE
+// declaration of "what counts as a complete cycle".
+var requiredRoles = phasecontract.RequiredRoles()
 
 // canonicalRole folds the two ledger role vocabularies onto the canonical
 // buckets the verifier counts. The bash dispatcher records AGENT names

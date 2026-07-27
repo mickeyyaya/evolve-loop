@@ -135,14 +135,14 @@ func TestContract_WriteTarget(t *testing.T) {
 
 func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 	all := Contracts()
-	if len(all) != 9 {
-		t.Fatalf("Contracts() len=%d, want 9", len(all))
+	if len(all) != 11 {
+		t.Fatalf("Contracts() len=%d, want 11", len(all))
 	}
 	seen := map[string]bool{}
 	for _, c := range all {
 		seen[c.Phase] = true
 	}
-	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "orchestrator", "ship"} {
+	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "orchestrator", "ship", "retro", "build-planner"} {
 		if !seen[phase] {
 			t.Errorf("Contracts() missing %q", phase)
 		}

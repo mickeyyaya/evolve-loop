@@ -40,6 +40,13 @@
         "op": "eq",
         "value": "code-audit-fail"
       }
+    ],
+    "skip_when": [
+      {
+        "field": "cycle_size",
+        "op": "eq",
+        "value": "trivial"
+      }
     ]
   },
   "after": "triage",
