@@ -1,0 +1,26 @@
+{
+  "id": "triage-cards-carry-files",
+  "title": "Triage top_n cards omit files[] — a file-less committed card is invisible to the fleet disjointness planner",
+  "kind": "loop-reliability",
+  "priority": "high",
+  "weight": 0.85,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/phases/triage/triage.go",
+    "go/internal/triagecap/recorder.go"
+  ],
+  "connects_to": [
+    "fleet-lane-batch-menu"
+  ],
+  "deps": [],
+  "route": "lane",
+  "injected_by": "console-2026-07-28-menu-landing-verification",
+  "evidence": "Observed live on batch-14's relaunched wave (cycles 1133/1134): cycle-1130's triage-decision.json top_n card {id: surface-verdict-conflict-in-audit-classify, action: 'capture pre-override agent verdict in Classify (go/internal/phases/audit/audit.go)...'} carries NO files[] field, so fleet.TodosFromTriage falls back to the id-island ([]string{id}) and the widen path treated it as disjoint from the backfilled verdict-coherence-auditor-vs-egps — whose files[] explicitly declares go/internal/phases/audit/audit.go. Both lanes now plausibly edit audit.go concurrently: a ship-time same-file conflict (the 948 lost-work class) the disjointness planner exists to prevent, undetectable because the card's file knowledge lives only in prose. Also blocks lane MENUS (PR #366): a file-less card can never attract its same-file cluster mates.",
+  "notes": "Fix at the WRITER, not the planner: the triage phase's decision schema/prompt must require files[] on every top_n card (the agent already names files in the action prose — make it structured), and the decision recorder should WARN on a card without files. The planner side is already correct: cards with files partition properly (proven by PR #366 tests). Do NOT guess files at plan time from prose — a wrong inferred file is worse than an island.",
+  "acceptance": [
+    "RED first: the triage decision writer/schema rejects or loudly WARNs on a top_n card missing files[] when the action names a repo path.",
+    "A live cycle's triage-decision.json top_n cards carry files[] matching the committed items' declared surfaces.",
+    "widenNarrowDecision over a files-carrying committed card correctly clusters same-file backfill into the SAME lane (menu) instead of a fictional-disjoint second lane.",
+    "cd go && go test -race ./internal/triagecap/... ./internal/phases/triage/... ./internal/fleet/... N/N PASS."
+  ]
+}

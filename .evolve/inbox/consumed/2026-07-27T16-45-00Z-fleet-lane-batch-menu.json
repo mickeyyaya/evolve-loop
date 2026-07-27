@@ -1,0 +1,29 @@
+{
+  "id": "fleet-lane-batch-menu",
+  "title": "Fleet lanes never consume a batch \u2014 wave seeder hands each lane b[0] only, so 'prefer a whole batch as top_n' is dead guidance under fleet scope",
+  "kind": "loop-reliability",
+  "priority": "medium",
+  "weight": 0.8,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/triagecap/topn_width.go",
+    "go/internal/triagecap/wave_seed.go",
+    "go/internal/core/lanescope.go"
+  ],
+  "connects_to": [
+    "inboxbatch-cross-campaign-fusion"
+  ],
+  "deps": [],
+  "route": "console",
+  "injected_by": "console-2026-07-28-batch14-batching-verification",
+  "console_claim": "2026-07-28 operator prioritized; being fixed console-first this session (batch-14 wave-1 in flight); do not seed into a lane",
+  "evidence": "Live wave-1 of batch-14 (cycles 1127/1128): both lane-scope.json files carry a SINGLE-element todo_ids despite the schema being []string, and cycle-1127's triage rationale states verbatim 'fleet_scope restricts this cycle to the single assigned todo-id verdict-coherence-auditor-vs-egps; no other candidates were considered' \u2014 while the SAME cycle's triage prompt renders 'prefer selecting a whole batch as top_n (its items share a worktree, build, and audit \u2014 one cycle amortizes the pipeline across them)'. Root: SelectFleetWidthTopN (topn_width.go:66-67) partitions the backlog into file-disjoint buckets then keeps ONLY b[0] per bucket as the lane representative, discarding bucket-mates; the batch-consumption intent can therefore only ever engage in single-lane (non-fleet) runs.",
+  "notes": "fleet.Partition's buckets are already the right within-lane batches: members land in one bucket BECAUSE they share files (same area, one worktree amortizes them) and buckets are mutually file-disjoint (cross-lane safe). Fix shape: seed each lane with a capped prefix of its bucket (cap matching the 4-item batch chunk size / triage size bands) instead of b[0] alone \u2014 lane-scope.TodoIDs already supports it. Lane scope then becomes a MENU, not a pin: triage keeps authority to commit a subset as top_n and defer the rest (today's semantics treat the single id as mandatory). Preserve the cycle-640 lane-identity invariant: scout and triage must see the SAME scope set, materialized before any phase. Sequence AFTER inboxbatch-cross-campaign-fusion: with fusion unfixed, a mega-cluster bucket could hand a lane 4 unrelated items and recreate the bag-cycle problem the area floor just killed.",
+  "acceptance": [
+    "RED first: SelectFleetWidthTopN (or its successor seam) returns each lane's bucket members up to the cap, not just b[0]; existing single-focus (count<2) behavior unchanged.",
+    "A fleet wave's lane-scope.json carries >1 todo_ids when the backlog has clusterable same-area items, and the two lanes' id sets remain file-disjoint.",
+    "Triage inside a multi-id lane may commit a subset and defer the rest without a scope-violation warning.",
+    "cd go && go test -race ./internal/triagecap/... ./internal/core/... ./internal/fleet/... N/N PASS."
+  ],
+  "consumed_by": "console-2026-07-28 PR #366 be33c1b1 (campaign partition + lane menus, diff-review x3 APPROVE)"
+}
