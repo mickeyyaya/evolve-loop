@@ -1,0 +1,22 @@
+{
+  "id": "verdict-coherence-auditor-vs-egps",
+  "title": "Auditor PASS/WARN + EGPS red => cycle FAIL with no reconciliation or surfaced conflict",
+  "kind": "pipeline-integrity",
+  "priority": "high",
+  "weight": 0.92,
+  "campaign": "convergence-2026-07",
+  "files": [
+    "go/internal/phases/audit/audit.go",
+    "go/internal/core/final_verdict_floor.go"
+  ],
+  "connects_to": [
+    "audit-probe-tree-isolation",
+    "cycle-352-egps-cannot-honor-auditor-false-red-adjudication",
+    "cycle-456-coverage-predicate-race-nonhermetic-flips-gating-verdict",
+    "cycle-87-audit-vs-egps-verdict-divergence",
+    "verdict_source_fix_insufficient"
+  ],
+  "route": "lane",
+  "injected_by": "console-2026-07-27-failed-cycle-forensics",
+  "notes": "Cycle-1116 auditor verdict PASS, cycle-1107 WARN ('the work is correct, green and honestly reported'), cycle-1117 'Not FAIL, because the trade is net-positive' \u2014 all three shipped a FAIL because EGPS red_count>0. The deterministic gate SHOULD outrank prose, so failing closed is defensible; what is not defensible is that the conflict is invisible: nothing records 'agent said PASS, gate said RED', so an operator reading the dossier cannot tell a real defect from a poisoned predicate. Emit an explicit verdict-conflict record (agent verdict, gate verdict, the red ids) and treat a PASS/WARN-vs-RED disagreement as a first-class signal that the PREDICATE may be at fault \u2014 that is exactly what audit-probe-tree-isolation turned out to be. RECURRENCE CONTEXT: this is the 4th instance of a named family \u2014 lessons cycle-87-audit-vs-egps-verdict-divergence (conf 0.92, prescribed 4 fixes), cycle-352-egps-cannot-honor-auditor-false-red-adjudication (0.95), cycle-456-coverage-predicate-race-nonhermetic-flips-gating-verdict (0.9). All four cycle-87 fixes are grep-verified ABSENT at HEAD (no exempt enum, no gate_audit_to_retrospective, no exemption parser; ShipEligible is still raw RedCount==0). HARD CONSTRAINT for the builder: acs-verdict.json is written AFTER audit-report.md (1115: 00:15:09 vs 00:13:56; 1117: 01:38:45 vs 01:37:36), so 'have the auditor reconcile against the gate' is structurally impossible without phase reordering or sharing the gating output."
+}

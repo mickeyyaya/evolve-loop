@@ -3,11 +3,21 @@
   "title": "TDD keeps authoring whole-suite 'X stays green' ACS meta-predicates that flake red under fleet contention",
   "kind": "pipeline-integrity",
   "priority": "high",
-  "weight": 0.84,
+  "weight": 0.91,
   "campaign": "convergence-2026-07",
-  "files": ["agents/evolve-tdd.md", "go/internal/evalquality/", "go/internal/acssuite/"],
-  "connects_to": ["wave-planner-pass-scope-prune", "gitstage-deterministic-classification"],
-  "route": "lane",
+  "files": [
+    "agents/evolve-tdd-engineer.md",
+    "go/internal/evalqualitycheck/",
+    "go/internal/acssuite/"
+  ],
+  "connects_to": [
+    "acs-evidence-tail-capture",
+    "audit-probe-tree-isolation",
+    "core-suite-shared-tmp-p-hermeticity",
+    "gitstage-deterministic-classification",
+    "wave-planner-pass-scope-prune"
+  ],
+  "route": "console-manual",
   "injected_by": "console-batch12-halt-forensics",
-  "notes": "Batch-12 halt forensics (2026-07-27): cycles 1107/1115/1116 each carried ONE red predicate and all three were whole-suite meta-predicates (ShippedGateSuitesStillGreen / BridgeAndRecoveryStayGreen / CoreAndTopngateSuitesStayGreen) that shell broad `go test ./internal/...` runs; cycle-1116's red passes uncontended (42.5s single run) — width-2 contention flake, the 858-862/944 class recurring at the TDD-AUTHORSHIP level. The integration-tier scoping fix (f09ecfc4) scoped the RUNNER's tier; TDD-authored predicates that spawn their own whole-suite subprocesses bypass it. Root-cause the class, options in preference order: (a) eval-quality pre-flight / acssuite lint REJECTS predicates whose subprocess scope exceeds the cycle's touched packages (deterministic check on the go test package args), forcing TDD to scope to touched pkgs — regression staleness is already covered by the 195-predicate regression suite, so whole-repo meta-predicates are pure duplication; (b) tdd persona instruction to never author suite-stays-green predicates (weakest, drifts). Do NOT just raise timeouts — that hides the duplication. Related landed mitigation: EGPS red diagnostics now carry semantic predicate identity so three such flakes no longer collide into one breaker fingerprint (console fix same day)."
+  "notes": "Root cause CORRECTED 2026-07-27 (console forensics). Two DISTINCT triggers, not one: cycles 1115/1117 = auditor-authored TestZZAudit* probes written into the package under test (see audit-probe-tree-isolation); cycles 1107/1116 = the machine-global /tmp/p project root shared by every concurrent lane (see core-suite-shared-tmp-p-hermeticity, 19521 entries live). The earlier 'width-2 CPU contention' framing was wrong AND the disproof was too: three concurrent `go test ./internal/core/` runs on an idle host cannot reproduce shared-fixed-path contention across lanes. Stronger repo-backed evidence that this is not a simple flake: acssuite.retryFlakyReds (acssuite.go:388-403) already re-runs a red scope once and cycle-1116 lost BOTH rolls. THIS ITEM REMAINS THE STRUCTURAL FIX for both triggers: cycles 1107/1115/1116/1117 each red-flagged ONE whole-suite meta-predicate (ShippedGateSuitesStillGreen / BridgeAndRecoveryStayGreen / CoreAndTopngateSuitesStayGreen) shelling broad `go test ./internal/...`; scoping predicates to the cycle's TOUCHED packages makes them immune to anything a sibling phase or lane does elsewhere in the tree. Note f09ecfc4 scoped the RUNNER's tier; TDD-authored predicates that spawn their own whole-suite subprocesses bypass it. Fix in preference order: (a) eval-quality pre-flight / acssuite lint REJECTS a predicate whose `go test` package args exceed the cycle's touched packages \u2014 whole-repo staleness is already covered by the 195-predicate regression suite, so meta-predicates are pure duplication; (b) tdd persona instruction (weakest, drifts). Do NOT raise timeouts \u2014 that hides it."
 }
