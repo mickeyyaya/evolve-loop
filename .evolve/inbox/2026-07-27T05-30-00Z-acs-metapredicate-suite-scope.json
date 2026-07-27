@@ -1,0 +1,13 @@
+{
+  "id": "acs-metapredicate-suite-scope",
+  "title": "TDD keeps authoring whole-suite 'X stays green' ACS meta-predicates that flake red under fleet contention",
+  "kind": "pipeline-integrity",
+  "priority": "high",
+  "weight": 0.84,
+  "campaign": "convergence-2026-07",
+  "files": ["agents/evolve-tdd.md", "go/internal/evalquality/", "go/internal/acssuite/"],
+  "connects_to": ["wave-planner-pass-scope-prune", "gitstage-deterministic-classification"],
+  "route": "lane",
+  "injected_by": "console-batch12-halt-forensics",
+  "notes": "Batch-12 halt forensics (2026-07-27): cycles 1107/1115/1116 each carried ONE red predicate and all three were whole-suite meta-predicates (ShippedGateSuitesStillGreen / BridgeAndRecoveryStayGreen / CoreAndTopngateSuitesStayGreen) that shell broad `go test ./internal/...` runs; cycle-1116's red passes uncontended (42.5s single run) — width-2 contention flake, the 858-862/944 class recurring at the TDD-AUTHORSHIP level. The integration-tier scoping fix (f09ecfc4) scoped the RUNNER's tier; TDD-authored predicates that spawn their own whole-suite subprocesses bypass it. Root-cause the class, options in preference order: (a) eval-quality pre-flight / acssuite lint REJECTS predicates whose subprocess scope exceeds the cycle's touched packages (deterministic check on the go test package args), forcing TDD to scope to touched pkgs — regression staleness is already covered by the 195-predicate regression suite, so whole-repo meta-predicates are pure duplication; (b) tdd persona instruction to never author suite-stays-green predicates (weakest, drifts). Do NOT just raise timeouts — that hides the duplication. Related landed mitigation: EGPS red diagnostics now carry semantic predicate identity so three such flakes no longer collide into one breaker fingerprint (console fix same day)."
+}

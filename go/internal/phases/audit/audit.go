@@ -150,7 +150,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}
 	}
 
-	redCount, shipEligible, acsErr := readACSVerdict(verdictPath)
+	redCount, redIDs, shipEligible, acsErr := readACSVerdict(verdictPath)
 	if acsErr != nil {
 		diags = append(diags, core.Diagnostic{
 			Severity: "error",
@@ -160,7 +160,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	} else if redCount > 0 {
 		diags = append(diags, core.Diagnostic{
 			Severity: "error",
-			Message:  fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount),
+			Message:  egpsRedMessage(redCount, redIDs),
 		})
 		verdict = core.VerdictFAIL
 	} else if shipEligible != nil && !*shipEligible {
@@ -313,19 +313,77 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 // is a *bool so the caller can distinguish "field absent" (nil — legacy verdicts
 // written before ship_eligible existed) from an explicit false (do-not-ship). A
 // read/parse error is returned so the missing/malformed-file FAIL floor holds.
-func readACSVerdict(path string) (redCount int, shipEligible *bool, err error) {
+// redIDs are the ac_ids of the red results (empty for legacy verdicts without a
+// results array) — the diagnostic embeds them so the failure-digest fingerprint
+// carries the DEFECT's identity: batch-12 (2026-07-27) halted on the
+// identical-fingerprint breaker because three DIFFERENT red predicates all
+// produced the byte-identical bare "red_count=1" reason (the cycle-1054/1060
+// constant-message collision class, at the gate-block).
+func readACSVerdict(path string) (redCount int, redIDs []string, shipEligible *bool, err error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return 0, nil, fmt.Errorf("read: %w", err)
+		return 0, nil, nil, fmt.Errorf("read: %w", err)
 	}
 	var v struct {
 		RedCount     int   `json:"red_count"`
 		ShipEligible *bool `json:"ship_eligible"`
+		Results      []struct {
+			ACID   string `json:"ac_id"`
+			Result string `json:"result"`
+		} `json:"results"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return 0, nil, fmt.Errorf("parse: %w", err)
+		return 0, nil, nil, fmt.Errorf("parse: %w", err)
 	}
-	return v.RedCount, v.ShipEligible, nil
+	for _, r := range v.Results {
+		if r.Result == "red" && r.ACID != "" {
+			redIDs = append(redIDs, r.ACID)
+		}
+	}
+	return v.RedCount, redIDs, v.ShipEligible, nil
+}
+
+// egpsRedIDCycleTokens strips the cycle-numbered chrome from an ACS ac_id:
+// "cycle1115/TestC1115_003_BridgeAndRecoveryStayGreen" →
+// "BridgeAndRecoveryStayGreen". The SEMANTIC name is the defect's stable
+// identity; the cycle-numbered prefix changes on every retry, and embedding it
+// would make a real cross-cycle recurrence never collide — blinding the
+// identical-fingerprint breaker (the same "never cycle numbers" rule
+// verdictFailDistinguisher documents). Both live naming conventions are
+// covered by stripping the C-group and the index group INDEPENDENTLY
+// (adversarial review caught `C\d+_\d+_` missing the two-part
+// "TestC841_Amplify_…"/"TestC416_NEG_…" shape, which left C841_ — a cycle
+// number — embedded): three-part TestC<cycle>_<index>_<Name> and two-part
+// TestC<cycle>_<Name>. A name that merely starts with 'C'+letters
+// ("TestCarryforward_…") is untouched — C\d+ requires digits.
+var egpsRedIDCycleTokens = regexp.MustCompile(`^(?:cycle\d+/)?(?:Test)?(?:C\d+_)?(?:\d+_)?`)
+
+// egpsRedMessage renders the one-line EGPS gate-block diagnostic. The red
+// predicates' cycle-normalized semantic names (acssuite results order, at most
+// maxNamedReds named) make the message — and therefore the failure
+// fingerprint — distinct per defect, while the same defect red again on a
+// retry cycle (new cycle-numbered ac_id, same semantic name) still collides
+// exactly, so the breaker keeps catching real recurrences.
+func egpsRedMessage(redCount int, redIDs []string) string {
+	const maxNamedReds = 5
+	if len(redIDs) == 0 {
+		return fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount)
+	}
+	shown := make([]string, 0, len(redIDs))
+	for _, id := range redIDs {
+		if n := egpsRedIDCycleTokens.ReplaceAllString(id, ""); n != "" {
+			shown = append(shown, n)
+		} else {
+			shown = append(shown, id) // degenerate id — keep verbatim over dropping
+		}
+	}
+	suffix := ""
+	if len(shown) > maxNamedReds {
+		suffix = fmt.Sprintf(" +%d more", len(shown)-maxNamedReds)
+		shown = shown[:maxNamedReds]
+	}
+	return fmt.Sprintf("EGPS: red_count=%d [%s%s] (cycle ships only when red_count==0)",
+		redCount, strings.Join(shown, " "), suffix)
 }
 
 type Config struct {
