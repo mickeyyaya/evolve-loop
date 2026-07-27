@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // autorespond.go — the fallback prompt-detection engine for interactive
@@ -105,6 +106,22 @@ func stripPromptEchoLines(pane, injectedPrompt string) string {
 // wall-text frame from fast-failing a working agent.
 func strippedForExhaustionScan(pane, injectedPrompt string) string {
 	return stripAgentDiffLines(stripPromptEchoLines(pane, injectedPrompt))
+}
+
+// strippedForFatalPaneScan is the bridge's view of the fatal-pane pane
+// treatment. It DELEGATES to recovery.StripAgentContent — the rules live once,
+// in the package that owns the registry, because this seam is not the registry's
+// only consumer: core.adviseOnUnclassifiedFailure (ADR-0044 C3) strips the same
+// way before the same Detect. Cycle-1117 fixed this seam alone and the two
+// drifted for six cycles, so the C3 hook kept classifying agent-authored diff
+// content as "already known" and silently skipping the advisor.
+//
+// It stays SEPARATE from strippedForExhaustionScan (which deletes matched lines
+// and has no protect-list) — the cycle-1115 auditor rejected that reuse because
+// the fatal registry's matchers are newline-anchored and partly literal English.
+// See recovery/strip.go for D1 (blank in place) and D2 (protect-list) in full.
+func strippedForFatalPaneScan(pane, injectedPrompt string, protected []string) string {
+	return recovery.StripAgentContent(pane, injectedPrompt, protected)
 }
 
 // decideAutoRespond is the pure decision: first interactive_prompts regex

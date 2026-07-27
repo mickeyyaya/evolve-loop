@@ -113,6 +113,26 @@ func SeedDetector() *FatalPaneDetector {
 	})
 }
 
+// Signatures reports the substrings the detector currently fires on, in
+// registry order. It reads the LIVE registry rather than a construction-time
+// snapshot, so a Promote-d signature is reported too — callers that protect
+// signature-bearing text from a stripper (bridge.strippedForFatalPaneScan)
+// must never work from a hand-copied literal that rots when Slice-5 promotes
+// a new entry. Empty substrings are omitted: they match everything in a
+// Contains-keyed consumer and would protect the whole pane. Nil-receiver safe.
+func (d *FatalPaneDetector) Signatures() []string {
+	if d == nil {
+		return nil
+	}
+	out := make([]string, 0, len(d.sigs))
+	for _, sig := range d.sigs {
+		if sig.Substr != "" {
+			out = append(out, sig.Substr)
+		}
+	}
+	return out
+}
+
 // Detect scans a recent pane tail for a seeded fatal signature. It returns
 // the typed cause plus the matched substring (for the justification trail),
 // or ok=false when nothing matches. Pure classification — no action, no

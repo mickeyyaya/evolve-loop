@@ -70,10 +70,19 @@ func (g *fatalPaneGate) verdict(det *recovery.FatalPaneDetector, ev StopEvent, s
 	// so a Busy checkpoint is a NON-match that RESETS the streak — not a
 	// skipped observation. Otherwise fatal-shaped text on either side of a
 	// visibly-working checkpoint accumulates into a kill.
-	_, _, ok := det.Detect(ev.StdoutTail)
+	//
+	// The gate observes the SAME stripped pane the verdict detects on — one
+	// meaning of the pane per checkpoint (salvage review HIGH: observing raw
+	// while the verdict reads stripped let agent-diff noise saturate the
+	// streak, so one transient stripped match crossed with zero real
+	// persistence — the exact transient-frame kill this gate exists to block).
+	stripped := strippedForFatalPaneScan(ev.StdoutTail, ev.InjectedPrompt, det.Signatures())
+	_, _, ok := det.Detect(stripped)
 	if !g.observe(ok && !ev.Busy) {
 		return ReviewVerdict{}, false
 	}
+	ev.StdoutTail = stripped
+	ev.InjectedPrompt = "" // already applied; the verdict must not strip twice
 	return fatalPaneVerdict(det, ev, stage, rec, stderr, pfx)
 }
 

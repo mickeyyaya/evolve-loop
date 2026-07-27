@@ -260,3 +260,33 @@ func TestFatalPaneGate_DisabledPathsNeverAccumulate(t *testing.T) {
 		}
 	})
 }
+
+// TestFatalPaneGate_AgentDiffNoiseDoesNotBankStreak (salvage review HIGH): the
+// gate must OBSERVE the same STRIPPED pane the verdict detects on. Observing
+// raw let agent-diff-quoted fatal text saturate the streak across checkpoints,
+// after which ONE transient genuinely-matching frame crossed instantly with
+// zero real persistence — the exact transient-frame kill the gate exists to
+// block.
+func TestFatalPaneGate_AgentDiffNoiseDoesNotBankStreak(t *testing.T) {
+	t.Parallel()
+	g := newFatalPaneGate()
+	rec := interaction.NewRecorder(t.TempDir())
+
+	// Saturate with agent-DIFF frames quoting a fatal signature: raw Detect
+	// matches, stripped Detect must not — so the streak must stay at zero.
+	diffTail := "❯ review the change\n+ chrome := \"There's an issue with the selected model\"\n+ det.handle(chrome)\n"
+	for i := 0; i < fatalPanePersistObservations+2; i++ {
+		if obs := observeFatal(t, g, rec, "enforce", diffTail, false); obs.preempted {
+			t.Fatalf("agent-diff frame %d preempted — the gate is detecting on the RAW pane (quoted signatures count as fatal)", i)
+		}
+	}
+	if g.streak != 0 {
+		t.Fatalf("streak = %d after %d agent-diff-only frames, want 0 — raw-pane observation banks quoted noise and lets the next real match cross with no persistence",
+			g.streak, fatalPanePersistObservations+2)
+	}
+
+	// One genuinely fatal frame after the noise must NOT cross (streak 0→1).
+	if obs := observeFatal(t, g, rec, "enforce", fatalTail, false); obs.preempted {
+		t.Fatal("a single real match after diff noise crossed the gate — the banked-noise saturation path is live")
+	}
+}

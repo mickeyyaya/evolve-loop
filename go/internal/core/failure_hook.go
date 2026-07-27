@@ -93,7 +93,22 @@ func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle in
 	}
 	sigDir := fatalSignaturesDir(projectRoot)
 	det := recovery.SeedDetectorWithPromotions(sigDir)
-	if cause, _, known := det.Detect(report.FinalPane); known {
+	// Scan the agent-STRIPPED pane, not the raw escalation evidence. The
+	// short-circuit below is deterministic-FIRST, so a false match here does not
+	// kill a phase — it does something quieter and worse: a genuinely NOVEL
+	// wedge whose pane merely carries agent-authored diff content quoting a
+	// seeded signature (an agent editing the registry, a builder writing a
+	// fatal-pane fixture) reads as "already classified". No advisor, no
+	// promotion, nothing learned, and the next occurrence burns the ~20 min
+	// maxExtends backstop again — ADR-0044's learning loop switched off by the
+	// agent's own text. Same stripper, same rules as the C2 bridge seam
+	// (recovery/strip.go). The empty prompt is deliberate: for a fatal-pane scan
+	// the echo half is neutered by the protect-list anyway (D2), so plumbing the
+	// phase prompt in here would add I/O and zero behaviour. The protect list is
+	// nil for the same reason — it is read only inside the echo branch, which an
+	// empty prompt disables (salvage review LOW: det.Signatures() here was a
+	// provably dead allocation per aborted phase).
+	if cause, _, known := det.Detect(recovery.StripAgentContent(report.FinalPane, "", nil)); known {
 		// Deterministic-first: the registry already classifies this pane —
 		// the fast-fail (C2) owns acting on it; no LLM consultation.
 		fmt.Fprintf(os.Stderr, "[orchestrator] phase-recovery: pane already classified (%s); skipping advisor\n", cause)

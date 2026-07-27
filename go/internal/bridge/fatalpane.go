@@ -73,7 +73,14 @@ func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage strin
 	if !fatalPaneClassifies(det, stage) {
 		return ReviewVerdict{}, false
 	}
-	cause, sig, ok := det.Detect(ev.StdoutTail)
+	// Scan the agent-STRIPPED pane, not the raw tail. Until cycle-1117 this
+	// seam read ev.StdoutTail directly while its twin one field away (the
+	// exhaustion scan) read a stripped pane — so an agent EDITING the fatal
+	// registry, its diff view rendering `Substr: "There's an issue with the
+	// selected model"`, was fast-failed on its own edit buffer. The protect-list
+	// comes FROM the live registry (det.Signatures()), so the echo half can
+	// never suppress a signature the detector is looking for.
+	cause, sig, ok := det.Detect(strippedForFatalPaneScan(ev.StdoutTail, ev.InjectedPrompt, det.Signatures()))
 	if !ok || ev.Busy {
 		return ReviewVerdict{}, false
 	}

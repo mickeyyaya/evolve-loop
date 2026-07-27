@@ -48,6 +48,12 @@ type StopEvent struct {
 	Progressed bool   // did the agent emit new output during the last interval?
 	Busy       bool   // is the agent visibly mid-turn per the per-CLI busy affordance?
 	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer (Stage 1)
+	// InjectedPrompt is the prompt actually delivered into this session — the
+	// same string the exhaustion scan strips against (autoResponder.injectedPrompt).
+	// fatalpane.go's C2 detector consumes it via strippedForFatalPaneScan so the
+	// agent quoting its own instructions cannot read as the CLI's fatal chrome.
+	// Empty = fail-open (strip no echoes), never a suppressed signal.
+	InjectedPrompt string
 	// State carries the per-CLI liveness detector's structured verdict — the
 	// reviewer's SOLE decision input (ev.livenessState()). Populated by the
 	// driver via panestream.SignalCenter.Observe+Aggregate (ADR-0068, S3); the

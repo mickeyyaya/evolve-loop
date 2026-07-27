@@ -730,7 +730,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				Progressed: progressed,
 				Busy:       livenessCenter.Busy(lp.session) || renderWedged,
 				StdoutTail: lastLines(evidencePane, 40),
-				State:      livenessState,
+				// Same source the exhaustion scan strips against, two lines up —
+				// one resolved prompt, one meaning of "what the agent was told",
+				// so the two detectors can never strip differently (cycle-1117).
+				InjectedPrompt: ar.injectedPrompt,
+				State:          livenessState,
 			}
 			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
 			// self-update, dead shell) preempts the reviewer in enforce —
