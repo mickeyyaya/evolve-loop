@@ -1,0 +1,23 @@
+{
+  "id": "bridgewatch-follow-macos-flake",
+  "title": "TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines flakes on macOS CI runners",
+  "kind": "test-reliability",
+  "priority": "medium",
+  "weight": 0.72,
+  "campaign": "loop-reliability-2026-07",
+  "files": [
+    "go/cmd/evolve/"
+  ],
+  "connects_to": [],
+  "deps": [],
+  "route": "lane",
+  "injected_by": "console-2026-07-28-release-postwatch",
+  "evidence": "go workflow on release commit 66f61aed (2026-07-27T19:05Z): --- FAIL: TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines (0.37s) on macos-latest ONLY; ubuntu green; the SAME runner+test was green on PR #367's run ~20 min earlier; the release commit changed zero Go code (version strings + changelog + dossiers). Local: go test -race -count=10 all green. Shape: a follow/tail test with a timing assumption that a slow macOS CI runner occasionally violates.",
+  "notes": "Fix the test's timing assumption, not the schedule: follow tests must synchronize on an observable event (file offset advanced, line delivered via channel with generous deadline) rather than a fixed sleep/poll window. Find the wait in the test (grep RunBridgeWatchFollow fixtures) and replace any fixed-duration assumption with an event wait bounded by a long deadline. Same discipline as the tickDuringBoot fix (claude-tmux prompt delivery).",
+  "acceptance": [
+    "The test's wait is event-driven with a deadline >= 10s, no bare sleeps shorter than the deadline.",
+    "go test -race -count=50 ./cmd/evolve/ -run TestRunBridgeWatchFollow green locally.",
+    "No production code change (test-only), or if the follow implementation itself has the race, RED-first fix with the race named.",
+    "cd go && go test -race ./cmd/evolve/... N/N PASS."
+  ]
+}
