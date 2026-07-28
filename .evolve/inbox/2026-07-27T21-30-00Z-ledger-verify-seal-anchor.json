@@ -1,0 +1,23 @@
+{
+  "id": "ledger-verify-seal-anchor",
+  "title": "evolve ledger verify walks from line 1 and reports the ancient sealed break — it should anchor at the last reset-seal",
+  "kind": "loop-reliability",
+  "priority": "medium",
+  "weight": 0.7,
+  "campaign": "loop-reliability-2026-07",
+  "files": [
+    "go/internal/adapters/ledger/",
+    "go/cmd/evolve/"
+  ],
+  "connects_to": [],
+  "deps": [],
+  "route": "lane",
+  "injected_by": "console-2026-07-28-ledger-null-fix",
+  "evidence": "evolve ledger verify → 'BROKEN: line 1740 prev_hash mismatch' — line 1740 is the manual-release-v10.16.0 era entry, immediately followed by reset-seal-cycle-108..111 operator seal entries (the sanctioned re-anchor after a historical break). Verify never gets past 1740, so it (a) cries wolf on every run about a break that was already adjudicated and sealed months ago, and (b) never checks the 80k+ entries AFTER the seal — including the 2026-07-22 cycle:null promote batch it should have flagged. A verifier that always fails on ancient history is a verifier nobody runs.",
+  "notes": "Fix: verify resolves the LAST reset-seal entry (role=operator, label reset-seal-*) and verifies the chain FROM that anchor forward, reporting the sealed prefix as 'sealed at seq N (operator)' info, not BROKEN. Guard: a seal must only anchor if itself hash-valid from its own prev; two seals chain normally. Do NOT rewrite history or re-hash — anchor semantics only.",
+  "acceptance": [
+    "RED first: a fixture ledger with break→seal→valid-chain verifies OK with an informational sealed-prefix note; a break AFTER the last seal still reports BROKEN.",
+    "Live: evolve ledger verify on this repo reports the post-seal chain status instead of the line-1740 wolf-cry.",
+    "cd go && go test -race ./internal/adapters/ledger/... N/N PASS."
+  ]
+}

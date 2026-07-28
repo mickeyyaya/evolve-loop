@@ -197,3 +197,20 @@ func TestLedgerEntry_Unmarshal_CycleOutOfRange(t *testing.T) {
 		})
 	}
 }
+
+// TestLedgerEntry_NullCycleAbsorbed — live corruption pin (2026-07-22): 15
+// inbox-lifecycle promote entries carry "cycle":null, and append-only history
+// cannot be rewritten — the defensive unmarshal must absorb null exactly like
+// an absent field (Cycle=0, no label, no error), or every full-ledger
+// iteration (evolve ledger verify, TestIter_RealLedger_NoStringCycleError)
+// hard-fails forever at seq 80361.
+func TestLedgerEntry_NullCycleAbsorbed(t *testing.T) {
+	raw := `{"ts":"2026-07-22T22:54:50Z","class":"inbox-lifecycle","action":"promote","task_id":"x","cycle":null,"git_sha":null,"reason":"ship-promote-processed"}`
+	var e LedgerEntry
+	if err := json.Unmarshal([]byte(raw), &e); err != nil {
+		t.Fatalf("null cycle must unmarshal like an absent field, got: %v", err)
+	}
+	if e.Cycle != 0 || e.CycleLabel != "" {
+		t.Fatalf("null cycle routed wrong: Cycle=%d CycleLabel=%q, want 0/empty", e.Cycle, e.CycleLabel)
+	}
+}
