@@ -192,6 +192,14 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	switch trimmed[0] {
+	case 'n':
+		// JSON null ≡ absent (live pin: 15 "cycle":null inbox-lifecycle
+		// entries written 2026-07-22 are permanent append-only history —
+		// rejecting them hard-fails every full-ledger iteration forever).
+		if !bytes.Equal(trimmed, []byte("null")) {
+			return fmt.Errorf("ledger cycle: unsupported JSON value %q", trimmed)
+		}
+		return nil
 	case '"':
 		var s string
 		if err := json.Unmarshal(trimmed, &s); err != nil {
