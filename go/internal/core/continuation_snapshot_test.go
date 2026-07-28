@@ -132,6 +132,13 @@ func TestStampContinuationManifest_WritesGatedManifest(t *testing.T) {
 	if got := gitOut(t, root, "merge-base", "--is-ancestor", m.SnapshotSHA, m.Branch); got != "" {
 		t.Errorf("snapshot not on branch: %s", got)
 	}
+	// Findings must point at the REASON artifact, not the digest identity
+	// shell (1146→1148 live gap: the digest served as "prior findings" told
+	// the next builder nothing, so it repeated the identical protectedsurface
+	// rejection while the fail-reason carried the remedy the whole time).
+	if filepath.Base(m.FindingsPath) != "audit-fail-reason.json" {
+		t.Errorf("FindingsPath = %q, want the audit-fail-reason.json REASON artifact — a digest shell is unactionable as builder findings", m.FindingsPath)
+	}
 }
 
 func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {

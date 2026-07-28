@@ -11,6 +11,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,11 +82,20 @@ func (o *Orchestrator) stampContinuationManifest(ctx context.Context, cs CycleSt
 		return
 	}
 	m := continuation.Continuation{
-		Worktree:     cs.ActiveWorktree,
-		Branch:       strings.TrimSpace(branch),
-		SnapshotSHA:  sha,
-		BaseSHA:      cs.WorktreeBaseSHA,
-		FindingsPath: filepath.Join(cs.WorkspacePath, "failure-digest.json"),
+		Worktree:    cs.ActiveWorktree,
+		Branch:      strings.TrimSpace(branch),
+		SnapshotSHA: sha,
+		BaseSHA:     cs.WorktreeBaseSHA,
+		// audit-fail-reason.json, NOT failure-digest.json (live gap,
+		// 1146→1148): the digest is the content-free identity shell
+		// {cycle, fingerprint, pre_class} — served as "prior findings" it
+		// told the next builder NOTHING, so attempt 2 repeated attempt 1's
+		// protectedsurface rejection byte-for-byte while the fail-reason
+		// carried the predicate's own rename remedy the whole time. The
+		// artifact exists whenever a floor or the ensureFailureDigest
+		// fallback produced one; absence degrades to no findings, WARNed at
+		// read time.
+		FindingsPath: filepath.Join(cs.WorkspacePath, "audit-fail-reason.json"),
 		Cycle:        cycle,
 	}
 	if err := continuation.WriteManifest(cs.WorkspacePath, m); err != nil {
@@ -162,12 +172,33 @@ func readContinuationFindings(path string) string {
 	}
 	body, err := os.ReadFile(path)
 	if err != nil {
+		// Absence degrades to "no findings" — but loudly, so the operator can
+		// tell "none existed" from "manifest points at the wrong path"
+		// (review MEDIUM: the fail-reason artifact is only written when a
+		// floor or the ensureFailureDigest fallback produced one).
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN continuation: findings artifact %s unreadable (%v) — builder gets no prior-attempt findings\n", path, err)
 		return ""
 	}
-	if len(body) > maxFindingsBytes {
-		body = body[:maxFindingsBytes]
+	// Render the reason artifact as readable lines, not raw JSON: the reasons
+	// carry the actionable remedy (1146→1148), and a builder should not read
+	// them through \n escapes. Unmarshal failure falls back to the raw body.
+	var a auditFailReason
+	if json.Unmarshal(body, &a) == nil && len(a.Reasons) > 0 {
+		rendered := "failed phase: " + a.Phase + "\n- " + strings.Join(a.Reasons, "\n- ")
+		return truncateFindings(rendered)
 	}
-	return strings.TrimSpace(string(body))
+	return truncateFindings(strings.TrimSpace(string(body)))
+}
+
+// truncateFindings bounds the findings text with an EXPLICIT marker — the cap
+// was unreachable while findings were the ~150-byte digest shell, but a
+// reason artifact can embed whole go-test blocks, and a silent mid-JSON cut
+// could hide the very remedy the findings exist to deliver.
+func truncateFindings(s string) string {
+	if len(s) <= maxFindingsBytes {
+		return s
+	}
+	return s[:maxFindingsBytes] + fmt.Sprintf("\n…[truncated %d bytes]", len(s)-maxFindingsBytes)
 }
 
 // adoptContinuationAfterTriage is the ADR-0076 slice C adoption seam, invoked

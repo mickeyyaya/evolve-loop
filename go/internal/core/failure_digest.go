@@ -154,6 +154,19 @@ func fingerprint(phase, preClass string, reasons []string) string {
 // literal prefix and the four-value enum, so no other reason text can match.
 var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
 
+// goTestDurationToken matches go-test timing chrome embedded in reason text:
+// the per-test "(0.02s)" and the package summary "\t1.478s". Decimal REQUIRED
+// — go test always prints decimals, while integer second tokens ("-timeout
+// 300s") are configuration and stay identity-bearing. Live pin: cycles
+// 1146/1148 failed the SAME protectedsurface red on the SAME files, split
+// into two fingerprints by "1.478s" vs "1.495s" alone (the third instance of
+// the identity-noise family after cycle tokens and narrative verdicts).
+// Accepted residual: a perf predicate whose message varies only in a measured
+// decimal-seconds value ("p95=2.10s" vs "p95=9.90s") folds to one fingerprint
+// — correct for the breaker (same defect, worsening measurement), documented
+// here so it is not rediscovered as a bug.
+var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
+
 // normalizeReasonForFingerprint projects a reason onto its DEFECT IDENTITY,
 // dropping tokens that are load-bearing for a human reader but pure noise for
 // identity. Display and identity are two projections of the one reason string:
@@ -175,7 +188,8 @@ var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIP
 // (which gate, which predicate) is untouched, so two DIFFERENT defects never
 // collapse into one fingerprint.
 func normalizeReasonForFingerprint(reason string) string {
-	return narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
+	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
+	return goTestDurationToken.ReplaceAllString(reason, "<dur>")
 }
 
 // ensureFailureDigest is the single-source wiring shared by BOTH retro
