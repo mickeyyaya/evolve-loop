@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
@@ -33,6 +34,14 @@ type FailureDigest struct {
 	Fingerprint string `json:"fingerprint"`
 	PreClass    string `json:"pre_class"`
 	Recurrence  int    `json:"recurrence"`
+	// Unexplained marks a digest whose reason set carries NO distinguishing
+	// content (empty, or exactly the content-free agent-graded router line).
+	// Its fingerprint asserts no defect identity: distinct failures collapse
+	// into this bucket by construction, so the blocker breaker must route it
+	// to the diagnosability rule, never the identical-fingerprint rule
+	// (batch-14: cycles 1137/1139/1143 — three DISTINCT auditor findings on
+	// one task, one shared boilerplate fingerprint, false halt).
+	Unexplained bool `json:"unexplained,omitempty"`
 }
 
 // RecurrenceCounter is the minimal read view of the recurrence ledger the
@@ -95,6 +104,7 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 		Cycle:       cycle,
 		Fingerprint: fingerprint(phase, preClass, reasons),
 		PreClass:    preClass,
+		Unexplained: reasonsAreContentFree(reasons),
 	}
 	if rc != nil {
 		digest.Recurrence = rc.Count(digest.Fingerprint)
@@ -208,7 +218,47 @@ func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fa
 // the audit report's first defect-ish line. STABLE across recurrences of the
 // same defect (never cycle numbers — those would blind the breaker to real
 // repeats). Empty when no artifact offers content (documented residual).
-func verdictFailDistinguisher(workspace string) string {
+func verdictFailDistinguisher(phase, workspace string) string {
+	// Defect identity FIRST — it is the only layer that separates the common
+	// case of the SAME task re-audited with a DIFFERENT finding each retry
+	// (batch-14: 1137/1139/1143 were three progressing findings on one task;
+	// the task-id layer is constant across them by definition). Task identity
+	// is the weakest signal and therefore the LAST resort, not the first.
+	//
+	// The sentinel read goes through phasecontract.ReadFailureBlock — the SAME
+	// authority the verdict path, dossier and failure-learning consult — not a
+	// hand-rolled parse (diff-review HIGH: a local reader dropped the
+	// placeholder-echo guard, so the Deliverable Contract's printed example
+	// "<one line per defect>" echoed into a report would mint a CONSTANT
+	// cross-task defect identity — the exact false-trip this file exists to
+	// prevent — and it also settles first-sentinel precedence and the
+	// per-phase report name in one call).
+	if fb, ok := phasecontract.ReadFailureBlock(workspace, phase); ok {
+		for _, d := range fb.Defects {
+			if head := defectHead(d); head != "" {
+				return "defect=" + head
+			}
+		}
+	}
+	// Same candidate order as ReadFailureBlock: the registry artifact name
+	// first (tdd's report is test-report.md), then the conventional name.
+	candidates := []string{phase + "-report.md"}
+	if c, ok := phasecontract.For(phase); ok && c.ArtifactName != candidates[0] {
+		candidates = []string{c.ArtifactName, phase + "-report.md"}
+	}
+	for _, name := range candidates {
+		raw, err := os.ReadFile(filepath.Join(workspace, name))
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(raw), "\n") {
+			t := strings.TrimSpace(line)
+			if strings.HasPrefix(t, "- D") || strings.HasPrefix(t, "- **D") {
+				return "defect=" + defectHead(t)
+			}
+		}
+		break // a readable report without bullets settles this layer
+	}
 	if raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json")); err == nil {
 		var d struct {
 			TopN []struct {
@@ -227,16 +277,95 @@ func verdictFailDistinguisher(workspace string) string {
 			}
 		}
 	}
-	if raw, err := os.ReadFile(filepath.Join(workspace, "audit-report.md")); err == nil {
-		for _, line := range strings.Split(string(raw), "\n") {
-			t := strings.TrimSpace(line)
-			if strings.HasPrefix(t, "- D") || strings.HasPrefix(t, "- **D") {
-				if len(t) > 160 {
-					t = t[:160]
-				}
-				return "defect=" + t
-			}
+	return ""
+}
+
+// freeTextCycleTokens matches cycle-numbered chrome INSIDE prose defect text
+// ("acs/cycle1141", "cycle-1141", "TestC1141_004_…") — the in-text
+// counterpart of the audit phase's anchored egpsRedIDCycleTokens. Both
+// require the literal cycle/TestC prefix plus digits, so two DIFFERENT
+// defects never collapse; only the retry-varying token folds.
+var freeTextCycleTokens = regexp.MustCompile(`\b(?:[Cc]ycle[-_ ]?\d+|TestC\d+_)`)
+
+// defectHead projects one defect string onto its stable identity head:
+// cycle-normalized, single-line, truncated.
+func defectHead(d string) string {
+	d = strings.TrimSpace(strings.ReplaceAll(d, "\n", " "))
+	if d == "" {
+		return ""
+	}
+	d = freeTextCycleTokens.ReplaceAllStringFunc(d, func(m string) string {
+		if strings.HasPrefix(m, "TestC") {
+			return "TestCN_"
+		}
+		return "cycle-N"
+	})
+	if len(d) > 160 {
+		d = strings.ToValidUTF8(d[:160], "")
+	}
+	return d
+}
+
+// agentGradedRouterReason is the ONE template for the dispatch loop's
+// "verdict FAIL routed to retro" fallback reason. Shared with
+// isBoilerplateRouterReason so the writer and the content-free detector can
+// never drift apart (pinned by TestAgentGradedRouterReason_MatchesBoilerplateDetector).
+func agentGradedRouterReason(phase string) string {
+	return fmt.Sprintf("phase %s verdict FAIL routed to retro (agent-graded; see the %s report artifact)", phase, phase)
+}
+
+// abnormalEpilogueReason is the ONE template for the abnormal-exit epilogue's
+// fallback reason (cyclerun_epilogue.go) — shared with the content-free
+// detector below for the same no-drift guarantee as the router line. Every
+// abort in the same phase renders identically (a SIGINT-cancelled lane, a
+// wedged bridge, an operator bounce), so this template asserts no identity.
+func abnormalEpilogueReason(phase string) string {
+	return "cycle aborted in phase " + phase + " (abnormal-exit epilogue)"
+}
+
+// boilerplateReasonRes match EXACTLY the bare fallback templates — anchored
+// both ends, so a reason carrying any appended distinguisher or real error
+// text is content-bearing.
+var boilerplateReasonRes = []*regexp.Regexp{
+	regexp.MustCompile(`^phase \S+ verdict FAIL routed to retro \(agent-graded; see the \S+ report artifact\)$`),
+	regexp.MustCompile(`^cycle aborted in phase \S+ \(abnormal-exit epilogue\)$`),
+}
+
+// isBoilerplateRouterReason reports whether one reason is a bare fallback
+// template with no distinguishing content.
+func isBoilerplateRouterReason(r string) bool {
+	r = strings.TrimSpace(r)
+	for _, re := range boilerplateReasonRes {
+		if re.MatchString(r) {
+			return true
 		}
 	}
-	return ""
+	return false
+}
+
+// reasonsAreContentFree reports whether a reason set asserts NO defect
+// identity: empty, or every line is the bare router boilerplate.
+func reasonsAreContentFree(reasons []string) bool {
+	if len(reasons) == 0 {
+		return true
+	}
+	for _, r := range reasons {
+		if !isBoilerplateRouterReason(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// agentGradedFailReason composes the dispatch loop's fallback fail-reason for
+// an agent-graded FAIL: the router line plus the strongest per-failure
+// distinguisher the workspace offers (cycles 1054/1060: a constant fallback
+// collided two different tasks; batch-14: a task-first distinguisher collided
+// three different defects of ONE task).
+func agentGradedFailReason(phase, workspace string) string {
+	reason := agentGradedRouterReason(phase)
+	if d := verdictFailDistinguisher(phase, workspace); d != "" {
+		reason += " " + d
+	}
+	return reason
 }
