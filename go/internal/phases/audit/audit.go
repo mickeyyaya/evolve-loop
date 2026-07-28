@@ -114,10 +114,12 @@ type hooks struct {
 	phaseIO config.Stage
 }
 
-func (hooks) PhaseName() string                           { return string(core.PhaseAudit) }
-func (hooks) AgentPromptName() string                     { return "evolve-auditor" }
-func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "audit-report.md" }
-func (hooks) DefaultModel() string                        { return "opus" } // Adversarial cross-family from Builder's Sonnet.
+func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
+func (hooks) AgentPromptName() string { return "evolve-auditor" }
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
+	return phasecontract.ArtifactFilename(string(core.PhaseAudit))
+}
+func (hooks) DefaultModel() string { return "opus" } // Adversarial cross-family from Builder's Sonnet.
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder

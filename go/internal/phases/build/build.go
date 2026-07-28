@@ -27,10 +27,12 @@ import (
 // hooks implements runner.Hooks for the build phase.
 type hooks struct{}
 
-func (hooks) PhaseName() string                           { return string(core.PhaseBuild) }
-func (hooks) AgentPromptName() string                     { return "evolve-builder" }
-func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "build-report.md" }
-func (hooks) DefaultModel() string                        { return "auto" }
+func (hooks) PhaseName() string       { return string(core.PhaseBuild) }
+func (hooks) AgentPromptName() string { return "evolve-builder" }
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
+	return phasecontract.ArtifactFilename(string(core.PhaseBuild))
+}
+func (hooks) DefaultModel() string { return "auto" }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder

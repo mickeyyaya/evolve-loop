@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // manifest.go — ship-bind tree-manifest reconciliation (shadow + enforce).
@@ -44,8 +45,19 @@ import (
 //      "shadow" — behavior-preserving.
 
 // manifestReportFiles are the phase reports whose named paths constitute the
-// cycle's declared file manifest.
-var manifestReportFiles = []string{"build-report.md", "test-report.md"}
+// cycle's declared file manifest. Both entries resolve through the phasecontract
+// SSOT. The TDD report is registered under the phase key "tdd" (its artifact
+// name diverges from the <phase>-report.md convention) — an earlier comment
+// here claimed "test" had no registry phase and kept the name as a literal, but
+// "test" was simply the wrong key, not a missing SSOT.
+//
+// ArtifactName (not ArtifactFilename) for both: every phase named here has a
+// registered artifact, so the convention fallback could only ever mask a lost
+// registration behind a plausible-but-wrong filename.
+var manifestReportFiles = []string{
+	phasecontract.ArtifactName(string(core.PhaseBuild)),
+	phasecontract.ArtifactName(string(core.PhaseTDD)),
+}
 
 // bareRootFileExts is the extension allow-list for bare root-level filenames
 // (no '/'). Kept to the extensions the repo actually tracks at its root or that

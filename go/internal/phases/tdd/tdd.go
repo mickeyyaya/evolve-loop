@@ -5,7 +5,7 @@
 // Skip semantics (Skipper interface):
 //   - EVOLVE_TEST_PHASE_ENABLED=0 → SKIPPED, NextPhase=build, no bridge call
 //
-// Verdict mapping (team-context.md body):
+// Verdict mapping (TDD report body; name resolved via phasecontract):
 //   - empty artifact → FAIL
 //   - missing "## Acceptance" → FAIL
 //   - missing "## RED Tests" → FAIL
@@ -31,12 +31,21 @@ type hooks struct{}
 func (hooks) PhaseName() string       { return string(core.PhaseTDD) }
 func (hooks) AgentPromptName() string { return "evolve-tdd-engineer" }
 
-// test-report.md is the name the tdd-engineer agent doc + the downstream
+// The artifact name resolves through the phasecontract registry, which is the
+// SSOT for the name the tdd-engineer agent doc + the downstream
 // build-planner/builder contract all use (5 agent docs). "team-context.md" was
 // a stale pre-rewrite name that left the bridge polling a file the agent never
 // writes — every tdd phase timed out (exit 81) despite completing its work.
-func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "test-report.md" }
-func (hooks) DefaultModel() string                        { return "auto" }
+//
+// ArtifactName (not ArtifactFilename) on purpose: tdd's registered artifact
+// name DIVERGES from the <phase>-report.md convention, so the convention
+// fallback would silently reinstate tdd-report.md — that same exit-81 timeout —
+// if the registration were ever lost. ArtifactName returns "" instead, which
+// fails loudly.
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
+	return phasecontract.ArtifactName(string(core.PhaseTDD))
+}
+func (hooks) DefaultModel() string { return "auto" }
 
 // ShouldSkip delegates to the central PhasePolicy (config.Load is the sole
 // reader of EVOLVE_TEST_PHASE_ENABLED). Legacy posture preserved: tdd runs

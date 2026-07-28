@@ -29,6 +29,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // removalClaim is the structured claim block a build report emits. Unrelated
@@ -68,7 +70,8 @@ func RemovalClaimFailures(_ context.Context, in ReviewInput) []string {
 // readBuildReport loads the build report from its canonical location, falling
 // back to the promoted copy the correction ladder writes under deliverables/.
 func readBuildReport(workspace string) (string, bool) {
-	for _, rel := range []string{"build-report.md", filepath.Join("deliverables", "build-report.md")} {
+	name := phasecontract.ArtifactFilename(string(PhaseBuild))
+	for _, rel := range []string{name, filepath.Join("deliverables", name)} {
 		if b, err := os.ReadFile(filepath.Join(workspace, rel)); err == nil {
 			return string(b), true
 		}

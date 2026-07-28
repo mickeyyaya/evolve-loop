@@ -22,6 +22,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Exit code contract (matches consensus-dispatch.sh):
@@ -207,7 +208,7 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 	}
 
 	// ── dispatch to aggregator via the native evolve binary ──
-	aggOutput := filepath.Join(in.WorkspacePath, "audit-report.md")
+	aggOutput := filepath.Join(in.WorkspacePath, phasecontract.ArtifactFilename("audit"))
 	logf("aggregating via cross-cli-vote...")
 	aggSubArgs := append([]string{"cross-cli-vote", aggOutput}, workerArtifacts...)
 	aggCmd, err := resolveNativeDispatch(in.DispatchDir, "aggregator", aggSubArgs)

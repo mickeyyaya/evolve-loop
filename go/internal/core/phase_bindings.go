@@ -122,7 +122,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	treeSum := sha256.Sum256([]byte(diff))
-	artPath := filepath.Join(workspace, "audit-report.md")
+	artPath := filepath.Join(workspace, phasecontract.ArtifactFilename(string(PhaseAudit)))
 	artBytes, err := os.ReadFile(artPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: read %s: %v\n", artPath, err)
@@ -212,7 +212,7 @@ func (o *Orchestrator) recordBuildBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	treeSum := sha256.Sum256([]byte(diff))
-	artPath := filepath.Join(workspace, "build-report.md")
+	artPath := filepath.Join(workspace, phasecontract.ArtifactFilename(string(PhaseBuild)))
 	entry := LedgerEntry{
 		TS:           o.now().UTC().Format(time.RFC3339),
 		Cycle:        cycle,

@@ -124,7 +124,7 @@ func CheckVerdictCoherence(in VerdictInputs) Coherence {
 // error and never a fabricated verdict (a reader that guessed would defeat the
 // whole coherence check).
 func ReadCycleVerdicts(workspace string) (audit, acs string, auditRan bool) {
-	if b, err := os.ReadFile(filepath.Join(workspace, "audit-report.md")); err == nil {
+	if b, err := os.ReadFile(filepath.Join(workspace, phasecontract.ArtifactFilename("audit"))); err == nil {
 		auditRan = true
 		if v, ok := phasecontract.ParseVerdictSentinel(string(b)); ok {
 			audit = v
