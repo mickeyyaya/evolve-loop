@@ -37,6 +37,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -152,6 +153,16 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// First-run onboarding nudge (non-blocking; defaults work without setup).
 	maybePrintSetupNudge(stderr, cfg.EvolveDir)
+
+	// ADR-0080 S2: report the worktree plane at boot — a loop launched into
+	// the PRIMARY checkout shares its tree with the operator console, the
+	// exact overlap that killed lanes 1149-1152. Classification failure is
+	// non-fatal (an exotic checkout still runs; the tripwire just stays dark).
+	if pi, perr := plane.Classify(cfg.ProjectRoot); perr == nil {
+		fmt.Fprintln(stderr, plane.BootLine(pi))
+	} else {
+		fmt.Fprintf(stderr, "[loop] WARN: plane classification failed (%v) — the ADR-0080 primary-checkout tripwire is dark this run\n", perr)
+	}
 
 	if cfg.DryRun {
 		buf, _ := json.MarshalIndent(map[string]any{
@@ -495,6 +506,11 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		// policy.json cli_health.proactive_probe is set.
 		runUsageProbe(cfg.ProjectRoot, cfg.EvolveDir, cycleEnv, stderr)
 
+		// ADR-0080 S3: refresh the runtime plane from origin before planning —
+		// lanes must base on the integration channel's truth, not a stale
+		// local main. FF-only; every skip is deliberate and the diverged case
+		// WARNs (the loop never merges).
+		syncMainFromOriginAtWaveBoundary(ctx, cfg.ProjectRoot, stderr)
 		// fleet-config-hot-reload-wave-boundary (cycle 739): re-resolve the
 		// committed fleet block at every wave boundary, before quota/budget
 		// sizing. A malformed/unreadable policy.json holds the previous width

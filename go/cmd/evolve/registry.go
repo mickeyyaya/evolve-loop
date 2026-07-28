@@ -49,6 +49,7 @@ var commands = []subcommand{
 
 	// Phase 1 + Phase 2 core surface.
 	{Name: "doctor", Summary: "Probe environment", Run: opscmd.RunDoctor},
+	{Name: "console-lease", Summary: "Time-bounded operator lease for runtime-tree paths (ADR-0080 S4)", Run: opscmd.RunConsoleLease},
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
 	{Name: "install", Summary: "Manual install of agents + loop skill into ~/.claude (install [--ci])", Run: runInstall},
 	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},

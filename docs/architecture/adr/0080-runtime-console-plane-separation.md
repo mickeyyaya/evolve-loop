@@ -1,6 +1,11 @@
 # ADR-0080: Runtime/Console plane separation — the loop owns its checkout
 
-- **Status**: Proposed (operator-requested design, 2026-07-28)
+- **Status**: Accepted — S1 executed 2026-07-28 (loop live from the runtime plane); S2-S4 landed the same day
+- **Implementation notes (deviations from the proposal, stated per Core Rule 3)**:
+  - The bare-hub conversion is DEFERRED to a quiet window: the primary checkout stays the object host and console plane. Same-branch enforcement is preserved, inverted — the RUNTIME worktree holds `main`, the console parks on `console-plane` + feature branches, so git itself still refuses a console checkout of `main`. Functionally identical isolation; zero migration risk against 200+ registered historical lane worktrees.
+  - S3 syncs `main` (not a `runtime/main` alias) because lane ships push `origin main` — keeping the runtime on `main` avoids re-teaching the ship path. FF-only semantics as designed.
+  - S3 self-SHA investigation (review round 2, ground truth): a wave-boundary FF CANNOT drift the ship self-SHA pin — `verifySelfSHA` hashes `os.Executable()` (gitignored `bin/evolve`, untracked build output no git operation rewrites). A draft repin seam here was provably inert and was DELETED rather than shipped as a false protection claim; the real hazard (operator rebuilds) stays covered by the boot and post-build re-pins.
+  - S4 shipped as the loud exact-path console lease (`evolve console-lease`) consulted by the tree-diff guard's classifier chain — the "rejected" allowlist reappears only in its bounded, expiring, WARN-per-waiver form. Adversarial review (BLOCK) then hardened authorship: the lease lives in the git COMMON dir (`plane.CommonGitDir` — outside every worktree, beyond the `.evolve/` legitimacy blanket, so a lane phase cannot author or shadow it) and is ADOPTED once at cycle start, so a mid-cycle write can never waive the cycle that made it. Residual accepted: on a sandbox-degraded host an agent with arbitrary filesystem write could still reach the hub — the lease is operator-attested by location and convention, not cryptography.
 - **Deciders**: operator + console session
 - **Context cycles**: 1121/1122, 1149/1150 (tree-diff guard kills from operator edits), 1151/1152 (dispatch death from operator `git rm` of runtime-minted stubs), PR #370 stowaway reds (ship auto-stage adopting operator-independent dirt)
 
