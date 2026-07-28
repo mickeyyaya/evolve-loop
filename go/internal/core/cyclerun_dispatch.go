@@ -1,12 +1,10 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
@@ -204,6 +202,11 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// (every attempt exit=85 — cycle-656) and checkpoint-and-defer instead of
 	// failing forward.
 	var attemptExits []int
+	// The sequential loop is the REFERENCE hook set (retry_opts.go): it consults
+	// every recovery hook through this one registry rather than calling the
+	// predicates directly, so the evaluate-batch path can be built from the same
+	// enumeration instead of re-remembering it by hand.
+	retryHooks := cr.mainDispatchRetryOpts()
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
 		obsCancel := cr.o.observer.Start(cr.ctx, string(next), phaseReq)
@@ -232,7 +235,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		if err != nil {
 			attemptExits = append(attemptExits, bridgeExitCode(err))
-			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
+			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				// All-families quota exhaustion (cycle-656 D2): every attempt
 				// returned exit=85, so the cross-family failover (cycle-393)
 				// has no remaining target — quota is a resource that resets in
@@ -276,25 +279,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.
 				// Default-on; policy.json can disable artifact backfill for the cycle.
-				backfillEnabled := cr.workflowConfig.BackfillEnabled
-				if attempt >= maxAttempts && errors.Is(err, ErrArtifactTimeout) && backfillEnabled {
-					artifactPath := backfillArtifactPath(cr.cs.WorkspacePath, string(next))
-					if ok, berr := backfill.TryExtract(cr.cs.WorkspacePath, string(next), artifactPath, 200); berr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill %s: %v\n", next, berr)
-					} else if ok {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: ErrArtifactTimeout exhausted; backfilled artifact from stdout.clean.txt; proceeding with WARN verdict\n", next)
-						resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
-						if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
-							TS:       cr.o.now().UTC().Format(time.RFC3339),
-							Cycle:    cr.cycle,
-							Role:     string(next),
-							Kind:     "backfill",
-							ExitCode: 81,
-						}); lerr != nil {
-							fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill ledger append: %v\n", lerr)
-						}
-						break
-					}
+				if backfilled, ok := retryHooks.backfill(next, err, attempt, maxAttempts); ok {
+					resp = backfilled
+					break
 				}
 				// Optional-phase infra skip (Workstream-D intent on
 				// ErrArtifactTimeout; cycle-283): an enrichment phase must not
@@ -303,7 +290,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// exhaustion is infra-shaped degrades to a synthesized WARN and
 				// the cycle advances toward audit/ship. The failed attempts stay
 				// in failure-learning and the ledger — recovered, never silent.
-				if cr.o.optionalInfraSkip(next, err) {
+				if retryHooks.optionalInfraSkip(next, err) {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: optional phase exhausted infra retries (%v); degrading to WARN and advancing (optional_infra_skip)\n", next, err)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
@@ -325,28 +312,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// (re-audit / retry-ship / debugger), and bounds the depth.
 				// Integrity breaches, an illegal edge, or exhausted depth return
 				// (_, false) and fall through to the loud abort below.
-				if se, ok := AsShipError(err); ok {
-					// Preserve the worktree from the exit cleanup while a
-					// ship failure is unresolved (ADR-0039 §8 / D10) —
-					// cleared when a later ship attempt succeeds.
-					cr.preserveWorktree = true
-					fleetWidth := fleetWidthFromEnv(cr.req.Env)
-					if rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.cycle, cr.cs, se, cr.recoveryDepth, fleetWidth); recovering {
-						cr.ctxSnap["ship_error_code"] = string(se.Code)
-						cr.ctxSnap["ship_error_class"] = string(se.Class)
-						cr.ctxSnap["ship_error_stage"] = string(se.Stage)
-						cr.ctxSnap["ship_error_debug"] = se.DebugString()
-						// ADR-0044 C1: the failed ship attempt ran and burned
-						// budget — record it before routing to recovery. A
-						// later successful ship records its own outcome.
-						cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attemptCount,
-							fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", se.Code, rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
-						cr.recoveryDepth++
-						cr.scheduledNext = rec
-						cr.current = PhaseShip // ship ran (and failed); keep forensics accurate
-						shipRecovered = true
-						break
-					}
+				if retryHooks.shipRecovery(next, err, resp, attemptCount) {
+					shipRecovered = true
+					break
 				}
 				// Post-ship observer skip (cycle-574 memo-phase-tier-envelope):
 				// a best-effort RoleControl observer (memo / post-ship-monitor)
@@ -358,7 +326,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// floor. Degrade to a synthesized WARN and advance; the failed
 				// attempts stay in failure-learning and the ledger — recovered,
 				// never silent.
-				if cr.o.postShipObserverSkip(next, cr.shipped) {
+				if retryHooks.postShipObserverSkip(next) {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: best-effort post-ship observer failed after ship (%v); degrading to WARN and advancing (post_ship_observer_skip)\n", next, err)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{

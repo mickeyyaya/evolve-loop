@@ -19,6 +19,20 @@ import (
 // Returns loopAbort + error (illegal static transition, or a fail-closed spine
 // gate at enforce), loopBreak (next == PhaseEnd → terminate the loop), or
 // loopNext + the chosen next phase.
+// recordSpineFailOpen appends one spine-gate fail-open to the cycle result, from
+// which finalizeCycle projects it into the committed dossier (the SkippedPhases
+// precedent: one record, one projection). Repeats ACCUMULATE — collapsing them
+// is how a 76-event epidemic reads as 1 — and a cycle that never fails open
+// carries an empty slice, so the rollup's threshold alarm stays silent on a
+// healthy batch. Called only from the fail-open branch of the spine gate.
+func (cr *cycleRun) recordSpineFailOpen(next Phase, missingArtifact, reason string) {
+	cr.result.SpineFailOpens = append(cr.result.SpineFailOpens, SpineFailOpen{
+		Phase:           string(next),
+		MissingArtifact: missingArtifact,
+		Reason:          reason,
+	})
+}
+
 func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 	var next Phase
 	// fromSchedule marks an iteration whose `next` came from scheduledNext —
@@ -149,6 +163,19 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 						reason = "digest degraded: " + strings.Join(fresh.DigestDegraded, "; ")
 					}
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN spine not satisfied for next=%s (a mandatory predecessor's handoff artifact is missing); proceeding fail-open (%s)\n", next, reason)
+					// …and record it (cycle-1166): stderr is not a surface an
+					// operator or a later sweep can count. The anchor comes
+					// from the SAME signals the gate blocked on (not the
+					// re-digest, which may differ) so the record explains THIS
+					// fail-open. The reporter is the gate's exact complement,
+					// so ok is true here; "" would be a contradiction, not a
+					// reason to drop the event — record it as unknown instead.
+					missing, ok := cr.o.sm.UnsatisfiedSpineAnchor(next, signals, cr.o.cfg)
+					anchor := string(missing)
+					if !ok || anchor == "" {
+						anchor = "unknown"
+					}
+					cr.recordSpineFailOpen(next, anchor, reason)
 				}
 			}
 		}

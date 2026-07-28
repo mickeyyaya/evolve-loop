@@ -79,6 +79,9 @@ type BuildOpts struct {
 	// rather than allowed to clobber the floor-derived FinalVerdict (cycle-802).
 	// Surfaced verbatim so the dossier records the degrade, never dropping it.
 	SkippedPhases []cyclestate.SkippedPhase
+	// SpineFailOpens are the cycle's spine-gate fail-open events (cycle-1166),
+	// surfaced verbatim so the dossier is where the epidemic becomes visible.
+	SpineFailOpens []cyclestate.SpineFailOpen
 }
 
 // Build assembles a Dossier for the given cycle. It validates the cycle number,
@@ -112,7 +115,8 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 				KeyFindings: "cycle completed; ledger walk deferred to future slice",
 			},
 		},
-		SkippedPhases: opts.SkippedPhases,
+		SkippedPhases:  opts.SkippedPhases,
+		SpineFailOpens: opts.SpineFailOpens,
 	}
 	// Ingest the per-phase timing log when present: real per-phase records +
 	// the cycle-level roll-up replace the stub, so the committed dossier carries

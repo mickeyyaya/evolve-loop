@@ -40,7 +40,7 @@ The unit layer is demonstrably healthy. The defect mass sits in **cross-package 
 | 0.85 | gate-wiring-binding-tests | test-quality | ship attestation reader unbound to writer; qualityGate removable without test failure |
 | 0.84 | swarm-session-accounting-fail-loud | silent-failure | Register + MarkReaped errors discarded — reaper's source of truth silently stale |
 | 0.83 | engine-launch-deps-call-local | concurrency | `e.deps.OnBoot` mutation; fresh-engine contract enforced by comment only |
-| 0.82 | evaluate-batch-retry-parity | design | parallel-evaluate retry loop missing optionalInfraSkip — **blocks the enforce flip** |
+| 0.82 | evaluate-batch-retry-parity | design | **RESOLVED** (cycle-1166, closed out cycle-1168) — batch path now delegates to the shared retry core: `retry_opts.go` `evaluateBatchRetryOpts` wires both degrade hooks, `evaluate_batch.go` `dispatchRunnerWithRetry` keeps none inline |
 | 0.80 | state-growth-caps | robustness | guards.log 23MB/339K lines unrotated; verdict-cache unbounded O(n) RMW; ledger seal built, never invoked |
 | 0.78 | paths-subtree-accessors | architecture | `.evolve/runs` etc. hand-joined in ~10 sites; invariants live in comments |
 | 0.74 | runlease-phaseobserver-test-hygiene | test+concurrency | package-var seams one t.Parallel from racing; sleep-sync tests; split-brain locking |
@@ -72,4 +72,4 @@ go vet ./...                                   # baseline
 ~/go/bin/gremlins unleash ./internal/<pkg>     # mutation-check any gate package; rm -rf $TMPDIR/gremlins-* after
 ```
 
-Sequencing constraints encoded in the items: inboxmover-promote-mkdir rides with/after `inbox-promotion-requires-landed-ship` (same file); state-growth-caps ledger-seal wiring rides workspace-hygiene S5's batch-end hook; engine-launch-deps-call-local must not disturb the token-telemetry S3 collector seam at `Engine.Launch`; evaluate-batch-retry-parity gates the parallel-evaluate enforce flip.
+Sequencing constraints encoded in the items: inboxmover-promote-mkdir rides with/after `inbox-promotion-requires-landed-ship` (same file); state-growth-caps ledger-seal wiring rides workspace-hygiene S5's batch-end hook; engine-launch-deps-call-local must not disturb the token-telemetry S3 collector seam at `Engine.Launch`. The evaluate-batch-retry-parity constraint is **cleared**: the retry parity landed in cycle-1166, so the parallel-evaluate enforce flip is no longer sequenced behind it — the remaining precondition is the StageOff→StageShadow soak decision, not this item.

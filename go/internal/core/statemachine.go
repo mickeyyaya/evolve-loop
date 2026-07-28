@@ -366,6 +366,22 @@ func effectiveOrder(cfg config.RoutingConfig) []string {
 // handoff is verified (anchorArtifactPresent) is fixed verification logic — an
 // anchor with no declared check (e.g. a never-skip triage) is a no-op.
 func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) bool {
+	_, unsatisfied := sm.UnsatisfiedSpineAnchor(target, sig, cfg)
+	return !unsatisfied
+}
+
+// UnsatisfiedSpineAnchor is SpineSatisfiedUpTo's REPORTER: it returns the FIRST
+// mandatory predecessor anchor of target whose handoff artifact is missing, and
+// whether such an anchor exists. It is the exact complement of the gate — both
+// walk the same anchor list through the same gateSatisfied check, so a reporter
+// that names an anchor the gate would have accepted (or stays silent where the
+// gate blocks) is impossible by construction.
+//
+// The fail-open WARN and its cycle-1166 telemetry need the CAUSE, not just the
+// fact: "ship proceeded with build's report missing" groups by cause, while
+// "ship proceeded" does not. The FIRST unsatisfied anchor is the right one to
+// report — a later anchor is usually missing only BECAUSE the earlier one is.
+func (sm *StateMachine) UnsatisfiedSpineAnchor(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) (Phase, bool) {
 	anchors := mandatoryAnchorsFor(cfg)
 	ti := -1
 	for i, a := range anchors {
@@ -375,14 +391,14 @@ func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSigna
 		}
 	}
 	if ti < 0 {
-		return true // non-anchor target: not gated by the spine floor
+		return "", false // non-anchor target: not gated by the spine floor
 	}
 	for i := 0; i < ti; i++ {
 		if !sm.gateSatisfied(anchors[i], sig) {
-			return false
+			return anchors[i], true
 		}
 	}
-	return true
+	return "", false
 }
 
 // gateSatisfied reports whether anchor's artifact floor holds against the digest

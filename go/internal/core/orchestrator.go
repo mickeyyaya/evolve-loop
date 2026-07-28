@@ -57,7 +57,7 @@ func wrapCycleLevelError(phase Phase, err error) error {
 // phase mis-marked Optional (the floor loop alone would miss ship, which is
 // not in the floor set). Phase-agnostic flow per ADR-0035/0038.
 func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
-	if !errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err) {
+	if !IsInfraTeardownError(err) {
 		return false
 	}
 	if isConfiguredMandatory(o.cfg, string(p)) {
@@ -980,7 +980,7 @@ OuterLoop:
 	if dossierGoal == "" {
 		dossierGoal = cr.req.GoalHash
 	}
-	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases, cr.result.SpineFailOpens); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return cr.result, nil

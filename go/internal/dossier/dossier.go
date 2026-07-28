@@ -44,8 +44,13 @@ type Dossier struct {
 	// Present so a cycle that PASSed its floor but had a retro/memo fail under
 	// quota pressure still records that experience instead of dropping it.
 	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`
-	StartedAt     string                    `json:"started_at,omitempty"`
-	EndedAt       string                    `json:"ended_at,omitempty"`
+	// SpineFailOpens records every spine-gate fail-open this cycle took (the
+	// phase entered anyway + the missing predecessor artifact + the reason).
+	// omitempty, mirroring skipped_phases: an operator scanning dossiers sees
+	// the field only where there is something to see (cycle-1166).
+	SpineFailOpens []cyclestate.SpineFailOpen `json:"spine_fail_opens,omitempty"`
+	StartedAt      string                     `json:"started_at,omitempty"`
+	EndedAt        string                     `json:"ended_at,omitempty"`
 	// Timing is the cycle-level latency roll-up (where the wall-clock went),
 	// ingested from phase-timing.json. Nil when the cycle wrote no timing log.
 	Timing *phasetiming.Summary `json:"timing,omitempty"`

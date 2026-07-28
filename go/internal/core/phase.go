@@ -60,6 +60,7 @@ type (
 	Diagnostic          = cyclestate.Diagnostic
 	CycleResult         = cyclestate.CycleResult
 	SkippedPhase        = cyclestate.SkippedPhase
+	SpineFailOpen       = cyclestate.SpineFailOpen
 	SystemFailureSignal = cyclestate.SystemFailureSignal
 )
 

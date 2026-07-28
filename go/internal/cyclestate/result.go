@@ -33,6 +33,13 @@ type CycleResult struct {
 	// was re-run. Provenance only — the re-run verdict is what recorded; a
 	// remediated cycle is never a silent PASS.
 	Remediations []string
+	// SpineFailOpens records every spine-gate fail-open this cycle took: the
+	// gate found a mandatory predecessor's handoff artifact missing and
+	// proceeded anyway (SpineFloor below enforce, or a non-clean absence).
+	// Before cycle-1166 these went to stderr and nowhere else — a width-3 batch
+	// emitted 76 of them with no counter, no dossier field and no threshold.
+	// Occurrences ACCUMULATE (never collapse repeats): the count IS the signal.
+	SpineFailOpens []SpineFailOpen
 	// FailReasons surfaces the floor-override explanations (the untruncated
 	// audit-fail-reason.json / CycleState.AuditFailReasons content) in the
 	// cycle summary and dossier — cycle-1022's lesson: the reason WAS recorded
@@ -57,6 +64,17 @@ type SystemFailureSignal struct {
 type SkippedPhase struct {
 	Phase  string `json:"phase"`
 	Reason string `json:"reason"`
+}
+
+// SpineFailOpen is one spine-gate fail-open event. Phase is the phase that was
+// entered anyway; MissingArtifact is the FIRST unsatisfied predecessor anchor
+// (the real cause — phase alone cannot group 76 WARNs by cause); Reason is the
+// fail-open reason verbatim ("would-block at enforce" vs "digest degraded: …"),
+// which is what distinguishes a dialed-down SpineFloor from a degraded read.
+type SpineFailOpen struct {
+	Phase           string `json:"phase"`
+	MissingArtifact string `json:"missing_artifact"`
+	Reason          string `json:"reason,omitempty"`
 }
 
 // TokenUsage records the LLM token counts attributed to a phase run.

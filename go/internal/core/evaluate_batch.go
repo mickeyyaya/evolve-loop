@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -81,42 +80,20 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 // (ArtifactTimeout / transient-bridge relaunch), in isolation — it reads only
 // immutable cr handles (runners, observer, retryConfig) and mutates nothing, so
 // it is safe to call concurrently. Returns (resp, attempts, err).
+//
+// Dispatch parity with the sequential loop is STRUCTURAL: both take their
+// recovery hooks from retry_opts.go and run the same retry core, so a hook added
+// there cannot silently miss this path (the gap that produced this item — an
+// optional evaluate phase exhausting infra retries aborted the whole batch).
+// Keeps `ship ⇒ build ∧ audit ∧ tdd` intact: mandatory/floor phases match no
+// skip predicate, so their errors still propagate. The ledger/failure-learning
+// side effects the sequential path emits are recorded by the batch merge, not
+// here (this helper mutates nothing, per its concurrency contract).
 func (cr *cycleRun) dispatchRunnerWithRetry(phase Phase, req PhaseRequest) (PhaseResponse, int, error) {
-	maxAttempts := cr.retryConfig.PhaseMaxAttempts
-	runner := cr.o.runners[phase]
-	var resp PhaseResponse
-	var err error
-	for attempt := 1; ; attempt++ {
-		obsCancel := cr.o.observer.Start(cr.ctx, string(phase), req)
-		resp, err = runner.Run(cr.ctx, req)
-		if obsCancel != nil {
-			obsCancel()
-		}
-		if err == nil && IsVerdict(resp.Verdict) {
-			return resp, attempt, nil
-		}
-		if err != nil {
-			if attempt >= maxAttempts || (!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)) {
-				// Dispatch parity with the sequential loop (cyclerun_dispatch.go):
-				// a catalog-Optional off-floor phase whose exhaustion is
-				// infra-shaped, or a best-effort post-ship Control observer,
-				// degrades to WARN+advance instead of aborting the whole batch.
-				// Both predicates are pure reads (o.cfg/o.catalog) — safe in this
-				// concurrent path. Keeps `ship ⇒ build ∧ audit ∧ tdd` intact:
-				// mandatory/floor phases never match, so their errors still
-				// propagate. The ledger/failure-learning side effects the
-				// sequential path emits are recorded by the batch merge, not here
-				// (this helper mutates nothing, per its concurrency contract).
-				if cr.o.optionalInfraSkip(phase, err) || cr.o.postShipObserverSkip(phase, cr.shipped) {
-					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, attempt, nil
-				}
-				return resp, attempt, err
-			}
-		} else if attempt >= maxAttempts { // err==nil but non-canonical verdict
-			return resp, attempt, fmt.Errorf("phase %s returned non-canonical verdict %q", phase, resp.Verdict)
-		}
-		executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
-	}
+	// Delegate — never a second hand-maintained loop. The batch's divergence
+	// from the sequential path is declared in evaluateBatchRetryOpts (ship
+	// recovery and backfill disabled), not re-derived here (cycle-1166).
+	return cr.retryPhaseRunner(phase, req, cr.evaluateBatchRetryOpts())
 }
 
 // dispatchEvaluateBatch runs the parallelizable post-build checking phases

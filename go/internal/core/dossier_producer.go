@@ -61,13 +61,14 @@ func dossierVerdict(outcome string) string {
 // cycle to <projectRoot>/knowledge-base/cycles/cycle-N.{json,md}. goal must be
 // non-blank (callers pass the human-readable goal text, falling back to the goal
 // hash). Returns an error the best-effort caller logs; it never panics.
-func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase) error {
+func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, spineFailOpens []SpineFailOpen) error {
 	d, err := dossier.Build(cycle, dossier.BuildOpts{
-		WorkspacePath: workspacePath,
-		Goal:          goal,
-		RunID:         runID,
-		FinalVerdict:  dossierVerdict(outcome),
-		SkippedPhases: skipped,
+		WorkspacePath:  workspacePath,
+		Goal:           goal,
+		RunID:          runID,
+		FinalVerdict:   dossierVerdict(outcome),
+		SkippedPhases:  skipped,
+		SpineFailOpens: spineFailOpens,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)
