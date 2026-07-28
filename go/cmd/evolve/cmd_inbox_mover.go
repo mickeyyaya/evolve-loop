@@ -74,6 +74,14 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if errors.Is(err, inboxmover.ErrBadArgs) || errors.Is(err, inboxmover.ErrBadState) {
 			return 1
 		}
+		// A non-delivery (destination mkdir failed) is NOT the ship.sh
+		// "already moved" case: the task is stranded and the cycle must see
+		// it. Exit 2 matches claim's mv-failed code
+		// (inboxmover-promote-mkdir-fail-loud).
+		if errors.Is(err, inboxmover.ErrMvFailed) {
+			fmt.Fprintf(stderr, "[inbox-mover] ERROR: promote did not deliver '%s': %v\n", taskID, err)
+			return 2
+		}
 		// ship.sh compat: all other paths exit 0.
 		return 0
 	case "recover-orphans":

@@ -302,8 +302,17 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 
 	base := filepath.Base(src)
 	destDir, dest := promoteDestPath(opts.InboxDir, base, newState, p)
+	// A destination mkdir failure is an INFRASTRUCTURE non-delivery, not the
+	// ship.sh "source already moved" case: the task is still sitting in
+	// srcRel/ and nothing downstream promoted it. Reporting it as
+	// (NoOp=true, nil) reused the compat contract for a genuine failure, so a
+	// stranded task was indistinguishable from a completed one to every caller
+	// (inboxmover-promote-mkdir-fail-loud). NoOp stays false and the error
+	// carries ErrMvFailed so the cmd layer can map it to a non-zero exit; the
+	// item is deliberately left where it was — a loud error that also lost the
+	// file would be a worse defect than the silent one.
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		opts.logf("WARN: ", "promote: mkdir -p '%s' failed — leaving file in %s/", destDir, srcRel)
+		opts.logf("ERROR: ", "promote: mkdir -p '%s' failed — leaving file in %s/: %v", destDir, srcRel, err)
 		writeLedger(opts, LedgerEntry{
 			Action: "promote-warn",
 			TaskID: taskID,
@@ -313,8 +322,7 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 			GitSHA: strPtr(p.CommitSHA),
 			Reason: "mkdir-failed",
 		})
-		res.NoOp = true
-		return res, nil
+		return res, fmt.Errorf("%w: mkdir %s: %v", ErrMvFailed, destDir, err)
 	}
 	if err := os.Rename(src, dest); err != nil {
 		opts.logf("WARN: ", "promote: mv failed for '%s' → %s (leaving in %s/): %v",
@@ -606,6 +614,15 @@ func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (R
 type quarantinePolicy struct {
 	ceiling     int
 	systemLevel bool
+
+	// committed restricts the failure_count bump (and therefore quarantine) to
+	// the ids triage actually COMMITTED to the cycle. A nil map means "every
+	// item in the drain" — the legacy whole-dir behavior that
+	// ReleaseCycleProcessingWithQuarantine keeps. Wave lanes claim a whole menu
+	// but work only the committed subset, so bumping the whole dir would
+	// quarantine healthy backlog after N failures of an unrelated task
+	// (wave-lane-task-quarantine-dead, menu semantics).
+	committed map[string]bool
 }
 
 // ReleaseCycleProcessingWithQuarantine is the ADR-0072 S5 failure-drain: it
@@ -671,13 +688,33 @@ func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quaran
 		// ADR-0072 S5: bump the durable failure_count and quarantine at the
 		// ceiling instead of releasing back to root. Fail-open — a read/write
 		// error skips quarantine and falls through to the normal release.
-		if quar != nil {
+		//
+		// systemLevel gates the BUMP, not just the quarantine decision (AC4 in
+		// full): a quota/infra storm must not walk healthy committed ids toward
+		// TaskRetryCeiling, or a single later task-level FAIL quarantines a
+		// backlog that never failed on its own merits.
+		if quar != nil && !quar.systemLevel && (quar.committed == nil || quar.committed[taskID]) {
 			if count, bumpErr := bumpFailureCount(src, reason); bumpErr == nil &&
 				ShouldQuarantine(count, quar.ceiling, quar.systemLevel) {
 				// Quarantine is terminal parking — shed any continuation stamp
 				// so an operator revival starts fresh (ADR-0076 slice C).
 				_ = updateItemJSON(src, func(m map[string]json.RawMessage) { delete(m, "continuation") })
-				if pr, pErr := Promote(opts, taskID, "quarantine", PromoteOpts{Cycle: fmt.Sprintf("%d", cycle)}); pErr == nil && !pr.NoOp {
+				// A non-delivery here is fail-open by design (the item falls
+				// through to the ordinary release below rather than being
+				// stranded in processing/) but it must never be SILENT: an
+				// un-quarantined poison item returns to the inbox root and the
+				// next triage re-picks the exact task the ceiling exists to
+				// park. One line, severity-marked, carrying the task id and the
+				// quarantine attempt (inboxmover-promote-mkdir-fail-loud).
+				pr, pErr := Promote(opts, taskID, "quarantine", PromoteOpts{Cycle: fmt.Sprintf("%d", cycle)})
+				switch {
+				case pErr != nil:
+					opts.logf("ERROR: ", "quarantine failed for '%s' (task-level failure #%d >= ceiling %d) — releasing to inbox root instead, it WILL be re-picked: %v",
+						taskID, count, quar.ceiling, pErr)
+				case pr.NoOp:
+					opts.logf("WARN: ", "quarantine no-op for '%s' (task-level failure #%d >= ceiling %d) — not parked, releasing to inbox root instead",
+						taskID, count, quar.ceiling)
+				default:
 					opts.logf("", "quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", base, count, quar.ceiling, cycle)
 					res.Recovered++
 					res.Paths = append(res.Paths, pr.DestPath)

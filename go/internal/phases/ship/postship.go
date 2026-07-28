@@ -6,7 +6,6 @@ package ship
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,11 +114,15 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	body, logLine := triageDecisionBytes(cycleDir, cid)
 	res.Logs = append(res.Logs, logLine)
 	unlandedShip := false
+	commitShort := ""
+	if len(res.CommitSHA) >= 8 {
+		commitShort = res.CommitSHA[:8]
+	}
+	// The ids this cycle committed to working — the input to the ONE lifecycle
+	// seam below. Empty when the landing gate refuses promotion, so the seam
+	// degrades to a pure residual drain.
+	var committedIDs []string
 	if body != nil {
-		commitShort := ""
-		if len(res.CommitSHA) >= 8 {
-			commitShort = res.CommitSHA[:8]
-		}
 		// Landing gate (cycle-598 regression, inbox-promotion-requires-landed-ship):
 		// promote to processed/ ONLY when the ship commit actually reached durable
 		// history (ancestor of HEAD or origin/<branch>). Cycle 598's push was
@@ -140,12 +143,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			for _, id := range extractIDs(body) {
-				_, _ = inboxmover.Promote(mvOpts, id, "processed", inboxmover.PromoteOpts{
-					Cycle:     fmt.Sprintf("%d", cid),
-					CommitSHA: commitShort,
-				})
-			}
+			committedIDs = inboxmover.CommittedIDs(body)
 			// Reconcile superseded[] — inbox items whose work shipped under a
 			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
 			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
@@ -180,10 +178,32 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	if unlandedShip {
 		releaseReason = "cycle-release-unlanded-ship-retry"
 	}
-	if _, releaseErr := inboxmover.ReleaseCycleProcessingWithReason(mvOpts, cid, releaseReason); releaseErr != nil {
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: residual claim release for cycle %d: %v", cid, releaseErr))
+	// ONE lifecycle seam (menu-pass-promotes-committed-ids): promoting the
+	// committed ids and draining the residual claims are the two halves of a
+	// single PASS transition, so they go through ApplyCycleOutcome together
+	// rather than as an ad-hoc promote loop plus a separate release call. A
+	// menu that ships N items in one commit now promotes exactly those N ids in
+	// code — cycle-1147 shipped 3 and promoted 0 because the promote was prose
+	// the agent never executed.
+	if or, outcomeErr := inboxmover.ApplyCycleOutcome(mvOpts, inboxmover.CycleOutcome{
+		Cycle:        cid,
+		Passed:       true,
+		CommittedIDs: committedIDs,
+		CommitSHA:    commitShort,
+		Reason:       releaseReason,
+	}); outcomeErr != nil {
+		// The "drain complete" line is a SUCCESS claim and stays inside the
+		// success branch: emitting it unconditionally after a WARN told
+		// operators (and every log-grepping gate) that the lifecycle drain
+		// completed on a run where part of it demonstrably did not.
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox outcome apply for cycle %d: %v", cid, outcomeErr))
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox lifecycle drain INCOMPLETE for cycle %d — items may remain in processing/ for re-triage", cid))
+	} else {
+		if len(or.Promoted) > 0 {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted %d committed inbox item(s) for cycle %d: %v", len(or.Promoted), cid, or.Promoted))
+		}
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	}
-	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	return nil
 }
 
@@ -244,37 +264,13 @@ func triageDecisionBytes(cycleDir string, cid int) ([]byte, string) {
 
 // extractIDs walks triage-decision.json JSON and returns the union of
 // .top_n[].id and .skip_shipped[].task_id (deduped, order-preserving).
+//
+// Delegates to inboxmover.CommittedIDs: the PASS closeout here and the FAIL
+// closeout in cmd_loop must agree byte-for-byte on what "the worked set" is, so
+// the reader lives once, next to the lifecycle it drives
+// (never_duplicate_centralize).
 func extractIDs(body []byte) []string {
-	var d struct {
-		TopN []struct {
-			ID string `json:"id"`
-		} `json:"top_n"`
-		SkipShipped []struct {
-			TaskID string `json:"task_id"`
-		} `json:"skip_shipped"`
-	}
-	if err := json.Unmarshal(body, &d); err != nil {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	out := []string{}
-	for _, e := range d.TopN {
-		if e.ID != "" {
-			if _, dup := seen[e.ID]; !dup {
-				seen[e.ID] = struct{}{}
-				out = append(out, e.ID)
-			}
-		}
-	}
-	for _, e := range d.SkipShipped {
-		if e.TaskID != "" {
-			if _, dup := seen[e.TaskID]; !dup {
-				seen[e.TaskID] = struct{}{}
-				out = append(out, e.TaskID)
-			}
-		}
-	}
-	return out
+	return inboxmover.CommittedIDs(body)
 }
 
 // repinPostCycle handles the case where the just-shipped commit

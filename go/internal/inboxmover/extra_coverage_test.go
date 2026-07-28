@@ -154,9 +154,17 @@ func TestClaim_RenameFails(t *testing.T) {
 	}
 }
 
-// --- Promote: mkdir + rename failure → NoOp success ------------------------
+// --- Promote: mkdir failure → loud error; rename failure → NoOp success -----
 
-func TestPromote_MkdirFailsNoOp(t *testing.T) {
+// TestPromote_MkdirFailsLoudly pins the inboxmover-promote-mkdir-fail-loud
+// contract. This test previously asserted (NoOp=true, nil) — the ship.sh
+// "source already moved" compat contract — for a destination mkdir failure,
+// which is a genuine non-delivery: the item never moved and every caller read
+// it as a completed promote. The assertion is INVERTED (not relaxed) on
+// purpose: the failure must now surface as ErrMvFailed with NoOp false, while
+// the promote-warn ledger line and the leave-the-file-alone behavior below stay
+// exactly as they were.
+func TestPromote_MkdirFailsLoudly(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -165,11 +173,16 @@ func TestPromote_MkdirFailsNoOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := Promote(Options{ProjectRoot: repo}, "task-1", "processed", PromoteOpts{Cycle: "0"})
-	if err != nil {
-		t.Fatalf("promote should be NoOp success, got err %v", err)
+	if !errors.Is(err, ErrMvFailed) {
+		t.Fatalf("err = %v, want ErrMvFailed: a destination mkdir failure is a non-delivery, not a no-op success", err)
 	}
-	if !res.NoOp {
-		t.Error("expected NoOp on mkdir failure")
+	if res.NoOp {
+		t.Error("res.NoOp = true on mkdir failure: NoOp is the 'already moved' compat contract and must not cover a stranded task")
+	}
+	// The item must still be where it started — a loud error that also lost the
+	// file would be worse than the silent no-op it replaces.
+	if _, statErr := os.Stat(filepath.Join(repo, ".evolve", "inbox", "processing", "cycle-5", "task-1.json")); statErr != nil {
+		t.Errorf("task-1.json left processing/cycle-5/ despite the failed promote: %v", statErr)
 	}
 	body, _ := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
 	if !strings.Contains(string(body), `"action":"promote-warn"`) {

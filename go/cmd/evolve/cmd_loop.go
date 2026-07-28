@@ -695,10 +695,26 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 					}
 				}
 				systemLevel := !isTaskLevelFailure(class.Class)
-				if _, relErr := inboxmover.ReleaseCycleProcessingWithQuarantine(inboxmover.Options{
+				// ONE lifecycle seam (wave-lane-task-quarantine-dead): the drain
+				// bumps failure_count on the ids triage COMMITTED, claiming them
+				// into processing/cycle-N first when a lane never did. Before
+				// this, the drain walked processing/ only — wave lanes never put
+				// their worked ids there, so batch-14 burned four FAILs on the
+				// same items with failure_count stuck at 0 and the S5 ceiling
+				// unreachable. An absent/unreadable decision leaves CommittedIDs
+				// nil, which is exactly the legacy whole-dir behavior.
+				committedIDs := failedCycleCommittedIDs(cycleWorkspace(cfg.ProjectRoot, result.Cycle))
+				if _, relErr := inboxmover.ApplyCycleOutcome(inboxmover.Options{
 					ProjectRoot: cfg.ProjectRoot,
 					Stderr:      stderr,
-				}, result.Cycle, "cycle-failure-release", failPol.Thresholds.TaskRetryCeiling, systemLevel); relErr != nil {
+				}, inboxmover.CycleOutcome{
+					Cycle:        result.Cycle,
+					Passed:       false,
+					CommittedIDs: committedIDs,
+					Reason:       "cycle-failure-release",
+					Ceiling:      failPol.Thresholds.TaskRetryCeiling,
+					SystemLevel:  systemLevel,
+				}); relErr != nil {
 					fmt.Fprintf(stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, relErr)
 				}
 				// All-families quota exhaustion (cycle-656): the dispatch seam
@@ -987,6 +1003,19 @@ func isTaskLevelFailure(c cycleclassify.Classification) bool {
 	default:
 		return false
 	}
+}
+
+// failedCycleCommittedIDs reads the failed cycle's triage-decision.json (written
+// by the triage phase, so it exists even when the cycle never reached ship) and
+// returns the ids triage committed to working. nil on any absent/unreadable/
+// malformed decision — the FAIL drain then falls back to its legacy whole-dir
+// behavior rather than silently bumping nothing.
+func failedCycleCommittedIDs(workspace string) []string {
+	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
+	if err != nil {
+		return nil
+	}
+	return inboxmover.CommittedIDs(body)
 }
 
 func readCarryoverCount(statePath string) (count int, ok bool) {
