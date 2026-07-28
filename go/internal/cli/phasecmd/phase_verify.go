@@ -1,6 +1,7 @@
 package phasecmd
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
@@ -68,7 +70,7 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	}
 
 	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
-	res, err := deliverable.VerifyWithStage(phase, roots, resolver, phaseVerifyPhaseIO())
+	res, err := verifyDeliverable(phase, roots, resolver)
 	if err != nil {
 		// Ambiguity/infra — fail OPEN at the call site.
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
@@ -90,6 +92,26 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return 1
+}
+
+// verifyDeliverable runs the well-formedness checks, adding the ADR-0077
+// documentation floor when — and only when — this invocation has a diff to
+// judge: phase `build` with a `--worktree`. That is exactly the shape the
+// host-side docs-floor reviewer sees, and the changed-path set comes from the
+// same derivation it uses (core.ChangedWorktreePaths), so the agent's
+// self-check and the gate cannot drift (ADR-0034).
+//
+// Fail-open everywhere else, byte-identical to before: no `--worktree` means no
+// diff to classify, and the floor is build-scoped (ADR-0077) so no other
+// phase's deliverable is taxed by it. A non-architecture-class diff never
+// yields the violation, so ordinary cycles are unaffected.
+func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (deliverable.Result, error) {
+	stage := phaseVerifyPhaseIO()
+	if phase != "build" || roots.Worktree == "" {
+		return deliverable.VerifyWithStage(phase, roots, resolver, stage)
+	}
+	changed := core.ChangedWorktreePaths(context.Background(), roots.Worktree)
+	return deliverable.VerifyBuildWithChangedPathsStage(roots, changed, resolver, stage)
 }
 
 // phaseVerifyPhaseIO resolves the EVOLVE_PHASE_IO rollout stage the SAME way the

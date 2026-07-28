@@ -92,6 +92,14 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	}
 	add(canonicalOrder...)
 	add(in.Cfg.Order...)
+	// The catalog the advisor was OFFERED: a phase we showed it as selectable is
+	// legitimate by construction, so it can never be "unknown". Cfg.Order already
+	// carries these in production (the composition root splices both the registry
+	// and .evolve/phases/ into it), making this defense in depth — the drop must
+	// never delete a phase the plan prompt itself advertised.
+	for _, c := range in.Catalog {
+		add(c.Name)
+	}
 	add(in.Cfg.Mandatory...)
 	for p := range in.Cfg.Triggers {
 		add(p)
@@ -101,6 +109,14 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	}
 	for _, m := range plan.MintPhases {
 		add(m.Name)
+	}
+	// Second minting channel: a phase minted INLINE on its own entry
+	// (PhasePlanEntry.Mint) is just as legitimate as one in plan.MintPhases —
+	// missing it would make the floor's drop delete the advisor's own mints.
+	for _, e := range plan.Entries {
+		if e.Mint != nil {
+			add(e.Phase)
+		}
 	}
 	return known
 }

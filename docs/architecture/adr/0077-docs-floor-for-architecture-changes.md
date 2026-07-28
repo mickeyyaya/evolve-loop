@@ -6,7 +6,8 @@
   floor), the `SpineFloor` dial (`internal/config` `RolloutStages.SpineFloor`)
 - **Enforcement surface:** `go/internal/docsfloor` (decision),
   `go/internal/policy` (`docs_floor` block), `go/internal/core`
-  (`docsFloorWarn`, wired into `DefaultBuildFloorChecks`)
+  (`docsFloorWarn`, wired into `DefaultBuildFloorChecks`; `ChangedWorktreePaths`),
+  `go/internal/cli/phasecmd` (`evolve phase verify build`)
 
 > **Addendum (cycle-1144) — the blocking-grade half.** The WARN above answers
 > the broad question with a broad label. Cycle-1144 adds the precise half at the
@@ -23,6 +24,35 @@
 > separate step — it needs a soak on real diffs first, exactly as this ADR's
 > "WARN, never REJECT" boundary demands. Worked example:
 > [ADR-0078](0078-fleet-landing-prefix-queue.md).
+
+> **Addendum (cycle-1150) — the blocking-grade half gets a caller.** The
+> cycle-1144 seam shipped **inert**: `deliverable.VerifyBuildWithChangedPaths`
+> had zero production callers, so an architecture-class build with no docs delta
+> still passed the agent's own `evolve phase verify build` self-check — the exact
+> command every phase prompt's Deliverable Contract tells the agent to run before
+> declaring done. Cycle-1150 wires it:
+>
+> - `core.ChangedWorktreePaths` — an **exported projection** of the existing
+>   unexported `changedWorktreePaths` (tracked diff vs `HEAD` + untracked adds,
+>   repo-relative). A projection, not a second derivation: the host-side reviewer
+>   (`build_floor_reviewer.go`) and the CLI self-check now read the same diff, so
+>   they cannot drift (the ADR-0034 no-drift invariant).
+> - `deliverable.VerifyBuildWithChangedPathsStage` — the resolver- and
+>   `EVOLVE_PHASE_IO`-stage-aware form. The CLI resolves through the merged phase
+>   catalog at the configured stage; reaching the floor via the defaulted
+>   `VerifyBuildWithChangedPaths` (built-in resolver, `StageOff`) would have
+>   silently *weakened* the build contract the self-check already enforces. The
+>   defaulted form is preserved as a thin pinning of the new one.
+> - `phasecmd.verifyDeliverable` — applies the floor **iff** `phase == "build"`
+>   **and** `--worktree` is set. No worktree means no diff to classify, so
+>   behaviour is byte-identical to before; the floor stays build-scoped and never
+>   leaks into another phase's deliverable; a non-architecture-class diff never
+>   yields the violation.
+>
+> Boundary 1 is unchanged: the **host-side** `docsFloorWarn` stays WARN pending a
+> soak. What changed is that the agent-callable self-check now returns exit 1
+> with `missing_architecture_docs` — a correction the builder can act on in the
+> same handoff, before any gate has to.
 
 ## Context
 
@@ -52,12 +82,18 @@ Three deliberate boundaries:
    adequate" is editorial. The gate reports only the mechanical half and leaves
    the judgement to the auditor. A blocking verdict would make the gate the
    arbiter of documentation quality, which it cannot be.
-2. **The label is derived from the diff, not self-reported.** `LabelArchitecture`
-   matches the changed paths against the trust-kernel surfaces
+2. **The label is derived from the diff, not self-reported.** The production
+   label source is `docsfloor.IsArchitectureClass` — the classifier
+   `core.docsFloorWarn` actually calls (`build_floor_reviewer.go`). It matches
+   the changed paths against the trust-kernel surfaces
    (`go/internal/{core,policy,config,phasecontract,router}/`,
-   `docs/architecture/phase-registry.json`). A self-reported label is exactly
-   what a rushed change omits, so asking for one would make the floor
-   self-defeating.
+   `docs/architecture/phase-registry.json`) plus the guard/ship/fleet surfaces,
+   new packages and phase specs, and it drops test-only diffs. The original
+   broad predicate `LabelArchitecture` is retained in the package as the
+   documented coarse form but has **no production caller** — cycle-1144 rewired
+   the WARN to the strict classifier and nothing else calls it. A self-reported
+   label is exactly what a rushed change omits, so asking for one would make the
+   floor self-defeating.
 3. **SKIP is not PASS.** Stage off, an unlabeled change, and an empty change set
    all yield `StatusSkip` with a reason, so "not judged" can never be read back
    as "judged clean".
@@ -70,7 +106,9 @@ type Config  struct{ Stage string }                                  // off | sh
 type Input   struct{ ArchitectureLabeled bool; ChangedFiles []string }
 type Verdict struct{ Status, Reason string }                          // PASS | WARN | SKIP
 func Evaluate(cfg Config, in Input) Verdict
-func LabelArchitecture(changedFiles []string) bool
+func IsArchitectureClass(changedFiles []string) bool // strict — THE labeler production calls
+func HasDocsDelta(changedFiles []string) bool        // the "≥1 docs/ file" half
+func LabelArchitecture(changedFiles []string) bool   // broad/coarse — no production caller
 ```
 
 Decision order: `stage==off` ⇒ SKIP · not labeled ⇒ SKIP · empty change set ⇒

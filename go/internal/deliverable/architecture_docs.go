@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
@@ -56,7 +57,22 @@ func ArchitectureDocsViolations(changed []string) []Violation {
 // Return contract is Verify's: err != nil ⇒ ambiguity, fail OPEN; err == nil
 // with !OK ⇒ confirmed violation, fail CLOSED.
 func VerifyBuildWithChangedPaths(roots phasecontract.Roots, changed []string) (Result, error) {
-	res, err := Verify("build", roots)
+	return VerifyBuildWithChangedPathsStage(roots, changed, phasecontract.BuiltinResolver{}, config.StageOff)
+}
+
+// VerifyBuildWithChangedPathsStage is VerifyBuildWithChangedPaths threaded with
+// the caller's resolver and EVOLVE_PHASE_IO rollout stage — the same two dials
+// VerifyWithStage takes. The CLI self-check resolves through the merged phase
+// catalog and the configured stage; dropping to the built-in resolver at
+// StageOff to reach the docs floor would silently weaken the build contract it
+// already enforces (the stage-gated failure-context check). Additive by
+// construction: the floor is appended to the well-formedness violations, never
+// substituted for them.
+//
+// VerifyBuildWithChangedPathsStage(roots, changed, BuiltinResolver{}, StageOff)
+// == VerifyBuildWithChangedPaths, so the defaulted form stays byte-identical.
+func VerifyBuildWithChangedPathsStage(roots phasecontract.Roots, changed []string, resolver phasecontract.Resolver, phaseIO config.Stage) (Result, error) {
+	res, err := VerifyWithStage("build", roots, resolver, phaseIO)
 	if err != nil {
 		return Result{}, err
 	}

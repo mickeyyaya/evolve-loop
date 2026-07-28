@@ -239,3 +239,74 @@ func TestEvaluatorFloorPhase_SingleSource(t *testing.T) {
 		t.Fatalf("policy re-appends %q as the evaluator floor phase; router.EvaluatorFloorPhase = %q — the defense-in-depth twins diverged", got, EvaluatorFloorPhase)
 	}
 }
+
+// TestClampPlanToFloorWith_DropsUnknownPhaseEntry is the in-package regression
+// for the cycle-1151/1152 incident: the advisor hallucinated "gate-wiring-proof"
+// out of policy prose, ValidatePlan flagged it unknown-phase (report-only), and
+// the entry survived into dispatch ("profile not found"). The clamp must now
+// remove it — recording the removal under DropUnknownPhaseRule — while leaving
+// the known phases and the integrity floor intact.
+func TestClampPlanToFloorWith_DropsUnknownPhaseEntry(t *testing.T) {
+	const bogus = "gate-wiring-proof"
+	in := nonTrivialIn()
+	p := &PhasePlan{Entries: []PhasePlanEntry{
+		pe("scout", true), pe(bogus, true), pe("build", true), pe("ship", true),
+	}}
+
+	out, clamps := ClampPlanToFloorWith(in, p, DefaultShipFloor(), false)
+
+	for _, e := range out.Entries {
+		if e.Phase == bogus {
+			t.Errorf("unknown phase %q survived the clamp: %+v", bogus, out.Entries)
+		}
+	}
+	var drops int
+	for _, c := range clamps {
+		if c.Rule == DropUnknownPhaseRule && c.Phase == bogus && c.Forced == bogus+"=drop" {
+			drops++
+		}
+	}
+	if drops != 1 {
+		t.Errorf("want exactly 1 %q clamp for %q, got %d; clamps=%+v",
+			DropUnknownPhaseRule, bogus, drops, clamps)
+	}
+	for _, want := range []string{"scout", "tdd", "build", EvaluatorFloorPhase, "ship"} {
+		if !planRuns(out, want) {
+			t.Errorf("known phase %q is not running after the drop: %+v", want, out.Entries)
+		}
+	}
+	// PURE: the caller's plan is untouched.
+	if len(p.Entries) != 4 || p.Entries[1].Phase != bogus {
+		t.Errorf("input plan was mutated: %+v", p.Entries)
+	}
+}
+
+// TestClampPlanToFloorWith_KeepsCatalogOfferedPhase: a phase the advisor was
+// OFFERED in the plan prompt (RouteInput.Catalog) is legitimate by
+// construction, so the unknown-phase drop must never remove it — deleting a
+// phase we advertised would be a worse failure than the hallucination the drop
+// exists to catch.
+func TestClampPlanToFloorWith_KeepsCatalogOfferedPhase(t *testing.T) {
+	const offered = "bug-reproduction"
+	in := nonTrivialIn()
+	in.Catalog = []PhaseCard{{Name: offered}}
+	p := &PhasePlan{Entries: []PhasePlanEntry{
+		pe("scout", true), pe(offered, true), pe("no-such-phase", true),
+	}}
+
+	out, clamps := ClampPlanToFloorWith(in, p, DefaultShipFloor(), false)
+
+	if !planRuns(out, offered) {
+		t.Errorf("catalog-offered phase %q was dropped: %+v", offered, out.Entries)
+	}
+	for _, c := range clamps {
+		if c.Rule == DropUnknownPhaseRule && c.Phase == offered {
+			t.Errorf("drop clamp fired for the catalog-offered phase %q: %+v", offered, c)
+		}
+	}
+	for _, e := range out.Entries {
+		if e.Phase == "no-such-phase" {
+			t.Errorf("the genuinely unknown phase survived: %+v", out.Entries)
+		}
+	}
+}

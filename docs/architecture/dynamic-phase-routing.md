@@ -69,6 +69,20 @@ The clamp pass in `go/internal/router` enforces the floor regardless of stage or
 | Conditional TDD-pin | `tdd` is mandatory unless `cycle_size == trivial` (`EVOLVE_CONDITIONAL_MANDATORY`, default `tdd:cycle_size!=trivial`) |
 | Ship-needs-real-audit | A plan that reaches `ship` without a PASS audit bound to the built tree is rejected/clamped |
 | Insertion cap | The router may insert at most `EVOLVE_MAX_OPTIONAL_INSERTIONS` (default 4) optional phases |
+| Unknown-phase drop | An entry naming a phase outside the known-phase set is REMOVED, one `drop-unknown-phase` clamp per removal |
+
+### Unknown-phase drop (cycles 1151/1152)
+
+`ValidatePlan` has always flagged an advisor-invented phase as `unknown-phase`, but it is documented **PURE and REPORT-ONLY** — nothing removed the entry. Cycles 1151 and 1152 both hard-failed at dispatch (`phase gate-wiring-proof: profile not found`) because the advisor minted that name out of operating-policy prose and the clamp, the sole plan disposer, only ever *added* phases.
+
+`ClampPlanToFloorWith` now drops those entries before applying the floor, reusing `knownPhaseSet` so the two layers can never disagree about what "known" means:
+
+- **Known** = the canonical order ∪ the configured walk (`Cfg.Order`/`Mandatory`/`Triggers`/`Conditional`, into which the composition root splices both `docs/architecture/phase-registry.json` and `.evolve/phases/<name>/`) ∪ the catalog offered to the advisor (`RouteInput.Catalog`) ∪ phases minted by this plan — via `plan.MintPhases` *or* inline on an entry (`PhasePlanEntry.Mint`).
+- **Removal, not `Run=false`**: dispatch keys off the entry's presence.
+- Both `run:true` and `run:false` entries are dropped; each removal emits exactly one `Clamp{Rule: "drop-unknown-phase", Forced: "<phase>=drop"}` so the disposition is never silent.
+- The floor still runs afterwards, so a drop can never strand the ship chain, and `ClampPlanToFloorWith` stays PURE (a new `Entries` slice; the caller's plan is unmutated for the re-plan comparison).
+
+The failure mode the drop must never cause is deleting a *legitimate* phase, so the known-set is deliberately generous: anything the plan prompt advertised is known by construction.
 
 ## Configuration surface
 

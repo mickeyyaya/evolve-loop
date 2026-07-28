@@ -66,6 +66,11 @@ func DefaultShipFloor() []string { return []string{"tdd", "build", "audit"} }
 // ClampPlanToFloor: this forces audit to RUN; the ship phase's audit-binding
 // still guarantees it PASSED.
 //
+// It also DROPS any entry naming a phase outside the plan's known-phase set
+// (see dropUnknownPhases) before applying the floor: ValidatePlan already
+// detects those but is REPORT-ONLY, so the clamp — the sole disposer — is where
+// enforcement belongs.
+//
 // PURE: returns a NEW plan (input unmutated) plus the clamps applied.
 func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intentRequired bool) (*PhasePlan, []Clamp) {
 	if plan == nil {
@@ -81,12 +86,12 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	}
 	// MintPhases carried through unchanged: the clamp governs the run/skip
 	// Entries (the integrity floor), never the set of minted phases.
+	entries, clamps := dropUnknownPhases(in, plan)
 	out := &PhasePlan{
-		Entries:    append([]PhasePlanEntry(nil), plan.Entries...),
+		Entries:    entries,
 		MintPhases: plan.MintPhases,
 	}
 
-	var clamps []Clamp
 	force := func(phase string, rule string) {
 		if planRuns(out, phase) {
 			return // already running — nothing to clamp
@@ -131,6 +136,47 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 		force(phase, "ship-requires-"+phase)
 	}
 	return out, clamps
+}
+
+// DropUnknownPhaseRule is the clamp rule token recorded when the floor removes
+// a plan entry naming a phase outside the known-phase set.
+const DropUnknownPhaseRule = "drop-unknown-phase"
+
+// dropUnknownPhases returns a NEW entry slice with every entry whose phase is
+// not in knownPhaseSet removed, plus one Clamp per removal so the drop is never
+// silent (floor.go's "no silent disposition" rule).
+//
+// Why here and not in ValidatePlan: ValidatePlan already flags these as
+// "unknown-phase" but is documented PURE and REPORT-ONLY, so nothing removed
+// them — an advisor-hallucinated phase reached dispatch and crashed the cycle
+// with "profile not found" (cycles 1151, 1152). The clamp is the sole plan
+// disposer, so enforcement belongs here. knownPhaseSet is REUSED rather than
+// re-derived, keeping the drop mint-aware and in lockstep with the walk.
+//
+// Both run:true and run:false entries are dropped: a skipped unknown is still
+// garbage the walk and the telemetry must not see. Removal, not Run=false —
+// dispatch keys off the entry's presence.
+func dropUnknownPhases(in RouteInput, plan *PhasePlan) ([]PhasePlanEntry, []Clamp) {
+	known := knownPhaseSet(in, plan)
+	entries := make([]PhasePlanEntry, 0, len(plan.Entries))
+	var clamps []Clamp
+	for _, e := range plan.Entries {
+		if _, ok := known[e.Phase]; ok {
+			entries = append(entries, e)
+			continue
+		}
+		proposed := e.Phase + "=skip"
+		if e.Run {
+			proposed = e.Phase + "=run"
+		}
+		clamps = append(clamps, Clamp{
+			Phase:    e.Phase,
+			Rule:     DropUnknownPhaseRule,
+			Proposed: proposed,
+			Forced:   e.Phase + "=drop",
+		})
+	}
+	return entries, clamps
 }
 
 // planRuns reports whether the plan has an entry for phase with Run==true. An

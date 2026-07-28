@@ -405,6 +405,19 @@ func changedWorktreePaths(ctx context.Context, worktree string) []string {
 	return paths
 }
 
+// ChangedWorktreePaths is the exported projection of changedWorktreePaths for
+// consumers outside this package — today `evolve phase verify build`, which
+// feeds the set to deliverable.VerifyBuildWithChangedPaths so the agent's
+// self-check judges the SAME diff the host-side docs-floor reviewer does
+// (build_floor_reviewer.go:136). A projection, not a second implementation:
+// re-deriving the diff in internal/cli/phasecmd would put two answers to "what
+// did this cycle change?" in the tree and let the gate and the self-check drift
+// (the ADR-0034 no-drift invariant). Fail-open semantics are inherited — a path
+// that is not a git repo yields no paths rather than an error.
+func ChangedWorktreePaths(ctx context.Context, worktree string) []string {
+	return changedWorktreePaths(ctx, worktree)
+}
+
 // normalizeBuildGofmt applies the deterministic `gofmt -w -s` normalization to
 // the build worktree's Go module BEFORE the audit gofmt gate inspects it.
 // Formatting is deterministic work and must not depend on the LLM builder

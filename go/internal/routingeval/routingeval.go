@@ -49,7 +49,8 @@ type Case struct {
 // router.RouteInput.
 type descriptor struct {
 	IntentRequired   bool     `json:"intent_required"`
-	TddPinned        *bool    `json:"tdd_pinned"` // nil ⇒ pinned (floor's default-mandatory side)
+	TddPinned        *bool    `json:"tdd_pinned"`   // nil ⇒ pinned (floor's default-mandatory side)
+	KnownPhases      []string `json:"known_phases"` // non-canonical phases the advisor was offered
 	Floor            []string `json:"floor"`
 	ExpectRunSet     []string `json:"expect_run_set"`
 	ExpectClamps     []string `json:"expect_clamps"`
@@ -70,6 +71,15 @@ func (d descriptor) toRouteInput() router.RouteInput {
 			"tdd": {Field: "cycle_size", Op: "ne", Value: "trivial"},
 		}
 		in.Signals.Triage = router.TriageSignals{CycleSize: "trivial", Present: true}
+	}
+	// A case replaying a NON-canonical phase (a registry/.evolve/phases overlay
+	// such as bug-reproduction) must declare it: production builds RouteInput
+	// from the resolved routing config, where the composition root has already
+	// spliced those in, so an empty Cfg here would under-approximate the live
+	// known-phase set and the floor's unknown-phase drop would delete a
+	// legitimate phase that production keeps.
+	for _, p := range d.KnownPhases {
+		in.Catalog = append(in.Catalog, router.PhaseCard{Name: p})
 	}
 	return in
 }
