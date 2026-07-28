@@ -62,12 +62,17 @@ type BlockerVerdict struct {
 // task-legit (statemap severing, tree-guard aborts).
 const guardAbortClass = "guard-abort"
 
-// isUnexplainedDigest reports the degenerate empty-evidence digest: no reason
-// artifact existed, so phase and pre-class degraded to their unknown defaults.
-// These MUST NOT count as "identical" defects — distinct failures collapse
-// into this bucket by construction.
+// isUnexplainedDigest reports a digest whose fingerprint asserts NO defect
+// identity. Two shapes: the degenerate empty-evidence digest (no reason
+// artifact — phase and pre-class degraded to unknown), and the self-marked
+// content-free digest (reasons were empty or pure agent-graded router
+// boilerplate; batch-14: three DISTINCT auditor findings shared one
+// boilerplate fingerprint and false-tripped the identical rule). These MUST
+// NOT count as "identical" defects — distinct failures collapse into these
+// buckets by construction; the UnexplainedCeiling rule owns them under its
+// honest diagnosability-breakdown name.
 func isUnexplainedDigest(d FailureDigest) bool {
-	return d.PreClass == "unknown" && strings.HasPrefix(d.Fingerprint, "|unknown|")
+	return d.Unexplained || (d.PreClass == "unknown" && strings.HasPrefix(d.Fingerprint, "|unknown|"))
 }
 
 // EvaluateBlockerBreaker applies the two rules over a batch's failure digests.

@@ -1,0 +1,26 @@
+{
+  "id": "wave-lane-task-quarantine-dead",
+  "title": "S5 task quarantine never fires for wave lanes — items are never claimed to processing/, so FAIL releases bump no failure_count",
+  "kind": "pipeline-integrity",
+  "priority": "high",
+  "weight": 0.88,
+  "campaign": "loop-reliability-2026-07",
+  "files": [
+    "go/internal/inboxmover/inboxmover.go",
+    "go/cmd/evolve/cmd_loop.go"
+  ],
+  "connects_to": [
+    "fleet-lane-batch-menu"
+  ],
+  "deps": [],
+  "route": "lane",
+  "injected_by": "console-2026-07-28-breaker-halt-forensics",
+  "evidence": "Batch-14: workspace-hygiene-s5-wiring-shadow-default failed its cycle FOUR times (1137 agent-graded FAIL, 1139 agent-graded FAIL, 1142 EGPS red, 1143 agent-graded FAIL) and was re-dispatched every wave with failure_count never incremented — .evolve/inbox/processing/ holds only stale cycle-411/416/425 dirs, so ReleaseCycleProcessingWithQuarantine (the ONLY bumpFailureCount caller, inboxmover.go:675) iterates an empty processing/cycle-N/ and quarantine ceilings (ADR-0072 S5 task_retry_ceiling) are structurally unreachable for fleet-dispatched work. The identical-fingerprint breaker's false halt MASKED this: it stopped the batch before the grind became obvious. Wave lanes keep items in inbox root (per-id Promote on ship covers the SUCCESS path only).",
+  "notes": "Fix the LIFECYCLE, not the counter: either (a) wave dispatch Claims each lane-scope id into processing/cycle-N at launch (freshness gate already excludes in-flight ids within a wave; cross-wave claims make consumption/failure accounting transactional — the forensics rule 'item-consumption must be transactional with landing'), with release-on-FAIL walking the SAME claim; or (b) keep root-resident items but route the FAIL path through a per-id failure_count bump keyed by lane-scope ids (smaller, but leaves two lifecycle models alive — option (a) preferred per never_duplicate_centralize). Interacts with lane MENUS (PR #366): only ids triage COMMITTED should bump on FAIL, not the whole menu.",
+  "acceptance": [
+    "RED first: a wave lane whose cycle FAILs leaves its committed item with failure_count+1; at task_retry_ceiling the item moves to quarantine and is not re-seeded.",
+    "Menu semantics: unworked menu ids (not committed by triage) neither bump nor quarantine.",
+    "Success path unchanged: per-id Promote to processed/ still works from inbox root or processing/.",
+    "cd go && go test -race ./internal/inboxmover/... ./cmd/evolve/... N/N PASS."
+  ]
+}

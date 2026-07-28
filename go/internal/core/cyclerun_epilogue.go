@@ -28,7 +28,7 @@ func (cr *cycleRun) abnormalEpilogue() {
 	// Evidence floor: a digest for the breaker/disposition machinery even when
 	// the abort predates the retro paths (idempotent with both).
 	cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath,
-		cr.cs.Phase, "cycle aborted in phase "+cr.cs.Phase+" (abnormal-exit epilogue)")
+		cr.cs.Phase, abnormalEpilogueReason(cr.cs.Phase))
 	// Record floor: exactly one dossier per started cycle, on every path.
 	dossierGoal := cr.req.Context["goal"]
 	if dossierGoal == "" {
