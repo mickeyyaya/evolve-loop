@@ -1,0 +1,6 @@
+{
+  "name": "gate-wiring-proof",
+  "role": "gate-wiring-proof",
+  "cli": "claude",
+  "model_tier_default": "deep"
+}

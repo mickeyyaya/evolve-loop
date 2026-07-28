@@ -244,3 +244,32 @@ func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 		t.Fatalf("abnormal-epilogue digest not marked Unexplained: %+v — its template is constant per phase, so identical fingerprints across distinct aborts are guaranteed", d)
 	}
 }
+
+// TestFailureDigest_DurationTokensNormalizeOut — live pin (1146/1148): two
+// attempts failed the SAME protectedsurface red on the SAME two files, but
+// the reason embeds go-test durations ("(0.02s)", "\t1.478s" vs "\t1.495s"),
+// so the fingerprints split and the breaker went blind to a genuine
+// recurrence. Third instance of the identity-noise family (cycle tokens,
+// narrative verdicts, durations).
+func TestFailureDigest_DurationTokensNormalizeOut(t *testing.T) {
+	a := fingerprint("audit", "gate-block", []string{
+		"--- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.02s); file: x_guard_test.go; FAIL\tgo/acs/regression/protectedsurface\t1.478s"})
+	b := fingerprint("audit", "gate-block", []string{
+		"--- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.03s); file: x_guard_test.go; FAIL\tgo/acs/regression/protectedsurface\t1.495s"})
+	if a != b {
+		t.Fatalf("reasons differing ONLY in test durations minted different fingerprints:\n  %s\n  %s", a, b)
+	}
+	c := fingerprint("audit", "gate-block", []string{
+		"--- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.02s); file: DIFFERENT_guard_test.go; FAIL\tgo/acs/regression/protectedsurface\t1.478s"})
+	if a == c {
+		t.Fatalf("different offending files collapsed to one fingerprint — normalization over-folded")
+	}
+	// Integer-second tokens are CONFIGURATION, not timing chrome (review
+	// MEDIUM: the decimal-required contract needs its own negative pin, or a
+	// widened `\d+(\.\d+)?s` regex passes every other assertion here).
+	d := fingerprint("audit", "gate-block", []string{"go test -timeout 300s failed"})
+	e := fingerprint("audit", "gate-block", []string{"go test -timeout 600s failed"})
+	if d == e {
+		t.Fatalf("integer-second config tokens (-timeout 300s vs 600s) folded — the duration rule must require a decimal")
+	}
+}
