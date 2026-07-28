@@ -18,7 +18,20 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
+
+// scoutArtifactName is the scout deliverable's filename, DERIVED from the
+// phasecontract registry (the report-filename SSOT) rather than re-typed here.
+// Cycle-1141: lane-scope reconciliation reads the scout report by name, so a
+// frozen copy of that name silently degrades goal_hash normalization into its
+// fail-open branch the moment the registry moves — a lane-identity bug that
+// looks like an absent report.
+var scoutArtifactName = func() string {
+	c, _ := phasecontract.For("scout")
+	return c.ArtifactName
+}()
 
 // LaneScopeFile is the on-disk lane-identity pin inside the run workspace.
 const LaneScopeFile = "lane-scope.json"
@@ -82,7 +95,7 @@ var fencedJSONRe = regexp.MustCompile("(?s)```json\\s*(.*?)```")
 // scoutReportGoalHash extracts the Decision Trace goal_hash from
 // <workspace>/scout-report.md. "" on absence or any parse failure (fail-open).
 func scoutReportGoalHash(workspace string) string {
-	b, err := os.ReadFile(filepath.Join(workspace, "scout-report.md"))
+	b, err := os.ReadFile(filepath.Join(workspace, scoutArtifactName))
 	if err != nil {
 		return ""
 	}
@@ -137,11 +150,11 @@ func normalizeScoutGoalHash(workspace string) {
 	if ls == nil || ls.GoalHash == "" {
 		return
 	}
-	reportPath := filepath.Join(workspace, "scout-report.md")
+	reportPath := filepath.Join(workspace, scoutArtifactName)
 	b, err := os.ReadFile(reportPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report.md unreadable during goal_hash normalize: %v (lane identity still pinned in %s)\n", err, LaneScopeFile)
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s unreadable during goal_hash normalize: %v (lane identity still pinned in %s)\n", scoutArtifactName, err, LaneScopeFile)
 		}
 		return // absent report ⇒ nothing to reconcile (fail-open)
 	}

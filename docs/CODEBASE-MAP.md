@@ -16,7 +16,14 @@ live here as Go packages — there is no bash dispatcher.
   cycle, ship, guard, doctor, release, …); `go/cmd/apicover/` is the
   public-API coverage tool — all 128 internal packages are graduated into
   its hard-fail enforce gate (SSOT list: `go/.apicover-enforce`; ADR-0050
-  Phase 5, complete as of v19.0.0).
+  Phase 5, complete as of v19.0.0). **`./acs/cycle<N>` predicate packages are
+  NOT enrolled** (cycle-1147): they export nothing, so there is no API surface
+  to enforce, and enrollment routes them into the build handoff floor's
+  *enforced* coverage run, which reads their untagged `//go:build acs` setup
+  failure as a test failure — the cycle-1145 gate-block that blocked the lane
+  for three attempts. The legacy `./acs/cycle9..661` entries predate that run
+  and are grandfathered behind `core.buildTagVisiblePackages`; the ceiling is
+  pinned by `TestAPICoverEnforceDoesNotEnrollModernACSPackages`.
 - `go/internal/` — 128 internal packages implementing the pipeline.
   Phase-1 modularization leaf packages: `go/internal/gitexec`
   (git-CLI isolation leaf, depends only on `go/internal/sysexec`),

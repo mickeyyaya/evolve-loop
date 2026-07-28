@@ -99,3 +99,37 @@ func TestRetroAndBuildPlanner_RegisteredWithRuntimeTruthNames(t *testing.T) {
 		}
 	}
 }
+
+// TestArtifactName_ResolvesFromRegistryAndSkipsNoArtifact exercises the
+// accessor the cycle-1145 backfill routed five packages through (evalgate,
+// topngate, phases/scout, router, cyclesimulator). It must return the registry
+// value — not a re-typed literal — for real deliverable phases, and the empty
+// string for the two cases callers have to branch on: an unregistered phase and
+// a NoArtifact phase ("ship", whose result is a pushed commit, not a file).
+func TestArtifactName_ResolvesFromRegistryAndSkipsNoArtifact(t *testing.T) {
+	for _, phase := range []string{"scout", "build", "audit", "tdd", "triage", "intent"} {
+		c, ok := For(phase)
+		if !ok {
+			t.Fatalf("premise broken: phase %q is not registered", phase)
+		}
+		if got := ArtifactName(phase); got != c.ArtifactName {
+			t.Errorf("ArtifactName(%q) = %q, want the registry value %q", phase, got, c.ArtifactName)
+		}
+		if ArtifactName(phase) == "" {
+			t.Errorf("ArtifactName(%q) is empty — consumers would join a bare directory path", phase)
+		}
+	}
+
+	// Alias resolution rides on For, so the human-facing name must agree.
+	if ArtifactName("advisor") != ArtifactName("router") {
+		t.Errorf("ArtifactName(\"advisor\") = %q, want the canonical router value %q",
+			ArtifactName("advisor"), ArtifactName("router"))
+	}
+
+	if got := ArtifactName("ship"); got != "" {
+		t.Errorf("ArtifactName(\"ship\") = %q, want \"\" — ship is NoArtifact, so a caller must fall back rather than write a file", got)
+	}
+	if got := ArtifactName("no-such-phase-cycle1145"); got != "" {
+		t.Errorf("ArtifactName(unregistered) = %q, want \"\"", got)
+	}
+}

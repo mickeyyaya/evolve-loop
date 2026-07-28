@@ -18,6 +18,8 @@ package core
 import (
 	"context"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -80,8 +82,21 @@ func TestRemediation_GateFailThenPassContinuesSpine(t *testing.T) {
 	if len(rems) != 1 {
 		t.Fatalf("want exactly 1 remediation builder dispatch, got %d (directives: %q)", len(rems), build.directives)
 	}
-	if !strings.Contains(rems[0], "tdd") || !strings.Contains(rems[0], "tdd-report.md") {
-		t.Errorf("remediation directive must name the gate and its report; got %q", rems[0])
+	// The report filename must come from the phasecontract registry, NOT the
+	// "<phase>-report.md" convention: the tdd gate's deliverable is
+	// test-report.md, so the convention pointed the remediation directive at a
+	// tdd-report.md that never exists — the builder was told to read a missing
+	// file. Asserting through ArtifactFilename keeps this honest under a rename.
+	wantReport := phasecontract.ArtifactFilename("tdd")
+	if wantReport == "tdd-report.md" {
+		t.Fatalf("registry regression: tdd's artifact is %q — this test's whole point is that the gate's "+
+			"real deliverable differs from the <phase>-report.md convention", wantReport)
+	}
+	if !strings.Contains(rems[0], "tdd") || !strings.Contains(rems[0], wantReport) {
+		t.Errorf("remediation directive must name the gate and its REGISTRY artifact %q; got %q", wantReport, rems[0])
+	}
+	if strings.Contains(rems[0], "tdd-report.md") {
+		t.Errorf("remediation directive still names the conventional tdd-report.md, which the gate never writes; got %q", rems[0])
 	}
 	if gate.calls != 2 {
 		t.Fatalf("gate must re-run after the fix: calls=%d, want 2 (remediated PASS ends the retry pressure)", gate.calls)

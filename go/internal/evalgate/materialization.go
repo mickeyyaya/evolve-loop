@@ -6,10 +6,14 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// scoutReportName is the artifact the scout phase writes into the workspace.
-const scoutReportName = "scout-report.md"
+// scoutReportName is the artifact the scout phase writes into the workspace,
+// resolved from the phasecontract registry (the artifact-name SSOT) rather than
+// re-declared here — a registry rename must not leave this gate reading a file
+// nobody writes any more.
+var scoutReportName = phasecontract.ArtifactName(string(core.PhaseScout))
 
 // materializationGate (Gate A) enforces the scout contract: every slug scout
 // SELECTED must have a real .evolve/evals/<slug>.md file. It fires after the

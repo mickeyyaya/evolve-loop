@@ -64,7 +64,12 @@ undiagnosable. Its blast radius is every subsequent cycle.
    never failed proves nothing.
 2. **Dual review before commit** (simplifier + language reviewer via
    commit-gate); architecture changes additionally get an adversarial
-   architect review. Pure-docs diffs may skip the simplifier.
+   architect review, and must land with the ADR or design doc that explains
+   them. Pure-docs diffs may skip the simplifier.
+   *Mechanized: the docs floor (`internal/docsfloor`, ADR-0077) WARNs at the
+   build handoff when an architecture-labeled change touches no `docs/` file.
+   WARN, not block — "is there a doc at all" is mechanical, "is this doc
+   adequate" stays with the auditor.*
 3. **Wiring proof (the I2 invariant).** A mechanism ships only with proof its
    output is consumed on the composed live path. Unit-green ≠ live-green.
    *Evidence: retrofile, the recurrence escalator, the claim→quarantine chain,
@@ -116,8 +121,9 @@ Pipeline-class phases and reviews run deep/top.
 | Failure thresholds & breaker ceilings | `internal/policy` `failure_policy.thresholds` | `.evolve/policy.json` |
 | Build handoff floor / remediation | `workflow.build_floor`, `remediation_rounds` | `.evolve/policy.json` |
 | Protected surfaces | `guards.ProtectedSurfaceManifest` (compiled) | operator manual ship only |
+| Docs floor (§3.2) | `internal/docsfloor` + build handoff floor (WARN) | `.evolve/policy.json` `docs_floor.stage` |
 
 Related: [runtime-reference.md](runtime-reference.md) ·
-[control-flags.md](../architecture/control-flags.md) · ADRs 0064/0072/0073/0074/0075 ·
+[control-flags.md](../architecture/control-flags.md) · ADRs 0064/0072/0073/0074/0075/0077 ·
 [lessons-and-resolutions-2026-07](../../knowledge-base/research/lessons-and-resolutions-2026-07.md)
 (the incident evidence behind every rule above).

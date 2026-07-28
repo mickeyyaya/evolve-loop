@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
@@ -251,7 +252,7 @@ func (o *Orchestrator) recordGenericBinding(ctx context.Context, phase Phase, in
 		return
 	}
 	treeSum := sha256.Sum256([]byte(diff))
-	artPath := filepath.Join(in.workspace, string(phase)+"-report.md")
+	artPath := filepath.Join(in.workspace, phasecontract.ArtifactFilename(string(phase)))
 	entry := LedgerEntry{
 		TS:           o.now().UTC().Format(time.RFC3339),
 		Cycle:        in.cycle,

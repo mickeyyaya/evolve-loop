@@ -32,6 +32,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // remediationDenied are the judgment/floor phases that must NEVER be
@@ -78,7 +79,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	cr.remediationRounds[next]++
 	round := cr.remediationRounds[next]
 
-	report := filepath.Join(cr.cs.WorkspacePath, string(next)+"-report.md")
+	report := filepath.Join(cr.cs.WorkspacePath, phasecontract.ArtifactFilename(string(next)))
 	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s FAILed — dispatching builder fix round %d/%d (report: %s)\n",
 		next, round, wf.RemediationRounds, report)
 

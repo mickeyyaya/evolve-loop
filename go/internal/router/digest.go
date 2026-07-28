@@ -202,7 +202,7 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 // signal); a report that exists but cannot be read is a read-miss and degrades
 // LOUDLY (R5), matching readFirstTracked's distinction.
 func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
-	info, err := os.Stat(filepath.Join(workspace, "scout-report.md"))
+	info, err := os.Stat(filepath.Join(workspace, phasecontract.ArtifactName("scout")))
 	switch {
 	case err == nil && info.Size() > 0:
 		return ScoutSignals{Present: true}

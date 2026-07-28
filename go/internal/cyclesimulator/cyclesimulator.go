@@ -27,6 +27,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Exit codes (matches cycle-simulator.sh):
@@ -125,10 +127,15 @@ func Run(in Inputs, stderr io.Writer) int {
 		phase, agent, fname string
 		writer              func(string) string
 	}{
-		{"intent", "intent", "intent.md", in.writeIntent},
-		{"research", "scout", "scout-report.md", in.writeScout},
-		{"build", "builder", "build-report.md", in.writeBuild},
-		{"audit", "auditor", "audit-report.md", in.writeAudit},
+		// Filenames come from the phasecontract registry (artifact-name SSOT):
+		// the simulator's whole job is to prove the real plumbing accepts what
+		// it writes, which it cannot do from its own copy of the names. Note
+		// the "research" phase key is the simulator's legacy gate vocabulary —
+		// the ARTIFACT is scout's, hence the "scout" lookup.
+		{"intent", "intent", phasecontract.ArtifactName("intent"), in.writeIntent},
+		{"research", "scout", phasecontract.ArtifactName("scout"), in.writeScout},
+		{"build", "builder", phasecontract.ArtifactName("build"), in.writeBuild},
+		{"audit", "auditor", phasecontract.ArtifactName("audit"), in.writeAudit},
 	}
 	for _, ph := range phases {
 		if err := in.AdvanceFn(ph.phase, ph.agent); err != nil {

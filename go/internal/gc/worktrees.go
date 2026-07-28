@@ -48,17 +48,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// WorktreesPolicy is the retention grace on top of the merged/clean/dead gate,
-// embedded in gc.Policy (S5 wiring reads it from policy.json:gc.worktrees).
-type WorktreesPolicy struct {
-	// KeepRecent: among fully-eligible (merged, clean, dead) candidates, the
-	// newest N by mtime are always kept, mirroring RunsPolicy.KeepFull.
-	KeepRecent int `json:"keep_recent,omitempty"`
-	// MinAgeMinutes: a candidate younger than this is never touched — the grace
-	// window that covers the create -> lease-write race.
-	MinAgeMinutes int `json:"min_age_minutes,omitempty"`
-}
-
 // WorktreeAction is the disposition PlanWorktrees assigns each candidate.
 type WorktreeAction string
 

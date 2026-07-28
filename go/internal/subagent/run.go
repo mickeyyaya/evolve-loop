@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
@@ -113,13 +115,58 @@ type RunResult struct {
 // Subtask names may include digits and hyphens after the first letter.
 var workerNameRE = regexp.MustCompile(`^([a-z][a-z-]+)-worker-([a-z][a-z0-9-]+)$`)
 
+// nonRegistryRoles are dispatchable agent roles that ship a
+// .evolve/profiles/<role>.json but have NO phasecontract entry: they are not
+// spine phases with a report contract, so the registry cannot know them. This
+// is the ONLY hand-maintained half of the allow-list, and it is deliberately
+// the small half — adding a spine phase to phasecontract now makes it
+// dispatchable automatically.
+var nonRegistryRoles = []string{
+	"inspirer", "evaluator", "plan-reviewer", "memo", "tester",
+}
+
 // agentRoles is the canonical allow-list of agent roles (single source of
 // truth). agentRolePattern is derived from it, and tests iterate it, so a new
-// role is added in exactly one place. Must stay in sync with subagent-run.sh:631.
-var agentRoles = []string{
-	"scout", "tdd-engineer", "builder", "auditor", "inspirer",
-	"evaluator", "retrospective", "orchestrator", "plan-reviewer",
-	"intent", "triage", "memo", "tester", "build-planner",
+// role is added in exactly one place.
+//
+// Sync point that CANNOT be automated: legacy/scripts/dispatch/subagent-run.sh
+// (cmd_run's role case, ~line 631) carries the bash mirror of this list. It is a
+// separate runtime with no access to the Go registry, so a new role must be
+// added there by hand; every OTHER Go consumer derives from here.
+var agentRoles = buildAgentRoles()
+
+// buildAgentRoles derives the allow-list as the UNION of (a) every
+// phasecontract-registered agent that actually produces an LLM deliverable and
+// (b) nonRegistryRoles. Before cycle-1145 this was a second hand-typed slice
+// beside the registry and had already drifted: "router" is registered (and ships
+// .evolve/profiles/router.json) yet was not dispatchable.
+//
+// NoArtifact phases are excluded: "ship" is registered but is a native
+// host-side phase with no profile, so accepting it would break the
+// role↔profile conformance invariant (TestAgentRoles_EveryRoleHasProfile).
+// Output is sorted so the derived regex — and every test that iterates the
+// list — is deterministic despite Contracts()' unordered map iteration.
+func buildAgentRoles() []string {
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(nonRegistryRoles)+len(phasecontract.Contracts()))
+	add := func(role string) {
+		if role == "" || seen[role] {
+			return
+		}
+		seen[role] = true
+		out = append(out, role)
+	}
+	for _, c := range phasecontract.Contracts() {
+		if c.NoArtifact {
+			continue
+		}
+		add(c.AgentName)
+	}
+	for _, r := range nonRegistryRoles {
+		add(r)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // agentRolePattern matches exactly the canonical roles in agentRoles.

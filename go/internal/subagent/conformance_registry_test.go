@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // conformance_registry_test.go — B6: keep the agent-role allow-list SSOT
@@ -87,6 +89,49 @@ func TestAgentRoles_SSOTIntegrity(t *testing.T) {
 	for _, bad := range []string{"", "Scout", "scout2", "not-a-role", "auditor-worker-x", "builder ", " builder", "scout|builder"} {
 		if agentRolePattern.MatchString(bad) {
 			t.Errorf("agentRolePattern should reject %q but matched it", bad)
+		}
+	}
+}
+
+// TestAgentRoles_DerivedFromPhaseContractRegistry pins the cycle-1145
+// required-roles-ssot refactor from both sides: the allow-list must COVER every
+// dispatchable registry agent (the drift that let "router" fall out of it), must
+// RETAIN the profile-backed roles the registry does not know, and must not
+// over-reach onto NoArtifact phases like "ship" (which has no profile).
+func TestAgentRoles_DerivedFromPhaseContractRegistry(t *testing.T) {
+	allowed := make(map[string]bool, len(agentRoles))
+	for _, r := range agentRoles {
+		allowed[r] = true
+	}
+
+	var registryAgents int
+	for _, c := range phasecontract.Contracts() {
+		if c.NoArtifact || c.AgentName == "" {
+			if c.AgentName != "" && allowed[c.AgentName] {
+				t.Errorf("agentRoles contains %q, a NoArtifact registry phase (%s) with no profile — the derivation over-reached", c.AgentName, c.Phase)
+			}
+			continue
+		}
+		registryAgents++
+		if !allowed[c.AgentName] {
+			t.Errorf("agentRoles is missing registry agent %q (phase %s) — the allow-list drifted from phasecontract", c.AgentName, c.Phase)
+		}
+	}
+	if registryAgents == 0 {
+		t.Fatal("premise broken: phasecontract registered no dispatchable agents")
+	}
+
+	for _, r := range nonRegistryRoles {
+		if !allowed[r] {
+			t.Errorf("agentRoles dropped non-registry role %q — the derivation must be a union, not a substitution", r)
+		}
+	}
+
+	// Sorted output keeps agentRolePattern (and every test that iterates the
+	// list) stable across Contracts()' unordered map iteration.
+	for i := 1; i < len(agentRoles); i++ {
+		if agentRoles[i-1] > agentRoles[i] {
+			t.Fatalf("agentRoles is not sorted at index %d (%q > %q) — derivation order is nondeterministic", i, agentRoles[i-1], agentRoles[i])
 		}
 	}
 }

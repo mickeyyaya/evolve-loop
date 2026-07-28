@@ -28,6 +28,44 @@ verdict; a JSON contract requires valid JSON with the listed top-level keys (a *
 — unknown/future keys are ignored). `ArtifactName` is pinned to the profile `output_artifact`
 basename by `TestArtifactNameMatchesProfileOutput` (drift detector).
 
+### Reading the registry from Go (cycle-1145)
+
+Two accessors project the registry so no consumer re-declares its vocabulary:
+
+- **`phasecontract.ArtifactName(phase) string`** — the artifact-name SSOT. Returns `""` for an
+  unregistered phase *and* for a `NoArtifact` phase (`ship`, whose result is a pushed commit);
+  callers needing a fallback branch on the empty string, as `core.backfillArtifactPath` does.
+  `internal/evalgate`, `internal/topngate`, `internal/phases/scout`, `internal/router` and
+  `internal/cyclesimulator` each carried their own `"scout-report.md"` copy until cycle-1145 — a
+  registry rename left all five reading a file nobody wrote. **Never re-type an artifact filename
+  in Go; call this.** Enforced by `go/acs/cycle1145` predicate 001 (absence check over
+  `go/internal`, with 003 as its anti-gaming twin).
+- **`phasecontract.ArtifactFilename(phase) string`** (cycle-1147) — `ArtifactName` plus the
+  `"<phase>-report.md"` convention fallback, for the callers that need *a* filename rather than the
+  "is one registered?" signal. It exists because the fallback branch itself was the duplicated
+  thing: `core.backfillArtifactPath`, `core.recordGenericBinding`, `core/cyclerun_remediate`
+  and `cycleclassify` each re-typed `phase + "-report.md"` beside their own lookup, so a phase
+  whose registry name *diverges* from the convention silently got the wrong path from three of
+  them. That was not hypothetical — the `tdd` gate writes **`test-report.md`**, so graduated
+  remediation had been telling the builder to "read the gate's report at `tdd-report.md`", a file
+  that never exists (fixed here; pinned by `TestRemediation_GateFailThenPassContinuesSpine`, which
+  now asserts through the registry and explicitly rejects the conventional name).
+  **Rule: `ArtifactName` when the empty string is meaningful, `ArtifactFilename` otherwise; never
+  the literal.**
+- **`phasecontract.Contracts()`** — the agent-name vocabulary. `internal/subagent`'s dispatch
+  allow-list (`agentRoles`) is the **union** of every non-`NoArtifact` registry `AgentName` and the
+  small hand-kept `nonRegistryRoles` slice (`inspirer`, `evaluator`, `plan-reviewer`, `memo`,
+  `tester` — profile-backed roles that are not spine phases). Registering a spine phase now makes
+  it dispatchable automatically; before cycle-1145 the list was hand-typed beside the registry and
+  `router` had already fallen out of it. `NoArtifact` phases are excluded so `ship` — registered but
+  with no `.evolve/profiles/ship.json` — stays rejected and the role↔profile conformance invariant
+  holds.
+
+**The one sync point that cannot be automated:** `legacy/scripts/dispatch/subagent-run.sh` (cmd_run's
+role case, ~line 631) mirrors `agentRoles` in bash. It is a separate runtime with no access to the Go
+registry, so a **new role must be added there by hand**. Every other consumer derives. This is
+recorded in `run.go`'s doc comment as well, at the declaration an editor actually touches.
+
 ## What the agent sees
 
 The bridge injects a deterministic `## Deliverable Contract` block (rules < policy < contract <

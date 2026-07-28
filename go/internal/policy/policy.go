@@ -26,7 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -94,7 +94,7 @@ type Policy struct {
 	// package may import without weight); absent ⇒ gc defaults. The hard
 	// rules — quarantine manual-only, ledger never touched, live runs never
 	// touched — are NOT configurable here, by design.
-	GC *gc.Policy `json:"gc,omitempty"`
+	GC *gcpolicy.Policy `json:"gc,omitempty"`
 	// Fanout configures the fan-out dispatch subsystem. Absent ⇒ built-in
 	// defaults apply (concurrency=2, track_workers=true, cache_prefix=true).
 	Fanout *FanoutPolicy `json:"fanout,omitempty"`
@@ -169,6 +169,11 @@ type Policy struct {
 	// Recovery configures the ADR-0044 Unified Phase Recovery rollout stage.
 	// Absent ⇒ built-in default applies (PhaseRecovery="shadow" — behavior-neutral).
 	Recovery *RecoveryPolicy `json:"recovery,omitempty"`
+	// DocsFloor configures the ADR-0077 documentation floor for
+	// architecture-labeled changes. Absent ⇒ built-in default applies
+	// (Stage="enforce" — the floor only WARNs, so arming it by default is
+	// byte-neutral to every verdict).
+	DocsFloor *DocsFloorPolicy `json:"docs_floor,omitempty"`
 	// ACS configures the ACS Go lane timeout. Absent ⇒ built-in defaults apply
 	// (DefaultTimeout=60s). Replaces EVOLVE_ACS_GO_TIMEOUT_S env read.
 	ACS *ACSConfig `json:"acs,omitempty"`
@@ -1520,6 +1525,32 @@ func (p Policy) RecoveryConfig() RecoveryPolicy {
 	}
 	if p.Recovery.SpineFloor != "" {
 		c.SpineFloor = p.Recovery.SpineFloor
+	}
+	return c
+}
+
+// DocsFloorPolicy is the .evolve/policy.json "docs_floor" block — the
+// config-as-code dial (no flag) for the ADR-0077 documentation floor, shaped
+// exactly like the SpineFloor dial it is modeled on.
+type DocsFloorPolicy struct {
+	// Stage selects the rollout stage: "off" / "shadow" / "enforce".
+	// Empty/absent ⇒ "enforce". Unlike the spine floor, "enforce" here still
+	// only WARNs (see internal/docsfloor): the mechanical half of the rule is
+	// "is there a doc at all", and judging adequacy stays with the auditor.
+	// "off" is the no-recompile escape hatch for a lane that legitimately
+	// churns architecture surfaces without a doc delta.
+	Stage string `json:"stage,omitempty"`
+}
+
+// DocsFloorConfig returns docs-floor configuration with the built-in default
+// resolved: empty/absent Stage ⇒ "enforce".
+func (p Policy) DocsFloorConfig() DocsFloorPolicy {
+	c := DocsFloorPolicy{Stage: "enforce"}
+	if p.DocsFloor == nil {
+		return c
+	}
+	if p.DocsFloor.Stage != "" {
+		c.Stage = p.DocsFloor.Stage
 	}
 	return c
 }

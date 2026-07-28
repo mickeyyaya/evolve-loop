@@ -30,57 +30,20 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
-// Policy is the .evolve/policy.json:gc block. The zero value means
-// "defaults": see withDefaults. A zero ArchiveAfterDays/DeleteAfterDays
-// disables that action entirely — retention never escalates by default.
-type Policy struct {
-	// Mode controls whether the GC hook runs. off (default) = disabled;
-	// shadow = discover+plan+log manifest without mutations; enforce = shadow+apply.
-	Mode string     `json:"mode,omitempty"`
-	Runs RunsPolicy `json:"runs,omitempty"`
-	// SalvageTTLDays prunes <evolve>/operator-salvage entries. Default 30.
-	SalvageTTLDays int `json:"salvage_ttl_days,omitempty"`
-	// LogsTTLDays prunes <evolve>/dispatch-logs/*.log. Default 30.
-	LogsTTLDays int `json:"logs_ttl_days,omitempty"`
-	// TrackerTTLDays prunes <run-dir>/.ephemeral subtrees of KEPT runs.
-	// Default 7 (mirrors pruneephemeral).
-	TrackerTTLDays int `json:"tracker_ttl_days,omitempty"`
-	// Worktrees is the retention grace for the worktree+branch backlog sweep
-	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
-	Worktrees WorktreesPolicy `json:"worktrees,omitempty"`
-}
-
-// RunsPolicy is the retention ladder for run directories.
-type RunsPolicy struct {
-	// KeepFull: the newest N run dirs (by mtime, live or not — live runs are
-	// protected independently of this count) are always kept in full,
-	// however old. Default 10.
-	KeepFull int `json:"keep_full,omitempty"`
-	// ArchiveAfterDays: beyond KeepFull, a dead run STRICTLY older than this
-	// is moved under <evolve>/archive/runs/. 0 = never archive.
-	ArchiveAfterDays int `json:"archive_after_days,omitempty"`
-	// DeleteAfterDays: beyond KeepFull, a dead run STRICTLY older than this
-	// is deleted. 0 = never delete. Delete wins over archive when both match.
-	DeleteAfterDays int `json:"delete_after_days,omitempty"`
-}
-
-func (p Policy) withDefaults() Policy {
-	if p.Runs.KeepFull == 0 {
-		p.Runs.KeepFull = 10
-	}
-	if p.SalvageTTLDays == 0 {
-		p.SalvageTTLDays = 30
-	}
-	if p.LogsTTLDays == 0 {
-		p.LogsTTLDays = 30
-	}
-	if p.TrackerTTLDays == 0 {
-		p.TrackerTTLDays = 7
-	}
-	return p
-}
+// Policy, RunsPolicy and WorktreesPolicy are the `.evolve/policy.json` gc
+// block, re-exported from the zero-dependency internal/gcpolicy leaf. The
+// types moved out (cycle-1141) so internal/policy — the config SSOT — can hold
+// the block without depending on this engine; these aliases keep every
+// existing gc.Policy / gc.RunsPolicy call site working unchanged.
+type (
+	Policy          = gcpolicy.Policy
+	RunsPolicy      = gcpolicy.RunsPolicy
+	WorktreesPolicy = gcpolicy.WorktreesPolicy
+)
 
 // RunDir is one discovered run directory. Discovery is injected: L3.2's
 // layout-agnostic, lease-aware discovery is the production source; tests
@@ -135,7 +98,7 @@ func Plan(opts Options) (Manifest, error) {
 	if opts.EvolveDir == "" || !filepath.IsAbs(opts.EvolveDir) {
 		return Manifest{}, fmt.Errorf("gc: EvolveDir must be absolute, got %q", opts.EvolveDir)
 	}
-	pol := opts.Policy.withDefaults()
+	pol := opts.Policy.WithDefaults()
 	now := opts.Now
 	if now == nil {
 		now = time.Now

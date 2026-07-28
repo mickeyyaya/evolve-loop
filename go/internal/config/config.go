@@ -540,6 +540,20 @@ func defaults() RoutingConfig {
 		// applyRegistry (cycles 263/264: the advisory router skipped the
 		// scope-clamp). Tests constructing RoutingConfig directly keep this
 		// 4-phase baseline.
+		// Mandatory DELIBERATELY diverges from phasecontract.RequiredRoles() —
+		// audited cycle-1141, kept separate on purpose. The two lists answer
+		// different questions and must not be merged:
+		//   - phasecontract.RequiredRoles()/RequiredArtifacts() = "what must a
+		//     COMPLETED cycle have PRODUCED" (report-bearing spine phases;
+		//     consumed by cyclehealth/redteamcheck/ledgerverify).
+		//   - this list = "what must the ROUTER always PLAN" — a superset that
+		//     includes "ship", a phase that writes no report and therefore
+		//     cannot appear in an artifact-derived registry vocabulary.
+		// Deriving this from the registry would silently drop "ship" from every
+		// plan; hardcoding the registry's half is the drift risk. The invariant
+		// that actually binds them — Mandatory ⊇ registry-required phases, plus
+		// "ship", and nothing the registry does not know — is asserted by the
+		// cycle-1141 ACS predicate rather than by shared code.
 		Mandatory:                   []string{"scout", "build", "audit", "ship"},
 		Conditional:                 map[string]CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
 		MaxInsertions:               4,

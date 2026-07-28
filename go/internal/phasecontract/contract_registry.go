@@ -238,6 +238,42 @@ func For(phase string) (Contract, bool) {
 	return c, ok
 }
 
+// ArtifactName returns the deliverable filename a phase writes, resolved from
+// the registry — the SSOT for artifact names — so no consumer has to re-declare
+// the literal. Before cycle-1145 five packages (evalgate, topngate,
+// phases/scout, router, cyclesimulator) each carried their own copy of
+// "scout-report.md"; a rename in the registry silently left them behind.
+//
+// Returns "" when the phase is not registered, and "" for a NoArtifact phase
+// (ship), whose result is a pushed commit rather than a file — callers that
+// need a fallback filename should test for the empty string, exactly as
+// core.backfillArtifactPath does.
+func ArtifactName(phase string) string {
+	c, ok := For(phase)
+	if !ok || c.NoArtifact {
+		return ""
+	}
+	return c.ArtifactName
+}
+
+// ArtifactFilename returns the deliverable filename for a phase, falling back
+// to the "<phase>-report.md" convention when the registry has no answer —
+// either the phase is unregistered (user/inserted phases) or it is NoArtifact.
+//
+// This is the SSOT form of the fallback every call site was hand-rolling:
+// core.backfillArtifactPath, core/routing_dispatch and three more sites each
+// re-declared `phase + "-report.md"` beside their own [For] lookup, which is
+// how the retro-phase path mismatch survived cycle-1145's backfill (the
+// registry moved, the literals did not). Callers that must DISTINGUISH "no
+// registered artifact" from "conventional name" keep using [ArtifactName],
+// whose empty return carries that distinction.
+func ArtifactFilename(phase string) string {
+	if name := ArtifactName(phase); name != "" {
+		return name
+	}
+	return phase + "-report.md"
+}
+
 // requiredPhases is the SSOT for "what a completed cycle must have produced":
 // the three spine phases every cycle ledgers and whose reports every downstream
 // completeness consumer requires. Roles and artifact names are DERIVED from

@@ -43,10 +43,12 @@ func buildScoutBacklogRE() *regexp.Regexp {
 
 type hooks struct{}
 
-func (hooks) PhaseName() string                           { return string(core.PhaseScout) }
-func (hooks) AgentPromptName() string                     { return "evolve-scout" }
-func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "scout-report.md" }
-func (hooks) DefaultModel() string                        { return "auto" }
+func (hooks) PhaseName() string       { return string(core.PhaseScout) }
+func (hooks) AgentPromptName() string { return "evolve-scout" }
+func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
+	return phasecontract.ArtifactName(string(core.PhaseScout))
+}
+func (hooks) DefaultModel() string { return "auto" }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder

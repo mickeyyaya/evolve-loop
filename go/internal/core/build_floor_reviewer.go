@@ -29,6 +29,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // BuildFloorCheckFn runs the deterministic build-floor checks for a completed
@@ -83,7 +85,37 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out := RemovalClaimFailures(ctx, in)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
+	// ADR-0077 docs floor: WARN-only, so it rides the SAME derived change set
+	// rather than returning a failure — an architecture change with no doc is a
+	// finding for the auditor, never a handoff REJECT.
+	docsFloorWarn(in, paths)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
+}
+
+// docsFloorWarn evaluates the ADR-0077 documentation floor over the handoff's
+// change set and prints its WARN to stderr (the same channel every other
+// fail-open floor signal uses, so it lands in the phase log the auditor reads).
+// Stage comes from .evolve/policy.json `docs_floor.stage`; an unreadable policy
+// falls back to the compiled default, which the empty Config.Stage encodes.
+func docsFloorWarn(in ReviewInput, paths []string) {
+	var cfg docsfloor.Config
+	if in.ProjectRoot != "" {
+		if p, err := policy.Load(filepath.Join(in.ProjectRoot, ".evolve", "policy.json")); err == nil {
+			cfg.Stage = p.DocsFloorConfig().Stage
+		}
+	}
+	// Label with the blocking-grade classifier (docsfloor.IsArchitectureClass):
+	// it drops test-only diffs — which document nothing and were the WARN's main
+	// false positive — and picks up the trust-kernel, new-package and phase-spec
+	// surfaces the broad label misses. The VERDICT stays WARN (ADR-0077): only
+	// the precision of "is this architecture" improves here.
+	v := docsfloor.Evaluate(cfg, docsfloor.Input{
+		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),
+		ChangedFiles:        paths,
+	})
+	if v.Status == docsfloor.StatusWarn {
+		fmt.Fprintf(os.Stderr, "[docs-floor] WARN: %s\n", v.Reason)
+	}
 }
 
 // changedFloorPaths derives the lane's changed repo paths for the floor.
@@ -123,6 +155,8 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	// paths comes from changedFloorPaths (cycle-base diff, HEAD fallback) —
 	// see its doc for why the base axis is load-bearing.
 	pkgs := changedGoTestPackages(paths)
+	moduleDir := codequality.ModuleDir(in.Worktree)
+	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs)
 	if len(pkgs) == 0 {
 		return nil
 	}
@@ -130,7 +164,6 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	// instrumented pass inside apicoverNamingFailures (their test run doubles
 	// as the selfcheck — reviewer MED: never run the same package's tests
 	// twice per handoff); everything else takes the plain selfcheck.
-	moduleDir := codequality.ModuleDir(in.Worktree)
 	enforcedSet := map[string]bool{}
 	if enforceBytes, err := os.ReadFile(filepath.Join(moduleDir, ".apicover-enforce")); err == nil {
 		for _, p := range ciparity.IntersectEnforced(pkgs, enforceBytes) {
@@ -168,6 +201,59 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	}
 	out = append(out, namingFails...)
 	return out
+}
+
+// buildTagVisiblePackages drops changed packages that have NO Go files under
+// the default build tags — the ACS predicate packages, which are `//go:build
+// acs`. `go test` on one is a SETUP failure ("build constraints exclude all Go
+// files"), not a test failure, so without this filter a cycle whose diff
+// carries an acs package red-lines its own build floor for a package that is
+// green under `-tags acs`.
+//
+// Second line of defense, not the fix: the plain selfcheck path already
+// tolerates this condition via goTestExcludedByBuildTags, and the primary fix
+// is that modern acs packages are NOT enrolled in .apicover-enforce at all (see
+// the rationale block there). This filter covers the legacy ./acs/cycle9..661
+// enrollments, which would otherwise still reach the enforced coverage run.
+//
+// Fail-open by construction: any `go list` plumbing error returns the input
+// unchanged, so a broken toolchain narrows nothing and the floor keeps judging.
+func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string) []string {
+	if len(pkgs) == 0 {
+		return pkgs
+	}
+	args := append([]string{"list", "-e", "-f", "{{.Dir}}\t{{len .GoFiles}}\t{{len .TestGoFiles}}\t{{len .XTestGoFiles}}"}, pkgs...)
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = moduleDir
+	cmd.Env = sanitizeEnv(os.Environ())
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: go list failed (%v) — build-tag visibility filter skipped this handoff\n", err)
+		return pkgs
+	}
+	empty := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		f := strings.Split(strings.TrimSpace(line), "\t")
+		if len(f) != 4 {
+			continue
+		}
+		if f[1] == "0" && f[2] == "0" && f[3] == "0" {
+			empty[filepath.Clean(f[0])] = true
+		}
+	}
+	if len(empty) == 0 {
+		return pkgs
+	}
+	kept := make([]string, 0, len(pkgs))
+	for _, p := range pkgs {
+		dir := filepath.Clean(filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
+		if empty[dir] {
+			fmt.Fprintf(os.Stderr, "[build-floor] NOTE: %s has no Go files under the default build tags (build-tagged package) — excluded from the selfcheck run\n", p)
+			continue
+		}
+		kept = append(kept, p)
+	}
+	return kept
 }
 
 // apicoverNamingFailures runs the coverage-backed apicover enforce check over

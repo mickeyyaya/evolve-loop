@@ -17,13 +17,18 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-const (
-	triageReportName = "triage-report.md"
-	buildReportName  = "build-report.md"
-	tddReportName    = "test-report.md"
-	scoutReportName  = "scout-report.md"
+// The four report filenames this gate reads, resolved from the phasecontract
+// registry (the artifact-name SSOT) instead of re-typed here. This gate exists
+// to stop two task-identity sources from diverging; it must not itself be a
+// second declaration of what those sources are NAMED.
+var (
+	triageReportName = phasecontract.ArtifactName("triage")
+	buildReportName  = phasecontract.ArtifactName("build")
+	tddReportName    = phasecontract.ArtifactName("tdd")
+	scoutReportName  = phasecontract.ArtifactName(string(core.PhaseScout))
 )
 
 // gate is one structural inter-phase check. appliesTo selects the phase whose

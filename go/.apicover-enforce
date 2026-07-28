@@ -459,3 +459,38 @@
 # apicover_named_test.go. Imports only stdlib + adapters/flock.
 ./internal/dispositionrouter
 ./internal/continuation
+
+# docs floor (cycle-1141, ADR-0077, new-package graduation): the stdlib-only
+# decision leaf that mechanizes operating-policy §3 rule 2 — an
+# architecture-labeled change with no docs/ touch WARNs at the build handoff
+# floor. Config/Input/Verdict/Status* + Evaluate + LabelArchitecture are
+# named+exercised by docsfloor_test.go.
+./internal/docsfloor
+
+# gc config leaf (cycle-1141, decoupling campaign): Policy/RunsPolicy/
+# WorktreesPolicy + WithDefaults extracted from internal/gc so internal/policy
+# (the config SSOT) no longer depends on the retention ENGINE — the inverted
+# edge that closed a policy→gc→phasecontract→phasespec→policy import cycle.
+# gc re-exports via aliases; gcpolicy_test.go names+exercises every export.
+./internal/gcpolicy
+
+# ACS predicate packages (./acs/cycle<N>) are NOT enrolled — the "completeness
+# invariant" cycles 1141/1144/1145 asserted here does not exist. Two reasons,
+# both load-bearing:
+#
+#  1. apicover enforces the public-API DoD (every export named + exercised).
+#     An acs package exports NOTHING — it is `//go:build acs` test predicates —
+#     so there is no API surface to enforce and enrollment measures nothing.
+#  2. Enrollment ROUTES the package into the build handoff floor's enforced
+#     coverage run (build_floor_reviewer.go), which — unlike the plain
+#     selfcheck path with goTestExcludedByBuildTags — reads the untagged
+#     "build constraints exclude all Go files … [setup failed]" SETUP result as
+#     a TEST failure. That is the cycle-1145 gate-block (fingerprint
+#     build|gate-block|866df5da1e50): every cycle whose base diff carried an
+#     enrolled acs package red-lined its own handoff over a package that is
+#     green under `-tags acs`.
+#
+# The ./acs/cycle9..661 entries above predate the handoff-time enforced run and
+# are left untouched (removing them is a CI-scope change, not this fix); the
+# floor's buildTagVisiblePackages filter keeps them from re-triggering (2).
+# Pinned by TestAPICoverEnforceDoesNotEnrollModernACSPackages.

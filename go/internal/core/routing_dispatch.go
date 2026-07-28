@@ -367,15 +367,11 @@ func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 }
 
 // backfillArtifactPath returns the absolute path to the backfilled artifact
-// file. The filename comes from the phasecontract registry — the SSOT the
-// agent's own deliverable contract is projected from — instead of a switch
-// literal that had to be kept in sync with backfill.phaseHeaders by hand. A
-// phase with no registered artifact (or a NoArtifact phase like ship) falls
-// back to the "<phase>-report.md" convention.
+// file. The filename comes from phasecontract.ArtifactFilename — the SSOT the
+// agent's own deliverable contract is projected from, including the
+// "<phase>-report.md" fallback for unregistered/NoArtifact phases — instead of
+// a switch literal that had to be kept in sync with backfill.phaseHeaders by
+// hand.
 func backfillArtifactPath(workspacePath, phase string) string {
-	filename := phase + "-report.md"
-	if c, ok := phasecontract.For(phase); ok && !c.NoArtifact && c.ArtifactName != "" {
-		filename = c.ArtifactName
-	}
-	return filepath.Join(workspacePath, filename)
+	return filepath.Join(workspacePath, phasecontract.ArtifactFilename(phase))
 }

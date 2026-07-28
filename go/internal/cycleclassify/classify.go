@@ -443,7 +443,7 @@ func isPromptEchoSelfReport(workspace, phase, excerpt string) bool {
 		return false
 	}
 	// (2) deliverable declares PASS.
-	report, err := os.ReadFile(filepath.Join(workspace, phase+"-report.md"))
+	report, err := os.ReadFile(filepath.Join(workspace, phasecontract.ArtifactFilename(phase)))
 	if err != nil {
 		return false
 	}

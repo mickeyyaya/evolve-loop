@@ -5,8 +5,21 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
+
+// auditArtifactName is the audit deliverable's filename, DERIVED from the
+// phasecontract registry (the SSOT for report filenames) rather than re-typed.
+// Cycle-1141: the registry exists precisely so this vocabulary is declared once
+// — a synthesized defect that points at a stale filename sends the next cycle
+// looking for a file that is no longer written.
+func auditArtifactName() string {
+	if c, ok := phasecontract.For("audit"); ok && c.ArtifactName != "" {
+		return c.ArtifactName
+	}
+	return "the audit report"
+}
 
 // timingRecords reads phase-timing.json from the cycle workspace and projects it
 // into per-phase dossier records plus the cycle-level roll-up. Returns ok=false
@@ -122,7 +135,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		d.Defects = []Defect{{
 			ID:       "audit-fail",
 			Severity: "HIGH",
-			Summary:  "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+			Summary:  fmt.Sprintf("cycle did not pass audit; see %s + acs-verdict.json", auditArtifactName()),
 			Fix:      "address the audit findings recorded for this cycle",
 		}}
 		d.Carryover = []Carryover{{

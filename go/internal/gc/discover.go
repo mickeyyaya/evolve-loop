@@ -30,21 +30,25 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // runMarkers are the files whose presence identifies a directory as a run
 // workspace. run.json is the canonical post-CB.4 marker (the WriteCycleState
-// guard mirror); the rest cover pre-CB.4 runs that only hold phase
-// artifacts.
-var runMarkers = []string{
+// guard mirror); phase-timing/interaction-summary and the registry's required
+// phase artifacts cover pre-CB.4 runs that only hold phase artifacts.
+//
+// Cycle-1141: the artifact half is DERIVED from phasecontract.RequiredArtifacts()
+// — the report-filename SSOT — not re-typed. A frozen copy would stop
+// recognizing a run dir the moment the registry's required set changed, and
+// discovery is what protects a dir from the retention engine: a marker list
+// that silently falls behind the registry turns into deleted run evidence.
+var runMarkers = append([]string{
 	"run.json",
 	"phase-timing.json",
 	"interaction-summary.json",
-	"scout-report.md",
-	"build-report.md",
-	"audit-report.md",
-}
+}, phasecontract.RequiredArtifacts()...)
 
 // DiscoverOptions tunes Discover.
 type DiscoverOptions struct {
