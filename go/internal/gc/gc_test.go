@@ -559,12 +559,14 @@ func TestPlan_KeepFullCountsLiveRunsPositionally(t *testing.T) {
 	}
 }
 
-// TestGCPolicyModeDefaultsOff verifies that the zero value of gc.Policy.Mode is ""
-// (which runGCHook treats as "off" — disabled by default).
+// TestGCPolicyModeDefaultsOff verifies that the zero value of gc.Policy.Mode is
+// "" — the "operator set nothing" signal. Since workspace-hygiene S5, runGCHook
+// resolves that absent mode to "shadow" (non-mutating), not "off"; only an
+// explicit "off" disables the hook. The zero value itself is unchanged.
 func TestGCPolicyModeDefaultsOff(t *testing.T) {
 	pol := Policy{}
 	if pol.Mode != "" {
-		t.Errorf("Policy{}.Mode = %q, want \"\" (zero value == off behavior in runGCHook)", pol.Mode)
+		t.Errorf("Policy{}.Mode = %q, want \"\" (absent mode — runGCHook resolves it to shadow)", pol.Mode)
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type loopResult struct {
@@ -93,7 +94,12 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	}
 	mode := gcPol.Mode
 	if mode == "" {
-		mode = "off"
+		// workspace-hygiene S5: an ABSENT gc.mode resolves to "shadow", not
+		// "off". Shadow never mutates (plan + publish only), so the default is
+		// safe, and a sweep that can only run after an operator edits
+		// policy.json never drains the accumulated backlog. Enforce stays an
+		// explicit policy.json decision.
+		mode = "shadow"
 	}
 	switch mode {
 	case "off":
@@ -104,6 +110,16 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 		return
 	}
 
+	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
+	// Deliberately independent of the run-dir sweep: either half failing (bad
+	// plan, unwritable workspace, non-git ProjectRoot) must never silently
+	// disable the other. Both are best-effort batch-end hygiene.
+	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
+}
+
+// runRunDirGC is the L3.4 run-directory retention sweep: Discover→Plan→publish,
+// and Apply only under enforce.
+func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
 	runs, err := gc.Discover(cfg.EvolveDir, gc.DiscoverOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: discover failed: %v; writing empty manifest\n", err)
@@ -114,24 +130,7 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[gc] WARN: plan failed: %v\n", err)
 		return
 	}
-	raw, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		fmt.Fprintf(stderr, "[gc] WARN: manifest encode failed: %v\n", err)
-		return
-	}
-	if err := os.MkdirAll(workspace, 0o755); err != nil {
-		fmt.Fprintf(stderr, "[gc] WARN: create workspace for manifest: %v\n", err)
-		return
-	}
-	target := filepath.Join(workspace, "gc-shadow-manifest.json")
-	tmp := fmt.Sprintf("%s.tmp.%d", target, os.Getpid())
-	if err := os.WriteFile(tmp, append(raw, '\n'), 0o644); err != nil {
-		fmt.Fprintf(stderr, "[gc] WARN: write manifest temp: %v\n", err)
-		return
-	}
-	if err := os.Rename(tmp, target); err != nil {
-		_ = os.Remove(tmp)
-		fmt.Fprintf(stderr, "[gc] WARN: publish manifest: %v\n", err)
+	if !publishGCManifest(workspace, "gc-shadow-manifest.json", manifest, stderr) {
 		return
 	}
 	archive, del := gcActionCounts(manifest)
@@ -145,6 +144,74 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 		return
 	}
 	fmt.Fprintf(stderr, "[gc] enforce: applied %d items\n", len(manifest.Items))
+}
+
+// runWorktreeGC is workspace-hygiene S5: the batch-end wiring that finally gives
+// S4's gc.PlanWorktrees/gc.ApplyWorktrees a production caller. It drains the
+// accumulated worktree+branch backlog — plan and publish under shadow, plan,
+// publish and apply under enforce. Fail-open: a ProjectRoot that is not a git
+// repo warns and skips, leaving the run-dir sweep untouched.
+func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
+	if cfg.ProjectRoot == "" {
+		// Never infer the repo from the process cwd: an unset ProjectRoot with
+		// mode=enforce would aim `git branch -d` at whatever repo the binary
+		// happens to run inside. Refuse loudly instead.
+		fmt.Fprintf(stderr, "[gc] WARN: worktree sweep skipped: ProjectRoot is unset\n")
+		return
+	}
+	opts := gc.WorktreeOptions{
+		ProjectRoot:  cfg.ProjectRoot,
+		WorktreeBase: filepath.Join(cfg.ProjectRoot, ".evolve", "worktrees"),
+		EvolveDir:    cfg.EvolveDir,
+		Policy:       gcPol.Worktrees,
+		Exec:         sysexec.DefaultRunner,
+	}
+	manifest, err := gc.PlanWorktrees(opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: worktree plan failed: %v; skipping worktree sweep\n", err)
+		return
+	}
+	if !publishGCManifest(workspace, "workspace-gc-manifest.json", manifest, stderr) {
+		return
+	}
+	fmt.Fprintf(stderr, "[gc] worktree shadow: %d items\n", len(manifest.Items))
+
+	if mode != "enforce" {
+		return
+	}
+	if err := gc.ApplyWorktrees(opts, manifest); err != nil {
+		// Partial application is normal (errors.Join over per-item refusals):
+		// report and continue — the manifest is the evidence of record.
+		fmt.Fprintf(stderr, "[gc] WARN: worktree enforce apply: %v\n", err)
+	}
+	fmt.Fprintf(stderr, "[gc] worktree enforce: applied %d items\n", len(manifest.Items))
+}
+
+// publishGCManifest atomically writes v as pretty JSON to <workspace>/name
+// (tmp+rename). Shared by both sweeps so the run-dir and worktree manifests are
+// published identically. Returns false after warning on any failure.
+func publishGCManifest(workspace, name string, v any, stderr io.Writer) bool {
+	raw, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: %s encode failed: %v\n", name, err)
+		return false
+	}
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: create workspace for %s: %v\n", name, err)
+		return false
+	}
+	target := filepath.Join(workspace, name)
+	tmp := fmt.Sprintf("%s.tmp.%d", target, os.Getpid())
+	if err := os.WriteFile(tmp, append(raw, '\n'), 0o644); err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: write %s temp: %v\n", name, err)
+		return false
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		_ = os.Remove(tmp)
+		fmt.Fprintf(stderr, "[gc] WARN: publish %s: %v\n", name, err)
+		return false
+	}
+	return true
 }
 
 func gcActionCounts(manifest gc.Manifest) (archive, del int) {

@@ -15,8 +15,10 @@ package gcpolicy
 // "defaults": see WithDefaults. A zero ArchiveAfterDays/DeleteAfterDays
 // disables that action entirely — retention never escalates by default.
 type Policy struct {
-	// Mode controls whether the GC hook runs. off (default) = disabled;
-	// shadow = discover+plan+log manifest without mutations; enforce = shadow+apply.
+	// Mode controls whether the GC hook runs. off = disabled; shadow
+	// (the default an ABSENT mode resolves to in runGCHook, workspace-hygiene
+	// S5) = discover+plan+log manifest without mutations; enforce =
+	// shadow+apply, always an explicit operator decision.
 	Mode string     `json:"mode,omitempty"`
 	Runs RunsPolicy `json:"runs,omitempty"`
 	// SalvageTTLDays prunes <evolve>/operator-salvage entries. Default 30.

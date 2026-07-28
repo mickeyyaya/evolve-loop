@@ -86,12 +86,25 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 	return lane, lane != -1
 }
 
-// SelectWaveSeedMenus is the menu-aware wave seed: the inbox backlog packed
-// into up to `count` mutually file-disjoint lanes (SelectFleetWidthTopN, the
-// existing SSOT) with each lane deepened to at most perLane same-file cluster
-// mates. The outer slice length is the realizable WAVE WIDTH — callers gate
-// on it exactly as they gated on len(SelectWaveSeedTopN(...)).
-func SelectWaveSeedMenus(evolveDir string, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
+// SelectWaveSeedMenus is the menu-aware wave seed: an already-committed prefix
+// preserved verbatim and widened from the inbox backlog to up to `count`
+// mutually file-disjoint lanes (WidenTopNToFleetWidth, the existing SSOT), each
+// lane deepened to at most perLane same-file cluster mates. The outer slice
+// length is the realizable WAVE WIDTH — callers gate on it exactly as they
+// gated on len(SelectWaveSeedTopN(...)).
+//
+// committed carries ids the caller has already bound to this wave. Seeding used
+// to go through the committed-BLIND SelectFleetWidthTopN, so a menu pass could
+// silently drop or reorder a committed id behind a higher-weight backlog item
+// (menu-pass-preserve-committed-ids). An empty committed prefix delegates back
+// to SelectFleetWidthTopN: it is the byte-identical legacy pick and, unlike
+// WidenTopNToFleetWidth (whose count<2 contract returns `committed` unchanged,
+// i.e. nothing), it still yields a single lane at count<2.
+func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
 	backlog := ReadInboxBacklog(evolveDir, isProtected)
-	return ExpandWithClusterMates(SelectFleetWidthTopN(backlog, count), backlog, perLane)
+	seed := SelectFleetWidthTopN(backlog, count)
+	if len(committed) > 0 {
+		seed = WidenTopNToFleetWidth(committed, backlog, count)
+	}
+	return ExpandWithClusterMates(seed, backlog, perLane)
 }

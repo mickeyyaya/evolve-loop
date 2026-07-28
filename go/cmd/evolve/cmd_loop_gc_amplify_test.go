@@ -7,22 +7,35 @@ import (
 	"testing"
 )
 
-func TestAmplifyGCEmptyEnvIsOff(t *testing.T) {
-	// No policy.json with gc.mode → gcPol.Mode="" → treated as "off".
+// TestAmplifyGCNoPolicyFileDefaultsToShadow: no policy.json on disk at all →
+// gcPol.Mode="" → workspace-hygiene S5 resolves it to "shadow", so the run-dir
+// manifest IS published (shadow never mutates). Amended in cycle 1159: this
+// test previously asserted the pre-S5 ""→off default, the exact behavior the
+// slice inverts (same amendment as TestGCOff). The assertion is not weakened —
+// explicit gc.mode=off remains pinned by TestGCOff and
+// TestRunGCHook_ExplicitOffSkipsWorktreeSweep.
+func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
 
 	runGCHook(loopConfig{EvolveDir: evolveDir}, workspace, os.Stderr)
 
-	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); !os.IsNotExist(err) {
-		t.Fatalf("absent gc.mode should behave like off and write no manifest, stat err=%v", err)
+	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); err != nil {
+		t.Fatalf("absent policy.json must default to shadow and publish the manifest, stat err=%v", err)
+	}
+	// ProjectRoot is unset: the worktree sweep must refuse rather than aim git
+	// at the process cwd, so no workspace manifest is published.
+	if _, err := os.Stat(filepath.Join(workspace, "workspace-gc-manifest.json")); !os.IsNotExist(err) {
+		t.Fatalf("unset ProjectRoot must skip the worktree sweep, stat err=%v", err)
 	}
 }
 
 // TestAmplifyGCShadowContinuesAfterPolicyLoadError verifies that when policy.json
-// is unreadable, runGCHook logs a WARN and returns (no manifest). After the
-// EVOLVE_GC→gc.Policy.Mode migration the mode lives in policy.json, so an
-// unreadable policy means mode="" (off) — safe default.
+// is unreadable, runGCHook logs a WARN and CONTINUES on the zero-value policy.
+// Amended in cycle 1159 (workspace-hygiene S5): an unreadable policy yields
+// mode="" which now resolves to "shadow", not "off". That is still the safe
+// default — shadow only plans and publishes, it never mutates the tree, which
+// the run-dir assertions below pin directly.
 func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
@@ -37,9 +50,13 @@ func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 	if !strings.Contains(strings.ToLower(stderr.String()), "policy") {
 		t.Fatalf("policy load failure should be logged, stderr=%q", stderr.String())
 	}
-	// Mode defaults to "off" when policy is unreadable — no manifest written.
-	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); !os.IsNotExist(err) {
-		t.Fatalf("unreadable policy → mode=off; manifest must not be written, stat err=%v", err)
+	// Mode resolves to "shadow" when policy is unreadable: the plan is
+	// published, and nothing is mutated (shadow has no apply step).
+	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); err != nil {
+		t.Fatalf("unreadable policy → shadow; manifest must still be published, stat err=%v", err)
+	}
+	if fi, err := os.Stat(filepath.Join(evolveDir, "policy.json")); err != nil || !fi.IsDir() {
+		t.Fatalf("shadow must not mutate the tree: policy.json placeholder changed, fi=%v err=%v", fi, err)
 	}
 }
 

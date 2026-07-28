@@ -126,7 +126,7 @@ func TestSelectWaveSeedMenus_EndToEnd(t *testing.T) {
 	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
 	writeInboxTodo(t, evolveDir, "b2", 0.6, "go/internal/y/b.go")
 
-	menus := SelectWaveSeedMenus(evolveDir, 2, 4, nil)
+	menus := SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil)
 	if len(menus) != 2 {
 		t.Fatalf("menus = %d, want 2 lanes", len(menus))
 	}
@@ -142,9 +142,9 @@ func TestSelectWaveSeedMenus_IsDeterministic(t *testing.T) {
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
 	writeInboxTodo(t, evolveDir, "a2", 0.9, "go/internal/x/a.go")
 	writeInboxTodo(t, evolveDir, "b1", 0.9, "go/internal/y/b.go")
-	first := renderMenus(SelectWaveSeedMenus(evolveDir, 2, 4, nil))
+	first := renderMenus(SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil))
 	for i := 0; i < 10; i++ {
-		if got := renderMenus(SelectWaveSeedMenus(evolveDir, 2, 4, nil)); got != first {
+		if got := renderMenus(SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil)); got != first {
 			t.Fatalf("run %d diverged: %s vs %s", i, got, first)
 		}
 	}
@@ -199,5 +199,116 @@ func TestExpandWithClusterMates_OverlappingSelectionFirstLaneKeepsFile(t *testin
 	}
 	if got := menuIDs(menus[1]); got != "second" {
 		t.Errorf("menus[1] = %s, want second alone — a later overlapping rep must not accrete mates on a stolen claim", got)
+	}
+}
+
+// --- cycle 1159: menu-pass-preserve-committed-ids ------------------------
+//
+// RED tests for the committed-prefix gap: SelectWaveSeedMenus seeded its base
+// selection with SelectFleetWidthTopN(backlog, count) — a FRESH top-N pick with
+// no committed input — while the sibling seam WidenTopNToFleetWidth(committed,
+// backlog, count) exists precisely to preserve an already-committed prefix while
+// widening to fleet width. A menu-pass invocation could therefore silently drop
+// or reorder ids a caller had already committed to.
+//
+// CONTRACT for Builder (do NOT modify these tests — implement production code):
+//   - SelectWaveSeedMenus gains a `committed []FleetCandidate` parameter:
+//     SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate,
+//                         count, perLane int, isProtected func(string) bool)
+//   - It seeds via WidenTopNToFleetWidth(committed, backlog, count) instead of
+//     SelectFleetWidthTopN(backlog, count), then deepens with
+//     ExpandWithClusterMates as before.
+//   - committed == nil must reproduce today's behavior byte-identically (the
+//     one production caller, seedWavePlanFromInbox, has no committed prefix).
+//   - ExpandWithClusterMates keeps its signature: it already honors an
+//     overlapping committed prefix ("first lane keeps the file").
+
+// TestSelectWaveSeedMenus_PreservesCommittedPrefix: a LOW-weight committed
+// candidate must lead the menus even though the backlog holds higher-weight
+// work. This is the defect — the committed-blind selector would rank a1 first
+// and drop c1 entirely once the fleet width was filled.
+func TestSelectWaveSeedMenus_PreservesCommittedPrefix(t *testing.T) {
+	evolveDir := t.TempDir()
+	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "a2", 0.7, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
+	writeInboxTodo(t, evolveDir, "c1", 0.1, "go/internal/z/c.go") // committed, lowest weight
+
+	committed := []FleetCandidate{cand("c1", 0.1, "go/internal/z/c.go")}
+	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
+
+	if len(menus) != 2 {
+		t.Fatalf("menus = %d lanes, want 2 (committed prefix + one widened lane): %v", len(menus), renderMenus(menus))
+	}
+	if got := menus[0][0].ID; got != "c1" {
+		t.Errorf("lane 0 rep = %q, want the committed id %q — committed intent must never be reordered behind a higher-weight backlog item; menus=%s", got, "c1", renderMenus(menus))
+	}
+	if got := menuIDs(menus[1]); got != "a1,a2" {
+		t.Errorf("lane 1 = %q, want a1,a2 (widened from backlog, deepened with its same-file mate); menus=%s", got, renderMenus(menus))
+	}
+}
+
+// TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded is the edge case:
+// a committed id whose todo has already been consumed out of the inbox must
+// still seed its lane. Reading the backlog alone would lose it.
+func TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded(t *testing.T) {
+	evolveDir := t.TempDir()
+	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
+
+	committed := []FleetCandidate{cand("gone", 0.5, "go/internal/z/gone.go")} // absent from the inbox
+	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
+
+	if len(menus) == 0 || menus[0][0].ID != "gone" {
+		t.Fatalf("committed id absent from the inbox must still seed lane 0; menus=%s", renderMenus(menus))
+	}
+}
+
+// TestSelectWaveSeedMenus_CommittedOverlapNeverDropped: committed intent is
+// authoritative even when two committed items share a file — WidenTopNToFleetWidth
+// preserves every committed candidate verbatim, and neither may be dropped by the
+// disjointness rule that governs BACKFILLED lanes only.
+func TestSelectWaveSeedMenus_CommittedOverlapNeverDropped(t *testing.T) {
+	evolveDir := t.TempDir()
+	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
+
+	committed := []FleetCandidate{
+		cand("c1", 0.4, "go/internal/z/c.go"),
+		cand("c2", 0.3, "go/internal/z/c.go"), // overlaps c1 on purpose
+	}
+	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
+
+	seen := map[string]bool{}
+	for _, m := range menus {
+		for _, c := range m {
+			seen[c.ID] = true
+		}
+	}
+	for _, id := range []string{"c1", "c2"} {
+		if !seen[id] {
+			t.Errorf("committed id %q was dropped; menus=%s", id, renderMenus(menus))
+		}
+	}
+}
+
+// TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection is the negative /
+// anti-no-op case: with NO committed prefix the menus must be exactly what the
+// legacy committed-blind path produced. A naive "always prepend committed"
+// implementation passes the positive tests above but breaks the sole production
+// caller (seedWavePlanFromInbox), which passes no prefix.
+func TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection(t *testing.T) {
+	evolveDir := t.TempDir()
+	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "a2", 0.7, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
+	writeInboxTodo(t, evolveDir, "b2", 0.6, "go/internal/y/b.go")
+
+	backlog := ReadInboxBacklog(evolveDir, nil)
+	want := renderMenus(ExpandWithClusterMates(SelectFleetWidthTopN(backlog, 2), backlog, 4))
+	if got := renderMenus(SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil)); got != want {
+		t.Errorf("nil committed = %q, want legacy %q — an empty prefix must not change the selection", got, want)
+	}
+	if want != "a1,a2 | b1,b2" { // guard the guard: the legacy shape itself is pinned
+		t.Errorf("legacy baseline drifted: %q", want)
 	}
 }

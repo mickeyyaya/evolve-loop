@@ -496,7 +496,10 @@ func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 	// (phases/triage) also runs on the zero-value Config, so the compiled
 	// default IS the batching cap's single source today — if MaxItems ever
 	// gets policy-wired, thread the same resolved value here.
-	menus := triagecap.SelectWaveSeedMenus(evolveDir, count, inboxbatch.DefaultMaxItems, guards.IsProtectedSurface)
+	// nil committed prefix: this seed path builds a wave from the inbox alone
+	// (the committed-decision path goes through widenNarrowDecision, which
+	// already widens via WidenTopNToFleetWidth).
+	menus := triagecap.SelectWaveSeedMenus(evolveDir, nil, count, inboxbatch.DefaultMaxItems, guards.IsProtectedSurface)
 	if len(menus) < 2 {
 		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(menus))
 	}

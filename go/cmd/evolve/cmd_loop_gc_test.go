@@ -135,10 +135,13 @@ func TestGCShadow(t *testing.T) {
 	}
 }
 
-// TestGCOff: off mode (and unset) writes no manifest and touches nothing.
+// TestGCOff: an EXPLICIT off mode writes no manifest and touches nothing.
+// (Cycle 1159 / workspace-hygiene S5: an ABSENT gc.mode no longer means off —
+// it now resolves to shadow, pinned by TestRunGCHook_DefaultModeIsShadow. Only
+// an operator's explicit "off" disables the hook, so this test sets it.)
 func TestGCOff(t *testing.T) {
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
-	// policy.json has no gc.mode → defaults to "off"
+	gcSetMode(t, evolveDir, "off")
 
 	cfg := loopConfig{EvolveDir: evolveDir, ProjectRoot: filepath.Dir(evolveDir)}
 	var buf bytes.Buffer
