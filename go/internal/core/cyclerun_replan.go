@@ -97,6 +97,15 @@ func (cr *cycleRun) postScoutReplan() {
 	// Increment ONLY on a successful dispatch (we passed the < maxDepth check
 	// above): a nil/error re-plan is fail-open and must NOT consume a depth slot.
 	cr.replanDepth++
+	// WS2-S2 parity with the upfront plan (cyclerun.go): record the structural
+	// validation of the RAW re-plan — pre-clamp, so the advisor's INTENT is what
+	// gets recorded. Validating the clamped plan would record nothing, since the
+	// clamp has already dropped the unknown phase; a re-plan that hallucinates a
+	// phase would then be dropped silently, with no forensic trail — exactly the
+	// failure dropUnknownPhases (floor.go) exists to make visible. Report-only:
+	// the clamp below remains the sole disposer. Keyed by depth so each re-plan
+	// under RePlanMaxDepth>1 keeps its own record.
+	cr.o.recordPlanRejectionsKind(cr.ctx, cr.cycle, cr.cs, router.ValidatePlan(in, raw), fmt.Sprintf("replan-%d", cr.replanDepth))
 	clamped, clamps := router.ClampPlanToFloorWith(in, raw, cr.o.resolvedShipFloor(), cr.cs.IntentRequired)
 	cr.o.recordPhasePlanKind(cr.ctx, cr.cycle, cr.cs, clamped, clamps, "replan")
 

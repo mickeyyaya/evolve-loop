@@ -322,9 +322,30 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 // The artifact is hash-bound into the ledger like every sibling decision
 // artifact (recordPhasePlan / recordRoutingDecision), so a post-hoc mutation is
 // tamper-evident — "standalone" means a separate file, not outside the chain.
+//
+// This is the back-compat entry point (kind "plan" → advisor-rejections.json);
+// the post-scout re-plan records via recordPlanRejectionsKind with "replan-<n>".
 func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection) {
+	o.recordPlanRejectionsKind(ctx, cycle, cs, rejections, "plan")
+}
+
+// recordPlanRejectionsKind is recordPlanRejections keyed by PLAN KIND, so the
+// several plans a single cycle can produce (the upfront "plan" plus one
+// "replan-<n>" per post-scout re-plan, up to RePlanMaxDepth) each keep their own
+// record instead of the last writer erasing the rest. Kind "plan" keeps the
+// historical path (advisor-rejections.json); every other kind lands beside it as
+// advisor-rejections-<kind>.json — the same one-artifact-per-decision shape
+// recordPhasePlanKind uses for phase-<kind>.json, so accumulation needs no
+// read-modify-write of a shared file (no lost update under concurrent cycles).
+// The ledger kind stays "plan_rejections" for all kinds; ArtifactPath is what
+// distinguishes them, so existing ledger consumers keep matching.
+func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection, kind string) {
 	if cs.WorkspacePath == "" {
 		return
+	}
+	name := "advisor-rejections.json"
+	if kind != "" && kind != "plan" {
+		name = "advisor-rejections-" + kind + ".json"
 	}
 	if rejections == nil {
 		rejections = []router.PlanRejection{}
@@ -334,7 +355,7 @@ func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs C
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections marshal (cycle %d): %v\n", cycle, err)
 		return
 	}
-	artifactPath := filepath.Join(cs.WorkspacePath, "advisor-rejections.json")
+	artifactPath := filepath.Join(cs.WorkspacePath, name)
 	sha := ""
 	if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections mkdir: %v\n", err)
