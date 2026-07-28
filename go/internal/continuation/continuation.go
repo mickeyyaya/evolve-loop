@@ -26,7 +26,7 @@ type Continuation struct {
 	Branch       string `json:"branch"`        // cycle branch carrying the snapshot commit
 	SnapshotSHA  string `json:"snapshot_sha"`  // immutable ref of the preserved work
 	BaseSHA      string `json:"base_sha"`      // main-ancestor base the work builds on
-	FindingsPath string `json:"findings_path"` // failure-digest artifact (project-root relative; read tolerantly)
+	FindingsPath string `json:"findings_path"` // the failed attempt's REASON artifact (audit-fail-reason.json — content the next builder can act on, never the content-free digest shell; read tolerantly)
 	Cycle        int    `json:"cycle"`         // FAILed cycle that produced it
 }
 
