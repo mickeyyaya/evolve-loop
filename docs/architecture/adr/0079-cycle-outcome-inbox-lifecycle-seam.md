@@ -86,6 +86,50 @@ still covers the case it was written for, and only that case.
   relying on the blanket ship.sh exit-0 contract for that specific failure will
   see the failure it was previously swallowing.
 
+## Accepted risk — `ClaimLaneScope` mutates the shared inbox root
+
+Decision 3 explains why the claim happens at outcome time. It did not state what
+that placement costs, and the cycle-1156 audit (D4) was right to ask.
+
+**The exposure.** `ClaimLaneScope` is called from a *per-lane* closeout path, but
+it moves files out of the *shared* `.evolve/inbox/` root — the same root every
+sibling lane's triage reads, with no lane isolation (`inboxbatch.LoadDir` on the
+root only, `triage.go:113`). At the standing fleet width of 3 those lanes are
+live concurrently, so a sibling lane whose triage runs while a FAILing lane's
+claim is in flight can **miss** an item that is momentarily in
+`processing/cycle-N/` rather than at the root. The blast radius is one item, for
+one sibling cycle: the item is not lost, not double-worked, and not corrupted —
+it is invisible to one triage pass.
+
+**Why it is accepted rather than guarded.** The two bounding mechanisms below
+already cap the window at one cycle and make the concurrent case non-destructive.
+Closing it fully means a lock (or a lane-aware root reader) around a
+self-healing, single-cycle, single-item window — new cross-lane locking on the
+hot inbox path, whose own failure modes (a stale lock stranding the whole fleet)
+are worse than the miss it prevents. The audit offered "acknowledge (accepted
+risk) or guard"; this is the acknowledgement.
+
+**Bound 1 — the residual drain self-heals it.** `ApplyCycleOutcome` always drains
+`processing/cycle-N/` back to the inbox root at cycle end, on PASS and on FAIL
+alike, and a residual claim released on PASS accrues no `failure_count`. The miss
+window therefore closes after **one** cycle without operator action; it cannot
+accumulate into a permanently invisible item.
+
+**Bound 2 — the dest-exists double-move guard.** The drain skips an item whose
+destination already exists at the root (`inboxmover.go:706-710`) instead of
+renaming over it, so a concurrent release that already landed the root copy is
+never clobbered by a second lane's drain. The concurrent case degrades to a
+no-op, not to data loss.
+
+**Re-evaluate if** the fleet width grows well past 3, triage learns to read
+`processing/` (which would remove the exposure outright), or the drain's
+unconditional residual pass stops being unconditional — the first two shrink the
+risk, the third invalidates Bound 1 and reopens this decision.
+
+Pinned by `go/acs/cycle1160/predicates_test.go` predicates 004 (this text names
+the mechanism and both bounds) and 005 (the code still behaves the way this text
+describes), so the prose and the behaviour cannot drift apart silently.
+
 ## Verification
 
 `go/acs/cycle1156/predicates_test.go` — 8 predicates asserting the filesystem

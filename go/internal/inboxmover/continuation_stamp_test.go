@@ -92,7 +92,7 @@ func TestQuarantinePromotion_ShedsContinuationStamp(t *testing.T) {
 	// failure_count 2 + ceiling 3 → the bump inside release reaches 3 and
 	// quarantines. The quarantined item must NOT carry a stamp.
 	opts, cycle, _ := stampFixture(t, true, 2)
-	if _, err := ReleaseCycleProcessingWithQuarantine(opts, cycle, "cycle-failure-release", 3, false); err != nil {
+	if _, err := failDrain(opts, cycle, 3, false); err != nil {
 		t.Fatalf("release: %v", err)
 	}
 	quarPath := filepath.Join(opts.ProjectRoot, ".evolve", "inbox", "quarantine", "task-a.json")

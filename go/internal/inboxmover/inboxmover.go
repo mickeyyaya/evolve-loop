@@ -617,31 +617,33 @@ type quarantinePolicy struct {
 
 	// committed restricts the failure_count bump (and therefore quarantine) to
 	// the ids triage actually COMMITTED to the cycle. A nil map means "every
-	// item in the drain" — the legacy whole-dir behavior that
-	// ReleaseCycleProcessingWithQuarantine keeps. Wave lanes claim a whole menu
-	// but work only the committed subset, so bumping the whole dir would
-	// quarantine healthy backlog after N failures of an unrelated task
+	// item in the drain" — the legacy whole-dir behavior, which an outcome with
+	// no committed ids still selects. Wave lanes claim a whole menu but work
+	// only the committed subset, so bumping the whole dir would quarantine
+	// healthy backlog after N failures of an unrelated task
 	// (wave-lane-task-quarantine-dead, menu semantics).
 	committed map[string]bool
 }
 
-// ReleaseCycleProcessingWithQuarantine is the ADR-0072 S5 failure-drain: it
-// releases processing/cycle-<cycle>/ like ReleaseCycleProcessingWithReason but
-// first increments each item's durable task-level failure_count — the single
-// source of truth that replaces the dead cyclestate.CyclesUnpicked counter —
-// and, once that count reaches `ceiling` on a task-level failure (systemLevel
-// false, honoring S3 precedence), routes the item to .evolve/inbox/quarantine/
-// instead of back to the inbox root, so a poison todo stops being re-picked
-// every cycle. Fail-open end to end: any per-item read/write error falls back
-// to a normal release so a bookkeeping fault never strands nor wrongly
-// quarantines an item. A ceiling <= 0 is exactly ReleaseCycleProcessingWithReason.
-func ReleaseCycleProcessingWithQuarantine(opts Options, cycle int, reason string, ceiling int, systemLevel bool) (RecoverResult, error) {
-	return releaseCycleProcessing(opts, cycle, reason, &quarantinePolicy{ceiling: ceiling, systemLevel: systemLevel})
-}
-
-// releaseCycleProcessing is the shared drain core. quar==nil is the plain
-// release-to-root behavior; a non-nil quar applies the S5 quarantine decision
-// per item before falling back to the release.
+// releaseCycleProcessing is the shared drain core. It is the ADR-0072 S5
+// failure-drain when quar is non-nil: it releases processing/cycle-<cycle>/
+// like ReleaseCycleProcessingWithReason but first increments each item's
+// durable task-level failure_count — the single source of truth that replaces
+// the dead cyclestate.CyclesUnpicked counter — and, once that count reaches
+// quar.ceiling on a task-level failure (systemLevel false, honoring S3
+// precedence), routes the item to .evolve/inbox/quarantine/ instead of back to
+// the inbox root, so a poison todo stops being re-picked every cycle.
+// Fail-open end to end: any per-item read/write error falls back to a normal
+// release so a bookkeeping fault never strands nor wrongly quarantines an item.
+// A ceiling <= 0 is exactly ReleaseCycleProcessingWithReason.
+//
+// It stays UNEXPORTED on purpose (audit D3): ApplyCycleOutcome is the one
+// public door into the cycle-outcome lifecycle, so the PASS-promote and
+// FAIL-bump halves cannot drift apart behind a second entry point
+// (never_duplicate_centralize).
+//
+// quar==nil is the plain release-to-root behavior; a non-nil quar applies the
+// S5 quarantine decision per item before falling back to the release.
 func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
 	if reason == "" {
 		reason = "cycle-release"

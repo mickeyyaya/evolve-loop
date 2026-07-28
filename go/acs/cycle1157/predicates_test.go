@@ -277,10 +277,17 @@ func TestC1157_003_quarantine_promote_failure_is_surfaced(t *testing.T) {
 	blockDir(t, filepath.Join(inbox, "quarantine"))
 
 	var errBuf bytes.Buffer
-	res, err := inboxmover.ReleaseCycleProcessingWithQuarantine(
-		testOpts(root, &errBuf), 1157, "cycle-failure-release", 2, false)
+	// No CommittedIDs: the whole-dir drain, which is what the retired
+	// ReleaseCycleProcessingWithQuarantine wrapper did (audit D3 retired the
+	// wrapper; ApplyCycleOutcome's FAIL path is the one public door now).
+	res, err := inboxmover.ApplyCycleOutcome(testOpts(root, &errBuf), inboxmover.CycleOutcome{
+		Cycle:   1157,
+		Passed:  false,
+		Reason:  "cycle-failure-release",
+		Ceiling: 2,
+	})
 	if err != nil {
-		t.Fatalf("ReleaseCycleProcessingWithQuarantine err = %v; the drain stays fail-open — the failed quarantine is reported, not raised", err)
+		t.Fatalf("ApplyCycleOutcome(FAIL) err = %v; the drain stays fail-open — the failed quarantine is reported, not raised", err)
 	}
 
 	stderr := errBuf.String()
@@ -293,7 +300,7 @@ func TestC1157_003_quarantine_promote_failure_is_surfaced(t *testing.T) {
 	}
 	// Fail-open half: the item must still have been released, not stranded.
 	if findItem(t, inbox, "poison-task") == "" {
-		t.Errorf("poison-task is no longer at the inbox root after the failed quarantine (Recovered=%d): the drain must stay fail-open, a loud failure must not also strand the item in processing/", res.Recovered)
+		t.Errorf("poison-task is no longer at the inbox root after the failed quarantine (released=%v, quarantined=%v): the drain must stay fail-open, a loud failure must not also strand the item in processing/", res.Released, res.Quarantined)
 	}
 	if findItem(t, filepath.Join(inbox, "processing", "cycle-1157"), "poison-task") != "" {
 		t.Error("poison-task left behind in processing/cycle-1157/: the failed quarantine must fall through to the ordinary release")
@@ -310,9 +317,13 @@ func TestC1157_004_successful_quarantine_emits_no_failure_diagnostic(t *testing.
 	// No blockDir: inbox/quarantine/ is creatable, so the promote succeeds.
 
 	var errBuf bytes.Buffer
-	if _, err := inboxmover.ReleaseCycleProcessingWithQuarantine(
-		testOpts(root, &errBuf), 1157, "cycle-failure-release", 2, false); err != nil {
-		t.Fatalf("ReleaseCycleProcessingWithQuarantine: %v", err)
+	if _, err := inboxmover.ApplyCycleOutcome(testOpts(root, &errBuf), inboxmover.CycleOutcome{
+		Cycle:   1157,
+		Passed:  false,
+		Reason:  "cycle-failure-release",
+		Ceiling: 2,
+	}); err != nil {
+		t.Fatalf("ApplyCycleOutcome(FAIL): %v", err)
 	}
 
 	if findItem(t, filepath.Join(inbox, "quarantine"), "poison-task") == "" {

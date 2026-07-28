@@ -21,8 +21,8 @@
 //   - PASS side (menu-pass-promotes-committed-ids): promotion is agent-driven, so
 //     cycle-1147 shipped three menu items in one commit and promoted NONE of them
 //     — processed/cycle-1147/ is empty and all three re-entered the backlog.
-//   - FAIL side (wave-lane-task-quarantine-dead): ReleaseCycleProcessingWithQuarantine
-//     (inboxmover.go:621) is the only bumpFailureCount caller and it walks ONLY
+//   - FAIL side (wave-lane-task-quarantine-dead): the failure drain is the only
+//     bumpFailureCount caller and it walks ONLY
 //     processing/cycle-N/. Wave lanes never claim their ids into processing/, so
 //     the ADR-0072 S5 retry ceiling is structurally unreachable for fleet work
 //     (batch-14: four FAILs, failure_count never incremented).
@@ -40,7 +40,6 @@
 //	    Cycle        int      // cycle number
 //	    Passed       bool     // true = PASS (promote), false = FAIL (bump/quarantine)
 //	    CommittedIDs []string // triage-decision.json `## top_n` — the worked set
-//	    LaneIDs      []string // full lane/menu scope (superset; may be nil)
 //	    CommitSHA    string   // ship SHA, PASS only ("" = no SHA prefix)
 //	    Reason       string   // ledger reason ("" = default)
 //	    Ceiling      int      // FailureThresholds.TaskRetryCeiling (FAIL only)
@@ -345,8 +344,8 @@ func TestC1156_004_lane_scope_claim_moves_menu_ids_to_processing(t *testing.T) {
 // neither bump nor quarantine".
 //
 // The second half is the anti-overcorrection axis: claiming the whole menu at
-// dispatch and then bumping everything in processing/cycle-N/ (what
-// ReleaseCycleProcessingWithQuarantine does today) would punish items no phase
+// dispatch and then bumping everything in processing/cycle-N/ (the legacy
+// whole-dir drain behaviour) would punish items no phase
 // ever worked, quarantining healthy backlog after N unrelated lane failures.
 func TestC1156_005_failed_cycle_bumps_only_committed_ids(t *testing.T) {
 	root, inbox := newInbox(t)
@@ -358,7 +357,6 @@ func TestC1156_005_failed_cycle_bumps_only_committed_ids(t *testing.T) {
 		Cycle:        1156,
 		Passed:       false,
 		CommittedIDs: []string{"committed-item"},
-		LaneIDs:      []string{"committed-item", "menu-only-item"},
 		Reason:       "cycle-failure-release",
 		Ceiling:      2,
 	}); err != nil {
@@ -395,7 +393,6 @@ func TestC1156_006_committed_id_quarantines_at_ceiling(t *testing.T) {
 		Cycle:        1156,
 		Passed:       false,
 		CommittedIDs: []string{"poison-item"},
-		LaneIDs:      []string{"poison-item", "menu-only-item"},
 		Reason:       "cycle-failure-release",
 		Ceiling:      2,
 	}); err != nil {
@@ -458,7 +455,6 @@ func TestC1156_007_passing_cycle_promotes_exactly_committed_ids(t *testing.T) {
 		Cycle:        1156,
 		Passed:       true,
 		CommittedIDs: []string{"shipped-a", "shipped-b"},
-		LaneIDs:      []string{"shipped-a", "shipped-b", "menu-only-item"},
 		CommitSHA:    "77dfdbc9aa11bb22",
 	}); err != nil {
 		t.Fatalf("ApplyCycleOutcome(PASS) returned error: %v", err)

@@ -87,7 +87,7 @@ type CarryoverTodo struct {
 	// never incremented in the real cycle-failure path — a dead field. The
 	// single source of truth for per-task failure memory is now the inbox item
 	// JSON's own "failure_count", bumped and consulted by
-	// inboxmover.ReleaseCycleProcessingWithQuarantine. Kept for wire-compat with
+	// inboxmover.ApplyCycleOutcome's FAIL drain. Kept for wire-compat with
 	// existing state.json blobs; do not add new reads.
 	CyclesUnpicked int `json:"cycles_unpicked"`
 	// ExpiresAt (RFC3339) is the TTL stamp inherited from the FailedRecord that

@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+// failDrain runs the ADR-0072 S5 failure drain over processing/cycle-<cycle>/
+// through the ONE public lifecycle door, ApplyCycleOutcome. Audit D3 retired
+// the ReleaseCycleProcessingWithQuarantine wrapper these tests used to call: it
+// had no production caller, so it was a second entry point into a lifecycle
+// ApplyCycleOutcome owns. Leaving CommittedIDs nil selects the same whole-dir
+// bump the wrapper performed, so these assertions cover the identical path.
+func failDrain(opts Options, cycle, ceiling int, systemLevel bool) (OutcomeResult, error) {
+	return ApplyCycleOutcome(opts, CycleOutcome{
+		Cycle:       cycle,
+		Passed:      false,
+		Reason:      "cycle-failure-release",
+		Ceiling:     ceiling,
+		SystemLevel: systemLevel,
+	})
+}
+
 // writeProcItem drops a minimal item into processing/cycle-<cycle>/.
 func writeProcItem(t *testing.T, inbox, cycle, id string) {
 	t.Helper()
@@ -43,12 +59,12 @@ func TestReleaseWithQuarantine_BelowCeilingReleasesAndCounts(t *testing.T) {
 	writeProcItem(t, inbox, "5", "task-a")
 
 	opts := Options{ProjectRoot: root}
-	res, err := ReleaseCycleProcessingWithQuarantine(opts, 5, "cycle-failure-release", 2, false)
+	res, err := failDrain(opts, 5, 2, false)
 	if err != nil {
 		t.Fatalf("release: %v", err)
 	}
-	if res.Recovered != 1 {
-		t.Fatalf("Recovered = %d; want 1", res.Recovered)
+	if len(res.Released) != 1 {
+		t.Fatalf("Released = %v; want exactly 1 item back at the inbox root", res.Released)
 	}
 	rootItem := filepath.Join(inbox, "task-a.json")
 	if _, err := os.Stat(rootItem); err != nil {
@@ -71,7 +87,7 @@ func TestReleaseWithQuarantine_AtCeilingQuarantines(t *testing.T) {
 
 	// First failure (count→1): released to root, below ceiling 2.
 	writeProcItem(t, inbox, "5", "poison")
-	if _, err := ReleaseCycleProcessingWithQuarantine(opts, 5, "cycle-failure-release", 2, false); err != nil {
+	if _, err := failDrain(opts, 5, 2, false); err != nil {
 		t.Fatal(err)
 	}
 	// Re-claim for the next cycle: move root item into processing/cycle-6/.
@@ -82,7 +98,7 @@ func TestReleaseWithQuarantine_AtCeilingQuarantines(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Second failure (count→2): hits ceiling, quarantines.
-	if _, err := ReleaseCycleProcessingWithQuarantine(opts, 6, "cycle-failure-release", 2, false); err != nil {
+	if _, err := failDrain(opts, 6, 2, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +126,7 @@ func TestReleaseWithQuarantine_SystemLevelNeverQuarantines(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts := Options{ProjectRoot: root}
-	if _, err := ReleaseCycleProcessingWithQuarantine(opts, 5, "cycle-failure-release", 2, true); err != nil {
+	if _, err := failDrain(opts, 5, 2, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(inbox, "sys-task.json")); err != nil {

@@ -9,12 +9,11 @@ package inboxmover
 //     menu items in ONE commit and promoted none of them — processed/cycle-1147/
 //     was empty and all three re-entered the very next triage
 //     (menu-pass-promotes-committed-ids).
-//   - FAIL side: ReleaseCycleProcessingWithQuarantine is the only
-//     bumpFailureCount caller and it walks ONLY processing/cycle-N/. Nothing
-//     ever put a wave lane's worked ids there, so the ADR-0072 S5 retry ceiling
-//     was structurally unreachable for fleet work — batch-14 burned four FAILs
-//     on the same items with failure_count never leaving 0
-//     (wave-lane-task-quarantine-dead).
+//   - FAIL side: the drain that bumps failure_count walks ONLY
+//     processing/cycle-N/. Nothing ever put a wave lane's worked ids there, so
+//     the ADR-0072 S5 retry ceiling was structurally unreachable for fleet work
+//     — batch-14 burned four FAILs on the same items with failure_count never
+//     leaving 0 (wave-lane-task-quarantine-dead).
 //
 // ApplyCycleOutcome is the one entry point both closeout paths now call, so the
 // PASS-promote and FAIL-bump halves cannot drift apart again
@@ -35,7 +34,6 @@ type CycleOutcome struct {
 	Cycle        int      // cycle number
 	Passed       bool     // true = PASS (promote committed ids), false = FAIL (bump/quarantine)
 	CommittedIDs []string // triage-decision.json top_n/skip_shipped — the WORKED set
-	LaneIDs      []string // full lane/menu scope (superset; may be nil)
 	CommitSHA    string   // ship SHA, PASS only ("" = no SHA prefix)
 	Reason       string   // ledger reason ("" = default)
 	Ceiling      int      // FailureThresholds.TaskRetryCeiling (FAIL only; <=0 disables quarantine)
