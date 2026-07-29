@@ -9,7 +9,12 @@ import (
 
 func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 	loader := NewFromDir(realProfilesDir(t))
-	for _, name := range []string{"router", "triage", "retrospective", "adversarial-review"} {
+	// adversarial-review left this set 2026-07-29: agy ignored the phase's
+	// deliverable contract 7/7 times across correction re-dispatches (its own
+	// report format, no machine verdict line), which demoted the contract
+	// gate enforce→advisory in BOTH batch-18 wave-1 lanes — a gate-weakening
+	// outcome. See TestAdversarialReviewRoutesToClaudeDeep below.
+	for _, name := range []string{"router", "triage", "retrospective"} {
 		t.Run(name, func(t *testing.T) {
 			p, err := loader.Get(name)
 			if err != nil {
@@ -22,6 +27,29 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 				t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 			}
 		})
+	}
+}
+
+// TestAdversarialReviewRoutesToClaudeDeep pins the 2026-07-29 reroute: the
+// adversarial reviewer is a review-class phase (auditor / plan-reviewer /
+// premise-challenge house pattern — claude at deep) and its deliverable
+// contract requires exact section + machine-verdict compliance that agy did
+// not honor under correction (cycles 1171/1172, 7/7 blocks, circuit opened).
+// Contract-gate CLI-escalation is queued (contract-block-cli-escalation);
+// until it lands, the primary CLI must be the format-compliant one.
+func TestAdversarialReviewRoutesToClaudeDeep(t *testing.T) {
+	p, err := NewFromDir(realProfilesDir(t)).Get("adversarial-review")
+	if err != nil {
+		t.Fatalf("load profile: %v", err)
+	}
+	if p.CLI != "claude-tmux" {
+		t.Fatalf("CLI=%q, want claude-tmux (the contract-compliant reviewer)", p.CLI)
+	}
+	if len(p.CLIFallback) != 0 {
+		t.Fatalf("CLIFallback=%v, want [] (agy is banned from fallback; claude is already primary)", p.CLIFallback)
+	}
+	if p.ModelTierDefault != "deep" {
+		t.Fatalf("ModelTierDefault=%q, want deep (adversarial work is opus-class)", p.ModelTierDefault)
 	}
 }
 
