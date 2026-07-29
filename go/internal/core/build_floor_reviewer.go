@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
 // BuildFloorCheckFn runs the deterministic build-floor checks for a completed
@@ -321,6 +322,15 @@ const (
 // defense-in-depth so one hung package cannot wedge the whole check beyond
 // the ambient ctx.
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
+	// ADR-0080 P1: the coverage run doubles as the enforced packages'
+	// selfcheck — a full go-test execution, host-wide single-flight for the
+	// same reason as the EGPS suite (batch-16 contention false-reds). A lock
+	// failure degrades to unserialized, never to skipped verification.
+	if release, lerr := verifylock.Acquire(ctx, filepath.Dir(moduleDir), os.Stderr); lerr == nil {
+		defer release()
+	} else {
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: verification single-flight unavailable (%v) — running unserialized\n", lerr)
+	}
 	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
 	if err != nil {
 		return "", err.Error(), coverStatusPlumbingError

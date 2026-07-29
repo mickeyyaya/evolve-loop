@@ -944,6 +944,22 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.ContinuedFailures++
 			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
+			// ADR-0080 P2: graded task-level FAILs bump the committed ids'
+			// durable failure_count where they live (inbox root) and
+			// quarantine at the ADR-0072 ceiling — the release-path
+			// accounting never fires for wave lanes (no processing/ claim),
+			// which is how 12-attempt grinds ran with failure_count 0.
+			// System-level classes are not the task's fault (AC4) and skip.
+			wsp := cycleWorkspace(cfg.ProjectRoot, ranCycle)
+			if isTaskLevelFailure(cycleclassify.Classify(wsp).Class) {
+				failPol := policy.DefaultSystemFailurePolicy()
+				if pol, polErr := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); polErr == nil {
+					if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
+						failPol = fp
+					}
+				}
+				recordCommittedFailures(cfg.ProjectRoot, wsp, ranCycle, failPol.Thresholds.TaskRetryCeiling, stderr)
+			}
 		}
 
 		// Goal-stall escalation: an empty/blocked cycle shipped nothing and left

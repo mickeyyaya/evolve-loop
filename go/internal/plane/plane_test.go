@@ -186,3 +186,13 @@ func TestCommonGitDir_WalksCommondir(t *testing.T) {
 		t.Fatalf("primary common dir = %q, want its own .git %q", pcommon, pinfo.GitDir)
 	}
 }
+
+// TestConsoleLeaseFileName_IsTheSingleSharedName freezes the const's VALUE
+// (renaming it orphans every existing hub lease). It does not prove call
+// sites reference the const — that is the compiler's job once both packages
+// import it.
+func TestConsoleLeaseFileName_IsTheSingleSharedName(t *testing.T) {
+	if ConsoleLeaseFileName != "evolve-console-lease.json" {
+		t.Fatalf("ConsoleLeaseFileName = %q — renaming it orphans existing hub leases; coordinate reader+writer+docs", ConsoleLeaseFileName)
+	}
+}

@@ -35,6 +35,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
 // DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
@@ -42,6 +43,11 @@ const DefaultTimeout = 60 * time.Second
 
 // evidenceMax caps the captured output excerpt per predicate.
 const evidenceMax = 600
+
+// maxLockWait bounds the single-flight queue wait: generous enough for a
+// full sibling suite run, finite so a wedged holder degrades this lane to
+// unserialized instead of deadlocking the fleet.
+const maxLockWait = 15 * time.Minute
 
 // SkipExitCode is the TAP/automake SKIP convention: a predicate exiting 77
 // declares its evidence absent / not-applicable on this clone. It is counted
@@ -157,6 +163,26 @@ func Run(opts Options) (Verdict, error) {
 
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle}
 
+	// ADR-0080 P1: the suite execution is host-wide SINGLE-FLIGHT. Fleet
+	// lanes are separate processes each shelling full package suites; run
+	// concurrently they oversubscribe the host and turn long suites into
+	// false reds (batch-16: TouchedPackagesStayGreen red on 1166/1167/1169,
+	// green in the preserved worktree — an identical-fingerprint halt over
+	// infrastructure). Blocking is bounded by the caller's lifetime only:
+	// verification MUST run, serialized, never skipped.
+	// Bounded wait (review HIGH): a wedged HOLDER must degrade this lane to
+	// unserialized (WARN below), never deadlock the fleet — the whole degrade
+	// path exists for exactly that, and an unbounded Background ctx made it
+	// unreachable.
+	lockCtx, lockCancel := context.WithTimeout(context.Background(), maxLockWait)
+	defer lockCancel()
+	release, lockErr := verifylock.Acquire(lockCtx, opts.Root, os.Stderr)
+	if lockErr != nil {
+		fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable (%v) — running unserialized\n", lockErr)
+	} else {
+		defer release()
+	}
+
 	goResults, gErr := runGoTest(opts)
 	if gErr != nil {
 		return Verdict{}, gErr
@@ -253,6 +279,13 @@ func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []stri
 	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
 	cmd.Dir = moduleDir
 	cmd.Env = env
+	// WaitDelay (review HIGH): CommandContext kills the direct `go` process,
+	// not test-binary grandchildren — and meta-predicates shell inner go-test
+	// runs. Without a delay a surviving grandchild pins CombinedOutput's pipe
+	// past ctx expiry, the lane never returns, and (single-flight) the held
+	// lock starves every other lane. Same discipline as the sandbox and fleet
+	// launchers.
+	cmd.WaitDelay = 30 * time.Second
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
