@@ -1,0 +1,25 @@
+{
+  "cycle": 1202,
+  "run_id": "01KYQK47V2MHZBT5YPT9FQ2HWW",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "WARN",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "WARN",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "debugger",
+      "reason": "FAIL"
+    }
+  ]
+}
