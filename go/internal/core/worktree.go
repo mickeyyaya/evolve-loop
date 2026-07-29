@@ -94,12 +94,62 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle. The
 	// name equals the lane-namespaced directory leaf (runscope).
 	branch := rs.CycleBranch()
-	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, "HEAD")
+	// Base the lane on the CURRENT upstream tip, not this checkout's local HEAD
+	// (resolved only on the create path — reuse above must never re-base a live
+	// lane, which would discard in-progress work).
+	startRef, err := laneStartRef(context.Background(), projectRoot)
+	if err != nil {
+		return "", fmt.Errorf("worktree base ref (cycle %d): %w", cycle, err)
+	}
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
 	if err != nil || code != 0 {
-		return "", fmt.Errorf("git worktree add -B %s %s: rc=%d err=%v: %s", branch, wt, code, err, stderr)
+		return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
 	}
 	linkGuardDeps(wt, projectRoot, cycle)
 	return wt, nil
+}
+
+// laneStartRef resolves the ref a FRESH lane branch is cut from.
+//
+// Basing on the local HEAD of projectRoot is the defect this closes: in a
+// multi-lane fleet the shared checkout drifts behind the remote as sibling
+// lanes land, so every lane provisioned afterwards silently forks from a stale
+// tip — re-introducing already-fixed defects and inflating ship-time merge
+// conflicts. Contract:
+//
+//   - origin configured  → fetch it in projectRoot (the shared object store the
+//     new worktree is cut from) and cut from origin/<default-branch>.
+//   - fetch fails        → FATAL (rule 12). A best-effort fetch that continues
+//     from the stale local tip IS the defect, not the fix, so the error is
+//     returned and nothing is provisioned.
+//   - no origin at all   → "HEAD", the explicit local-only fallback for
+//     isolated checkouts and test fixtures, which must not break.
+func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
+	git := gitexec.Git{Dir: projectRoot, Exec: gitRunner}
+	url, _, code, err := git.Capture(ctx, "config", "--get", "remote.origin.url")
+	if err != nil || code != 0 || strings.TrimSpace(url) == "" {
+		return "HEAD", nil // remoteless repo — documented fallback
+	}
+	if _, stderr, code, err := git.Capture(ctx, "fetch", "origin"); err != nil || code != 0 {
+		return "", fmt.Errorf("git fetch origin: rc=%d err=%v: %s", code, err, strings.TrimSpace(stderr))
+	}
+	return "origin/" + originDefaultBranch(ctx, git), nil
+}
+
+// originDefaultBranch reads the remote's published default branch from
+// refs/remotes/origin/HEAD (set by clone / `git remote set-head`). That ref is
+// absent in some checkouts, so "main" is the documented floor — if the guess is
+// wrong, `worktree add` fails loudly on the unknown ref rather than silently
+// falling back to the stale local tip.
+func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
+	out, _, code, err := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+	if err != nil || code != 0 {
+		return "main"
+	}
+	if b := strings.TrimPrefix(strings.TrimSpace(out), "origin/"); b != "" {
+		return b
+	}
+	return "main"
 }
 
 // CreateFrom provisions the cycle worktree seeded from startRef instead of
