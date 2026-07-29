@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -14,6 +15,26 @@ import (
 
 // cmd_bridge_watch_test.go — TDD tests for `evolve bridge watch`,
 // the read-only live channel feed tail for human debugging.
+
+// lockedBuffer is a bytes.Buffer safe for the follow tests' shape: the follow
+// loop writes from its own goroutine while the test polls String() waiting for
+// the rendered line. Without the mutex that poll is a data race under -race.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
 
 // --- renderFeedLine tests ---
 
@@ -286,17 +307,32 @@ func TestRunBridgeWatchFollow_TailsNewLines(t *testing.T) {
 	ws := t.TempDir()
 	path := channel.FeedPath(ws, "scout")
 	os.WriteFile(path, []byte(`{"seq":1,"kind":"assistant_text","data":{"text":"first"}}`+"\n"), 0o644)
-	// 200ms is well above 2 poll cycles at 20ms.
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	// The follow loop seeds its start offset from the file size ASYNCHRONOUSLY,
+	// so an append that lands before it is seeded is skipped forever. The old
+	// shape — a fixed 10ms sleep inside a 200ms deadline — lost that race on a
+	// loaded macOS runner and reported a hard failure. Wait on the EVENT (the
+	// rendered line) under a deadline generous enough that scheduler jitter can
+	// never decide the outcome, re-appending each tick until the loop is up.
+	// The happy path still finishes in ~one tick; the deadline is only ever
+	// spent by a genuine regression.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	var out, errb bytes.Buffer
+	out := &lockedBuffer{}
+	var errb bytes.Buffer
 	done := make(chan int, 1)
-	go func() { done <- runBridgeWatchFollow(ctx, &out, &errb, ws, "scout") }()
-	// Let the goroutine seed its offset, then append the new line.
-	time.Sleep(10 * time.Millisecond)
-	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
-	f.WriteString(`{"seq":2,"kind":"assistant_text","data":{"text":"second"}}` + "\n")
-	f.Close()
+	go func() { done <- runBridgeWatchFollow(ctx, out, &errb, ws, "scout") }()
+
+	deadline := time.Now().Add(20 * time.Second)
+	for !strings.Contains(out.String(), "second") && time.Now().Before(deadline) {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatalf("open feed for append: %v", err)
+		}
+		f.WriteString(`{"seq":2,"kind":"assistant_text","data":{"text":"second"}}` + "\n")
+		f.Close()
+		time.Sleep(watchFollowInterval)
+	}
+	cancel()
 	code := <-done
 	if code != 0 {
 		t.Fatalf("exit=%d want 0", code)
@@ -356,16 +392,33 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 	path := channel.FeedPath(ws, "scout")
 	// Seed with one byte so offset starts at 1 (non-zero; forces a seek+read).
 	os.WriteFile(path, []byte("\n"), 0o644)
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	// The follow loop seeds its start offset from the file size ASYNCHRONOUSLY,
+	// so an append that lands before it is seeded is skipped forever. The old
+	// shape — a fixed 10ms sleep inside a 200ms deadline — lost that race on a
+	// loaded macOS runner and reported a hard failure. Wait on the EVENT (the
+	// rendered line) under a deadline generous enough that scheduler jitter can
+	// never decide the outcome, re-appending each tick until the loop is up.
+	// The happy path still finishes in ~one tick; the deadline is only ever
+	// spent by a genuine regression.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	var out, errb bytes.Buffer
+	out := &lockedBuffer{}
+	var errb bytes.Buffer
 	done := make(chan int, 1)
-	go func() { done <- runBridgeWatchFollow(ctx, &out, &errb, ws, "scout") }()
-	time.Sleep(10 * time.Millisecond)
-	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
-	// Append: one empty line, one malformed JSON line, one valid line.
-	f.WriteString("\nnot-json\n" + `{"seq":5,"kind":"ping"}` + "\n")
-	f.Close()
+	go func() { done <- runBridgeWatchFollow(ctx, out, &errb, ws, "scout") }()
+
+	deadline := time.Now().Add(20 * time.Second)
+	for !strings.Contains(out.String(), "ping") && time.Now().Before(deadline) {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Fatalf("open feed for append: %v", err)
+		}
+		// Append: one empty line, one malformed JSON line, one valid line.
+		f.WriteString("\nnot-json\n" + `{"seq":5,"kind":"ping"}` + "\n")
+		f.Close()
+		time.Sleep(watchFollowInterval)
+	}
+	cancel()
 	code := <-done
 	if code != 0 {
 		t.Fatalf("exit=%d want 0", code)
@@ -373,6 +426,10 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 	// Only the valid JSON line should render.
 	if !strings.Contains(out.String(), "ping") {
 		t.Fatalf("expected 'ping' in output, got: %q", out.String())
+	}
+	// The malformed and empty lines must have been skipped, not rendered.
+	if strings.Contains(out.String(), "not-json") {
+		t.Fatalf("malformed line leaked into output: %q", out.String())
 	}
 }
 

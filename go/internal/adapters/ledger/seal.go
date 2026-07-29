@@ -283,7 +283,7 @@ func (l *FileLedger) VerifyDeep(_ context.Context) error {
 	}
 	full = append(full, liveLines...)
 
-	lastSeq, lastSha, sawV837, err := walkChain(full, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(full, effectiveAnchorSHA(full, l.loadAnchorSHA()))
 	if err != nil {
 		return err
 	}

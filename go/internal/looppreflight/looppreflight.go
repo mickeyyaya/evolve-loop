@@ -351,6 +351,7 @@ func Run(opts Options) (Result, error) {
 	}
 	checks := []CheckResult{
 		checkPipelineStructure(o),
+		checkBaseDivergence(o),
 		checkLLMCLIStatus(o),
 		checkHostCapabilities(o),
 		checkCLIVersionFreeze(o),

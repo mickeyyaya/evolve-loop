@@ -184,7 +184,7 @@ func (l *FileLedger) Verify(_ context.Context) error {
 		return nil
 	}
 
-	lastSeq, lastSha, sawV837, err := walkChain(lines, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(lines, effectiveAnchorSHA(lines, l.loadAnchorSHA()))
 	if err != nil {
 		return err
 	}

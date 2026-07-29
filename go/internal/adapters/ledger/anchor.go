@@ -20,8 +20,104 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
+
+// resetSealKindPrefix is the Kind prefix of an IN-BAND epoch anchor: an
+// operator entry the chain itself carries (e.g. `reset-seal-cycle1189`).
+//
+// It exists alongside the out-of-band ledger-anchor.json because the two
+// answer different operational needs. The JSON anchor is a one-off remedy an
+// operator records ABOUT a line that already exists (`evolve ledger anchor
+// <seq>`); the in-band seal is written AS the chain moves on, so a recovery
+// that resumes the chain leaves its own sign-off inside the auditable record
+// instead of in a sidecar file that can be lost, copied, or diverge from it.
+// Both mean the same thing to the walk — "history before me is preserved but
+// no longer chain-validated" — so they resolve through one helper and the
+// LATER of the two always wins.
+const resetSealKindPrefix = "reset-seal-"
+
+// operatorRole is the Role an in-band seal must carry. Sealing is a TRUST
+// decision, so a phase agent writing `reset-seal-*` under its own role must
+// not be able to silence Verify. This is also why SealCycle's unattended
+// boot self-heal path (core.SealOptions.AutomatedRecovery, triggered merely
+// by a dead owner PID) writes a DIFFERENT role ("operator-autoseal") rather
+// than this one: without that split, arranging for any owning process to die
+// was enough to mint a trust-anchor-eligible seal with no human ever
+// involved, since Role/CycleLabel are otherwise self-declared fields with no
+// authentication of their own.
+const operatorRole = "operator"
+
+// isOperatorSeal reports whether e is an in-band operator epoch seal.
+//
+// The marker is accepted in EITHER field, because the ledger carries two
+// shapes and only one of them was ever recognised: the PRODUCTION writer
+// (core.SealCycle, go/internal/core/reset.go) emits `kind:"reset"` with the
+// marker in `cycle_label` ("reset-seal-cycle-108"), while the doc-level shape
+// puts it in `kind`. Matching on Kind alone made this resolver inert on every
+// real ledger — unit-green, live-red — so `evolve ledger verify` kept crying
+// wolf on the adjudicated line-1740 damage (cycle-1191). Role is still the
+// authority check: a phase agent cannot silence Verify under its own role.
+func isOperatorSeal(e core.LedgerEntry) bool {
+	if e.Role != operatorRole {
+		return false
+	}
+	return strings.HasPrefix(e.Kind, resetSealKindPrefix) ||
+		strings.HasPrefix(e.CycleLabel, resetSealKindPrefix)
+}
+
+// sealChainsFromPrev is the seal TRUST GUARD: an in-band seal may only move the
+// epoch anchor forward when it is itself hash-valid from its own predecessor.
+//
+// Without it, appending one operator-role `reset-seal-*` line carrying a forged
+// prev_hash would silence verification of the ENTIRE prefix behind it, turning
+// the epoch anchor from a preservation remedy into a chain-integrity bypass. A
+// pre-v8.37 line (no prev_hash key at all) carries no self-proof, so it can
+// never anchor either.
+func sealChainsFromPrev(hasPrev bool, e core.LedgerEntry, prevLineSHA string) bool {
+	if !hasPrev {
+		return false
+	}
+	if prevLineSHA == "" {
+		return e.PrevHash == ZeroSeed // the seal is itself the genesis line
+	}
+	return e.PrevHash == prevLineSHA
+}
+
+// effectiveAnchorSHA resolves the epoch anchor the chain walk should start
+// from: the LAST of (the out-of-band ledger-anchor.json line, any self-valid
+// in-band operator seal at or after it). Returns "" when neither exists, which
+// is full-strict verification.
+//
+// When fileAnchorSHA is set but no line carries it, it is returned unchanged so
+// walkChain still reports "anchor not found" — a stale or tampered sidecar must
+// fail loudly, never silently degrade to "no anchor, verify everything".
+func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) string {
+	anchor := fileAnchorSHA
+	// Seals BEFORE the sidecar anchor are already inside the untrusted prefix,
+	// so only seals at/after it may move the anchor forward.
+	reached := fileAnchorSHA == ""
+	prevLineSHA := ""
+	for _, line := range lines {
+		sha := sha256Hex(line)
+		switch {
+		case !reached && sha == fileAnchorSHA:
+			reached = true
+		case !reached:
+			// still inside the untrusted prefix
+		default:
+			if hasPrev, e, err := decodeLedgerLine(line); err == nil &&
+				isOperatorSeal(e) && sealChainsFromPrev(hasPrev, e, prevLineSHA) {
+				anchor = sha
+			}
+		}
+		prevLineSHA = sha
+	}
+	return anchor
+}
 
 // ledgerAnchor is the on-disk shape of <evolveDir>/ledger-anchor.json.
 type ledgerAnchor struct {

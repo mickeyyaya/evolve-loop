@@ -75,7 +75,8 @@ func AutosealStaleMarker(ctx context.Context, ledger ledgerAppender, opts SealOp
 	}
 
 	sealOpts := opts
-	sealOpts.Force = true // override the (fresh-but-dead-owner) lease fence
+	sealOpts.Force = true             // override the (fresh-but-dead-owner) lease fence
+	sealOpts.AutomatedRecovery = true // unattended self-heal, not a human sign-off — never operator-trust-eligible
 	res, err := SealCycle(ctx, ledger, sealOpts)
 	if err != nil {
 		return SealResult{}, false, err

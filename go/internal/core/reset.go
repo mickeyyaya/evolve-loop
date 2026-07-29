@@ -72,7 +72,25 @@ type SealOptions struct {
 	// (the 2-6min post-crash window) now seals WITHOUT --force. nil preserves the
 	// old freshness-only fence for un-migrated callers (back-compat).
 	PidAlive func(pid int) bool
+	// AutomatedRecovery marks a seal driven by unattended boot self-heal
+	// (AutosealStaleMarker, triggered merely by a dead owner PID — trivially
+	// arrangeable by anything that can kill the owning process) rather than an
+	// explicit human `evolve cycle reset`. ADR-0081's in-band epoch anchor
+	// trusts a ledger line ONLY when its Role is exactly "operator" — a real
+	// human sign-off. Before this flag, both paths wrote Role:"operator"
+	// identically, so triggering the automated path was enough to mint a
+	// trust-anchor-eligible seal with no human involved at all (the
+	// unauthenticated-self-declared-role defect). Set true, the ledger entry
+	// carries a distinct role that Verify's epoch-anchor resolver does not
+	// recognise — the automated recovery still runs (clearing the role-gate
+	// block), it just never gains operator trust for chain verification.
+	AutomatedRecovery bool
 }
+
+// autosealRole is the Role an unattended boot self-heal seal carries — never
+// "operator", so it cannot move the ledger verify epoch anchor (see
+// SealOptions.AutomatedRecovery).
+const autosealRole = "operator-autoseal"
 
 // SealResult reports what was (or, in dry-run, would be) sealed.
 type SealResult struct {
@@ -248,13 +266,21 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		}
 	}
 
-	// 3. Auditable ledger entry (append-only, hash-chained).
+	// 3. Auditable ledger entry (append-only, hash-chained). Role is
+	// "operator" only for an explicit human `evolve cycle reset` — an
+	// AutomatedRecovery seal (unattended boot self-heal) writes autosealRole
+	// instead so it can never be mistaken for a human trust decision by the
+	// ledger verify epoch-anchor resolver (see SealOptions.AutomatedRecovery).
 	if ledger != nil {
+		role := "operator"
+		if opts.AutomatedRecovery {
+			role = autosealRole
+		}
 		entry := LedgerEntry{
 			TS:           rfc,
 			Cycle:        0,
 			CycleLabel:   fmt.Sprintf("reset-seal-cycle-%d", cycleID),
-			Role:         "operator",
+			Role:         role,
 			Kind:         "reset",
 			GitHEAD:      head,
 			ArtifactPath: archiveDir,
