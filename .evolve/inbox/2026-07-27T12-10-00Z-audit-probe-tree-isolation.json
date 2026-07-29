@@ -1,29 +1,29 @@
 {
-  "id": "audit-probe-tree-isolation",
-  "title": "Adversarial auditor writes TestZZAudit* probe tests INTO the package under test \u2014 whole-suite ACS predicates sweep them up and fail the cycle on the auditor's own probe",
-  "kind": "pipeline-integrity",
-  "priority": "high",
-  "weight": 0.86,
-  "campaign": "convergence-2026-07",
-  "files": [
-    "agents/evolve-auditor.md",
-    "skills/audit/SKILL.md",
-    "go/internal/acssuite/",
-    "go/internal/phases/audit/"
+  "acceptance": [
+    "RED first: a fixture worktree with an untracked TestZZAudit_*.go in a package a meta-predicate sweeps makes that predicate red; after the fix it is green AND the probe file is copied to the run dir.",
+    "agents/evolve-auditor.md mandates `go test -overlay` for probe tests (cycle-1106 PoCA/PoCB is the in-tree precedent).",
+    "The Go backstop logs LOUDLY when it excludes an audit-created test file \u2014 silent exclusion would hide a real auditor finding.",
+    "cd go && go test -race ./internal/phases/audit/... ./internal/acssuite/... N/N PASS."
   ],
+  "campaign": "convergence-2026-07",
   "connects_to": [
     "acs-evidence-tail-capture",
     "acs-metapredicate-suite-scope",
     "core-suite-shared-tmp-p-hermeticity",
     "verdict-coherence-auditor-vs-egps"
   ],
-  "route": "console-manual",
+  "files": [
+    "agents/evolve-auditor.md",
+    "skills/audit/SKILL.md",
+    "go/internal/acssuite/",
+    "go/internal/phases/audit/"
+  ],
+  "id": "audit-probe-tree-isolation",
   "injected_by": "console-2026-07-27-failed-cycle-forensics",
-  "notes": "CONFIRMED root cause for cycles 1115 and 1117; the signature is CONSISTENT WITH but UNPROVEN for 1107/1116, whose failing test names are unrecoverable (see acs-evidence-tail-capture \u2014 that is precisely why they cannot be confirmed) and whose predicates never ran ./internal/bridge at all; their actual trigger is core-suite-shared-tmp-p-hermeticity. Evidence: the tests that failed at audit time were TestZZAudit_QuoteSpillSuppressed (1115) and TestZZAuditProbe_BulletBannerSuppressed (1117) \u2014 the ZZ prefix sorts last; these are probe tests the AUDITOR authored into internal/bridge. A meta-predicate running `go test ./internal/bridge/...` inherits the probe's failure as if the BUILDER had regressed a sibling. Corroboration: each cycle's exact suite, re-run quietly in its preserved worktree, is EXIT=0 green (verified 2026-07-27), and the auditor's own verdict disagreed with the gate (see verdict-coherence-auditor-vs-egps). Caveat on the 1117 pair: red #1 used `-run ^TestC1117_`, which EXCLUDES TestZZAuditProbe_* by construction, so only red #2 (the unfiltered bridge+recovery sweep) is probe-explained. The safe pattern already exists in-tree: cycle-1106's auditor probed via `go test -overlay` (PoCA/PoCB), which never writes the real tree. FIX: (a) auditor persona MUST use -overlay for probes \u2014 note agents/evolve-auditor.md today contains ZERO mentions of overlay/probe/_test.go, so this is a NET-NEW rule, not a tightening; (b) Go backstop: detect untracked *_test.go created during the audit phase, PRESERVE them to the run dir (today discarded, so the finding is unrecoverable), exclude before the ACS run, log loudly. The observer must not perturb the observed system.",
-  "acceptance": [
-    "RED first: a fixture worktree with an untracked TestZZAudit_*.go in a package a meta-predicate sweeps makes that predicate red; after the fix it is green AND the probe file is copied to the run dir.",
-    "agents/evolve-auditor.md mandates `go test -overlay` for probe tests (cycle-1106 PoCA/PoCB is the in-tree precedent).",
-    "The Go backstop logs LOUDLY when it excludes an audit-created test file \u2014 silent exclusion would hide a real auditor finding.",
-    "cd go && go test -race ./internal/phases/audit/... ./internal/acssuite/... N/N PASS."
-  ]
+  "kind": "pipeline-integrity",
+  "notes": "CONFIRMED root cause for cycles 1115 and 1117; the signature is CONSISTENT WITH but UNPROVEN for 1107/1116, whose failing test names are unrecoverable (see acs-evidence-tail-capture \u2014 that is precisely why they cannot be confirmed) and whose predicates never ran ./internal/bridge at all; their actual trigger is core-suite-shared-tmp-p-hermeticity. Evidence: the tests that failed at audit time were TestZZAudit_QuoteSpillSuppressed (1115) and TestZZAuditProbe_BulletBannerSuppressed (1117) \u2014 the ZZ prefix sorts last; these are probe tests the AUDITOR authored into internal/bridge. A meta-predicate running `go test ./internal/bridge/...` inherits the probe's failure as if the BUILDER had regressed a sibling. Corroboration: each cycle's exact suite, re-run quietly in its preserved worktree, is EXIT=0 green (verified 2026-07-27), and the auditor's own verdict disagreed with the gate (see verdict-coherence-auditor-vs-egps). Caveat on the 1117 pair: red #1 used `-run ^TestC1117_`, which EXCLUDES TestZZAuditProbe_* by construction, so only red #2 (the unfiltered bridge+recovery sweep) is probe-explained. The safe pattern already exists in-tree: cycle-1106's auditor probed via `go test -overlay` (PoCA/PoCB), which never writes the real tree. FIX: (a) auditor persona MUST use -overlay for probes \u2014 note agents/evolve-auditor.md today contains ZERO mentions of overlay/probe/_test.go, so this is a NET-NEW rule, not a tightening; (b) Go backstop: detect untracked *_test.go created during the audit phase, PRESERVE them to the run dir (today discarded, so the finding is unrecoverable), exclude before the ACS run, log loudly. The observer must not perturb the observed system. | reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; RAISED: candidate mechanism for the batch-18 seal/lease flake family (probes written INTO the package under test perturb whole-suite runs) \u2014 coordinate with suite-family-flake-deflake",
+  "priority": "high",
+  "route": "console-manual",
+  "title": "Adversarial auditor writes TestZZAudit* probe tests INTO the package under test \u2014 whole-suite ACS predicates sweep them up and fail the cycle on the auditor's own probe",
+  "weight": 0.93
 }

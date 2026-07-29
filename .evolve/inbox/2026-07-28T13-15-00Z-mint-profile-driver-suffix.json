@@ -1,0 +1,23 @@
+{
+  "id": "mint-profile-driver-suffix",
+  "title": "Advisor phase mint writes bare CLI names into profiles — preflight pipeline-structure HALTs on 'claude resolves to no known driver'",
+  "kind": "loop-reliability",
+  "priority": "medium",
+  "weight": 0.78,
+  "campaign": "loop-reliability-2026-07",
+  "files": [
+    "go/internal/core/",
+    "go/internal/subagent/"
+  ],
+  "connects_to": [],
+  "deps": [],
+  "route": "lane",
+  "injected_by": "console-2026-07-28-plane-cutover",
+  "evidence": "The batch-15 advisor mint wrote .evolve/profiles/gate-wiring-proof.json with cli:\"claude\" while every hand-authored profile carries the driver-suffixed name (cli:\"claude-tmux\", \"codex-tmux\"). The FIRST loop launch that ran preflight over the minted stub (runtime-plane relaunch, 2026-07-28T12:15) HALTed readiness: pipeline-structure: profile \"gate-wiring-proof\": CLI \"claude\" resolves to no known driver. Batch-15 never noticed because its launches predate the mint; dispatch itself tolerated the bare name (cycles 1158/1159 ran the phase) — so mint output passes DISPATCH but fails PREFLIGHT: two resolvers, two vocabularies. Operator-patched to claude-tmux in the runtime plane to unblock.",
+  "notes": "Fix at the MINTER: the advisor mint must emit the resolved driver name (the same translation dispatch applies), and a mint-time validation should run the SAME resolver preflight uses (single vocabulary — never_duplicate_centralize). A regression predicate: minted profile passes `evolve doctor`/readiness pipeline-structure check the moment it is written.",
+  "acceptance": [
+    "RED first: a minted profile with a bare family CLI name either never occurs (minter resolves) or fails the mint step loudly at mint time, not at the NEXT loop launch.",
+    "Preflight and dispatch resolve profile CLI names through ONE shared function.",
+    "cd go && go test -race ./internal/core/... ./internal/subagent/... N/N PASS."
+  ]
+}

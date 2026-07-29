@@ -1,22 +1,22 @@
 {
-  "id": "dossier-carries-failure-reason",
-  "title": "FAIL dossiers are content-free ('see audit-report.md') \u2014 the knowledge base records that a cycle failed but never why",
-  "kind": "pipeline-integrity",
-  "priority": "medium",
-  "weight": 0.86,
   "campaign": "convergence-2026-07",
-  "files": [
-    "go/internal/core/dossier_producer.go",
-    "knowledge-base/cycles/"
-  ],
   "connects_to": [
     "retro-skipped-on-fail",
     "acs-evidence-tail-capture"
   ],
-  "route": "lane",
-  "injected_by": "console-2026-07-27-failed-cycle-forensics",
-  "notes": "All six FAIL dossiers (1105/1106/1107/1115/1116/1117) carry byte-identical defects: [{id: audit-fail, severity: HIGH, summary: 'cycle did not pass audit; see audit-report.md + acs-verdict.json'}]. The dossier is the durable cross-cycle memory, yet it stores a POINTER to two files inside a run dir instead of the finding. Both inputs are already structured and available at write time: acs-verdict.json has red_ids, and audit-fail-reason.json has a reasons[] array. Carry the red predicate ids + the audit fail reason into the dossier so the next cycle's scout/triage can see WHAT failed without opening run artifacts. COVERAGE GAP in the naive fix: cycles 1105/1106 are agent-graded FAILs with red_count:0 / red_ids:null, so red_ids covers only the EGPS shape. A richer structured source already exists for those: the <!-- evolve-verdict: {...schema_version:2, failure:{class, defects[], evidence_paths[]}} --> trailer in audit-report.md (1105 line 131, 1106 line 152) carries full D1..D5 with file:line. Use that as the primary source. ORDERING: sequence AFTER acs-evidence-tail-capture \u2014 carrying red_ids into the dossier without fixing the excerpt just relocates a content-free pointer.",
   "deps": [
     "acs-evidence-tail-capture"
-  ]
+  ],
+  "files": [
+    "go/internal/core/dossier_producer.go",
+    "knowledge-base/cycles/"
+  ],
+  "id": "dossier-carries-failure-reason",
+  "injected_by": "console-2026-07-27-failed-cycle-forensics",
+  "kind": "pipeline-integrity",
+  "notes": "All six FAIL dossiers (1105/1106/1107/1115/1116/1117) carry byte-identical defects: [{id: audit-fail, severity: HIGH, summary: 'cycle did not pass audit; see audit-report.md + acs-verdict.json'}]. The dossier is the durable cross-cycle memory, yet it stores a POINTER to two files inside a run dir instead of the finding. Both inputs are already structured and available at write time: acs-verdict.json has red_ids, and audit-fail-reason.json has a reasons[] array. Carry the red predicate ids + the audit fail reason into the dossier so the next cycle's scout/triage can see WHAT failed without opening run artifacts. COVERAGE GAP in the naive fix: cycles 1105/1106 are agent-graded FAILs with red_count:0 / red_ids:null, so red_ids covers only the EGPS shape. A richer structured source already exists for those: the <!-- evolve-verdict: {...schema_version:2, failure:{class, defects[], evidence_paths[]}} --> trailer in audit-report.md (1105 line 131, 1106 line 152) carries full D1..D5 with file:line. Use that as the primary source. ORDERING: sequence AFTER acs-evidence-tail-capture \u2014 carrying red_ids into the dossier without fixing the excerpt just relocates a content-free pointer. | reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; convergence quality depends on briefs \u2014 generation-over-generation narrowing needs the reason in the dossier",
+  "priority": "medium",
+  "route": "lane",
+  "title": "FAIL dossiers are content-free ('see audit-report.md') \u2014 the knowledge base records that a cycle failed but never why",
+  "weight": 0.9
 }

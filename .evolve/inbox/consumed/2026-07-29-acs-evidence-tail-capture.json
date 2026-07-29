@@ -1,24 +1,25 @@
 {
-  "id": "acs-evidence-tail-capture",
-  "title": "ACS red evidence is head-truncated to ~600 chars \u2014 always build noise, never the '--- FAIL:' line, so every red predicate is undiagnosable",
-  "kind": "pipeline-integrity",
-  "priority": "high",
-  "weight": 0.94,
-  "campaign": "convergence-2026-07",
-  "files": [
-    "go/internal/acssuite/acssuite.go"
-  ],
-  "connects_to": [
-    "audit-probe-tree-isolation",
-    "acs-metapredicate-suite-scope"
-  ],
-  "route": "console-manual",
-  "injected_by": "console-2026-07-27-failed-cycle-forensics",
-  "notes": "acssuite excerpt() caps EvidenceExcerpt at evidenceMax=600 (acssuite.go:43) taken from the HEAD of the output. A `go test` run's first 600 chars are compiler/WARN noise, so the failing test name is ALWAYS truncated away. Measured across all 5 reds in 1107/1115/1116/1117: evidence_len 593-601 and '--- FAIL:' present in NONE. For 1107 and 1116 no AUDIT-TIME failing test name survives anywhere on disk \u2014 why those cycles failed is permanently unrecoverable, and it is the reason audit-probe-tree-isolation cannot be confirmed for them. IMPORTANT for the builder: `go test -json` parsing and per-test output scoping ALREADY EXIST (parseGoTestJSON, acssuite.go:505-519) \u2014 do NOT re-plumb them. The lost bytes are the INNER subprocess text a meta-predicate t.Logf'd as free-form, which acssuite cannot restructure from outside. PRIMARY FIX (~10 lines): make excerpt() TAIL-anchored, which is also cycle-1116's own retro Preventive Action 1. Secondary: record why no test name could be extracted (compile failure, timeout, signal) rather than emitting a content-free exit code.",
   "acceptance": [
     "RED first: a golden go-test stream whose first 600 bytes are build noise and whose failure is at the tail -> the Result carries the failing test name; asserted absent before the fix.",
     "Every red Result either names >=1 failing test or explicitly records why none could be extracted.",
     "The retained raw excerpt is TAIL-anchored; evidenceMax stays a named constant.",
     "Backfill is impossible by construction \u2014 1107/1116 stay unrecoverable; the item says so."
-  ]
+  ],
+  "campaign": "convergence-2026-07",
+  "connects_to": [
+    "audit-probe-tree-isolation",
+    "acs-metapredicate-suite-scope"
+  ],
+  "consumed_by": "console-2026-07-29: superseded by PR #374 f24d2839 \u2014 red predicates persist their FULL stream (first run + retry, attribution header) to acs-red-evidence/, strictly stronger than tail capture; retry_outcome field added",
+  "files": [
+    "go/internal/acssuite/acssuite.go"
+  ],
+  "id": "acs-evidence-tail-capture",
+  "injected_by": "console-2026-07-27-failed-cycle-forensics",
+  "kind": "pipeline-integrity",
+  "notes": "acssuite excerpt() caps EvidenceExcerpt at evidenceMax=600 (acssuite.go:43) taken from the HEAD of the output. A `go test` run's first 600 chars are compiler/WARN noise, so the failing test name is ALWAYS truncated away. Measured across all 5 reds in 1107/1115/1116/1117: evidence_len 593-601 and '--- FAIL:' present in NONE. For 1107 and 1116 no AUDIT-TIME failing test name survives anywhere on disk \u2014 why those cycles failed is permanently unrecoverable, and it is the reason audit-probe-tree-isolation cannot be confirmed for them. IMPORTANT for the builder: `go test -json` parsing and per-test output scoping ALREADY EXIST (parseGoTestJSON, acssuite.go:505-519) \u2014 do NOT re-plumb them. The lost bytes are the INNER subprocess text a meta-predicate t.Logf'd as free-form, which acssuite cannot restructure from outside. PRIMARY FIX (~10 lines): make excerpt() TAIL-anchored, which is also cycle-1116's own retro Preventive Action 1. Secondary: record why no test name could be extracted (compile failure, timeout, signal) rather than emitting a content-free exit code.",
+  "priority": "high",
+  "route": "console-manual",
+  "title": "ACS red evidence is head-truncated to ~600 chars \u2014 always build noise, never the '--- FAIL:' line, so every red predicate is undiagnosable",
+  "weight": 0.94
 }
