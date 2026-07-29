@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "go/internal/deliverable/deliverable.go",
+    "go/internal/phasecontract/sentinel.go",
+    ".evolve/runs/cycle-1198/adversarial-review-report.md",
+    "inbox: deliverable-verified-bytes-single-read",
+    "inbox: nonconforming-deliverable-settle-wait-latency"
+  ],
+  "created_at": "2026-07-30T02:05:00Z",
+  "fix": "Instrument first: on a bad_verdict violation, log the VERIFIED byte length + tail-64-bytes hash alongside the on-disk length at rejection time (one line, proves/refutes the partial-read in a single occurrence). Then fix the sequencing: verify must fire only after the completion signal that follows the LAST artifact write (settle/fsync barrier or re-verify once after a short settle when the ONLY violation is bad_verdict and sections all pass \u2014 that shape is the partial-read signature). Fold in deliverable-verified-bytes-single-read (0.86, verify->classify TOCTOU) so the whole chain reads ONE byte snapshot: read once -> verify those bytes -> classify those bytes.",
+  "id": "deliverable-verify-read-races-final-write",
+  "kind": "pipeline-integrity",
+  "notes": "Console-probed 2026-07-30: the live file parses clean through the production parser \u2014 this is NOT a writer/detector template drift and NOT an agent-format failure. Advisory demotion means affected cycles run with a weakened adversarial gate until fixed.",
+  "priority": "P1",
+  "summary": "batch-19 cycle-1198 (lane monotonic+triage-synthesis), adversarial-review on claude-tmux: contract gate blocked 3x with ONLY [bad_verdict] 'no parseable verdict' \u2014 sections present \u2014 then CIRCUIT OPEN demoted enforce->advisory. The final on-disk deliverable (12784 bytes) ends with a byte-perfect sentinel '<!-- evolve-verdict: {\"phase\":\"adversarial-review\",\"verdict\":\"FAIL\",\"schema_version\":1} -->' and phasecontract.ParseVerdictSentinel parses it fine (console probe: ok=true verdict=FAIL). The parser and vocabulary are correct; the gate must have verified DIFFERENT bytes \u2014 a read racing the agent's final write (the sentinel is the LAST line: a partial read shows sections-yes/verdict-no, the exact observed violation), or a contracted-path vs workspace-copy skew at check time. DISCRIMINATOR vs the batch-18 agy blocks (cycles 1171/1172): agy's final artifacts were genuinely non-compliant (missing sections AND sentinel, 3 violations) \u2014 real agent failure, reroute stands; claude's artifact is complete and compliant with ONLY the verdict violation \u2014 mechanical race.",
+  "title": "Contract verify reads the deliverable BEFORE the agent's final flush \u2014 well-formed sentinel rejected as [bad_verdict], circuit demotes the gate",
+  "weight": 0.94
+}
