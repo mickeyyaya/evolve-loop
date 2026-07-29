@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -343,15 +344,13 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				} else {
 					mints = verifiedActiveMints(cr.req.ProjectRoot, mints)
 				}
-				var realLeaks []string
-				for _, p := range leaked {
-					if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) || isActiveMintPhasePath(mints, p) {
-						continue
-					}
-					realLeaks = append(realLeaks, p)
-				}
+				realLeaks, waived := filterRealLeaks(next, leaked, mints, cr.consoleLeased, os.Stderr)
 				if len(realLeaks) == 0 {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
+					if waived > 0 {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s continued only because %d leaked path(s) were console-leased (ADR-0080 S4) — not a clean phase\n", next, waived)
+					} else {
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s wrote only legitimate main-tree paths (.evolve/ workspace); continuing\n", next)
+					}
 					leaked = nil
 				} else {
 					leaked = realLeaks
@@ -376,4 +375,24 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	}
 
 	return loopNext, nil
+}
+
+// filterRealLeaks applies the tree-diff guard's classifier chain to the
+// leaked set: workspace legitimacy, scout eval materialization, registered
+// TTL-fresh mints, and — LAST, loud (ADR-0080 S4) — the cycle-start-adopted
+// console lease, which waives EXACT paths only and prints one WARN per
+// waiver so a leased leak can never masquerade as a clean phase.
+func filterRealLeaks(next Phase, leaked []string, mints, leased map[string]bool, warn io.Writer) (real []string, waived int) {
+	for _, p := range leaked {
+		if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) || isActiveMintPhasePath(mints, p) {
+			continue
+		}
+		if leased[p] {
+			waived++
+			fmt.Fprintf(warn, "[orchestrator] WARN tree-diff: leaked path %q WAIVED by the cycle-start console lease (ADR-0080 S4) — operator-leased, not a clean phase\n", p)
+			continue
+		}
+		real = append(real, p)
+	}
+	return real, waived
 }

@@ -54,14 +54,17 @@ type cycleRun struct {
 	req               CycleRequest
 	cycle             int
 	mainDirtyBaseline map[string]bool
-	envSnap           map[string]string     // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
-	ctxSnap           map[string]string     // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
-	preCycleHEAD      string                // read post-loop by finalizeCycle
-	benchedCLIs       []router.BenchedCLI   // CLI-health snapshot; read in selectNext Decide
-	clampedPlan       *router.PhasePlan     // clamped whole-cycle plan; nil ⇒ static spine
-	directivesSet     directives.Set        // runtime operator-directives snapshot; read in dispatch (cr.directivesSet.Merged)
-	retryConfig       policy.RetryConfig    // resolved once at orchestrator construction
-	workflowConfig    policy.WorkflowConfig // resolved once at orchestrator construction
+	// consoleLeased: ADR-0080 S4 operator lease ADOPTED at cycle start (hub-
+	// resident; a mid-cycle write cannot waive the cycle that made it).
+	consoleLeased  map[string]bool
+	envSnap        map[string]string     // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
+	ctxSnap        map[string]string     // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
+	preCycleHEAD   string                // read post-loop by finalizeCycle
+	benchedCLIs    []router.BenchedCLI   // CLI-health snapshot; read in selectNext Decide
+	clampedPlan    *router.PhasePlan     // clamped whole-cycle plan; nil ⇒ static spine
+	directivesSet  directives.Set        // runtime operator-directives snapshot; read in dispatch (cr.directivesSet.Merged)
+	retryConfig    policy.RetryConfig    // resolved once at orchestrator construction
+	workflowConfig policy.WorkflowConfig // resolved once at orchestrator construction
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
 	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle
@@ -292,6 +295,7 @@ type cycleInit struct {
 	cs                CycleState
 	cycle             int
 	mainDirtyBaseline map[string]bool
+	consoleLeased     map[string]bool
 }
 
 // newCycleRun performs RunCycle's resource setup (extracted behavior-preserving):
@@ -429,6 +433,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
 	// relocates paths the build introduced, never the operator's pre-existing work.
 	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
+	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
 	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
 	// here, isolated from the live tree. cs.ActiveWorktree gates source writes
 	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
@@ -483,6 +488,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		cs:                cs,
 		cycle:             cycle,
 		mainDirtyBaseline: mainDirtyBaseline,
+		consoleLeased:     consoleLeased,
 	}, run, nil
 }
 

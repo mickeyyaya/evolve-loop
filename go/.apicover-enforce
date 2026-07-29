@@ -57,6 +57,8 @@
 # Rollup + HumanMS, consumed by core (writer), dossier, and `evolve cycle timing`.
 ./internal/phasetiming
 ./internal/phasewatchdog
+./internal/plane
+./internal/verifylock
 ./internal/policy
 ./internal/projecthash
 ./internal/quotareset

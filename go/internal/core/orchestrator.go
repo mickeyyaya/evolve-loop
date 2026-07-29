@@ -770,6 +770,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 		req:               req,
 		cycle:             init.cycle,
 		mainDirtyBaseline: init.mainDirtyBaseline,
+		consoleLeased:     init.consoleLeased,
 		state:             init.state,
 		cs:                init.cs,
 		result:            CycleResult{Cycle: init.cycle, FinalVerdict: VerdictPASS},

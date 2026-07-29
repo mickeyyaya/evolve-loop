@@ -15,7 +15,7 @@ import (
 // a quota wall). Returns the process exit code.
 func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver>)")
+		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver> | plane [root])")
 		return 10
 	}
 	switch args[0] {
@@ -25,6 +25,8 @@ func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDoctorBoot(args[1:], stdout, stderr)
 	case "live":
 		return runDoctorLive(args[1:], stdout, stderr)
+	case "plane":
+		return runDoctorPlane(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve doctor: unknown subcommand %q\n", args[0])
 		return 10
