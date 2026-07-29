@@ -12,6 +12,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,7 +232,7 @@ func TestAgentGradedRouterReason_MatchesBoilerplateDetector(t *testing.T) {
 // defect to the identical-fingerprint rule.
 func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 	cr, _ := epilogueRun(t, false)
-	cr.abnormalEpilogue()
+	cr.abnormalEpilogue(nil)
 	raw, err := os.ReadFile(filepath.Join(cr.cs.WorkspacePath, "failure-digest.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -242,6 +243,85 @@ func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 	}
 	if !d.Unexplained {
 		t.Fatalf("abnormal-epilogue digest not marked Unexplained: %+v — its template is constant per phase, so identical fingerprints across distinct aborts are guaranteed", d)
+	}
+}
+
+// TestAbnormalEpilogue_CauseBecomesDistinguisher — live pin (batch-19 halt at
+// cycle-1208): cycles 1197/1199/1207 aborted in phase build for THREE distinct
+// reasons, but the epilogue wrote only the constant template, so all three
+// digests were Unexplained with ONE fingerprint and the diagnosability
+// breaker had to halt the batch to get an operator. The abort CAUSE — the
+// error RunCycle was about to return — is the missing distinguisher: with it
+// appended, the digest is content-bearing and distinct per cause; without it
+// (nil cause: a bare bounce) the template stays honestly Unexplained.
+func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
+	digestFor := func(t *testing.T, cause error) FailureDigest {
+		t.Helper()
+		cr, _ := epilogueRun(t, false)
+		cr.abnormalEpilogue(cause)
+		raw, err := os.ReadFile(filepath.Join(cr.cs.WorkspacePath, "failure-digest.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var d FailureDigest
+		if err := json.Unmarshal(raw, &d); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	timeout := digestFor(t, fmt.Errorf("build: bridge: launch exit=81: [claude-tmux] session killed: core: bridge artifact timeout"))
+	if timeout.Unexplained {
+		t.Fatalf("an abort WITH a cause must be content-bearing, got Unexplained: %+v", timeout)
+	}
+	compile := digestFor(t, fmt.Errorf("build: worktree self-check: go vet ./...: exit 1"))
+	if compile.Unexplained || compile.Fingerprint == timeout.Fingerprint {
+		t.Fatalf("distinct causes must yield distinct fingerprints: %q vs %q", compile.Fingerprint, timeout.Fingerprint)
+	}
+	// Same cause twice ⇒ same fingerprint (the breaker's recurrence signal).
+	if again := digestFor(t, fmt.Errorf("build: bridge: launch exit=81: [claude-tmux] session killed: core: bridge artifact timeout")); again.Fingerprint != timeout.Fingerprint {
+		t.Fatalf("identical causes must share a fingerprint: %q vs %q", again.Fingerprint, timeout.Fingerprint)
+	}
+	// The same cause on consecutive RETRY cycles carries cycle-numbered tokens
+	// that must normalize out — otherwise recurrence never accumulates and the
+	// breaker goes blind (the raw-cause degenerate implementation fails here).
+	c1 := digestFor(t, fmt.Errorf("build: acs/cycle1197 worktree: bridge artifact timeout"))
+	c2 := digestFor(t, fmt.Errorf("build: acs/cycle1207 worktree: bridge artifact timeout"))
+	if c1.Fingerprint != c2.Fingerprint {
+		t.Fatalf("same cause across retry cycles must share a fingerprint: %q vs %q", c1.Fingerprint, c2.Fingerprint)
+	}
+	// A multi-line cause must flatten — a raw newline inside the reason breaks
+	// downstream line-oriented consumers.
+	multi := digestFor(t, fmt.Errorf("build: vet failed:\n./pkg/x.go:10: undefined: y\n"))
+	if multi.Unexplained {
+		t.Fatalf("multi-line cause must still be content-bearing: %+v", multi)
+	}
+}
+
+// TestAbnormalEpilogue_TeardownMarkedAndTailKept pins the review decisions on
+// the cycle-1208 fix: (1) a teardown-shaped cause (IsInfraTeardownError) is
+// marked "teardown=" — its identical fingerprints DELIBERATELY stay in the
+// identical-fingerprint population (one infra condition mowing down three
+// lanes SHOULD stop the batch at the ceiling; the marker keeps the halt
+// legible) — and (2) truncation keeps the error-chain TAIL, where identity
+// lives, so two roots under one long shared prefix never collapse.
+func TestAbnormalEpilogue_TeardownMarkedAndTailKept(t *testing.T) {
+	cr, _ := epilogueRun(t, false)
+	cr.abnormalEpilogue(fmt.Errorf("build: bridge: %w", ErrArtifactTimeout))
+	raw, err := os.ReadFile(filepath.Join(cr.cs.WorkspacePath, "audit-fail-reason.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "teardown=") {
+		t.Fatalf("teardown-shaped cause must carry the teardown marker: %s", raw)
+	}
+	longPrefix := strings.Repeat("shared/prefix/segment/", 12)
+	a := causeHead("phase build: " + longPrefix + ": root cause alpha")
+	b := causeHead("phase build: " + longPrefix + ": root cause beta")
+	if a == b {
+		t.Fatalf("tail-kept truncation must keep distinct roots distinct under a long shared prefix: %q", a)
+	}
+	if !strings.Contains(a, "root cause alpha") {
+		t.Fatalf("the root cause (chain tail) must survive truncation: %q", a)
 	}
 }
 
