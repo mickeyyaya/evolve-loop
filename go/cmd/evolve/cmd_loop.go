@@ -935,6 +935,16 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		var stopOnFail bool
 		consecutiveFails, stopOnFail = consecutiveFailBreaker(
 			result.FinalVerdict == core.VerdictFAIL, consecutiveFails, maxConsecutiveFails)
+		if result.FinalVerdict == core.VerdictFAIL {
+			// ADR-0080 P2 accounting runs BEFORE the breaker break so the
+			// terminal FAIL — the one that stops the batch — still bumps
+			// (review M2). This site covers any iteration that falls through
+			// to in-process orch.RunCycle (sequential, wave-dispatch error,
+			// empty-backlog fallback); fleet lanes exec `evolve cycle run`,
+			// whose epilogue calls the same helper — mutually exclusive, so
+			// no cycle double-bumps.
+			recordTaskFailureForCycle(cfg.ProjectRoot, cfg.EvolveDir, ranCycle, stderr)
+		}
 		if stopOnFail {
 			lr.StopReason = "fail"
 			break
@@ -944,22 +954,6 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.ContinuedFailures++
 			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
-			// ADR-0080 P2: graded task-level FAILs bump the committed ids'
-			// durable failure_count where they live (inbox root) and
-			// quarantine at the ADR-0072 ceiling — the release-path
-			// accounting never fires for wave lanes (no processing/ claim),
-			// which is how 12-attempt grinds ran with failure_count 0.
-			// System-level classes are not the task's fault (AC4) and skip.
-			wsp := cycleWorkspace(cfg.ProjectRoot, ranCycle)
-			if isTaskLevelFailure(cycleclassify.Classify(wsp).Class) {
-				failPol := policy.DefaultSystemFailurePolicy()
-				if pol, polErr := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); polErr == nil {
-					if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
-						failPol = fp
-					}
-				}
-				recordCommittedFailures(cfg.ProjectRoot, wsp, ranCycle, failPol.Thresholds.TaskRetryCeiling, stderr)
-			}
 		}
 
 		// Goal-stall escalation: an empty/blocked cycle shipped nothing and left

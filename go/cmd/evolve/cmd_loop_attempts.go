@@ -12,9 +12,41 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
+
+// recordTaskFailureForCycle is the WHOLE graded-FAIL accounting chain for one
+// FAILed cycle: classify the workspace, skip system-level classes (AC4 —
+// infra/guards are not the task's fault), resolve the retry ceiling from
+// operator policy (compiled default when absent), and bump/quarantine the
+// committed ids. It is shared by the sequential loop body AND the
+// `evolve cycle run` child epilogue — every fleet lane execs the child, so a
+// chain living only in the sequential body is unreachable exactly where the
+// grinds happen (batch-18 wave 1: cycles 1171/1172 FAILed with zero bumps).
+//
+// CONCURRENCY: RecordRootTaskFailure serializes on the inbox .bump.lock and
+// re-resolves the item path in-lock; quarantine's os.Rename vs a concurrent
+// lane Claim is atomic either way (loser no-ops/WARNs, no torn state). The
+// one genuinely new outcome (review M3): a sibling lane's FAIL can quarantine
+// an id a still-RUNNING lane also committed — that lane may then PASS while
+// its item sits in quarantine/ awaiting `evolve inbox quarantine release`.
+func recordTaskFailureForCycle(projectRoot, evolveDir string, cycle int, warn io.Writer) {
+	wsp := cycleWorkspace(projectRoot, cycle)
+	if !isTaskLevelFailure(cycleclassify.Classify(wsp).Class) {
+		return
+	}
+	failPol := policy.DefaultSystemFailurePolicy()
+	if pol, err := policy.Load(filepath.Join(evolveDir, "policy.json")); err == nil {
+		if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
+			failPol = fp
+		}
+	}
+	recordCommittedFailures(projectRoot, wsp, cycle, failPol.Thresholds.TaskRetryCeiling, warn)
+}
 
 // recordCommittedFailures applies the FAIL-side accounting for one graded
 // task-level FAIL: one bump per committed id, quarantine at the ceiling.

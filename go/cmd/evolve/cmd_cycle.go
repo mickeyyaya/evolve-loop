@@ -241,6 +241,13 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
 		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr)
 	}
+	// ADR-0080 P2: graded-FAIL accounting runs in the child, like the halt
+	// dossier above — the loop body's site never sees lane results (they
+	// come back as bare exit codes) and the two entrypoints are mutually
+	// exclusive, so no cycle double-bumps. Full story on the helper.
+	if result.FinalVerdict == core.VerdictFAIL && result.Cycle > 0 {
+		recordTaskFailureForCycle(projectRoot, evolveDir, result.Cycle, stderr)
+	}
 	return cycleRunExitCode(result)
 }
 
