@@ -79,7 +79,23 @@ type Result struct {
 	// single bounded retry (cycle-468): value "passed-on-retry". Visible in
 	// the wire JSON so a flake is never silently absorbed; the first-run
 	// failure evidence is retained deliberately (the flake's signature).
+	// The meaning is PINNED by acs/cycle468 (deterministic reds carry no
+	// flaky key) — retry outcomes for reds live in RetryOutcome instead.
 	Flaky string `json:"flaky,omitempty"`
+
+	// RetryOutcome records what the bounded retry established about a red
+	// that STAYED red: "red-on-retry" (the retry ran and confirmed) or
+	// "retry-inconclusive" (the retry produced no result for this test —
+	// expired ctx, crash). Absent on greens, skips, and absorbed flakes.
+	// Without it a confirmed red was indistinguishable from a starved
+	// retry (batch-18 forensics gap).
+	RetryOutcome string `json:"retry_outcome,omitempty"`
+
+	// fullEvidence retains the red predicate's COMPLETE captured stream
+	// (unexported: the wire JSON stays capped at evidenceMax — the full
+	// record lands in acs-red-evidence/ beside the verdict instead; cycles
+	// 1173/1175/1178 were undiagnosable from the elided excerpt alone).
+	fullEvidence string
 }
 
 // PredicateSuite is the count breakdown.
@@ -97,6 +113,9 @@ type PredicateSuite struct {
 func warningsFromFlaky(results []Result) []string {
 	var w []string
 	for _, r := range results {
+		// Only absorbed flakes surface as warnings — acs/cycle468 pins that a
+		// deterministic red adds NO warnings entry; RetryOutcome + the
+		// acs-red-evidence/ file are the confirmed-red forensic surface.
 		if r.Flaky != "" {
 			w = append(w, fmt.Sprintf("flaky: %s passed-on-retry (bounded single retry absorbed a non-deterministic red; investigate under host contention)", r.ACID))
 		}
@@ -187,7 +206,11 @@ func Run(opts Options) (Verdict, error) {
 	if gErr != nil {
 		return Verdict{}, gErr
 	}
+	// After demoteOutOfScope: a red demoted to skip must leave no phantom
+	// red-evidence file (review M2 — the forensic surface must match the
+	// verdict).
 	demoteWarnings := demoteOutOfScope(goResults, opts)
+	writeRedEvidence(opts, goResults)
 	for _, r := range goResults {
 		v.record(r)
 	}
@@ -449,19 +472,96 @@ func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, st
 	raw, _ := goExec(ctx, moduleDir, pat, env) // bounded: exactly one retry
 	retry := parseGoTestJSON(strings.NewReader(raw), cycle)
 	greenOnRetry := make(map[string]bool, len(retry))
+	retryRan := make(map[string]bool, len(retry))
+	retryEvidence := make(map[string]string, len(retry))
 	for _, r := range retry {
+		retryRan[r.ACID] = true
 		if r.ResultStr == "green" {
 			greenOnRetry[r.ACID] = true
 		}
+		if r.fullEvidence != "" {
+			retryEvidence[r.ACID] = r.fullEvidence
+		}
 	}
 	for i := range results {
-		if results[i].ResultStr == "red" && greenOnRetry[results[i].ACID] {
+		if results[i].ResultStr != "red" {
+			continue
+		}
+		switch {
+		case greenOnRetry[results[i].ACID]:
 			results[i].ResultStr = "green"
 			results[i].ExitCode = 0
 			results[i].Flaky = "passed-on-retry"
+		case retryRan[results[i].ACID]:
+			// Red stayed red: record it in RetryOutcome (NOT Flaky — its
+			// passed-on-retry meaning is pinned by acs/cycle468) and keep
+			// the retry's stream too.
+			results[i].RetryOutcome = "red-on-retry"
+			if re := retryEvidence[results[i].ACID]; re != "" {
+				results[i].fullEvidence += "\n--- RETRY RUN (still red) ---\n" + re
+			}
+		default:
+			// The retry produced NO result for this test (expired ctx, crash
+			// before it ran): inconclusive, not confirmed.
+			results[i].RetryOutcome = "retry-inconclusive"
 		}
 	}
 	return results
+}
+
+// writeRedEvidence persists each red predicate's COMPLETE captured stream
+// (first run + any retry, see retryFlakyReds) to
+// <workspace>/acs-red-evidence/<ac_id>.txt, ProjectRoot preferred over Root
+// (the same convention the verdict's own location uses). Each file opens
+// with a `# cycle=… ac_id=… run=…` header so repeated Runs in one cycle
+// stay attributable; a name collision (duplicate ACIDs across scope dirs
+// share a path.Base) gets a numeric suffix instead of a silent overwrite.
+// Best-effort and loud: a write failure WARNs and never blocks the verdict.
+func writeRedEvidence(opts Options, results []Result) {
+	root := opts.ProjectRoot
+	if root == "" {
+		root = opts.Root
+	}
+	dir := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", opts.Cycle), "acs-red-evidence")
+	for _, r := range results {
+		if r.ResultStr != "red" || r.fullEvidence == "" {
+			continue
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "[acs] WARN: red-evidence dir: %v\n", err)
+			return
+		}
+		body := fmt.Sprintf("# cycle=%d ac_id=%s predicate=%s run=%s\n--- FIRST RUN ---\n%s",
+			opts.Cycle, r.ACID, r.Predicate, time.Now().UTC().Format(time.RFC3339), r.fullEvidence)
+		base := strings.ReplaceAll(r.ACID, "/", "__")
+		collisions := 0
+		for i := 0; i < 10; i++ {
+			name := base + ".txt"
+			if i > 0 {
+				name = fmt.Sprintf("%s-%d.txt", base, i+1)
+			}
+			f, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+			if os.IsExist(err) {
+				collisions++
+				continue
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[acs] WARN: red-evidence write %s: %v\n", name, err)
+				break
+			}
+			_, werr := f.WriteString(body)
+			if cerr := f.Close(); werr == nil {
+				werr = cerr
+			}
+			if werr != nil {
+				fmt.Fprintf(os.Stderr, "[acs] WARN: red-evidence write %s: %v\n", name, werr)
+			}
+			break
+		}
+		if collisions == 10 {
+			fmt.Fprintf(os.Stderr, "[acs] WARN: red-evidence: 10 name collisions for %s — evidence dropped\n", base)
+		}
+	}
 }
 
 // goEvent is the subset of the `go test -json` event schema we consume.
@@ -562,6 +662,7 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 		case "red":
 			r.ExitCode = 1
 			full := a.output.String()
+			r.fullEvidence = full
 			r.EvidenceExcerpt = excerpt(full)
 			// Extract inner failing-test identity from the FULL output,
 			// before the excerpt cap can destroy it. The predicate's own
