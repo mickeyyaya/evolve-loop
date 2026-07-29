@@ -73,3 +73,85 @@ func TestRecordCommittedFailures_NoDecisionAccountsNothing(t *testing.T) {
 		t.Fatalf("no committed set ⇒ silence, got %s", warn.String())
 	}
 }
+
+// The full graded-FAIL chain (classify → task-level gate → policy ceiling →
+// bump) as ONE shared helper — `evolve cycle run` (every fleet lane) and the
+// sequential loop body must run the SAME chain. Batch-18 wave 1 proved the
+// gap live: two graded FAILs (1171/1172), failure_count still absent, because
+// the chain lived only in the sequential body fleet lanes never execute.
+
+// TestCycleRunEpilogue_CallsFailureAccounting pins the WIRING, not the
+// behavior (review M1): the helper tests below all invoke the chain directly,
+// so deleting the cmd_cycle.go call site would leave them green while
+// reopening the exact batch-18 no-op. runCycleRun cannot be driven to a FAIL
+// verdict hermetically (--simulate always PASSes), so this is a source
+// assertion — same class as the manifest/template pins used elsewhere: the
+// epilogue must call recordTaskFailureForCycle AFTER the halt branch.
+func TestCycleRunEpilogue_CallsFailureAccounting(t *testing.T) {
+	src, err := os.ReadFile("cmd_cycle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	haltAt := strings.Index(string(src), "haltOnSystemFailure(evolveDir")
+	callAt := strings.Index(string(src), "recordTaskFailureForCycle(projectRoot, evolveDir, result.Cycle")
+	if haltAt < 0 || callAt < 0 {
+		t.Fatalf("epilogue wiring missing: halt branch at %d, accounting call at %d", haltAt, callAt)
+	}
+	if callAt < haltAt {
+		t.Fatalf("accounting must run AFTER the ADR-0072 halt early-return (halt at %d, call at %d) — a halting system failure is never the task's fault", haltAt, callAt)
+	}
+}
+
+func TestRecordTaskFailureForCycle_TaskLevelFailBumpsCommitted(t *testing.T) {
+	root, ws := attemptsFixture(t, []string{"grinder"})
+	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("Verdict: FAIL — audit red\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+	recordTaskFailureForCycle(root, filepath.Join(root, ".evolve"), 9, &warn)
+	// Fixture seeds failure_count=2; the default policy ceiling is 2, so the
+	// bump to 3 crosses it ⇒ quarantine. That also pins the policy load.
+	if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", "quarantine", "grinder.json")); err != nil {
+		t.Fatalf("task-level FAIL must run the accounting chain end-to-end: %v\n%s", err, warn.String())
+	}
+}
+
+func TestRecordTaskFailureForCycle_SystemLevelFailSkipsAccounting(t *testing.T) {
+	root, ws := attemptsFixture(t, []string{"grinder"})
+	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("INFRASTRUCTURE FAILURE: connection refused\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+	recordTaskFailureForCycle(root, filepath.Join(root, ".evolve"), 9, &warn)
+	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "grinder.json"))
+	if err != nil {
+		t.Fatalf("system-level failure must not move the item: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if fc, _ := got["failure_count"].(float64); fc != 2 {
+		t.Fatalf("system-level failure is not the task's fault (AC4) — failure_count must stay 2, got %v", got["failure_count"])
+	}
+}
+
+func TestRecordTaskFailureForCycle_PolicyCeilingOverridesDefault(t *testing.T) {
+	root, ws := attemptsFixture(t, []string{"grinder"})
+	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("Verdict: FAIL\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pol := []byte(`{"failure_policy":{"thresholds":{"task_retry_ceiling":9}}}`)
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), pol, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+	recordTaskFailureForCycle(root, filepath.Join(root, ".evolve"), 9, &warn)
+	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "grinder.json"))
+	if err != nil {
+		t.Fatalf("ceiling 9 with count 3 must bump in place, not quarantine: %v\n%s", err, warn.String())
+	}
+	if !strings.Contains(string(raw), `"failure_count": 3`) && !strings.Contains(string(raw), `"failure_count":3`) {
+		t.Fatalf("bump to 3 expected under ceiling 9: %s", raw)
+	}
+}
