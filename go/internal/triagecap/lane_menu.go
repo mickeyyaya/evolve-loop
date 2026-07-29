@@ -105,7 +105,7 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 // i.e. nothing), it still yields a single lane at count<2.
 func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
 	backlog := ReadInboxBacklog(evolveDir, isProtected)
-	committed = pruneConsumed(evolveDir, committed)
+	committed = PruneConsumed(evolveDir, committed)
 	seed := SelectFleetWidthTopN(backlog, count)
 	if len(committed) > 0 {
 		seed = WidenTopNToFleetWidth(committed, backlog, count)
@@ -113,7 +113,7 @@ func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, pe
 	return ExpandWithClusterMates(seed, backlog, perLane)
 }
 
-// pruneConsumed drops carried-over committed ids the inbox lifecycle has
+// PruneConsumed drops carried-over committed ids the inbox lifecycle has
 // already consumed (wave-planner-pass-scope-prune). WidenTopNToFleetWidth
 // copies the committed prefix through VERBATIM, so without this a consumed id
 // is re-pinned into a later wave's lane-scope.json — cycle-1116 re-pinned
@@ -121,11 +121,16 @@ func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, pe
 // the plan artifact itself honest instead of leaning on the launch-time
 // freshness gate to skip a lane that should never have been planned.
 //
+// Exported because the PRIMARY per-wave seam (widenNarrowDecision in package
+// main, go/cmd/evolve/cmd_loop_wave.go) must reuse this exact primitive rather
+// than reimplement it — this is the single source for "is a committed id still
+// live", not a seed-path-only helper.
+//
 // Only TERMINAL states prune: processed/rejected/quarantine. pending and
 // processing stay (still live work), and — load-bearing — an id with no
 // lifecycle evidence at all stays too. A prune that dropped what it cannot
 // resolve would starve every wave of non-inbox-backed cards.
-func pruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidate {
+func PruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidate {
 	if len(committed) == 0 {
 		return committed
 	}

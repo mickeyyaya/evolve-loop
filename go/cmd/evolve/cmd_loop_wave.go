@@ -563,7 +563,19 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 			committed = append(committed, triagecap.FleetCandidate{ID: c.ID, Files: c.Files})
 		}
 	}
-	if len(committed) >= count {
+	// Drop committed ids the inbox lifecycle has already consumed, reusing the
+	// SAME primitive as the fresh-seed path (triagecap.PruneConsumed). This must
+	// run BEFORE the fleet-width short-circuit below: a prior decision that is
+	// already `count` wide would otherwise return verbatim and re-pin a consumed
+	// id into the next wave's lane-scope.json (cycle-1116 re-pinned
+	// tdd-topn-binding-gate after cycle-1113 consumed it). `pruned` then disarms
+	// BOTH return-original-bytes shortcuts — those bytes still carry the consumed
+	// id, so "nothing to add" must not mean "leave the stale plan as-is".
+	pruned := false
+	if kept := triagecap.PruneConsumed(evolveDir, committed); len(kept) < len(committed) {
+		committed, pruned = kept, true
+	}
+	if !pruned && len(committed) >= count {
 		return data // already fleet-width — committed intent is authoritative; no inbox read, no re-marshal.
 	}
 	backlog := triagecap.ReadInboxBacklog(evolveDir, guards.IsProtectedSurface)
@@ -577,7 +589,7 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 	// thread the same resolved value into BOTH call sites.
 	menus := triagecap.ExpandWithClusterMates(widened, backlog, inboxbatch.DefaultMaxItems)
 	topN := menuCards(menus)
-	if len(topN) <= len(committed) {
+	if !pruned && len(topN) <= len(committed) {
 		return data // nothing disjoint to add, no mates to deepen with — leave the decision as-is.
 	}
 	out, err := json.Marshal(map[string]any{"top_n": topN})
