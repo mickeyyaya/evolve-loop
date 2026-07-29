@@ -1,0 +1,147 @@
+{
+  "cycle": 1199,
+  "run_id": "01KYQFSJ7X0E8G6W6TW1HWQW9C",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 143698,
+      "started_at": "2026-07-29T17:50:34Z",
+      "ended_at": "2026-07-29T17:52:59Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 7185,
+        "cache_read": 676710,
+        "cache_write": 47777
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 120425,
+      "started_at": "2026-07-29T17:56:12Z",
+      "ended_at": "2026-07-29T17:58:14Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 130632,
+      "started_at": "2026-07-29T17:58:15Z",
+      "ended_at": "2026-07-29T18:00:26Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 26,
+        "output": 5553,
+        "cache_read": 618522,
+        "cache_write": 63960
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 258138,
+      "started_at": "2026-07-29T18:00:26Z",
+      "ended_at": "2026-07-29T18:04:45Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 16153,
+        "cache_read": 1581295,
+        "cache_write": 72045
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 204641,
+      "started_at": "2026-07-29T18:04:45Z",
+      "ended_at": "2026-07-29T18:11:37Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 1327,
+        "output": 8206,
+        "cache_read": 1539587,
+        "cache_write": 57404
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1199",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase build"
+    }
+  ],
+  "timing": {
+    "total_ms": 857534,
+    "phase_count": 5,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 258138,
+    "by_archetype_ms": {
+      "build": 204641,
+      "plan": 652893
+    },
+    "total_tokens": {
+      "input": 1415,
+      "output": 37097,
+      "cache_read": 4416114,
+      "cache_write": 241186
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 1327,
+        "output": 8206,
+        "cache_read": 1539587,
+        "cache_write": 57404
+      },
+      "plan": {
+        "input": 88,
+        "output": 28891,
+        "cache_read": 2876527,
+        "cache_write": 183782
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9996796851814669
+  }
+}
