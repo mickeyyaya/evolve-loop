@@ -13,15 +13,16 @@ import (
 )
 
 // Dispatch states reported by ResolveDispatchState. Pending means the task is
-// still launchable; Processing/Processed/Rejected/Retry mirror the lifecycle
-// dirs; Unknown means no lifecycle evidence exists (callers fail open — not
-// every planned id is inbox-backed).
+// still launchable; Processing/Processed/Rejected/Retry/Quarantine mirror the
+// lifecycle dirs; Unknown means no lifecycle evidence exists (callers fail open
+// — not every planned id is inbox-backed).
 const (
 	StatePending    = "pending"
 	StateProcessing = "processing"
 	StateProcessed  = "processed"
 	StateRejected   = "rejected"
 	StateRetry      = "retry"
+	StateQuarantine = "quarantine"
 	StateUnknown    = "unknown"
 )
 
@@ -34,8 +35,13 @@ type DispatchState struct {
 
 // ResolveDispatchState classifies taskID against the inbox lifecycle dirs:
 // inbox/ → pending (with its declared deps), processing/cycle-N/ → processing
-// (Detail names the cycle), processed|rejected|retry/ → that state, and no
-// evidence anywhere → unknown. Best-effort reads throughout — an unreadable
+// (Detail names the cycle), processed|rejected|retry|quarantine/ → that state,
+// and no evidence anywhere → unknown.
+//
+// quarantine/ is load-bearing here, not decorative: without it a todo parked by
+// the ADR-0072 S5 retry ceiling fell through to StateUnknown, which the
+// dispatch freshness gate fails OPEN on — so the ceiling would park a poison
+// todo and the very next wave would launch it again. Best-effort reads throughout — an unreadable
 // dir or malformed file is treated as no evidence, never an error, so a bad
 // inbox can only ever fail OPEN at the dispatch gate.
 func ResolveDispatchState(opts Options, taskID string) DispatchState {
@@ -49,7 +55,7 @@ func ResolveDispatchState(opts Options, taskID string) DispatchState {
 			return DispatchState{State: StateProcessing, Detail: filepath.Base(dir)}
 		}
 	}
-	for _, state := range []string{StateProcessed, StateRejected, StateRetry} {
+	for _, state := range []string{StateProcessed, StateRejected, StateRetry, StateQuarantine} {
 		if _, err := findFileByTaskID(filepath.Join(opts.InboxDir, state), taskID); err == nil {
 			return DispatchState{State: state}
 		}

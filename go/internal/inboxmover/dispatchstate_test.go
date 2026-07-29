@@ -35,6 +35,7 @@ func TestResolveDispatchState(t *testing.T) {
 	writeTask(t, filepath.Join(inbox, "processed"), "task-done", nil)
 	writeTask(t, filepath.Join(inbox, "rejected"), "task-nope", nil)
 	writeTask(t, filepath.Join(inbox, "retry"), "task-again", nil)
+	writeTask(t, filepath.Join(inbox, "quarantine"), "task-poison", nil)
 	opts := Options{ProjectRoot: root}
 
 	cases := []struct {
@@ -48,6 +49,11 @@ func TestResolveDispatchState(t *testing.T) {
 		{"task-done", StateProcessed, "", ""},
 		{"task-nope", StateRejected, "", ""},
 		{"task-again", StateRetry, "", ""},
+		// A todo parked by the ADR-0072 S5 retry ceiling must classify as
+		// quarantine, NOT fall through to StateUnknown: the dispatch freshness
+		// gate fails OPEN on unknown, so an unclassified quarantine would let the
+		// very next wave relaunch the poison todo the ceiling just parked.
+		{"task-poison", StateQuarantine, "", ""},
 		{"task-never-seen", StateUnknown, "", ""},
 	}
 	for _, tc := range cases {

@@ -171,3 +171,72 @@ honored end to end rather than half-honored at the quarantine gate.
 Verification: `go/acs/cycle1157/predicates_test.go` — 5 predicates (001/002/005
 are regression locks on the producer half; 003 is the drain diagnostic; 004 is
 its anti-no-op twin proving the diagnostic is conditional).
+
+## Amendment (cycle 1180) — the FAIL half reaches the wave path
+
+Decision 1's table claimed two call sites. Only one of them was ever on a fleet
+lane's code path, so the seam this ADR built was still dead for the work it was
+written for.
+
+**What was actually wired.** The FAIL call site lived in `cmd_loop.go`'s
+*sequential* branch. A wave lane never executes it: `productionWaveLauncher`
+launches `evolve cycle run` as a **subprocess** (`cycleRunArgs`), and the wave
+branch that collects the results only counts `failedLanes` and logs `N/M lanes
+ok`. `fleet.Result{Index, ExitCode, Err}` carries neither the lane's cycle
+number nor its workspace, so the supervisor is structurally incapable of
+applying a lane's verdict. The S5 ceiling therefore stayed unreachable for
+fleet-dispatched work even after cycle-1156 — the batch-14 symptom this ADR
+diagnosed was fixed in the layer that could not see it.
+
+Two further gaps kept quarantine cosmetic even once reachable:
+
+- `ResolveDispatchState` classified `inbox/{root,processing,processed,rejected,
+  retry}` but **not** `quarantine/`. A parked todo fell through to
+  `StateUnknown`, and the dispatch freshness gate fails OPEN on unknown — so the
+  ceiling parked a poison item and the next wave relaunched it.
+- The wave **seed** (`SelectWaveSeedMenus` → `WidenTopNToFleetWidth`) copies the
+  carried-over `committed` prefix through verbatim, re-pinning an already
+  consumed id into a later `lane-scope.json` (cycle-1116 re-pinned
+  `tdd-topn-binding-gate` after cycle-1113 consumed it).
+
+**Decision 5 — the FAIL closeout is an importable package with two call sites.**
+`internal/cycleoutcome.ApplyFailure(FailureInputs)` is the seam; `package main`
+is not importable, which is why the logic could be neither reused by the fleet
+path nor pinned by any predicate while it sat inline. `FailureInputsFor` derives
+the two things a caller cannot state on its own — the S5 ceiling from
+`policy.json` and whether the failure was task-level — so the blame rule has one
+definition (`cmd_loop.go`'s `isTaskLevelFailure` and `failedCycleCommittedIDs`
+are now thin forwarders).
+
+| Path | Call site | Applies |
+|---|---|---|
+| PASS closeout | `internal/phases/ship/postship.go` `promoteInbox` | `Passed: true` |
+| FAIL, sequential loop | `cmd/evolve/cmd_loop.go` cycle-level-failure branch | `ApplyFailure` |
+| FAIL, fleet lane | `cmd/evolve/cmd_cycle.go` `runCycleRun` | `ApplyFailure` |
+
+The lane applies its own verdict **in-process**, where the cycle number and
+workspace are local — mirroring the PASS half, which has always lived inside the
+cycle process for exactly this reason. Both FAIL shapes are covered and each
+applies exactly once: a cycle-level error (`core.ErrCycleLevelFailure`) and a
+clean return carrying `FinalVerdict == FAIL`. A lifecycle fault WARNs but never
+changes the exit code — that code is the lane's only channel to its parent.
+
+**Decision 6 — quarantine is a dispatch state.** `StateQuarantine` joins the
+lifecycle classification, so the freshness gate's default branch skips a parked
+id with `consumed: quarantine` as the reason instead of failing open on it.
+
+**Decision 7 — the seed prunes consumed carry-overs.** `SelectWaveSeedMenus`
+drops committed ids resolving to `processed`/`rejected`/`quarantine` before
+widening, making the plan artifact honest rather than leaning on the launch-time
+gate to skip a lane that should never have been planned. `pending` and
+`processing` survive (still live work) and — load-bearing — so does an id with
+**no** lifecycle evidence: a prune that dropped what it cannot resolve would
+starve every wave of non-inbox-backed cards.
+
+Verification: `go/acs/cycle1180/predicates_test.go` — 4 predicates driving the
+real seams over isolated temp trees (002 walks a ceiling-3 lifecycle to
+quarantine; 003 is the negative half proving uncommitted menu ids and S3
+system-level failures stay inert; 001 and 004 pin the two gaps above, each with
+its fail-open edge asserted). Unit coverage for the new package lives at
+`go/internal/cycleoutcome/cycleoutcome_test.go`; permanent regression evals at
+`.evolve/evals/{wave-lane-task-quarantine-dead,wave-planner-pass-scope-prune}.md`.

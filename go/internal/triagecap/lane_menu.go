@@ -12,8 +12,11 @@ package triagecap
 // claimed, so they simply remain dispatchable backlog.
 
 import (
+	"io"
 	"path/filepath"
 	"sort"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 // ExpandWithClusterMates deepens a selection (one lane per member) into lane
@@ -102,9 +105,38 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 // i.e. nothing), it still yields a single lane at count<2.
 func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
 	backlog := ReadInboxBacklog(evolveDir, isProtected)
+	committed = pruneConsumed(evolveDir, committed)
 	seed := SelectFleetWidthTopN(backlog, count)
 	if len(committed) > 0 {
 		seed = WidenTopNToFleetWidth(committed, backlog, count)
 	}
 	return ExpandWithClusterMates(seed, backlog, perLane)
+}
+
+// pruneConsumed drops carried-over committed ids the inbox lifecycle has
+// already consumed (wave-planner-pass-scope-prune). WidenTopNToFleetWidth
+// copies the committed prefix through VERBATIM, so without this a consumed id
+// is re-pinned into a later wave's lane-scope.json — cycle-1116 re-pinned
+// tdd-topn-binding-gate after cycle-1113 consumed it. Pruning at the SEED makes
+// the plan artifact itself honest instead of leaning on the launch-time
+// freshness gate to skip a lane that should never have been planned.
+//
+// Only TERMINAL states prune: processed/rejected/quarantine. pending and
+// processing stay (still live work), and — load-bearing — an id with no
+// lifecycle evidence at all stays too. A prune that dropped what it cannot
+// resolve would starve every wave of non-inbox-backed cards.
+func pruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidate {
+	if len(committed) == 0 {
+		return committed
+	}
+	opts := inboxmover.Options{InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: io.Discard}
+	kept := make([]FleetCandidate, 0, len(committed))
+	for _, c := range committed {
+		switch inboxmover.ResolveDispatchState(opts, c.ID).State {
+		case inboxmover.StateProcessed, inboxmover.StateRejected, inboxmover.StateQuarantine:
+			continue
+		}
+		kept = append(kept, c)
+	}
+	return kept
 }

@@ -27,6 +27,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
@@ -225,6 +227,17 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		BypassPolicy:          bypassPolicy,
 	})
 	if err != nil {
+		// A cycle-level FAIL must reach the inbox lifecycle from HERE too: every
+		// fleet lane runs this entrypoint as a subprocess, and fleet.Result
+		// carries neither the lane's cycle number nor its workspace — so the
+		// parent wave loop structurally cannot apply a lane's verdict. Applying
+		// it in-process (where cycle + workspace are local) mirrors the PASS half
+		// in phases/ship/postship.go and is what makes the ADR-0072 S5 retry
+		// ceiling reachable for fleet-dispatched work at all.
+		var clf *core.ErrCycleLevelFailure
+		if errors.As(err, &clf) {
+			applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr)
+		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return 1
 	}
@@ -241,7 +254,25 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
 		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr)
 	}
+	// The other shape of a FAIL: RunCycle returned no error but the cycle's
+	// final verdict is FAIL. Same closeout, applied exactly once (the err!=nil
+	// branch above already returned).
+	if result.FinalVerdict == cyclestate.VerdictFAIL {
+		applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr)
+	}
 	return cycleRunExitCode(result)
+}
+
+// applyCycleFailureOutcome walks the failed cycle's triage-committed ids
+// through the inbox failure lifecycle (bump failure_count, quarantine at the S5
+// ceiling) via the shared seam. Best-effort: a lifecycle hiccup WARNs but never
+// changes the cycle's exit code, which is the lane's only channel to its parent.
+func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer) {
+	if _, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
+		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
+	)); err != nil {
+		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle, err)
+	}
 }
 
 // filterEvolveEnv extracts the EVOLVE_* and BRIDGE_* slice of the

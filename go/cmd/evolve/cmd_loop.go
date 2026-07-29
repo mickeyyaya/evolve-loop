@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 
 	// Blank import: checkpoint's init() registers core.PhaseBoundaryCheckpointer
 	// so the orchestrator writes a resumable checkpoint at every phase boundary.
@@ -33,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -704,33 +704,19 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 				// re-released, so a poison todo stops being re-picked every cycle.
 				// Transient infra and system/kernel breaches are NOT the task's fault
 				// (they take the S3 halt path), so they never quarantine here (AC4).
-				failPol := policy.DefaultSystemFailurePolicy()
-				if pol, polErr := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); polErr == nil {
-					if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
-						failPol = fp
-					}
-				}
-				systemLevel := !isTaskLevelFailure(class.Class)
 				// ONE lifecycle seam (wave-lane-task-quarantine-dead): the drain
 				// bumps failure_count on the ids triage COMMITTED, claiming them
 				// into processing/cycle-N first when a lane never did. Before
 				// this, the drain walked processing/ only — wave lanes never put
 				// their worked ids there, so batch-14 burned four FAILs on the
 				// same items with failure_count stuck at 0 and the S5 ceiling
-				// unreachable. An absent/unreadable decision leaves CommittedIDs
-				// nil, which is exactly the legacy whole-dir behavior.
-				committedIDs := failedCycleCommittedIDs(cycleWorkspace(cfg.ProjectRoot, result.Cycle))
-				if _, relErr := inboxmover.ApplyCycleOutcome(inboxmover.Options{
-					ProjectRoot: cfg.ProjectRoot,
-					Stderr:      stderr,
-				}, inboxmover.CycleOutcome{
-					Cycle:        result.Cycle,
-					Passed:       false,
-					CommittedIDs: committedIDs,
-					Reason:       "cycle-failure-release",
-					Ceiling:      failPol.Thresholds.TaskRetryCeiling,
-					SystemLevel:  systemLevel,
-				}); relErr != nil {
+				// unreachable. The seam now lives in internal/cycleoutcome so
+				// the fleet path (runCycleRun, where a lane's cycle number and
+				// workspace are local) calls the SAME code — a second inline
+				// copy here is what kept the halves out of sync.
+				if _, relErr := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
+					cfg.ProjectRoot, cfg.EvolveDir, cycleWorkspace(cfg.ProjectRoot, result.Cycle), result.Cycle, stderr,
+				)); relErr != nil {
 					fmt.Fprintf(stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, relErr)
 				}
 				// All-families quota exhaustion (cycle-656): the dispatch seam
@@ -1024,30 +1010,19 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 // file is absent/unreadable/malformed, so the caller skips the completion check
 // rather than ever treating an unreadable state as "goal complete".
 // isTaskLevelFailure reports whether a cycle classification is a task-level
-// failure eligible for ADR-0072 S5 quarantine. Only genuine per-task defects
-// (build/audit/ship-gate) count; transient infrastructure and system/kernel
-// breaches are not the task's fault and take the S3 halt path, so they never
-// quarantine a todo (AC4 — S3 precedence over task quarantine).
+// failure eligible for ADR-0072 S5 quarantine. Thin forwarder: the rule itself
+// lives in internal/cycleoutcome beside the failure seam that acts on it, so
+// the loop's quarantine surface and the closeout can never fork on "whose fault
+// was this" (transient infra and system breaches take the S3 halt path and
+// never quarantine a todo — AC4).
 func isTaskLevelFailure(c cycleclassify.Classification) bool {
-	switch c {
-	case cycleclassify.ClassBuildFail, cycleclassify.ClassAuditFail, cycleclassify.ClassShipGateConfig:
-		return true
-	default:
-		return false
-	}
+	return cycleoutcome.IsTaskLevelFailure(c)
 }
 
-// failedCycleCommittedIDs reads the failed cycle's triage-decision.json (written
-// by the triage phase, so it exists even when the cycle never reached ship) and
-// returns the ids triage committed to working. nil on any absent/unreadable/
-// malformed decision — the FAIL drain then falls back to its legacy whole-dir
-// behavior rather than silently bumping nothing.
+// failedCycleCommittedIDs reads the failed cycle's committed id set. Thin
+// forwarder to the seam's reader for the same single-definition reason.
 func failedCycleCommittedIDs(workspace string) []string {
-	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
-	if err != nil {
-		return nil
-	}
-	return inboxmover.CommittedIDs(body)
+	return cycleoutcome.CommittedIDsFor(workspace)
 }
 
 func readCarryoverCount(statePath string) (count int, ok bool) {
