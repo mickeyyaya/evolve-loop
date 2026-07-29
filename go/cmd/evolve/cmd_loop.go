@@ -38,7 +38,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -921,6 +920,21 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		var stopOnFail bool
 		consecutiveFails, stopOnFail = consecutiveFailBreaker(
 			result.FinalVerdict == core.VerdictFAIL, consecutiveFails, maxConsecutiveFails)
+		if result.FinalVerdict == core.VerdictFAIL {
+			// FAIL closeout runs BEFORE the breaker break so the terminal
+			// FAIL — the one that stops the batch — still bumps (#373 M2).
+			// This site covers any iteration that falls through to
+			// in-process orch.RunCycle; fleet lanes exec `evolve cycle run`,
+			// whose epilogue applies the SAME internal/cycleoutcome seam —
+			// mutually exclusive, so no cycle double-bumps. (Merge of the
+			// loop-authored ADR-0079 seam over the console #373 helper: one
+			// closeout, two entry points.)
+			if _, relErr := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
+				cfg.ProjectRoot, cfg.EvolveDir, cycleWorkspace(cfg.ProjectRoot, ranCycle), ranCycle, stderr,
+			)); relErr != nil {
+				fmt.Fprintf(stderr, "[loop] WARN: could not apply cycle %d failure outcome to the inbox: %v\n", ranCycle, relErr)
+			}
+		}
 		if stopOnFail {
 			lr.StopReason = "fail"
 			break
@@ -930,22 +944,6 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.ContinuedFailures++
 			fmt.Fprintf(stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",
 				ranCycle, consecutiveFails, maxConsecutiveFails)
-			// ADR-0080 P2: graded task-level FAILs bump the committed ids'
-			// durable failure_count where they live (inbox root) and
-			// quarantine at the ADR-0072 ceiling — the release-path
-			// accounting never fires for wave lanes (no processing/ claim),
-			// which is how 12-attempt grinds ran with failure_count 0.
-			// System-level classes are not the task's fault (AC4) and skip.
-			wsp := cycleWorkspace(cfg.ProjectRoot, ranCycle)
-			if isTaskLevelFailure(cycleclassify.Classify(wsp).Class) {
-				failPol := policy.DefaultSystemFailurePolicy()
-				if pol, polErr := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); polErr == nil {
-					if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
-						failPol = fp
-					}
-				}
-				recordCommittedFailures(cfg.ProjectRoot, wsp, ranCycle, failPol.Thresholds.TaskRetryCeiling, stderr)
-			}
 		}
 
 		// Goal-stall escalation: an empty/blocked cycle shipped nothing and left
