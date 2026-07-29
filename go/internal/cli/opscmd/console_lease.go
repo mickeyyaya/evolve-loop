@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
@@ -76,8 +75,22 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.StringVar(&reason, "reason", "", "why the operator is touching the runtime tree")
 	fs.StringVar(&projectRoot, "project-root", ".", "runtime plane root the lease applies to")
 	fs.BoolVar(&clear, "clear", false, "remove the active lease")
-	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
-		return 10
+	// Interspersed parse: the documented form is paths-first (`console-lease
+	// <path>... --ttl 30m`), stdlib flag stops at the first positional, and
+	// cmdutil.ReorderArgs is bool-flag-only by contract (it scatters
+	// `--ttl 10m` style values into the positional list) — so collect
+	// positionals ourselves and re-parse the remainder.
+	var rawPaths []string
+	rest := args
+	for {
+		if err := fs.Parse(rest); err != nil {
+			return 10
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		rawPaths = append(rawPaths, fs.Arg(0))
+		rest = fs.Args()[1:]
 	}
 	leasePath, err := hubLeasePath(projectRoot)
 	if err != nil {
@@ -85,6 +98,10 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if clear {
+		if len(rawPaths) > 0 {
+			fmt.Fprintln(stderr, "evolve console-lease: --clear takes no paths (it removes the whole lease)")
+			return 10
+		}
 		if err := os.Remove(leasePath); err != nil && !os.IsNotExist(err) {
 			fmt.Fprintf(stderr, "evolve console-lease: clear: %v\n", err)
 			return 1
@@ -92,7 +109,7 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "[console-lease] cleared — tree-diff guard fully armed")
 		return 0
 	}
-	paths, err := normalizeLeasePaths(projectRoot, fs.Args())
+	paths, err := normalizeLeasePaths(projectRoot, rawPaths)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
 		return 10
