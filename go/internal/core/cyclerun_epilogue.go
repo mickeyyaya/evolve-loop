@@ -20,15 +20,45 @@ import (
 // loud: it must never mask the original error, and each step tolerates the
 // others failing. Uses a fresh context — the cycle's own ctx is typically
 // already canceled on these paths (the cycle-1048 shape).
-func (cr *cycleRun) abnormalEpilogue() {
+//
+// cause is the error RunCycle is about to return — the abort's ONE
+// distinguishing fact (nil on a bare bounce AND on a panic, which reaches
+// this defer with retErr unset: both stay honestly Unexplained). Appended to
+// the constant template it makes the digest content-bearing and
+// cause-distinct; without it three distinct same-phase aborts share one
+// Unexplained fingerprint and the diagnosability breaker's only move is
+// halting the batch (batch-19 cycle-1208: 1197/1199/1207 all
+// "build|unknown|7c02ce1f4f95").
+//
+// Teardown-shaped causes (IsInfraTeardownError: artifact timeout, transient
+// bridge death) are marked "teardown=" instead of "cause=". Their identical
+// fingerprints STAY in the identical-fingerprint population DELIBERATELY
+// (review HIGH, decision pinned): one systemic infra condition mowing down
+// three lanes is exactly the recurring-infra shape ADR-0072's halt doctrine
+// wants stopped at the ceiling — the marker makes that shape legible in the
+// halt message instead of reading as "identical defects".
+func (cr *cycleRun) abnormalEpilogue(cause error) {
 	if cr.cycleCompletedNormally {
 		return
 	}
 	epilogueCtx := context.Background()
+	reason := abnormalEpilogueReason(cr.cs.Phase)
+	if cause != nil {
+		// causeHead: cycle-normalized + TAIL-kept truncation, so identical
+		// causes across cycles share a fingerprint (recurrence countable) and
+		// distinct roots under long identical prefixes never collapse. The
+		// boilerplate detector is anchored to the bare template, so any
+		// suffixed form is content-bearing by design.
+		if IsInfraTeardownError(cause) {
+			reason += " teardown=" + causeHead(cause.Error())
+		} else {
+			reason += " cause=" + causeHead(cause.Error())
+		}
+	}
 	// Evidence floor: a digest for the breaker/disposition machinery even when
 	// the abort predates the retro paths (idempotent with both).
 	cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath,
-		cr.cs.Phase, abnormalEpilogueReason(cr.cs.Phase))
+		cr.cs.Phase, reason)
 	// Record floor: exactly one dossier per started cycle, on every path.
 	dossierGoal := cr.req.Context["goal"]
 	if dossierGoal == "" {
