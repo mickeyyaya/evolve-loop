@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1170"
+  ],
+  "consumed_by": "console-2026-07-29: fixed console-first, landed in PR #372 squash 4e523438 \u2014 root cause was NOT a forged verdict but contention false-reds: whole-suite meta-predicates (TouchedPackagesStayGreen) red under fleet oversubscription while green in the preserved worktree (fingerprint audit|gate-block|d3ffc68e62b6 = 3 honest recurrences of ONE host-level defect). Fix: internal/verifylock host-wide single-flight wired into acssuite.Run + build-floor scopedCover (15m bounded wait, WaitDelay=30s) + FAIL-side attempt accounting (inboxmover.RecordRootTaskFailure). Resume on v22.10.0 binary.",
+  "created_at": "2026-07-28T16:39:00Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-07-28T16:39:00Z. Evidence: failure fingerprint \"audit|gate-block|d3ffc68e62b6\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=audit|gate-block|d3ffc68e62b6)",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1170. The pipeline forged a verdict (category=pipeline-blocker): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 failure fingerprint \"audit|gate-block|d3ffc68e62b6\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=audit|gate-block|d3ffc68e62b6)",
+  "weight": 0.99
+}
