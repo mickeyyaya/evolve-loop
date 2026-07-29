@@ -29,6 +29,17 @@ type Rule interface {
 // house style) and real-backlog validation showed its transitive closure
 // chains half the backlog into one mega-cluster; opt in via ConnectsRule when
 // a tighter backlog warrants it. Order is presentation-only (edges union).
+//
+// root_cause is excluded PERMANENTLY, and not for the connects_to reason (too
+// many edges) but the opposite one: it yields zero edges. An exact-match rule
+// on that field was built and reverted (cycle-1204; .evolve/state.json
+// failedApproaches[54]). Measuring the real backlog settled it: all 20 non-empty
+// root_cause values were unique free-form prose, 122-1564 bytes, no two alike —
+// unlike campaign/dep ids, which are short reusable keys, root_cause is a
+// per-defect narrative, structurally a sibling of notes/evidence. Equality
+// binding therefore emits no edges on real data, and normalizing or fuzzing the
+// match only manufactures false ones, since the values describe genuinely
+// unrelated defects. Do not re-add it.
 func DefaultRules() []Rule {
 	return []Rule{campaignRule{}, fileAreaRule{}, depRule{}}
 }
