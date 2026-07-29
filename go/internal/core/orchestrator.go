@@ -745,7 +745,7 @@ func (o *Orchestrator) ensureSafeConfig() error {
 	return nil
 }
 
-func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleResult, error) {
+func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleResult, retErr error) {
 	if err := o.ensureSafeConfig(); err != nil {
 		return CycleResult{}, err
 	}
@@ -792,7 +792,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (CycleRes
 	defer cr.releaseShipWindow()
 	// Cycle-1048: no exit path may leave a started cycle without its evidence
 	// trail (dossier + digest + coherent state) — see cyclerun_epilogue.go.
-	defer cr.abnormalEpilogue()
+	// retErr (the named return) is the abort's cause at defer-execution time —
+	// the distinguisher that keeps three distinct aborts from sharing one
+	// Unexplained fingerprint (batch-19 cycle-1208 halt).
+	defer func() { cr.abnormalEpilogue(retErr) }()
 
 	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
 	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle

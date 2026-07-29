@@ -320,6 +320,29 @@ func defectHead(d string) string {
 	return d
 }
 
+// causeHead projects an abort-cause error string onto its stable identity:
+// cycle-normalized, single-line, and — unlike defectHead — TAIL-kept when over
+// budget. Error chains grow prefix-first ("phase build: attempt N: bridge:
+// <long path>: <root cause>"), so the distinguishing content lives at the END;
+// a head-kept cut would collapse two different roots under one long shared
+// prefix into one fingerprint (review M1 on the batch-19 cycle-1208 fix).
+func causeHead(errText string) string {
+	s := strings.TrimSpace(strings.ReplaceAll(errText, "\n", " "))
+	if s == "" {
+		return ""
+	}
+	s = freeTextCycleTokens.ReplaceAllStringFunc(s, func(m string) string {
+		if strings.HasPrefix(m, "TestC") {
+			return "TestCN_"
+		}
+		return "cycle-N"
+	})
+	if len(s) > 160 {
+		s = "…" + strings.ToValidUTF8(s[len(s)-160:], "")
+	}
+	return s
+}
+
 // agentGradedRouterReason is the ONE template for the dispatch loop's
 // "verdict FAIL routed to retro" fallback reason. Shared with
 // isBoilerplateRouterReason so the writer and the content-free detector can

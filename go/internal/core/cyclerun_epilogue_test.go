@@ -33,7 +33,7 @@ func epilogueRun(t *testing.T, completedNormally bool) (*cycleRun, string) {
 
 func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
 	cr, root := epilogueRun(t, false)
-	cr.abnormalEpilogue()
+	cr.abnormalEpilogue(nil)
 
 	dossier := filepath.Join(root, "knowledge-base", "cycles", "cycle-77.json")
 	raw, err := os.ReadFile(dossier)
@@ -53,7 +53,7 @@ func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
 
 func TestAbnormalEpilogue_NoopAfterNormalCloseout(t *testing.T) {
 	cr, root := epilogueRun(t, true)
-	cr.abnormalEpilogue()
+	cr.abnormalEpilogue(nil)
 	if _, err := os.Stat(filepath.Join(root, "knowledge-base", "cycles", "cycle-77.json")); err == nil {
 		t.Fatal("a normally-closed cycle must not get an epilogue dossier (no clobbering)")
 	}

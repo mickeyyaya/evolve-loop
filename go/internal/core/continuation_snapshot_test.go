@@ -192,7 +192,7 @@ func TestAbnormalEpilogue_StampsContinuation(t *testing.T) {
 	}
 	cr.cycleCompletedNormally = false
 
-	cr.abnormalEpilogue()
+	cr.abnormalEpilogue(nil)
 
 	m, ok, err := continuation.ReadManifest(ws)
 	if err != nil || !ok {
