@@ -27,10 +27,15 @@ import (
 // tolerant-by-default: real items are a mix of hand-authored and
 // agent-autofiled JSON, so anything absent zero-values rather than erroring.
 type Item struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Weight     float64  `json:"weight"`
-	Kind       string   `json:"kind"`
+	ID     string  `json:"id"`
+	Title  string  `json:"title"`
+	Weight float64 `json:"weight"`
+	Kind   string  `json:"kind"`
+	// Class is the item's declared archetype ("pipeline-architecture",
+	// "task-contract-design", …). Authors have been writing it into inbox JSON
+	// for a while; it was silently dropped at load until cycle-1190. It is the
+	// routing signal downstream archetype detectors key off (IsOperatorState).
+	Class      string   `json:"class"`
 	Priority   string   `json:"priority"`
 	Campaign   string   `json:"campaign"`
 	Files      []string `json:"files"`
