@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1218"
+  ],
+  "consumed_by": "console-2026-07-30: NOT a forged verdict and NOT a pipeline defect \u2014 the halt was CORRECT and its cause is legible for the first time thanks to PR #376 (epilogue cause distinguisher). Fingerprint build|unknown|c8e066ca323d = THREE lanes' build phases aborting on the SAME honest cause, captured verbatim in the digest: 'new internal package(s) absent from go/.apicover-enforce \u2014 graduate each (add its pattern line and an apicover_named_test.go) or the apicover unnamed-export gate never inspects it'. Before #376 this would have been a content-free build|unknown with no cause anywhere on disk. The recurrence is real: three independent lanes each created a new internal package without enrolling it, because the enrollment requirement is NOT in the builder's brief. Filed as acs-apicover-enrollment-in-builder-brief (0.94). Batch-21 also lost its first ~3h to SIX leaked `yes` load generators (19h old, survivors of an incomplete sweep) which starved deep-tier phases past their timeouts in cycles 1216/1217/1218 \u2014 killed, and the deflake item's reproducer constraint hardened. Resuming with --resume: the pipeline is sound, the recurring defect is task-level and now briefed.",
+  "created_at": "2026-07-30T07:47:05Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-07-30T07:47:05Z. Evidence: failure fingerprint \"build|unknown|c8e066ca323d\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=build|unknown|c8e066ca323d)",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1218. The pipeline forged a verdict (category=pipeline-blocker): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 failure fingerprint \"build|unknown|c8e066ca323d\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=build|unknown|c8e066ca323d)",
+  "weight": 0.99
+}
