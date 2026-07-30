@@ -79,6 +79,28 @@ The invariant block stays in the cacheable prompt prefix; the per-cycle path liv
 (cache-safe + recency-optimal). The block tells the agent to write there, emit the verdict
 sentinel, and run `evolve phase verify` before finishing.
 
+Immediately after that footer line, `phasecontract.RenderContractTail` appends the **machine** half of
+the contract as one XML-tagged block, at the generation point:
+
+```xml
+<deliverable-contract phase="audit">
+  <artifact-path>/…/.evolve/runs/cycle-1218/audit-report.md</artifact-path>
+  <required-sections>
+    <section>## Verdict</section>
+  </required-sections>
+  <verdict-sentinel verdicts="PASS|FAIL|WARN|SKIPPED"><!-- evolve-verdict: {…} --></verdict-sentinel>
+  <self-check>evolve phase verify audit --workspace &lt;your workspace dir&gt;</self-check>
+</deliverable-contract>
+```
+
+Why the same facts appear twice: Claude follows **turn-tail** instructions more reliably than
+preamble ones, and XML-tagged sections parse unambiguously — which is why the *correction* prompt
+(identical requirements, tail placement) already got compliance the prefix block did not. Every
+string in the block is projected from `Contract.Sections` / `Contract.RequiredKeys` /
+`RenderVerdictSentinel`, so there is **no second template** for the writer and the detector to drift
+apart on. The sentinel is gated on `len(Verdicts)>0` exactly as the prefix block gates it (build/
+scout/triage stay sentinel-free), and a `NoArtifact` contract (`ship`) gets the footer alone.
+
 ## Self-check (agent-callable)
 
 ```

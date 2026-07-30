@@ -44,12 +44,10 @@ Read reference `worktree-isolation` for isolation verification and commit protoc
 - **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
 
 ### Budget Checkpoint Protocol
-**At turn 15**, before issuing the next tool call, pause and execute this checkpoint:
-1. Count turns used so far.
-2. List all remaining steps (edits not yet made, verifications not yet run, report not yet written).
-3. Estimate turns needed for each remaining step.
-4. If `turns_used + remaining_turns_estimate > 25`: defer non-essential steps. Document deferred items in build-report.md under "Deferred — turn budget."
-5. Never defer: the `build-report.md` write and the worktree commit.
+**At turn 15**, before the next tool call: count turns used, list every remaining step (edits not made,
+verifications not run, report not written) and estimate its turns. If `turns_used + estimate > 25`, defer
+non-essential steps and document them in build-report.md under "Deferred — turn budget."
+Never defer the `build-report.md` write or the worktree commit.
 
 ### Mid-Trajectory Compaction Protocol
 
@@ -63,11 +61,25 @@ After the block, release attention from stale raw tool results and reason from t
 ## Shared Constraints
 Read [AGENTS.md](AGENTS.md) section `Shared Constraints` for the universal Banned Patterns and Tool Hygiene rules that apply to this phase. Read reference `tool-batching` for turn-budget optimization tips.
 
-### Export naming + mandatory pre-flight (hard floor)
+### Export naming, package graduation, caller proof (hard floor)
 
-Every NEW exported identifier MUST be named in a test with a real assertion
-executing it, same handoff; new packages enroll in `go/.apicover-enforce`.
+Every NEW exported identifier MUST be named in a test with a real assertion executing it, same handoff.
 The floor REJECTS otherwise (diff-scoped: only YOUR exports block you).
+
+**Graduate a new package in the SAME diff.** A new `go/internal/<pkg>` is invisible to the **repo-wide**
+apicover unnamed-export gate until enrolled (ADR-0069's second gate; the per-cycle ACS coverage gate is a
+different one and needs no enrollment). Two edits, both required — enrolled-but-unnamed fails too:
+1. append the line `./internal/<pkg>` to `go/.apicover-enforce`;
+2. add `go/internal/<pkg>/apicover_named_test.go` naming **every exported symbol** of the package in a real
+   assertion that executes it.
+
+**Caller proof — integration is an acceptance criterion, not an assumption.** For every new exported symbol,
+option, struct field, gate, or CLI flag, `build-report.md` MUST name its **production caller** (`file:line`)
+and cite the test proving the seam is REACHED from that caller — a reachability test through the real entry
+point, not a unit test that calls the seam directly. A seam whose only caller is a test is dead code: say so
+explicitly with a removal cycle, or delete it. Wiring a seam into one execution path only (sequential loop but
+not fleet mode) is the same defect — name the paths you covered.
+
 **MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and
 iterate until GREEN before declaring done — hand off only with GREEN evidence.
 
@@ -88,18 +100,16 @@ iterate until GREEN before declaring done — hand off only with GREEN evidence.
 ### Step 2.5: Online Research (if needed)
 See reference `build-research-protocol`.
 ### Step 2.7: Skill Consultation (if recommended)
-**Standing minimalism discipline — ALWAYS ON (baked in; no skill call needed):** apply this during
-Step 3 Design and Implementation. Take the laziest solution that actually works — stop at the FIRST
-rung that holds: (1) does it need to exist? → skip it (YAGNI), say so in one line; (2) stdlib does it
-→ use it; (3) native platform / `policy.json` config covers it → use it over new code or a flag; (4)
-an already-present dependency solves it → use it, never add one for a few lines; (5) one line → one
-line; (6) only then, the minimum that works. No abstraction with a single implementation, no
-scaffolding "for later", deletion over addition, fewest files, shortest working diff. Mark a
-deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path. This operationalizes
-Core Principle #1 (Minimal Change). **NEVER** simplify away input validation at trust boundaries,
-error handling that prevents data loss, security, accessibility, an explicit request, or a pipeline
-gate (the RED test / safety invariants / eval+contract gates / ship floor stay). Full ruleset:
-[skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md).
+**Standing minimalism discipline — ALWAYS ON (baked in; no skill call needed):** during Step 3 Design and
+Implementation take the laziest solution that actually works — stop at the FIRST rung that holds: (1) does it
+need to exist? → skip it (YAGNI), say so in one line; (2) stdlib does it → use it; (3) native platform /
+`policy.json` config covers it → use it over new code or a flag; (4) an already-present dependency solves it
+→ use it, never add one for a few lines; (5) one line → one line; (6) only then, the minimum that works. No
+abstraction with a single implementation, no scaffolding "for later", deletion over addition, fewest files,
+shortest working diff. Mark a deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path.
+This operationalizes Core Principle #1. **NEVER** simplify away input validation at trust boundaries, error
+handling that prevents data loss, security, accessibility, an explicit request, or a pipeline gate (the RED
+test / safety invariants / eval+contract gates / ship floor stay). Full ruleset: [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md).
 
 If `task.recommendedSkills` non-empty, consult skills before Step 3.
 
@@ -207,10 +217,9 @@ The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-repor
 
 ## Pre-handoff Regression Slice (cycle-91+; native ACS suite since v12)
 
-**Before writing build-report.md**, Builder MUST run the NATIVE ACS suite — the
-replacement for the v12-removed `run-regression-suite-slice.sh` — and confirm it is
-green. This is the SAME suite the auditor runs as ground truth; passing locally makes
-the audit a rubber-stamp rather than a rejection.
+**Before writing build-report.md**, Builder MUST run the NATIVE ACS suite (the replacement for the v12-removed
+`run-regression-suite-slice.sh`) and confirm it is green — the SAME suite the auditor runs as ground truth, so
+passing locally makes the audit a rubber-stamp rather than a rejection.
 
 ```bash
 ./go/bin/evolve acs suite --cycle <N>    # native replacement for run-regression-suite-slice.sh; run from the worktree
@@ -220,29 +229,19 @@ the audit a rubber-stamp rather than a rejection.
 - **`red>0` / exit 2**: BLOCK — do NOT write build-report.md or claim PASS until the red predicates are remediated by **fixing your code** (you may NOT edit the predicates themselves — bash `acs/cycle-N/*.sh` OR Go `go/acs/cycle<N>/predicates_test.go`; both are TDD-engineer-owned), then re-run until `red=0`. A Go-lane compile error surfaces as a hard suite error, not a silent pass.
 - **Eval graders:** also run your task's graders (`go test -run <names>` from `evals/<task-slug>.md`). A `no tests to run` result means the required test does NOT exist — WRITE IT before claiming PASS; never report PASS for a grader that matched zero tests.
 
-Include the suite's verbatim output line in the final `build-report.md` under a
-`## Regression Slice` or `## Pre-handoff Slice` section, AND on its own line a
-`<green>/<total> PASS` summary derived from the suite's `green=`/`total=` fields
-(e.g. `72/72 PASS` when `green=72 total=72`) — predicate
-`acs/cycle-91/006-build-report-slice-attestation.sh` attests on that `N/N PASS` line,
-and the native `green=…/red=…` format alone does not match it. NEVER claim `Status: PASS`
-from self-assessment alone — the native suite + eval graders are the ground truth the
-auditor re-runs; if they are not green for you, they will not be green for the auditor either.
+Include the suite's verbatim output line in the final `build-report.md` under a `## Regression Slice` or
+`## Pre-handoff Slice` section, AND on its own line a `<green>/<total> PASS` summary derived from the suite's
+`green=`/`total=` fields (e.g. `72/72 PASS` when `green=72 total=72`) — predicate
+`acs/cycle-91/006-build-report-slice-attestation.sh` attests on that `N/N PASS` line, and the native
+`green=…/red=…` format alone does not match it. NEVER claim `Status: PASS` from self-assessment alone — the
+suite + eval graders are the auditor's ground truth; not green for you means not green for the auditor.
 
 ## Pre-handoff Git Tracking Attestation (cycle-93+)
 
-After the regression slice passes, Builder MUST verify every file delivered in
-this cycle is tracked by git — not merely present on disk:
-
-```bash
-git ls-files --error-unmatch agents/AGENTS.md
-git ls-files --error-unmatch .evolve/profiles/AGENTS.md
-# … one invocation per delivered file path
-```
-
-**If any `git ls-files --error-unmatch` exits non-zero: BLOCK** — do not write
-`build-report.md`. A gitignored file passes `[ -f ]` but is silently dropped at ship.
-Run after `git add`; unstaged new files also exit non-zero (correct BLOCK signal).
+After the regression slice passes, verify every file delivered this cycle is git-TRACKED, not merely present
+on disk: `git ls-files --error-unmatch <path>` once per delivered path, run after `git add`.
+**Any non-zero exit: BLOCK** — do not write `build-report.md`. A gitignored file passes `[ -f ]` but is
+silently dropped at ship; unstaged new files also exit non-zero (correct BLOCK signal).
 
 ## STOP CRITERION
 
