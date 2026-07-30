@@ -108,6 +108,41 @@ check and the harness's post-phase gate can never drift.
   `CIRCUIT OPEN` escalation, so a miscalibrated gate cannot halt the loop. State persists in
   `.evolve/contract-gate-breaker.json`; a clean cycle resets it (half-open).
 
+## Write-in-flight grace (read robustness)
+
+A phase agent's final deliverable write is not atomic with respect to the verify call that follows
+it: a verifier can observe ENOENT (create not yet visible) or a zero-length file for a deliverable
+that IS being written. A single unretried read cannot distinguish that from "never written", and
+both surface as a CONFIRMED violation — a false FAIL that fails CLOSED.
+
+`readDeliverableWithGrace` (`internal/deliverable/deliverable.go`) therefore treats
+absence/emptiness as **provisional** for a bounded window (`readGraceWindow = 500ms`, re-polled
+every `readGracePoll = 20ms`):
+
+- **Reads first, waits only on failure.** The common already-written case pays exactly one
+  `os.ReadFile` and no sleep — pinned by `TestReadDeliverableWithGrace_PresentContentIsOneReadNoSleep`.
+- **Never launders a real violation.** A genuinely missing or permanently empty deliverable still
+  yields the same violation code once the window closes. The window delays the verdict, never
+  changes it.
+- **Fail-open on infra.** A non-absence read fault (EISDIR, permissions, IO) returns immediately as
+  infra ambiguity — it will never clear, so the budget is not spent on it and it is never
+  reclassified as a violation.
+- **Layering.** On the host-runner path this nests inside the existing 16x reconcile retry
+  (`runner.go verifyReconcileDeliverable`), so a genuinely-absent artifact's confirmed-missing worst
+  case is ~11s — accepted: paid once, only by a phase that produced nothing. The layer's real
+  purpose is the retry-LESS callers (`evolve phase verify` self-check).
+
+Deliberately **not** configurable: an I/O robustness constant, not a phase setting (`graceSleep` is
+a test seam, not a dial). Coverage: `internal/deliverable/grace_test.go`.
+
+**Known residual (queued):** partial-but-non-blank content — the file present with its sections but
+its trailing verdict sentinel not yet appended (observed cycle-1198) — is NOT retried here. Closing
+it at the source requires artifact-ready CROSS-POLL stability in the bridge detector
+(`artifact-ready-crosspoll-debounce`, queued): an in-poll settle sleep cannot span the
+multi-second gap between an agent's `Write` and its follow-up `Edit`, and the change alters the tick
+contract for every artifact-completion fixture plus any short `ArtifactTimeoutS`, so it needs its own
+cycle with a timeout-budget audit.
+
 ## Verdict sentinel (Strangler Fig)
 
 Producers emit `<!-- evolve-verdict: {"phase":"audit","verdict":"PASS","schema_version":1} -->`.
