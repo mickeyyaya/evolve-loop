@@ -156,7 +156,7 @@ write commits a **false** forensic identity — worse than an absent one.
 
 ---
 
-## 7. Deep-tier artifact budgets + self-describing timeouts (PR #384, open)
+## 7. Deep-tier artifact budgets + self-describing timeouts
 
 **The issue.** Six phases died `missing_artifact` in one day across four phase
 types — audit ×2, retro, adversarial-review, tdd ×2 — **one on a provably quiet
@@ -184,7 +184,7 @@ changed. **Lesson: do not file unverified claims.**
 
 ---
 
-## 8. Contract-gate CLI escalation (PR #384, open)
+## 8. Contract-gate CLI escalation
 
 **The issue, twice confirmed.** A phase whose deliverable fails its contract is
 re-dispatched to the **same** CLI forever — `cli_fallback` fires only on infra
@@ -207,6 +207,19 @@ left the live triage path permanently demoted with zero evidence.
 
 **Bonus finding.** `dispositionrouter.StageIntent` had **no production caller**
 before this change. Tests only.
+
+**Delivery note — both sections above shipped twice.** The first PR carrying
+them was cut from a base that predated the persona and e2e work, and CI on the
+*merge* of that stale base against current `main` produced two failures that
+existed in neither branch: `internal/prompts`'
+`TestPersonaStopCriterionDedupe_CombinedLineCountReduced` (the persona line
+budget is a hard ceiling, and two independent branches each spent part of it)
+and `internal/core`'s `TestGuardRecoversCatalogWritesSourcePhaseLeak`. Both
+pass on a clean rebuild of the same two commits onto current `main`, and the
+full e2e tier passes locally (1501s, both suites). Recorded because the failure
+signature is indistinguishable from a real regression while reading CI, and the
+cheap diagnostic — cherry-pick onto current `main` and run the two named
+packages — takes minutes where chasing the symptom takes hours.
 
 ---
 
