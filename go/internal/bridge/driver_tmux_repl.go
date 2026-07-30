@@ -432,12 +432,21 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	if interval <= 0 {
 		interval = defaultIfZero(deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
 	}
+	// The configured extend backstop, resolved once: it both builds the default
+	// reviewer and is REPORTED in the timeout summary (an operator reading
+	// "extends_used=6 max_extends=6" knows the budget was the wall, not a stall).
+	// The <=0 clamp mirrors newDeterministicReviewer's, so the number reported is
+	// the number actually enforced.
+	maxExtends := defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends)
+	if maxExtends <= 0 {
+		maxExtends = defaultArtifactMaxExtends
+	}
 	// Defensive default: the Engine path sets deps.Reviewer via withDefaults,
 	// but direct runTmuxREPL callers (tests, future Stage-1 wiring) may not —
 	// avoid a nil-deref at the review checkpoint.
 	reviewer := deps.Reviewer
 	if reviewer == nil {
-		reviewer = newDeterministicReviewer(defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends))
+		reviewer = newDeterministicReviewer(maxExtends)
 	}
 	// SignalCenter (ADR-0068, S3): the authoritative liveness source for the
 	// checkpoint below — Observe+Aggregate replace the bare per-run detectorFor(lp)
@@ -501,6 +510,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	attempt := 0
 	intervalStart := 0
+	// waitedS mirrors the wait loop's `elapsed` into function scope so the
+	// timeout summary below can report how long this launch actually waited.
+	// `elapsed` is scoped to the for statement, and lastEv.ElapsedS is only
+	// populated once a review CHECKPOINT is reached — a wait that ends before the
+	// first checkpoint (ctx cancel) would report 0 and read as "died instantly".
+	waitedS := 0
 	// --- Correlation span tracking for the bidirectional channel (ADR-0037).
 	// openCorrID is the CorrID of the most-recently-delivered idle-gated ask
 	// that has not yet been answered. sawBusy guards against a false
@@ -546,6 +561,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
+		waitedS = elapsed
 		if err := ctx.Err(); err != nil {
 			// Context cancelled (orchestrator timeout / SIGTERM / the next phase
 			// tearing down this session): before abandoning, ONE final completion
@@ -815,6 +831,21 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// fires on wall-shaped text the agent merely wrote or echoed, which the real
 		// regex correctly ignored — an operator chasing a regex that is working.
 		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedForExhaustionScan(lastGoodPane, ar.injectedPrompt), paneProfile.ExhaustedRegex)
+		// Self-describing death (inbox item deep-phase-artifact-budget-too-small):
+		// exit 81 alone says nothing, and the diagnostic file listing printed above
+		// used to become the recorded cause. This ONE marker line carries how long
+		// the wait ran and how much of the extend budget it consumed, so the next
+		// reader can separate "too slow — raise bridge.phase_artifact_timeout_s for
+		// this phase" (extends_used == max_extends while the agent was busy) from
+		// "wedged" (paused early, idle, no progress). The phase= field is
+		// cfg.Agent — the SAME key bridge.phase_artifact_timeout_s is indexed on —
+		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
+		// is also the final stderr line, and lifted into the error by Engine.Launch.
+		fmt.Fprintf(deps.Stderr,
+			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v reason=%q\n",
+			artifactTimeoutMarker, phaseName, waitedS, interval, attempt, maxExtends,
+			reviewActionOrNone(lastVerdict.Action), livenessOrUnknown(lastEv.State),
+			lastEv.Progressed, lastEv.Busy, lastVerdict.Reason)
 		return ExitArtifactTimeout, nil
 	}
 

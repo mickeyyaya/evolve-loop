@@ -61,7 +61,9 @@ func TestLoad_BridgeBlock(t *testing.T) {
 // budget resolver: compiled defaults keyed on the bridge AGENT LABEL, a
 // positive-only operator merge, and a fresh map per call. The 900s retro entry
 // exists because the grown retro contract does not fit the 300s builtin
-// (cycle-1048's retro was ctx-canceled at ~608s).
+// (cycle-1048's retro was ctx-canceled at ~608s); the 1200s deep-tier entries
+// exist because six deep-tier phases died at ~650s with no artifact in a single
+// day (see TestBridgePolicy_DeepTierArtifactBudgets for the arithmetic).
 func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -71,12 +73,19 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 	}{
 		{"compiled-agent-label", nil, "retrospective", 900},
 		{"compiled-phase-alias", nil, "retro", 900},
-		{"unlisted-phase-uses-builtin-sentinel", nil, "build", 0},
-		{"operator-adds-entry", map[string]int{"build": 600}, "build", 600},
+		// "scout" (not "build") is the unlisted probe: build/audit/tdd now carry
+		// compiled deep-tier budgets, so asserting 0 for them would pin the
+		// pre-fix cliff instead of the sentinel contract.
+		{"unlisted-phase-uses-builtin-sentinel", nil, "scout", 0},
+		{"operator-adds-entry", map[string]int{"scout": 600}, "scout", 600},
 		{"operator-raises-compiled", map[string]int{"retrospective": 1200}, "retrospective", 1200},
+		// Explicit positive operator config is AUTHORITATIVE in both directions:
+		// it may deliberately lower a compiled default. Only non-positive values
+		// are rejected.
+		{"operator-lowers-compiled", map[string]int{"audit": 600}, "audit", 600},
 		{"zero-override-rejected", map[string]int{"retrospective": 0}, "retrospective", 900},
 		{"negative-override-rejected", map[string]int{"retrospective": -5}, "retrospective", 900},
-		{"negative-unlisted-never-negative", map[string]int{"build": -30}, "build", 0},
+		{"negative-unlisted-never-negative", map[string]int{"scout": -30}, "scout", 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -89,7 +98,7 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 
 	// An unrelated override must not erase a compiled entry, and the per-phase
 	// map must never bleed into the global artifact_timeout_s budget.
-	bp := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"build": 600}}
+	bp := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"scout": 600}}
 	if got := bp.PhaseArtifactTimeouts()["retrospective"]; got != 900 {
 		t.Errorf("compiled retrospective entry = %d after unrelated override, want 900", got)
 	}

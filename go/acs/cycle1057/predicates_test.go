@@ -22,6 +22,15 @@
 // Every predicate here exercises the system under test (policy resolution, the
 // real Engine.Launch dispatch path, the real production adapter root, the real
 // retro phase). No source-grep assertions.
+//
+// PARTIALLY SUPERSEDED (inbox item deep-phase-artifact-budget-too-small): the
+// "every other phase keeps the 300s builtin" clause above was deliberately
+// NARROWED, not abandoned. build/audit/tdd/adversarial-review now carry compiled
+// 1200s budgets because ~650s (300s base × 6 extends) killed six deep-tier
+// phases in one day with no artifact at all. The invariant this suite pins —
+// an UNLISTED phase resolves 0, the "use the builtin" sentinel, so global hang
+// detection is not weakened across the board — is unchanged and is now probed
+// through phases that are still unlisted (scout/intent/triage/ship).
 package cycle1057
 
 import (
@@ -139,7 +148,9 @@ func TestC1057_001_PolicyPhaseArtifactTimeoutDefaults(t *testing.T) {
 		t.Errorf("compiled default \"retro\" alias budget = %d, want 900 — the phase/agent-label skew "+
 			"(core/routing_dispatch.go) is permanent, so both vocabularies must carry the budget", got["retro"])
 	}
-	for _, phase := range []string{"build", "audit", "scout", "tdd-engineer", "builder"} {
+	// Still-UNLISTED phases (build/audit/tdd/adversarial-review were added to the
+	// compiled map by the deep-phase-artifact-budget fix; see the package note).
+	for _, phase := range []string{"scout", "intent", "triage", "ship"} {
 		if v := got[phase]; v != 0 {
 			t.Errorf("phase %q resolved %d, want 0 — an unlisted phase must fall through to the 300s "+
 				"builtin; global hang detection must not be weakened to fix one phase", phase, v)
@@ -215,9 +226,9 @@ func TestC1057_003_PhaseArtifactTimeout_InvalidRejected(t *testing.T) {
 
 	// A non-positive entry for an unlisted phase resolves 0, never negative:
 	// a negative deadline is never a valid budget.
-	got := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"build": -30}}.PhaseArtifactTimeouts()
-	if got["build"] != 0 {
-		t.Errorf("negative build override resolved %d, want 0", got["build"])
+	got := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"scout": -30}}.PhaseArtifactTimeouts()
+	if got["scout"] != 0 {
+		t.Errorf("negative scout override resolved %d, want 0", got["scout"])
 	}
 
 	// A non-integer JSON entry must not corrupt resolution: either Load errors,
@@ -253,11 +264,13 @@ func TestC1057_004_ArtifactTimeout_RetroLaunchCarries900(t *testing.T) {
 			"budget must survive Engine.Launch → arg vector → parseLaunchArgs", retroAgentLabel, got)
 	}
 
-	if _, err := eng.Launch(context.Background(), fx.request("build")); err != nil {
+	// "scout" is the still-unlisted probe (build now carries a compiled 1200s
+	// deep-tier budget; see the package note).
+	if _, err := eng.Launch(context.Background(), fx.request("scout")); err != nil {
 		t.Logf("Launch returned err=%v (expected)", err)
 	}
 	if got := spy.last(t).ArtifactTimeoutS; got != 0 {
-		t.Errorf("build launch: Config.ArtifactTimeoutS = %d, want 0 — an unlisted phase must fall through "+
+		t.Errorf("scout launch: Config.ArtifactTimeoutS = %d, want 0 — an unlisted phase must fall through "+
 			"to the 300s builtin, not inherit retro's budget", got)
 	}
 }

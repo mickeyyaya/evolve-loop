@@ -87,6 +87,48 @@ type StopReviewer interface {
 	Review(ev StopEvent) ReviewVerdict
 }
 
+// artifactTimeoutMarker prefixes the ONE self-describing summary line the
+// artifact wait emits before returning ExitArtifactTimeout, and is the token
+// Engine.Launch matches on to lift that line into the exit-81 error
+// (artifactTimeoutSummary). It exists because a timeout death otherwise carries
+// no reason beyond the code: the reader of a dead cycle cannot tell "the agent
+// was still working and ran out of budget" (raise bridge.phase_artifact_timeout_s)
+// from "the pane was wedged" (fix the wedge). Marker-driven rather than
+// position-driven on purpose — real launches emit `[bridge] WARN:` sandbox
+// chatter BEFORE the wait, which a first-`[bridge]`-line heuristic would report
+// as the timeout's cause. Hyphenated + colon-space so it can never collide with
+// the StopArtifactTimeout kind string ("artifact_timeout").
+const artifactTimeoutMarker = "artifact-timeout: "
+
+// reviewActionOrNone renders a review action for the timeout summary, naming the
+// case where the wait ended before any review checkpoint (ctx cancel) instead of
+// printing an empty field the reader must guess at.
+func reviewActionOrNone(a ReviewAction) string {
+	if a == "" {
+		return "none"
+	}
+	return string(a)
+}
+
+// livenessOrUnknown renders a LivenessState as a stable snake_case word for the
+// timeout summary. panestream.LivenessState is an unexported-vocabulary int with
+// no String method, so %s would emit Go debug chrome; the zero value means "no
+// checkpoint observed liveness", which is itself the signal.
+func livenessOrUnknown(s panestream.LivenessState) string {
+	switch s {
+	case panestream.LivenessIdle:
+		return "idle"
+	case panestream.LivenessBusyButStagnant:
+		return "busy_stagnant"
+	case panestream.LivenessConverging:
+		return "converging"
+	case panestream.LivenessHung:
+		return "hung"
+	default:
+		return "unknown"
+	}
+}
+
 // defaultArtifactMaxExtends backstops a continuously-working-but-never-finishing
 // agent: after this many review intervals the reviewer pauses for investigation
 // rather than extending forever. With the 300s default interval this is ~30 min
