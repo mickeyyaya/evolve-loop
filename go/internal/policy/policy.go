@@ -616,19 +616,48 @@ type BridgePolicy struct {
 //
 // retro=900s: the grown retro contract (report + preventive_actions +
 // disposition.json) no longer fits the 300s builtin — cycle-1048's retro was
-// ctx-canceled at ~608s mid-authoring, losing the artifact entirely. Every
-// other phase deliberately stays on the builtin so global hang detection is not
-// weakened to fix one phase.
+// ctx-canceled at ~608s mid-authoring, losing the artifact entirely.
+//
+// The deep-tier analysis phases (tdd, build, audit, adversarial-review) carry
+// 1200s: the bridge's base artifact-wait is 300s (bridge.tmuxArtifactTimeoutS)
+// and the deterministic reviewer grants at most 6 extends
+// (bridge.defaultArtifactMaxExtends), so ~650s of wall clock was the effective
+// ceiling for every phase this map did not name. SIX cycles died there in one
+// day with codes=[missing_artifact] — report + acs absent, a content-free infra
+// FAIL — across FOUR phase types (audit ×2 and retro on cycle-1201,
+// adversarial-review on 1217, tdd on 1218/1219), the last on a QUIET host, which
+// rules out contention as the sole cause: load made it worse, the budget was the
+// floor. An opus-tier agent doing real analysis on this repo legitimately needs
+// more than 11 minutes. Both vocabularies are listed for the same reason retro
+// carries two keys (the cycle-1054 unit-green/live-dead defect): the runner
+// dispatches Agent = the core phase NAME ("tdd"/"build"/"audit"), while the
+// persona vocabulary spells the same phases "tdd-engineer"/"builder"/"auditor",
+// and the skew is permanent.
+//
+// This list stays NARROW by design. Every phase NOT named here deliberately
+// keeps the 300s builtin, so global hang detection is not weakened across the
+// board to fix the phases that legitimately think for a long time — a wedged
+// scout/intent/triage/ship is still surfaced in ~11 minutes, not ~2.3 hours.
 var defaultPhaseArtifactTimeoutS = map[string]int{
-	"retrospective": 900,
-	"retro":         900,
+	"retrospective":      900,
+	"retro":              900,
+	"tdd":                1200,
+	"tdd-engineer":       1200,
+	"build":              1200,
+	"builder":            1200,
+	"audit":              1200,
+	"auditor":            1200,
+	"adversarial-review": 1200,
 }
 
 // PhaseArtifactTimeouts resolves the per-phase artifact-wait budgets in
 // seconds, keyed on bridge agent label: the compiled defaults merged with the
 // operator's phase_artifact_timeout_s overrides. Overrides are positive-only —
-// a zero or negative entry is rejected rather than applied, so it can neither
-// lower a compiled default nor yield a negative deadline. A phase with no entry
+// a zero or negative entry is rejected rather than applied, so a typo can
+// neither silently restore a compiled default's pre-fix cliff nor yield a
+// negative deadline. A listed POSITIVE value is authoritative in both
+// directions: an operator may deliberately raise or lower a compiled default,
+// because explicit config outranks a compiled guess. A phase with no entry
 // resolves 0, the bridge's "use the built-in default" sentinel (300s), and the
 // global ArtifactTimeoutS is never read or written here. Returns a fresh map on
 // every call so a mutating caller cannot poison later resolutions.
