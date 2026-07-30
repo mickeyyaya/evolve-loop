@@ -9,11 +9,69 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
+// fixtureHome is the HERMETIC operator home every $HOME/.claude test resolves
+// against. Deliberately NOT the machine's real home and deliberately NOT under
+// /tmp: the old helper fell back to "/tmp" when HOME was unset, which made every
+// "$HOME/.claude" assertion actually exercise the /tmp always-safe rule instead
+// — the test passed for the wrong reason in HOME-less sandboxes and CI
+// (guards-role-hermetic-home). isAlwaysSafe is pure string logic (it never
+// touches the filesystem), so a synthetic path is the strongest fixture: it
+// cannot exist, cannot be /tmp, and cannot vary by machine.
+const fixtureHome = "/fixture-home/operator"
+
+// TestIsAlwaysSafe_DecidesAgainstTheGivenHome pins the predicate itself: the
+// always-safe rule applies to the home it was GIVEN and to no other. The
+// t.Setenv is a tripwire, not the subject — the predicate takes home as a
+// parameter and cannot read the environment, so these assertions fail only if a
+// future edit re-introduces an env read inside it (the wound this seam removed).
+func TestIsAlwaysSafe_DecidesAgainstTheGivenHome(t *testing.T) {
+	if !isAlwaysSafe(filepath.Join(fixtureHome, ".claude", "somefile"), fixtureHome) {
+		t.Errorf("%s/.claude/somefile is not always-safe against its OWN home", fixtureHome)
 	}
-	return "/tmp"
+	t.Setenv("HOME", "/some/other/home")
+	if !isAlwaysSafe(filepath.Join(fixtureHome, ".claude", "somefile"), fixtureHome) {
+		t.Error("the given home stopped working once the ambient HOME disagreed — something is reading the environment again")
+	}
+	if isAlwaysSafe(filepath.Join("/some/other/home", ".claude", "somefile"), fixtureHome) {
+		t.Error("a DIFFERENT home's .claude was treated as always-safe — the rule must be scoped to one home")
+	}
+}
+
+// TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude is the item's named RED: with NO
+// home resolved, the $HOME/.claude rule must match NOTHING. The dangerous shape
+// is filepath.Join("", ".claude") == ".claude", which would turn every
+// relative ".claude/..." path (and, once prefixed, plenty of others) into
+// always-safe scratch space on any HOME-less runner.
+func TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude(t *testing.T) {
+	for _, path := range []string{
+		".claude/settings.json",
+		"/repo/.claude/settings.json",
+		"/Users/someone/.claude/settings.json",
+	} {
+		if isAlwaysSafe(path, "") {
+			t.Errorf("isAlwaysSafe(%q, home=\"\") = true — with no home there is no $HOME/.claude rule to apply", path)
+		}
+	}
+	// /tmp is home-independent and must keep working with no home at all.
+	if !isAlwaysSafe("/tmp/scratch/foo.go", "") {
+		t.Error("/tmp scratch must stay always-safe regardless of home")
+	}
+}
+
+// TestNewRole_ResolvesHomeFromEnv is the production-wiring proof: the exported
+// constructor the composition root calls (guardcmd.buildGuard → NewRole) is the
+// ONE place that reads $HOME, so the guard's decision is reproducible for the
+// life of the process instead of re-reading a mutable env at every Decide.
+func TestNewRole_ResolvesHomeFromEnv(t *testing.T) {
+	t.Setenv("HOME", fixtureHome)
+	g := NewRole(nil, false)
+	if g.home != fixtureHome {
+		t.Errorf("NewRole resolved home=%q, want %q from $HOME", g.home, fixtureHome)
+	}
+	t.Setenv("HOME", "")
+	if g := NewRole(nil, false); g.home != "" {
+		t.Errorf("with HOME unset NewRole resolved home=%q, want \"\" (no fabricated fallback — /tmp was the old one, and it made $HOME tests assert the /tmp rule)", g.home)
+	}
 }
 
 // Role is the port of scripts/guards/role-gate.sh — per-phase write
@@ -145,12 +203,17 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 	}
 }
 
+// TestRole_AlwaysSafeDirs asserts BOTH halves of an always-safe verdict: Allow
+// AND !Alarm. Without the alarm assertion a regression that alarms on every /tmp
+// write is undetectable, and a flood of false alarms is how a real violation
+// hides. The home is the hermetic fixture, so the second case exercises the
+// $HOME/.claude rule itself rather than /tmp's (guards-role-hermetic-home).
 func TestRole_AlwaysSafeDirs(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
-	g := NewRole(s, false)
+	g := newRoleWithHome(s, false, fixtureHome)
 	for _, path := range []string{
 		"/tmp/scratch/foo.go",
-		filepath.Join(homeDir(), ".claude/somefile"),
+		filepath.Join(fixtureHome, ".claude/somefile"),
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Write",
@@ -158,6 +221,9 @@ func TestRole_AlwaysSafeDirs(t *testing.T) {
 		})
 		if !dec.Allow {
 			t.Errorf("always-safe %q denied: %s", path, dec.Reason)
+		}
+		if dec.Alarm {
+			t.Errorf("always-safe %q raised an Alarm: %s — alarming on ordinary scratch writes floods the operator signal that real violations need", path, dec.Reason)
 		}
 	}
 }

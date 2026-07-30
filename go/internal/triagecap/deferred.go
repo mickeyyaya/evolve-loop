@@ -33,7 +33,7 @@ func DeferredFloorPackages(artifact string, candidatePkgs []string) []string {
 			body = body[:next[0]]
 		}
 		for _, m := range listItemRE.FindAllStringSubmatch(body, -1) {
-			item := m[1]
+			item := floorItem(m[1])
 			if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 				continue
 			}

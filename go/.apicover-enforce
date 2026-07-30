@@ -477,6 +477,16 @@
 # gc re-exports via aliases; gcpolicy_test.go names+exercises every export.
 ./internal/gcpolicy
 
+# go-package-pattern scope rule leaf (2026-07-30, flaky-predicate-authoring-lint):
+# IsPackagePattern/IsRecursive/Key + ModulePrefix/WholeModule extracted from the
+# private copies that had grown in internal/acssuite (run-time predicate scope
+# demotion) and internal/evalqualitycheck (authoring-time flaky-shape lint). Two
+# copies of one scope rule is a drift surface: a shape the authoring lint stopped
+# recognizing would have silently stopped being demoted at run time too. Zero
+# non-stdlib deps by design — neither caller may drag in the other's tree.
+# gopkgpattern_test.go names+exercises every export.
+./internal/gopkgpattern
+
 # ACS predicate packages (./acs/cycle<N>) are NOT enrolled — the "completeness
 # invariant" cycles 1141/1144/1145 asserted here does not exist. Two reasons,
 # both load-bearing:

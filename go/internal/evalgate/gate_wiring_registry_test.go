@@ -28,9 +28,10 @@ import (
 // slice. Every gate in newGatesForTest() MUST have an entry here; adding a new
 // gate obliges its author to add a wiring pin and register it below.
 var pinnedGateWirings = map[string]string{
-	"predicate-quality":  "TestQualityGate_WiredIntoReviewer",
-	"floor-binding":      "TestFloorBindingGate_WiredIntoReviewer",
-	"evals-materialized": "TestMaterializationGate_WiredIntoReviewer",
+	"predicate-quality":     "TestQualityGate_WiredIntoReviewer",
+	"floor-binding":         "TestFloorBindingGate_WiredIntoReviewer",
+	"evals-materialized":    "TestMaterializationGate_WiredIntoReviewer",
+	"flaky-predicate-shape": "TestFlakyShapeGate_WiredIntoReviewer",
 }
 
 // TestAllReviewerGates_HaveWiringPin is the forcing function: it iterates the

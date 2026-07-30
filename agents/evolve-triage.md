@@ -123,7 +123,7 @@ cycle_size_estimate: small
 phase_skip: []
 
 ## top_n (commit to THIS cycle)
-- {id}: {action} — priority={H|M|L}, evidence={pointer}, source={scout|carryover}
+- {id}: {action} — priority={H|M|L}, files={repo/relative/path.go;second/path.go}, evidence={pointer}, source={scout|carryover}
 - ...
 
 ## deferred (carry to NEXT cycle's carryoverTodos)
@@ -157,7 +157,7 @@ phase_skip: []
 ```json
 {
   "cycle": <N>,
-  "top_n": [{"id": "<task_id>", "action": "..."}, ...],
+  "top_n": [{"id": "<task_id>", "action": "...", "files": ["<repo/relative/path>", ...]}, ...],
   "committed_floors": ["<package_floor_committed_in_top_n>", ...],
   "deferred_floors": ["<package_floor_deferred_or_dropped>", ...],
   "deferred": [{"id": "<task_id>"}],
@@ -168,6 +168,23 @@ phase_skip: []
   "phase_skip": []
 }
 ```
+
+`files[]` on every `top_n` card is the card's repo FOOTPRINT — the repo-relative
+paths the work will touch. It is REQUIRED whenever the work touches files (omit it
+only for genuinely file-less work: research, a doc read, an inbox triage decision).
+Declare it in BOTH places: the `## top_n` item's metadata tail as
+`files=path1;path2` (semicolon-separated — the tail itself is comma-separated) and
+the companion's `"files": [...]`. Keep each item on ONE line: the report parsers are
+line-scoped, so a wrapped item loses everything after the first newline. Paths must
+be repo-relative with no `..`, no globs, and no unsubstituted `{placeholder}` — a
+footprint the planner cannot match by exact path is worse than none, because the
+card then looks compliant while overlapping nothing. This is the ONLY channel the fleet lane planner
+can read: it partitions concurrent lanes by EXACT repo-relative file overlap, so a
+card with no `files[]` becomes an island and a second lane may edit the very file
+your card's prose names (live: cycles 1130/1133/1134 put two lanes on
+`go/internal/phases/audit/audit.go`). You already name these paths in the action
+prose — make them structured. Never pad the list with files you are not going to
+touch: an invented overlap merges two lanes that should have run in parallel.
 
 `committed_floors[]` is the declaration-primary source for the triage capacity
 clamp. Include each package whose coverage/floor target is actually committed
@@ -195,8 +212,9 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 7. No item is in two buckets.
 
 8. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+9. Every `## top_n` item that touches files carries `files=path1;path2` in its metadata tail (and the same paths in the companion's `files[]`). A card whose action names a repo path but declares no `files=` is WARNed about by the triage-cap reviewer and is invisible to the fleet lane planner.
 
-If any check fails, fix in place. Do not mark complete until all eight hold.
+If any check fails, fix in place. Do not mark complete until all nine hold.
 
 ## Reference Index (Layer 3, on-demand)
 

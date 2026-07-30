@@ -17,10 +17,15 @@ import "sort"
 // (nil-safe to read — always allocated); OverThresholdCycles lists the cycles
 // whose OWN count exceeded the threshold, ascending. A clean batch rolls up to
 // the zero-ish value: Total 0, empty ByPhase, no escalation.
+//
+// The json tags match the snake_case vocabulary of the surfaces that carry it
+// (the loop summary's spine_fail_opens block, the dossier's own fields) — a
+// rollup that serializes as Total/ByPhase inside an otherwise snake_case
+// document reads as a different document's field.
 type SpineFailOpenRollup struct {
-	Total               int
-	ByPhase             map[string]int
-	OverThresholdCycles []int
+	Total               int            `json:"total"`
+	ByPhase             map[string]int `json:"by_phase"`
+	OverThresholdCycles []int          `json:"over_threshold_cycles,omitempty"`
 }
 
 // RollupSpineFailOpens folds a batch's dossiers into one summary. A cycle

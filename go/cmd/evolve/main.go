@@ -116,7 +116,9 @@ v12.1 utilities + composition:
                               [--ollama-base M] [--codex-home D]
                               [--no-prune] ) — ADR-0040/ADR-0041
   eval                      Eval-quality + verify subcommands
-                              ( eval quality-check <eval.md>
+                              ( eval quality-check
+                              [-predicates <acs/cycle<N> dir|file>]
+                              <eval.md>
                               | eval verify <eval.md> <workspace> )
   cycle-health              11-signal cycle integrity fingerprint
                               ( cycle-health <cycle-N> <workspace> )

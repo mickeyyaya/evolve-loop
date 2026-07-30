@@ -84,7 +84,7 @@ func CountCommittedFloors(artifact string, knownPkgs []string) int {
 	}
 	total := 0
 	for _, m := range listItemRE.FindAllStringSubmatch(body, -1) {
-		item := m[1]
+		item := floorItem(m[1])
 		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 			continue
 		}
@@ -273,7 +273,7 @@ func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 		return seen
 	}
 	for _, m := range listItemRE.FindAllStringSubmatch(body, -1) {
-		item := m[1]
+		item := floorItem(m[1])
 		if !floorWordRE.MatchString(item) || !floorPercentRE.MatchString(item) {
 			continue
 		}
@@ -313,6 +313,30 @@ var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 // after a hyphen, so a hypothetical slug like "low-priority=x" is stripped
 // too — that only ever undercounts (fail-open direction).
 var metadataFieldRE = regexp.MustCompile(`\bdefer_reason=[^\n]*|\b(?:source|priority)=\S+|\bevidence=`)
+
+// filesFieldRE locates the START of a declared-footprint field; the VALUE is
+// delimited by span parsing (splitDeclaredFiles), not by \S+. The whole field is
+// removed from the item before ANY floor matching runs (floorItem) — a footprint
+// is the files the work will touch, never a coverage commitment. Left in place it
+// would (a) flip a non-floor card into a floor-bearing one whenever a declared
+// path contains "floor"/"coverage" (go/internal/triagecap/floors.go does), adding
+// a phantom committed floor straight into the capacity clamp, and (b) attribute
+// deferred floors to packages a card merely edits, so Gate C would block
+// predicates on them.
+var filesFieldRE = regexp.MustCompile(`\bfiles\s*[=:]\s*`)
+
+// nextMetadataFieldRE finds the start of the next `, key=` metadata field, which
+// is what terminates a files= value (the tail is comma-separated `key=value`
+// pairs). Requiring the comma is what lets a files= value itself contain commas.
+var nextMetadataFieldRE = regexp.MustCompile(`,\s*[A-Za-z_][A-Za-z0-9_]*=`)
+
+// floorItem is the item text every floor matcher must see: the declared footprint
+// removed. The SINGLE place this stripping happens, so a new floor scan cannot
+// forget it (the four existing scans all route through here).
+func floorItem(item string) string {
+	_, stripped := splitDeclaredFiles(item)
+	return stripped
+}
 
 // pathOnlyPkgs are packages whose basenames are also ordinary coverage prose;
 // they count only when slash-qualified ("internal/paths"), never as bare

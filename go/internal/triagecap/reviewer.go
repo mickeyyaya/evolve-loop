@@ -81,8 +81,19 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 		r.logf("[triage-cap] ambiguity, failing open: %v", err)
 		return core.ReviewResult{Approve: true}
 	}
+	// Footprint provenance (triage-cards-carry-files): a committed card that names
+	// a repo path in prose but declares no files= is invisible to the fleet
+	// disjointness planner. WARN-only and non-blocking — the correction ladder is
+	// for capacity, and refusing a deliverable over provenance would trade a
+	// silent overlap risk for a hard cycle failure. Runs on EVERY triage
+	// deliverable (the clamp is enforce by compiled default), before the
+	// floor-specific checks, so the signal does not depend on the report being
+	// floor-bearing.
 	pkgs := r.pkgsFn(in.ProjectRoot)
 	companionPath := filepath.Join(in.Workspace, TriageDecisionName())
+	if msg := MissingCardFilesWarning(string(data), companionPath); msg != "" {
+		r.logf("[triage-cap] WARN: %s", msg)
+	}
 	floors := CommittedFloorCount(string(data), companionPath, pkgs)
 	// F3 producer check: the declaration-primary design needs its producer.
 	// A floor-bearing report still governed by the prose fallback gets a
