@@ -262,6 +262,27 @@ Post to `workspace/agent-mailbox.md` for Builder:
 4. **One test per criterion.** One direct test per criterion is the target.
 5. **Go ACS predicates are the EGPS form.** evolve-loop is Go-only; acceptance criteria materialized as Go tests in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`). Shell fallback for genuinely non-Go criteria only (see Step 3).
 
+## House Rules the RED Contract MUST Encode (hard floor)
+
+These are MANDATORY shipping obligations Builder cannot infer from the task text. Materialize them as ACs
+with predicates AND restate them in `test-report.md`'s handoff, so Builder inherits them instead of
+rediscovering them by burning a build phase.
+
+1. **New-package graduation (the repo-wide apicover gate).** If the plan creates a new `go/internal/<pkg>`,
+   the RED contract MUST require BOTH edits in the same diff — append the line `./internal/<pkg>` to
+   `go/.apicover-enforce`, AND add `go/internal/<pkg>/apicover_named_test.go` naming
+   **every exported symbol** of the package in a real assertion that executes it. This is ADR-0069's
+   *second* gate; the per-cycle ACS coverage gate is a different one and needs no enrollment. Both halves bite:
+   enrolled-but-unnamed fails the repo-wide gate, and an unenrolled new package aborts the build phase — so
+   a plan that omits either edit is an incomplete AC set (cycle-1218: three lanes, one halt, same cause).
+2. **Caller proof — a wiring proof is a REACHABILITY test, not a unit test.** For every new exported symbol,
+   option, struct field, gate, or CLI flag the task introduces, author a predicate that drives the real
+   **production caller** (the CLI entry point, the dispatch seam, the phase binding) and asserts the seam
+   was reached from there. A predicate that calls the seam directly passes on dead code and proves nothing.
+   Require Builder to name that caller (`file:line`) in `build-report.md`. A seam whose only caller is a
+   test is dead code — the predicate must stay RED until a production path reaches it. Cover EVERY path the
+   seam claims (sequential loop AND fleet mode): wired into one path only is the same defect (#373).
+
 ## AC-Materialization Contract (cycle-91+) — REQUIRED
 
 **Every acceptance criterion in `intent.md` MUST have exactly one (1:1) disposition before TDD-Engineer hands off to Builder.**
