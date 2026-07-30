@@ -323,7 +323,14 @@ func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
 	// enforce flip; off/shadow keep the prompt byte-identical (the classifier's
 	// always-on Pass 0 must not see new sentinels in production).
 	includePhaseIO := a.phaseIO >= config.StageAdvisory
-	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractFooter(c, artifactPath)
+	// The tail is RenderContractTail, not RenderContractFooter: the footer path
+	// line is still there (byte-identical, and it stays the marker tooling greps
+	// for) but it is now followed by the XML-tagged <deliverable-contract> block
+	// that restates the machine contract AT the generation point. Claude follows
+	// turn-tail instructions more reliably than preamble ones, which is why the
+	// correction prompt — same requirements, tail placement — is what gets
+	// compliance today.
+	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath)
 }
 
 // injectRulesPrefix prepends a "## Rules" block carrying the per-agent

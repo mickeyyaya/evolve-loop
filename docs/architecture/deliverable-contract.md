@@ -79,6 +79,28 @@ The invariant block stays in the cacheable prompt prefix; the per-cycle path liv
 (cache-safe + recency-optimal). The block tells the agent to write there, emit the verdict
 sentinel, and run `evolve phase verify` before finishing.
 
+Immediately after that footer line, `phasecontract.RenderContractTail` appends the **machine** half of
+the contract as one XML-tagged block, at the generation point:
+
+```xml
+<deliverable-contract phase="audit">
+  <artifact-path>/…/.evolve/runs/cycle-1218/audit-report.md</artifact-path>
+  <required-sections>
+    <section>## Verdict</section>
+  </required-sections>
+  <verdict-sentinel verdicts="PASS|FAIL|WARN|SKIPPED"><!-- evolve-verdict: {…} --></verdict-sentinel>
+  <self-check>evolve phase verify audit --workspace &lt;your workspace dir&gt;</self-check>
+</deliverable-contract>
+```
+
+Why the same facts appear twice: Claude follows **turn-tail** instructions more reliably than
+preamble ones, and XML-tagged sections parse unambiguously — which is why the *correction* prompt
+(identical requirements, tail placement) already got compliance the prefix block did not. Every
+string in the block is projected from `Contract.Sections` / `Contract.RequiredKeys` /
+`RenderVerdictSentinel`, so there is **no second template** for the writer and the detector to drift
+apart on. The sentinel is gated on `len(Verdicts)>0` exactly as the prefix block gates it (build/
+scout/triage stay sentinel-free), and a `NoArtifact` contract (`ship`) gets the footer alone.
+
 ## Self-check (agent-callable)
 
 ```
@@ -107,6 +129,41 @@ check and the harness's post-phase gate can never drift.
   consecutive blocks (`defaultBreakerThreshold = 3`) it demotes enforce→advisory and logs a
   `CIRCUIT OPEN` escalation, so a miscalibrated gate cannot halt the loop. State persists in
   `.evolve/contract-gate-breaker.json`; a clean cycle resets it (half-open).
+
+## Write-in-flight grace (read robustness)
+
+A phase agent's final deliverable write is not atomic with respect to the verify call that follows
+it: a verifier can observe ENOENT (create not yet visible) or a zero-length file for a deliverable
+that IS being written. A single unretried read cannot distinguish that from "never written", and
+both surface as a CONFIRMED violation — a false FAIL that fails CLOSED.
+
+`readDeliverableWithGrace` (`internal/deliverable/deliverable.go`) therefore treats
+absence/emptiness as **provisional** for a bounded window (`readGraceWindow = 500ms`, re-polled
+every `readGracePoll = 20ms`):
+
+- **Reads first, waits only on failure.** The common already-written case pays exactly one
+  `os.ReadFile` and no sleep — pinned by `TestReadDeliverableWithGrace_PresentContentIsOneReadNoSleep`.
+- **Never launders a real violation.** A genuinely missing or permanently empty deliverable still
+  yields the same violation code once the window closes. The window delays the verdict, never
+  changes it.
+- **Fail-open on infra.** A non-absence read fault (EISDIR, permissions, IO) returns immediately as
+  infra ambiguity — it will never clear, so the budget is not spent on it and it is never
+  reclassified as a violation.
+- **Layering.** On the host-runner path this nests inside the existing 16x reconcile retry
+  (`runner.go verifyReconcileDeliverable`), so a genuinely-absent artifact's confirmed-missing worst
+  case is ~11s — accepted: paid once, only by a phase that produced nothing. The layer's real
+  purpose is the retry-LESS callers (`evolve phase verify` self-check).
+
+Deliberately **not** configurable: an I/O robustness constant, not a phase setting (`graceSleep` is
+a test seam, not a dial). Coverage: `internal/deliverable/grace_test.go`.
+
+**Known residual (queued):** partial-but-non-blank content — the file present with its sections but
+its trailing verdict sentinel not yet appended (observed cycle-1198) — is NOT retried here. Closing
+it at the source requires artifact-ready CROSS-POLL stability in the bridge detector
+(`artifact-ready-crosspoll-debounce`, queued): an in-poll settle sleep cannot span the
+multi-second gap between an agent's `Write` and its follow-up `Edit`, and the change alters the tick
+contract for every artifact-completion fixture plus any short `ArtifactTimeoutS`, so it needs its own
+cycle with a timeout-budget audit.
 
 ## Verdict sentinel (Strangler Fig)
 
