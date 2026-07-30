@@ -1,0 +1,25 @@
+{
+  "id": "overlay-family-name-transport-ambiguity",
+  "title": "A routing overlay naming a bare FAMILY still crosses transport when the phase's chain holds a non-default driver of that family — the advisor path has the defect the contract-escalation path just had",
+  "weight": 0.87,
+  "kind": "defect",
+  "priority": "medium",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "PR #390 fixed the observed instance: llmroute.ApplySoftOverlay now promotes the chain's EXACT entry when the chain already contains ov.CLI, instead of rewriting it through defaultDriverForFamily. That closes the contract-escalation case (chain [claude-p codex], overlay 'codex' -> was dispatching codex-tmux, exit=10 with no tmux). It does NOT close the case where the overlay names a bare FAMILY the chain holds only under a non-default driver: chain [claude-p codex] with overlay 'claude' finds no exact match, falls through to defaultDriverForFamily('claude') = claude-tmux, and moves a headless-configured phase onto tmux exactly as before. That is the ADVISOR overlay path (router model-routing projection), which is where overlay CLIs most often arrive as bare family names.\n\nThe reason PR #390 stopped at exact-match rather than adding a family-match rung: the vocabulary is genuinely AMBIGUOUS. 'codex' is both a family name and a registered driver name, so 'promote any chain entry of the same family' cannot be distinguished from 'the operator asked for this specific driver'. Concretely, an operator overlay of 'claude-tmux' against a chain of [claude-p] must NOT be satisfied by promoting claude-p — that would override an explicit transport request with the opposite one. Guessing the semantics under release pressure was the wrong trade; deciding them deliberately is this item.",
+  "acceptance": [
+    "Decide and DOCUMENT whether an overlay CLI is a family selector, a driver selector, or both-with-a-precedence — one sentence in llmroute's package doc, since the ambiguity is the actual defect",
+    "RED: TestApplySoftOverlay_BareFamilyDoesNotCrossTransportWhenTheChainHoldsANonDefaultDriver (chain [claude-p codex], overlay 'claude')",
+    "RED: an explicit driver-qualified overlay must still win over a same-family chain entry (overlay 'claude-tmux' vs chain [claude-p]) — the case that forbids naive family matching",
+    "The advisor/router projection path is covered, not just the contract-escalation path — name the production caller for each",
+    "go test -race ./internal/{llmroute,router,core}/ PASS; apicover -enforce clean on internal/llmroute"
+  ],
+  "files": [
+    "go/internal/llmroute/model_routing_overlay.go",
+    "go/internal/llmroute/llmroute.go",
+    "go/internal/router/"
+  ],
+  "deps": [],
+  "connects_to": ["contract-block-cli-escalation", "driver-agnostic-model-routing"],
+  "source": "console-2026-07-30, found by CI macOS (no tmux) on PR #390 and scoped deliberately short of a guess",
+  "created_at": "2026-07-30T23:05:00Z"
+}
