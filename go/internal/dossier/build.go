@@ -75,10 +75,14 @@ type BuildOpts struct {
 	// artifacts, so the dossier records WHY the cycle failed and still satisfies
 	// Validate — the producer never fabricates a PASS for a failed cycle.
 	FinalVerdict string
-	// SkippedPhases are non-floor phases whose non-PASS outcome was degraded
-	// rather than allowed to clobber the floor-derived FinalVerdict (cycle-802).
-	// Surfaced verbatim so the dossier records the degrade, never dropping it.
+	// SkippedPhases are phases that genuinely did NOT run, with the skip cause.
+	// Surfaced verbatim.
 	SkippedPhases []cyclestate.SkippedPhase
+	// VerdictsNotAdopted are non-floor phases that RAN whose non-PASS outcome was
+	// declined rather than allowed to clobber the floor-derived FinalVerdict
+	// (cycle-802). Surfaced verbatim so the dossier records the degrade, never
+	// dropping it — and never as a "skipped phase" (dossier-retro-skipped-mislabel).
+	VerdictsNotAdopted []cyclestate.VerdictNotAdopted
 	// SpineFailOpens are the cycle's spine-gate fail-open events (cycle-1166),
 	// surfaced verbatim so the dossier is where the epidemic becomes visible.
 	SpineFailOpens []cyclestate.SpineFailOpen
@@ -115,8 +119,9 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 				KeyFindings: "cycle completed; ledger walk deferred to future slice",
 			},
 		},
-		SkippedPhases:  opts.SkippedPhases,
-		SpineFailOpens: opts.SpineFailOpens,
+		SkippedPhases:              opts.SkippedPhases,
+		PhasesRunVerdictNotAdopted: opts.VerdictsNotAdopted,
+		SpineFailOpens:             opts.SpineFailOpens,
 	}
 	// Ingest the per-phase timing log when present: real per-phase records +
 	// the cycle-level roll-up replace the stub, so the committed dossier carries

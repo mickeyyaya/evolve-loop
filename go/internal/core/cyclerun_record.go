@@ -102,8 +102,8 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// CompletedPhases already includes `next` (appended above), so
 	// floorAlreadyCompleted reflects whether an authoritative (floor/ship)
 	// verdict preceded this phase. A non-floor post-verdict phase failing under
-	// quota/timeout no longer clobbers a floor PASS; it degrades into
-	// SkippedPhases instead. See final_verdict_floor.go.
+	// quota/timeout no longer clobbers a floor PASS; its verdict is preserved in
+	// VerdictsNotAdopted instead. See final_verdict_floor.go.
 	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
 	// Learn from a FLOOR-phase FAIL verdict returned with NO dispatch error:
 	// audit's in-process CI-parity gates (skills-drift / gofmt / EGPS / apicover)

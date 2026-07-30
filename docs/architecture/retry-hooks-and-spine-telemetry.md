@@ -62,8 +62,9 @@ proceeding fail-open` WARNs to stderr and nowhere else: an epidemic with no
 dashboard. This change is measurement-first — make it visible, *then* decide
 whether the fix is artifact-retry, driver-bounce recovery, or an enforce flip.
 
-**Design.** Follows the `SkippedPhases` precedent exactly (one record, one
-projection) rather than inventing a new shape:
+**Design.** Follows the `VerdictsNotAdopted` precedent exactly (one record, one
+projection — the field was named `SkippedPhases` until the record split of
+`dossier-retro-skipped-mislabel`) rather than inventing a new shape:
 
 ```
 StateMachine.UnsatisfiedSpineAnchor   → names the FIRST unsatisfied predecessor

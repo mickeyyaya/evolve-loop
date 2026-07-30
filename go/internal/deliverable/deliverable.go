@@ -41,6 +41,27 @@ type Result struct {
 	Phase        string      `json:"phase"`
 	ArtifactPath string      `json:"artifact_path"`
 	Violations   []Violation `json:"violations,omitempty"`
+	// Content is the EXACT deliverable bytes this verdict was computed from —
+	// the single-read seam (deliverable-verified-bytes-single-read). Verify has
+	// to read the artifact to judge it; before this field the host runner
+	// re-read the same path to classify, so the classified bytes were only
+	// PROBABLY the bytes that passed Verify (a file swap in between classified
+	// content Verify never saw). BaseRunner.Run — the production consumer —
+	// classifies Content, making "the file is the sole verdict source" literal.
+	//
+	// Semantics (err == nil; every error return is a zero Result, so it carries
+	// neither path nor content), keyed on ArtifactPath:
+	//
+	//	ArtifactPath == ""  → the contract declares NO file (ship/NoArtifact):
+	//	                      Content is meaningless and always empty.
+	//	ArtifactPath != ""  → Content is what the read returned: the bytes on a
+	//	                      present deliverable (OK or !OK), empty when the
+	//	                      artifact was absent/blank at the end of the
+	//	                      write-in-flight grace window.
+	//
+	// json:"-" deliberately: the `evolve phase verify` JSON output is a verdict
+	// report, not a copy of the report it verified.
+	Content string `json:"-"`
 }
 
 // Violation codes (stable; consumed by tests, the CLI, and the gate).
@@ -107,6 +128,9 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 		// Unreadable for a reason other than absence (permissions, IO) is infra.
 		return Result{}, fmt.Errorf("deliverable: read %s: %w", path, err)
 	}
+	// Single-read seam: every return below carries the bytes this verdict was
+	// computed from, so the caller never re-reads the path (see Result.Content).
+	res.Content = content
 	if !exists {
 		res.add(CodeMissingArtifact, fmt.Sprintf("deliverable not found — write it to exactly: %s", path))
 		// If the agent wrote it into the worktree instead, say so — that is

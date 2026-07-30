@@ -322,10 +322,49 @@ var settleSleep = time.Sleep
 // uncontracted phases pay ZERO retries (no wasted settle window). Waiting can only
 // UPGRADE toward the agent's real on-disk verdict; a never-settling deliverable still
 // returns not-OK.
-func (b *BaseRunner) verifyReconcileDeliverable(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+//
+// CANCELLATION (verifyreconcile-ctx-cancel-unconditional-sleep): the wait observes
+// ctx, so a cancelled phase stops waiting instead of sleeping out the ladder —
+// reconcileSettleRetries intervals PLUS a verify probe per rung, each probe nesting
+// deliverable's 500ms write-in-flight grace window. The first probe always runs (a
+// deliverable already on disk is still caught); cancellation then stops both the
+// sleeping and the re-probing, and the last result stands. The bounded retry count
+// remains the ceiling while ctx is live, and the OK/not-OK decision and fail-closed
+// fallback are untouched — only the waiting is dropped.
+//
+// SCOPE — this is the CLEAN-EXIT path's guard, and the reconcile-on-teardown call
+// site deliberately passes context.WithoutCancel (see there): on that path a
+// cancelled ctx is frequently the CAUSE of the teardown (the tmux driver launders a
+// ctx-cancel into ExitArtifactTimeout after one final poll —
+// driver_tmux_repl.go's "the runner's settle-retry was the only thing standing
+// between that mislabel and a false FAIL"), so honoring cancellation there would
+// re-open the cycles-824/825 class. On the clean-exit path the agent already exited 0,
+// so cancellation genuinely means nothing more is coming.
+//
+// REACHABILITY — the honored-cancel case is OPERATOR-INTERRUPT only. cmd_cycle.go
+// hands RunCycle a context.Background(), so a fleet lane never observes cancel and
+// this branch is inert in the standing mode; the one cancellable root is cmd_loop.go's
+// signal.NotifyContext. The residual it accepts: a SIGINT landing between the driver's
+// clean return and this call, on a phase whose deliverable is still flushing, bails
+// after one probe and FAILs where the full settle window would have PASSed. Bounded by
+// deliverable's 500ms grace nested in that first probe, and the loop is terminating
+// anyway — a wrong verdict on a cycle nobody will ship.
+//
+// The ctx check straddles the sleep (before and after) rather than racing a timer
+// against it: sleepFn is an injected, uninterruptible seam, so selecting on ctx.Done()
+// would mean calling the seam from a spawned goroutine and racing tests that count its
+// invocations. Post-cancel cost is therefore bounded at ONE interval with no further
+// probe — the amplification this fix targets.
+func (b *BaseRunner) verifyReconcileDeliverable(ctx context.Context, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 	res, verr := b.verifyFn(phase, roots)
 	for attempt := 0; attempt < reconcileSettleRetries && verr == nil && !res.OK; attempt++ {
+		if ctx.Err() != nil {
+			return res, verr
+		}
 		b.sleepFn(reconcileSettleInterval)
+		if ctx.Err() != nil {
+			return res, verr
+		}
 		res, verr = b.verifyFn(phase, roots)
 	}
 	return res, verr
@@ -359,7 +398,10 @@ func forensicCodes(vs []deliverable.Violation) string {
 
 // acsFloorRescues reports whether a teardown-time deliverable.Verify not-OK should
 // be OVERRIDDEN by the deterministic ACS ground truth (verdict-incoherence family:
-// cycles 603/921/924/931/3). True iff ALL hold:
+// cycles 603/921/924/931/3). report is the VERIFIED deliverable content (the bytes
+// Verify read — Result.Content), never a fresh read: the rescue decision and the
+// subsequent Classify must judge the SAME snapshot, or a rescue could fire on bytes
+// the classify step never sees. True iff ALL hold:
 //   - the phase is audit (the acs-verdict.json + coherence floor are audit-scoped);
 //   - the acssuite verdict is PASS — a NON-LLM signal a session stall cannot corrupt;
 //   - the report declares a PASS-class verdict sentinel (via the canonical
@@ -372,7 +414,7 @@ func forensicCodes(vs []deliverable.Violation) string {
 // definition of "both verdicts agree on PASS", so the teardown floor rescues exactly
 // what the post-hoc floor would otherwise HALT on. It never manufactures a PASS: a
 // malformed/verdict-less/token-missing report, or a non-ship-eligible suite, declines.
-func acsFloorRescues(phase, workspace, artifactPath string) bool {
+func acsFloorRescues(phase, workspace, report string) bool {
 	if phase != string(core.PhaseAudit) {
 		return false
 	}
@@ -388,11 +430,59 @@ func acsFloorRescues(phase, workspace, artifactPath string) bool {
 	if tok == "" {
 		return false
 	}
-	report, err := os.ReadFile(artifactPath)
-	if err != nil {
-		return false
+	return strings.Contains(report, tok)
+}
+
+// classifiedArtifact returns the content Classify must judge for a CONTRACTED
+// phase, given the deliverable's Verify result, the artifact path THIS run
+// dispatched, and the terminal pane as the last resort.
+//
+// SINGLE READ (deliverable-verified-bytes-single-read): when the Verify result
+// describes the same file the bridge was told to write, its Content IS the
+// classified content — verdict and content come from ONE read, so a writer racing
+// the just-finished launch cannot slip bytes past the gate that judged them.
+//
+// The fallback covers a phase whose dispatched artifact filename differs from its
+// contract's, where Verify judged a DIFFERENT file and so holds no bytes for this
+// one (nor any verified-vs-classified claim to make). The known case is intent in
+// DELTA mode — it dispatches intent-delta.md while the intent contract names
+// intent.md — reachable only with EVOLVE_INTENT_DELTA set, which no in-repo caller
+// does, so this is an operator-mode path rather than the default one. It is a
+// PRE-EXISTING skew this fix deliberately does not paper over (the contract gate
+// verifies a file that phase was never asked to write). Every other BaseRunner phase
+// derives its filename from the same registry the contract does, so the paths agree
+// and the fast path applies. Also lands here: an errored/path-less Result, and a
+// NoArtifact contract (ArtifactPath "") were one ever routed through BaseRunner —
+// ship's is not.
+//
+// The fallback reads the dispatched artifact exactly as the pre-single-read code
+// did, including the "absent + !OK ⇒ empty artifact" rule that makes an unwritten
+// deliverable a coherent FAIL instead of a pane-scraped one. NOTE that rule now also
+// applies on the reconciled call site, which previously could only keep the pane;
+// unreachable in practice (it needs a path skew AND a read failure AND !res.OK, and
+// the pane is empty on any teardown anyway), but it is a real unification of two
+// call sites that had slightly different rules.
+// The snapshot is authoritative only when it is BOTH of the same file AND
+// non-empty. Empty is not evidence of absence: an infra read fault returns an
+// empty Result, and a deliverable that materialises after the ladder's last
+// probe verifies absent — in either case the snapshot would classify "" for a
+// file that is on disk right now. Falling through costs one syscall on a path
+// that was already headed for FAIL, and it rescues the case named above (an
+// intent-delta phase deriving [intent-unchanged] → SKIPPED from a late file).
+// This is also what makes the two call sites symmetric: the ACS-rescue branch
+// does its own late-bytes read for the rescue's own evidence, and without this
+// clause the clean-exit site would be the only one without that liveness.
+func classifiedArtifact(res deliverable.Result, artifactPath, pane string) string {
+	if res.ArtifactPath == artifactPath && res.Content != "" {
+		return res.Content
 	}
-	return strings.Contains(string(report), tok)
+	if data, err := os.ReadFile(artifactPath); err == nil {
+		return string(data)
+	}
+	if !res.OK {
+		return "" // contracted file genuinely absent → Classify sees no sentinel → FAIL
+	}
+	return pane
 }
 
 // Name implements core.PhaseRunner.
@@ -781,6 +871,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	reconciled := false
 	acsFloorRescued := false
 	acsFloorOverriddenCodes := "" // teardown Verify codes the ACS floor overrode (surfaced on the response)
+	// reconciledRes is the reconcile probe's Verify result, carried out of this
+	// block so the classify step below consumes the bytes that Verify READ
+	// (Result.Content) instead of re-reading the path — see the verdict-source
+	// comment on the single-read invariant.
+	var reconciledRes deliverable.Result
 	if bridgeErr != nil {
 		// A bridge INFRA teardown — an artifact-wait timeout (exit 81) OR a
 		// transient failure (exit 80/85/86: quota, liveness-exhaustion) — ends the
@@ -799,11 +894,22 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				// catalog-aware default.
 				roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 			}
-			res, verr := b.verifyReconcileDeliverable(phase, roots)
+			// CANCELLATION-IMMUNE ladder (WithoutCancel, deliberate): on THIS path a
+			// cancelled ctx is frequently the CAUSE of the teardown, not a reason to stop
+			// waiting — the tmux driver, on ctx.Err(), takes one final completion poll and
+			// otherwise exits ExitArtifactTimeout, "laundering a finished session into a
+			// timeout … the runner's settle-retry was the only thing standing between that
+			// mislabel and a false FAIL" (driver_tmux_repl.go). Honoring cancellation here
+			// would re-open the cycles-824/825 false-FAIL class the ladder exists for, and
+			// it would buy nothing in the standing fleet mode (a lane's `evolve cycle run`
+			// passes context.Background()). The ctx-aware bail lives on the clean-exit path
+			// below, where the agent exited 0 and nothing more is coming.
+			res, verr := b.verifyReconcileDeliverable(context.WithoutCancel(ctx), phase, roots)
 			switch {
 			case verr == nil && res.OK:
 				// Deliverable survived the timeout — fall through to Classify.
 				reconciled = true
+				reconciledRes = res
 			case b.optional:
 				// Optional-phase soft-fail (Workstream D / cycle-120): no
 				// trustworthy deliverable, but an optional phase's successor is
@@ -840,8 +946,27 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				// the clean exit uses. This is exactly the (audit==PASS && acs==PASS)
 				// condition the ADR-0072 coherence floor flags as incoherent, prevented at
 				// the source instead of halting after the fact.
-				if acsFloorRescues(phase, req.Workspace, artifactPath) {
+				// The verified snapshot is BOTH the rescue's evidence and (below) the
+				// classified content. When the probe produced no bytes — an infra read
+				// fault returns an empty Result, and an artifact that appeared after the
+				// last probe verifies absent — fall back to ONE disk read and adopt those
+				// bytes into the snapshot, so the rescue keeps the liveness it had before
+				// the single-read change AND the rescue and the classification still judge
+				// the same bytes (a rescue on content Classify never sees would FAIL anyway).
+				// Setting ArtifactPath alongside Content keeps the snapshot
+				// self-consistent (these bytes, and where they came from) so the
+				// classify step below reuses them instead of reading a third time.
+				// It does widen the field from "the path Verify judged" to "the
+				// path these bytes came from" — safe here because audit has no
+				// dispatch/contract path skew, and scoped to this rescue branch.
+				if res.Content == "" {
+					if data, readErr := os.ReadFile(artifactPath); readErr == nil {
+						res.ArtifactPath, res.Content = artifactPath, string(data)
+					}
+				}
+				if acsFloorRescues(phase, req.Workspace, res.Content) {
 					reconciled = true
+					reconciledRes = res
 					acsFloorRescued = true
 					acsFloorOverriddenCodes = forensicCodes(res.Violations)
 					log.Diag().Infof("[runner] ACS-FLOOR phase=%s: teardown Verify not-OK (codes=[%s]) but the acssuite verdict is ship-eligible and the report carries this cycle's challenge token with a PASS sentinel — reconciled to the deterministic verdict\n", phase, acsFloorOverriddenCodes)
@@ -901,48 +1026,48 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// back to the pane" design left that fabricated verdict reachable under any flush-
 	// timing pressure; widening the settle window only lowered the odds. This removes the
 	// pane from the contracted-verdict path entirely, so timing can no longer cause
-	// incoherence — only latency. (Precise invariant: the verdict is sourced from the file
-	// as verifyFn read it; the runner then re-reads the path — a pre-existing double read.
-	// A file swap in the microsecond window between the two would classify the swapped
-	// bytes; see the deliverable-verified-bytes-single-read follow-up.)
+	// incoherence — only latency.
+	//
+	// SINGLE READ (deliverable-verified-bytes-single-read): the classified bytes ARE the
+	// verified bytes. verifyFn returns the content it judged (deliverable.Result.Content)
+	// and this block consumes THAT — it never re-reads artifactPath. The earlier
+	// verify-then-re-read pair left a window in which a process racing the just-finished
+	// launch could swap the file, so the recorded verdict could belong to content no gate
+	// ever checked; the invariant is now literal ("the file", not "the file as of the
+	// Verify read"). classifiedArtifact owns the one-line decision — including the two
+	// cases where the verified bytes are not this artifact's (a NoArtifact contract, and a
+	// phase whose dispatched filename differs from its contract's); see its doc.
 	//
 	//   - verr != nil  → no contract for this phase (or an IO fault): well-formedness is
 	//     undeterminable, so the pane/Classify remains the legitimate source. UNCHANGED.
-	//   - res.OK       → contracted + well-formed: classify the FILE. Anti-gaming intact —
-	//     the file passed Verify's challenge-token + required-section + ADR-0039 checks.
+	//   - res.OK       → contracted + well-formed: classify the VERIFIED bytes. Anti-gaming
+	//     intact — those bytes passed Verify's challenge-token + section + ADR-0039 checks.
 	//   - !res.OK      → contracted + malformed/absent after the settle WAIT: a COHERENT
-	//     deliverable-production FAIL. Do NOT classify the malformed file (Classify would
-	//     launder its sentinel past the FAILED challenge-token gate) NOR the pane; hand
-	//     Classify an EMPTY artifact (no sentinel → FAIL) and surface the contract Codes.
+	//     deliverable-production FAIL. The verified bytes still reach Classify (a phase may
+	//     derive a legitimate NON-SHIP verdict from partial content — intent delta's
+	//     "[intent-unchanged]" → SKIPPED); an ABSENT deliverable verifies as empty content,
+	//     so Classify sees no sentinel → FAIL. The ship-guard below then stops a
+	//     verification-FAILED deliverable from laundering a ship-eligible verdict, and the
+	//     contract Codes are surfaced as diagnostics.
 	//
-	// The reconcile-on-timeout path already proved the file well-formed above, so it reads
-	// unconditionally.
+	// The reconcile-on-teardown path already verified the deliverable above, so it reuses
+	// that probe's bytes (reconciledRes) instead of verifying — or reading — again.
 	var deliverableViolations []deliverable.Violation
 	deliverableUnverified := false
 	if reconciled {
-		if data, readErr := os.ReadFile(artifactPath); readErr == nil {
-			artifact = string(data)
-		}
+		artifact = classifiedArtifact(reconciledRes, artifactPath, artifact)
 	} else {
 		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
 		if req.ProjectRoot != "" {
 			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 		}
-		res, verr := b.verifyReconcileDeliverable(phase, roots)
+		res, verr := b.verifyReconcileDeliverable(ctx, phase, roots)
 		switch {
 		case verr != nil:
 			// Uncontracted phase (or IO fault): keep the pane as the verdict source.
 		default:
-			// Contracted phase → classify the FILE, never the pane — on BOTH res.OK and
-			// !res.OK. A phase can derive a legitimate NON-SHIP verdict from partial content
-			// that fails full verification (intent delta's "[intent-unchanged]" → SKIPPED),
-			// so the content must reach Classify; the ship-guard after Classify then stops a
-			// verification-FAILED deliverable from laundering a ship-eligible verdict.
-			if data, readErr := os.ReadFile(artifactPath); readErr == nil {
-				artifact = string(data)
-			} else if !res.OK {
-				artifact = "" // contracted file genuinely absent → Classify sees no sentinel → FAIL
-			}
+			// Contracted phase → classify the verified bytes, never the pane.
+			artifact = classifiedArtifact(res, artifactPath, artifact)
 			if !res.OK {
 				deliverableViolations = res.Violations
 				deliverableUnverified = true

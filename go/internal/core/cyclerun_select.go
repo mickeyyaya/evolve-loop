@@ -20,8 +20,8 @@ import (
 // gate at enforce), loopBreak (next == PhaseEnd → terminate the loop), or
 // loopNext + the chosen next phase.
 // recordSpineFailOpen appends one spine-gate fail-open to the cycle result, from
-// which finalizeCycle projects it into the committed dossier (the SkippedPhases
-// precedent: one record, one projection). Repeats ACCUMULATE — collapsing them
+// which finalizeCycle projects it into the committed dossier (the
+// VerdictsNotAdopted precedent: one record, one projection). Repeats ACCUMULATE — collapsing them
 // is how a 76-event epidemic reads as 1 — and a cycle that never fails open
 // carries an empty slice, so the rollup's threshold alarm stays silent on a
 // healthy batch. Called only from the fail-open branch of the spine gate.

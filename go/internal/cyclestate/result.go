@@ -13,13 +13,26 @@ type CycleResult struct {
 	// RetroDecision is the failure-adapter's verdict on the retro branch,
 	// populated only when retro ran. Format: "<action>: <reason>".
 	RetroDecision string
-	// SkippedPhases records non-floor phases (retrospective, memo, the *-scans,
-	// router/advisor) whose non-PASS outcome was PREVENTED from overwriting an
-	// already-recorded floor-derived FinalVerdict (cycle-802,
-	// retro-bridge-timeout-width10). Without this a retro FAIL under quota/timeout
-	// pressure clobbered an audit PASS and zeroed the wave. The degrade is
-	// preserved here (never silently dropped) and surfaced in the cycle dossier.
+	// SkippedPhases records phases that genuinely did NOT run, with the cause
+	// (e.g. closeout after an abnormal mid-cycle exit). Surfaced in the cycle
+	// dossier as skipped_phases.
+	//
+	// It is NOT the home for a phase that ran and had its verdict declined —
+	// that is VerdictsNotAdopted. Conflating the two is the
+	// dossier-retro-skipped-mislabel defect: every FAIL dossier from 1028/1035
+	// through 1198 claimed `skipped_phases: [{phase: retro, reason: FAIL}]` while
+	// the run dir held retro's report, so the committed record contradicted its
+	// own artifacts.
 	SkippedPhases []SkippedPhase
+	// VerdictsNotAdopted records non-floor phases (retrospective, memo, the
+	// *-scans, router/advisor) that RAN and returned non-PASS AFTER a floor-derived
+	// FinalVerdict was recorded, so their verdict was PREVENTED from overwriting it
+	// (cycle-802, retro-bridge-timeout-width10). Without this a retro FAIL under
+	// quota/timeout pressure clobbered an audit PASS and zeroed the wave. The
+	// outcome is preserved here (never silently dropped) and surfaced in the cycle
+	// dossier as phases_run_verdict_not_adopted — a name that cannot be misread as
+	// "this phase did not run".
+	VerdictsNotAdopted []VerdictNotAdopted
 	// SystemFailure, when non-nil, marks that this cycle's failure was
 	// classified as SYSTEM-level (ADR-0072): the pipeline itself — not the
 	// task's code — is the cause (verdict-incoherence, infra-systemic,
@@ -58,12 +71,22 @@ type SystemFailureSignal struct {
 	Halt     bool   `json:"halt"`
 }
 
-// SkippedPhase is one non-floor phase whose non-PASS verdict was degraded rather
-// than allowed to overwrite a floor-derived cycle verdict. Reason carries the
-// verdict/label the phase actually produced (FAIL|WARN|SKIPPED).
+// SkippedPhase is one phase that did NOT run. Reason is the SKIP CAUSE (e.g.
+// "abnormal exit in phase build"), not a verdict — a phase that ran belongs in
+// VerdictNotAdopted.
 type SkippedPhase struct {
 	Phase  string `json:"phase"`
 	Reason string `json:"reason"`
+}
+
+// VerdictNotAdopted is one phase that RAN to completion whose non-PASS verdict was
+// NOT adopted as the cycle verdict (the cycle-802 floor guard: a post-verdict
+// non-floor phase may not clobber a floor-derived FinalVerdict). Verdict is what
+// the phase actually returned (FAIL|WARN|SKIPPED) — the value the old
+// SkippedPhase.Reason carried, under a name that no longer implies a skip.
+type VerdictNotAdopted struct {
+	Phase   string `json:"phase"`
+	Verdict string `json:"verdict"`
 }
 
 // SpineFailOpen is one spine-gate fail-open event. Phase is the phase that was

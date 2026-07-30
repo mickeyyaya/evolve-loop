@@ -45,11 +45,21 @@ type Dossier struct {
 	Decisions []string       `json:"decisions,omitempty"`
 	Lessons   []Lesson       `json:"lessons,omitempty"`
 	Carryover []Carryover    `json:"carryover,omitempty"`
-	// SkippedPhases records non-floor phases whose non-PASS outcome was degraded
+	// SkippedPhases records phases that genuinely did NOT run, with the cause
+	// (closeout after an abnormal mid-cycle exit).
+	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`
+	// PhasesRunVerdictNotAdopted records non-floor phases that RAN and returned
+	// non-PASS after the floor verdict was set, so their verdict was declined
 	// rather than allowed to overwrite the floor-derived FinalVerdict (cycle-802).
 	// Present so a cycle that PASSed its floor but had a retro/memo fail under
 	// quota pressure still records that experience instead of dropping it.
-	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`
+	//
+	// These records used to be written into skipped_phases, which made every FAIL
+	// dossier claim `{phase: retro, reason: FAIL}` was SKIPPED while retro's report
+	// sat in the run dir — a record contradicting its own artifacts, poisoning the
+	// consumers that read dossiers to learn which judgment phases executed
+	// (dossier-retro-skipped-mislabel). omitempty, mirroring skipped_phases.
+	PhasesRunVerdictNotAdopted []cyclestate.VerdictNotAdopted `json:"phases_run_verdict_not_adopted,omitempty"`
 	// SpineFailOpens records every spine-gate fail-open this cycle took (the
 	// phase entered anyway + the missing predecessor artifact + the reason).
 	// omitempty, mirroring skipped_phases: an operator scanning dossiers sees

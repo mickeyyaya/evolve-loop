@@ -43,6 +43,19 @@ func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
 	if !strings.Contains(string(raw), "FAIL") || !strings.Contains(string(raw), "abnormal exit in phase retro") {
 		t.Fatalf("dossier must record the abnormal outcome, got %s", raw)
 	}
+	// closeout genuinely did NOT run, so this is the one TRUE skipped_phases record —
+	// and it must live on the result, which is what the dossier projects (one record,
+	// one projection). The ran-but-declined field stays absent: a phase that never ran
+	// has no verdict to decline (dossier-retro-skipped-mislabel).
+	if len(cr.result.SkippedPhases) != 1 || cr.result.SkippedPhases[0].Phase != "closeout" {
+		t.Errorf("the skip must be recorded on CycleResult.SkippedPhases, not only inlined into the dossier call: %+v", cr.result.SkippedPhases)
+	}
+	if !strings.Contains(string(raw), `"skipped_phases"`) {
+		t.Errorf("a phase that did not run belongs under skipped_phases, got %s", raw)
+	}
+	if strings.Contains(string(raw), `"phases_run_verdict_not_adopted"`) {
+		t.Errorf("no phase ran-but-declined here; the field must be omitted, got %s", raw)
+	}
 	if _, err := os.Stat(filepath.Join(cr.cs.WorkspacePath, "failure-digest.json")); err != nil {
 		t.Fatal("abnormal exit must still produce the failure digest (breaker/disposition input)")
 	}

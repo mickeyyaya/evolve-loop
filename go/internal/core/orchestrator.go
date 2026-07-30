@@ -984,7 +984,7 @@ OuterLoop:
 	if dossierGoal == "" {
 		dossierGoal = cr.req.GoalHash
 	}
-	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases, cr.result.SpineFailOpens); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return cr.result, nil

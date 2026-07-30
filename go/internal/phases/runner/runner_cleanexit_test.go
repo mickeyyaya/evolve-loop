@@ -47,12 +47,12 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *t
 	// The presence probe races the idle state: the first two checks miss, the
 	// third — within the bounded settle window — catches the well-formed PASS.
 	calls := 0
-	settling := func(string, phasecontract.Roots) (deliverable.Result, error) {
+	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
 		if calls < 3 {
-			return deliverable.Result{OK: false}, nil
+			return verifiedFrom(deliverable.Result{OK: false}, phase, roots), nil
 		}
-		return deliverable.Result{OK: true}, nil
+		return verifiedFrom(deliverable.Result{OK: true}, phase, roots), nil
 	}
 	r := New(Options{
 		Hooks:    hooks,
@@ -119,9 +119,9 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPan
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
 	nb := &noisyStdoutBridge{fileContent: "", stdout: stdout}
 	calls := 0
-	neverSettles := func(string, phasecontract.Roots) (deliverable.Result, error) {
+	neverSettles := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
-		return deliverable.Result{OK: false}, nil
+		return verifiedFrom(deliverable.Result{OK: false}, phase, roots), nil
 	}
 	r := New(Options{
 		Hooks:    hooks,

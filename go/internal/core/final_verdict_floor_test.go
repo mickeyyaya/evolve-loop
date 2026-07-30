@@ -16,8 +16,14 @@ import (
 // sites (cyclerun_record.go / resume.go), where CompletedPhases already includes
 // the phase being recorded.
 
-func hasSkipped(sp []SkippedPhase, phase string) bool {
-	for _, s := range sp {
+// hasNotAdopted reports whether a phase's declined verdict was preserved. The
+// records live in CycleResult.VerdictsNotAdopted (dossier
+// phases_run_verdict_not_adopted); they used to be filed under SkippedPhases,
+// which made the dossier claim a phase that RAN had been skipped
+// (dossier-retro-skipped-mislabel). What cycle-802 requires is unchanged: the
+// degrade is PRESERVED, never dropped.
+func hasNotAdopted(recs []VerdictNotAdopted, phase string) bool {
+	for _, s := range recs {
 		if s.Phase == phase {
 			return true
 		}
@@ -26,7 +32,7 @@ func hasSkipped(sp []SkippedPhase, phase string) bool {
 }
 
 // AC1: audit PASS, then a non-floor phase (retro) FAILs under quota/timeout —
-// FinalVerdict must stay PASS and retro must be surfaced in SkippedPhases.
+// FinalVerdict must stay PASS and retro's declined verdict must be surfaced.
 func TestNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
 	o := &Orchestrator{}
 	r := &CycleResult{}
@@ -42,8 +48,8 @@ func TestNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
 	if r.FinalVerdict != VerdictPASS {
 		t.Errorf("non-floor retro FAIL clobbered floor verdict: FinalVerdict=%q, want PASS (the storm)", r.FinalVerdict)
 	}
-	if !hasSkipped(r.SkippedPhases, string(PhaseRetro)) {
-		t.Errorf("retro degrade not recorded in SkippedPhases: %+v", r.SkippedPhases)
+	if !hasNotAdopted(r.VerdictsNotAdopted, string(PhaseRetro)) {
+		t.Errorf("retro degrade not recorded in VerdictsNotAdopted: %+v", r.VerdictsNotAdopted)
 	}
 }
 
@@ -102,8 +108,8 @@ func TestResumeNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
 	if r.FinalVerdict != VerdictPASS {
 		t.Errorf("resume: non-floor retro FAIL clobbered a persisted floor PASS: FinalVerdict=%q, want PASS", r.FinalVerdict)
 	}
-	if !hasSkipped(r.SkippedPhases, string(PhaseRetro)) {
-		t.Errorf("resume: retro degrade not recorded in SkippedPhases: %+v", r.SkippedPhases)
+	if !hasNotAdopted(r.VerdictsNotAdopted, string(PhaseRetro)) {
+		t.Errorf("resume: retro degrade not recorded in VerdictsNotAdopted: %+v", r.VerdictsNotAdopted)
 	}
 }
 
@@ -127,11 +133,11 @@ func TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn(t *testing.T) {
 	}
 
 	// The degrade then flows through recordFinalVerdict as a non-clobbering
-	// SkippedPhases entry (floor already passed).
+	// verdict-not-adopted entry (floor already passed).
 	r := &CycleResult{FinalVerdict: VerdictPASS}
 	o.recordFinalVerdict(r, PhaseRetro, degraded.Verdict, o.floorAlreadyCompleted([]string{"tdd", "build", "audit", "retro"}))
-	if r.FinalVerdict != VerdictPASS || !hasSkipped(r.SkippedPhases, string(PhaseRetro)) {
-		t.Errorf("degraded retro must preserve PASS and record skip: verdict=%q skipped=%+v", r.FinalVerdict, r.SkippedPhases)
+	if r.FinalVerdict != VerdictPASS || !hasNotAdopted(r.VerdictsNotAdopted, string(PhaseRetro)) {
+		t.Errorf("degraded retro must preserve PASS and record the declined verdict: verdict=%q notAdopted=%+v", r.FinalVerdict, r.VerdictsNotAdopted)
 	}
 
 	// A floor phase's exhaustion stays fatal (no degrade path).
@@ -145,23 +151,35 @@ func TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn(t *testing.T) {
 	}
 }
 
-// AC6: skipped/degraded non-floor phases are surfaced in the dossier via
-// CycleResult.SkippedPhases → dossier.BuildOpts.SkippedPhases, never dropped.
+// AC6: degraded/skipped non-floor phases are surfaced in the dossier, never
+// dropped. The record is SPLIT BY WHAT ACTUALLY HAPPENED (dossier-retro-skipped-
+// mislabel): a phase that RAN and had its verdict declined goes to
+// CycleResult.VerdictsNotAdopted → phases_run_verdict_not_adopted, while
+// skipped_phases keeps its literal meaning for a phase that did not run.
+// Cycle-802's requirement — the outcome survives instead of clobbering the floor
+// verdict — is what both halves preserve.
 func TestDossier_RecordsSkippedPhases(t *testing.T) {
-	skipped := []SkippedPhase{{Phase: "retrospective", Reason: VerdictFAIL}}
+	notAdopted := []VerdictNotAdopted{{Phase: "retrospective", Verdict: VerdictFAIL}}
+	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 	d, err := dossier.Build(9, dossier.BuildOpts{
-		WorkspacePath: t.TempDir(),
-		Goal:          "cycle-802 floor-gated verdict",
-		FinalVerdict:  VerdictPASS,
-		SkippedPhases: skipped,
+		WorkspacePath:      t.TempDir(),
+		Goal:               "cycle-802 floor-gated verdict",
+		FinalVerdict:       VerdictPASS,
+		SkippedPhases:      skipped,
+		VerdictsNotAdopted: notAdopted,
 	})
 	if err != nil {
 		t.Fatalf("dossier.Build: %v", err)
 	}
-	if len(d.SkippedPhases) != 1 || d.SkippedPhases[0].Phase != "retrospective" {
-		t.Errorf("dossier did not surface skipped_phases: %+v", d.SkippedPhases)
+	if len(d.PhasesRunVerdictNotAdopted) != 1 ||
+		d.PhasesRunVerdictNotAdopted[0].Phase != "retrospective" ||
+		d.PhasesRunVerdictNotAdopted[0].Verdict != VerdictFAIL {
+		t.Errorf("dossier did not surface the ran-but-declined retro verdict: %+v", d.PhasesRunVerdictNotAdopted)
+	}
+	if len(d.SkippedPhases) != 1 || d.SkippedPhases[0].Phase != "closeout" {
+		t.Errorf("dossier did not surface a genuine skip: %+v", d.SkippedPhases)
 	}
 	if err := d.Validate(); err != nil {
-		t.Errorf("dossier with skipped_phases must still validate: %v", err)
+		t.Errorf("dossier with both record kinds must still validate: %v", err)
 	}
 }
