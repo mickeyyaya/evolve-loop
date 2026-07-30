@@ -17,14 +17,35 @@ type Overlay struct {
 }
 
 // ApplySoftOverlay returns a NEW Plan with ov applied over in; in is never
-// mutated. ov.CLI is normalized like a pin primary (defaultDriverForFamily) so
-// a bare family ("codex") promotes to its registered driver ("codex-tmux");
-// an already driver-qualified or unregistered name passes through unchanged.
+// mutated.
+//
+// ov.CLI resolves in two steps, and the order matters. If the plan's chain
+// ALREADY contains ov.CLI, that exact entry is promoted — the chain was
+// resolved for this phase and its entries are concrete drivers the phase can
+// actually run. Only a CLI the chain does not name is normalized like a pin
+// primary (defaultDriverForFamily), so a bare family ("codex") promotes to its
+// registered driver ("codex-tmux"); an already driver-qualified or unregistered
+// name passes through unchanged.
+//
+// Promoting-in-place is what keeps an overlay from crossing TRANSPORT. Found on
+// CI macOS (PR #390): a headless phase with chain [claude-p codex] escalated its
+// contract-blocked re-dispatch to "codex" and was sent to codex-TMUX, because
+// the bare-family rule fired on a name the chain already held. The same string
+// then resolved two ways inside one phase's own chain — the fallback ladder ran
+// driver "codex", the escalation ran "codex-tmux" — which is a hard exit=10 on a
+// host without tmux, and a silent transport change (different cost, cadence and
+// quota behaviour) on a host with it.
 func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
 	out := in
 	out.Candidates = append([]string(nil), in.Candidates...)
 	if ov.CLI != "" {
 		primary := defaultDriverForFamily(ov.CLI)
+		for _, c := range out.Candidates {
+			if c == ov.CLI {
+				primary = c
+				break
+			}
+		}
 		candidates := make([]string, 0, len(out.Candidates)+1)
 		candidates = append(candidates, primary)
 		seen := map[string]struct{}{primary: {}}
