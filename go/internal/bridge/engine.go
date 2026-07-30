@@ -527,7 +527,21 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		_ = os.WriteFile(filepath.Join(req.Workspace, agent+"-launch-error.txt"), stderrBuf.Bytes(), 0o644)
 	}
 	msg := fmt.Sprintf("bridge: launch exit=%d", code)
-	if cause := firstDiagnosticLine(stderrBuf.String()); cause != "" {
+	cause := firstDiagnosticLine(stderrBuf.String())
+	// An artifact-timeout death must be self-describing (inbox item
+	// deep-phase-artifact-budget-too-small): prefer the driver's marker summary —
+	// waited / extends consumed / last review verdict — over whatever line the
+	// positional firstDiagnosticLine heuristic landed on. For the tmux drivers,
+	// whose notes carry a `[<cli>-tmux]` prefix rather than `[bridge]`, that
+	// heuristic fell through to the LAST non-empty line, which on this path is one
+	// of the workspace file listings the timeout diagnostic prints: the recorded
+	// error_message was a filename. Scoped to 81 so no other exit's cause changes.
+	if code == ExitArtifactTimeout {
+		if summary := artifactTimeoutSummary(stderrBuf.String()); summary != "" {
+			cause = summary
+		}
+	}
+	if cause != "" {
 		msg += ": " + cause
 	}
 	// Wrap the artifact-timeout exit with the port-level sentinel so the
@@ -725,6 +739,21 @@ func firstDiagnosticLine(stderr string) string {
 		last = line
 	}
 	return boundCause(last)
+}
+
+// artifactTimeoutSummary lifts the artifact wait's self-describing summary line
+// out of a launch's stderr, matching on artifactTimeoutMarker rather than on
+// position: a real launch emits `[bridge] WARN:` sandbox chatter BEFORE the wait,
+// so the first-`[bridge]`-line rule firstDiagnosticLine uses would report that
+// WARN as the timeout's cause. Returns "" when the driver produced no summary
+// (e.g. a non-tmux driver returning 81), leaving the legacy cause in place.
+func artifactTimeoutSummary(stderr string) string {
+	for _, line := range strings.Split(stderr, "\n") {
+		if i := strings.Index(line, artifactTimeoutMarker); i >= 0 {
+			return boundCause(strings.TrimSpace(line[i:]))
+		}
+	}
+	return ""
 }
 
 // boundCause caps the cause line rune-safely (never split UTF-8 mid-sequence).

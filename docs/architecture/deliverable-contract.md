@@ -128,7 +128,42 @@ check and the harness's post-phase gate can never drift.
 - **Circuit breaker:** trips on contract/quality violations (not process exit codes). After N
   consecutive blocks (`defaultBreakerThreshold = 3`) it demotes enforce→advisory and logs a
   `CIRCUIT OPEN` escalation, so a miscalibrated gate cannot halt the loop. State persists in
-  `.evolve/contract-gate-breaker.json`; a clean cycle resets it (half-open).
+  `.evolve/contract-gate-breaker.json`; a clean cycle resets it (half-open). The counter is
+  **global** (not per-phase, per-cycle or per-lane), so a cycle that aborted mid-ladder can leave it
+  hot — which is why the escalation below keys off the gate's reported count, not a local ordinal.
+- **CLI escalation before the breaker** (`internal/core/contract_escalation.go`): a contract block
+  never triggers the profile's `cli_fallback` chain (that fires only on infra exits
+  `{80,81,85,124,127}`), so a CLI that systematically mis-formats a deliverable used to burn every
+  correction and open the circuit — a format failure silently WEAKENING the gate (batch-19
+  adversarial-review, batch-21 triage; both agy-tmux). The correction ladder now re-dispatches the
+  **second** consecutive block on a different CLI **family**: the first candidate in the phase's
+  resolved dispatch chain from another family, else the universal `claude-tmux` fallback.
+  - The **first** block is never escalated: one malformed turn is a bad turn, not a CLI verdict.
+  - The trigger is `ReviewResult.Blocks` — the gate's own consecutive-block count — never a
+    re-counted correction ordinal (the two desync when the global counter arrives hot or the salvage
+    rung consumes a block without a re-dispatch).
+  - `Blocks == 0` never escalates. The other gates chained at the same seam (evalgate, topngate,
+    triagecap, the build floor) keep no block counter; their rejections are task-binding/capacity
+    failures, not format-compliance failures, so a different CLI is not the remedy.
+  - The failed family comes from the CLI that **actually ran** (routing override > `EVOLVE_*_CLI` >
+    profile, via `llmroute.Resolve`), not from `profile.cli` — which would compute the family from a
+    CLI that never dispatched. Same-family siblings (`claude-tmux`/`claude-p`) are not escalations.
+  - Candidates are validated with `policy.ValidatePin`, so a profile's `allowed_clis` bounds the
+    escalation exactly as it bounds an operator pin.
+  - Applied to `PhaseRequest.ModelRoutingCLI` on **that re-dispatch only** (a soft overlay: escalated
+    CLI becomes chain primary, the profile's own chain stays behind it) and reverted when the ladder
+    ends. The phase's primary routing and the profile on disk are untouched — the common PASS path is
+    unchanged. Minted/user phases resolve `.evolve/profiles/<phase>.json` (the built-in
+    `phaseAgentName` table covers only the 10 spine phases).
+- **A demotion is no longer silent.** `ReviewResult.Demoted` marks the approval the gate did not
+  earn; `core.ChainReviewers` carries it through both exits (all-approve **and** a later gate's
+  rejection). The orchestrator emits a `WARN CONTRACT GATE DEMOTED` line naming the phase, the CLI,
+  whether escalation actually ran, and the last violation; appends a `contract_gate_demoted` ledger
+  entry whose `Action` carries the same evidence; and **stages** an autofile escalation intent in
+  `.evolve/escalations/pending-actions.jsonl`. Staged, never written straight to `.evolve/inbox`: a
+  mid-cycle inbox write races `inboxmover.Claim`'s `os.Rename`; `recurrence.ApplyBoundary`
+  (per-iteration loop boundary) is the only sanctioned inbox writer — and it applies intents only at
+  `failure_disposition.stage=enforce`.
 
 ## Write-in-flight grace (read robustness)
 

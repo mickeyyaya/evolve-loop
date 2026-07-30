@@ -156,7 +156,7 @@ write commits a **false** forensic identity — worse than an absent one.
 
 ---
 
-## 7. Deep-tier artifact budgets + self-describing timeouts (PR #384, open)
+## 7. Deep-tier artifact budgets + self-describing timeouts
 
 **The issue.** Six phases died `missing_artifact` in one day across four phase
 types — audit ×2, retro, adversarial-review, tdd ×2 — **one on a provably quiet
@@ -184,7 +184,7 @@ changed. **Lesson: do not file unverified claims.**
 
 ---
 
-## 8. Contract-gate CLI escalation (PR #384, open)
+## 8. Contract-gate CLI escalation
 
 **The issue, twice confirmed.** A phase whose deliverable fails its contract is
 re-dispatched to the **same** CLI forever — `cli_fallback` fires only on infra
@@ -207,6 +207,55 @@ left the live triage path permanently demoted with zero evidence.
 
 **Bonus finding.** `dispositionrouter.StageIntent` had **no production caller**
 before this change. Tests only.
+
+## 8b. The escalation crossed transport — and my first diagnosis was wrong
+
+**Delivery note.** The first PR carrying sections 7 and 8 was cut from a base
+that predated the persona and e2e work, and it went red on both platforms. I
+diagnosed **both** failures as stale-base artifacts. Half of that was right and
+half was a claim I had not earned, so it is worth recording exactly which half.
+
+**The ubuntu half was stale base.** `internal/prompts`'
+`TestPersonaStopCriterionDedupe_CombinedLineCountReduced` (the persona line
+budget is a hard ceiling, and two independent branches each spent part of it)
+and `internal/core`'s `TestGuardRecoversCatalogWritesSourcePhaseLeak` fail on
+the *merge* of that stale base against current `main` and pass on a clean
+rebuild of the same two commits. That diagnosis held.
+
+**The macOS half was a real defect in section 8's own feature**, and my local
+run said "green" because **this machine has tmux and the CI runner does not**.
+`TestE2ECLIFallbackChain/trigger_81_falls_back_to_codex` failed with
+`build correction 2 dispatch failed: launch exit=10: [codex-tmux] new-session:
+exec: "tmux": executable file not found`.
+
+Read the two lines together and the defect is unmissable:
+
+```
+[runner] phase=scout  dispatch chain: claude-p@sonnet=81 -> codex@sonnet=0   # fallback → driver "codex"
+[engine] ... driver "codex-tmux" ... (agent build)                            # escalation → driver "codex-tmux"
+```
+
+**The same string, `codex`, resolved two different ways inside one phase's own
+chain.** `llmroute.ApplySoftOverlay` normalized the overlay CLI through
+`defaultDriverForFamily`, which maps a bare family to its *default* driver —
+correct for a family name, wrong for a name the chain already held as a
+concrete, headless driver. So a contract block on a headless phase silently
+re-dispatched it onto tmux: a hard `exit=10` cycle failure where tmux is absent,
+and where tmux is present, a silent move to a different transport with different
+cost, cadence, and quota behaviour that nothing reports.
+
+**The fix** is a two-step resolution with the order stated: if the plan's chain
+already contains `ov.CLI`, promote **that exact entry** — the chain was resolved
+for this phase and its entries are drivers the phase can actually run; only a
+CLI the chain does not name falls through to family normalization. Both existing
+overlay tests stay green unchanged (their chains are all-tmux, so the family rule
+still fires), and the new pin fails on the pre-fix code.
+
+**The lesson is the same one section 7 already records, one section later.** A
+green local run is evidence about the local host, not about CI. When a CI-only
+failure is attributed to something else, the attribution needs a reproduction
+under CI's constraints — here, re-running the suite with `tmux` removed from
+`PATH`, which takes one command and settles it.
 
 ---
 
