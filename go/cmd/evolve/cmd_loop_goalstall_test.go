@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // The tracker must escalate ONLY on the threshold-th consecutive non-shipping
@@ -69,7 +71,7 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 	esc := &goalStallEscalation{streak: 3, reasons: []string{"SKIPPED_UNKNOWN", "SKIPPED_AUDIT_ADVISORY"}}
 	goalHash := "805f6cedd62d9c2b3592ec1750943ec1bf238e920f34884edead2205d01d7d55"
 
-	item := buildGoalStallItem(goalHash, esc, 0.5 /* below floor */, 644, "2026-07-18T00:00:00Z")
+	item := buildGoalStallItem(goalStallKind, goalHash, esc, 0.5 /* below floor */, 644, "2026-07-18T00:00:00Z")
 	if item.Weight < goalStallWeightFloor {
 		t.Errorf("weight %v not clamped up to floor %v", item.Weight, goalStallWeightFloor)
 	}
@@ -103,7 +105,7 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 // validate() must reject an under-weighted or field-missing item so a malformed
 // self-injection fails loud (the "never a silent no-op todo" contract).
 func TestGoalStallItem_ValidateRejectsMalformed(t *testing.T) {
-	good := buildGoalStallItem("abcd1234ef", &goalStallEscalation{streak: 3}, 0.9, 1, "2026-07-18T00:00:00Z")
+	good := buildGoalStallItem(goalStallKind, "abcd1234ef", &goalStallEscalation{streak: 3}, 0.9, 1, "2026-07-18T00:00:00Z")
 	if err := good.validate(); err != nil {
 		t.Fatalf("a well-formed item must validate: %v", err)
 	}
@@ -153,7 +155,7 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 	esc := &goalStallEscalation{streak: 3, reasons: []string{"SKIPPED_UNKNOWN"}}
 	var stderr strings.Builder
 
-	handleGoalStall(evolveDir, goalHash, workspace, 644, esc, 3, 0.9, &stderr)
+	handleGoalStall(goalStallKind, evolveDir, goalHash, workspace, 644, esc, 3, 0.9, &stderr)
 
 	// inbox todo written at the goal-stable path
 	inboxPath := filepath.Join(evolveDir, "inbox", goalStallItemIDPrefix+"805f6ced.json")
@@ -170,5 +172,29 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "GOAL-STALL") {
 		t.Errorf("no loud stderr line emitted: %q", stderr.String())
+	}
+}
+
+// TestNonShippingOutcome_ExactNegationOfCoreShipping is the caller proof for
+// core.IsShippingVerdict: the breaker must be its exact negation, never a
+// second hand-maintained list. If someone adds a shipping label to core and
+// not here (or vice versa), the streak counter and the throughput window
+// would disagree about whether the same cycle landed work.
+func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
+	for _, v := range []string{
+		core.VerdictPASS, core.VerdictFAIL, core.VerdictWARN,
+		core.CycleOutcomeShippedViaBuild, core.CycleOutcomeSkippedAuditAdvisory,
+		core.CycleOutcomeSkippedUnknown, "SKIPPED", "", "SHIPPED",
+	} {
+		if got, want := nonShippingOutcome(v), !core.IsShippingVerdict(v); got != want {
+			t.Errorf("nonShippingOutcome(%q) = %v, want %v (negation of core.IsShippingVerdict)", v, got, want)
+		}
+	}
+	// Anti-tautology: the two labels that DO ship must not count as
+	// non-progress, so a streak cannot accumulate across shipping cycles.
+	for _, v := range []string{core.VerdictPASS, core.CycleOutcomeShippedViaBuild} {
+		if nonShippingOutcome(v) {
+			t.Errorf("verdict %q ships — it must never advance the non-progress streak", v)
+		}
 	}
 }

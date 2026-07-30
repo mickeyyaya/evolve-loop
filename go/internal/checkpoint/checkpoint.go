@@ -23,6 +23,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 // Reason mirrors the four bash-canonical checkpoint reasons.
@@ -188,14 +190,13 @@ func init() {
 	// IS an escalation reason, so unlike the phase-complete hook below it
 	// writes unconditionally (still carrying the recorded integrity chain and
 	// holding the same sidecar lock). detectQuotaPause / `evolve loop --resume`
-	// consume it. minimal: QuotaResetAt left empty — the resume path treats a
-	// missing wake-at as "operator decides"; wiring usageprobe.ParseResetHint
-	// here is the upgrade path.
+	// consume it — including the wake-at withQuotaReset stamps on.
 	core.QuotaBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		return flock.WithPathLock(cycleStatePath, func() error {
 			existing := readExistingIntegrity(cycleStatePath)
-			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing))
+			cp := ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing)
+			return applyWithHooks(defaultHooks(), cycleStatePath, withQuotaReset(cp, cs.WorkspacePath, projectRoot, now))
 		})
 	}
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
@@ -236,6 +237,45 @@ func init() {
 			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonPhaseComplete, 0, "", now, existing))
 		})
 	}
+}
+
+// withQuotaReset stamps the wake-at pair (QuotaResetAt + QuotaResetSource) onto a
+// quota-likely checkpoint. It exists because the seam used to leave both EMPTY, so
+// cmd_loop printed `QUOTA-PAUSE: … wake-at= source=unknown` and the auto-resume
+// delay arithmetic skills/loop/SKILL.md prescribes (max(60, min(3600, wake_at -
+// now + 60))) had no timestamp to run on — auto-resume was structurally dead at
+// every quota wall.
+//
+// quotareset.Compute is the SSOT for the source-priority chain — operator
+// override (policy.json quota_reset.reset_at) > the CLI adapter's scraped
+// "resets HH:MMam" hint at <workspace>/quota-reset-hint.txt > now + default
+// hours — so this only injects `now` (determinism) and the policy-sourced knobs,
+// never a second estimator. Fail-open by construction: the fallback arm always
+// yields a timestamp, so the field is never blank on the paths that matter.
+//
+// Scoped to the quota reason on purpose: a phase-complete breadcrumb has no reset
+// instant, and stamping one there would advertise a fictional wake time.
+func withQuotaReset(cp Checkpoint, workspace, projectRoot string, now time.Time) Checkpoint {
+	qr := policy.Policy{}.QuotaResetConfig()
+	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
+		qr = pol.QuotaResetConfig()
+	}
+	res, err := quotareset.Compute(workspace, quotareset.Options{
+		Now:          func() time.Time { return now },
+		ResetAt:      qr.ResetAt,
+		DefaultHours: qr.DefaultHours,
+	})
+	if err != nil {
+		// UNREACHABLE TODAY (review LOW): quotareset.Compute returns nil on every arm.
+		// Kept as contract-driven handling for a future error arm, not as live code. Still record the source so
+		// the QUOTA-PAUSE line explains itself instead of reprinting the
+		// indistinguishable `source=unknown` this fix exists to remove.
+		cp.QuotaResetSource = "unavailable"
+		return cp
+	}
+	cp.QuotaResetAt = res.ISO
+	cp.QuotaResetSource = res.Source
+	return cp
 }
 
 // hasEscalationCheckpoint reports whether path already holds a checkpoint

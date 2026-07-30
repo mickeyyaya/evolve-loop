@@ -17,6 +17,27 @@ func TestGoalStallThreshold_DefaultAndOverride(t *testing.T) {
 	}
 }
 
+// The non-progress threshold is the UNION breaker's ceiling (any non-shipping
+// outcome, FAIL included). It must be config-driven with its own compiled
+// default, and that default must sit ABOVE the empty-only goal-stall threshold —
+// a mixed FAIL/EMPTY streak is noisier evidence than a clean empty streak, so it
+// gets more rope before escalating.
+func TestGoalStallNonprogressThreshold_DefaultAndOverride(t *testing.T) {
+	got := (Policy{}).GoalStallNonprogressThreshold()
+	if got != 5 {
+		t.Errorf("absent block: nonprogress threshold = %d, want compiled default 5", got)
+	}
+	if base := (Policy{}).GoalStallThreshold(); got <= base {
+		t.Errorf("nonprogress default %d must exceed the empty-only goal-stall default %d", got, base)
+	}
+	if got := (Policy{GoalStall: &GoalStallPolicy{NonprogressThreshold: 8}}).GoalStallNonprogressThreshold(); got != 8 {
+		t.Errorf("override: nonprogress threshold = %d, want 8", got)
+	}
+	if got := (Policy{GoalStall: &GoalStallPolicy{NonprogressThreshold: -1}}).GoalStallNonprogressThreshold(); got != 5 {
+		t.Errorf("non-positive: nonprogress threshold = %d, want default 5", got)
+	}
+}
+
 func TestGoalStallWeight_DefaultAndOverride(t *testing.T) {
 	if got := (Policy{}).GoalStallWeight(); got != 0.9 {
 		t.Errorf("absent block: weight = %v, want compiled default 0.9", got)

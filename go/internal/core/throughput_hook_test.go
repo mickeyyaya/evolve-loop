@@ -44,3 +44,48 @@ func TestThroughputRecorderWired_Probe(t *testing.T) {
 		t.Error("WithThroughputRecorder did not wire the seam")
 	}
 }
+
+// TestIsShippingVerdict_WholeOutcomeVocabulary walks every label the
+// ADR-0079 outcome vocabulary can put in CycleResult.FinalVerdict. The
+// allowlist shape is load-bearing: SKIPPED_UNKNOWN once fell through a
+// denylist-shaped breaker, so an unrecognised label must classify as
+// NON-shipping rather than defaulting to "shipped".
+func TestIsShippingVerdict_WholeOutcomeVocabulary(t *testing.T) {
+	tests := []struct {
+		verdict string
+		want    bool
+	}{
+		{VerdictPASS, true},
+		{CycleOutcomeShippedViaBuild, true},
+		{VerdictFAIL, false},
+		{VerdictWARN, false},
+		{CycleOutcomeSkippedAuditAdvisory, false},
+		{CycleOutcomeSkippedUnknown, false},
+		{"SKIPPED", false},
+		{"", false},        // never recorded — must not read as shipped
+		{"pass", false},    // case matters; the labels are exact
+		{"SHIPPED", false}, // a plausible future label nobody classified
+	}
+	for _, tt := range tests {
+		if got := IsShippingVerdict(tt.verdict); got != tt.want {
+			t.Errorf("IsShippingVerdict(%q) = %v, want %v", tt.verdict, got, tt.want)
+		}
+	}
+}
+
+// TestIsShippingVerdict_IsTheOneDefinitionShippedOutcomeUses pins the
+// coupling that justifies exporting it: with HEAD moved, shippedOutcome must
+// agree with IsShippingVerdict on EVERY label. cmd/evolve's non-progress
+// breaker consumes the same function negated, so a divergence here is a
+// divergence between the throughput window and the breaker.
+func TestIsShippingVerdict_IsTheOneDefinitionShippedOutcomeUses(t *testing.T) {
+	for _, v := range []string{
+		VerdictPASS, VerdictFAIL, VerdictWARN,
+		CycleOutcomeShippedViaBuild, CycleOutcomeSkippedAuditAdvisory,
+		CycleOutcomeSkippedUnknown, "SKIPPED", "", "SHIPPED",
+	} {
+		if got, want := shippedOutcome(v, "aaa", "bbb"), IsShippingVerdict(v); got != want {
+			t.Errorf("verdict %q: shippedOutcome(HEAD moved) = %v but IsShippingVerdict = %v — the vocabulary has forked", v, got, want)
+		}
+	}
+}

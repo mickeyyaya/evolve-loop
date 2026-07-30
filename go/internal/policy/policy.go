@@ -1436,12 +1436,15 @@ func (p Policy) RetroAutofileDefaultWeight() float64 {
 
 // GoalStallPolicy is the .evolve/policy.json "goal_stall" block. It tunes the
 // goal-stall escalation (cmd/evolve/cmd_loop_goalstall.go): Threshold is the
-// number of CONSECUTIVE empty/blocked (non-shipping) cycles on one goal after
-// which the loop stops blind re-dispatch and self-files an inbox todo; Weight is
-// that todo's weight. Absent ⇒ the compiled-in safe defaults.
+// number of CONSECUTIVE empty/blocked cycles on one goal after which the loop
+// stops blind re-dispatch and self-files an inbox todo; NonprogressThreshold is
+// the same ceiling for the WIDER union class (any cycle that shipped nothing,
+// FAIL included); Weight is that todo's weight. Absent ⇒ the compiled-in safe
+// defaults.
 type GoalStallPolicy struct {
-	Threshold int     `json:"threshold,omitempty"`
-	Weight    float64 `json:"weight,omitempty"`
+	Threshold            int     `json:"threshold,omitempty"`
+	NonprogressThreshold int     `json:"nonprogress_threshold,omitempty"`
+	Weight               float64 `json:"weight,omitempty"`
 }
 
 // GoalStallThreshold returns the consecutive non-shipping-cycle count that
@@ -1454,6 +1457,24 @@ func (p Policy) GoalStallThreshold() int {
 		return safeDefault
 	}
 	return p.GoalStall.Threshold
+}
+
+// GoalStallNonprogressThreshold returns the consecutive NON-SHIPPING-cycle count
+// (any outcome that is not PASS / SHIPPED_VIA_BUILD — FAIL, WARN, empty and
+// blocked alike) that triggers the union non-progress escalation. It exists
+// because the empty-only goal-stall counter and the consecutive-FAIL breaker each
+// RESET on the other's outcome, so an interleaved FAIL,EMPTY,FAIL,EMPTY goal
+// crossed neither ceiling and ground on forever. Absent/non-positive block ⇒ 5,
+// deliberately ABOVE the empty-only default of 3: a mixed streak is noisier
+// evidence (a FAIL at least produced a signal), so it gets more rope. Sourced
+// from policy, never a Go literal at the call site
+// (feedback_phase_settings_from_config_not_code).
+func (p Policy) GoalStallNonprogressThreshold() int {
+	const safeDefault = 5
+	if p.GoalStall == nil || p.GoalStall.NonprogressThreshold <= 0 {
+		return safeDefault
+	}
+	return p.GoalStall.NonprogressThreshold
 }
 
 // GoalStallWeight returns the weight applied to a self-filed goal-stall inbox

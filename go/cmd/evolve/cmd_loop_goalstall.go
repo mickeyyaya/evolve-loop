@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -27,6 +28,18 @@ import (
 // abnormal-event, instead of blindly re-running it. The counter resets on any
 // shipping cycle.
 //
+// TWO breakers share this machinery, differing only in the outcome class they
+// count (see stallKind) and their policy threshold:
+//
+//   - goalStallKind — EMPTY/BLOCKED only, the consecutive-FAIL breaker's blind spot.
+//   - nonprogressKind — the UNION: every cycle that landed nothing, FAIL included.
+//     Added because the two class-keyed counters each RESET on the other's
+//     outcome, so a goal alternating FAIL,EMPTY,FAIL,EMPTY crossed NEITHER
+//     ceiling and burned pipelines forever while landing nothing (inbox
+//     nonprogress-breaker-interleaved-fail-empty). The union escalates and
+//     CONTINUES — the hard-halt decision for a pure-FAIL streak stays with
+//     consecutiveFailBreaker.
+//
 // Held in-memory for the loop invocation, mirroring consecutiveFailBreaker
 // (cmd_loop_control.go) and fleet.StarvationTracker — a stall burns WITHIN one
 // batch, so per-invocation tracking catches the live case; cross-process
@@ -43,6 +56,70 @@ const goalStallWeightFloor = 0.9
 // re-fire for the same goal overwrites the single open todo rather than piling
 // up duplicates.
 const goalStallItemIDPrefix = "goal-stall-"
+
+// nonprogressItemIDPrefix is the sibling prefix for the UNION breaker, distinct
+// from goalStallItemIDPrefix so a non-progress escalation cannot overwrite the
+// empty-only goal-stall todo for the same goal (both stay idempotent by goal
+// WITHIN their kind).
+const nonprogressItemIDPrefix = "nonprogress-"
+
+// stallKind is the identity of one consecutive-non-shipping breaker: which
+// outcome class it counts (for the human wording), the goal-stable inbox id
+// prefix, and the `source` field a scout reads. The two breakers differ ONLY in
+// identity + threshold — the counter (goalStallTracker), the weight floor, the
+// validate/write path and the abnormal-event are all shared — so the difference
+// is DATA, not a second copy of the machinery
+// (feedback_never_duplicate_centralize_via_design_patterns).
+type stallKind struct {
+	idPrefix string
+	// outcomes names the counted class in the title/description/event, e.g.
+	// "empty/blocked". Reporting a FAIL/EMPTY streak as empty-only would send the
+	// scout looking for the wrong evidence, so each kind states its own.
+	outcomes string
+	source   string
+	// marker is the stderr banner an operator greps for.
+	marker string
+}
+
+var (
+	// goalStallKind counts EMPTY/BLOCKED only — cycles that shipped nothing AND
+	// left no FAIL signal (the consecutive-FAIL breaker's blind spot).
+	goalStallKind = stallKind{
+		idPrefix: goalStallItemIDPrefix,
+		outcomes: "empty/blocked",
+		source:   "goal-stall-escalation",
+		marker:   "GOAL-STALL",
+	}
+	// nonprogressKind counts the UNION: every cycle that landed nothing, FAIL
+	// included. It exists because the two class-keyed breakers each reset on the
+	// other's outcome, so an interleaved FAIL,EMPTY,FAIL,EMPTY goal crossed
+	// neither ceiling (inbox nonprogress-breaker-interleaved-fail-empty).
+	nonprogressKind = stallKind{
+		idPrefix: nonprogressItemIDPrefix,
+		outcomes: "non-shipping (fail/empty/blocked). NOTE: a WARN-verdict cycle may have shipped inline — CycleResult carries no HEAD-moved field, so confirm HEAD before treating this streak as true non-progress",
+		source:   "nonprogress-escalation",
+		marker:   "NONPROGRESS",
+	}
+)
+
+// nonShippingOutcome reports whether a cycle FinalVerdict means "landed
+// nothing" — the union signal the interleaved-stream escape needs. Only PASS and
+// SHIPPED_VIA_BUILD actually land work; everything else (FAIL, WARN, the two
+// SKIPPED_* outcomes, a bare SKIPPED, and an unrecorded empty verdict) shipped
+// nothing. Deliberately an allowlist of SHIPPING outcomes rather than a denylist
+// of failures: a new non-shipping outcome label must not silently fall through
+// the breaker the way SKIPPED_UNKNOWN once fell through the FAIL breaker.
+func nonShippingOutcome(finalVerdict string) bool {
+	// Negation of core's ONE shipping-verdict definition, which the throughput
+	// hook also uses — a second copy would let a newly added outcome label reach
+	// one consumer and not the other (review MEDIUM).
+	//
+	// CAVEAT for whoever reads a filed todo: CycleResult carries no HEAD-moved
+	// field, so a WARN-verdict cycle that shipped inline still counts as
+	// non-progress here. That can file one spurious diagnostic todo; it can
+	// never halt.
+	return !core.IsShippingVerdict(finalVerdict)
+}
 
 // goalStallTracker counts consecutive non-shipping cycles for the running goal
 // and collects the distinct block reasons seen during the streak.
@@ -101,10 +178,10 @@ type goalStallItem struct {
 }
 
 // buildGoalStallItem constructs the weighted inbox todo for a goal that ran
-// `esc.streak` consecutive non-shipping cycles. weight is clamped UP to the 0.9
-// floor. The id is goal-stable (independent of cycle) so re-fires stay
-// idempotent by goal.
-func buildGoalStallItem(goalHash string, esc *goalStallEscalation, weight float64, cycle int, nowRFC3339 string) goalStallItem {
+// `esc.streak` consecutive cycles of `kind`'s outcome class. weight is clamped UP
+// to the 0.9 floor. The id is goal-AND-kind-stable (independent of cycle) so
+// re-fires stay idempotent per goal per breaker.
+func buildGoalStallItem(kind stallKind, goalHash string, esc *goalStallEscalation, weight float64, cycle int, nowRFC3339 string) goalStallItem {
 	if weight < goalStallWeightFloor {
 		weight = goalStallWeightFloor
 	}
@@ -114,19 +191,19 @@ func buildGoalStallItem(goalHash string, esc *goalStallEscalation, weight float6
 	}
 	short := shortGoalHash(goalHash)
 	return goalStallItem{
-		ID:       goalStallItemIDPrefix + short,
-		Title:    fmt.Sprintf("Goal %s stalled: %d consecutive empty/blocked cycles shipped nothing — re-scope, split, or unblock", short, esc.streak),
+		ID:       kind.idPrefix + short,
+		Title:    fmt.Sprintf("Goal %s stalled: %d consecutive %s cycles shipped nothing — re-scope, split, or unblock", short, esc.streak, kind.outcomes),
 		Weight:   weight,
 		Kind:     "bug",
 		Priority: "high",
 		Campaign: "pipeline-stability",
 		Description: fmt.Sprintf(
-			"The goal (hash %s) produced %d CONSECUTIVE empty/blocked cycles landing nothing "+
+			"The goal (hash %s) produced %d CONSECUTIVE %s cycles landing nothing "+
 				"(observed through cycle %d). The scheduler stopped blind re-dispatch and filed "+
 				"this instead of re-running the identical goal again. Re-scope to a narrower "+
 				"reachable slice, split the goal, or address the recurring block reason(s): %s.",
-			goalHash, esc.streak, cycle, reasons),
-		Source:    "goal-stall-escalation",
+			goalHash, esc.streak, kind.outcomes, cycle, reasons),
+		Source:    kind.source,
 		CreatedAt: nowRFC3339,
 	}
 }
@@ -171,29 +248,44 @@ func shortGoalHash(goalHash string) string {
 	return goalHash[:8]
 }
 
-// loadGoalStallConfig reads the goal-stall threshold + weight from policy.json,
-// falling back to the compiled defaults on any read error (sourced from policy,
-// never a Go literal at the call site — feedback_phase_settings_from_config_not_code).
-func loadGoalStallConfig(evolveDir string) (int, float64) {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		return policy.Policy{}.GoalStallThreshold(), policy.Policy{}.GoalStallWeight()
-	}
-	return pol.GoalStallThreshold(), pol.GoalStallWeight()
+// goalStallConfig carries the policy-sourced knobs both breakers read. Grouped
+// so the loop's single load site cannot pick up one threshold and miss the other.
+type goalStallConfig struct {
+	threshold            int // empty/blocked-only ceiling
+	nonprogressThreshold int // union (any non-shipping outcome) ceiling
+	weight               float64
 }
 
-// handleGoalStall self-files the goal-stall inbox todo and emits an
+// loadGoalStallConfig reads both stall thresholds + the todo weight from
+// policy.json, falling back to the compiled defaults on any read error (sourced
+// from policy, never a Go literal at the call site —
+// feedback_phase_settings_from_config_not_code).
+func loadGoalStallConfig(evolveDir string) goalStallConfig {
+	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	if err != nil {
+		pol = policy.Policy{}
+	}
+	return goalStallConfig{
+		threshold:            pol.GoalStallThreshold(),
+		nonprogressThreshold: pol.GoalStallNonprogressThreshold(),
+		weight:               pol.GoalStallWeight(),
+	}
+}
+
+// handleGoalStall self-files the inbox todo for `kind`'s escalation and emits an
 // abnormal-event for the observer. Failures are logged, never fatal — a
-// diagnostic escalation must not itself halt the loop.
-func handleGoalStall(evolveDir, goalHash, workspace string, cycle int, esc *goalStallEscalation, threshold int, weight float64, stderr io.Writer) {
-	item := buildGoalStallItem(goalHash, esc, weight, cycle, time.Now().UTC().Format(time.RFC3339))
+// diagnostic escalation must not itself halt the loop
+// (never_stop_queue_inject_inbox).
+func handleGoalStall(kind stallKind, evolveDir, goalHash, workspace string, cycle int, esc *goalStallEscalation, threshold int, weight float64, stderr io.Writer) {
+	item := buildGoalStallItem(kind, goalHash, esc, weight, cycle, time.Now().UTC().Format(time.RFC3339))
 	if path, err := item.writeTo(evolveDir); err != nil {
-		fmt.Fprintf(stderr, "[loop] WARN: goal-stall: failed to file inbox todo: %v\n", err)
+		fmt.Fprintf(stderr, "[loop] WARN: %s: failed to file inbox todo: %v\n", kind.source, err)
 	} else {
-		fmt.Fprintf(stderr, "[loop] GOAL-STALL: goal %s ran %d consecutive empty/blocked cycles — filed %s; re-scope/split instead of re-dispatching\n", shortGoalHash(goalHash), esc.streak, path)
+		fmt.Fprintf(stderr, "[loop] %s: goal %s ran %d consecutive %s cycles — filed %s; re-scope/split instead of re-dispatching\n",
+			kind.marker, shortGoalHash(goalHash), esc.streak, kind.outcomes, path)
 	}
 	if dirExists(workspace) {
 		w := dispatchevents.NewWriter(workspace)
-		_ = w.EmitGoalStallEscalated(cycle, esc.streak, threshold, goalHash)
+		_ = w.EmitGoalStallEscalated(cycle, esc.streak, threshold, goalHash, kind.outcomes)
 	}
 }

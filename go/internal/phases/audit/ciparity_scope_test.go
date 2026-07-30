@@ -24,7 +24,7 @@ import (
 // CI keeps the whole-suite backstop, exactly like apicover-enforce.
 func TestIntegrationTierGate_ScopesToTouchedPackages(t *testing.T) {
 	root, _ := goWorktree(t) // root/go/go.mod (module ciparitytest)
-	// Build handoff naming ONE changed package → cycleTouchedGo true AND
+	// Build handoff naming ONE changed package → changedScopeForGate run=true AND
 	// changedPackagesForAudit returns exactly ["./cmd/foo/..."].
 	runDir := filepath.Join(root, ".evolve", "runs", "cycle-7")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
