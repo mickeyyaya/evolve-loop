@@ -153,6 +153,12 @@ for TASK_SLUG in <task slugs from scout-report>; do
 done
 ```
 
+> Deliberately WITHOUT `-predicates`: that flag lints the cycle's ACS predicate
+> sources, which the TDD phase has not authored yet — `go/acs/cycle<N>/predicates_test.go`
+> does not exist during DISCOVER. The flaky-shape lint runs on the pipeline as
+> `internal/evalgate`'s `flaky-predicate-shape` gate at the END of the tdd phase
+> (advisory; see [acs-predicate-quality-gate.md](../../docs/architecture/acs-predicate-quality-gate.md) Layer 5).
+
 ## Eval Checksum Capture
 
 ```bash

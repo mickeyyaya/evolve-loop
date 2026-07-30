@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -163,32 +164,12 @@ func functionPackagePatterns(fn *ast.FuncDecl, consts map[string]string) []strin
 	return out
 }
 
-// modulePrefix is the import-path prefix of this repo's Go module; a string
-// starting with it is a package reference, not prose.
-const modulePrefix = "github.com/mickeyyaya/evolve-loop/go/"
-
 // isPackagePattern reports whether s is shaped like a `go test` package
-// argument. Deliberately conservative — a false positive here demotes a real
-// gate, a false negative merely leaves one broad predicate un-demoted:
-//   - "./x", "./x/y/..." relative patterns and the bare "./..." whole-module
-//     sweep (the broadest, most false-red-prone shape of all)
-//   - module import paths under modulePrefix
-//
-// File paths (with an extension), prose (spaces), and URLs never match.
+// argument. Delegates to gopkgpattern — the SAME rule the authoring-time
+// flaky-shape lint applies (internal/evalqualitycheck), so a shape one lint
+// stops recognizing cannot silently stop being demoted by the other.
 func isPackagePattern(s string) bool {
-	if s == "" || strings.ContainsAny(s, " \t\n") {
-		return false
-	}
-	if s == "./..." {
-		return true
-	}
-	if filepath.Ext(strings.TrimSuffix(s, "/...")) != "" {
-		return false
-	}
-	if strings.HasPrefix(s, "./") && len(s) > 2 {
-		return true
-	}
-	return strings.HasPrefix(s, modulePrefix)
+	return gopkgpattern.IsPackagePattern(s)
 }
 
 // wholeModuleKey is patternKey's marker for "./..." — every package at once,
@@ -197,21 +178,14 @@ const wholeModuleKey = "(whole-module)"
 
 // patternKey normalizes a pattern to a module-relative directory key so
 // "./internal/bridge/...", "./internal/bridge" and the full import path all
-// compare equal ("internal/bridge"). Unrecognized shapes yield "".
+// compare equal ("internal/bridge"). Unrecognized shapes yield "". The bare
+// whole-module sweep gets this package's never-in-scope marker instead of
+// gopkgpattern's "" (which would make it fail open into "unrecognized").
 func patternKey(p string) string {
-	p = strings.TrimSpace(p)
-	if p == "./..." {
+	if strings.TrimSpace(p) == gopkgpattern.WholeModule {
 		return wholeModuleKey
 	}
-	p = strings.TrimSuffix(p, "/...")
-	p = strings.TrimSuffix(p, "/")
-	switch {
-	case strings.HasPrefix(p, "./"):
-		return strings.TrimPrefix(p, "./")
-	case strings.HasPrefix(p, modulePrefix):
-		return strings.TrimPrefix(p, modulePrefix)
-	}
-	return ""
+	return gopkgpattern.Key(p)
 }
 
 // scopeLintChangedPackages derives the touched set for the lint from GIT, and

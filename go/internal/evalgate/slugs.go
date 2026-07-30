@@ -1,4 +1,4 @@
-// Package evalgate implements two structural inter-phase gates that replace
+// Package evalgate implements the structural inter-phase gates that replace
 // prose/trust contracts with verified checks, mounted at the orchestrator's
 // existing per-phase DeliverableReviewer seam (core.WithReviewer):
 //
@@ -7,10 +7,16 @@
 //     no eval files → audit FAIL after build tokens were already spent).
 //   - Gate B (predicate quality): after tdd, the selected slugs' eval predicates
 //     must not be tautological no-ops (cycle-204), via evalqualitycheck.
+//   - Gate C (floor binding): after tdd, EGPS floor predicates must bind only
+//     floors triage COMMITTED this cycle (cycle-280), via triagecap.
+//   - Gate D (flaky predicate shape): after tdd, the authored predicates are
+//     linted for shapes that flake under fleet load (cycles 1173/1175/1178).
+//     ADVISORY-ONLY — see flakyshape.go for why it can never block.
 //
-// Both gate ONLY on CERTAIN violations (a stat'd-missing file, a definite
-// tautology) and fail OPEN on any ambiguity (parse failure, zero slugs,
-// advisory WARN), so enforce-by-default never false-blocks a healthy cycle.
+// The BLOCKING gates (A/B/C) gate ONLY on CERTAIN violations (a stat'd-missing
+// file, a definite tautology, a proven deferred-floor binding) and fail OPEN on
+// any ambiguity (parse failure, zero slugs, advisory WARN), so enforce-by-default
+// never false-blocks a healthy cycle. Gate D never blocks at all.
 package evalgate
 
 import (

@@ -91,16 +91,21 @@ func TestRole_OutsideCycleAllowsControlPlane(t *testing.T) {
 // ~/.claude/settings.json (which wires the PreToolUse hooks) matches the legacy
 // "always-safe $HOME/.claude" rule, but a cycle must NOT be able to disable the
 // guards by rewriting it — the integrity check takes precedence inside a cycle.
+//
+// The home is the hermetic fixture: previously this asserted against the HOST's
+// $HOME (and against /tmp/.claude/settings.json when HOME was unset), so the
+// most security-critical predicate in the codebase was graded on a
+// machine-dependent path (guards-role-hermetic-home).
 func TestRole_DeniesGlobalSettingsInCycle(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID: 30, Phase: "build", ActiveAgent: "builder",
 		ActiveWorktree: "/work/wt/cycle-30",
 		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-30"),
 	})
-	g := NewRole(s, false)
+	g := newRoleWithHome(s, false, fixtureHome)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
-		ToolInput: map[string]any{"file_path": filepath.Join(homeDir(), ".claude/settings.json")},
+		ToolInput: map[string]any{"file_path": filepath.Join(fixtureHome, ".claude/settings.json")},
 	})
 	if dec.Allow {
 		t.Error("a cycle must NOT rewrite the global ~/.claude/settings.json hook wiring")
@@ -110,14 +115,45 @@ func TestRole_DeniesGlobalSettingsInCycle(t *testing.T) {
 	}
 }
 
+// TestRole_C1_DeniesGlobalSettingsUnsetHome is the item's named RED (HOME-less
+// runner). With NO home resolved, the always-safe $HOME/.claude rule cannot fire
+// at all, so the deny must come from the control-plane boundary alone — and it
+// must still ALARM. This is the assertion the old homeDir() fallback destroyed:
+// it rewrote the subject path to /tmp/.claude/settings.json, which is always-safe
+// by the /tmp rule, so a HOME-less run graded a different path than the one the
+// test names.
+func TestRole_C1_DeniesGlobalSettingsUnsetHome(t *testing.T) {
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID: 31, Phase: "build", ActiveAgent: "builder",
+		ActiveWorktree: "/work/wt/cycle-31",
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-31"),
+	})
+	g := newRoleWithHome(s, false, "") // HOME unset / sandboxed runner
+	for _, path := range []string{
+		"/Users/operator/.claude/settings.json", // a real global settings path
+		"/tmp/.claude/settings.json",            // the old fallback's path: always-safe dir, protected FILE
+	} {
+		dec := g.Decide(context.Background(), core.GuardInput{
+			ToolName:  "Edit",
+			ToolInput: map[string]any{"file_path": path},
+		})
+		if dec.Allow {
+			t.Errorf("with no home resolved, %q was ALLOWED — the hook wiring must be denied by the control-plane boundary regardless of $HOME", path)
+		}
+		if !dec.Alarm {
+			t.Errorf("deny of %q must raise an Alarm", path)
+		}
+	}
+}
+
 // TestRole_AllowsGlobalSettingsOutsideCycle confirms the operator can still edit
 // their own ~/.claude/settings.json outside a cycle (the C1 fix must not break it).
 func TestRole_AllowsGlobalSettingsOutsideCycle(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
-	g := NewRole(s, false)
+	g := newRoleWithHome(s, false, fixtureHome)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
-		ToolInput: map[string]any{"file_path": filepath.Join(homeDir(), ".claude/settings.json")},
+		ToolInput: map[string]any{"file_path": filepath.Join(fixtureHome, ".claude/settings.json")},
 	})
 	if !dec.Allow {
 		t.Errorf("operator (no active cycle) must be able to edit global settings: %s", dec.Reason)

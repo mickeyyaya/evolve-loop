@@ -10,11 +10,18 @@ import (
 )
 
 // gate is one structural inter-phase check. appliesTo selects the phase whose
-// deliverable it inspects; check returns a non-empty reason on a violation and
-// block=true only when the violation is CERTAIN (a stat'd-missing eval file, a
-// definite tautology) and so should abort the cycle at enforce. Any ambiguity
-// (parse failure, advisory WARN) returns block=false so enforce never
-// false-blocks a healthy cycle.
+// deliverable it inspects; check returns block=true only when a violation is
+// CERTAIN (a stat'd-missing eval file, a definite tautology) and so should abort
+// the cycle at enforce. Any ambiguity (parse failure, advisory WARN) returns
+// block=false so enforce never false-blocks a healthy cycle.
+//
+// `block` IS THE VIOLATION SIGNAL — `reason` is not. An ADVISORY gate returns a
+// non-empty reason on a perfectly healthy deliverable, because that reason is
+// how its observation reaches the phase log at all (flakyShapeGate emits exactly
+// one line per tdd phase on EVERY path, including the clean one). A future
+// simplification of Review that keys rejection off `reason != ""` would
+// therefore fail every tdd phase — including cycles with no Go predicate package
+// (review MEDIUM). Key on block, always.
 type gate interface {
 	name() string
 	appliesTo(phase string) bool
@@ -36,7 +43,7 @@ type reviewer struct {
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	return &reviewer{
 		stage: stage,
-		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}},
+		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate{}},
 		logf:  func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 	}
 }

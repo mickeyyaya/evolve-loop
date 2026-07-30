@@ -321,6 +321,33 @@ config-presence check declared with a `// acs-predicate: config-check` waiver. F
 table, canonical template, and worked examples are in the on-demand reference tail below — but this
 rule is mandatory every cycle and must never be stripped.
 
+## Predicate Reliability — REQUIRED (flaky-shape rules, kept in compact mode)
+
+A behavioral predicate can still be a **false-red generator**. Cycles 1173/1175/1178 each FAILed on
+sound work because one predicate shelled a whole-package `go test` under fleet load. The host lints
+your predicate sources at the end of THIS phase (`flaky-predicate-shape`, Gate D) and prints the
+result to the cycle log — **advisory: it never fails your phase**, so a finding is a note you should
+have fixed, not a block. Five banned shapes and what to write instead:
+
+| Don't | Do |
+|---|---|
+| `exec.Command("go","test","./...")` or any `/...` sweep, multi-package invocation, or the known 40s+ suites (`./internal/core`, `./cmd/evolve`) | ONE named package: `go test ./internal/<pkg>` — or narrow it with `-run TestX`. Whole-repo staleness is the regression suite's job, never a cycle predicate's. |
+| `deadline := time.Now().Add(5*time.Second)`; `time.Since(start) > …` | Poll on STATE (does the file/field exist yet), or derive the bound from the test context. Wall-clock bounds stretch arbitrarily under contention. |
+| `syscall.Kill(4242, 0)`, `os.FindProcess(12345)`, `/proc/4242/status` | Discover the PID at runtime: `os.Getpid()`, a pidfile, `pgrep`. A literal PID is a stale artifact of your session. |
+| `exec.Command("git","status")` | `exec.Command("git","-C",dir,"status")` or set `cmd.Dir`. Bare `git` resolves the repo from process cwd, which differs between main tree, worktree, and each fleet lane. |
+| `exec.Command("yes")`, `sh -c "while true; …"` | `exec.CommandContext(ctx, …)` + `WaitDelay`, or an in-process spinner with `defer stop()`. Un-reaped load generators burned 8 cores for 9 hours across batches 18–21. |
+
+Hand-check before you finish:
+
+```bash
+evolve eval quality-check -predicates "<worktree>/go/acs/cycle<N>" .evolve/evals/<slug>.md
+```
+
+**Exit 1 here is ADVISORY, not a failure** — a flaky-shape finding raises the verdict PASS→WARN. Fix
+the flagged shapes and re-run; do not treat rc=1 as a blocked phase. Exit 2 means something else
+entirely (a Level-0 tautological *eval*), and that one you must rewrite. Always read the
+`linted N file(s)` receipt: `linted 0` means the path was wrong and nothing was checked.
+
 ## Reference Index (Layer 3, on-demand)
 
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)

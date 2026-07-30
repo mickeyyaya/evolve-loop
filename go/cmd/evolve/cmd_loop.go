@@ -283,6 +283,14 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	cycleCtx := buildCycleContext(cfg)
 
 	lr := loopResult{StopReason: "max_cycles", classifyRoot: cfg.ProjectRoot}
+	// Bound the batch's cycle window BEFORE any cycle runs: the spine fail-open
+	// roll-up folds the committed dossiers of cycles >= this number, which is the
+	// only way a fleet batch (whose lane cycles never return a CycleResult to this
+	// process) gets counted. A failed read leaves it 0 = unknown, and the roll-up
+	// then falls back to the in-memory results rather than folding all of history.
+	if last, lerr := readLastCycleNumber(ctx, deps.Storage); lerr == nil {
+		lr.batchFirstCycle = last + 1
+	}
 
 	// --resume short-circuits the loop: load the checkpoint, run one
 	// cycle from the paused phase, then exit. M3 protocol.

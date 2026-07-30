@@ -15,13 +15,37 @@ import (
 //   - audit:        workspace_path only (audit-*.{md,json} go there)
 //   - learn/retrospective: workspace_path + .evolve/instincts/lessons/**
 //   - other phases: workspace_path only
-//   - Always-safe:  /tmp/**, $HOME/.claude/**
+//   - Always-safe:  /tmp/**, <home>/.claude/**
 type Role struct {
 	storage core.Storage
 	bypass  bool
+	// home is the operator home the always-safe <home>/.claude rule resolves
+	// against, captured ONCE at construction. Injected rather than read inside
+	// Decide so (a) one process makes one reproducible decision instead of
+	// re-reading a mutable env per tool call, and (b) tests grade a hermetic
+	// fixture home instead of whatever machine they run on — the wound that let
+	// the C1 global-settings regression assert a HOST-dependent path, and
+	// /tmp/.claude/... on a HOME-less runner (guards-role-hermetic-home).
+	// Empty means "no home resolved": the <home>/.claude rule then matches
+	// nothing at all, never a bare relative ".claude/".
+	home string
 }
 
-func NewRole(s core.Storage, bypass bool) *Role { return &Role{storage: s, bypass: bypass} }
+// NewRole builds the role guard for the current process, resolving the operator
+// home from $HOME. This is the composition root's constructor
+// (internal/cli/guardcmd.buildGuard, behind `evolve guard role`); the internal
+// newRoleWithHome seam exists for hermetic tests.
+func NewRole(s core.Storage, bypass bool) *Role {
+	return newRoleWithHome(s, bypass, os.Getenv("HOME"))
+}
+
+// newRoleWithHome is the home-injection seam. An unresolvable/absent home is
+// passed through as "" — never defaulted to a real directory, since a fabricated
+// fallback (the previous test helper's "/tmp") silently converts the
+// <home>/.claude rule into the /tmp rule.
+func newRoleWithHome(s core.Storage, bypass bool, home string) *Role {
+	return &Role{storage: s, bypass: bypass, home: home}
+}
 
 func (r *Role) Name() string { return "role" }
 
@@ -44,7 +68,7 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	// Always-safe scratch dirs — EXCEPT a protected control-plane path that lives
 	// there (e.g. the global ~/.claude/settings.json hook wiring), which must still
 	// face the integrity check below.
-	if isAlwaysSafe(path) && !IsProtectedSurface(path) {
+	if isAlwaysSafe(path, r.home) && !IsProtectedSurface(path) {
 		return core.GuardDecision{Allow: true}
 	}
 	if r.storage == nil {
@@ -107,14 +131,19 @@ func isLessonsCorpusPath(path string) bool {
 	return strings.Contains(p, "/.evolve/instincts/lessons/")
 }
 
-func isAlwaysSafe(path string) bool {
+// isAlwaysSafe reports whether path is scratch space every phase may write.
+// Pure: home is the caller's resolved operator home (Role.home) — no env read,
+// no filesystem access. An empty home disables the <home>/.claude rule entirely
+// rather than degrading to filepath.Join("", ".claude") == ".claude", which would
+// bless any relative ".claude/..." path on a HOME-less runner.
+func isAlwaysSafe(path, home string) bool {
 	if strings.HasPrefix(path, "/tmp/") || path == "/tmp" {
 		return true
 	}
-	if h := os.Getenv("HOME"); h != "" && strings.HasPrefix(path, filepath.Join(h, ".claude")+"/") {
-		return true
+	if home == "" {
+		return false
 	}
-	return false
+	return strings.HasPrefix(path, filepath.Join(home, ".claude")+"/")
 }
 
 func isUnderDir(path, dir string) bool {

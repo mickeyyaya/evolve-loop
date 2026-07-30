@@ -50,6 +50,15 @@ var (
 type projTopN struct {
 	ID     string `json:"id"`
 	Action string `json:"action,omitempty"`
+	// Files is the card's DECLARED repo footprint, parsed from the item's
+	// `files=a;b` metadata field. It is the only channel the fleet disjointness
+	// planner can read (fleet.TodosFromTriage → Todo.Files → Partition/menus are
+	// exact-file-overlap only): a card without it becomes an id island, so a
+	// second lane can concurrently edit the same file it names in prose
+	// (triage-cards-carry-files; live on cycles 1130/1133/1134). omitempty and
+	// NEVER inferred from the action prose — an absent footprint is honest, a
+	// guessed one silently merges or splits real lanes.
+	Files []string `json:"files,omitempty"`
 }
 
 type projID struct {
@@ -92,7 +101,7 @@ func ProjectDecisionJSON(artifact string, cycle int) ([]byte, error) {
 	}
 	if body, ok := sectionBody(artifact, topNHeadingRE); ok {
 		for _, it := range parseItems(body) {
-			d.TopN = append(d.TopN, projTopN{ID: it.id, Action: actionOf(it.rest)})
+			d.TopN = append(d.TopN, projTopN{ID: it.id, Action: actionOf(it.rest), Files: filesOf(it.rest)})
 		}
 	}
 	if body, ok := sectionBody(artifact, deferredSectionRE); ok {
@@ -162,6 +171,91 @@ func actionOf(rest string) string {
 		return strings.TrimSpace(rest[:i])
 	}
 	return strings.TrimSpace(rest)
+}
+
+// splitDeclaredFiles separates an item's `files=` metadata field(s) from the rest
+// of its text: it returns the raw declared tokens and the item with every files=
+// field REMOVED.
+//
+// Field-span parsing, not `files=(\S+)`: agents write `files=a.go; b.go` and
+// `files=a.go, b.go` at least as often as the contract's `a.go;b.go`, and a
+// value regex that stops at the first space both loses paths (a silently partial
+// footprint is still an overlap on the dropped file) and leaves the remainder in
+// the item text, where the floor counters would read those paths as package
+// mentions. The span therefore runs from `files=` to the next `, key=` metadata
+// field (or end of line), and every separator — `;`, `,`, whitespace — splits.
+// Repeated files= fields are all consumed and unioned (L1: a second field left
+// behind would feed exactly the leakage this avoids).
+func splitDeclaredFiles(rest string) (tokens []string, stripped string) {
+	var kept strings.Builder
+	remaining := rest
+	for {
+		start := filesFieldRE.FindStringIndex(remaining)
+		if start == nil {
+			kept.WriteString(remaining)
+			break
+		}
+		value := remaining[start[1]:]
+		end := len(value)
+		if m := nextMetadataFieldRE.FindStringIndex(value); m != nil {
+			end = m[0]
+		}
+		if nl := strings.IndexByte(value[:end], '\n'); nl >= 0 {
+			end = nl
+		}
+		tokens = append(tokens, strings.FieldsFunc(value[:end], isFilesSeparator)...)
+		kept.WriteString(remaining[:start[0]])
+		kept.WriteString(" ") // keep token boundaries intact for later matchers
+		remaining = value[end:]
+	}
+	return tokens, kept.String()
+}
+
+// isFilesSeparator reports whether r separates two declared paths. Whitespace is
+// included deliberately: a path cannot contain a space, so treating one as a
+// separator can only ever split a list the agent wrote loosely.
+func isFilesSeparator(r rune) bool {
+	return r == ';' || r == ',' || r == ' ' || r == '\t'
+}
+
+// filesOf extracts the item's declared repo footprint. Only repo-relative paths
+// survive (declaredFilePath) — the planner compares footprints by EXACT
+// repo-relative path, so a mangled token could never match another card's and is
+// dropped rather than handed over as a footprint that only looks like one (the
+// drop is not silent: MissingCardFilesWarning reports a declaration that yields
+// nothing usable). Returns nil when nothing is declared: the prose is NEVER mined
+// for paths (see projTopN.Files).
+func filesOf(rest string) []string {
+	tokens, _ := splitDeclaredFiles(rest)
+	var files []string
+	seen := map[string]bool{}
+	for _, tok := range tokens {
+		p, ok := declaredFilePath(tok)
+		if !ok || seen[p] {
+			continue
+		}
+		seen[p] = true
+		files = append(files, p)
+	}
+	return files
+}
+
+// declaredFilePath normalizes one declared token and reports whether it is usable
+// as a footprint entry. The surrounding punctuation of the shapes agents actually
+// write — `["a.go", "b.go"]`, backticked paths, a trailing sentence comma — is
+// trimmed; what CANNOT be repaired is rejected: an unsubstituted template
+// placeholder or a glob (no exact match is possible), an absolute path or a `..`
+// escape (not repo-relative — the planner's whole comparison basis), and a bare
+// filename (unlocatable).
+func declaredFilePath(tok string) (string, bool) {
+	p := strings.Trim(tok, "[]()\"'`,;:. \t")
+	if p == "" || strings.ContainsAny(p, "{}*?<>") {
+		return "", false
+	}
+	if strings.HasPrefix(p, "/") || strings.Contains(p, "..") || !strings.Contains(p, "/") {
+		return "", false
+	}
+	return p, true
 }
 
 // reasonOf extracts the dropped item's "reason=…" tail (to end of line).

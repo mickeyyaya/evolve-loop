@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
@@ -30,6 +31,11 @@ type loopResult struct {
 	// the default. Like RecoverableFailures it drives the rc=3 "completed but
 	// with failures" exit contract.
 	ContinuedFailures int `json:"continued_failures,omitempty"`
+	// SpineFailOpens is the batch roll-up of spine-gate fail-opens
+	// (spine-failopen-telemetry): the total, the per-phase breakdown, and the
+	// cycles whose own count breached the WARN threshold. Absent on a clean
+	// batch — the field appears only when there is an epidemic to see.
+	SpineFailOpens *dossier.SpineFailOpenRollup `json:"spine_fail_opens,omitempty"`
 	// CycleOutcomes is the R6 SLO classification per cycle (SHIPPED /
 	// SALVAGED / FAILED_EXPLAINED / FAILED_UNEXPLAINED), computed from the
 	// C1 records at emit time — the batch-level "every cycle delivers a
@@ -38,6 +44,12 @@ type loopResult struct {
 	// classifyRoot, when set (the loop entry points set it once), makes
 	// emit() populate CycleOutcomes from <root>/.evolve/runs/cycle-N.
 	classifyRoot string
+	// batchFirstCycle is the lowest cycle number this batch could have produced
+	// (state.LastCycleNumber + 1 at boot). It bounds the committed-dossier window
+	// the spine fail-open roll-up reads, which is how a batch whose cycles all ran
+	// in lane subprocesses is counted at all. Zero = unknown ⇒ no corpus read (an
+	// unbounded read would report the all-time total as this batch's).
+	batchFirstCycle int
 }
 
 type cycleOutcomeEntry struct {
@@ -74,6 +86,13 @@ func (lr *loopResult) emit(w io.Writer) {
 		// bookkeeping slot (evidence is evidence on every exit path).
 		// Best-effort; never breaks the dispatcher contract.
 		sweepRulePromotions(os.Stderr, lr.classifyRoot, lr.Cycles)
+	}
+	// Spine fail-open roll-up (spine-failopen-telemetry). Deliberately OUTSIDE the
+	// classifyRoot block above, which is gated on len(lr.Cycles) > 0: a fleet batch
+	// runs every cycle in a lane subprocess and appends NOTHING to lr.Cycles, yet
+	// those are precisely the batches whose fail-opens need counting.
+	if lr.SpineFailOpens == nil {
+		lr.SpineFailOpens = spineFailOpenRollup(lr.Cycles, lr.classifyRoot, lr.batchFirstCycle, os.Stderr)
 	}
 	buf, err := json.MarshalIndent(lr, "", "  ")
 	if err != nil {
@@ -224,6 +243,64 @@ func gcActionCounts(manifest gc.Manifest) (archive, del int) {
 		}
 	}
 	return archive, del
+}
+
+// spineFailOpenWarnThreshold is the per-cycle fail-open count above which the
+// batch summary escalates to a stderr WARN. A COMPILED constant, not policy: the
+// threshold decides when a measurement is loud, and a policy knob here would let
+// a noisy batch turn its own alarm off (the digestTopPatterns precedent). The
+// value is the item's "e.g. 3" — a cycle's spine legitimately degrades once or
+// twice under a driver bounce; four times is a pattern.
+const spineFailOpenWarnThreshold = 3
+
+// spineFailOpenRollup folds the batch's spine fail-opens into the summary block,
+// WARNing on stderr for every cycle that breached the threshold. Returns nil for a
+// clean batch so the summary omits the field entirely.
+//
+// TWO sources, because no single one sees a whole batch:
+//
+//   - the committed dossiers for cycles >= firstCycle. A fleet wave/pool lane is a
+//     separate `evolve cycle run` subprocess whose CycleResult never returns to
+//     this process (cmd_loop.go: the wave branch "does not append to lr.Cycles"),
+//     and the standing fleet width is >1 — so folding only the in-memory results
+//     would report zero for exactly the batches this telemetry was filed about.
+//     Lanes DO commit their dossier into the parent's knowledge-base/cycles.
+//   - the in-memory CycleResults, for any cycle with no dossier on disk (the
+//     sequential/resume path, or a cycle whose best-effort dossier write failed).
+//     Projected into the dossier shape the fold consumes — Cycle and
+//     SpineFailOpens are the only fields it reads.
+//
+// The dossier wins when a cycle has both: it is the committed record, written FROM
+// that same CycleResult, so preferring it costs nothing and dedupes the union.
+// firstCycle <= 0 means "the batch window is unknown" and skips the corpus read
+// entirely — reading the whole history would report an all-time total as if it were
+// this batch's.
+func spineFailOpenRollup(cycles []core.CycleResult, projectRoot string, firstCycle int, warn io.Writer) *dossier.SpineFailOpenRollup {
+	var ds []*dossier.Dossier
+	if projectRoot != "" && firstCycle > 0 {
+		ds = dossier.ReadCommitted(projectRoot, firstCycle)
+	}
+	committed := make(map[int]bool, len(ds))
+	for _, d := range ds {
+		committed[d.Cycle] = true
+	}
+	for _, c := range cycles {
+		if committed[c.Cycle] {
+			continue
+		}
+		ds = append(ds, &dossier.Dossier{Cycle: c.Cycle, SpineFailOpens: c.SpineFailOpens})
+	}
+	rollup := dossier.RollupSpineFailOpens(ds, spineFailOpenWarnThreshold)
+	if rollup.Total == 0 {
+		return nil
+	}
+	for _, cycle := range rollup.OverThresholdCycles {
+		fmt.Fprintf(warn, "[loop] WARN cycle %d took more than %d spine fail-opens "+
+			"(a mandatory predecessor's handoff artifact was missing and the phase ran anyway) — "+
+			"see spine_fail_opens in the summary and knowledge-base/cycles/cycle-%d.json\n",
+			cycle, spineFailOpenWarnThreshold, cycle)
+	}
+	return &rollup
 }
 
 // sweepRulePromotions is the I4 measured auto-enforce sweep (R8.2): scan the
