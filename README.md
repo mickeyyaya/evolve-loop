@@ -341,6 +341,15 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 | Version | Date | Notes |
 |---|---|---|
+| v22.12 | Jul 30 | Deep-tier artifact budgets (six missing_artifact deaths in one day) + contract-gate CLI escalation; verified-bytes single read; e2e budget moved into the make recipe — the assetless-tag class — and a failed publish now demotes its own listing |
+| v22.11 | Jul 30 | FAIL-side attempt accounting reaches fleet lanes (ADR-0079 `cycleoutcome` seam); red predicates become self-diagnosing — full-stream evidence files + bounded-retry outcome |
+| v22.10 | Jul 29 | **Runtime/console plane separation (ADR-0080)** — the loop owns its checkout; hub-resident console lease; verification single-flight |
+| v22.9 | Jul 28 | Identical-fingerprint breaker requires a content-bearing identity — ends the false-halt class; duration tokens folded out of fingerprints |
+| v22.8 | Jul 28 | Campaign `PARTITION` + fleet lane menus; persona-budget in-lane gate at the build floor |
+| v22.7 | Jul 22 | Build handoff floor + graduated remediation (the discard-sound-work class); statemap CAS floor closes the cycle-999/1000/1001 shared-state disease |
+| v22.6 | Jul 21 | Ship-manifest naming test + token-usage research — no runtime behaviour change |
+| v22.5 | Jul 20 | Universal CLI fallback — route to any installed LLM when the configured chain is absent instead of halting; cross-lane mint registry (ADR-0073) |
+| v22.4 | Jul 18 | Per-model quota-wall detection in `exhausted_regex`; goal-stall escalation; tier-fallback failover on exit-85 |
 | v22.3 | Jul 17 | **System-failure policy (ADR-0072):** loop halts on forged verdicts instead of retrying; clean-exit verdict-authority fix; token-telemetry + clean-boot campaign (−39% context/cycle) |
 | v22.2 | Jul 16 | Spine artifact floor armed; static/dynamic boundary-leak closures; inbox batch classifier; reconcile-on-quota-teardown |
 | v22.1 | Jul 8 | Landing-page interactive labs + demos; llms.txt |
@@ -356,15 +365,6 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v21.1 | Jun 24 | Prebuilt binaries for 13 Unix targets + install.sh OS/arch detection |
 | v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the strict-audit gate dial |
 | v20.4 | Jun 24 | Public OSS-mirror release automation |
-| v22.4 | Jul 18 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.5 | Jul 20 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.6 | Jul 21 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.7 | Jul 22 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.8 | Jul 28 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.9 | Jul 28 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.10 | Jul 29 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.11 | Jul 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.12 | Jul 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 

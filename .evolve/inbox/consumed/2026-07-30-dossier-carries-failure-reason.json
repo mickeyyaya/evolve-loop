@@ -4,6 +4,7 @@
     "retro-skipped-on-fail",
     "acs-evidence-tail-capture"
   ],
+  "consumed_by": "console-2026-07-30: LANDED \u2014 PR #379 squash 9a56f3e2. go/internal/dossier/failure.go on origin/main: FAIL dossiers carry a `failure` block (digest fingerprint + pre_class + up to 5 whitespace-collapsed, UTF-8-safe 200-byte reason heads) plus a `## Failure` md section, FAIL-gated so PASS/WARN byte-shape is unchanged; stale-digest cycle guard included. Verified live in batch-21/22 cycles.",
   "deps": [
     "acs-evidence-tail-capture"
   ],
