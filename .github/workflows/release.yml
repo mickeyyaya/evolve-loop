@@ -90,3 +90,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: verify release installs + performs for every LLM CLI (check #1)
         run: ./evolve release-verify-clis
+
+  # If ANY gating job fails or is skipped-by-failure, the tag's release object
+  # is still LIVE and ASSETLESS — the local ship pipeline runs `gh release
+  # create` (ship gitops step 4) BEFORE this workflow's suite has run, and
+  # GitHub's releases/latest would happily serve that empty release to the
+  # one-line installer. v22.11.0 and v22.12.0 both shipped assetless through
+  # exactly this hole; both times the fix was a human noticing 404s.
+  #
+  # Demoting to prerelease makes releases/latest fall back to the newest
+  # COMPLETE release, which is precisely the installer's contract. The demotion
+  # is intentionally not a delete: the tag and its history stay auditable, and
+  # re-promoting after a successful re-run is one PATCH.
+  demote-on-failure:
+    name: demote assetless release so latest keeps binaries
+    needs: [test, goreleaser, verify]
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: mark release prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rid=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq .id 2>/dev/null) \
+            || { echo "no release object for $GITHUB_REF_NAME — nothing to demote"; exit 0; }
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$rid" -F prerelease=true \
+            --jq '"demoted \(.tag_name): prerelease=\(.prerelease) — releases/latest now skips it"'
+          echo "::error::release pipeline failed for $GITHUB_REF_NAME — its release object was demoted to prerelease so the one-line installer keeps resolving a release WITH binaries. Re-run after fixing; re-promote with: gh api -X PATCH repos/$GITHUB_REPOSITORY/releases/$rid -F prerelease=false"
