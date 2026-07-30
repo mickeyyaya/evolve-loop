@@ -66,10 +66,13 @@ jobs:
         # + echo_phase_testbuild.go) compiles and runs — it was previously
         # orphaned (no workflow passed its tag). It registers a test-only "echo"
         # phase into the phases registry; production builds never set the tag.
-        # -timeout 45m: the fallback-chain e2e walks a full ~12-phase spine with a
-        # primary failure + fallback on EVERY phase (~10 min), which exceeds Go's
-        # 10m default and previously killed the package mid-cycle.
-        run: go test -count=1 -timeout 45m -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
+        # Invoked THROUGH the Makefile so this workflow and release.yml run the
+        # identical recipe. The -timeout 45m lives in `make test-e2e`, not here:
+        # it was inline in this file only, so release.yml — which already called
+        # make — kept Go's 10m default and v22.12.0 died at exactly 600.102s
+        # with build+publish SKIPPED, publishing an assetless tag. One recipe,
+        # one budget; a future bump cannot reach one workflow and miss the other.
+        run: make -C go test-e2e
       - name: coverage gate (>=85% per internal/* package)
         run: |
           fail=0
