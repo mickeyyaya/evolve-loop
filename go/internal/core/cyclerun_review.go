@@ -39,7 +39,19 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			Worktree:        dr.phaseWorktree,
 			ProjectRoot:     cr.req.ProjectRoot,
 		}
-		rr := cr.o.reviewer.Review(cr.ctx, rin)
+		// baseRoutingCLI is the routing CLI this phase was DISPATCHED with (the
+		// advisor overlay under model_routing=auto; empty otherwise). The
+		// contract-block escalation below temporarily overrides it for a
+		// re-dispatch and this value is restored when the ladder ends, so the
+		// phase's own routing is never mutated (scoping constraint 1 in
+		// contract_escalation.go).
+		baseRoutingCLI := dr.phaseReq.ModelRoutingCLI
+		// escalated latches once a contract-block escalation has re-pointed a
+		// re-dispatch, so the demotion WARN can state truthfully whether
+		// escalation was tried (it is a no-op for a phase whose whole chain is
+		// one CLI family).
+		escalated := false
+		rr := cr.reviewDeliverable(next, rin, contractDispatch{cli: baseRoutingCLI})
 		// Contract-correction retry: on a deliverable-contract reject,
 		// re-dispatch the phase with the violation injected as a
 		// "## Correction" directive (bounded by policy, default 2). This re-runs
@@ -111,7 +123,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				case sr.Relocated && sr.Verified:
 					// Never-upgrades-verdict: the relocated artifact faces
 					// the SAME gate — the breaker-touching FINAL outcome.
-					rr = cr.o.reviewer.Review(cr.ctx, rin)
+					rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated})
 					res := interaction.ResultRejectedAgain
 					if rr.Approve {
 						res = interaction.ResultAccepted
@@ -140,6 +152,23 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			corr++
 			fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
+			// CLI escalation (inbox contract-block-cli-escalation): from the
+			// correction answering the SECOND consecutive block, re-dispatch on
+			// a different CLI FAMILY instead of asking the CLI that just
+			// mis-formatted the deliverable twice to try a third time. Scoped to
+			// THIS re-dispatch only — the profile and the phase's own routing are
+			// untouched, and the soft overlay keeps the original chain behind the
+			// escalated primary. No target (already on the universal family with
+			// no other family configured) ⇒ the ladder behaves exactly as before.
+			if rr.Blocks >= contractEscalateAtBlock {
+				failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
+				if esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI); ok && esc != dr.phaseReq.ModelRoutingCLI {
+					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive contract blocks on cli=%s; correction %d re-dispatches on cli=%s (contract blocks never trigger cli_fallback, which is how a mis-formatting CLI used to demote the gate). The phase's primary routing is unchanged.\n",
+						next, rr.Blocks, failedCLI, corr, esc)
+					dr.phaseReq.ModelRoutingCLI = esc
+					escalated = true
+				}
+			}
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
 				Cycle:    cr.cycle,
@@ -213,7 +242,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			// rin.Response is refreshed for reviewer consistency; the deliverable
 			// reviewer reads the filesystem (workspace/worktree), not this field.
 			rin.Response = dr.resp
-			rr = cr.o.reviewer.Review(cr.ctx, rin)
+			rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated})
 			if rr.Approve {
 				recordCorrection(interaction.ResultAccepted)
 			} else {
@@ -221,8 +250,12 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			}
 		}
 		// Defensive: phaseReq is fresh per phase iteration, but never let the
-		// directive outlive the loop.
+		// directive — or a contract-block CLI escalation — outlive the loop. The
+		// escalation is scoped to the failing re-dispatch by construction; the
+		// restore is what keeps it from becoming a phase-wide reroute if a later
+		// consumer of dr.phaseReq is ever added.
 		dr.phaseReq.CorrectionDirective = ""
+		dr.phaseReq.ModelRoutingCLI = baseRoutingCLI
 		if !rr.Approve {
 			if maxCorrections == 0 {
 				// Byte-identical to the pre-feature abort message.
