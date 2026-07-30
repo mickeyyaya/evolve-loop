@@ -47,7 +47,7 @@ func TestRun_IntegrationTierGate_Offenders_FAILsAudit(t *testing.T) {
 }
 
 // AC3.2 (edge / no-op) — the default gate is a no-op (nil,nil) when the
-// worktree has no go module, mirroring goVetCheckDefault/cycleTouchedGo so the
+// worktree has no go module, mirroring goVetCheckDefault/changedScopeForGate so the
 // gate never fires against a synthetic or docs-only cycle. Forces
 // integrationTierCheckDefault to exist with the same guard.
 func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
@@ -93,7 +93,7 @@ func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cmdDir, "soak_integration_fixture_test.go"), []byte(brokenTest), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Build handoff naming a changed Go package → cycleTouchedGo true → the gate runs.
+	// Build handoff naming a changed Go package → changedScopeForGate run=true → the gate runs.
 	buildRun := filepath.Join(root, ".evolve", "runs", "cycle-9")
 	if err := os.MkdirAll(buildRun, 0o755); err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func writeRaceFixtureWorktree(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(cmdDir, "race_integration_fixture_test.go"), []byte(raceTest), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Build handoff naming a changed Go package → cycleTouchedGo true → gate runs.
+	// Build handoff naming a changed Go package → changedScopeForGate run=true → gate runs.
 	buildRun := filepath.Join(root, ".evolve", "runs", "cycle-9")
 	if err := os.MkdirAll(buildRun, 0o755); err != nil {
 		t.Fatal(err)

@@ -95,7 +95,7 @@ func TestNewDefault_WiresCIParityGates(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeACSVerdict(t, ws, 0) // EGPS green → only the go-vet gate can FAIL.
-	// A build handoff naming a changed Go package makes cycleTouchedGo true, so
+	// A build handoff naming a changed Go package makes changedScopeForGate report run=true, so
 	// the real repo-wide go-vet gate actually runs (it no-ops without one — the
 	// guard that keeps the gate off synthetic/incomplete test worktrees).
 	buildRun := filepath.Join(root, ".evolve", "runs", "cycle-7")

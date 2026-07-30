@@ -34,5 +34,15 @@ func shippedOutcome(finalVerdict, preHEAD, postHEAD string) bool {
 	if preHEAD == "" || postHEAD == "" || preHEAD == postHEAD {
 		return false
 	}
+	return IsShippingVerdict(finalVerdict)
+}
+
+// IsShippingVerdict reports whether a cycle's final verdict is one that CAN
+// represent shipped work. It is the ONE definition of that vocabulary: the
+// throughput hook pairs it with HEAD movement (above), and the loop's
+// non-progress breaker uses its negation to decide a cycle made no progress.
+// Two copies would let a newly added outcome label reach one consumer and not
+// the other (review MEDIUM).
+func IsShippingVerdict(finalVerdict string) bool {
 	return finalVerdict == VerdictPASS || finalVerdict == CycleOutcomeShippedViaBuild
 }

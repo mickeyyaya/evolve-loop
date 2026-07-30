@@ -312,7 +312,11 @@ func detectQuotaPause(evolveDir string) (quotaPause, bool) {
 	if v, ok := cp["quotaResetAt"].(string); ok {
 		qp.WakeAt = v
 	}
-	if v, ok := cp["quotaResetSource"].(string); ok {
+	// An ABSENT and an explicitly-EMPTY source both read as "unknown": the
+	// checkpointer now always stamps a real source (internal/checkpoint
+	// withQuotaReset), but a legacy pre-fix block carries "" and printing
+	// `source=` would leave an operator unable to tell missing from meaningless.
+	if v, ok := cp["quotaResetSource"].(string); ok && v != "" {
 		qp.Source = v
 	} else {
 		qp.Source = "unknown"

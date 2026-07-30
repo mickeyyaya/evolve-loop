@@ -160,11 +160,15 @@ func TestIntegrationTierScope_EnvExclusiveSkipped(t *testing.T) {
 	}
 }
 
-func TestCycleTouchedGo(t *testing.T) {
-	if cycleTouchedGo(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}) {
-		t.Error("no build handoff → false")
+// TestChangedScopeForGate_TouchedDecision is the "did this cycle build Go?" half
+// of changedScopeForGate (the derivability half lives in
+// ciparity_touchedgo_derivability_test.go). A worktree with no go module is
+// nothing-to-check; a handoff naming a changed Go package makes the gates run.
+func TestChangedScopeForGate_TouchedDecision(t *testing.T) {
+	if _, run, err := changedScopeForGate(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}); run || err != nil {
+		t.Errorf("no go module / no build handoff → (run=%v, %v), want (false, nil)", run, err)
 	}
-	root := t.TempDir()
+	root, _ := goWorktree(t)
 	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -173,8 +177,12 @@ func TestCycleTouchedGo(t *testing.T) {
 		[]byte(`{"thrusts":[{"files_modified":["go/internal/p/x.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !cycleTouchedGo(core.PhaseRequest{ProjectRoot: root, Cycle: 1}) {
-		t.Error("handoff with a changed Go package → true")
+	pkgs, run, err := changedScopeForGate(core.PhaseRequest{ProjectRoot: root, Cycle: 1})
+	if !run || err != nil {
+		t.Errorf("handoff with a changed Go package → (run=%v, %v), want (true, nil)", run, err)
+	}
+	if len(pkgs) != 1 || pkgs[0] != "./internal/p/..." {
+		t.Errorf("pkgs = %v, want the handoff's package", pkgs)
 	}
 }
 

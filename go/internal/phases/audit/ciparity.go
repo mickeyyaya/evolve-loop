@@ -172,27 +172,58 @@ func offenderLines(out string) []string {
 	return keep
 }
 
-// cycleTouchedGo reports whether this cycle has a build handoff naming >=1
-// changed Go package — the signal that this worktree is a REAL cycle build (a
-// synthetic test fixture or a docs-only cycle has none). The whole-repo gates
-// (go vet, acs-durable) run only then, so they never fire against an incomplete
-// module (e.g. a unit-test worktree with a bare go/ dir but no go.mod / repo
-// structure).
-func cycleTouchedGo(req core.PhaseRequest) bool {
+// errChangeSetUnderivable is the WARN-carrying error every whole-repo gate
+// returns when it cannot determine its own input. applyCIGate maps a non-nil
+// error to a WARN diagnostic (verdict unchanged), which is the deliberate
+// severity: the concrete trigger is a transient concurrent-fleet
+// `.git/index.lock` race, and a hard FAIL there would discard a shippable cycle.
+// Loud-but-soft — never the silent no-op it replaces.
+var errChangeSetUnderivable = errors.New(
+	"changed-package set is underivable this cycle (git diff failed — e.g. a concurrent-fleet .git/index.lock race), " +
+		"so this whole-repo gate cannot tell an untouched cycle from an unreadable one: gate skipped, CI backstops it")
+
+// changedScopeForGate is the SINGLE owner of the touched∧derivable decision the
+// three whole-repo gates (go vet, acs-durable, integration-tier) consult — no
+// gate re-derives the change-set independently. It returns the change-set too, so
+// the integration tier scopes from THIS result instead of calling
+// changedPackagesForAudit a second time.
+//
+// Three outcomes:
+//
+//	(pkgs, true,  nil) — a real cycle build touching >=1 Go package: run, scoped to pkgs.
+//	(nil,  false, err) — UNDERIVABLE: git failed, so "touched nothing" is unknowable.
+//	                     Fail-open LOUD (WARN), never silently.
+//	(nil,  false, nil) — derivable and genuinely empty (docs-only cycle, or no Go
+//	                     module at all): nothing to check, stay silent.
+//
+// It replaces cycleTouchedGo, which discarded FromGitChecked's derivable bool and
+// so collapsed the underivable case into the silent "touched nothing" one — the
+// cycle-581 D1/D2 fail-open class (apicover was hardened against it at its own
+// call site; this is the sibling frame the three shared gates went through).
+// The no-module guard is checked FIRST: a worktree with no go.mod has nothing to
+// check whatever git says, so a synthetic fixture gains no spurious WARN.
+func changedScopeForGate(req core.PhaseRequest) ([]string, bool, error) {
+	if moduleDirForReq(req) == "" {
+		return nil, false, nil // no go module in the worktree → nothing to check
+	}
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	pkgs, _ := changedPackagesForAudit(root, req.Cycle)
-	return len(pkgs) > 0
+	pkgs, derivable := changedPackagesForAudit(root, req.Cycle)
+	if !derivable {
+		return nil, false, errChangeSetUnderivable
+	}
+	return pkgs, len(pkgs) > 0, nil
 }
 
 // goVetCheckDefault runs `go vet ./...` (CI go.yml "vet + fmt" step / `make
 // lint`) over the whole worktree module — catches import cycles and other
-// vet-level defects a scoped build misses. No-op unless the cycle built Go.
+// vet-level defects a scoped build misses. No-op unless the cycle built Go; WARN
+// (not a silent skip) when the change-set is underivable.
 func goVetCheckDefault(req core.PhaseRequest) ([]string, error) {
-	if !cycleTouchedGo(req) {
-		return nil, nil
+	if _, run, err := changedScopeForGate(req); err != nil || !run {
+		return nil, err
 	}
 	return runCIGate(req, "go vet ./...", goVetTimeout, "go", "vet", "./...")
 }
@@ -200,10 +231,10 @@ func goVetCheckDefault(req core.PhaseRequest) ([]string, error) {
 // acsDurableCheckDefault runs the durable ACS regression suite with -tags acs
 // (CI ci.yml acs-durable gate / `make test-acs-durable`) — catches flagregistry
 // / flag-ceiling / skills-drift regressions invisible without the acs build tag.
-// No-op unless the cycle built Go.
+// No-op unless the cycle built Go; WARN when the change-set is underivable.
 func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
-	if !cycleTouchedGo(req) {
-		return nil, nil
+	if _, run, err := changedScopeForGate(req); err != nil || !run {
+		return nil, err
 	}
 	return runCIGate(req, "acs-durable (-tags acs)", acsDurableTimeout,
 		"go", "test", "-count=1", "-tags", "acs", "./acs/regression/...")
@@ -220,26 +251,19 @@ func acsDurableCheckDefault(req core.PhaseRequest) ([]string, error) {
 // not the whole module. No-op unless the cycle built Go; any non-zero exit →
 // offenders → FAIL.
 func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
-	if !cycleTouchedGo(req) {
-		return nil, nil
+	// The TIER no longer derives twice: changed is the change-set
+	// changedScopeForGate already resolved for this gate's touched∧derivable
+	// decision, so the second changedPackagesForAudit call is gone (4 derivations
+	// per cycle -> 3). Each of the three whole-repo gates still resolves its own
+	// scope independently, so an underivable cycle appends three identical WARN
+	// diagnostics — accurate, if repetitive (review MEDIUM: the earlier comment
+	// claimed ONE shared derivation, which overstated the change). Hoisting
+	// resolution into Classify and passing it down is the follow-up.
+	changed, shouldRun, scopeErr := changedScopeForGate(req)
+	if scopeErr != nil || !shouldRun {
+		return nil, scopeErr
 	}
 	dir := moduleDirForReq(req)
-	if dir == "" {
-		return nil, nil // no go module in the worktree → nothing to check
-	}
-	root := req.Worktree
-	if root == "" {
-		root = req.ProjectRoot
-	}
-	// cycleTouchedGo guarantees a derivable, non-empty change-set here: an
-	// underivable set (git diff failed) yields no packages, so cycleTouchedGo
-	// already returned false above. The derivable bool is therefore always true
-	// at this point and intentionally discarded. (The pre-existing gap that an
-	// underivable cycle silently skips this AND the sibling whole-repo gates —
-	// go vet / acs-durable, all gated on cycleTouchedGo — is tracked separately
-	// as the cycleTouchedGo-derivability-propagation defect; fixing it here would
-	// turn transient git-index.lock hiccups into new WARNs, out of scope.)
-	changed, _ := changedPackagesForAudit(root, req.Cycle)
 	ctx, cancel := context.WithTimeout(context.Background(), integrationTierTimeout)
 	defer cancel()
 	run := runCmd

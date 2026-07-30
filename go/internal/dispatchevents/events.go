@@ -179,15 +179,19 @@ func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 }
 
 // EmitGoalStallEscalated records that one goal produced `streak` consecutive
-// empty/blocked (non-shipping) cycles, crossing the goal-stall threshold — the
-// loop self-filed an inbox todo naming the goal instead of re-dispatching it
-// blindly again. goalHash identifies the stalled goal.
-func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash string) error {
+// non-shipping cycles, crossing a stall threshold — the loop self-filed an inbox
+// todo naming the goal instead of re-dispatching it blindly again. goalHash
+// identifies the stalled goal; outcomes names the counted class ("empty/blocked"
+// for the empty-only breaker, the wider fail/empty/blocked union for the
+// non-progress breaker) so the event says WHICH ceiling fired — a mixed
+// FAIL/EMPTY streak reported as empty-only would point diagnosis at the wrong
+// evidence.
+func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash, outcomes string) error {
 	return w.Emit(Event{
 		EventType:       EventGoalStallEscalated,
 		Severity:        SeverityWarn,
 		Cycle:           cycle,
-		Details:         fmt.Sprintf("goal %s produced %d consecutive empty/blocked cycles (threshold=%d) — nothing shipped; escalated instead of re-dispatching", goalHash, streak, threshold),
-		RemediationHint: "See the auto-filed goal-stall inbox todo: re-scope or split the goal, or address the recurring block reason before re-running it",
+		Details:         fmt.Sprintf("goal %s produced %d consecutive %s cycles (threshold=%d) — nothing shipped; escalated instead of re-dispatching", goalHash, streak, outcomes, threshold),
+		RemediationHint: "See the auto-filed stall inbox todo: re-scope or split the goal, or address the recurring block/fail reason before re-running it",
 	})
 }

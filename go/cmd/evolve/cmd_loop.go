@@ -462,13 +462,22 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// below; a sequential (Count==1) batch never touches it.
 	var starvationTracker fleet.StarvationTracker
 
-	// goal-stall escalation (cmd_loop_goalstall.go): counts consecutive
-	// empty/blocked (non-shipping) cycles on the running goal so a goal that keeps
-	// landing nothing (cycles 640-644) is escalated, not re-dispatched forever.
-	// Held outside the loop so the streak spans cycles. Threshold/weight sourced
-	// from policy.json (never a Go literal).
-	var goalStall goalStallTracker
-	goalStallThreshold, goalStallWeight := loadGoalStallConfig(cfg.EvolveDir)
+	// Stall escalation (cmd_loop_goalstall.go): TWO counters over the running
+	// goal, both held outside the loop so a streak spans cycles, both
+	// escalate-and-continue. goalStall counts consecutive empty/blocked cycles
+	// (cycles 640-644). nonprogress counts the UNION — every cycle that landed
+	// nothing, FAIL included — because the empty-only counter and the
+	// consecutive-FAIL breaker each reset on the other's outcome, so an
+	// interleaved FAIL,EMPTY,FAIL,EMPTY goal escaped both. Thresholds/weight
+	// sourced from policy.json (never a Go literal).
+	//
+	// SEQUENTIAL PATH ONLY (review MEDIUM — do not read this as closing the
+	// fleet gap): the wave and pool branches `continue` above, and each lane is
+	// a separate `evolve cycle` process holding no cross-cycle streak, so no
+	// fleet lane advances either counter. Fleet breaker parity is a standing
+	// separate gap.
+	var goalStall, nonprogress goalStallTracker
+	stallCfg := loadGoalStallConfig(cfg.EvolveDir)
 
 	// Pipeline-blocker breaker scope: only failures from THIS batch count
 	// (digests of cycles > batchStartCycle), so a historic blocker that was
@@ -953,10 +962,21 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		// weighted inbox todo naming the goal + reasons and emit an abnormal-event
 		// instead of re-running the identical goal again. The queue is never
 		// halted: escalate and continue (never_stop_queue_inject_inbox).
-		nonShipping := result.FinalVerdict == core.CycleOutcomeSkippedUnknown ||
+		emptyOrBlocked := result.FinalVerdict == core.CycleOutcomeSkippedUnknown ||
 			result.FinalVerdict == core.CycleOutcomeSkippedAuditAdvisory
-		if esc := goalStall.observe(nonShipping, result.FinalVerdict, goalStallThreshold); esc != nil {
-			handleGoalStall(cfg.EvolveDir, cfg.GoalHash, workspace, ranCycle, esc, goalStallThreshold, goalStallWeight, stderr)
+		if esc := goalStall.observe(emptyOrBlocked, result.FinalVerdict, stallCfg.threshold); esc != nil {
+			handleGoalStall(goalStallKind, cfg.EvolveDir, cfg.GoalHash, workspace, ranCycle, esc, stallCfg.threshold, stallCfg.weight, stderr)
+		}
+
+		// Union non-progress escalation: the two counters above are each keyed to
+		// ONE outcome class and RESET on the other's, so a goal alternating
+		// FAIL,EMPTY,FAIL,EMPTY crossed NEITHER ceiling — it burned pipelines
+		// forever while landing nothing, the exact class both breakers exist to
+		// stop. This third counter tracks the union ("shipped nothing", whatever
+		// the label) and escalates the SAME diagnostic way — never a halt; the
+		// hard-halt decision for a pure-FAIL streak stays with the breaker above.
+		if esc := nonprogress.observe(nonShippingOutcome(result.FinalVerdict), result.FinalVerdict, stallCfg.nonprogressThreshold); esc != nil {
+			handleGoalStall(nonprogressKind, cfg.EvolveDir, cfg.GoalHash, workspace, ranCycle, esc, stallCfg.nonprogressThreshold, stallCfg.weight, stderr)
 		}
 
 		// Escalation boundary (failure-disposition-router S4): apply the intents
