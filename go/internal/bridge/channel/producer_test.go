@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -78,18 +79,29 @@ func TestProducer_ExplicitSourcePaths(t *testing.T) {
 // loud WARN rather than silently producing an empty feed for the whole phase.
 func TestProducer_WarnsWhenSourceNeverAppears(t *testing.T) {
 	ws := t.TempDir()
-	var warn bytes.Buffer
+	// lockedBuf: Run writes the WARN from its own goroutine while the test
+	// polls for it, so the buffer needs its own lock (a bare bytes.Buffer
+	// would be a data race under -race).
+	warn := &lockedBuf{}
 	p := NewProducer(ProducerConfig{
 		Workspace: ws, Agent: "build", Phase: "build",
 		StdoutPath: filepath.Join(ws, "build-pane.live"), // never created
 		StderrPath: filepath.Join(ws, "build-breadcrumbs.live"),
 		PollEvery:  time.Millisecond, Now: func() time.Time { return time.Unix(0, 0).UTC() },
-		Warn: &warn,
+		Warn: warn,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { _ = p.Run(ctx); close(done) }()
-	time.Sleep(60 * time.Millisecond) // >> the miss threshold at 1ms polls
+	// POLL for the WARN instead of sleeping a fixed 60ms: a loaded runner (the
+	// macOS CI job, 2026-07-30) can starve the 1ms poll loop of the iterations
+	// the miss threshold needs, and the old fixed sleep then read an empty
+	// buffer — a wall-clock flake of exactly the async-wait class that
+	// dominates the flaky-test taxonomy. Generous ceiling, fast exit.
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(warn.String(), "source") && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 	cancel()
 	<-done // wait for Run to return so the buffer read does not race the writer
 
@@ -132,4 +144,24 @@ func TestProducer_FeedOpenError(t *testing.T) {
 	if err := p.Run(context.Background()); err == nil {
 		t.Fatal("want error opening feed in bogus workspace, got nil")
 	}
+}
+
+// lockedBuf is a mutex-guarded bytes.Buffer: the producer writes WARNs from its
+// Run goroutine while a test polls for them, which a bare buffer cannot serve
+// race-free.
+type lockedBuf struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuf) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuf) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
