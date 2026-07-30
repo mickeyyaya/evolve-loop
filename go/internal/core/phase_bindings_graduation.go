@@ -51,8 +51,42 @@ func buildGraduationCheck(ctx context.Context, worktree string) string {
 	if len(fresh) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("new package(s) %s changed this cycle but are absent from go/.apicover-enforce — graduate each (add its pattern line and an apicover_named_test.go) or the apicover unnamed-export gate never inspects it",
-		strings.Join(fresh, ", "))
+	return fmt.Sprintf("new package(s) %s changed this cycle but are absent from go/.apicover-enforce — the repo-wide apicover unnamed-export gate (ADR-0069's SECOND gate; the per-cycle ACS coverage gate is a different one and needs no enrollment) therefore never inspects them. Make EXACTLY these edits in THIS handoff, then re-run `evolve selfcheck build`:\n%s",
+		strings.Join(fresh, ", "), graduationPrescription(fresh))
+}
+
+// graduationPrescription renders the exact two edits per ungraduated package.
+//
+// The floor already NAMED the offending packages and still cost batch-21 three
+// build phases and a halt at cycle-1218: naming the class is not remediation
+// when the class is a house rule the agent never inherited. So the abort reason
+// emits the pattern line to append and the test path to create,
+// copy-pasteable, derived from the same "./internal/<pkg>" enforce-list form
+// the detector matched on so the prescription cannot name a package the check
+// did not flag.
+//
+// WHO READS THIS (review MEDIUM — do not overclaim): the reason reaches the
+// operator log, the phase outcome's abort_reason (phasetiming/failure_learning)
+// and the resume path — NOT an in-cycle builder re-dispatch, which the
+// correction ladder does not carry. The builder learns the rule from its
+// PERSONA (agents/evolve-builder.md); this text is what makes the failure
+// self-serving for whoever picks it up next, human or resumed cycle.
+func graduationPrescription(pkgs []string) string {
+	var b strings.Builder
+	for _, pkg := range pkgs {
+		fmt.Fprintf(&b, "  %s:\n", pkg)
+		fmt.Fprintf(&b, "    1. append this line to go/.apicover-enforce:  %s\n", pkg)
+		// A recursive pattern names no single directory, so prescribing
+		// "<pattern>/apicover_named_test.go" would hand the builder an invalid
+		// path (review LOW). Name the obligation without the bogus path.
+		if strings.Contains(pkg, "...") {
+			b.WriteString("    2. add an apicover_named_test.go in EACH package the pattern covers, naming every exported symbol in a real assertion that executes it (an enrolled-but-unnamed package fails the gate too)\n")
+			continue
+		}
+		dir := "go/" + strings.TrimPrefix(pkg, "./")
+		fmt.Fprintf(&b, "    2. create %s/apicover_named_test.go naming every exported symbol of the package in a real assertion that executes it (an enrolled-but-unnamed package fails the gate too)\n", dir)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // packageNewThisCycle reports whether an enforce-list-form package pattern

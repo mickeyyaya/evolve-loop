@@ -75,7 +75,7 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 		}
 	}
 
-	fmt.Fprintf(&b, "- Before you finish, run:  evolve phase verify %s --workspace <your workspace dir>\n", c.Phase)
+	fmt.Fprintf(&b, "- Before you finish, run:  %s\n", selfCheckCommand(c.Phase))
 	b.WriteString("  Fix every violation it reports. Do not declare done until it exits 0.\n\n---\n\n")
 	return b.String()
 }
@@ -84,6 +84,87 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 // as the last line of the prompt.
 func RenderContractFooter(c Contract, artifactPath string) string {
 	return fmt.Sprintf("\n\n%s %s\n", FooterMarker, artifactPath)
+}
+
+// RenderContractTail is the tail-most region of a dispatch prompt: the footer
+// path line plus one compact XML-tagged <deliverable-contract> block restating
+// the MACHINE half of the contract at the generation point.
+//
+// Why a second placement of the same facts is not duplication: Anthropic's
+// guidance is that Claude follows instructions in the USER TURN better than in a
+// system-ish preamble, and XML-tagged sections parse unambiguously. Our required
+// sections and sentinel live in RenderContractBlockStage, which by design sits in
+// the CACHEABLE PREFIX — far from generation — yet the correction prompt, which
+// restates the identical requirements in the turn tail, is what actually gets
+// compliance. This closes that asymmetry without touching the cache prefix.
+//
+// Every string here is PROJECTED from the same sources the prefix block and the
+// verdict detector read (Contract.Sections, Contract.RequiredKeys,
+// RenderVerdictSentinel) — there is no second template to drift. The sentinel is
+// gated on len(Verdicts)>0 exactly as the prefix block gates it, so build/scout/
+// triage (which emit no verdict by default) gain no sentinel the always-on
+// classifier has never seen. A NoArtifact contract (ship: the deliverable is a
+// pushed commit) gets the footer alone — instructing it to write a file would
+// invent an artifact the verifier must not find.
+func RenderContractTail(c Contract, artifactPath string) string {
+	footer := RenderContractFooter(c, artifactPath)
+	if c.NoArtifact {
+		return footer
+	}
+	var b strings.Builder
+	b.WriteString(footer)
+	fmt.Fprintf(&b, "\n<deliverable-contract phase=%q>\n", c.Phase)
+	fmt.Fprintf(&b, "  <artifact-path>%s</artifact-path>\n", artifactPath)
+	switch c.Kind {
+	case KindJSON:
+		// Wording matches the prefix's "valid JSON OBJECT containing these
+		// top-level keys" (review MEDIUM: "a single valid JSON value" also
+		// admits an array or string, which the verifier then rejects).
+		b.WriteString("  <format>a single valid JSON object — write nothing else to this file</format>\n")
+		if len(c.RequiredKeys) > 0 {
+			b.WriteString("  <required-keys>\n")
+			for _, k := range c.RequiredKeys {
+				fmt.Fprintf(&b, "    <key>%s</key>\n", k)
+			}
+			b.WriteString("  </required-keys>\n")
+		}
+	default:
+		if len(c.Sections) > 0 {
+			b.WriteString("  <required-sections>\n")
+			for _, s := range c.Sections {
+				fmt.Fprintf(&b, "    <section>%s</section>\n", s.Canonical)
+			}
+			b.WriteString("  </required-sections>\n")
+		}
+		if len(c.Verdicts) > 0 {
+			// The exemplar MUST carry the failure block wherever a FAIL/WARN
+			// sentinel without one is a contract violation (review HIGH): the
+			// tail is the recency-dominant copy, so a bare PASS exemplar is the
+			// one the agent follows — and audit is the phase whose verdict gates
+			// ship. Same failureExemplar the prefix projects, so the two cannot
+			// drift.
+			if c.RequireFailureContext || c.RequireFailureContextPhaseIO {
+				fmt.Fprintf(&b, "  <verdict-sentinel verdicts=%q note=\"a FAIL or WARN verdict MUST carry the failure block shown here\">%s</verdict-sentinel>\n",
+					bracketJoin(c.Verdicts), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
+			} else {
+				fmt.Fprintf(&b, "  <verdict-sentinel verdicts=%q>%s</verdict-sentinel>\n",
+					bracketJoin(c.Verdicts), RenderVerdictSentinel(c.Phase, c.Verdicts[0]))
+			}
+		}
+	}
+	// Placeholders stay LITERAL like the prefix's: this text is read by an
+	// agent, not an XML parser, and an entity-escaped placeholder gets pasted
+	// into a shell verbatim (review MEDIUM).
+	fmt.Fprintf(&b, "  <self-check>%s</self-check>\n", selfCheckCommand(c.Phase))
+	b.WriteString("</deliverable-contract>\n")
+	return b.String()
+}
+
+// selfCheckCommand is the ONE rendering of the phase self-check invocation,
+// shared by the prefix instruction and the tail block so a flag change cannot
+// drift one copy (review MEDIUM).
+func selfCheckCommand(phase string) string {
+	return fmt.Sprintf("evolve phase verify %s --workspace <your workspace dir>", phase)
 }
 
 // failureExemplar is the placeholder failure block shown in the prompt so the
