@@ -2,6 +2,7 @@ package llmroute
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -81,27 +82,40 @@ func TestDispatch_SuccessOnFirstCandidate(t *testing.T) {
 // result, having launched BOTH candidates in order. This is the exact
 // cycle-435 live failure (router-launch-error.txt: agy-tmux exit 81) replayed
 // at the Dispatch layer.
+// TestDispatch_FallsBackOnTriggerExit covers EVERY code in the default trigger
+// set, not one representative. The end-to-end proof (cmd/evolve
+// TestE2ECLIFallbackChain) walks the whole spine and therefore costs ~10
+// minutes per code; per-code trigger semantics belong here, where they cost
+// microseconds. If a code is added to defaultFallbackOnExit this table grows
+// automatically — it is derived from the package default, never re-typed.
 func TestDispatch_FallsBackOnTriggerExit(t *testing.T) {
-	plan := Plan{Candidates: []string{"agy-tmux", "claude-tmux"}, Triggers: []int{81}}
-	sl := &scriptedLaunch{seq: []scriptedAttempt{
-		{exitCode: 81, err: errors.New("bridge: launch exit=81")},
-		{exitCode: 0, err: nil},
-	}}
+	if len(defaultFallbackOnExit) == 0 {
+		t.Fatal("defaultFallbackOnExit is empty — the trigger contract would be vacuous")
+	}
+	for _, code := range defaultFallbackOnExit {
+		t.Run(fmt.Sprintf("exit_%d", code), func(t *testing.T) {
+			plan := Plan{Candidates: []string{"agy-tmux", "claude-tmux"}, Triggers: defaultFallbackOnExit}
+			sl := &scriptedLaunch{seq: []scriptedAttempt{
+				{exitCode: code, err: fmt.Errorf("bridge: launch exit=%d", code)},
+				{exitCode: 0, err: nil},
+			}}
 
-	got := Dispatch(plan, sl.launch)
+			got := Dispatch(plan, sl.launch)
 
-	if got.Err != nil {
-		t.Fatalf("Dispatch: expected fallback success, got err=%v", got.Err)
-	}
-	if got.CLI != "claude-tmux" {
-		t.Errorf("Dispatch: CLI=%q, want claude-tmux (the fallback that succeeded)", got.CLI)
-	}
-	want := []string{"agy-tmux", "claude-tmux"}
-	if !reflect.DeepEqual(sl.calls, want) {
-		t.Errorf("Dispatch: launched %v, want %v (both candidates tried in order)", sl.calls, want)
-	}
-	if !reflect.DeepEqual(got.Attempts, want) {
-		t.Errorf("Dispatch: Attempts=%v, want %v", got.Attempts, want)
+			if got.Err != nil {
+				t.Fatalf("Dispatch: expected fallback success, got err=%v", got.Err)
+			}
+			if got.CLI != "claude-tmux" {
+				t.Errorf("Dispatch: CLI=%q, want claude-tmux (the fallback that succeeded)", got.CLI)
+			}
+			want := []string{"agy-tmux", "claude-tmux"}
+			if !reflect.DeepEqual(sl.calls, want) {
+				t.Errorf("Dispatch: launched %v, want %v (both candidates tried in order)", sl.calls, want)
+			}
+			if !reflect.DeepEqual(got.Attempts, want) {
+				t.Errorf("Dispatch: Attempts=%v, want %v", got.Attempts, want)
+			}
+		})
 	}
 }
 
