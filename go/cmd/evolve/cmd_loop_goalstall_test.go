@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // The tracker must escalate ONLY on the threshold-th consecutive non-shipping
@@ -170,5 +172,29 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "GOAL-STALL") {
 		t.Errorf("no loud stderr line emitted: %q", stderr.String())
+	}
+}
+
+// TestNonShippingOutcome_ExactNegationOfCoreShipping is the caller proof for
+// core.IsShippingVerdict: the breaker must be its exact negation, never a
+// second hand-maintained list. If someone adds a shipping label to core and
+// not here (or vice versa), the streak counter and the throughput window
+// would disagree about whether the same cycle landed work.
+func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
+	for _, v := range []string{
+		core.VerdictPASS, core.VerdictFAIL, core.VerdictWARN,
+		core.CycleOutcomeShippedViaBuild, core.CycleOutcomeSkippedAuditAdvisory,
+		core.CycleOutcomeSkippedUnknown, "SKIPPED", "", "SHIPPED",
+	} {
+		if got, want := nonShippingOutcome(v), !core.IsShippingVerdict(v); got != want {
+			t.Errorf("nonShippingOutcome(%q) = %v, want %v (negation of core.IsShippingVerdict)", v, got, want)
+		}
+	}
+	// Anti-tautology: the two labels that DO ship must not count as
+	// non-progress, so a streak cannot accumulate across shipping cycles.
+	for _, v := range []string{core.VerdictPASS, core.CycleOutcomeShippedViaBuild} {
+		if nonShippingOutcome(v) {
+			t.Errorf("verdict %q ships — it must never advance the non-progress streak", v)
+		}
 	}
 }
