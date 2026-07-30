@@ -280,6 +280,26 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 	// Source: cycle 106 (2026-05-25) integration smoke caught the
 	// mismatch when the runner looked for `tdd.json` and prod only had
 	// `tdd-engineer.json`.
+	// .evolve/policy.json — disable the cycle-start LIVE model-catalog refresh.
+	// The compiled default is AutoRefresh=true (policy.go: "the cycle-start live
+	// refresh is on") and production turns it off in the checked-in
+	// .evolve/policy.json; this fixture seeded no policy at all, so it inherited
+	// the default and every `evolve cycle run` launched real CLI probes for EVERY
+	// family before its first phase — agy and ollama with no fake binary at all,
+	// plus a `/model` picker wait per family that can only time out against the
+	// fake REPL. That startup cost alone exceeded the 120s harness budget, so the
+	// cycle was killed before reaching ship: TestE2ECLIFallbackChain failed on all
+	// four trigger codes for a reason that had nothing to do with the fallback
+	// chain it exists to prove. Model discovery has its own tests; a fallback-chain
+	// fixture must not pay for it.
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatalf("mkdir .evolve: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"),
+		[]byte(`{"catalog":{"auto_refresh":false}}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write policy.json: %v", err)
+	}
+
 	profilesDir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
 		t.Fatalf("mkdir profiles: %v", err)
