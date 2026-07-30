@@ -1,0 +1,20 @@
+{
+  "connects_to": [
+    "branch feat/flaky-predicate-lint (pushed)",
+    "console stash 91485996 flakylint-wip-2026-07-30",
+    "go/internal/evalqualitycheck/flakylint.go",
+    "go/internal/cli/guardcmd/eval.go",
+    "docs/architecture/acs-predicate-quality-gate.md",
+    "skills/loop/phase2-discover.md",
+    "go/internal/acssuite/scopelint.go"
+  ],
+  "created_at": "2026-07-30T12:00:00Z",
+  "fix": "H1 (why it is not landed): the gate has NO CALLER \u2014 the only pipeline invocation of `evolve eval quality-check` is skills/loop/phase2-discover.md, which runs in DISCOVER, BEFORE go/acs/cycle<N>/predicates_test.go exists. Wire it at the predicate-authoring step / the gate_build_to_audit boundary that docs/architecture/acs-predicate-quality-gate.md already owns, and land the skill/doc edit in the same change. H2: a path with no .go files prints NOTHING and reads as a clean lint \u2014 print an unconditional receipt ('linted N file(s) under <path>') or error; this is the same silent-clean class already fixed once (a dropped flag). H3: add the missing pin that the lint can never LOWER a HALT (advisory-ness currently rests on one `&& overall == LevelPass` conjunct; a natural refactor would turn a tautological-eval HALT into a WARN). M4 (biggest FP source): the blanket literal scan flags package-pattern strings with no test shell near them (e.g. strings.Contains(enforceFile, \"./internal/core\"), exec.Command(\"rg\",...)) \u2014 collect argv-position patterns of ALL exec.Commands in one pass, then flag a literal only when it is in a go-test argv or in NO exec argv at all. M6: suppress the known-slow finding when argv carries -run/-run= (a correctly narrowed invocation). M7: extract the copied isPackagePattern/pkgKey helpers into a zero-dep leaf shared with acssuite/scopelint.go (the gcpolicy-from-gc precedent) so authoring-time and runtime scope rules cannot drift. M8: use a distinct line prefix (not L1) so the Auditor is not told 'tautological eval'. ALREADY APPLIED on the branch: M5 (dropped the Unix*/unique-name-idiom family \u2014 flagging fmt.Sprintf(\"run-%d\", time.Now().UnixNano()) prints a claim that is false about the code) and the flag-order fix (stdlib flag stops at the first positional, so the DOCUMENTED `<eval.md> -predicates <dir>` order silently dropped the flag and reported a clean PASS on an unlinted tree \u2014 interspersed parse loop + both-orders pin, the opscmd console-lease pattern).",
+  "id": "flaky-predicate-authoring-lint",
+  "kind": "pipeline-integrity",
+  "notes": "Corpus calibration exists (121 of 284 historical acs dirs flagged) but needs a PER-CLASS false-positive breakdown before any promotion past advisory \u2014 M4/M5 suggest a non-trivial slice of the 121 is the bare-string and UnixNano classes. Live proof of the premise the same day: TestProducer_WarnsWhenSourceNeverAppears (internal/bridge/channel) went red on macOS CI from a fixed-60ms-sleep wall-clock wait \u2014 exactly pattern 2 \u2014 fixed separately in PR #380.",
+  "priority": "P1",
+  "summary": "Console-built 2026-07-30 (branch feat/flaky-predicate-lint, pushed; opus review a4a155de attached below). internal/evalqualitycheck.LintFlakyPredicates is a deterministic AST lint over a NEW cycle's predicate sources flagging five flaky shapes (suite-scope go-test shells; time.Now()-derived deadlines; hardcoded sub-100k liveness PIDs; subprocess git without -C; unreaped load-generation \u2014 the class that leaked 8 cores for 9h this week), wired advisory into `evolve eval quality-check -predicates <path>`. 94.6% coverage, parse-robust, live-proven on a flaky fixture (5 findings) and clean on real corpus dirs. NOT LANDED: the review BLOCKed on three findings that make it dead-or-noisy as-is.",
+  "title": "Authoring-time flaky-predicate lint: WIRE it into the predicate-authoring gate + cut three false-positive classes",
+  "weight": 0.93
+}

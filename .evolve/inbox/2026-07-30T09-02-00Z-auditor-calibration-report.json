@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    "knowledge-base/cycles/",
+    "go/internal/core/failure_digest.go",
+    "kb/research/failed-loop-analysis-2026-07/README.md"
+  ],
+  "created_at": "2026-07-30T09:02:00Z",
+  "fix": "evolve audit calibration (opscmd): walk knowledge-base/cycles/*.json + runs/*/audit-fail-reason.json, tabulate narrative-vs-gate agreement matrix + per-defect-class breakdown, emit markdown to kb/research/. Follow-up (separate): persona rubric adjustment driven by the table, never by anecdote.",
+  "id": "auditor-calibration-report",
+  "kind": "observability",
+  "notes": "From the 2026-07-30 literature review. | pass-rate directive 2026-07-30: RAISED \u2014 the (narrative,gate) disagreement rate directly measures wasted generations; tells us which side errs before we tune either.",
+  "priority": "P2",
+  "summary": "LLM-as-judge research (2026: calibration probes arXiv:2512.22245, judge blind-spots arXiv:2606.10315) finds judges have LOW error-detection recall and systematic overconfidence \u2014 validating our gate-outranks-narrative policy. Our verdict-conflict machinery already records BOTH readings per cycle: months of (auditor narrative, deterministic gate) pairs sit in dossiers/audit-fail-reason artifacts. One Go tool computes the auditor's empirical sensitivity/specificity (how often narrative=PASS while a gate was red; narrative=FAIL while gates green) \u2014 if narrative-WARN-under-gate-FAIL dominates (observed repeatedly in batches 18-20), the auditor persona's WARN rubric needs tightening, evidence-first.",
+  "title": "Auditor calibration report: mine the dossier corpus's (narrative, gate) verdict pairs",
+  "weight": 0.86
+}

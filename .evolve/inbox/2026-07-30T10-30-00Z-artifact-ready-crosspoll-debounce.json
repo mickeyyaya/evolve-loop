@@ -1,0 +1,19 @@
+{
+  "connects_to": [
+    "go/internal/bridge/completion.go",
+    "go/internal/bridge/completion_test.go",
+    "go/internal/bridge/boot_handshake_test.go",
+    "go/internal/bridge/driver_tmux_repl_escalation_test.go",
+    "docs/architecture/deliverable-contract.md",
+    "inbox: deliverable-verified-bytes-single-read"
+  ],
+  "created_at": "2026-07-30T10:30:00Z",
+  "fix": "Implement cross-poll stability on artifactDetector (lastSize/lastModTime/stableTicks fields; mtime participates because size alone is content-blind to same-length rewrites). MUST ALSO: (a) short-circuit the debounce when ctx.Err()!=nil \u2014 the wait loop makes one final poll after cancellation to avoid laundering a finished session into ExitArtifactTimeout; (b) stash the relocation diagnostic on the detector so a not-yet-stable relocating tick cannot swallow the wrote-to-the-wrong-place note; (c) AUDIT THE TIMEOUT BUDGETS \u2014 this is why the console attempt was rolled back: an extra required tick breaks fixtures with short ArtifactTimeoutS (TestRunTmuxREPL_ExtendNoEscalationReport uses 2s and cannot complete two 2s ticks) and consumes one more canned pane frame in every artifact-completion fake (FakeTmuxController underruns; consider repeating the last frame \u2014 a settled real pane does \u2014 with an Underruns counter). Budget a full internal/bridge fixture sweep.",
+  "id": "artifact-ready-crosspoll-debounce",
+  "kind": "pipeline-integrity",
+  "notes": "The deliverable-side half shipped separately (grace window + tests + docs). The lane's cycle-1212 worktree (preserved) holds the in-poll variant + its acs/cycle1210 predicates as reference. Do NOT re-add completionEvidence.Bytes without a consumer \u2014 that was dead plumbing (see deliverable-verified-bytes-single-read for the consumer threading).",
+  "priority": "P1",
+  "summary": "Console analysis + opus review of the cycle-1212 salvage (2026-07-30): the deliverable-side grace window LANDED and covers absence/emptiness for retry-less callers, but the observed cycle-1198 signature is PARTIAL-BUT-NON-BLANK content (sections present, trailing verdict sentinel not yet appended by a follow-up Edit) \u2014 the gate rejected a deliverable that parsed perfectly moments later. Grace does not retry that shape by design; it must be closed at the SOURCE: artifactDetector.poll must require identical (size, mtime) across artifactStableTicks CONSECUTIVE poll ticks (~2s apart) before declaring ready \u2014 the artifact twin of stdoutDetector's stdoutIdlePolls. An IN-POLL settle sleep (the lane's first cut, 50ms) provably cannot span the multi-second gap between an agent's Write and its Edit (review HIGH).",
+  "title": "Artifact-ready needs CROSS-POLL stability, not an in-poll settle \u2014 closes the mid-write truncated-read class at the source",
+  "weight": 0.92
+}

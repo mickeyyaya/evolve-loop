@@ -14,9 +14,9 @@
   ],
   "id": "tokenopt-session-resume-on-retry",
   "kind": "feature",
-  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; two graded FAILs already narrowed the defect (PhaseMaxAttempts reachability) \u2014 continuation carries findings",
+  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; two graded FAILs already narrowed the defect (PhaseMaxAttempts reachability) \u2014 continuation carries findings | pass-rate directive 2026-07-30: RAISED \u2014 faster warm retries cut the cost of every convergence generation; its own two FAILs already localized the defect (reachability at live defaults).",
   "priority": "medium",
   "summary": "Orchestrator retry loop (cyclerun_dispatch.go:164-171) re-dispatches fresh; with the session id captured by S1/S3 telemetry, retries of the same phase resume the prior session (its context is already cache-read). Fall back to fresh boot when the session is stale past the 5-min cache TTL (a stale resume is a FULL cache miss \u2014 worse than fresh; papers 2.7). GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (oss.md 15, papers.md 2.7).",
   "title": "Token-opt: phase retry resumes the SAME CLI session (claude --resume) instead of fresh-booting \u2014 a retry today re-pays system prompt + instructions + exploration",
-  "weight": 0.82
+  "weight": 0.85
 }

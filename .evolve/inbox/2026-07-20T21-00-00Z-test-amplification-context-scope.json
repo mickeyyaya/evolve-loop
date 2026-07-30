@@ -9,7 +9,7 @@
   ],
   "how_to_apply": "Near-term (independent of codegraph): derive the covering-test set deterministically \u2014 packages touched by the cycle diff -> their *_test.go files + direct reverse-import test packages (go list -deps seam already exists in changedpkgs) \u2014 and inject ONLY that set as phase context; cap corpus bytes with a loud truncation note (no silent caps). Long-term: consume codegraph S2 impact API (covering-tests edge) when codegraph-blast-radius lands. Measure the delta via token-telemetry before/after (the per-phase usage.json artifacts). Guard: scoping must fail-open to today's behavior on derivation error, never block the phase.",
   "id": "test-amplification-context-scope",
-  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; RAISED from unweighted: self-described per-run token hog",
+  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; RAISED from unweighted: self-described per-run token hog | QUALITY REFRAME 2026-07-30 (kb/research/llm-output-stability-2026-07): context-rot research shows 30-50% accuracy loss well before the documented context limit (poisoning / distraction / confusion). This item was queued as a COST optimization; it is equally a QUALITY item \u2014 every low-signal token removed from a phase's window reduces distraction. Pair with context-fill-telemetry-and-cap (0.89) so the effect is measurable rather than assumed.",
   "title": "Scope test-amplification's context to the diff's covering tests \u2014 it is the per-run token outlier (5.4M cache-read/run, 13.5 min avg, 3.5x build's per-run context)",
   "weight": 0.89,
   "weight_hint": 0.92,

@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "go/internal/phases/triage/",
+    "go/internal/core/",
+    "inbox: auditor-calibration-report",
+    "inbox: tdd-structural-test-reachability-probe",
+    "kb/research/llm-output-stability-2026-07/README.md"
+  ],
+  "created_at": "2026-07-30T13:03:00Z",
+  "fix": "Add a bounded N-sample majority to exactly three decision points, config-driven (policy.json, default N=1 = today's behavior, so the change is inert until enabled): (a) triage top_n selection \u2014 a bad menu burns a whole cycle; (b) verdict-conflict adjudication \u2014 the cases where narrative and gate already disagree; (c) spec reachability (pairs with tdd-structural-test-reachability-probe 0.92). Record all N samples plus the disagreement rate as artifacts \u2014 the disagreement rate is itself the calibration signal that tells us whether N>1 is buying anything. Explicitly OUT of scope: builder, audit narrative, any phase whose output is code.",
+  "id": "self-consistency-on-decision-phases",
+  "kind": "feature",
+  "notes": "From the 2026-07-30 LLM-stability review \u00a75.",
+  "priority": "P2",
+  "summary": "Majority voting is the best dollar-per-accuracy technique for reasoning tasks (negligible gain past N\u224820) but reduces VARIANCE, not BIAS: when a model is systematically wrong all samples agree and voting cannot help. So it is wrong for the builder (whose failures are bias \u2014 it misunderstood the task) and right for cheap single-shot DECISIONS where one bad sample wastes an entire downstream cycle.",
+  "title": "N=3 self-consistency on DECISION phases only (triage top_n, verdict-conflict adjudication, spec reachability)",
+  "weight": 0.87
+}

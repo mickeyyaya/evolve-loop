@@ -1,0 +1,17 @@
+{
+  "connects_to": [
+    "go/internal/phasecontract/sentinel.go",
+    "go/internal/bridge/",
+    "inbox: contract-block-cli-escalation",
+    "kb/research/llm-output-stability-2026-07/README.md"
+  ],
+  "created_at": "2026-07-30T13:04:00Z",
+  "fix": "Where the phase's CLI exposes tool/function calling, have the agent emit the verdict via a tiny declared tool (phase, verdict, failure block) instead of appending a prose comment line; the bridge captures the structured call as the authoritative signal and the prose report stays human-facing. Keep the prose sentinel as the documented fallback for CLIs without tools (Strangler Fig, exactly like the existing sentinel-then-regex ladder). This removes the format-adherence failure class at the source for the CLIs that can support it, and removes the last-line fragility for everyone on that path.",
+  "id": "verdict-sentinel-as-tool-call",
+  "kind": "pipeline-integrity",
+  "notes": "From the 2026-07-30 LLM-stability review \u00a74.2. Ordering: contract-block-cli-escalation (0.9) is the compensating control and should land first \u2014 it works for every CLI; this item is the structural fix for the subset with tool support.",
+  "priority": "P2",
+  "summary": "Constrained decoding (FSM token masking against a JSON schema) is the 2026 production standard for structured output and gives 100% schema-valid results \u2014 but it is unavailable to us: we drive interactive CLI REPLs under tmux, not raw APIs. Consequence, observed live: agy ignored the deliverable contract 7/7 times across corrections (its own report format, no machine verdict line), demoting the contract gate to advisory in both wave-1 lanes; and the sentinel being the LAST LINE OF PROSE is also what made the verify-read race visible as [bad_verdict] (cycle-1198).",
+  "title": "Emit the machine verdict as a TOOL CALL where the CLI supports one \u2014 the available equivalent of constrained decoding",
+  "weight": 0.86
+}

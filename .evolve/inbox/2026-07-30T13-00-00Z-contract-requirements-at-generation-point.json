@@ -1,0 +1,17 @@
+{
+  "connects_to": [
+    "go/internal/phasecontract/",
+    "go/internal/prompts/",
+    "agents/evolve-*.md",
+    "kb/research/llm-output-stability-2026-07/README.md"
+  ],
+  "created_at": "2026-07-30T13:00:00Z",
+  "fix": "Append a compact, XML-tagged <deliverable-contract> block to the tail of every contracted phase's dispatch prompt: exact artifact path, required section headings verbatim, and the rendered sentinel template (reuse phasecontract's ONE template source so writer/detector cannot drift \u2014 the existing no-drift pin covers it). Keep the persona body's narrative guidance; the tail block is the machine contract restated adjacent to generation. MEASURE: contract-block rate per phase per 20 cycles before/after (the data already lands in the cycle logs). Do NOT also duplicate it a third time \u2014 one persona mention + one tail block.",
+  "id": "contract-requirements-at-generation-point",
+  "kind": "pipeline-integrity",
+  "notes": "From the 2026-07-30 LLM-stability review. Companion to contract-block-cli-escalation (the compensating control when a CLI ignores the contract regardless of placement).",
+  "priority": "P1",
+  "summary": "Anthropic's own guidance: Claude follows instructions in the USER TURN better than in the system message, and XML-tagged sections parse unambiguously. Our required-sections list + machine-verdict sentinel template live in the persona body (system-ish, far from the generation point) \u2014 yet the CORRECTION prompt, which puts the exact same requirements in the turn tail, is what gets compliance. That asymmetry is a free experiment with a measurable outcome: the contract-block rate per phase.",
+  "title": "Move hard deliverable-contract requirements to the GENERATION POINT (turn tail), not the persona body",
+  "weight": 0.9
+}

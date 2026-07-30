@@ -15,7 +15,7 @@
   ],
   "id": "tokenopt-role-scoped-instruction-digests",
   "kind": "feature",
-  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; ~24x full instruction stack per cycle \u2014 largest static multiplier",
+  "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; ~24x full instruction stack per cycle \u2014 largest static multiplier | QUALITY REFRAME 2026-07-30 (kb/research/llm-output-stability-2026-07): context-rot research shows 30-50% accuracy loss well before the documented context limit (poisoning / distraction / confusion). This item was queued as a COST optimization; it is equally a QUALITY item \u2014 every low-signal token removed from a phase's window reduces distraction. Pair with context-fill-telemetry-and-cap (0.89) so the effect is measurable rather than assumed.",
   "priority": "medium",
   "summary": "Evaluate per-phase instruction payloads: a scout does not need ship-gate rules; generate role-scoped digests from the SSOT (single-source-with-projection, like skills generate) and inject those; A/B one batch to verify no quality regression before default flip. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (papers.md 5.4).",
   "title": "Token-opt: role-scoped instruction digests \u2014 full CLAUDE.md/AGENTS.md stack injected ~24x/cycle measured at +20 percent cost in 2026 research; phases get role-scoped digests",

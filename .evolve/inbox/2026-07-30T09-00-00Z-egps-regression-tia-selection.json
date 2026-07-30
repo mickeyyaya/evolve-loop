@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/changedpkgs/changedpkgs.go",
+    "kb/research/failed-loop-analysis-2026-07/README.md"
+  ],
+  "created_at": "2026-07-30T09:00:00Z",
+  "fix": "In acssuite runGoTest: partition ./acs/regression/... by predicate package's declared target packages (predicates already grep/shell specific packages \u2014 derive mapping from acs metadata or a manifest); select intersect(changedpkgs). Config via policy.json gates block (stage: off|shadow|enforce, shadow logs would-skip counts first). Full-corpus triggers: batch boundary, any red in selected set, weekly floor. Wiring proof: predicate pinning that an out-of-selection regression still runs at the boundary sweep.",
+  "id": "egps-regression-tia-selection",
+  "kind": "pipeline-integrity",
+  "notes": "From the 2026-07-30 literature review. Serves BOTH operator priorities (pipeline improvement + token optimization). | pass-rate directive 2026-07-30: RAISED \u2014 shrinks the class-B flake surface AND per-cycle load AND tokens; Meta PTS evidence 99.9% catch at 1/3 tests.",
+  "priority": "P1",
+  "summary": "EGPS runs the FULL ~200-predicate regression corpus every cycle (~minutes of go-test under fleet load). Meta's predictive test selection (engineering.fb.com 2018, arXiv:1810.05286) catches 99.9% of regressions running ~1/3 of tests. Our deterministic equivalent needs no ML: select regression predicates whose packages intersect the cycle's changed packages (internal/changedpkgs is the existing SSOT) plus always-on red-team + this-cycle scopes; run the FULL corpus at batch boundaries and on any selected-red so selection can never hide a regression class. Double win: fewer predicate-seconds under load directly reduces the class-B env-flake surface (batches 17-20: ~20% of FAILs) AND cuts per-cycle token/wall cost.",
+  "title": "EGPS regression suite: changed-package test selection + boundary full-sweep (Meta PTS shape)",
+  "weight": 0.91
+}
