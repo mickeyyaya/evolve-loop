@@ -57,6 +57,9 @@
         "$ref": "#/definitions/Defect"
       }
     },
+    "failure": {
+      "$ref": "#/definitions/FailureRecord"
+    },
     "decisions": {
       "type": "array",
       "description": "Key decisions made during this cycle.",
@@ -122,6 +125,19 @@
         "id": {"type": "string", "minLength": 1},
         "action": {"type": "string", "minLength": 1},
         "priority": {"type": "string"}
+      }
+    },
+    "FailureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The FAIL cycle's failure identity, ingested from the workspace artifacts failure-digest.json (fingerprint + pre_class) and audit-fail-reason.json (reasons, <=5 entries of <=200 chars each). Absent on non-FAIL cycles and when the artifacts yielded no content — best-effort, never fabricated.",
+      "properties": {
+        "fingerprint": {"type": "string"},
+        "pre_class": {"type": "string"},
+        "reasons": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
       }
     },
     "CIWatchRecord": {

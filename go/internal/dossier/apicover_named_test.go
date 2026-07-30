@@ -84,6 +84,36 @@ func TestParseJSON_Named(t *testing.T) {
 	}
 }
 
+// TestFailureRecord_Named covers the FailureRecord type (apicover typed-var
+// check) and its JSON tags — the FAIL cycle's committed failure identity.
+func TestFailureRecord_Named(t *testing.T) {
+	fr := FailureRecord{
+		Fingerprint: "audit|gate-block|ab12cd34ef56",
+		PreClass:    "gate-block",
+		Reasons:     []string{"EGPS floor blocked ship: red_count=1"},
+	}
+	raw, err := json.Marshal(&Dossier{
+		Cycle:        1,
+		Goal:         "failure-record round-trip",
+		FinalVerdict: VerdictFail,
+		Phases:       []PhaseRecord{{Name: "audit", Verdict: VerdictFail}},
+		Defects:      []Defect{{ID: "d1", Summary: "s"}},
+		Carryover:    []Carryover{{ID: "c1", Action: "a"}},
+		Failure:      &fr,
+	})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var out Dossier
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if out.Failure == nil || out.Failure.Fingerprint != fr.Fingerprint ||
+		out.Failure.PreClass != fr.PreClass || len(out.Failure.Reasons) != 1 {
+		t.Errorf("FailureRecord round-trip: got %+v, want %+v", out.Failure, fr)
+	}
+}
+
 // TestVerdicts_Named covers the VerdictPass / VerdictWarn / VerdictFail constants.
 func TestVerdicts_Named(t *testing.T) {
 	for _, v := range []string{VerdictPass, VerdictWarn, VerdictFail} {
