@@ -60,15 +60,19 @@ func dossierVerdict(outcome string) string {
 // writeCycleDossier builds and persists the closeout dossier for one completed
 // cycle to <projectRoot>/knowledge-base/cycles/cycle-N.{json,md}. goal must be
 // non-blank (callers pass the human-readable goal text, falling back to the goal
-// hash). Returns an error the best-effort caller logs; it never panics.
-func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, spineFailOpens []SpineFailOpen) error {
+// hash). skipped and notAdopted are DISTINCT records and must not be conflated:
+// skipped = phases that did not run (with the cause), notAdopted = phases that RAN
+// whose verdict the floor guard declined (dossier-retro-skipped-mislabel). Returns
+// an error the best-effort caller logs; it never panics.
+func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, notAdopted []VerdictNotAdopted, spineFailOpens []SpineFailOpen) error {
 	d, err := dossier.Build(cycle, dossier.BuildOpts{
-		WorkspacePath:  workspacePath,
-		Goal:           goal,
-		RunID:          runID,
-		FinalVerdict:   dossierVerdict(outcome),
-		SkippedPhases:  skipped,
-		SpineFailOpens: spineFailOpens,
+		WorkspacePath:      workspacePath,
+		Goal:               goal,
+		RunID:              runID,
+		FinalVerdict:       dossierVerdict(outcome),
+		SkippedPhases:      skipped,
+		VerdictsNotAdopted: notAdopted,
+		SpineFailOpens:     spineFailOpens,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)

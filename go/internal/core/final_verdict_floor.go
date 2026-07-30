@@ -16,7 +16,8 @@ import "slices"
 // user-configured Policy.FloorPhases override, resolved via resolvedShipFloor)
 // or ship itself — may set FinalVerdict directly. Once one has, a non-floor
 // phase's non-PASS outcome is preserved-around and recorded into
-// CycleResult.SkippedPhases (surfaced in the dossier), never overwriting the
+// CycleResult.VerdictsNotAdopted (surfaced in the dossier as
+// phases_run_verdict_not_adopted), never overwriting the
 // floor verdict. Before any authoritative verdict exists (pre-audit phases,
 // scout-only investigation cycles) legacy behavior is preserved: the phase's
 // verdict stands, so no cycle loses its outcome.
@@ -57,15 +58,22 @@ func (o *Orchestrator) floorAlreadyCompleted(completed []string) bool {
 // authoritative phase (or any phase before a floor verdict exists) sets
 // FinalVerdict directly. A non-floor phase running AFTER a floor verdict has
 // been recorded must not clobber it: its non-PASS outcome is appended to
-// result.SkippedPhases (a PASS needs no record — it never threatened the
+// result.VerdictsNotAdopted (a PASS needs no record — it never threatened the
 // verdict). Pure apart from the append; safe to call from both dispatch loops.
+//
+// The phase here HAS RUN — it produced a verdict, that verdict was declined.
+// These records used to land in result.SkippedPhases, so every FAIL cycle's
+// dossier read `skipped_phases: [{phase: retro, reason: FAIL}]` while retro's
+// report sat in the run dir: a committed record contradicting its own artifacts
+// (dossier-retro-skipped-mislabel, 1028/1035 → 1105-1117 → 1198). SkippedPhases
+// now means only "did not run"; this list means "ran, verdict not adopted".
 func (o *Orchestrator) recordFinalVerdict(result *CycleResult, phase Phase, verdict string, floorAlreadyRecorded bool) {
 	if o.isAuthoritativePhase(phase) || !floorAlreadyRecorded {
 		result.FinalVerdict = verdict
 		return
 	}
 	if verdict != VerdictPASS {
-		result.SkippedPhases = append(result.SkippedPhases, SkippedPhase{Phase: string(phase), Reason: verdict})
+		result.VerdictsNotAdopted = append(result.VerdictsNotAdopted, VerdictNotAdopted{Phase: string(phase), Verdict: verdict})
 	}
 }
 

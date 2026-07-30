@@ -376,7 +376,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// verdict after retries exhausted is cycle-fatal ONLY for a
 				// floor/ship phase. A non-floor post-verdict phase degrades to
 				// SKIPPED+WARN and the cycle advances — recordFinalVerdict then
-				// records the degrade into SkippedPhases without clobbering the
+				// records the degrade into VerdictsNotAdopted without clobbering the
 				// floor verdict, closing the same storm from the contract side.
 				if degraded, ok := cr.o.nonFloorExhaustionDegrade(next, cr.cs.WorkspacePath, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases)); ok {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (contract_exhaustion_skip)\n", next, resp.Verdict)

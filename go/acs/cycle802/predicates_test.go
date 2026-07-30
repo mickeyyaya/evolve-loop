@@ -27,10 +27,17 @@
 //	    subsuming advisory-phase-contract-degrade (Task 3:
 //	    contract-exhaustion-degrades-non-floor)
 //	    → C802_005 runs TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn.
-//	AC6 skipped/degraded non-floor phases are surfaced in the dossier via
-//	    a durable CycleResult.SkippedPhases[] field, never silently dropped
-//	    (Task 1 dossier surfacing)
-//	→ C802_006 runs TestDossier_RecordsSkippedPhases.
+//	AC6 skipped/degraded non-floor phases are surfaced in the dossier via a
+//	    durable CycleResult field, never silently dropped (Task 1 dossier
+//	    surfacing). The field was CycleResult.SkippedPhases[] until
+//	    dossier-retro-skipped-mislabel split the record by what actually
+//	    happened: a phase that RAN whose verdict was declined now lands in
+//	    CycleResult.VerdictsNotAdopted[] → dossier
+//	    phases_run_verdict_not_adopted, while SkippedPhases[] is reserved for a
+//	    phase that did NOT run. The AC — the degrade survives instead of
+//	    clobbering the floor verdict — is unchanged and asserted on both halves.
+//	→ C802_006 runs TestDossier_RecordsSkippedPhases (name retained: the
+//	  predicate binds it by name, and renaming would mint a new ac_id identity).
 //	AC7 retrospective.json and memo.json declare sandbox.allow_network
 //	    true so the runtime stops silently forcing it and emitting the
 //	    noisy WARN (Task 4: retro-memo-allow-network-honest)
@@ -107,9 +114,12 @@ func TestC802_005_contract_exhaustion_non_floor_degrades_to_skipped_warn(t *test
 	runCoreTest(t, "TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn")
 }
 
-// AC6: skipped/degraded non-floor phases must be surfaced in the dossier
-// (CycleResult.SkippedPhases[]), not silently dropped once FinalVerdict stops
-// reflecting them.
+// AC6: skipped/degraded non-floor phases must be surfaced in the dossier, not
+// silently dropped once FinalVerdict stops reflecting them. Post
+// dossier-retro-skipped-mislabel the record is split by what happened — a phase
+// that RAN with a declined verdict → CycleResult.VerdictsNotAdopted[], a phase
+// that did NOT run → CycleResult.SkippedPhases[] — and the named core test
+// asserts both.
 func TestC802_006_dossier_records_skipped_phases(t *testing.T) {
 	runCoreTest(t, "TestDossier_RecordsSkippedPhases")
 }

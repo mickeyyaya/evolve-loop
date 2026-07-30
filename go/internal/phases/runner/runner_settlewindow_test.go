@@ -34,12 +34,12 @@ func TestRun_CleanExitIdle_DeliverableSettlesLate_WidenedWindowCatchesIt(t *test
 
 	const settleOnCall = 10 // past the OLD 3-retry window (give-up at call 4), within the widened window
 	calls := 0
-	settlesLate := func(string, phasecontract.Roots) (deliverable.Result, error) {
+	settlesLate := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
 		if calls < settleOnCall {
-			return deliverable.Result{OK: false}, nil
+			return verifiedFrom(deliverable.Result{OK: false}, phase, roots), nil
 		}
-		return deliverable.Result{OK: true}, nil
+		return verifiedFrom(deliverable.Result{OK: true}, phase, roots), nil
 	}
 	r := New(Options{
 		Hooks:    hooks,

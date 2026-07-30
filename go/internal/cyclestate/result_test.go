@@ -52,13 +52,11 @@ func TestDiagnostic_Wire(t *testing.T) {
 	}
 }
 
-// TestSkippedPhase_Wire pins the SkippedPhase wire shape — the degraded-phase
-// record (cycle-802 retro-bridge-timeout-width10 guard) that preserves a
-// non-floor phase's non-PASS verdict in the cycle dossier instead of letting it
-// clobber a floor-derived FinalVerdict. Its snake-case JSON tags are the dossier
-// contract, so a drift here silently drops the degrade audit trail.
+// TestSkippedPhase_Wire pins the SkippedPhase wire shape — a phase that did NOT
+// run, with its skip CAUSE (closeout after an abnormal mid-cycle exit). Its
+// snake-case JSON tags are the dossier contract.
 func TestSkippedPhase_Wire(t *testing.T) {
-	b, err := json.Marshal(SkippedPhase{Phase: "retro", Reason: "FAIL"})
+	b, err := json.Marshal(SkippedPhase{Phase: "closeout", Reason: "abnormal exit in phase build"})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -66,6 +64,36 @@ func TestSkippedPhase_Wire(t *testing.T) {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("SkippedPhase JSON missing %s; got %s", want, b)
 		}
+	}
+}
+
+// TestVerdictNotAdopted_Wire pins the ran-but-declined record (cycle-802
+// retro-bridge-timeout-width10 guard): a non-floor phase's non-PASS verdict is
+// preserved in the cycle dossier instead of clobbering a floor-derived
+// FinalVerdict. It is DISTINCT from SkippedPhase — the field names the phase's
+// VERDICT, so the dossier can never claim retro was skipped on a cycle where retro
+// ran (dossier-retro-skipped-mislabel). The tags are the dossier contract, so a
+// drift here silently drops the audit trail.
+func TestVerdictNotAdopted_Wire(t *testing.T) {
+	b, err := json.Marshal(VerdictNotAdopted{Phase: "retro", Verdict: "FAIL"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, want := range []string{`"phase"`, `"verdict"`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("VerdictNotAdopted JSON missing %s; got %s", want, b)
+		}
+	}
+	if strings.Contains(string(b), `"reason"`) {
+		t.Errorf("VerdictNotAdopted must not carry a skip-shaped \"reason\" key: %s", b)
+	}
+	// CycleResult carries the records; SkippedPhases stays reserved for real skips.
+	r := CycleResult{VerdictsNotAdopted: []VerdictNotAdopted{{Phase: "retro", Verdict: "FAIL"}}}
+	if len(r.VerdictsNotAdopted) != 1 || r.VerdictsNotAdopted[0].Phase != "retro" {
+		t.Errorf("CycleResult.VerdictsNotAdopted not wired: %+v", r)
+	}
+	if len(r.SkippedPhases) != 0 {
+		t.Errorf("a ran-but-declined phase must not land in SkippedPhases: %+v", r.SkippedPhases)
 	}
 }
 

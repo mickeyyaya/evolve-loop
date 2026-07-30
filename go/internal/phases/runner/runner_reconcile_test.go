@@ -23,7 +23,34 @@ import (
 // EGPS gate is exercised end-to-end in the audit package.
 
 func verifyReturns(res deliverable.Result, err error) func(string, phasecontract.Roots) (deliverable.Result, error) {
-	return func(string, phasecontract.Roots) (deliverable.Result, error) { return res, err }
+	return func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+		if err != nil {
+			return res, err
+		}
+		return verifiedFrom(res, phase, roots), nil
+	}
+}
+
+// verifiedFrom makes a scripted deliverable.Result honor the verifyFn seam's
+// SINGLE-READ contract (deliverable-verified-bytes-single-read): production's
+// deliverable.Verify returns the artifact path it judged plus the exact bytes it
+// read, and BaseRunner.Run classifies THOSE bytes. A double that returned only a
+// bare OK/!OK would leave the runner with nothing to classify, so every fake here
+// stamps the path + bytes exactly as Verify does — reading the same
+// <workspace>/<phase>-report.md the runner hands the bridge.
+//
+// No file on disk ⇒ the Result is left path-less, which is how a NoArtifact
+// contract (ship) presents and is what keeps the pane the verdict source for the
+// deliberately-lying alwaysOKVerify plumbing stubs.
+func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Roots) deliverable.Result {
+	path := filepath.Join(roots.Workspace, phase+"-report.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return res
+	}
+	res.ArtifactPath = path
+	res.Content = string(data)
+	return res
 }
 
 // TestRun_Timeout_WellFormedPASS_ReconcilesToPass — the core fix: timeout +
@@ -306,12 +333,12 @@ func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 	// mid-write), the third — within the settle window — catches the well-formed
 	// PASS deliverable.
 	calls := 0
-	settling := func(string, phasecontract.Roots) (deliverable.Result, error) {
+	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
 		if calls < 3 {
-			return deliverable.Result{OK: false}, nil
+			return verifiedFrom(deliverable.Result{OK: false}, phase, roots), nil
 		}
-		return deliverable.Result{OK: true}, nil
+		return verifiedFrom(deliverable.Result{OK: true}, phase, roots), nil
 	}
 	r := New(Options{
 		Hooks:    hooks,
@@ -345,9 +372,9 @@ func TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr()}
 	calls := 0
-	neverOK := func(string, phasecontract.Roots) (deliverable.Result, error) {
+	neverOK := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
-		return deliverable.Result{OK: false}, nil
+		return verifiedFrom(deliverable.Result{OK: false}, phase, roots), nil
 	}
 	r := New(Options{
 		Hooks:    hooks,

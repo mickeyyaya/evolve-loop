@@ -79,6 +79,30 @@
         "$ref": "#/definitions/Carryover"
       }
     },
+    "skipped_phases": {
+      "type": "array",
+      "description": "Phases that genuinely did NOT run, with the cause (closeout after an abnormal mid-cycle exit). A phase that RAN and returned non-PASS belongs in phases_run_verdict_not_adopted, never here.",
+      "items": {
+        "$ref": "#/definitions/SkippedPhase"
+      }
+    },
+    "phases_run_verdict_not_adopted": {
+      "type": "array",
+      "description": "Non-floor phases that RAN and returned non-PASS after the floor verdict was set, so their verdict was declined rather than allowed to overwrite the floor-derived final_verdict (cycle-802).",
+      "items": {
+        "$ref": "#/definitions/VerdictNotAdopted"
+      }
+    },
+    "spine_fail_opens": {
+      "type": "array",
+      "description": "Every spine-gate fail-open the cycle took: the phase entered anyway, the first unsatisfied predecessor anchor, and the reason (cycle-1166).",
+      "items": {
+        "$ref": "#/definitions/SpineFailOpen"
+      }
+    },
+    "timing": {
+      "$ref": "#/definitions/TimingSummary"
+    },
     "ci_watch": {
       "$ref": "#/definitions/CIWatchRecord"
     }
@@ -93,7 +117,77 @@
         "verdict": {"type": "string", "enum": ["PASS", "WARN", "FAIL"]},
         "key_findings": {"type": "string"},
         "artifact_sha": {"type": "string"},
-        "signals": {"type": "object"}
+        "signals": {"type": "object"},
+        "duration_ms": {"type": "integer", "description": "Phase wall-clock, ingested from phase-timing.json."},
+        "started_at": {"type": "string"},
+        "ended_at": {"type": "string"},
+        "archetype": {"type": "string"},
+        "model_source": {"type": "string", "description": "Model provenance: profile | pin | advisor. Absent on a legacy timing log."},
+        "resolved_model": {"type": "string", "description": "The concrete model or tier the phase actually ran on."},
+        "tokens": {"$ref": "#/definitions/TokenUsage"}
+      }
+    },
+    "SkippedPhase": {
+      "type": "object",
+      "required": ["phase", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "phase": {"type": "string", "minLength": 1},
+        "reason": {"type": "string"}
+      }
+    },
+    "VerdictNotAdopted": {
+      "type": "object",
+      "required": ["phase", "verdict"],
+      "additionalProperties": false,
+      "description": "One phase that ran to completion whose non-PASS verdict was not adopted as the cycle verdict. verdict is what the phase actually returned (FAIL|WARN|SKIPPED).",
+      "properties": {
+        "phase": {"type": "string", "minLength": 1},
+        "verdict": {"type": "string"}
+      }
+    },
+    "SpineFailOpen": {
+      "type": "object",
+      "required": ["phase", "missing_artifact"],
+      "additionalProperties": false,
+      "properties": {
+        "phase": {"type": "string", "minLength": 1},
+        "missing_artifact": {"type": "string", "description": "The FIRST unsatisfied predecessor anchor — the real cause. Phase alone cannot group fail-opens by cause."},
+        "reason": {"type": "string", "description": "The fail-open reason verbatim: \"would-block at enforce\" vs \"digest degraded: …\"."}
+      }
+    },
+    "TimingSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cycle-level latency and token roll-up, ingested from phase-timing.json (phasetiming.Summary). Absent when the cycle wrote no timing log. All token fields are zero on a legacy log written before they existed — never fabricated.",
+      "properties": {
+        "total_ms": {"type": "integer"},
+        "phase_count": {"type": "integer"},
+        "retried_count": {"type": "integer", "description": "Dispatches that took more than one attempt."},
+        "longest_phase": {"type": "string"},
+        "longest_ms": {"type": "integer"},
+        "by_archetype_ms": {
+          "type": "object",
+          "description": "archetype -> summed duration_ms.",
+          "additionalProperties": {"type": "integer"}
+        },
+        "total_tokens": {"$ref": "#/definitions/TokenUsage"},
+        "tokens_by_archetype": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/definitions/TokenUsage"}
+        },
+        "wasted_tokens": {"$ref": "#/definitions/TokenUsage", "description": "Usage spent by FAIL-verdict entries — work that did not ship."},
+        "cache_hit_ratio": {"type": "number", "description": "cache_read/(input+cache_read) over the whole cycle; 0 when there was no input."}
+      }
+    },
+    "TokenUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input": {"type": "integer"},
+        "output": {"type": "integer"},
+        "cache_read": {"type": "integer"},
+        "cache_write": {"type": "integer"}
       }
     },
     "Defect": {

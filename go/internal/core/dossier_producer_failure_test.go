@@ -86,7 +86,7 @@ func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
 	}
 	writeFailureArtifacts(t, ws, reasons)
 
-	if err := writeCycleDossier(nil, root, ws, 9, "fix Z", "run9", VerdictFAIL, nil, nil); err != nil {
+	if err := writeCycleDossier(nil, root, ws, 9, "fix Z", "run9", VerdictFAIL, nil, nil, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, md := readDossierPair(t, root, 9)
@@ -131,7 +131,7 @@ func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 	}
 	writeFailureArtifacts(t, ws, reasons)
 
-	if err := writeCycleDossier(nil, root, ws, 10, "fix W", "run10", VerdictFAIL, nil, nil); err != nil {
+	if err := writeCycleDossier(nil, root, ws, 10, "fix W", "run10", VerdictFAIL, nil, nil, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, _ := readDossierPair(t, root, 10)
@@ -163,7 +163,7 @@ func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
-	if err := writeCycleDossier(nil, root, t.TempDir(), 11, "fix V", "run11", VerdictFAIL, nil, nil); err != nil {
+	if err := writeCycleDossier(nil, root, t.TempDir(), 11, "fix V", "run11", VerdictFAIL, nil, nil, nil); err != nil {
 		t.Fatalf("writeCycleDossier must not fail on absent failure artifacts: %v", err)
 	}
 	m, md := readDossierPair(t, root, 11)
@@ -196,7 +196,7 @@ func TestDossierFailure_PassKeepsShape(t *testing.T) {
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"stale reason from a retried attempt"})
 
-	if err := writeCycleDossier(nil, root, ws, 12, "improve U", "run12", CycleOutcomeShippedViaBuild, nil, nil); err != nil {
+	if err := writeCycleDossier(nil, root, ws, 12, "improve U", "run12", CycleOutcomeShippedViaBuild, nil, nil, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, md := readDossierPair(t, root, 12)

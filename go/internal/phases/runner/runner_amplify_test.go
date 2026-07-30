@@ -47,8 +47,8 @@ func (f *divergentBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 // used to isolate the runner's own file-vs-stdout selection logic from
 // deliverable.Verify's real parsing rules (covered separately in
 // internal/deliverable and internal/phasecontract tests).
-func alwaysOKVerify(phase string, _ phasecontract.Roots) (deliverable.Result, error) {
-	return deliverable.Result{OK: true, Phase: phase}, nil
+func alwaysOKVerify(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+	return verifiedFrom(deliverable.Result{OK: true, Phase: phase}, phase, roots), nil
 }
 
 // TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout
