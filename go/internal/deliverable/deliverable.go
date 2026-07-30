@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -101,20 +102,19 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	path := c.ArtifactPath(roots)
 	res := Result{Phase: phase, ArtifactPath: path}
 
-	data, err := os.ReadFile(path)
+	content, exists, err := readDeliverableWithGrace(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			res.add(CodeMissingArtifact, fmt.Sprintf("deliverable not found — write it to exactly: %s", path))
-			// If the agent wrote it into the worktree instead, say so — that is
-			// the actionable correction (the recoverBuildLeak failure class).
-			checkStray(&res, c, roots)
-			res.finish()
-			return res, nil
-		}
 		// Unreadable for a reason other than absence (permissions, IO) is infra.
 		return Result{}, fmt.Errorf("deliverable: read %s: %w", path, err)
 	}
-	content := string(data)
+	if !exists {
+		res.add(CodeMissingArtifact, fmt.Sprintf("deliverable not found — write it to exactly: %s", path))
+		// If the agent wrote it into the worktree instead, say so — that is
+		// the actionable correction (the recoverBuildLeak failure class).
+		checkStray(&res, c, roots)
+		res.finish()
+		return res, nil
+	}
 	if strings.TrimSpace(content) == "" {
 		res.add(CodeEmptyArtifact, fmt.Sprintf("deliverable at %s is empty", path))
 		res.finish()
@@ -129,6 +129,75 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	}
 	res.finish()
 	return res, nil
+}
+
+// Write-in-flight grace window (cycle-1212). A phase agent's final deliverable
+// write is not atomic with respect to the verify call that follows it: the
+// self-check and the host contract gate can both observe ENOENT (create not yet
+// visible) or a zero-length file (bytes not yet flushed) for a deliverable that
+// IS being written. A single unretried read cannot tell that from "never
+// written", and both surface as a CONFIRMED violation — a false FAIL that fails
+// CLOSED. So absence/emptiness is treated as provisional for a bounded window.
+//
+// The window must be long enough to cover a lagging write and short enough that
+// a genuinely missing deliverable is still reported promptly (a retry that waits
+// minutes is its own outage). Deliberately NOT configurable: this is an I/O
+// robustness constant, not a phase setting — no flag, no dial.
+//
+// LAYERING (review HIGH on the first cut): the host runner already re-probes
+// Verify up to 16x at 200ms for missing/empty/MALFORMED artifacts
+// (runner.go verifyReconcileDeliverable), so on that path this window nests
+// inside the outer retry and a genuinely-absent artifact's confirmation cost
+// is ~16x(probe+500ms) ≈ 11s worst-case — accepted: it is paid once, only on
+// a phase that produced nothing, and is far cheaper than the false FAIL it
+// prevents. This grace layer EXISTS for the callers with NO outer retry (the
+// CLI self-check, `evolve phase verify`). Partial-but-non-blank content is
+// deliberately NOT retried here — mid-write truncation is closed at the
+// SOURCE by the bridge artifact-ready cross-poll debounce (completion.go),
+// and malformed-but-present stays the runner's reconcile territory.
+const (
+	readGraceWindow = 500 * time.Millisecond
+	readGracePoll   = 20 * time.Millisecond
+)
+
+// graceSleep is the test seam for the grace poll (the runner's settleSleep
+// idiom): not a dial — tests inject a no-op so negative paths do not pay
+// real-time waits.
+var graceSleep = time.Sleep
+
+// readDeliverableWithGrace reads the deliverable at path, tolerating a write
+// still in flight. It reads FIRST and waits only on failure, so the
+// overwhelmingly common already-written case pays exactly one os.ReadFile.
+//
+// Returns:
+//
+//	err != nil            → non-absence read fault (EISDIR, permissions, IO) →
+//	                        infra ambiguity, surfaced immediately since it will
+//	                        never clear on its own; the retry budget is not spent
+//	                        on it and it is never reclassified as a violation.
+//	exists == false       → still absent when the grace window closed → the
+//	                        caller's confirmed CodeMissingArtifact.
+//	exists, content blank → still empty when the window closed → the caller's
+//	                        confirmed CodeEmptyArtifact.
+//
+// The grace window never launders a real violation into a PASS: it only delays
+// the verdict, it does not change it.
+func readDeliverableWithGrace(path string) (content string, exists bool, err error) {
+	deadline := time.Now().Add(readGraceWindow)
+	for {
+		data, rerr := os.ReadFile(path)
+		switch {
+		case rerr == nil && strings.TrimSpace(string(data)) != "":
+			return string(data), true, nil
+		case rerr != nil && !os.IsNotExist(rerr):
+			return "", false, rerr
+		}
+		// Absent, or present-but-blank: possibly a write still in flight.
+		if !time.Now().Before(deadline) {
+			return string(data), rerr == nil, nil
+		}
+		graceSleep(readGracePoll)
+	}
 }
 
 func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots phasecontract.Roots, phaseIO config.Stage) {
