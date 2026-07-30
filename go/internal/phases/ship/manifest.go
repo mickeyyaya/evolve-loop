@@ -252,6 +252,50 @@ func porcelainChangedPaths(out string) []string {
 	return sortedKeys(seen)
 }
 
+// stagedGonePaths returns the paths a `git add` pathspec must NOT name, because
+// they exist in neither the worktree nor the index under that name. Naming one
+// is fatal rc=128 ("did not match any files") and git fails the ENTIRE add, so
+// one such path fails the whole ship.
+//
+// Two porcelain shapes produce it, and they are spelled differently — which is
+// why this is a function and not a one-line prefix check:
+//
+//	"D  <path>"           a staged deletion, worktree side clean
+//	"R  <old> -> <new>"   a staged rename; <old> is gone, <new> is a real file
+//
+// Only the INDEX column (line[0]) decides. An unstaged deletion (" D") still
+// has an index entry for `add` to remove, so it stays in the pathspec. A copy
+// ("C  <src> -> <dst>") leaves <src> on disk, so it is not gone. "DD" is the
+// both-deleted MERGE CONFLICT state, where `git add <path>` is the resolution
+// and must not be filtered — hence the "D " prefix test rather than line[0]=='D'.
+//
+// The rename shape is the one that was missing, and it is not reachable from
+// the deletion shape: porcelain NEVER reports a staged move as "D  <old>" plus
+// "A  <new>", so a filter that knows only "D " misses every move. Inbox
+// reconciliation produces moves by construction — an item is rewritten with one
+// field appended and relocated to consumed/, which git scores as a rename — and
+// this had been carried as an operator gotcha ("ship-staging RENAME rc=128")
+// rather than fixed, failing every boundary ship that consumed a queue item.
+func stagedGonePaths(porcelain string) map[string]bool {
+	gone := map[string]bool{}
+	for _, line := range strings.Split(porcelain, "\n") {
+		if len(line) <= 3 {
+			continue
+		}
+		// unquoteGitPath: keys are compared against the DECODED paths
+		// stagePathspec produced, so a quoted entry must decode too.
+		switch {
+		case strings.HasPrefix(line, "D "):
+			gone[unquoteGitPath(strings.TrimSpace(line[3:]))] = true
+		case line[0] == 'R':
+			if src, _, ok := strings.Cut(line[3:], " -> "); ok {
+				gone[unquoteGitPath(strings.TrimSpace(src))] = true
+			}
+		}
+	}
+	return gone
+}
+
 // sortedKeys renders a path set as a sorted slice.
 func sortedKeys(set map[string]bool) []string {
 	out := make([]string, 0, len(set))

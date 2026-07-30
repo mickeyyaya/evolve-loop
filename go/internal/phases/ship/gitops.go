@@ -739,23 +739,14 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		fi, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
 		return statErr == nil && fi.Mode().IsRegular()
 	})
-	// A fully-staged deletion ("D " — index staged, worktree side clean) has
-	// NOTHING left to stage, and naming it in the pathspec is fatal rc=128
-	// ("did not match any files": the file exists in neither worktree nor
-	// index-as-file). The operator boundary flow produces exactly this shape
-	// (stage explicit paths incl. deletions → commit-gate → ship re-stages).
-	// Unstaged deletions (" D") stay in the pathspec — `add` records those.
-	stagedDeleted := map[string]bool{}
-	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "D ") && len(line) > 3 {
-			// unquoteGitPath: the key is compared against the DECODED paths
-			// stagePathspec produced, so a quoted entry must decode too.
-			stagedDeleted[unquoteGitPath(strings.TrimSpace(line[3:]))] = true
-		}
-	}
+	// Drop the paths that exist in neither the worktree nor the index under
+	// that name. Naming one is fatal rc=128 and it kills the WHOLE staging
+	// call, so a single such path fails the entire ship — see stagedGonePaths
+	// for the two porcelain shapes that produce it.
+	gone := stagedGonePaths(out)
 	kept := paths[:0]
 	for _, p := range paths {
-		if !stagedDeleted[p] {
+		if !gone[p] {
 			kept = append(kept, p)
 		}
 	}
