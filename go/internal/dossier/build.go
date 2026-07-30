@@ -147,6 +147,14 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 			Action:   fmt.Sprintf("resolve the audit findings that failed cycle %d", cycle),
 			Priority: "high",
 		}}
+		// Ingest the failure identity the workspace already carries. RESIDUAL
+		// (review MEDIUM): failure-digest.json is written when the dispatch
+		// loop routes into retro, so a FAIL reclassified at finalize without a
+		// retro dispatch yields reasons[] only — the block shrinks honestly
+		// rather than fabricating an identity.
+		if rec, ok := failureRecord(opts.WorkspacePath, cycle); ok {
+			d.Failure = rec
+		}
 	}
 	return d, nil
 }

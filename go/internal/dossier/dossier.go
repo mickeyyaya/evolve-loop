@@ -36,9 +36,15 @@ type Dossier struct {
 	TreeSHA      string        `json:"tree_sha,omitempty"`
 	Phases       []PhaseRecord `json:"phases"`
 	Defects      []Defect      `json:"defects,omitempty"`
-	Decisions    []string      `json:"decisions,omitempty"`
-	Lessons      []Lesson      `json:"lessons,omitempty"`
-	Carryover    []Carryover   `json:"carryover,omitempty"`
+	// Failure is the FAIL cycle's failure identity (digest fingerprint +
+	// pre-class + bounded reasons[]), ingested from the workspace artifacts
+	// failure-digest.json + audit-fail-reason.json so the committed record
+	// says WHY the cycle failed. Nil on non-FAIL cycles and whenever the
+	// artifacts yielded no content — best-effort, never fabricated.
+	Failure   *FailureRecord `json:"failure,omitempty"`
+	Decisions []string       `json:"decisions,omitempty"`
+	Lessons   []Lesson       `json:"lessons,omitempty"`
+	Carryover []Carryover    `json:"carryover,omitempty"`
 	// SkippedPhases records non-floor phases whose non-PASS outcome was degraded
 	// rather than allowed to overwrite the floor-derived FinalVerdict (cycle-802).
 	// Present so a cycle that PASSed its floor but had a retro/memo fail under
