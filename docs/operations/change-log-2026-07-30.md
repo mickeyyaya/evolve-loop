@@ -405,3 +405,190 @@ inherited the live model-catalog refresh, compounded by a spine that had roughly
 doubled since the 120s budget was written. The release gate is cleared once the
 fix lands; no release was cut while the invariant was unproven, which was the
 right call at the time.
+
+**Merged as `2bdccc86` (PR #386).** `main` went green on both the `go` and `CI`
+workflows at that SHA, and macOS e2e stayed green across every PR that followed
+(#387, #388, #389, #390). This is what made v22.12.0 cuttable; §12–§17 below are
+the work that landed on top of it.
+
+---
+
+## 12. `IsShippingVerdict` earns its export (PR #387, `0ad3bf48`)
+
+**The issue.** CI `apicover -enforce` went RED on `internal/core`: 282 of 283
+exported symbols covered, with `IsShippingVerdict` "uncovered — no test names
+it". The symbol had been exported in that same branch *specifically* so the
+throughput hook and the loop's non-progress breaker would share one definition
+of "this cycle landed work".
+
+**Why the obvious fix was the wrong one.** A test that simply calls the function
+satisfies the gate and proves nothing. The export exists to prevent a fork
+between two consumers, and nothing asserted the consumers agreed.
+
+**What shipped instead.** Three tests. The vocabulary walk covers all six
+declared outcome labels plus `SKIPPED`, `""`, `"pass"` and `"SHIPPED"` —
+asserting the *allowlist* shape, because `SKIPPED_UNKNOWN` once fell through a
+denylist-shaped breaker and was counted as progress. The coupling test asserts
+`shippedOutcome(v, HEAD-moved) == IsShippingVerdict(v)` for every label, so the
+in-package consumer cannot drift. And `cmd/evolve` gets the caller proof for the
+cross-package consumer with an anti-tautology half: the two shipping labels must
+never advance the non-progress streak.
+
+**In reality.** `internal/core` reads 283/283, and a future outcome label cannot
+reach the throughput window without also reaching the breaker.
+
+---
+
+## 13. Four queued items, two of which did not reproduce (PR #388, `b21b7010`)
+
+Recorded honestly rather than padded — a fix report that claims to have fixed
+what was filed, when it fixed something else, is how a queue accumulates
+phantom-closed items.
+
+**`spine-failopen-telemetry` (0.85) — the per-cycle half already existed.**
+Cycle-1166 landed the dossier field. What was missing:
+`dossier.RollupSpineFailOpens` had **no production caller**. The batch-level
+count — the actual ask, "76 fail-opens in one batch is an epidemic without a
+dashboard" — was dead code. It is now wired into `loopResult.emit`.
+
+The first implementation would have reported zero for exactly the batch shape
+the item was filed about: it sourced only `lr.Cycles`, which fleet wave and pool
+lanes never append to, so at the standing width of 3 the block would have been
+permanently absent. The fix folds **committed dossiers** for cycles at or after
+`batchFirstCycle`, unioned with in-memory results, dossier winning per cycle. A
+window of 0 means *unknown* and reads no corpus at all, so an all-time total can
+never be misreported as one batch.
+
+**`guards-role-hermetic-home` (0.85) — the filed escape does not exist.**
+`role.go`'s `&& !IsProtectedSurface(path)` already closes the claimed C1 hole.
+What *was* real is worse in a quieter way: `isAlwaysSafe` read `$HOME` raw, and
+the test's fallback meant every `$HOME/.claude` assertion silently exercised
+`/tmp` — the test proved nothing about the guard it named. Home is now injected
+at the composition root, `isAlwaysSafe` is pure, and an empty home disables the
+rule rather than guarding `filepath.Join("", ".claude")`.
+
+**`triage-cards-carry-files` (0.89) — plus a gate-integrity find.** The consumer
+side was already correct since #366; the de-facto writer `ProjectDecisionJSON`
+emitted only `{id, action}`. Cards now declare `files=` and carry them into the
+companion instead of having them inferred from prose. The unfiled defect found
+while doing it: floor scans ran on the **raw item text**, so a footprint that
+merely mentioned `floors.go` flipped a non-floor card into a floor-bearing one —
+one phantom committed floor, which clamps triage capacity. All floor scans now
+route through `floorItem`.
+
+**`flaky-predicate-authoring-lint` (0.93) — unlandable because it had no
+caller.** It is now `evalgate` Gate D, firing at the *end* of the tdd phase,
+which is the first moment `go/acs/cycleN/predicates_test.go` exists. Advisory by
+construction: `block=false` is a constant, and a monotonic `maxEvalLevel` join
+replaced an `&& overall == LevelPass` conjunct, so the gate can never *lower* a
+HALT. Corpus false-positive work is measured, not asserted: 341 → 179 findings
+via argv-position resolution and `-run` suppression. `internal/gopkgpattern` was
+extracted as a shared leaf (it had been duplicated in `acssuite`) and graduated
+in `.apicover-enforce`.
+
+**Review findings applied.** The gate interface now documents that **`block` is
+the violation signal and a non-empty `reason` is not** — without that, a future
+"simplification" keying on `reason != ""` would fail every tdd phase. A dead
+`failedCycleCommittedIDs` forwarder that a stale implementer base had
+re-introduced was removed: the very no-caller class this change fixes elsewhere.
+The `-run` suppression's promotion preconditions are recorded at the code site,
+because two of them are still open (the value is never inspected, and
+runtime-built patterns are invisible) and both must close before enforce.
+
+---
+
+## 14. Read the verified bytes, not the file again (PR #389, `2d6b297a`)
+
+**The issue.** `phases/runner` verified a deliverable and then re-read the same
+path twice more to classify it. Between verify and classify the file can change,
+so the gate's verdict and the content the pipeline acted on were not provably
+the same bytes.
+
+**Why this fix.** `deliverable.Result` now carries `Content` (`json:"-"`,
+populated once after the verified read, building on the landed grace window
+rather than duplicating it), and both re-reads are gone.
+
+**What the item did not know, and what nearly broke.** The two reads were not
+always of the same path. `intent` in DELTA mode dispatches `intent-delta.md`
+while the intent phasecontract names `intent.md`, so `Verify` judges a different
+file than the phase was asked to write. A naive "just classify the verified
+bytes" FAILed every intent-delta cycle. `classifiedArtifact` keys on
+`res.ArtifactPath == artifactPath`: fast path uses the verified bytes, otherwise
+it falls back to the pre-existing read of the dispatched artifact. **That skew
+is itself a defect** — the contract gate verifies a file the phase was never
+asked to write — and it is queued rather than silently absorbed.
+
+---
+
+## 15. Cancellation that does not resurrect a false-FAIL (PR #389, `2d6b297a`)
+
+**The issue.** `verifyReconcileDeliverable` slept unconditionally: 16 sleeps and
+16 probes on an already-dead context.
+
+**Why the straightforward fix was blocked, and rightly.** Honoring cancellation
+at the *teardown* call site regresses the cycles-824/825 false-FAIL class —
+`bridge/driver_tmux_repl.go` launders a ctx-cancel into `ExitArtifactTimeout`,
+and its own comment names the settle ladder as "the only thing standing between
+that mislabel and a false FAIL". The adversarial reviewer caught this and the
+BLOCK was accepted.
+
+**What shipped.** The teardown site passes `context.WithoutCancel(ctx)`; the
+ctx-aware bail is scoped to the clean-exit path only, where the agent exited 0
+and nothing more is coming. Post-cancel cost is bounded at one 200ms interval
+with no further probe. Pinned by a test that fails without `WithoutCancel`.
+
+---
+
+## 16. A dossier that contradicted its own artifacts (PR #389, `2d6b297a`)
+
+**The issue.** `knowledge-base/cycles/cycle-1193.json` recorded
+`skipped_phases:[{phase:retro,reason:FAIL}]` while
+`.evolve/runs/cycle-1193/retrospective-report.md` sat on disk. The retro had
+run. The durable record said it was skipped — and the durable record is what
+cross-cycle consumers read to learn which judgment phases executed.
+
+**Why it happened.** The cycle-802 floor guard declines a post-verdict non-floor
+phase's verdict rather than letting it clobber a floor-derived `FinalVerdict`.
+That declining was recorded by writing into `SkippedPhases`, conflating "did not
+run" with "ran, verdict not adopted".
+
+**The fix.** A new `VerdictNotAdopted{Phase, Verdict}` and
+`CycleResult.VerdictsNotAdopted`; `recordFinalVerdict` appends there;
+`SkippedPhase`'s doc narrows to real skips. One record, one projection —
+`phases_run_verdict_not_adopted` in the dossier, `omitempty`, so a cycle that
+declined nothing keeps its exact byte shape.
+
+**Honest residual.** Roughly 90 historical dossiers still carry the mislabel and
+the fix is forward-only with no version discriminator, so the disposition
+assembler still reads a partly-poisoned corpus. Stated rather than quietly
+carried.
+
+---
+
+## 17. The drift test ADR-0055 promised and did not have
+
+**The issue.** `schemas/cycle-dossier.schema.json` declares
+`additionalProperties: false` and was missing **four** top-level keys and
+**seven** `PhaseRecord` keys. Any external tool that took the committed schema
+at its word would reject every real dossier. ADR-0055 states the Go struct is
+the SSOT and that "the `TestSchema_NoDrift` drift test guards this in CI" — that
+test did not exist, which is precisely why eleven fields rotted unnoticed.
+
+**Why a fourth key was not the fix.** Adding the new key and leaving the other
+ten would have been the fifth instance of the same class.
+
+**What shipped.** The schema was repaired (four top-level properties, five new
+definitions, seven `PhaseRecord` fields), and
+`go/internal/dossier/schema_drift_test.go` now implements the promised check —
+**bidirectionally**, via a registry mapping every schema object to its Go type.
+One-way in either direction is insufficient: "every Go field appears in the
+schema" lets a removed field linger forever, and a schema-side-only check lets a
+new Go field rot exactly as these did. A definition present in the schema but
+absent from the registry also fails, so a new nested type cannot go unchecked.
+
+**Proof it works.** Run against the pre-repair schema, it reports exactly the
+drift — 5 missing definitions, `PhaseRecord` missing 7 fields, root missing 4 —
+and it is green after. An anti-no-op twin proves the comparison would catch a new
+field rather than passing because both sides read from the same place, and that a
+`json:"-"` field is correctly excluded from the wire surface.
+

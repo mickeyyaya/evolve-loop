@@ -1,0 +1,24 @@
+{
+  "id": "dossier-corpus-carries-retro-mislabel",
+  "title": "~90 committed dossiers still claim retro was SKIPPED when it ran — the mislabel fix is forward-only and the disposition assembler still reads the poisoned corpus",
+  "weight": 0.84,
+  "kind": "defect",
+  "priority": "medium",
+  "campaign": "loop-reliability-2026-07",
+  "summary": "dossier-retro-skipped-mislabel (PR #389) stopped NEW dossiers from recording a declined verdict as a skip: a phase that RAN and returned non-PASS after the floor verdict was set now lands in phases_run_verdict_not_adopted, not skipped_phases. The fix is FORWARD-ONLY and carries no version discriminator, so roughly 90 historical dossiers in knowledge-base/cycles/ still say `skipped_phases:[{phase:retro,reason:FAIL}]` for cycles whose retrospective-report.md is on disk. Any consumer that reads the corpus to learn which judgment phases executed — the disposition assembler is the one that matters — still gets the wrong answer for every pre-fix cycle. Decide deliberately between the two honest options rather than leaving it: (a) a one-shot backfill that rewrites the affected records, cross-checked against the presence of the run artifact rather than guessed from the reason string; or (b) a schema_version discriminator so consumers can tell a pre-fix record from a post-fix one and degrade rather than believe it. Do NOT do both.",
+  "acceptance": [
+    "A count of affected dossiers, derived not estimated, with the artifact cross-check that proves each one's retro really ran",
+    "Either the backfill (idempotent, dry-runnable, and it must NOT touch a record whose retro genuinely did not run) or the discriminator, with the choice justified in the commit body",
+    "TestSchema_NoDrift stays green — the schema is now structurally checked, so a discriminator field must be added on BOTH sides",
+    "A consumer-side test proving the disposition assembler no longer treats a pre-fix record as evidence retro was skipped"
+  ],
+  "files": [
+    "knowledge-base/cycles/",
+    "go/internal/dossier/",
+    "schemas/cycle-dossier.schema.json"
+  ],
+  "deps": ["dossier-retro-skipped-mislabel"],
+  "connects_to": ["dossier-carries-failure-reason"],
+  "source": "console-2026-07-30 wave-2 B, stated as an honest residual rather than quietly carried",
+  "created_at": "2026-07-30T22:15:00Z"
+}

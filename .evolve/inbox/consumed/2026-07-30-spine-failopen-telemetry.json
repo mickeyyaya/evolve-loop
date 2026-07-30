@@ -11,9 +11,16 @@
     "RED: TestLoopSummary_RollsUpSpineFailOpensPerBatch",
     "go test -race PASS; apicover clean"
   ],
-  "files": ["go/internal/core/orchestrator.go", "go/internal/dossier/"],
+  "files": [
+    "go/internal/core/orchestrator.go",
+    "go/internal/dossier/"
+  ],
   "deps": [],
-  "connects_to": ["advisory-phase-contract-degrade", "retro-bridge-timeout-width10"],
+  "connects_to": [
+    "advisory-phase-contract-degrade",
+    "retro-bridge-timeout-width10"
+  ],
   "source": "ultrathink failure deep-dive 2026-07-13 (operator)",
-  "created_at": "2026-07-13T08:03:00Z"
+  "created_at": "2026-07-13T08:03:00Z",
+  "consumed_by": "console-2026-07-30: LANDED — PR #388 squash b21b7010. The per-cycle half had already landed in cycle-1166; what was MISSING is that dossier.RollupSpineFailOpens had NO PRODUCTION CALLER, so the batch-level count — the actual ask, '76 fail-opens in one batch is an epidemic without a dashboard' — was dead code. Now wired into loopResult.emit. The first implementation would have reported ZERO for exactly the batch shape this item was filed about: it sourced only lr.Cycles, which fleet wave and pool lanes never append to, so at the standing width of 3 the block would have been permanently absent. Fixed by folding COMMITTED DOSSIERS for cycles >= batchFirstCycle unioned with in-memory results (dossier wins per cycle); window 0 means UNKNOWN and reads no corpus, so an all-time total can never be misreported as one batch. NOT done: no threshold escalation — this is measurement-only, per the item's own measurement-first framing."
 }

@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "RED first: the triage decision writer/schema rejects or loudly WARNs on a top_n card missing files[] when the action names a repo path.",
+    "A live cycle's triage-decision.json top_n cards carry files[] matching the committed items' declared surfaces.",
+    "widenNarrowDecision over a files-carrying committed card correctly clusters same-file backfill into the SAME lane (menu) instead of a fictional-disjoint second lane.",
+    "cd go && go test -race ./internal/triagecap/... ./internal/phases/triage/... ./internal/fleet/... N/N PASS."
+  ],
+  "campaign": "convergence-2026-07",
+  "connects_to": [
+    "fleet-lane-batch-menu"
+  ],
+  "deps": [],
+  "evidence": "Observed live on batch-14's relaunched wave (cycles 1133/1134): cycle-1130's triage-decision.json top_n card {id: surface-verdict-conflict-in-audit-classify, action: 'capture pre-override agent verdict in Classify (go/internal/phases/audit/audit.go)...'} carries NO files[] field, so fleet.TodosFromTriage falls back to the id-island ([]string{id}) and the widen path treated it as disjoint from the backfilled verdict-coherence-auditor-vs-egps — whose files[] explicitly declares go/internal/phases/audit/audit.go. Both lanes now plausibly edit audit.go concurrently: a ship-time same-file conflict (the 948 lost-work class) the disjointness planner exists to prevent, undetectable because the card's file knowledge lives only in prose. Also blocks lane MENUS (PR #366): a file-less card can never attract its same-file cluster mates.",
+  "files": [
+    "go/internal/phases/triage/triage.go",
+    "go/internal/triagecap/recorder.go"
+  ],
+  "id": "triage-cards-carry-files",
+  "injected_by": "console-2026-07-28-menu-landing-verification",
+  "kind": "loop-reliability",
+  "notes": "Fix at the WRITER, not the planner: the triage phase's decision schema/prompt must require files[] on every top_n card (the agent already names files in the action prose — make it structured), and the decision recorder should WARN on a card without files. The planner side is already correct: cards with files partition properly (proven by PR #366 tests). Do NOT guess files at plan time from prose — a wrong inferred file is worse than an island. | reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first",
+  "priority": "high",
+  "route": "lane",
+  "title": "Triage top_n cards omit files[] — a file-less committed card is invisible to the fleet disjointness planner",
+  "weight": 0.89,
+  "consumed_by": "console-2026-07-30: LANDED — PR #388 squash b21b7010. The consumer side was already correct since PR #366; the de-facto writer ProjectDecisionJSON emitted only {id, action}. Cards now declare files= and carry them into the companion instead of having them inferred from prose. GATE-INTEGRITY DEFECT found while doing it, not in the filed item: floor scans ran on the RAW item text, so a footprint that merely MENTIONED floors.go flipped a non-floor card into a floor-bearing one — one phantom committed floor, which clamps triage capacity. All floor scans now route through floorItem. Adversarial review asked whether a fourth floor scan was unrouted; resolved CLEAN — three route through floorItem and the fourth (project.go parseItems) is the top_n projector with no floor logic."
+}

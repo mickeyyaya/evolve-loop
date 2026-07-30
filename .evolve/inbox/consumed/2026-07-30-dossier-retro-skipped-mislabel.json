@@ -1,0 +1,22 @@
+{
+  "id": "dossier-retro-skipped-mislabel",
+  "created_at": "2026-07-22T10:32:00Z",
+  "weight": 0.86,
+  "kind": "defect",
+  "priority": "high",
+  "title": "FAIL-cycle dossiers record skipped_phases: retro reason=FAIL while retrospective-report.md exists in the run dir — record-vs-disk incoherence in the dossier writer (likely the PASS-only memo phase mislabeled as retro)",
+  "summary": "Cycles 1028 and 1035 (both FAIL): knowledge-base/cycles/cycle-N.json says {phase: retro, reason: FAIL} under skipped_phases, yet .evolve/runs/cycle-N/ contains retrospective-report.md, retro-usage.json, retrospective-stdout.log — retro RAN. Either the dossier writer inverts the retro-fires-on-FAIL trigger in its skip bookkeeping, or the memo phase (which genuinely IS skipped on FAIL) is recorded under the name retro. A dossier that misstates which judgment phases executed poisons downstream consumers (recurrence analysis, the queued failure-disposition-router's assembler reads dossiers). Small fix + regression pin asserting a FAIL cycle's dossier records retro as EXECUTED when its artifacts exist and memo as the skipped phase. RECURRED + ROOT-CAUSED 2026-07-27 (cycles 1105/1106/1107/1115/1116/1117): all six FAIL dossiers carry skipped_phases:[{phase:retro,reason:FAIL}] while retrospective-report.md exists in every run dir (15-24KB of real root-cause content). Mechanism confirmed at go/internal/core/final_verdict_floor.go:64-70 — recordFinalVerdict appends to SkippedPhases when a NON-FLOOR phase that RAN returns non-PASS after the floor verdict is set, so the field means 'verdict not adopted' and Reason carries the VERDICT, not a skip cause. The dossier renders it as 'phase skipped'. Fix is naming/semantics: split into phases_run_verdict_not_adopted vs a true skipped_phases, or stamp executed:true from artifact presence. Do NOT 'make retro run on FAIL' — it already does; that edit would break the cycle-802 clobber guard this code exists to enforce.",
+  "acceptance": [
+    "RED: fixture FAIL cycle with retro artifacts → dossier must NOT list retro in skipped_phases (and lists memo skipped reason=FAIL if that is the real semantics)",
+    "go test -race on the dossier/coherence pkg PASS"
+  ],
+  "files": [
+    "go/internal/coherence/",
+    "go/internal/core/ (dossier writer)"
+  ],
+  "connects_to": [
+    "failure-disposition-router (assembler trusts dossier phase records)"
+  ],
+  "source": "operator observation 2026-07-22 while classifying cycle-1035",
+  "consumed_by": "console-2026-07-30: LANDED — PR #389 squash 2d6b297a. Confirmed on disk first: knowledge-base/cycles/cycle-1193.json recorded skipped_phases:[{phase:retro,reason:FAIL}] while .evolve/runs/cycle-1193/retrospective-report.md existed. The cycle-802 floor guard declines a post-verdict non-floor phase's verdict; that declining was recorded as a SKIP, so every FAIL dossier claimed retro never ran — a record contradicting its own artifacts, read by exactly the consumers that learn which judgment phases executed. New cyclestate.VerdictNotAdopted{Phase,Verdict} + phases_run_verdict_not_adopted (omitempty, so a cycle that declined nothing keeps its byte shape); SkippedPhase's doc narrows to real skips. UNFILED DEFECT FOUND AND FIXED IN THE SAME PR: schemas/cycle-dossier.schema.json declares additionalProperties:false and was missing FOUR top-level keys and SEVEN PhaseRecord keys, so any external tool taking the committed schema at its word rejects every real dossier; ADR-0055 promised TestSchema_NoDrift 'guards this in CI' and it did not exist. Schema repaired and the test written, bidirectional on names and STRUCTURAL on shape (a name inventory stays green while the schema is unusable — proven with the reviewer's own $ref-swap mutation). RESIDUAL: forward-only, ~90 historical dossiers keep the mislabel — filed as dossier-corpus-carries-retro-mislabel 0.84."
+}
