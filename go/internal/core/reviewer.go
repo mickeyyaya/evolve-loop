@@ -48,6 +48,28 @@ type ReviewResult struct {
 	Approve bool
 	Reason  string
 	Retry   bool
+	// Demoted marks that the contract gate's own circuit breaker gave up and
+	// demoted enforce→advisory (deliverable.Reviewer's consecutive-block
+	// breaker). Without this flag a demotion is structurally identical to a
+	// compliant deliverable, so the orchestrator cannot report that a gate
+	// stopped being enforced — the batch-19/batch-21 blind spot (inbox
+	// contract-block-cli-escalation). Reason carries the last violation.
+	//
+	// Normally paired with Approve=true (the demotion IS the approval), but
+	// ChainReviewers carries it onto a rejection from a LATER gate in the chain
+	// too: the contract gate stopped enforcing whether or not topngate/triagecap
+	// went on to reject the same deliverable.
+	Demoted bool
+	// Blocks is the reviewer's own count of CONSECUTIVE contract blocks including
+	// this one — the breaker count that will open the circuit at its threshold.
+	// 0 means the deciding reviewer keeps no such counter (evalgate, topngate,
+	// triagecap, the build floor): those rejections are task-binding or capacity
+	// failures, not format-compliance failures, so the orchestrator must not read
+	// them as CLI evidence. The correction ladder keys its CLI escalation off
+	// THIS, never off a locally re-counted correction ordinal — the two desync
+	// whenever a prior cycle left the breaker hot or the salvage rung consumed a
+	// block without a re-dispatch.
+	Blocks int
 }
 
 // DeliverableReviewer adjudicates a finished phase's deliverable. Implementations
@@ -98,15 +120,48 @@ func ChainReviewers(reviewers ...DeliverableReviewer) DeliverableReviewer {
 type chainReviewer []DeliverableReviewer
 
 func (c chainReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
+	// Demoted must survive BOTH exits. Production mounts the contract gate in the
+	// middle of this chain (cmd_cycle.go: buildFloor → evalgate → contract →
+	// triagecap → topngate), so:
+	//   - rebuilding a bare Approve:true would swallow the gate's own "I gave up
+	//     enforcing" report on the all-approve path, and
+	//   - returning a LATER reviewer's rejection verbatim would swallow it too —
+	//     the case that actually bites triage, whose triagecap gate sits directly
+	//     after the contract gate. Either way the orchestrator goes blind and the
+	//     demotion is invisible exactly as before this fix.
+	out := ReviewResult{Approve: true}
 	for _, r := range c {
 		if r == nil {
 			continue
 		}
-		if res := r.Review(ctx, in); !res.Approve {
-			return res
+		res := r.Review(ctx, in)
+		if !res.Approve {
+			return carryDemotion(res, out)
+		}
+		if res.Demoted && !out.Demoted {
+			out.Demoted = true
+			out.Reason = res.Reason
+			out.Blocks = res.Blocks
 		}
 	}
-	return ReviewResult{Approve: true}
+	return out
+}
+
+// carryDemotion attaches an earlier reviewer's demotion evidence to the decision
+// that short-circuits the chain, without overriding evidence the decider carries
+// itself. The rejection stays verbatim in every other respect.
+func carryDemotion(decision, seen ReviewResult) ReviewResult {
+	if !seen.Demoted {
+		return decision
+	}
+	decision.Demoted = true
+	if decision.Reason == "" {
+		decision.Reason = seen.Reason
+	}
+	if decision.Blocks == 0 {
+		decision.Blocks = seen.Blocks
+	}
+	return decision
 }
 
 // noopReviewer is the orchestrator's default when WithReviewer was not used:

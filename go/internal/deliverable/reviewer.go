@@ -146,10 +146,17 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	n := incrBreaker(bp)
 	if n >= r.threshold {
 		r.logf("[contract-gate] CIRCUIT OPEN: %d consecutive contract blocks — demoting enforce→advisory so the loop is not bricked. Inspect policy.gates.contract_gate / the failing phase %q. Last reason: %s", n, in.Phase, reason)
-		return core.ReviewResult{Approve: true}
+		// Demoted (never a bare Approve): the orchestrator turns this into a
+		// loud, phase+CLI-named WARN, a cycle-visible ledger entry and a staged
+		// escalation intent. An approval the gate did not earn must not look
+		// like one (inbox contract-block-cli-escalation).
+		return core.ReviewResult{Approve: true, Demoted: true, Reason: reason, Blocks: n}
 	}
 	r.logf("[contract-gate] %s: %s (stage=enforce, BLOCK %d/%d)", in.Phase, reason, n, r.threshold)
-	return core.ReviewResult{Approve: false, Reason: reason}
+	// Blocks reports THIS breaker's consecutive count so the correction ladder
+	// escalates its CLI off the same counter that will open the circuit, instead
+	// of re-deriving a correction ordinal that desyncs from it.
+	return core.ReviewResult{Approve: false, Reason: reason, Blocks: n}
 }
 
 // summarize renders the violations into one actionable rejection reason.
