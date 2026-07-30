@@ -278,7 +278,66 @@ sweep can target it by name.
 
 ---
 
-## Still red, still open — do not release past this
+## 11. `TestE2ECLIFallbackChain` — the red that blocked the release (FIXED)
+
+**The issue.** All four subtests (80/81/124/127) failed on `origin/main`. It runs
+only in CI's macOS e2e tier, so it went unnoticed. It is load-bearing: the only
+automated proof that the CLI fallback chain — what the whole
+any-CLI-any-phase invariant rests on — works end to end.
+
+**Why it took real digging.** The surface lied twice. One run showed
+`roles=[orchestrator intent]`; another showed **no ledger at all** and six lines
+of output. Neither is a fallback bug. Three hypotheses were eliminated with
+evidence before the cause appeared: the trigger set is correct
+(`resolveTriggers` → `{80,81,85,124,127}`), the fixture's bare `claude-p`/`codex`
+driver names are valid (both manifests exist), and the fixture's stale
+`model_tier_default:"sonnet"` is irrelevant (tested, reverted rather than left
+as unverified noise).
+
+The answer came from running the child process under a diagnostic harness that
+**streamed its output to a file** instead of letting the test discard it on
+timeout. Two compounding causes:
+
+**Cause 1 — the fixture inherited a live model-catalog refresh.** The compiled
+default is `AutoRefresh=true` ("the cycle-start live refresh is on"). Production
+disables it in `.evolve/policy.json`; the fixture seeded **no policy at all**, so
+every `evolve cycle run` probed **every CLI family** before its first phase. From
+the child log: `[recipe] launching: agy`, two fake-CLI boots, then `ollama`, each
+burning a `/model` picker wait that can only time out against a fake REPL. That
+startup cost alone exceeded the budget, so the cycle was killed before reaching
+ship — failing on all four codes for a reason unrelated to fallback.
+
+**Cause 2 — the spine outgrew the budget.** With startup fixed, the chain works,
+but reaching ship costs ~10 minutes: `intent → scout → triage → plan-review →
+tdd → build-planner → build → builder → tester → audit → auditor → ship`, each
+phase paying a primary failure **plus** a fallback. Half those phases did not
+exist when the 120s budget was written. Four in parallel never had a chance.
+
+**The fix, by test layer.** Per-code trigger semantics moved to
+`llmroute.TestDispatch_FallsBackOnTriggerExit`, now **table-driven over
+`defaultFallbackOnExit` itself** — a newly added trigger code is covered
+automatically, in microseconds. The e2e keeps the one thing only an e2e can
+prove: a real cycle, every phase falling back, still reaches ship. The workflow's
+e2e step gained `-timeout 30m` because Go's 10-minute default was itself killing
+the package mid-cycle.
+
+**And the rot-proofing, which matters more than the fix.** The harness used to
+run the child for a fixed wall-clock budget and then check how far it got — so it
+passed only because the cycle *happened* to reach ship before an arbitrary kill.
+That is exactly how it rotted the first time. It now **polls the ledger for the
+role it is asserting and stops the moment it appears**: a fast host finishes
+sooner, a slow host still passes, and the result depends on the invariant rather
+than the machine. The generous ceiling remains as an upper bound, not as the
+thing being measured.
+
+**Lesson worth keeping.** A fixture that seeds *nothing* silently inherits every
+future default. This one predated the cycle-start catalog refresh, production got
+the off-switch, and the test never did — so a subsystem it does not test grew
+into its critical path. Fixtures should pin the defaults they depend on.
+
+---
+
+## Was still red, now fixed — release gate
 
 `TestE2ECLIFallbackChain` fails all four infra-exit triggers (80/81/124/127) on
 `origin/main`. Reproduced on a clean detached checkout, so it is **not** caused by
@@ -292,4 +351,8 @@ the mechanism the whole any-CLI-any-phase invariant rests on — works end to en
 (trigger set correct; driver names valid; the fixture's stale
 `model_tier_default:"sonnet"` is not the cause) and the remaining leads ordered.
 
-No release was cut. The preflight would have attested to something known false.
+**UPDATE (same day): fixed — see §11 above.** Root cause was a fixture that
+inherited the live model-catalog refresh, compounded by a spine that had roughly
+doubled since the 120s budget was written. The release gate is cleared once the
+fix lands; no release was cut while the invariant was unproven, which was the
+right call at the time.

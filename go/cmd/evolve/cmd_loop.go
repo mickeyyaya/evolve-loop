@@ -1017,12 +1017,6 @@ func isTaskLevelFailure(c cycleclassify.Classification) bool {
 	return cycleoutcome.IsTaskLevelFailure(c)
 }
 
-// failedCycleCommittedIDs reads the failed cycle's committed id set. Thin
-// forwarder to the seam's reader for the same single-definition reason.
-func failedCycleCommittedIDs(workspace string) []string {
-	return cycleoutcome.CommittedIDsFor(workspace)
-}
-
 func readCarryoverCount(statePath string) (count int, ok bool) {
 	b, err := os.ReadFile(statePath)
 	if err != nil {

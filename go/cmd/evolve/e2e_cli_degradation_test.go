@@ -26,11 +26,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -49,19 +51,29 @@ func TestE2ECLIFallbackChain(t *testing.T) {
 	evolveBin := buildBinary(t, binDir, "evolve", "./cmd/evolve", repoRoot)
 	fakeBin := buildBinary(t, binDir, "evolve-fake-cli", "./cmd/evolve-fake-cli", repoRoot)
 
-	// Default fallback triggers (cli_chain.go:defaultFallbackOnExit):
-	// 80 boot-timeout, 81 artifact-timeout, 124 timeout(1), 127 missing-binary.
-	// Each must make the primary claude-p fall back to codex and still ship.
-	for _, code := range []int{80, 81, 124, 127} {
-		code := code
-		t.Run(fmt.Sprintf("trigger_%d_falls_back_to_codex", code), func(t *testing.T) {
-			t.Parallel()
-			runFallbackCycle(t, fallbackCfg{
-				EvolveBin: evolveBin, FakeBin: fakeBin, RepoRoot: repoRoot,
-				PrimaryExitCode: code, ExpectShip: true,
-			})
+	// ONE representative trigger walks the whole spine end to end. 81
+	// (artifact-timeout) is the code that actually fires in production.
+	//
+	// This loop used to run all four default triggers (80/81/124/127) and that
+	// is why the test rotted: reaching ship now costs ~10 MINUTES per code —
+	// every phase pays a primary failure plus a fallback, and the spine has
+	// roughly doubled since this was written (intent, triage, plan-review,
+	// build-planner, tester… all arrived later). Four of those in parallel
+	// exceeded the harness budget and the test failed on ALL FOUR codes for a
+	// reason unrelated to the fallback chain.
+	//
+	// PER-CODE trigger semantics did not go away — they moved to
+	// llmroute.TestDispatch_FallsBackOnTriggerExit, which is table-driven over
+	// defaultFallbackOnExit itself (so a new code is covered automatically) and
+	// costs microseconds. What only an e2e can prove is what stays here: a real
+	// cycle, every phase falling back, still reaches ship.
+	t.Run("trigger_81_falls_back_to_codex", func(t *testing.T) {
+		t.Parallel()
+		runFallbackCycle(t, fallbackCfg{
+			EvolveBin: evolveBin, FakeBin: fakeBin, RepoRoot: repoRoot,
+			PrimaryExitCode: 81, ExpectShip: true,
 		})
-	}
+	})
 
 	// 99 (ExitRequireFullUnmet) is NOT a fallback trigger — the primary fails,
 	// the runner does NOT try codex, and the cycle must fail.
@@ -108,7 +120,21 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	out, err := runWithTimeout(cmd, 120*time.Second)
+	// CEILING, not a target: measured ~500-900s to reach ship on a quiet M4; a CI
+	// runner is slower, and an under-sized ceiling is exactly how this test rotted
+	// (the old 120s became unreachable when the spine roughly doubled). Because the
+	// harness POLLS, a fast host exits as soon as ship appears and never pays the
+	// ceiling — so raising it costs nothing except on a host that genuinely needs it.
+	//
+	// The cycle does NOT exit cleanly in this fixture by design (native ship
+	// cannot complete a real ff-merge here — see the note below), so waiting for
+	// the process means always burning the whole budget and, worse, passing only
+	// because the cycle happened to reach ship before an arbitrary wall-clock
+	// kill. That is precisely how this test rotted once already. Instead: poll
+	// the ledger for the role we are asserting and stop the moment it appears.
+	// The ceiling stays generous; a faster machine finishes sooner and a slower
+	// one still passes, so the result depends on the INVARIANT, not the host.
+	out, err := runUntilLedgerRole(cmd, projRoot, "ship", cfg.ExpectShip, 1500*time.Second)
 
 	// The primary (claude-p) ALWAYS fails with the chosen code. Whether the
 	// cycle REACHES the ship phase is read from the ledger role — the
@@ -172,4 +198,75 @@ func gitLogContains(t *testing.T, projRoot, sub string) bool {
 		return false
 	}
 	return strings.Contains(string(logOut), sub)
+}
+
+// runUntilLedgerRole starts cmd and returns as soon as the ledger records role
+// (when wantRole is true), else waits for the process to exit on its own. The
+// poll interval is coarse on purpose: the ledger is appended once per phase, so
+// sub-second polling buys nothing. Returns the child's combined output captured
+// so far and its exit error (nil when we stopped it after observing the role).
+func runUntilLedgerRole(cmd *exec.Cmd, projRoot, role string, wantRole bool, ceiling time.Duration) (string, error) {
+	var buf syncBuffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Start(); err != nil {
+		return buf.String(), err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	if !wantRole {
+		// Non-trigger case: the cycle MUST fail on its own and fail fast. Waiting
+		// for the real exit is the assertion.
+		select {
+		case err := <-done:
+			return buf.String(), err
+		case <-time.After(ceiling):
+			_ = cmd.Process.Kill()
+			<-done
+			return buf.String(), fmt.Errorf("cycle did not exit within %s", ceiling)
+		}
+	}
+
+	ledger := filepath.Join(projRoot, ".evolve", "ledger.jsonl")
+	deadline := time.Now().Add(ceiling)
+	for {
+		select {
+		case err := <-done:
+			// Exited on its own — the caller reads the ledger either way.
+			return buf.String(), err
+		default:
+		}
+		if data, rerr := os.ReadFile(ledger); rerr == nil && strings.Contains(string(data), role) {
+			_ = cmd.Process.Kill()
+			<-done
+			return buf.String(), nil
+		}
+		if !time.Now().Before(deadline) {
+			_ = cmd.Process.Kill()
+			<-done
+			return buf.String(), fmt.Errorf("role %q not recorded within %s", role, ceiling)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// syncBuffer is a mutex-guarded buffer: the child's output is written from the
+// exec goroutine while the poll loop may read it, which a bare bytes.Buffer
+// cannot serve race-free.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
