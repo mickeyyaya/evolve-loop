@@ -77,6 +77,18 @@ var markdownTmpl = template.Must(template.New("dossier-md").
 
 {{range .Defects}}- **{{.ID}}**{{if .Severity}} ({{.Severity}}){{end}}: {{.Summary}}{{if .Fix}} — fix: {{.Fix}}{{end}}
 {{end}}{{- end}}
+{{- if .Failure}}
+
+## Failure
+{{- if .Failure.Fingerprint}}
+
+**Fingerprint:** ` + "`{{.Failure.Fingerprint}}`" + `{{if .Failure.PreClass}} · **Class:** {{.Failure.PreClass}}{{end}}
+{{- end}}
+{{- if .Failure.Reasons}}
+
+{{range .Failure.Reasons}}- {{.}}
+{{end}}{{- end}}
+{{- end}}
 {{- if .Lessons}}
 
 ## Lessons
