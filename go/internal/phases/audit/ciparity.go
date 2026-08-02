@@ -670,6 +670,13 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	}
 	offenders := make([]string, 0, len(ungraduated))
 	for _, pkg := range ungraduated {
+		// Same predicate as the build-entry seam: a test-only package has no
+		// production surface for the gate to inspect — flagging it here after
+		// the build seam stopped doing so would just move the vacuous FAIL one
+		// phase later (ciparity.PackageDirHasProductionGoFiles rationale).
+		if !ciparity.PackageDirHasProductionGoFiles(dir, pkg) {
+			continue
+		}
 		offenders = append(offenders, fmt.Sprintf("%s: new package absent from go/.apicover-enforce — add it + an apicover_named_test.go", pkg))
 	}
 	return offenders, nil

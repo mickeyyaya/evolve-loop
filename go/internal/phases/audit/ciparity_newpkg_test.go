@@ -91,6 +91,15 @@ func TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged(t *testing.T)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// The graduation gate now inspects the package DIR (test-only packages are
+	// vacuous and skipped — ciparity.PackageDirHasProductionGoFiles), so the
+	// fixture must materialize the production file its handoff claims.
+	if err := os.MkdirAll(filepath.Join(goDir, "internal", "brandnew"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "internal", "brandnew", "x.go"), []byte("package brandnew\n\n// Exported is real surface.\nfunc Exported() int { return 1 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
 		[]byte(`{"thrusts":[{"files_new":["go/internal/brandnew/x.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)

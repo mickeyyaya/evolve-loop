@@ -91,6 +91,39 @@ func TestBuildGraduationCheck(t *testing.T) {
 			wantContains: []string{"./internal/brandnew", ".apicover-enforce"},
 		},
 		{
+			// cycle-1223/1224/1228 halt class (batch of 2026-08-02): the tdd
+			// phase RED-first mints a package containing ONLY a _test.go file.
+			// A test-only package has ZERO exported production symbols, so the
+			// repo-wide apicover gate this graduation protects cannot fire on
+			// it (CI's own enforce step: "apicover finds 0 exported symbols in
+			// the test-only acs packages and passes") — the obligation is
+			// vacuous, but the abort was fatal AND unreachable by any in-cycle
+			// correction, so the next cycle re-minted the same package and the
+			// identical-fingerprint breaker halted the batch at 3.
+			name: "test-only-package-does-not-abort",
+			setup: func(t *testing.T, wt string) {
+				gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
+				gradCommitAll(t, wt)
+				gradWrite(t, wt, "go/internal/testonly/testonly_test.go",
+					"package testonly\n\nimport \"testing\"\n\nfunc TestRed(t *testing.T) { t.Fatal(\"red first\") }\n")
+			},
+			wantContains: nil,
+		},
+		{
+			// The moment the builder adds the PRODUCTION half to that same
+			// package, the graduation obligation becomes real and the abort
+			// must return — pinning that the fix narrows to test-only, not to
+			// "new packages with any test file".
+			name: "test-only-plus-production-file-still-aborts",
+			setup: func(t *testing.T, wt string) {
+				gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
+				gradCommitAll(t, wt)
+				gradWrite(t, wt, "go/internal/mixed/mixed_test.go", "package mixed\n")
+				gradWrite(t, wt, "go/internal/mixed/mixed.go", "package mixed\n\n// Exported is surface the gate must inspect.\nfunc Exported() int { return 1 }\n")
+			},
+			wantContains: []string{"./internal/mixed", ".apicover-enforce"},
+		},
+		{
 			// AC1 negative (the anti-no-op arm): the same new package enrolled in
 			// the SAME diff (self-graduation) must pass — a guard that flags every
 			// new package regardless of enrollment is wrong.

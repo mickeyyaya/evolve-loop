@@ -38,6 +38,14 @@ func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse 
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Materialize the production file the handoff claims — the gate now skips
+	// test-only/absent package dirs (vacuous obligation; cycles 1223/1224/1228).
+	if err := os.MkdirAll(filepath.Join(goDir, "internal", "brandnew"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "internal", "brandnew", "x.go"), []byte("package brandnew\n\nfunc Exported() int { return 1 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
 		[]byte(`{"thrusts":[{"files_new":["go/internal/brandnew/x.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
