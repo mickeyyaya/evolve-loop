@@ -122,6 +122,7 @@ var commands = []subcommand{
 	{Name: "models", Summary: "Live tier→model catalog: refresh | list", Run: runModels},
 	{Name: "tokens", Summary: "Token-usage telemetry: report [--last N] (ranked per-phase consumers)", Run: runTokens},
 	{Name: "lessons", Summary: "Lesson analytics: recurrence (deterministic recurrence ledger, patterns by count + fix status)", Run: runLessons},
+	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
 }
 
 // lookupCommand returns the subcommand matching name or any of its
