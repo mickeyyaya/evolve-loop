@@ -69,7 +69,7 @@ var composedGateTargets = map[string]string{
 	"compile":  "build",
 	"test":     "test",
 	"acs":      "test-acs-durable",
-	"apicover": "apicover",
+	"apicover": "apicover-enforce",
 }
 
 // runComposedGates re-runs the full native gate set against the composed
