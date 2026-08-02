@@ -131,6 +131,15 @@ apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scop
 	@$(GO) tool cover -func=coverage.txt > coverage.func.txt
 	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
 
+apicover-enforce: ## Per-package hard-fail over go/.apicover-enforce (mirrors go.yml Phase-5; the composed-gate recipe — a red here means an uncovered/false-green EXPORT, and it must fail the tree)
+	@mkdir -p $(BIN_DIR)
+	@$(GO) build -o $(BIN_DIR)/apicover ./cmd/apicover
+	@pkgs="$${APICOVER_PKGS:-$$(grep -vE '^[[:space:]]*(#|$$)' .apicover-enforce)}"; \
+	if [ -z "$$pkgs" ]; then echo "apicover-enforce: no enforced packages — skipping"; exit 0; fi; \
+	$(GO) test -count=1 -tags integration -coverprofile=coverage.txt $$pkgs >/dev/null; \
+	$(GO) tool cover -func=coverage.txt > coverage.func.txt; \
+	echo "$$pkgs" | xargs $(GO) list -e -f '{{.Dir}}' | xargs $(BIN_DIR)/apicover -enforce -cover coverage.func.txt
+
 lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
 	@diff_out=$$(gofmt -d -s .) ; \
