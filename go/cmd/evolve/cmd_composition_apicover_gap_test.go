@@ -64,7 +64,7 @@ func TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport(t *testing.T) {
 	// BEFORE any side effect. The fix cycle must rebuild this against a
 	// throwaway COPY of the module (temp dir), never the live tree, and flip
 	// the core assertion to t.Fatalf as its regression pin.
-	t.Skip("KNOWN BUG reproduction disabled (percycle-audit-apicover-newexport-parity): mutates the live repo tree and poisons the CI coverage profile — redesign against a temp module copy in the fix cycle")
+	t.Skip("reproduction PERMANENTLY disabled: it mutates the live repo tree and poisons the CI coverage profile. The gap it reproduced is CLOSED — composedGateTargets[\"apicover\"] now names the enforcing apicover-enforce recipe, pinned tree-mutation-free by TestComposedApicoverGate_TargetRecipeEnforces (recipe text) and proven live in both directions at land time. A future live-run reproduction must be rebuilt against a throwaway module COPY, never this tree (percycle-audit-apicover-newexport-parity residual)")
 	goRoot := apicoverGoRoot(t)
 	repoRoot := filepath.Dir(goRoot)
 
