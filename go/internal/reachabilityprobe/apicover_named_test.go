@@ -2,10 +2,13 @@ package reachabilityprobe
 
 // apicover_named_test.go — repo-wide apicover public-API coverage (House
 // Rule 1 / ADR-0069's second gate): names and exercises every exported symbol
-// of this brand-new package (ImportGraph, CallSite, Violation, CheckCallSite)
-// by identifier, in the same diff that graduates it into go/.apicover-enforce.
+// of this package (ImportGraph, CallSite, Violation, CheckCallSite,
+// BuildImportGraph) by identifier.
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 // TestExportedSymbols_Named names every exported identifier of this package
 // and pins the two load-bearing contracts: CheckCallSite detects the
@@ -35,5 +38,43 @@ func TestExportedSymbols_Named(t *testing.T) {
 	acyclic := CallSite{PinningPackage: "leaf", ReferencedPackage: "storage", Symbol: "UpdateStateMap"}
 	if got := CheckCallSite(graph, acyclic); got != nil {
 		t.Errorf("CheckCallSite(%+v, %+v) = %+v, want nil (leaf is absent from graph)", graph, acyclic, got)
+	}
+}
+
+// TestBuildImportGraph_Named names BuildImportGraph and exercises it against
+// the real toolchain: a known direct edge (this package imports
+// internal/sysexec) must surface in the returned graph, and an unresolvable
+// package pattern must produce a wrapped, non-nil error.
+func TestBuildImportGraph_Named(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("resolving module root: %v", err)
+	}
+
+	const thisPkg = "github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
+	const sysexecPkg = "github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+
+	var graph ImportGraph
+	graph, err = BuildImportGraph(repoRoot, "./internal/reachabilityprobe")
+	if err != nil {
+		t.Fatalf("BuildImportGraph(%q, ./internal/reachabilityprobe) returned error: %v", repoRoot, err)
+	}
+	imports, ok := graph[thisPkg]
+	if !ok {
+		t.Fatalf("graph missing key %q", thisPkg)
+	}
+	found := false
+	for _, imp := range imports {
+		if imp == sysexecPkg {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("graph[%q] = %v, want it to contain %q", thisPkg, imports, sysexecPkg)
+	}
+
+	if _, err = BuildImportGraph(repoRoot, "./internal/does/not/exist/nope"); err == nil {
+		t.Error("BuildImportGraph(bogus package) = nil error, want non-nil")
 	}
 }

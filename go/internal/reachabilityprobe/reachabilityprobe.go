@@ -16,12 +16,52 @@
 // package back would be an import cycle.
 package reachabilityprobe
 
-import "fmt"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+)
 
 // ImportGraph maps a package name to the packages it directly imports. It is
 // the caller's responsibility to build this from the real toolchain (e.g.
 // `go list -deps`); this package only walks the graph it is given.
 type ImportGraph map[string][]string
+
+// listedPackage is the subset of `go list -json` output BuildImportGraph
+// needs: the package's own import path and its direct imports.
+type listedPackage struct {
+	ImportPath string
+	Imports    []string
+}
+
+// BuildImportGraph derives an ImportGraph from the real toolchain by shelling
+// out to `go list -deps -json` for pkgs (package patterns such as
+// "./internal/fleet"), scoped to the Go module rooted at repoRoot (the
+// directory containing go.mod). It returns the transitive closure's direct
+// import edges for every package reached, matching the shape CheckCallSite
+// already consumes, or a wrapped error if the toolchain invocation fails
+// (unresolvable package pattern, build errors, etc).
+func BuildImportGraph(repoRoot string, pkgs ...string) (ImportGraph, error) {
+	args := append([]string{"list", "-deps", "-json"}, pkgs...)
+	out, err := sysexec.Output(context.Background(), sysexec.DefaultRunner, repoRoot, "go", args...)
+	if err != nil {
+		return nil, fmt.Errorf("reachabilityprobe: go list -deps -json %s: %w", strings.Join(pkgs, " "), err)
+	}
+
+	graph := ImportGraph{}
+	dec := json.NewDecoder(strings.NewReader(out))
+	for dec.More() {
+		var pkg listedPackage
+		if err := dec.Decode(&pkg); err != nil {
+			return nil, fmt.Errorf("reachabilityprobe: decoding go list -deps -json output: %w", err)
+		}
+		graph[pkg.ImportPath] = pkg.Imports
+	}
+	return graph, nil
+}
 
 // CallSite describes a structural test's frozen pin: a call to
 // ReferencedPackage.Symbol( written inside a file belonging to
