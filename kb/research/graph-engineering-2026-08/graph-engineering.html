@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graph Engineering × Evolve Loop</title>
+<style>
+  :root{--bg:#0e1116;--card:#161b23;--ink:#e6e9ef;--dim:#8b95a7;--acc:#5eead4;--warn:#fbbf24;--edge:#3b4456;--ok:#4ade80;--bad:#f87171;}
+  @media (prefers-color-scheme: light){:root{--bg:#f6f7f9;--card:#ffffff;--ink:#1a2233;--dim:#5b6474;--edge:#c9d2e0;}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,"Segoe UI",Roboto,sans-serif;padding:2rem 1rem;max-width:960px;margin:0 auto}
+  h1{font-size:1.7rem;margin-bottom:.3rem}
+  h2{font-size:1.15rem;margin:2.2rem 0 .8rem;color:var(--acc)}
+  p.lead{color:var(--dim);margin-bottom:1.2rem}
+  .card{background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:1.1rem 1.3rem;margin:.8rem 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--edge);color:var(--dim);margin-bottom:.5rem}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  svg{width:100%;height:auto;display:block}
+  .svgwrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.88rem}
+  td,th{padding:.45rem .6rem;border-bottom:1px solid var(--edge);text-align:left;vertical-align:top}
+  th{color:var(--dim);font-weight:600}
+  code{background:rgba(128,128,160,.15);padding:.05rem .35rem;border-radius:5px;font-size:.85em}
+  .foot{color:var(--dim);font-size:.8rem;margin-top:2.5rem}
+  .node-label{font:600 11px -apple-system,sans-serif;fill:var(--ink)}
+  .edge-label{font:10px -apple-system,sans-serif;fill:var(--dim)}
+</style>
+</head>
+<body>
+<h1>Graph Engineering × Evolve Loop</h1>
+<p class="lead">What the 2026 "graph engineering" concept teaches this project — and the one place it changes what we build. Companion to <code>kb/research/graph-engineering-2026-08/README.md</code>.</p>
+
+<h2>1 · The concept in one picture</h2>
+<div class="card">
+<p style="margin-bottom:.8rem">An AI system is designed as an <b>executable graph</b>: nodes are agents, deterministic functions, and <b>validators</b>; edges are handoffs, gates, and <b>recovery paths</b>. Engineering effort lives on the edges.</p>
+<div class="svgwrap"><svg viewBox="0 0 880 190" role="img" aria-label="executable graph: scout to triage to build to audit to ship with validator gates and a recovery edge">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#8b95a7"/></marker></defs>
+  <g stroke="#8b95a7" stroke-width="1.4" fill="none">
+    <line x1="120" y1="70" x2="180" y2="70" marker-end="url(#a)"/>
+    <line x1="300" y1="70" x2="360" y2="70" marker-end="url(#a)"/>
+    <line x1="480" y1="70" x2="540" y2="70" marker-end="url(#a)"/>
+    <line x1="660" y1="70" x2="720" y2="70" marker-end="url(#a)"/>
+    <path d="M600 100 Q600 160 420 160 Q250 160 245 105" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  </g>
+  <g>
+    <rect x="20" y="45" width="100" height="50" rx="10" fill="none" stroke="#5eead4"/><text x="70" y="74" text-anchor="middle" class="node-label">scout (LLM)</text>
+    <rect x="180" y="45" width="120" height="50" rx="10" fill="none" stroke="#5eead4"/><text x="240" y="74" text-anchor="middle" class="node-label">triage (LLM)</text>
+    <rect x="360" y="45" width="120" height="50" rx="10" fill="none" stroke="#5eead4"/><text x="420" y="74" text-anchor="middle" class="node-label">build (LLM)</text>
+    <rect x="540" y="45" width="120" height="50" rx="10" fill="none" stroke="#fbbf24"/><text x="600" y="68" text-anchor="middle" class="node-label">audit + gates</text><text x="600" y="84" text-anchor="middle" class="edge-label">validator node</text>
+    <rect x="720" y="45" width="100" height="50" rx="10" fill="none" stroke="#4ade80"/><text x="770" y="74" text-anchor="middle" class="node-label">ship (code)</text>
+    <text x="420" y="182" text-anchor="middle" class="edge-label">recovery edge — failure-adapter verdict routes FAIL back as a typed retry, never a silent loop</text>
+    <text x="150" y="58" class="edge-label">gate</text><text x="330" y="58" class="edge-label">gate</text><text x="510" y="58" class="edge-label">gate</text><text x="690" y="58" class="edge-label">gate</text>
+  </g>
+</svg></div>
+</div>
+
+<h2>2 · Half of this we already are</h2>
+<div class="card">
+<table>
+<tr><th>Graph-engineering concept</th><th>Evolve Loop today</th></tr>
+<tr><td>Executable DAG of typed nodes</td><td class="ok">Phase spine + Go orchestrator state machine</td></tr>
+<tr><td>Deterministic vs semantic routing</td><td class="ok">Advisor proposes (LLM) · typed routing authority + clamps dispose (code) — ADR-0074</td></tr>
+<tr><td>Validators as first-class nodes</td><td class="ok">EGPS · contract gate · evalgate A–D · spine floor · ship gate</td></tr>
+<tr><td>Recovery-path edges</td><td class="ok">Failure-adapter PROCEED/RETRY/BLOCK · graduated remediation</td></tr>
+<tr><td>Pausable, resumable state</td><td class="ok">Per-phase checkpoints · <code>--resume</code></td></tr>
+<tr><td><b>Graph-shaped memory, traversed at retrieval</b></td><td class="bad">Missing — knowledge is graph-shaped JSON retrieved by grep</td></tr>
+</table>
+<p style="margin-top:.7rem;color:var(--dim)">The execution half needs vocabulary, not code. The <b>memory half is the real gap</b>.</p>
+</div>
+
+<h2>3 · The gap: a knowledge graph nobody traverses</h2>
+<div class="card">
+<p style="margin-bottom:.8rem">Dossiers, inbox items, lessons, and fingerprints already carry edge fields — <code>connects_to</code>, <code>deps</code>, <code>class</code>, <code>failure.fingerprint</code>, <code>carryover</code> — written by gated stages and read by nobody. The apicover defect class recurred <b>six times</b> before a human counted the edges by hand.</p>
+<div class="svgwrap"><svg viewBox="0 0 880 250" role="img" aria-label="knowledge graph: items, cycles, fingerprints, lessons connected by typed edges">
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0L8,4L0,8z" fill="#8b95a7"/></marker></defs>
+  <g stroke="#3b4456" stroke-width="1.3" fill="none">
+    <line x1="150" y1="60"  x2="330" y2="60"  marker-end="url(#b)" stroke="#f87171"/>
+    <line x1="150" y1="190" x2="330" y2="72"  marker-end="url(#b)" stroke="#f87171"/>
+    <line x1="450" y1="60"  x2="600" y2="60"  marker-end="url(#b)"/>
+    <line x1="450" y1="70"  x2="600" y2="185" marker-end="url(#b)"/>
+    <line x1="720" y1="60"  x2="790" y2="60"  marker-end="url(#b)" stroke="#4ade80"/>
+    <line x1="150" y1="200" x2="595" y2="200" marker-end="url(#b)" stroke-dasharray="4 4"/>
+  </g>
+  <g>
+    <ellipse cx="90" cy="60" rx="62" ry="24" fill="none" stroke="#f87171"/><text x="90" y="64" text-anchor="middle" class="node-label">cycle-960 FAIL</text>
+    <ellipse cx="90" cy="195" rx="62" ry="24" fill="none" stroke="#f87171"/><text x="90" y="199" text-anchor="middle" class="node-label">cycle-998 FAIL</text>
+    <ellipse cx="390" cy="60" rx="62" ry="24" fill="none" stroke="#fbbf24"/><text x="390" y="64" text-anchor="middle" class="node-label">class: apicover-gap</text>
+    <ellipse cx="660" cy="60" rx="62" ry="24" fill="none" stroke="#5eead4"/><text x="660" y="64" text-anchor="middle" class="node-label">item 0.94</text>
+    <ellipse cx="660" cy="195" rx="62" ry="24" fill="none" stroke="#5eead4"/><text x="660" y="199" text-anchor="middle" class="node-label">lesson: gate-wiring</text>
+    <rect x="790" y="38" width="76" height="44" rx="9" fill="none" stroke="#4ade80"/><text x="828" y="64" text-anchor="middle" class="node-label">PR #396</text>
+    <text x="240" y="50" class="edge-label">recurs-as</text>
+    <text x="240" y="120" class="edge-label">recurs-as</text>
+    <text x="505" y="50" class="edge-label">filed-as</text>
+    <text x="500" y="140" class="edge-label">teaches</text>
+    <text x="742" y="50" class="edge-label">fixed-by</text>
+    <text x="330" y="215" class="edge-label">2-hop query: "what fixed this class before?" — the question every triage brief asks and grep cannot answer</text>
+  </g>
+</svg></div>
+</div>
+
+<h2>4 · What we merge — three slices, one invariant</h2>
+<div class="grid">
+<div class="card"><span class="tag">Slice 1</span><p><b><code>evolve kb graph</code></b> — a read-only Go projector over the committed corpus. Typed nodes (cycle · defect · item · class · fingerprint · file · commit), typed edges (recurs-as · consumed-by · fixed-by · touches). No DB, no daemon — in-memory, milliseconds.</p></div>
+<div class="card"><span class="tag">Slice 2</span><p><b>Brief-time traversal</b> — scout/triage briefs get the 2-hop neighborhood of the batch's items: prior same-class fixes, their squash SHAs, touched files, attached lessons. Precision where it converts to pass-rate.</p></div>
+<div class="card"><span class="tag">Slice 3</span><p><b>Recurrence as a query</b> — <code>recurs-as</code> edges over the full corpus surface a repeating class after its <em>second</em> instance, mechanically — not its sixth, by hand.</p></div>
+<div class="card"><span class="tag">Invariant</span><p><b>SSOT stays the JSON files</b>; the graph is a derived projection guarded by a drift test. And per the production-validated pattern: <b>zero LLM calls at retrieval time</b> — the LLM consumes the traversal, never performs it.</p></div>
+</div>
+
+<h2>5 · Deliberately not merged</h2>
+<div class="card">
+<p><span class="warn">✗</span> Graph database / vector store — corpus is hundreds of nodes; projection wins.&nbsp;
+<span class="warn">✗</span> LangGraph adoption — the Go orchestrator <em>is</em> the executable graph.&nbsp;
+<span class="warn">✗</span> LLM-extracted edges — edges come only from fields gated stages already write; extraction would reintroduce drift.</p>
+</div>
+
+<p class="foot">Sources: Analytics Vidhya "Graph Engineering" (Jul 2026) · arXiv 2507.21407, 2606.00610, 2509.22009, 2512.13564 · Atlan AI-memory guide · Zylos memory-architecture survey. Full citations in README.md beside this file.</p>
+</body>
+</html>
