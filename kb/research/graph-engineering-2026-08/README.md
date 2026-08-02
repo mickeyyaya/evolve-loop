@@ -126,3 +126,53 @@ after the *second* instance, mechanically.
 - [AI Agent Memory Architectures — Zylos Research, Apr 2026](https://zylos.ai/research/2026-04-05-ai-agent-memory-architectures-persistent-knowledge/)
 - [LangGraph as a DAG: Rethinking Data Pipeline Orchestration — Medium](https://medium.com/@srikrishnan.tech/langgraph-as-a-dag-rethinking-data-pipeline-orchestration-f089ccea175b)
 - [Building Production-Ready AI Agents with LangGraph — Ranjan Kumar](https://ranjankumar.in/building-production-ready-ai-agents-with-langgraph-a-developers-guide-to-deterministic-workflows)
+
+## 6. Benefit analysis — counterfactuals against this repo's own incidents
+
+Added 2026-08-02 after the operator asked what this concretely buys. Grounded in
+documented incidents, not literature claims.
+
+**Five causal chains:**
+
+1. **Recurrence detection.** `warnship-apicover-ci-gap` recurred SIX times
+   (cycle-960, cycle-998, 2× 07-29, PRs #372/#387) while its item sat queued
+   with a written fix plan. Instances 3–6 were prioritization failures — the
+   `class` edges existed, nothing counted them. A `recurs-as` corpus query
+   feeding `weight_hint` surfaces a class at instance two. This is also the
+   queued `recurrence-ledger` item's missing design (the lesson-to-action-gap
+   meta-defect: retros diagnose, nothing escalates).
+2. **Stranded-claim blindness.** `contract-block-cli-escalation` sat claimed in
+   a FAILed cycle's processing/ for weeks while its class recurred twice more
+   (one recurrence cost the top-priority lane, cycle-1215). "Items claimed by
+   FAIL-dossier cycles" is a one-hop join over data that existed throughout.
+3. **Reconciliation is a manual graph join.** The 2026-07-30 16-item
+   reconciliation — matching live items to six squash SHAs — recurs at every
+   batch boundary. `fixed-by` edges make its inverse the mechanical drift
+   detector for the batch-21 cycle-1214 class (re-attempting finished work).
+4. **Brief precision → pass rate.** PR #379 put failure identity into dossiers
+   precisely for generation-over-generation narrowing (proven: 1172-red →
+   1176-clean → 1180-shipped); retrieval is still grep. The capped 2-hop packet
+   mechanizes it, and gives the auditor prior-defect-density per file for free.
+5. **Token/cache economics.** Deterministic traversal output is byte-stable
+   when the corpus is unchanged — prompt-cache friendly — and bounded where
+   directory-listing re-derivation is neither. Direction backed by the −39%
+   clean-boot precedent; the literature's 35% figure is NOT transplanted (it
+   measures vector baselines on large corpora, not grep on hundreds of files).
+
+**Structural argument:** menu grouping (exact-file overlap), the carryforward
+filter, the disposition assembler, and the queued fingerprint-similarity tier
+are each bespoke traversals over the same corpus — the projector is the
+centralize-via-projection move; one substrate, N queries, one drift test.
+
+**Transfer:** every target repo evolve runs against accumulates the same
+schemas, so the projector ships in the binary and each project gets recurrence
+detection and brief traversal with zero setup.
+
+**What it does not buy:** none of the infra failure classes (contention flakes,
+quota storms, driver deaths) — it shortens diagnosis, not the flakes; and the
+projector must render absent edges as absent (~90 mislabeled dossiers, early
+ones without `failure` blocks) or it launders corpus holes into confidence.
+
+**Sequencing:** slice 3 first (cheapest, strongest evidence), slice 1 with it
+(3 needs the substrate), slice 2 last and shadow-staged — it changes what
+builders see, so it goes through the repo's staging idiom, not straight in.
