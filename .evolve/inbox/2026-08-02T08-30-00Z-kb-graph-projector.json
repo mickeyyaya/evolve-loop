@@ -1,0 +1,28 @@
+{
+  "id": "kb-graph-projector",
+  "title": "Knowledge-graph projection over the committed corpus — recurrence at instance TWO, briefs by traversal, one substrate for the N ad-hoc joins",
+  "weight": 0.85,
+  "kind": "feature",
+  "priority": "medium",
+  "campaign": "loop-reliability-2026-08",
+  "summary": "Design + benefit analysis: kb/research/graph-engineering-2026-08/ (PR #397, incl. the visual explainer and §6 counterfactuals against this repo's own incidents). Core: our durable knowledge is graph-shaped JSON retrieved by grep — dossiers carry failure.fingerprint/defects/lessons/carryover, inbox items carry connects_to/deps/class, and NO code traverses any of it. The apicover class recurred SIX times while its item sat queued with a fix plan; contract-block-cli-escalation recurred twice while stranded in a FAILed cycle's processing/; the 2026-07-30 16-item reconciliation was a manual graph join that recurs at every batch boundary. Build the projection, keep the JSON as SSOT.",
+  "acceptance": [
+    "SLICE 3 FIRST (cheapest, strongest evidence), SLICE 1 with it (the substrate), SLICE 2 last and SHADOW-STAGED (it changes what builders see — the repo's staging idiom, never straight to enforce)",
+    "Slice 1: read-only in-memory projector over knowledge-base/cycles/ + .evolve/inbox/ (live+consumed) + lessons; typed nodes (cycle,defect,lesson,item,class,fingerprint,file,commit) and edges (recurs-as,consumed-by,connects-to,depends-on,touches,fixed-by); `evolve kb graph neighbors <id> --hops 2` and `evolve kb graph recurrences <class|fingerprint>`; no DB, no daemon, no new deps",
+    "Slice 3: recurrence report surfaces a class at its SECOND instance corpus-wide; wire its count into triage weight_hint (advisory), never into the halting breaker's window semantics",
+    "INVARANTS: zero LLM calls at retrieval time (rule 5 + the Zep production pattern); absent edges render as ABSENT, never synthesized (~90 mislabeled dossiers, early ones lack failure blocks); projector field-reads bound to the Go structs by a drift test (TestSchema_NoDrift precedent)",
+    "Caps live in the projector, not the prompt: hops<=2, nodes<=40 (deep-tier artifact budget)",
+    "RED-first per slice; caller proof for every new export; apicover enrollment for any new package",
+    "NOT in scope: graph DB, vector store, LangGraph, LLM-extracted edges — each rejected with reasons in the design doc"
+  ],
+  "files": [
+    "go/internal/dossier/",
+    "go/internal/inboxbatch/",
+    "go/cmd/evolve/",
+    "kb/research/graph-engineering-2026-08/README.md"
+  ],
+  "deps": [],
+  "connects_to": ["percycle-audit-apicover-newexport-parity", "breaker-fingerprint-similarity-tier", "dossier-carries-failure-reason", "sleep-time-kb-consolidation"],
+  "source": "console-2026-08-02 graph-engineering research (operator-approved via 'ok' on the §6 + item offer)",
+  "created_at": "2026-08-02T08:30:00Z"
+}
