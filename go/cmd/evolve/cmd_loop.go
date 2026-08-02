@@ -411,8 +411,14 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	// Batch-START sweep. KEPT deliberately (scout AC1.3 leaves the call): it
+	// drains the backlog the PREVIOUS batch left behind before this batch
+	// allocates any new worktree, which is what keeps disk from growing across
+	// a crashed run that never reached its own batch-end sweep. It cannot
+	// reap this batch's own worktrees — that is what the batch-END sweep below
+	// is for; the two are complementary, not redundant.
 	lastBeforeGCHook, _ := readLastCycleNumber(context.Background(), deps.Storage)
-	runGCHook(cfg, cycleWorkspace(cfg.ProjectRoot, lastBeforeGCHook+1), stderr)
+	gcHookFn(cfg, cycleWorkspace(cfg.ProjectRoot, lastBeforeGCHook+1), stderr)
 
 	dc := loadDispatchConfig(cfg.EvolveDir)
 	dispPolicy := resolveDispatchPolicy(dc.Policy, stderr)
@@ -606,7 +612,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			// through to the sequential path below.
 			waveCfg, wavePace := budgetAwareWaveConfig(ctx, fleetCfg, cfg.ProjectRoot, cfg.EvolveDir, deps.Storage, stderr)
 			launcher := productionWaveLauncher(waveCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
-			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, waveCfg.Count), launcher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i)
+			ran, _, results, werr := dispatchIteration(ctx, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, waveCfg.Count, stderr), launcher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i)
 			switch {
 			case werr != nil:
 				fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", i, werr)
@@ -670,7 +676,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 				// sequential. minWidthRepair (cmd_loop_wave.go) owns the guard +
 				// WARN-vs-dispatch branching so the call-site wiring is unit-testable.
 				oneLauncher := productionWaveLauncher(fleetCfg, waveBinPath, cfg.ProjectRoot, cfg.GoalHash, cfg.GoalText, stdout, stderr)
-				if minWidthRepair(ctx, fleetCfg, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, fleetCfg.Count), oneLauncher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i, stderr) {
+				if minWidthRepair(ctx, fleetCfg, waveCfg, productionWavePreflight(cfg.ProjectRoot), productionWavePlanFn(cfg, deps.Storage, fleetCfg.Count, stderr), oneLauncher, consoleRoutedResolver(cfg.ProjectRoot, stderr), i, stderr) {
 					continue
 				}
 			}
@@ -1019,6 +1025,15 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	finalizeCompletedCycle(cfg, stderr)
+	// Batch-END workspace hygiene sweep (workspace-hygiene S5 wiring). Ordered
+	// finalize FIRST, then the hook, so the sweep observes a FINALIZED batch —
+	// the completed cycle's marker is already cleared, so the run dirs and
+	// worktrees this batch produced are reapable now instead of one batch
+	// later. Only this clean-exit path fires it: the error/fail path returned
+	// above and every signal path returns 130 without reaching here, because a
+	// signal-interrupted batch stays resumable (`evolve loop --resume`) and
+	// reaping its worktrees/branches would destroy the state the resume needs.
+	gcHookFn(cfg, cycleWorkspace(cfg.ProjectRoot, batchEndGCCycle(lr, lastBeforeGCHook+1)), stderr)
 	lr.emit(stdout)
 	// E1 exit-code contract: when any cycle in the batch hit a
 	// recoverable failure (verify-fail + classify → recoverable) OR a

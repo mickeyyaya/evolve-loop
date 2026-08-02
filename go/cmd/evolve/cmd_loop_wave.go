@@ -442,7 +442,7 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 // thin. The threaded ctx (PR #298 reviewer note) reaches the storage read,
 // so loop shutdown cancels the plan path too. Deferred: a dedicated
 // single-writer triage-only runner.
-func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int) wavePlanFn {
+func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) wavePlanFn {
 	return func(ctx context.Context, waveIndex int) ([]byte, []string, error) {
 		// Preferred source: the immediately-prior cycle's single-writer triage
 		// decision — partition the work it already selected.
@@ -454,6 +454,12 @@ func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int) waveP
 				// lane. Widen it from the durable inbox backlog before partitioning
 				// so the primary path un-starves too — not just the absent-decision
 				// fallback below (cycle-503 starvation on the primary path).
+				//
+				// Prune BEFORE widening: an id consumed during an earlier wave
+				// is dead work, and dropping it first frees the lane slot for
+				// widenNarrowDecision to refill from the live backlog. Pruning
+				// after would leave the wave a lane short.
+				data = pruneConsumedScope(data, cfg.ProjectRoot, stderr)
 				return widenNarrowDecision(data, cfg.EvolveDir, count), nil, nil
 			}
 			// Prior decision absent (fresh start, `evolve cycle reset` sealed the
@@ -520,6 +526,85 @@ func menuCards(menus [][]triagecap.FleetCandidate) []map[string]any {
 		}
 	}
 	return topN
+}
+
+// pruneConsumedScope drops every top_n id whose inbox lifecycle resolves to a
+// CONSUMED state (processed / rejected / retry) before the prior decision is
+// widened into the next wave's plan.
+//
+// The bug it fixes (one confirmed instance, cycle-1116): the primary planning
+// path re-reads the prior cycle's triage-decision.json and never re-resolves
+// its ids, so an item consumed during an earlier wave is planned into the NEXT
+// wave's lane-scope.json. The dispatch-time freshness gate
+// (productionFreshnessProbe / freshnessGatedLauncher) already stops that lane
+// from re-executing dead work and STAYS as defense in depth — but the plan
+// itself is still wrong, and the plan is what every downstream reader
+// (operator, dossier, retro) sees.
+//
+// FAIL OPEN, deliberately: only positively-consumed ids are dropped. `pending`
+// ids and ids with NO lifecycle evidence (`unknown` — not every planned id is
+// inbox-backed) are retained untouched. Over-pruning would starve the wave,
+// which is strictly worse than the stale entry this fixes. Reuses
+// inboxmover.ResolveDispatchState — the same resolver the dispatch-time probe
+// uses, so plan-time and dispatch-time can never disagree about what
+// "consumed" means; no second bookkeeping file.
+//
+// Best-effort throughout: an unparseable decision, or one carrying
+// committed_floors (which fleet.TodosFromTriage dispatches ahead of top_n,
+// ignoring top_n entirely), returns the original bytes unchanged — as does the
+// common case where nothing was consumed, so a healthy wave is byte-identical
+// to today.
+func pruneConsumedScope(data []byte, projectRoot string, stderr io.Writer) []byte {
+	var decision struct {
+		CommittedFloors []string `json:"committed_floors"`
+		TopN            []struct {
+			ID    string   `json:"id"`
+			Files []string `json:"files"`
+		} `json:"top_n"`
+	}
+	if json.Unmarshal(data, &decision) != nil || len(decision.CommittedFloors) > 0 || len(decision.TopN) == 0 {
+		return data
+	}
+	opts := inboxmover.Options{ProjectRoot: projectRoot, Stderr: io.Discard}
+	kept := make([]map[string]any, 0, len(decision.TopN))
+	dropped := 0
+	for _, c := range decision.TopN {
+		if c.ID != "" && isConsumedDispatchState(inboxmover.ResolveDispatchState(opts, c.ID).State) {
+			fmt.Fprintf(stderr, "[loop] WARN: wave plan: pruned consumed top_n id %q from prior decision\n", c.ID)
+			dropped++
+			continue
+		}
+		card := map[string]any{"id": c.ID}
+		if len(c.Files) > 0 {
+			card["files"] = c.Files
+		}
+		kept = append(kept, card)
+	}
+	if dropped == 0 {
+		return data // nothing consumed — leave the committed decision untouched.
+	}
+	var full map[string]any
+	if err := json.Unmarshal(data, &full); err != nil {
+		return data
+	}
+	full["top_n"] = kept
+	out, err := json.Marshal(full)
+	if err != nil {
+		return data
+	}
+	return out
+}
+
+// isConsumedDispatchState reports whether a lifecycle state means the item is
+// done with — the same three terminal states productionFreshnessProbe treats
+// as stale at dispatch. StateProcessing is NOT consumed: it is in flight, and
+// its own claim is what keeps a second lane off it.
+func isConsumedDispatchState(state string) bool {
+	switch state {
+	case inboxmover.StateProcessed, inboxmover.StateRejected, inboxmover.StateRetry:
+		return true
+	}
+	return false
 }
 
 // widenNarrowDecision is the thin main-package adapter that turns a present-but-

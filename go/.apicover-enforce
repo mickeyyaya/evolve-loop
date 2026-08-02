@@ -487,6 +487,13 @@
 # gopkgpattern_test.go names+exercises every export.
 ./internal/gopkgpattern
 
+# reachabilityprobe (cycle-1225, tdd-structural-test-reachability-probe): pure
+# compiler-probe check flagging a frozen structural-test pin whose referenced
+# package already (transitively) imports the pinning package — the cycle-644
+# unbuildable-import-cycle shape. apicover_named_test.go names+exercises every
+# export (ImportGraph, CallSite, Violation, CheckCallSite).
+./internal/reachabilityprobe
+
 # ACS predicate packages (./acs/cycle<N>) are NOT enrolled — the "completeness
 # invariant" cycles 1141/1144/1145 asserted here does not exist. Two reasons,
 # both load-bearing:

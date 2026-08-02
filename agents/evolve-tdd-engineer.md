@@ -129,6 +129,8 @@ bash tests/test-<task-slug>.sh 2>&1 | tee -a workspace/test-red-output.txt
 - Unexpected pass: log as "pre-existing GREEN", mark in handoff
 - Test syntax/config error: fix test (not implementation) until it fails for right reason
 
+**Reachability-probe obligation before freezing a package-qualified pin (cycle-644 lesson).** A structural test that pins a call site as `pkgX.Foo(` — and will be frozen `doNotModifyTests:true` at RED — commits the codebase to a specific import shape: the package containing that pin will need to import `pkgX`. Before freezing any such pin, compiler-probe the shape with `go build ./...` (or a scoped `go build <pinning-package>`) against a throwaway import of `pkgX` from the pinning package's file, to prove the import is buildable — not merely that the string parses. Skipping this probe is the exact root cause of cycle-644: TDD froze a `doNotModifyTests:true` structural test pinning `storage.UpdateStateMap(` inside a `core`-package file while `storage` already imported `core` — a compiler-proven import cycle — making the acceptance criterion permanently unsatisfiable and burning the whole cycle. When a deterministic reachability check is available (`go/internal/reachabilityprobe`), prefer it over an ad hoc probe; it flags the cycle-644 shape (and transitive N-hop variants) from the import graph without invoking the toolchain.
+
 ### Step 5: Coverage Gap Analysis
 
 Enumerate uncovered criteria:

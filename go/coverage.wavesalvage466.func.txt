@@ -1,9 +1,11 @@
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:64:		Validate		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:76:		Run			100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/fleet.go:107:		launchOne		93.3%
-github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:49:		FreshenSpecs		96.0%
-github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:89:		filterScope		100.0%
-github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:114:		ClassifyEmptyScopeBuild	100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:52:		FreshenSpecs		96.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:92:		filterScope		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:140:		dropStaleContractLines	100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:159:		contractLineID		83.3%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/freshness.go:176:		ClassifyEmptyScopeBuild	100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/packagegraph.go:27:		TransitivePackageSet	93.8%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/packagegraph.go:63:		IsGlobalZone		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/packagegraph.go:74:		GlobalZoneFiles		100.0%
@@ -38,8 +40,8 @@ github.com/mickeyyaya/evolve-loop/go/internal/fleet/starvation.go:105:		BuildSta
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/starvation.go:129:		Validate		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/starvation.go:148:		WriteTo			66.7%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/triageplan.go:52:		PlanFromTriage		100.0%
-github.com/mickeyyaya/evolve-loop/go/internal/fleet/triageplan.go:66:		TodosFromTriage		100.0%
+github.com/mickeyyaya/evolve-loop/go/internal/fleet/triageplan.go:75:		TodosFromTriage		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:21:		PlanWaves		100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:71:		combinedContract	100.0%
 github.com/mickeyyaya/evolve-loop/go/internal/fleet/waves.go:90:		groupByFiles		93.8%
-total:										(statements)		95.4%
+total:										(statements)		95.5%

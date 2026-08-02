@@ -78,7 +78,7 @@ func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight
 // the wave path). Single-sourcing the decision→todos parse keeps the pool and
 // wave schedulers reading identical committed work.
 func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) poolPlanFn {
-	wavePlan := productionWavePlanFn(cfg, storage, count)
+	wavePlan := productionWavePlanFn(cfg, storage, count, stderr)
 	return func(ctx context.Context, waveIndex int) ([]fleet.Todo, error) {
 		decisionJSON, cardPackages, err := wavePlan(ctx, waveIndex)
 		if err != nil {

@@ -102,6 +102,13 @@ func (lr *loopResult) emit(w io.Writer) {
 	fmt.Fprintln(w, string(buf))
 }
 
+// gcHookFn is the workspace-hygiene sweep seam (the bootRecoverFn /
+// runLoopPreflightFn idiom used throughout this package). EVERY gc-hook call
+// site goes through it so tests can observe when the sweep fires relative to
+// the batch's cycles and to finalizeCompletedCycle — S5's whole point is the
+// ORDERING, which a direct call cannot express.
+var gcHookFn = runGCHook
+
 func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
 	if err != nil {
@@ -178,13 +185,7 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 		fmt.Fprintf(stderr, "[gc] WARN: worktree sweep skipped: ProjectRoot is unset\n")
 		return
 	}
-	opts := gc.WorktreeOptions{
-		ProjectRoot:  cfg.ProjectRoot,
-		WorktreeBase: filepath.Join(cfg.ProjectRoot, ".evolve", "worktrees"),
-		EvolveDir:    cfg.EvolveDir,
-		Policy:       gcPol.Worktrees,
-		Exec:         sysexec.DefaultRunner,
-	}
+	opts := worktreeGCOptions(cfg.ProjectRoot, cfg.EvolveDir, gcPol.Worktrees)
 	manifest, err := gc.PlanWorktrees(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: worktree plan failed: %v; skipping worktree sweep\n", err)
@@ -204,6 +205,21 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 		fmt.Fprintf(stderr, "[gc] WARN: worktree enforce apply: %v\n", err)
 	}
 	fmt.Fprintf(stderr, "[gc] worktree enforce: applied %d items\n", len(manifest.Items))
+}
+
+// worktreeGCOptions is the SINGLE construction site for the worktree sweep's
+// options, shared by the in-loop hook (runWorktreeGC) and the operator command
+// (`evolve gc`, cmd_gc.go). Both sweeps must aim at the same worktree base and
+// carry the same policy, or an operator's manual drain would plan a different
+// backlog than the one the loop's manifest advertises.
+func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy) gc.WorktreeOptions {
+	return gc.WorktreeOptions{
+		ProjectRoot:  projectRoot,
+		WorktreeBase: filepath.Join(projectRoot, ".evolve", "worktrees"),
+		EvolveDir:    evolveDir,
+		Policy:       pol,
+		Exec:         sysexec.DefaultRunner,
+	}
 }
 
 // publishGCManifest atomically writes v as pretty JSON to <workspace>/name
@@ -440,6 +456,21 @@ func lastCycleIn(lr loopResult) int {
 		return lr.Cycles[n-1].Cycle
 	}
 	return 0
+}
+
+// batchEndGCCycle picks the cycle workspace the batch-end sweep publishes its
+// manifests into: the batch's own last cycle. A batch that exited before any
+// cycle ran has no run dir of its own, so it falls back to the same workspace
+// the batch-start sweep used (startNext = lastCycleNumber+1) — never cycle-0,
+// which is not a real run dir.
+func batchEndGCCycle(lr loopResult, startNext int) int {
+	if n := lastCycleIn(lr); n > 0 {
+		return n
+	}
+	if startNext > 0 {
+		return startNext
+	}
+	return 1
 }
 
 // loopConfig is the resolved invocation. Extracted so --dry-run and

@@ -14,6 +14,7 @@ description: Use when writing or changing any production code or tests — new f
 3. **Search before you write.** Before adding any function/type/helper: search for the existing one. Duplication is the measured #1 AI-code pathology (+81% duplicated blocks since 2023). Extending beats re-creating; consolidating beats both.
 4. **Never weaken a test to make it pass.** Tests encode intent. If a test is wrong, fix it in a commit that says so; if it's right, fix the code. Deleting/skipping/loosening assertions to go green is falsifying evidence.
 5. **The diff you ship is the smallest correct one.** No drive-by refactors, no unrequested "improvements", no formatting churn outside touched lines. File separate work separately.
+6. **Mock only network/clock/subprocess — never your own logic.**
 
 ## Rationalization table (RIGID — if you think it, stop)
 

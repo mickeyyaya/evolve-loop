@@ -11,6 +11,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -83,7 +84,7 @@ func TestProductionWavePlanFn_SeedsFromInboxWhenNoPriorDecision(t *testing.T) {
 
 	// erroringReadStorage makes readLastCycleNumber return an error → "no prior
 	// cycle" → the planFn must seed from the inbox, not fall back to sequential.
-	plan := productionWavePlanFn(loopConfig{ProjectRoot: dir, EvolveDir: dir}, &erroringReadStorage{}, 2)
+	plan := productionWavePlanFn(loopConfig{ProjectRoot: dir, EvolveDir: dir}, &erroringReadStorage{}, 2, io.Discard)
 	data, cards, err := plan(context.Background(), 0)
 	if err != nil {
 		t.Fatalf("planFn must seed from inbox on a missing prior decision, got error: %v", err)
