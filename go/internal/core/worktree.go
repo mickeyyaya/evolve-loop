@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
@@ -101,13 +102,43 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("worktree base ref (cycle %d): %w", cycle, err)
 	}
-	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
-	if err != nil || code != 0 {
-		return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
+	// Transient-contention retry (cycles 1221/1231/1232/1234/1240): N lanes of
+	// one repo provision concurrently, and `git worktree add` takes repo-level
+	// locks in the SHARED .git (the plane itself is a linked worktree), so a
+	// collision returns rc=255 with nothing on stderr beyond "Preparing
+	// worktree". One transient collision used to kill the lane's whole cycle:
+	// ActiveWorktree stayed empty, CB.2 fail-fasted every dispatch exit=10,
+	// three identical fingerprints halted the batch — twice in one day, once
+	// with zero console git activity (lane-vs-lane, not operator-vs-lane).
+	// Bounded backoff'd retry treats contention as what it is; a PERSISTENT
+	// failure still fails loudly with the same error after the last attempt —
+	// the downstream alarm chain is correct and must stay armed (the refuted
+	// PR #400 is the record of what happens when the alarm is silenced
+	// instead). verifylock is the precedent for cross-lane git serialization.
+	var stderr string
+	var code int
+	for attempt := 0; attempt < worktreeAddAttempts; attempt++ {
+		if attempt > 0 {
+			worktreeAddRetrySleep(time.Duration(attempt) * 2 * time.Second)
+			fmt.Fprintf(os.Stderr, "[worktree] retry %d/%d: git worktree add -B %s after transient rc=%d\n", attempt, worktreeAddAttempts-1, branch, code)
+		}
+		_, stderr, code, err = gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
+		if err == nil && code == 0 {
+			linkGuardDeps(wt, projectRoot, cycle)
+			return wt, nil
+		}
 	}
-	linkGuardDeps(wt, projectRoot, cycle)
-	return wt, nil
+	return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
 }
+
+// worktreeAddAttempts bounds the provisioning retry: first try + two retries.
+// Two is enough for lock-window collisions at the standing fleet width; a
+// third identical failure is a real condition the fail-fast must surface.
+const worktreeAddAttempts = 3
+
+// worktreeAddRetrySleep is the inter-attempt backoff clock — a seam so the
+// package tests count sleeps instead of paying them.
+var worktreeAddRetrySleep = time.Sleep
 
 // laneStartRef resolves the ref a FRESH lane branch is cut from.
 //
