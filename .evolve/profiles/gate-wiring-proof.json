@@ -1,6 +1,0 @@
-{
-  "name": "gate-wiring-proof",
-  "role": "gate-wiring-proof",
-  "cli": "claude-tmux",
-  "model_tier_default": "deep"
-}

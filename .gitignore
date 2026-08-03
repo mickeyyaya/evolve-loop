@@ -163,3 +163,9 @@ campaign.log
 # was committed this way). The build predicates now use `-o os.DevNull`; this is
 # belt-and-suspenders so a regression can never be `git add`ed again.
 go/acs/**/evolve
+
+# Runtime-minted per-host phase stubs (ADR-0074 wired no-op): dispatch reads them
+# from DISK; tracking them fails phasecoherence (profile with no persona) and
+# phasespec (no SELECT metadata). Ship's staging sweep must never re-add them.
+.evolve/phases/gate-wiring-proof/
+.evolve/profiles/gate-wiring-proof.json

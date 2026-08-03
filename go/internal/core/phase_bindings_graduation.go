@@ -45,6 +45,13 @@ func buildGraduationCheck(ctx context.Context, worktree string) string {
 	var fresh []string
 	for _, pkg := range ciparity.NewUngraduatedPackages(changed, enforceBytes) {
 		if packageNewThisCycle(ctx, worktree, pkg) {
+			if !packageHasProductionGoFiles(worktree, pkg) {
+				// Never silently skip (review F2): the vacuous-obligation skip
+				// is announced, so a test-only mint that lands unenrolled is
+				// visible in the cycle log rather than discovered at audit.
+				fmt.Fprintf(os.Stderr, "[build-floor] graduation deferred: new package %s is test-only (no production .go surface) — abort suppressed; audit re-flags the package on any later change\n", pkg)
+				continue
+			}
 			fresh = append(fresh, pkg)
 		}
 	}
@@ -87,6 +94,13 @@ func graduationPrescription(pkgs []string) string {
 		fmt.Fprintf(&b, "    2. create %s/apicover_named_test.go naming every exported symbol of the package in a real assertion that executes it (an enrolled-but-unnamed package fails the gate too)\n", dir)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// packageHasProductionGoFiles delegates to the SHARED graduation predicate —
+// see ciparity.PackageDirHasProductionGoFiles for the test-only-package
+// rationale (cycles 1223/1224/1228). One predicate, two seams, no disagreement.
+func packageHasProductionGoFiles(worktree, pkg string) bool {
+	return ciparity.PackageDirHasProductionGoFiles(codequality.ModuleDir(worktree), pkg)
 }
 
 // packageNewThisCycle reports whether an enforce-list-form package pattern
