@@ -45,7 +45,10 @@ func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	// Two leading "❯" frames: claude-tmux now ticks the auto-responder during
 	// boot (tickDuringBoot), so the first boot iteration reads the pane twice
 	// (boot loop + tick) before the marker check breaks.
-	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯", "working ❯", "done ❯", "cleanup"}}
+	// The extra "working ❯" is the settling tick: under the cycle-1233 cross-poll
+	// stability window (completion.go) the artifact completes one tick after it
+	// first appears, so the pane is captured once more before cleanup.
+	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
 	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
 	if rc != ExitOK {

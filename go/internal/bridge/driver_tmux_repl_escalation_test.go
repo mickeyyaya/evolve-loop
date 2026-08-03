@@ -78,11 +78,23 @@ func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
 	}
 }
 
+// writingReviewer models the agent finishing its deliverable mid-wait: the
+// artifact is written ONCE, at the first review checkpoint, and then left alone.
+//
+// The write-once guard is load-bearing under the cycle-1233 cross-poll
+// stability window (completion.go): a reviewer that rewrote the file at every
+// checkpoint would bump its mtime on every tick, so the window could never
+// close and this fixture would spin forever. A real agent writes its deliverable
+// and stops — the fixture now models that instead of a permanent rewriter.
 type writingReviewer struct {
 	artifact string
+	wrote    bool
 }
 
 func (w *writingReviewer) Review(ev StopEvent) ReviewVerdict {
-	_ = os.WriteFile(w.artifact, []byte("PROTOTYPE OK\n"), 0o644)
+	if !w.wrote {
+		_ = os.WriteFile(w.artifact, []byte("PROTOTYPE OK\n"), 0o644)
+		w.wrote = true
+	}
 	return ReviewVerdict{Action: ReviewExtend, Reason: "still working"}
 }

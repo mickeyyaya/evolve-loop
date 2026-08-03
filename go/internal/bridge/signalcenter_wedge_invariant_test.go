@@ -126,7 +126,7 @@ func TestStopReview_RenderWedgeOverride(t *testing.T) {
 		"",                      // every subsequent capture: blank (live session, render wedge)
 	}}}
 	rev := &scriptedReviewer{}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},
 		ArtifactTimeoutS: 2,

@@ -116,8 +116,15 @@ func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	// The pane QUOTES spill text (an agent discussing shell errors) but the
 	// foreground process is still the CLI → must not fail. The artifact
 	// appears on paste, so the run completes normally.
+	// The spill-lookalike frame is queued TWICE: under the cycle-1233 cross-poll
+	// stability window the artifact completes one tick later than it used to, so
+	// the pane is captured once more while the deliverable settles. Repeating the
+	// same frame is what a real settled pane does — and it keeps the lookalike
+	// text on screen for that extra tick, which is exactly what this test wants
+	// ignored. The frame budget is grown, not the panic-on-underrun contract
+	// weakened (see TestFakeTmuxController_UnderrunAfterExhaustion).
 	base := &FakeTmuxController{
-		CaptureFrames: []string{"❯", cycle274BquoteSpill + "\n❯", "final", "cleanup"},
+		CaptureFrames: []string{"❯", cycle274BquoteSpill + "\n❯", cycle274BquoteSpill + "\n❯", "final", "cleanup"},
 		PaneCmd:       "node",
 	}
 	tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}

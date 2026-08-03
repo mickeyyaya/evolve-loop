@@ -192,13 +192,43 @@ every `readGracePoll = 20ms`):
 Deliberately **not** configurable: an I/O robustness constant, not a phase setting (`graceSleep` is
 a test seam, not a dial). Coverage: `internal/deliverable/grace_test.go`.
 
-**Known residual (queued):** partial-but-non-blank content — the file present with its sections but
-its trailing verdict sentinel not yet appended (observed cycle-1198) — is NOT retried here. Closing
-it at the source requires artifact-ready CROSS-POLL stability in the bridge detector
-(`artifact-ready-crosspoll-debounce`, queued): an in-poll settle sleep cannot span the
-multi-second gap between an agent's `Write` and its follow-up `Edit`, and the change alters the tick
-contract for every artifact-completion fixture plus any short `ArtifactTimeoutS`, so it needs its own
-cycle with a timeout-budget audit.
+**Closed at the source (`artifact-ready-crosspoll-debounce`).** Partial-but-non-blank content — the
+file present with its sections but its trailing verdict sentinel not yet appended (observed
+cycle-1198) — is deliberately NOT retried by this reader. An in-poll settle sleep cannot span the
+multi-second gap between an agent's `Write` and its follow-up `Edit`, so the fix lives upstream in
+the bridge completion detector (`internal/bridge/completion.go`), which now carries a **cross-poll
+stability window**: the same `(path, size, mtime)` key must be observed across `artifactStableTicks`
+consecutive wait-loop ticks (~2s apart) before `ready` fires. `mtime` is in the key because a
+size-only window is blind to an equal-length fix-up `Edit`. Not configurable, for the same reason
+`readGraceWindow` is not.
+
+### Relocation is gated by the window, with ONE stated exception
+
+`artifactLocate` (read-only: where is the artifact?) is split from `artifactReady` (the mover that
+canonicalizes a non-canonical fallback, per the cycle-108/141 tolerance) precisely so the window can
+gate the destructive half. `relocateFile` falls back to **copy+remove** when rename fails
+(cross-device, unwritable source directory); run against a file the agent is still appending to,
+that publishes a truncated snapshot at the canonical path and then deletes the original. So it runs
+only on the tick the window closes.
+
+The exception is the wait loop's ONE post-cancel final poll (`isFinalPoll`, and the `ctx.Err()` twin
+for a detector whose context died mid-wait). It completes with `stable == 0` — deliberately, because
+demanding a fresh window it can never get would launder every finished-at-the-buzzer session into
+`ExitArtifactTimeout`, strictly worse than the truncated read this closed. That concession is
+bounded to `renameOnlyRelocate`: rename relinks the inode, so an agent's open fd keeps appending
+into the file at its new canonical path and no byte is lost; if the rename cannot be done, the poll
+returns the error and the phase takes its artifact timeout. `copy+remove` never runs under finality
+(cycle-1256 audit D1 — the earlier unqualified "the window gates relocation" wording in this file
+and in `completion.go` was an audited false claim; state the exception or do not make the claim).
+
+`artifactLocate` is also the chokepoint that decides which bytes become the committed deliverable,
+so it `Lstat`s and accepts only non-empty **regular** files — a planted symlink is never followed
+into the artifact `evolve ship` commits — and `relocateFile`'s copy branch takes its temp file from
+`os.CreateTemp` rather than a log-disclosed `<dst>.tmp.<pid>` (D3/D4).
+
+Coverage: `internal/bridge/completion_debounce_test.go`,
+`completion_relocate_stability_test.go`, `completion_finalpoll_relocate_test.go`. Durable regression
+entry: `.evolve/evals/artifact-ready-crosspoll-debounce.md`.
 
 ## Verdict sentinel (Strangler Fig)
 

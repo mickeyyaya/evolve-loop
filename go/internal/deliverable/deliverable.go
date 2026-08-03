@@ -177,8 +177,20 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 // prevents. This grace layer EXISTS for the callers with NO outer retry (the
 // CLI self-check, `evolve phase verify`). Partial-but-non-blank content is
 // deliberately NOT retried here — mid-write truncation is closed at the
-// SOURCE by the bridge artifact-ready cross-poll debounce (completion.go),
-// and malformed-but-present stays the runner's reconcile territory.
+// SOURCE by the bridge artifact-ready cross-poll debounce (completion.go):
+// the wait loop reports a deliverable finished only after artifactStableTicks
+// consecutive poll ticks observe an UNCHANGED (size, mtime) key, so a file
+// still being appended to never reaches this reader half-written. mtime is in
+// the key because a size-only window is blind to an equal-length fix-up Edit,
+// and that same window gates the DESTRUCTIVE relocation of a non-canonical
+// fallback rather than following it (copying first would snapshot a partial
+// file to the canonical path and remove the source the agent still holds
+// open). One path there completes without a closed window — the wait loop's
+// final post-cancel poll — and it is restricted to rename-only
+// canonicalization, which relinks an inode and so cannot truncate or delete;
+// stating the exception is the point, because the unqualified version of this
+// sentence was audited as a claim the code refuted (cycle-1256 D2). What is
+// malformed-but-present stays the runner's reconcile territory.
 const (
 	readGraceWindow = 500 * time.Millisecond
 	readGracePoll   = 20 * time.Millisecond

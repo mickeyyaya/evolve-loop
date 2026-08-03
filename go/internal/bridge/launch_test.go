@@ -154,6 +154,28 @@ func run(t *testing.T, fr *fakeRunner, args []string) (int, string) {
 	return runLookup(t, fr, args, nil)
 }
 
+// newTestEngine builds an Engine for driver tests with a HERMETIC environment
+// by default: a test that does not pin Deps.LookupEnv gets the EMPTY lookup
+// rather than falling through to os.LookupEnv (lookupEnv, driver_common.go),
+// carrying the `run`/`runLookup` convention above across to the tmux-REPL
+// suite. Deps.Env is consulted first by lookupEnv and is unaffected, so a test
+// that MEANS to exercise an env branch still opts IN explicitly.
+//
+// Why this exists: runTmuxREPL reads ipcenv.FleetKey ("EVOLVE_FLEET") through
+// lookupEnv, and under a fleet supervisor with no --worktree it fails closed
+// with the CB.2 refusal errWorktreeRequired -> ExitBadFlags(10) BEFORE the
+// artifact wait loop runs. With LookupEnv nil that read reached the AMBIENT
+// process env, so 20 driver tests passed in a developer shell and failed under
+// the ACS/EGPS runner, which inherits the orchestrator's EVOLVE_FLEET=1
+// (internal/acsrunner/runner.go does not sanitize). That cost cycle-1252 and
+// cycle-1254 a run each. The guard is correct; the fixtures were porous.
+func newTestEngine(d Deps) *Engine {
+	if d.LookupEnv == nil {
+		d.LookupEnv = mapLookup(nil)
+	}
+	return NewEngine(d)
+}
+
 // --- mock-cli-drivers.bats parity -----------------------------------------
 
 func TestLaunchArgs_ClaudeP_HappyPath(t *testing.T) {

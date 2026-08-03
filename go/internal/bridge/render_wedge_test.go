@@ -37,7 +37,7 @@ func (j *jiggleTmux) JiggleWindow(_ context.Context, _ string) error {
 
 func runTmuxWedge(t *testing.T, fx launchFixture, tmux TmuxController, spy func(phase, action, reason string)) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},
 		ArtifactTimeoutS: 2,

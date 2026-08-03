@@ -37,13 +37,16 @@ func TestArtifactDetector_Poll(t *testing.T) {
 	if ready, _, note, err := d.poll(context.Background()); ready || err != nil || note != "" {
 		t.Fatalf("absent artifact: got (ready=%v, note=%q, err=%v), want (false, \"\", nil)", ready, note, err)
 	}
-	// Present (non-empty) → ready with an "appeared" note.
+	// Present (non-empty) and UNCHANGING → ready with an "appeared" note.
+	// Readiness is no longer first-sight: cycle-1233 added the cross-poll
+	// stability window (see completion_debounce_test.go for that contract), so
+	// parity with artifactReady is asserted at the point the window closes.
 	if err := os.WriteFile(canonical, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ready, _, note, err := d.poll(context.Background())
-	if !ready || err != nil {
-		t.Fatalf("present artifact: ready=%v err=%v, want ready", ready, err)
+	got, note := pollUntilReady(t, d, artifactStableTicks+2, nil)
+	if got < 0 {
+		t.Fatalf("present, unchanging artifact never reported ready within %d polls", artifactStableTicks+2)
 	}
 	if !strings.Contains(note, "appeared") {
 		t.Errorf("note = %q, want it to mention 'appeared'", note)

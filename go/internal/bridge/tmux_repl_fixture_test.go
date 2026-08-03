@@ -94,7 +94,10 @@ func TestTmuxFixture(t *testing.T) {
 
 	t.Run("artifact_delivery", func(t *testing.T) {
 		cfg := fixtureConfig(t)
-		base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "final scrollback", "cleanup scrollback"}}
+		// Two "working ❯" frames: the cycle-1233 cross-poll stability window
+		// (completion.go) completes the artifact one tick after it first appears,
+		// so the pane is captured once more while the deliverable settles.
+		base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "final scrollback", "cleanup scrollback"}}
 		tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}
 		code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 			name: "claude-tmux", session: "fixture-artifact", launchCmd: "claude", promptMarker: "❯", bootIntervalS: 1,
@@ -124,14 +127,16 @@ func TestCodexUpdateMenuDismiss(t *testing.T) {
 		frames   []string
 		wantSkip bool
 	}{
+		// The repeated "idle ›" is the settling tick the cycle-1233 cross-poll
+		// stability window adds before the artifact completes (see completion.go).
 		{
 			name:     "menu_present_skip_before_inject",
-			frames:   []string{cycle274CodexUpdateMenu, "ready ›", "idle ›", "final", "cleanup"},
+			frames:   []string{cycle274CodexUpdateMenu, "ready ›", "idle ›", "idle ›", "final", "cleanup"},
 			wantSkip: true,
 		},
 		{
 			name:     "menu_absent_no_spurious_skip",
-			frames:   []string{"ready ›", "idle ›", "final", "cleanup"},
+			frames:   []string{"ready ›", "idle ›", "idle ›", "final", "cleanup"},
 			wantSkip: false,
 		},
 	}

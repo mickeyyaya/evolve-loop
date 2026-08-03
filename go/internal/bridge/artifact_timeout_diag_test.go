@@ -85,7 +85,7 @@ func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 		{Action: ReviewExtend, Reason: "still working"},
 		{Action: ReviewPause, Reason: "no output during the last 2s interval"},
 	}}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:               tmux,
 		Sleep:              func(time.Duration) {},
 		Reviewer:           rev,

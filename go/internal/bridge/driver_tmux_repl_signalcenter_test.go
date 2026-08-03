@@ -121,7 +121,7 @@ func TestRunTmuxREPL_RenderWedgeStillPromotesToBusyStagnant(t *testing.T) {
 	// Engine directly instead, exactly as render_wedge_test.go's runTmuxWedge
 	// does, but with the reviewer injected so this test can read StopEvent.State
 	// rather than only the OnStopReview reason string.
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},
 		ArtifactTimeoutS: 2,

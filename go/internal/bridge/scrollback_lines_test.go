@@ -28,7 +28,7 @@ func runScrollbackPhase(t *testing.T, scrollbackLines int) []int {
 		t.Fatalf("seed artifact: %v", err)
 	}
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		ScrollbackLines: scrollbackLines,

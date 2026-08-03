@@ -444,12 +444,19 @@ type captureHookTmux struct {
 	artifact string
 	marker   string
 	n        int
+	wrote    bool
 }
 
+// CapturePane drops the artifact on the second capture and then leaves it
+// alone. The write-once guard is load-bearing under the cycle-1233 cross-poll
+// stability window (completion.go): rewriting the file on every capture would
+// bump its mtime on every tick, so the window could never close and the driver
+// would run out its whole wait budget. A real agent writes its deliverable once.
 func (c *captureHookTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
 	c.n++
-	if c.n >= 2 {
+	if c.n >= 2 && !c.wrote {
 		_ = os.WriteFile(c.artifact, []byte("done"), 0o644)
+		c.wrote = true
 	}
 	return c.marker, nil
 }

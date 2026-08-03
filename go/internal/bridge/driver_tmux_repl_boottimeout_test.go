@@ -29,7 +29,7 @@ func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
 	// default), so an exact 9 proves the typed field bounds the loop.
 	const wantPolls = 4*2 + 1 // 4 boot-poll iterations × 2 captures (loop + tick) + 1 deferred tmuxCleanup capture
 	tmux := &fakeTmux{}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:         tmux,
 		Sleep:        func(time.Duration) {},
 		BootTimeoutS: 4,
@@ -52,7 +52,7 @@ func TestEngineLaunch_BootTimeout_RecordsStrike(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	store := clihealth.NewStore(t.TempDir(), nil)
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},
 		BootTimeoutS:     4,

@@ -147,6 +147,23 @@ func fileNonEmpty(path string) bool {
 	return err == nil && fi.Size() > 0
 }
 
+// regularFileNonEmpty is fileNonEmpty for paths whose CONTENT is about to be
+// promoted into a committed deliverable: it Lstats, so a symlink is judged as a
+// symlink instead of as whatever it points at, and only a non-empty REGULAR
+// file qualifies. fileNonEmpty's os.Stat follows links by design (its callers —
+// doctor's credential probes, the stdout-log check — are asking "does the thing
+// at the other end exist?"), but artifactLocate is a promotion chokepoint: an
+// agent that plants `<artifact> -> ~/.claude/.credentials.json` would otherwise
+// have that file's bytes relocated into the canonical deliverable and committed
+// by `evolve ship`. Devices, FIFOs and directories are rejected for the same
+// reason — reading them is not "the agent wrote its report here". Failing
+// closed (the phase waits, then times out with the artifact diagnostic) is the
+// safe direction: a real deliverable is always a regular file.
+func regularFileNonEmpty(path string) bool {
+	fi, err := os.Lstat(path)
+	return err == nil && fi.Mode().IsRegular() && fi.Size() > 0
+}
+
 // isDir reports whether path is an existing directory.
 func isDir(path string) bool {
 	fi, err := os.Stat(path)
@@ -182,8 +199,52 @@ func isDir(path string) bool {
 // operator. The caller logs it.
 // See docs/architecture/adr/0024-conditional-ship-gate-floor-and-phase-advisor.md.
 func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
-	if fileNonEmpty(cfg.Artifact) {
+	return artifactCanonicalize(cfg, relocateFile)
+}
+
+// artifactCanonicalize is artifactReady with the mover injected, so a caller
+// that has NOT confirmed the artifact settled can restrict which relocation
+// semantics are allowed to run (cycle-1256 D1). move is only ever consulted for
+// a NON-canonical artifact; the canonical case moves nothing under either mover.
+//
+// Two movers exist, and the difference is not stylistic:
+//   - relocateFile — rename, falling back to copy+remove. Correct only for a
+//     file already observed to have stopped changing, because copy+remove
+//     snapshots the source and then deletes it.
+//   - renameOnlyRelocate — rename, or fail. Safe for a file that may still be
+//     growing, because rename preserves the inode: an agent's open fd keeps
+//     appending into the file at its new canonical path.
+func artifactCanonicalize(cfg *Config, move func(src, dst string) error) (ready bool, relocatedFrom string, err error) {
+	path, found := artifactLocate(cfg)
+	if !found {
+		return false, "", nil
+	}
+	if path == cfg.Artifact {
 		return true, "", nil
+	}
+	if rerr := move(path, cfg.Artifact); rerr != nil {
+		return false, "", fmt.Errorf("relocate %s → %s: %w", path, cfg.Artifact, rerr)
+	}
+	return true, path, nil
+}
+
+// artifactLocate reports where the phase artifact currently IS — the canonical
+// path when it holds a non-empty file, otherwise the first non-empty fallback
+// in artifactReady's search order — WITHOUT moving anything. It is the
+// read-only half of artifactReady, which layers the relocation on top.
+//
+// The split exists because relocation is irreversible and, on relocateFile's
+// cross-device copy+remove branch, destructive: it snapshots the source and
+// then removes it. Observing a fallback that is still being written and moving
+// it on that first sighting truncates the deliverable permanently. So
+// artifactDetector runs its cross-poll stability window against this read-only
+// answer and only calls artifactReady — the mover — once the file has settled.
+// Candidates are qualified with regularFileNonEmpty, not fileNonEmpty: this is
+// the chokepoint that decides which bytes become the committed deliverable, so
+// a symlink is never followed here (cycle-1256 D3).
+func artifactLocate(cfg *Config) (path string, found bool) {
+	if regularFileNonEmpty(cfg.Artifact) {
+		return cfg.Artifact, true
 	}
 	base := filepath.Base(cfg.Artifact)
 	candidates := []string{filepath.Join(cfg.Workspace, "workspace", base)}
@@ -194,15 +255,12 @@ func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
 		)
 	}
 	for _, fallback := range candidates {
-		if fallback == cfg.Artifact || !fileNonEmpty(fallback) {
+		if fallback == cfg.Artifact || !regularFileNonEmpty(fallback) {
 			continue
 		}
-		if rerr := relocateFile(fallback, cfg.Artifact); rerr != nil {
-			return false, "", fmt.Errorf("relocate %s → %s: %w", fallback, cfg.Artifact, rerr)
-		}
-		return true, fallback, nil
+		return fallback, true
 	}
-	return false, "", nil
+	return "", false
 }
 
 // relocateFile moves src to dst, creating dst's parent directory. It tries an
@@ -212,7 +270,13 @@ func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
 // (ENOSPC, network I/O) never leaves a truncated non-empty file at the
 // canonical path — which the poll loop would otherwise read as "ready". This
 // mirrors the ${file}.tmp.$$ + mv discipline used across the codebase's
-// atomic writers. Used by artifactReady to canonicalize a non-canonical write.
+// atomic writers. The temp file is created with os.CreateTemp — O_EXCL with an
+// unpredictable suffix — rather than the old "<dst>.tmp.<pid>" name, whose PID
+// component is small, guessable and disclosed in logs: an agent that pre-planted
+// that name as a symlink turned this copy into an arbitrary-write primitive
+// (cycle-1256 D4). Used by artifactReady to canonicalize a non-canonical write
+// that has already been observed to stop changing; callers that have NOT
+// established that must use renameOnlyRelocate instead.
 func relocateFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("relocate: mkdir dst dir: %w", err)
@@ -224,16 +288,51 @@ func relocateFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("relocate: read src: %w", err)
 	}
-	tmp := fmt.Sprintf("%s.tmp.%d", dst, os.Getpid())
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	tf, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("relocate: create dst tmp: %w", err)
+	}
+	tmp := tf.Name()
+	if _, werr := tf.Write(data); werr != nil {
+		_ = tf.Close()
 		_ = os.Remove(tmp)
-		return fmt.Errorf("relocate: write dst tmp: %w", err)
+		return fmt.Errorf("relocate: write dst tmp: %w", werr)
+	}
+	if cerr := tf.Close(); cerr != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("relocate: close dst tmp: %w", cerr)
+	}
+	if err := os.Chmod(tmp, 0o644); err != nil { // CreateTemp is 0600; match the old mode
+		_ = os.Remove(tmp)
+		return fmt.Errorf("relocate: chmod dst tmp: %w", err)
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("relocate: rename tmp into place: %w", err)
 	}
 	_ = os.Remove(src)
+	return nil
+}
+
+// renameOnlyRelocate canonicalizes src → dst with rename semantics ONLY: if the
+// rename cannot be done (a cross-device src, an unwritable source directory) it
+// reports the error instead of degrading to relocateFile's copy+remove.
+//
+// This is the mover for a caller that has NOT confirmed the artifact stopped
+// changing — today, artifactDetector's finality short-circuit. Rename is the one
+// canonicalization that is safe for a file still being written: it relinks the
+// same inode, so the agent's open fd keeps appending into the file at its new
+// path and the deliverable reader still sees every byte. copy+remove on the same
+// file snapshots it half-written and then deletes the original, which is
+// permanent data loss dressed up as a settled artifact (cycle-1256 D1).
+func renameOnlyRelocate(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("relocate (rename-only): mkdir dst dir: %w", err)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return fmt.Errorf("relocate (rename-only): %w — refusing the copy+remove "+
+			"fallback because this artifact was never observed to settle", err)
+	}
 	return nil
 }
 

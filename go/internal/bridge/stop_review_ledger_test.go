@@ -33,7 +33,7 @@ func runTmuxOnStopReview(t *testing.T, fx launchFixture, tmux *fakeTmux, rev Sto
 	d.Sleep = func(time.Duration) {}
 	d.Reviewer = rev
 	d.OnStopReview = spy
-	eng := NewEngine(d)
+	eng := newTestEngine(d)
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
 	return code, stderr.String()

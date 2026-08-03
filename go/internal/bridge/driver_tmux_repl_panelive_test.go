@@ -175,9 +175,13 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 			tmux.setPane("❯ q\n\n⏺ done\n\n❯\n  ⏵⏵ bypass permissions on · ← for agents")
 		default:
 			// Drop the artifact only after both breadcrumbs are in the file so
-			// the loop cannot exit before idle_reached fires.
-			if b, _ := os.ReadFile(bcPath); strings.Contains(string(b), "idle_reached") {
-				_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
+			// the loop cannot exit before idle_reached fires — and write it ONCE.
+			// Under the cycle-1233 cross-poll stability window (completion.go) a
+			// file rewritten every tick bumps its mtime forever and never settles.
+			if _, err := os.Stat(cfg.Artifact); err != nil {
+				if b, _ := os.ReadFile(bcPath); strings.Contains(string(b), "idle_reached") {
+					_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
+				}
 			}
 		}
 	}

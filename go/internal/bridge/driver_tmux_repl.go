@@ -570,10 +570,22 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// break skipped straight to the !completed → ExitArtifactTimeout exit,
 			// laundering a finished session into a timeout (session-lifecycle
 			// residual; the runner's settle-retry was the only thing standing
-			// between that mislabel and a false FAIL). The artifact detector is a
-			// pure file stat, so the dead ctx cannot fail this last look; a
-			// genuinely unfinished session still exits ExitArtifactTimeout.
-			if ready, _, note, _ := detector.poll(ctx); ready {
+			// between that mislabel and a false FAIL). A genuinely unfinished
+			// session still exits ExitArtifactTimeout.
+			//
+			// The poll gets a context DETACHED from the cancellation (cycle-1236):
+			// this line dispatches to all three completionDetector strategies, and
+			// only artifactDetector is a pure file stat. stdoutDetector shells
+			// CapturePane and gitEvidenceDetector shells git — exec.CommandContext
+			// refuses to fork on a dead ctx, both swallow the transport error as
+			// "not ready", and a DELIVERED stdout/git phase exited 81. withFinalPoll
+			// hands them a live, finalPollGrace-bounded context carrying the
+			// explicit finality marker artifactDetector's short-circuit now keys on
+			// (a live ctx alone would have disarmed it — completion.go).
+			finalCtx, finalCancel := withFinalPoll(ctx)
+			ready, _, note, _ := detector.poll(finalCtx)
+			finalCancel()
+			if ready {
 				completed = true
 				if note != "" {
 					fmt.Fprintf(deps.Stderr, "%s %s\n", pfx, note)

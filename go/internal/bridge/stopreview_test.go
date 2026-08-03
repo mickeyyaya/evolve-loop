@@ -175,7 +175,7 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 	d.Tmux = tmux
 	d.Sleep = func(time.Duration) {}
 	d.Reviewer = rev
-	eng := NewEngine(d)
+	eng := newTestEngine(d)
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
 	return code, stderr.String()

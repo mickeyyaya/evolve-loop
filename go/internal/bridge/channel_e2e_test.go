@@ -72,7 +72,12 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		case !strings.Contains(string(bc), "idle_reached"):
 			tmux.setPane(answer) // PaneBusy=false + ⏺ answer above the box → idle_reached + pane.live
 		default:
-			_ = os.WriteFile(artifact, []byte("done"), 0o644) // both breadcrumbs in → complete
+			// Both breadcrumbs in → complete. Written ONCE: under the cycle-1233
+			// cross-poll stability window (completion.go) a file rewritten on
+			// every tick keeps bumping its mtime and never settles.
+			if _, err := os.Stat(artifact); err != nil {
+				_ = os.WriteFile(artifact, []byte("done"), 0o644)
+			}
 		}
 		time.Sleep(3 * time.Millisecond)
 	}

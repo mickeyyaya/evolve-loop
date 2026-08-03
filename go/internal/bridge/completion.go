@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
@@ -33,6 +34,41 @@ import (
 // finished" for the stdout contract. Debounce: a streaming agent's pane
 // changes every tick, so the counter only accrues once output has settled.
 const stdoutIdlePolls = 3
+
+// artifactStableTicks is the artifact twin of stdoutIdlePolls: how many
+// consecutive poll ticks (each ~2s in the wait loop) must observe the SAME
+// (size, mtime) before the deliverable counts as finished. Two is the minimum
+// that is actually a window — one observation is just the legacy first-sight
+// read — and each extra tick costs ~2s on every phase, so it stays small.
+const artifactStableTicks = 2
+
+// finalPollGrace bounds the wait loop's ONE post-cancel completion poll. The
+// poll runs on a context DETACHED from the cancelled one (see withFinalPoll) so
+// detectors that shell a subprocess can actually run it; this timeout is what
+// keeps that detachment from re-introducing an unbounded wait during teardown.
+// Sized for a single tmux capture / `git rev-parse`, not for an agent turn.
+const finalPollGrace = 5 * time.Second
+
+// finalPollCtxKey marks a context as the wait loop's LAST look before it gives
+// up. Finality is signalled EXPLICITLY rather than inferred from ctx.Err():
+// the final poll now carries a live context (a dead one cannot fork tmux or
+// git — completion.go's stdout/git detectors were starved by exactly that), so
+// cancellation is no longer observable to the detector at all.
+type finalPollCtxKey struct{}
+
+// withFinalPoll returns the context for the wait loop's final completion poll:
+// detached from the caller's cancellation, bounded by finalPollGrace, and
+// carrying the finality marker. The caller MUST call the returned cancel.
+func withFinalPoll(ctx context.Context) (context.Context, context.CancelFunc) {
+	live := context.WithValue(context.WithoutCancel(ctx), finalPollCtxKey{}, true)
+	return context.WithTimeout(live, finalPollGrace)
+}
+
+// isFinalPoll reports whether this poll is the wait loop's last look.
+func isFinalPoll(ctx context.Context) bool {
+	final, _ := ctx.Value(finalPollCtxKey{}).(bool)
+	return final
+}
 
 // completionEvidence carries what a detector observed at completion. Empty for
 // the artifact contract (the file at cfg.Artifact is the evidence, read by the
@@ -149,23 +185,136 @@ func shortSHA(s string) string {
 	return s
 }
 
-// artifactDetector is the legacy contract: completion = a non-empty file at
-// cfg.Artifact (with the cycle-108 non-canonical relocate tolerance). It wraps
-// artifactReady verbatim so behavior is identical to the pre-Strategy code.
-type artifactDetector struct{ cfg *Config }
+// artifactDetector implements the artifact contract: completion = a non-empty
+// file at cfg.Artifact (with the cycle-108 non-canonical relocate tolerance)
+// that has STOPPED CHANGING. artifactLocate answers "is it there?" without
+// touching the file; a cross-poll stability window answers "is it finished?";
+// artifactReady then canonicalizes it.
+//
+// Why the window (cycle-1198): an agent's deliverable is typically a Write
+// followed seconds later by an Edit. First-sight completion accepted the
+// half-written intermediate — the gate rejected a scout-report.md that parsed
+// perfectly moments afterwards. The deliverable-side grace retry
+// (deliverable.go) covers absence/emptiness only; a "parses fine, wrong
+// content" read is not retried, by design. So the fix belongs here, at the
+// source.
+//
+// The state is carried ACROSS poll calls, not within one: an in-poll settle
+// sleep (the rejected cycle-1212 design) is tens of milliseconds and cannot
+// span a multi-second Write→Edit gap. The wait loop already calls poll every
+// ~2s; that cadence IS the window. mtime is in the stability key because size
+// alone is content-blind to an equal-length fix-up Edit.
+// The window gates the DESTRUCTIVE relocation, it does not merely follow it
+// (cycle-1249). poll's read-only half is artifactLocate; relocateFile — whose
+// cross-device branch copies a partial file into the canonical path and then
+// REMOVES the source the agent is still appending to — runs only on the tick the
+// window closes. Relocating that way on first sight would defeat the debounce on
+// the very path scout flagged as highest-risk, leaving a permanently stable,
+// permanently truncated deliverable that the window then certifies as finished.
+//
+// Precisely stated, because the earlier wording of this paragraph claimed more
+// than the code did and cycle-1256 audited it as a refuted safety claim (D2):
+// the ONE path that completes without a closed window — the finality
+// short-circuit below — still canonicalizes a non-canonical fallback, but it is
+// restricted to renameOnlyRelocate. Rename relinks an inode and so is safe for a
+// file that may still be growing; copy+remove is not, and under finality it
+// never runs.
+type artifactDetector struct {
+	cfg *Config
 
-func (d *artifactDetector) poll(_ context.Context) (bool, completionEvidence, string, error) {
-	ready, from, err := artifactReady(d.cfg)
+	haveLast    bool
+	lastPath    string
+	lastSize    int64
+	lastModTime time.Time
+	stable      int
+}
+
+func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, string, error) {
+	path, found := artifactLocate(d.cfg)
+	if !found {
+		d.haveLast, d.stable = false, 0
+		return false, completionEvidence{}, "", nil
+	}
+	// Final look: this is the wait loop's ONE last poll before it gives up
+	// (driver_tmux_repl.go). Demanding a fresh window it can never get would
+	// launder every finished-at-the-buzzer session into ExitArtifactTimeout —
+	// turning a truncated-read fix into a worse false-FAIL generator. The
+	// artifact is on disk, which is the evidence; short-circuit. Checked AFTER
+	// artifactLocate, whose found result already proves a non-empty artifact
+	// exists, so finality can never manufacture completion from nothing.
+	//
+	// stable is 0 here — no window was ever closed on this artifact — so the
+	// mover is renameOnlyRelocate, NOT relocateFile (cycle-1256 D1). Completing
+	// on an unwitnessed artifact is a deliberate, bounded concession; deleting
+	// the agent's source file after snapshotting it half-written is not, and
+	// that is exactly what relocateFile's copy+remove branch does. Rename-only
+	// keeps the concession reversible: worst case the canonical path holds a
+	// file the agent's fd is still appending into, best case a finished one, and
+	// never a truncated snapshot with the original destroyed. If the rename
+	// cannot be done, the poll reports the error and the phase takes its
+	// artifact timeout — the honest outcome for "we could not safely finish".
+	//
+	// Two keys, deliberately: isFinalPoll is the explicit signal the wait loop
+	// now sends (its final context is LIVE, so ctx.Err() would never fire there
+	// again), and ctx.Err() still covers a detector polled on a context that
+	// died under it mid-wait — the pre-existing contract, unchanged.
+	if isFinalPoll(ctx) || ctx.Err() != nil {
+		return d.completeWith(renameOnlyRelocate)
+	}
+	fi, serr := os.Stat(path)
+	if serr != nil {
+		// Vanished between artifactLocate and here (or unreadable): treat as not
+		// ready and restart the window rather than completing on a stale read.
+		d.haveLast, d.stable = false, 0
+		return false, completionEvidence{}, "", nil
+	}
+	// path is part of the key: an artifact that moved between ticks (a fallback
+	// the agent rewrote at the canonical path) is a NEW observation, not a
+	// continuation of the old file's window.
+	if d.haveLast && path == d.lastPath && fi.Size() == d.lastSize && fi.ModTime().Equal(d.lastModTime) {
+		d.stable++
+	} else {
+		d.stable = 1 // this observation is the first of a new window
+	}
+	d.haveLast, d.lastPath, d.lastSize, d.lastModTime = true, path, fi.Size(), fi.ModTime()
+
+	if d.stable < artifactStableTicks {
+		return false, completionEvidence{}, "", nil
+	}
+	// The window closed: this artifact HAS been observed to stop changing, so
+	// the full mover — including relocateFile's cross-device copy+remove — is
+	// safe here and only here.
+	return d.completeWith(relocateFile)
+}
+
+// completeWith canonicalizes the artifact with the caller's mover and reports
+// the phase done. This is the ONLY place the non-canonical fallback is moved —
+// deferring the move to here is what keeps a still-growing fallback where the
+// agent left it. The mover is a parameter rather than a constant because the two
+// callers differ in what they have PROVEN about the artifact: the window-close
+// path witnessed it settle (relocateFile), the finality short-circuit did not
+// (renameOnlyRelocate). A relocation failure surfaces as the detector's error
+// (the wait loop logs it once); an artifact that vanished between the window's
+// last look and this call restarts the window rather than completing on nothing.
+func (d *artifactDetector) completeWith(move func(src, dst string) error) (bool, completionEvidence, string, error) {
+	ready, from, err := artifactCanonicalize(d.cfg, move)
 	if err != nil {
 		return false, completionEvidence{}, "", err
 	}
 	if !ready {
+		d.haveLast, d.stable = false, 0
 		return false, completionEvidence{}, "", nil
 	}
-	if from != "" {
-		return true, completionEvidence{}, fmt.Sprintf("artifact relocated from non-canonical %s → %s; appeared: %s", from, d.cfg.Artifact, d.cfg.Artifact), nil
+	return true, completionEvidence{}, d.completionNote(from), nil
+}
+
+// completionNote is the operator-facing log line for a completing tick, naming
+// the non-canonical source when this launch relocated one.
+func (d *artifactDetector) completionNote(relocatedFrom string) string {
+	if relocatedFrom != "" {
+		return fmt.Sprintf("artifact relocated from non-canonical %s → %s; appeared: %s", relocatedFrom, d.cfg.Artifact, d.cfg.Artifact)
 	}
-	return true, completionEvidence{}, fmt.Sprintf("artifact appeared: %s", d.cfg.Artifact), nil
+	return fmt.Sprintf("artifact appeared: %s", d.cfg.Artifact)
 }
 
 // stdoutDetector implements the stdout contract for agents (the router/advisor)

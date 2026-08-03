@@ -59,7 +59,7 @@ func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop now"}}}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},
 		ArtifactTimeoutS: 7,
