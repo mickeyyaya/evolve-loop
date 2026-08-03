@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
 )
 
 // runPhaseVerify implements `evolve phase verify <phase> --workspace DIR
@@ -107,11 +108,53 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 // yields the violation, so ordinary cycles are unaffected.
 func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (deliverable.Result, error) {
 	stage := phaseVerifyPhaseIO()
-	if phase != "build" || roots.Worktree == "" {
-		return deliverable.VerifyWithStage(phase, roots, resolver, stage)
+	if phase == "build" && roots.Worktree != "" {
+		changed := core.ChangedWorktreePaths(context.Background(), roots.Worktree)
+		return deliverable.VerifyBuildWithChangedPathsStage(roots, changed, resolver, stage)
 	}
-	changed := core.ChangedWorktreePaths(context.Background(), roots.Worktree)
-	return deliverable.VerifyBuildWithChangedPathsStage(roots, changed, resolver, stage)
+	res, err := deliverable.VerifyWithStage(phase, roots, resolver, stage)
+	if err != nil || phase != "tdd" || roots.Worktree == "" {
+		return res, err
+	}
+	return withFrozenPinViolations(res, roots.Worktree), nil
+}
+
+// codeUnreachableFrozenPin is the stable violation code the tdd reachability
+// gate emits, so an agent reading stderr knows WHICH gate failed.
+const codeUnreachableFrozenPin = "unreachable_frozen_pin"
+
+// withFrozenPinViolations adds the cycle-644 reachability gate to a tdd
+// verdict: every call site frozen by this deliverable (`doNotModifyTests:
+// true`) that would require its pinning package to import a package already
+// importing it back is a permanently unsatisfiable acceptance criterion, and
+// cycle-644 proved that costs a whole cycle to discover from the build side.
+// Catching it here — the self-check every tdd agent runs before handing off,
+// sharing its verifier with the host-side contract gate (ADR-0034) — makes the
+// check deterministic instead of a doc obligation the agent may forget
+// (agents/evolve-tdd-engineer.md:132).
+//
+// Placement mirrors the ADR-0077 docs-floor precedent: phase-scoped and
+// `--worktree`-scoped, because the worktree is the only place the pinned
+// production files and their import graph exist. Fail-open on every infra
+// ambiguity (unparseable handoff, no module, `go list` failure) — only a
+// compiler-provable cycle turns a well-formed deliverable red.
+func withFrozenPinViolations(res deliverable.Result, worktree string) deliverable.Result {
+	frozen, err := reachabilityprobe.FrozenTestFiles(res.ArtifactPath)
+	if err != nil || len(frozen) == 0 {
+		return res
+	}
+	violations, err := reachabilityprobe.CheckFrozenPins(worktree, frozen)
+	if err != nil || len(violations) == 0 {
+		return res
+	}
+	for i := range violations {
+		res.Violations = append(res.Violations, deliverable.Violation{
+			Code:    codeUnreachableFrozenPin,
+			Message: violations[i].Error(),
+		})
+	}
+	res.OK = false
+	return res
 }
 
 // phaseVerifyPhaseIO resolves the EVOLVE_PHASE_IO rollout stage the SAME way the
