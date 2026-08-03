@@ -44,7 +44,14 @@ func buildGraduationCheck(ctx context.Context, worktree string) string {
 	changed := changedGoTestPackages(changedWorktreePaths(ctx, worktree))
 	var fresh []string
 	for _, pkg := range ciparity.NewUngraduatedPackages(changed, enforceBytes) {
-		if packageNewThisCycle(ctx, worktree, pkg) && packageHasProductionGoFiles(worktree, pkg) {
+		if packageNewThisCycle(ctx, worktree, pkg) {
+			if !packageHasProductionGoFiles(worktree, pkg) {
+				// Never silently skip (review F2): the vacuous-obligation skip
+				// is announced, so a test-only mint that lands unenrolled is
+				// visible in the cycle log rather than discovered at audit.
+				fmt.Fprintf(os.Stderr, "[build-floor] graduation deferred: new package %s is test-only (no production .go surface) — abort suppressed; audit re-flags the package on any later change\n", pkg)
+				continue
+			}
 			fresh = append(fresh, pkg)
 		}
 	}

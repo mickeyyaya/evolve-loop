@@ -133,3 +133,38 @@ func TestApicoverNewPkgGraduationDefault_CmdChangeNotFlagged(t *testing.T) {
 		t.Fatalf("apicoverNewPackageGraduationDefault(go/cmd/... only change) = (%v,%v), want (nil,nil) — cmd/ is out of scope", off, err)
 	}
 }
+
+// TestApicoverNewPkgGraduationDefault_TestOnlyPackageNotFlagged is the
+// mutation-killing negative for the audit seam (review F1): a changed NEW
+// package whose dir holds ONLY a _test.go file must produce ZERO offenders —
+// delete the PackageDirHasProductionGoFiles skip in
+// apicoverNewPackageGraduationDefault and THIS test goes red, where before it
+// nothing at this seam drove the predicate to false (the exact
+// seams-silently-disagreeing class graduation_registration_test.go documents).
+func TestApicoverNewPkgGraduationDefault_TestOnlyPackageNotFlagged(t *testing.T) {
+	root, goDir := goWorktree(t)
+	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(goDir, "internal", "testonly"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "internal", "testonly", "only_test.go"), []byte("package testonly\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
+		[]byte(`{"thrusts":[{"files_new":["go/internal/testonly/only_test.go"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	offenders, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
+	if err != nil {
+		t.Fatalf("apicoverNewPackageGraduationDefault: %v", err)
+	}
+	if len(offenders) != 0 {
+		t.Fatalf("test-only new package must not be flagged at the audit seam (vacuous obligation), got offenders: %v", offenders)
+	}
+}
