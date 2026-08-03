@@ -95,13 +95,39 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		driverDone <- code
 	}()
 
-	// Let the driver boot and seek the (empty) inbox to EOF before the
-	// supervisor appends, so its correlated ask is not skipped by the seek.
-	time.Sleep(20 * time.Millisecond)
+	// The driver seeks the inbox cursor to EOF at boot, so an ask appended
+	// BEFORE that seek is skipped forever — and with this test's self-paced
+	// tmux, a skipped ask means the answer never arrives. A bare sleep here
+	// lost that race on a loaded CI runner (driver goroutine scheduled late →
+	// 10m package-timeout panic, macOS 2026-08-03). Sync positively instead:
+	// the driver creates build-pane.live strictly AFTER the cursor seek in the
+	// same goroutine, so once the file exists the seek has happened and an
+	// appended ask is guaranteed to be delivered.
+	paneLivePath := filepath.Join(ws, "build-pane.live")
+	for bootDeadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Millisecond) {
+		if _, err := os.Stat(paneLivePath); err == nil {
+			break
+		}
+		if time.Now().After(bootDeadline) {
+			t.Fatal("driver never created build-pane.live — REPL boot did not reach the channel stage")
+		}
+	}
 
+	// The supervisor's clock must ADVANCE: its Ask deadline is computed and
+	// checked via the injected Now, so the producer's frozen clock here turned
+	// every lost-answer scenario into an infinite poll — the 10s Timeout could
+	// structurally never fire, and a missed ask became the package's 10-minute
+	// timeout panic (macOS CI 2026-08-03) instead of a 10s ErrResponseTimeout
+	// with diagnostics. One fake millisecond per reading keeps the test free of
+	// wall-clock timestamps while making the failsafe real.
+	var supTick int64
+	supNow := func() time.Time {
+		supTick++
+		return time.Unix(0, supTick*int64(time.Millisecond)).UTC()
+	}
 	sup := channel.NewSupervisor(channel.SupervisorConfig{
 		Workspace: ws, Agent: "build", Transport: "claude-tmux",
-		Now: now, NewID: func() string { return "cX" },
+		Now: supNow, NewID: func() string { return "cX" },
 		PollEvery: time.Millisecond, Timeout: 10 * time.Second,
 	})
 	ans, err := sup.Ask(context.Background(), "summarize what tmux is")
