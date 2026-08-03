@@ -810,13 +810,28 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// attempt so operators/graders see the persona fired without diffing the
 		// prompt file. Rendered even for the empty set (skill-overlays=[]).
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, overlaySkills, tier))
+		// Pre-worktree phases (scout/intent/triage) and post-teardown retro
+		// carry no per-cycle worktree, but the tree the agent runs over must
+		// still be EXPLICIT: the tmux drivers' CB.2 fleet guard refuses the
+		// process-cwd fallback (exit=10), which killed scouts 1231/1232/1234
+		// with identical fingerprints and halted the 2026-08-03 batch (retro
+		// hit the same refusal non-fatally the day before). The cycle's own
+		// project root is what these phases have always run over — in fleet
+		// lanes the supervisor's cwd equalled it, which is why single-driver
+		// mode never surfaced this. req.Worktree itself stays empty upstream:
+		// consumers keying on `Worktree == ""` (build floor skip, contract
+		// roots, preservation) keep that meaning.
+		dispatchWorktree := req.Worktree
+		if dispatchWorktree == "" {
+			dispatchWorktree = req.ProjectRoot
+		}
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:                 candidateCLI,
 			Profile:             profilePath,
 			Model:               tier,
 			Prompt:              prompt,
 			Workspace:           req.Workspace,
-			Worktree:            req.Worktree,
+			Worktree:            dispatchWorktree,
 			RunID:               req.RunID,
 			ProjectRoot:         req.ProjectRoot,
 			ArtifactPath:        artifactPath,
