@@ -159,15 +159,14 @@ func TestDigest_GenericSignalFold(t *testing.T) {
 	}
 }
 
-// TestDigest_NoSignalsBlock_GenericOnlyContainsBuiltins confirms a handoff without a signals
-// block leaves Generic containing only built-ins like run_dir.artifact_bytes.
-func TestDigest_NoSignalsBlock_GenericOnlyContainsBuiltins(t *testing.T) {
+// TestDigest_NoSignalsBlock_GenericNil confirms a handoff without a signals
+// block leaves Generic nil (fail-open, no allocation).
+func TestDigest_NoSignalsBlock_GenericNil(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "handoff-scout.json", scoutHandoff)
 	sig, _ := Digest(ws, []string{"scout"})
-	delete(sig.Generic, "run_dir.artifact_bytes")
-	if len(sig.Generic) > 0 {
-		t.Errorf("Generic = %v, want empty after stripping built-ins when no signals block present", sig.Generic)
+	if sig.Generic != nil {
+		t.Errorf("Generic = %v, want nil when no signals block present", sig.Generic)
 	}
 }
 

@@ -21,10 +21,13 @@ package reachabilityprobe
 import (
 	"encoding/json"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -95,11 +98,18 @@ var (
 )
 
 // pinnedRef is one extracted pin plus the module root its packages resolve
-// against — the module root is needed to build the import graph but is an
-// implementation detail, so ExtractFrozenPins projects it away.
+// against and the import aliases in scope where the pin was written — both are
+// needed to resolve the pin against a real import graph but are implementation
+// details, so ExtractFrozenPins projects them away.
 type pinnedRef struct {
 	site       CallSite
 	moduleRoot string
+	// aliases maps an identifier introduced by an import alias in the frozen
+	// test file carrying this pin to the full import path it binds. That file
+	// is the only place the binding can live: were the PINNED PRODUCTION file
+	// to import the referenced package already, the module would be cyclic
+	// today and `go list` would produce no graph at all.
+	aliases map[string]string
 }
 
 // ExtractFrozenPins returns one CallSite per package-qualified pin found in
@@ -129,6 +139,7 @@ func extractPins(worktreeRoot string, frozenTestFiles []string) ([]pinnedRef, er
 		if err != nil {
 			continue // fail open: a frozen file we cannot read proves nothing
 		}
+		aliases := importAliases(body)
 		for _, line := range strings.Split(string(body), "\n") {
 			source, referenced, symbol, ok := pinOnLine(line)
 			if !ok {
@@ -145,10 +156,39 @@ func extractPins(worktreeRoot string, frozenTestFiles []string) ([]pinnedRef, er
 					Symbol:            symbol,
 				},
 				moduleRoot: moduleRoot,
+				aliases:    aliases,
 			})
 		}
 	}
 	return refs, nil
+}
+
+// importAliases returns the identifier -> full import path bindings introduced
+// by ALIASED imports in the Go source src. Unaliased imports are omitted: the
+// identifier they bind is already covered by resolvePackage's base-name
+// matching. `_` and `.` bind no usable package identifier and are never
+// resolved, so a pin spelled through one still fails open. A source that will
+// not parse binds nothing (fail open) — it proves no cycle either way.
+func importAliases(src []byte) map[string]string {
+	file, err := parser.ParseFile(token.NewFileSet(), "", src, parser.ImportsOnly)
+	if err != nil {
+		return nil
+	}
+	var aliases map[string]string
+	for _, spec := range file.Imports {
+		if spec.Name == nil || spec.Name.Name == "_" || spec.Name.Name == "." {
+			continue
+		}
+		imported, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			continue
+		}
+		if aliases == nil {
+			aliases = map[string]string{}
+		}
+		aliases[spec.Name.Name] = imported
+	}
+	return aliases
 }
 
 // pinOnLine returns the pinned source path, referenced package identifier and
@@ -236,7 +276,7 @@ func CheckFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]Violation
 		if graph == nil {
 			continue
 		}
-		referenced, ok := resolvePackage(graph, ref.site.ReferencedPackage, ref.site.PinningPackage)
+		referenced, ok := resolvePackage(graph, ref.site.ReferencedPackage, ref.site.PinningPackage, ref.aliases)
 		if !ok {
 			continue
 		}
@@ -253,7 +293,26 @@ func CheckFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]Violation
 // full import path present in graph, preferring the candidate sharing the
 // longest prefix with the pinning package (the nearest neighbour in the same
 // module) and breaking ties lexically so the verdict is deterministic.
-func resolvePackage(graph ImportGraph, ident, pinning string) (string, bool) {
+//
+// Precedence is exact path, then base name, then alias — and the ORDER is the
+// load-bearing part. The identifier is compiled in the PINNED PRODUCTION file's
+// scope, not the frozen test file's, so an alias declared in the test file is a
+// hint about intent, never an authoritative binding. Consulting it first (as
+// this resolver did until cycle-1248) makes the map able to SUPPRESS: one import
+// line in the frozen test file rebinding `storage` to some benign package
+// silently redirects a `storage.UpdateStateMap(` pin away from the real
+// internal/storage that base-name matching would have found, and an alias
+// binding anything outside the module graph killed resolution outright. Either
+// turns the gate blind to the exact cycle-644 shape it exists to catch — and a
+// frozen test file is agent-authored, so that suppression is one plausible-
+// looking edit away.
+//
+// Consulted LAST, the alias can only ever ADD reach: it resolves identifiers
+// (`st`, `lf`) that match no package's base name and would otherwise fail open,
+// and it can no longer displace a real graph package that does match. An alias
+// binding a package absent from graph resolves nothing, which is the same
+// fail-open verdict as no alias at all.
+func resolvePackage(graph ImportGraph, ident, pinning string, aliases map[string]string) (string, bool) {
 	if _, exact := graph[ident]; exact {
 		return ident, true
 	}
@@ -267,7 +326,15 @@ func resolvePackage(graph ImportGraph, ident, pinning string) (string, bool) {
 			best, bestScore = pkg, score
 		}
 	}
-	return best, best != ""
+	if best != "" {
+		return best, true
+	}
+	if aliased, bound := aliases[ident]; bound {
+		if _, known := graph[aliased]; known {
+			return aliased, true
+		}
+	}
+	return "", false
 }
 
 // commonPrefixLen returns the length of the shared leading run of a and b.

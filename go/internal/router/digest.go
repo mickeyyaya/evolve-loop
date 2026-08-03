@@ -68,25 +68,7 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	for _, phase := range completed {
 		sig.foldFailureSentinel(workspace, phase)
 	}
-	if sig.Generic == nil {
-		sig.Generic = make(map[string]any, 1)
-	}
-	sig.Generic["run_dir.artifact_bytes"] = float64(dirSize(workspace))
 	return sig, nil
-}
-
-func dirSize(path string) int64 {
-	var size int64
-	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return nil
-	})
-	return size
 }
 
 // unwrapPayload returns the inner `payload` object bytes of the canonical
