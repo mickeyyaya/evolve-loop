@@ -1,0 +1,20 @@
+{
+  "id": "minted-phase-verdict-contract-unsatisfiable",
+  "title": "flake-rerun-scan contract rejected BOTH CLI families with [bad_verdict] — when escalation fails too, the defect is the minted phase's own contract/template, not the model",
+  "weight": 0.88,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-08",
+  "summary": "First post-relaunch batch (cycle ~1224, lane tdd-structural-test-reachability-probe): minted phase flake-rerun-scan failed its contract [bad_verdict: no parseable verdict] on agy-tmux (blocks 1-2), CLI ESCALATION fired correctly at block 2 (agy-tmux -> claude-tmux, first live firing), and the ESCALATED CLI FAILED THE SAME WAY — block 3, circuit open, gate demoted enforce->advisory for the rest of the run. Two independent model families producing the identical no-parseable-verdict violation kills the model-property hypothesis for this instance (batch-18/21 evidence had claude COMPLYING where agy failed). The probable defect classes, in check order: (1) the minted phase's prompt/contract template never instructs the verdict line or names a different artifact than the phase writes (compare intent-delta-contract-path-skew — the contract gate verifying a file the phase was never asked to write); (2) the mint pipeline (advisor phase mint) generates contracts with RequireVerdict but a deliverable spec lacking the verdict section; (3) verdict parsed from the wrong artifact in minted-phase dispatch. NOTE the system otherwise behaved exactly as designed: escalation fired, breaker opened as last resort, demotion WARN carried all four facts (phase/cli/escalation-ran/violation), and the CYCLE STILL PASSED on its floor gates (ADR-0072 demote-don't-brick). The cost is that every future mint of a verdict-less contract demotes that run's gate — later phases ship ungated — so this recurs until the TEMPLATE side is fixed.",
+  "acceptance": [
+    "READ FIRST: the rejected flake-rerun-scan deliverable + its phasecontract from the preserved lane run dir — confirm whether the verdict line is absent from the OUTPUT or the INSTRUCTION",
+    "RED: a mint-pipeline test proving a minted contract with RequireVerdict also emits the verdict instruction in the rendered prompt tail (RenderContractTail)",
+    "flake-rerun-scan (or an equivalent minted phase) passes its contract live on the PRIMARY CLI",
+    "go test -race ./internal/phasecontract/ ./internal/deliverable/ PASS"
+  ],
+  "files": ["go/internal/phasecontract/render.go", "go/internal/deliverable/", ".evolve/phases/"],
+  "deps": [],
+  "connects_to": ["contract-block-cli-escalation", "intent-delta-contract-path-skew", "contract-requirements-at-generation-point"],
+  "source": "console-2026-08-03 live monitor — first live contract-escalation firing, refuted its own model-property premise",
+  "created_at": "2026-08-03T00:30:00Z"
+}

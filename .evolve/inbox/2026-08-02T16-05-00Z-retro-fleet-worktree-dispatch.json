@@ -1,0 +1,20 @@
+{
+  "id": "retro-fleet-worktree-dispatch",
+  "title": "retro dispatch in fleet mode refused: 'explicit worktree required (refusing process-cwd fallback)' — the knowledge-capture phase FAILs in fleet lanes on the post-2026-08-02 binary",
+  "weight": 0.9,
+  "kind": "defect",
+  "priority": "high",
+  "campaign": "loop-reliability-2026-08",
+  "summary": "First batch on binary 6880559a (all 2026-07-30..08-02 fixes): retro bridge launch dies exit=10 '[claude-tmux] fleet mode: explicit worktree required (refusing process-cwd fallback)', 3 occurrences in the artifact-ready-crosspoll-debounce lane's first cycle, FAIL verdict emitted and routed via failure-adapter (non-fatal; the cycle-802 floor means it lands in phases_run_verdict_not_adopted, not a clobbered cycle verdict). REGRESSION HYPOTHESIS with bisect hint: batches 21/22 ran fleet width 3 and their retros DID run (cycle-1193's retrospective-report.md exists on disk — the very evidence in the dossier-retro-skipped-mislabel fix). The refusal message is a deliberate hardening guard, so either (a) a session change stopped passing the lane worktree into retro's BridgeRequest while the guard now refuses the cwd fallback that used to mask it, or (b) the guard itself landed newly strict. Either way retro/memo knowledge capture silently degrades to FAIL-not-adopted in every fleet lane if systematic — the lesson-to-action pipeline runs blind. CHECK FIRST: grep the launch site for where fleet lanes populate the retro dispatch worktree vs where build/audit get theirs; the fix is plumbing the SAME worktree the lane already owns, never relaxing the guard.",
+  "acceptance": [
+    "RED: a fleet-mode dispatch test proving retro's BridgeRequest carries the lane worktree (fails on current main)",
+    "retro + memo run green in a fleet lane live; retrospective-report.md materializes in the lane's run dir",
+    "the guard's refusal stays intact (no cwd fallback reintroduced)",
+    "go test -race ./internal/bridge/ ./internal/core/ ./internal/phases/retro/... PASS"
+  ],
+  "files": ["go/internal/bridge/", "go/internal/core/cyclerun_dispatch.go", "go/internal/phases/"],
+  "deps": [],
+  "connects_to": ["dossier-retro-skipped-mislabel", "lesson_to_action_gap"],
+  "source": "console-2026-08-02 live loop monitor, first post-relaunch batch, cycle ~1219",
+  "created_at": "2026-08-02T16:05:00Z"
+}

@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1228"
+  ],
+  "consumed_by": "console-2026-08-03: FIXED console-first, PR #398 squash c76e4b3f (adversarially reviewed, BLOCK cleared with a mutation-kill proof). Root cause: the tdd phase RED-first mints a TEST-ONLY package; buildGraduationCheck aborted any new package absent from .apicover-enforce, but a test-only package has zero exported production symbols \u2014 the obligation was vacuous, the abort fatal, and the prescription never rides the correction ladder, so the class recurred identically (1223/1224/1228) until the fingerprint breaker halted. Fix: ciparity.PackageDirHasProductionGoFiles consulted by BOTH graduation seams (build-entry abort + audit offender list), skips announced loudly, abort returns the moment a production file lands. Residuals queued from review: predicate keys on file presence not exported-symbol presence (panic-stub mint still aborts); dead '...' branch.",
+  "created_at": "2026-08-02T17:49:15Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-08-02T17:49:15Z. Evidence: failure fingerprint \"build|unknown|a020515c604d\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=build|unknown|a020515c604d)",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1228. The pipeline forged a verdict (category=pipeline-blocker): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 failure fingerprint \"build|unknown|a020515c604d\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=build|unknown|a020515c604d)",
+  "weight": 0.99
+}
