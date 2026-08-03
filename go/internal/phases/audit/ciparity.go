@@ -670,6 +670,18 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	}
 	offenders := make([]string, 0, len(ungraduated))
 	for _, pkg := range ungraduated {
+		// Same predicate as the build-entry seam: a test-only package has no
+		// production surface for the gate to inspect — flagging it here after
+		// the build seam stopped doing so would just move the vacuous FAIL one
+		// phase later (ciparity.PackageDirHasProductionGoFiles rationale).
+		if !ciparity.PackageDirHasProductionGoFiles(dir, pkg) {
+			// Never silently skip (review F2): the deferred obligation must be
+			// visible in the outcome record — enrollment re-raises when the
+			// production half lands (this seam has no new-this-cycle filter,
+			// so ANY later change to the package re-flags it).
+			fmt.Fprintf(os.Stderr, "[audit] graduation deferred: %s has no production .go surface (test-only/absent) — enrollment obligation re-raises when production code lands\n", pkg)
+			continue
+		}
 		offenders = append(offenders, fmt.Sprintf("%s: new package absent from go/.apicover-enforce — add it + an apicover_named_test.go", pkg))
 	}
 	return offenders, nil

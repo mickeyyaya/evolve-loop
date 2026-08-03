@@ -12,6 +12,8 @@ package ciparity
 import (
 	"bufio"
 	"bytes"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -64,6 +66,37 @@ func IntersectEnforced(changed []string, enforceBytes []byte) []string {
 // entry ("./internal/foo/...") matches its enforce-list form ("./internal/foo").
 func normalizePattern(p string) string {
 	return strings.TrimSuffix(strings.TrimSpace(p), "/...")
+}
+
+// PackageDirHasProductionGoFiles reports whether the package directory behind
+// an enforce-list-form pattern ("./internal/foo", resolved against moduleDir)
+// holds at least one non-test .go file — an exported API surface the repo-wide
+// apicover gate could actually inspect. A TEST-ONLY package (the tdd phase's
+// RED-first mint) has zero exported production symbols, so the graduation
+// obligation is VACUOUS on it: CI's enforce step passes such packages with
+// "0 exported, 0 covered", while flagging them killed cycles 1223/1224/1228
+// with identical fingerprints and halted the 2026-08-02 batch. BOTH graduation
+// seams (build-entry abort, audit offender list) consult this ONE predicate so
+// a package cannot pass the build seam and then die at audit for the same
+// vacuous reason. A recursive pattern ("...") names no single directory, so it
+// reports true (stays flagged, never guessed about). Fail-open on an
+// unreadable dir — a package that cannot be proven obligation-bearing must not
+// fail a phase; the repo-wide CI gate stays the backstop.
+func PackageDirHasProductionGoFiles(moduleDir, pkg string) bool {
+	if strings.Contains(pkg, "...") {
+		return true
+	}
+	entries, err := os.ReadDir(filepath.Join(moduleDir, filepath.FromSlash(strings.TrimPrefix(pkg, "./"))))
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go") {
+			return true
+		}
+	}
+	return false
 }
 
 // NewUngraduatedPackages returns the changed package patterns that live under
