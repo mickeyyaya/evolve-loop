@@ -48,6 +48,24 @@ precedence (high → low):
   env/profile/default chain **and** the `"auto"` → model-catalog expansion (a
   pinned exact model never triggers a catalog lookup).
 
+### Candidate-chain construction (single authority)
+
+The CLI candidate chain behind both dispatch entry points is built by ONE
+function — `buildCandidates(primary, prof, excludeProfileCLI)` in
+`go/internal/llmroute/dispatch.go`. Common behaviour: primary first, then
+`profile.cli_fallback` whitespace-trimmed, empties dropped, first occurrence
+wins, and the result always holds at least the primary (`Dispatch` fails loudly
+on an empty chain).
+
+`excludeProfileCLI` is the only difference between the two callers, and it is a
+parameter rather than a second copy of the loop (cycle-1265 collapsed the former
+`candidatesFrom`/`chainCandidates` pair):
+
+| Caller | `excludeProfileCLI` | Why |
+|---|---|---|
+| `llmroute.Resolve` | `false` | a pinned or env-forced primary keeps the profile's chain intact, so the phase retains CLI-failure resilience (see the `pin.cli` bullet above) |
+| `llmroute.ChainFor` | `true` | `prof.CLI` names the CLI the composition root deliberately swapped away from (e.g. the advisor routed around a benched family); re-appending it as a "fallback" would walk straight back into it |
+
 ### Guardrails
 
 A pin is validated against the phase profile's guardrails at dispatch:

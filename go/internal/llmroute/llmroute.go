@@ -28,7 +28,6 @@ package llmroute
 import (
 	"os/exec"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -138,7 +137,7 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 		tiers = TierChain(model, envelopeMin(prof))
 	}
 	return Plan{
-		Candidates:    candidatesFrom(primary, prof),
+		Candidates:    buildCandidates(primary, prof, false),
 		Triggers:      resolveTriggers(prof),
 		PrimarySource: source,
 		Model:         model,
@@ -208,29 +207,6 @@ func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile)
 		return prof.CLI, "profile." + agent + ".cli"
 	}
 	return "claude-tmux", "default"
-}
-
-// candidatesFrom builds the chain: primary first, then the deduped
-// profile.cli_fallback list (whitespace-trimmed, empties dropped, first
-// occurrence wins to preserve operator order).
-func candidatesFrom(primary string, prof *profiles.Profile) []string {
-	candidates := []string{primary}
-	if prof == nil {
-		return candidates
-	}
-	seen := map[string]struct{}{primary: {}}
-	for _, c := range prof.CLIFallback {
-		c = strings.TrimSpace(c)
-		if c == "" {
-			continue
-		}
-		if _, dup := seen[c]; dup {
-			continue
-		}
-		seen[c] = struct{}{}
-		candidates = append(candidates, c)
-	}
-	return candidates
 }
 
 // resolveTriggers returns profile.cli_fallback_on_exit or the conservative

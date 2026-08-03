@@ -66,21 +66,39 @@ func Dispatch(plan Plan, launch func(cli string) (exitCode int, err error)) Disp
 // package default trigger set.
 func ChainFor(primary string, prof *profiles.Profile) Plan {
 	return Plan{
-		Candidates: chainCandidates(primary, prof),
+		Candidates: buildCandidates(primary, prof, true),
 		Triggers:   resolveTriggers(prof),
 	}
 }
 
-// chainCandidates builds the deduped chain: primary first, then prof's
-// declared fallback (whitespace-trimmed, empties dropped), skipping any entry
-// that repeats the primary or prof.CLI (the swapped-away original primary).
-func chainCandidates(primary string, prof *profiles.Profile) []string {
+// buildCandidates is the single home for the "primary first, then the deduped
+// profile.cli_fallback list" chain — the one builder behind BOTH entry points
+// (Resolve via llmroute.go and ChainFor above), which previously carried
+// near-identical private copies of this loop
+// ([[never_duplicate_centralize_via_design_patterns]]). Fallback entries are
+// whitespace-trimmed, empties dropped, and first occurrence wins so the
+// operator's declared order survives.
+//
+// excludeProfileCLI is the ONE documented behavioural difference between the
+// two callers, now an explicit parameter rather than a second copy of the loop:
+//
+//   - ChainFor passes true — prof.CLI names the CLI the composition root
+//     deliberately swapped away from, so re-appending it as a "fallback" would
+//     just walk back into it (see ChainFor's doc comment).
+//   - Resolve passes false — a pinned/env-forced primary keeps the profile's
+//     chain intact so the phase retains CLI-failure resilience (see Resolve's
+//     doc comment).
+//
+// prof may be nil, and a fallback list of nothing but noise collapses to the
+// primary alone: the result always holds >=1 candidate, which is the invariant
+// Dispatch's empty-chain guard depends on.
+func buildCandidates(primary string, prof *profiles.Profile, excludeProfileCLI bool) []string {
 	candidates := []string{primary}
 	if prof == nil {
 		return candidates
 	}
 	seen := map[string]struct{}{primary: {}}
-	if prof.CLI != "" {
+	if excludeProfileCLI && prof.CLI != "" {
 		seen[prof.CLI] = struct{}{}
 	}
 	for _, c := range prof.CLIFallback {
