@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "RED: a Create test with an injected transient rc=255 first attempt succeeds on retry",
+    "final-failure path unchanged (WARN + source phases blocked + fail-fast preserved)",
+    "the abnormal-exit failure reason for a provisioning-blocked cycle names the git error, not the downstream phase refusal",
+    "go test -race ./internal/core/... PASS"
+  ],
+  "campaign": "loop-reliability-2026-08",
+  "connects_to": [
+    "retro-fleet-worktree-dispatch",
+    "verification-single-flight"
+  ],
+  "created_at": "2026-08-03T02:20:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/cyclerun.go",
+    "go/internal/adapters/runner/"
+  ],
+  "id": "worktree-provisioning-retry",
+  "kind": "defect",
+  "notes": "[CREATE-ROOT LANDED 2026-08-03] PR #401 (opus APPROVE, empirically probed: git's atexit junk-removal cleans a failed add's partial state, cross-lane -B hijack impossible via runscope namespacing + git fail-closed). REMAINING, from the review: (M1) the SAME un-retried git worktree add exists at THREE more roots \u2014 core/worktree.go CreateFrom (continuation seeding, live per ADR-0076), swarm/provision.go:147 (N concurrent workers \u2014 structurally the HIGHEST-contention site), cmd_worktree.go:82 (operator CLI); extract addWorktreeWithRetry and call from all four, else the next collision presents as a fresh incident class. (M2) terminal error reports only the LAST attempt's rc/stderr \u2014 retain and report the FIRST failure too (SIGKILL'd attempt 1 leaves the dir, attempt 2 dies rc=128 already-exists, masking the transient \u2014 reproduced). (L4) the retry announcement says 'transient' for every failure class and sleeps BEFORE announcing \u2014 announce then sleep, drop the assertion. (L5) comment over-claims 'repo-level lock': git die() is 128; rc=255 = a CHILD process (checkout/reset in the new worktree) failing to spawn \u2014 resource/sandbox, not lock; correct the comment before it seeds the next misdiagnosis. STILL OPEN from the original filing: fingerprint the PROVISIONING error, not the downstream scout alarm. | 2026-08-04: Create-root retry LANDED on main \u2014 PR #401 squash a497ffe1 (opus APPROVEd). Remaining scope is ONLY the residuals: M1 extract addWorktreeWithRetry for CreateFrom/swarm/provision.go:147/cmd_worktree.go:82, M2 first-failure retention, L4 announce-then-sleep wording, L5 rc=255 comment correction, fingerprint-the-provisioning-error-not-the-scout-alarm.",
+  "priority": "high",
+  "source": "console-2026-08-03 second batch-halt forensics; adversarial review of the refuted PR #400 supplied the decisive check",
+  "summary": "Cycles 1231/1232/1234: git worktree add -B cycle-\u2026 rc=255 (transient contention on the shared .git \u2014 the runtime plane is a LINKED WORKTREE of the console repo, so console git activity and N lanes' provisioning all take the same locks). Provisioning fails once -> ActiveWorktree empty -> CB.2 correctly fail-fasts every subsequent dispatch exit=10 -> identical fingerprints -> breaker halt. The alarm chain is CORRECT end-to-end; the missing piece is that Create treats a transient lock failure as permanent. Fix shape (verifylock precedent): bounded retry-with-backoff around o.worktree.Create (e.g. 3 attempts, 2s/4s), treating rc=255-with-empty-stderr as retryable; on final failure keep today's WARN+fail-fast. ALSO the fingerprint should carry the PROVISIONING error, not the downstream scout refusal \u2014 the 3 dossiers fingerprinted the alarm (scout|infra-error) instead of the cause, which cost one wrong fix (PR #400, adversarially refuted) before the WARN was read. OPERATOR half, already in force: no console git churn in the shared repo while a batch runs (live_loop_console_dev_worktree_only).",
+  "title": "worktree.Create has no retry \u2014 one transient git-lock collision on the shared .git kills a lane's whole cycle (and 3 identical ones halt the batch)",
+  "weight": 0.82
+}

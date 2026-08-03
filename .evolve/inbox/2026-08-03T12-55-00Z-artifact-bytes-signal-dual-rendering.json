@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "RED: keystone parity test extended with an ArtifactBytes fixture row BEFORE the feature",
+    "both renderings emit it from the spec; keystone green",
+    "routingtest selected by the per-cycle gates for any router/ change (see egps-regression-tia-selection)",
+    "go test ./internal/{router,routingtest}/ PASS"
+  ],
+  "campaign": "loop-reliability-2026-08",
+  "connects_to": [
+    "egps-regression-tia-selection"
+  ],
+  "created_at": "2026-08-03T12:55:00Z",
+  "deps": [
+    "egps-regression-tia-selection"
+  ],
+  "files": [
+    "go/internal/router/digest.go",
+    "go/internal/routingtest/"
+  ],
+  "id": "artifact-bytes-signal-dual-rendering",
+  "kind": "feature",
+  "priority": "medium",
+  "source": "console-2026-08-03 main-red forensics; revert PR carries the full chain",
+  "summary": "Cycle-1250 (99a82b3c, REVERTED console-first 2026-08-03) injected sig.Generic['run_dir.artifact_bytes']=dirSize(workspace) unconditionally into router.Digest. routingtest's keystone (TestSignalSpec_DualRenderingAgree: pure rendering MUST equal Digest extraction from ONE fixture) can never pass against a runtime-computed value the fixture cannot model \u2014 main red 5 commits, both platforms, while per-cycle changed-scope gates never selected routingtest. The telemetry intent is GOOD (artifact-size signals feed budget/routing decisions). Re-land it the framework's way: SignalSpec gains ArtifactBytes; the orchestrator rendering writes it from the run dir; the PURE rendering emits it from the spec; the keystone stays green because both sides derive from the fixture. Alternative if size must stay runtime-truthful: a non-signal telemetry channel (phasetiming), never Digest.Generic.",
+  "title": "run_dir.artifact_bytes telemetry re-landed through the SANCTIONED dual-rendering path \u2014 cycle-1250's Digest-side injection made the keystone parity unsatisfiable and held main RED",
+  "weight": 0.8
+}
