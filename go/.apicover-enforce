@@ -514,3 +514,4 @@
 # are left untouched (removing them is a CI-scope change, not this fix); the
 # floor's buildTagVisiblePackages filter keeps them from re-triggering (2).
 # Pinned by TestAPICoverEnforceDoesNotEnrollModernACSPackages.
+./internal/regressiontia

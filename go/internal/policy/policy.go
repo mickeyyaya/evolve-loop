@@ -159,6 +159,10 @@ type Policy struct {
 	// Absent ⇒ built-in defaults apply (stage="off" — dispatcher dormant,
 	// byte-identical to pre-T1 baseline; concurrency=3, the soak sweet spot).
 	ParallelEvaluate *ParallelEvaluatePolicy `json:"parallel_evaluate,omitempty"`
+	// RegressionTIA configures test-impact selection over the EGPS Go
+	// regression corpus. Absent ⇒ built-in default applies (stage="off" —
+	// nothing computed, no artifact, byte-identical audit path).
+	RegressionTIA *RegressionTIAPolicy `json:"regression_tia,omitempty"`
 	// Classify configures the cycle-failure classifier. Absent ⇒ built-in
 	// defaults apply (HangClassifier=false — the exit-transport-hang
 	// reclassifier is opt-in).

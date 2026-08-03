@@ -36,6 +36,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -44,6 +45,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
@@ -640,6 +642,10 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	if root == "" {
 		root = req.ProjectRoot
 	}
+	// Regression test-impact evidence, BEFORE the suite runs. It is about which
+	// packages this cycle touched, not about what the suite found, so it must
+	// not sit behind the zero-predicate early return below.
+	emitTIADecision(req, root)
 	// Probe quarantine runs in Classify (before the verdict-exists gate), not
 	// here — a pre-staged acs-verdict.json skips this function entirely and
 	// must not skip the quarantine with it (review M8).
@@ -663,6 +669,38 @@ func generateACSVerdict(req core.PhaseRequest) error {
 		return fmt.Errorf("write verdict: %w", err)
 	}
 	return nil
+}
+
+// emitTIADecision is the production caller for regression test-impact
+// selection: it resolves the staged rollout from .evolve/policy.json, computes
+// the decision over this cycle's changed packages, and drops it in the cycle
+// workspace as evidence.
+//
+// Two bounds hold it inside the observability lane. It NEVER changes what
+// acssuite runs — at the live "off" default (the checked-in policy.json has no
+// regression_tia block) it returns before touching git, so this path is
+// byte-identical to its pre-change self. And a failure to write the evidence is
+// deliberately swallowed: shadow TIA runs on the path that grades every cycle,
+// so a broken evidence sink must degrade quietly rather than turn a healthy
+// audit into an error. Observability may never gate the gate.
+func emitTIADecision(req core.PhaseRequest, root string) {
+	stage := policy.RegressionTIAStageFor(req.ProjectRoot)
+	if stage == "off" {
+		return
+	}
+	// An underivable changed set (no repo, git error, concurrent-fleet index
+	// lock) must not be read as "nothing changed" — that is the direction that
+	// hides a regression class — so it degrades to an empty scope, which the
+	// selector treats as UNKNOWN impact and skips nothing for.
+	changed, derivable := changedpkgs.FromGitChecked(root, "HEAD")
+	if !derivable {
+		changed = nil
+	}
+	d := regressiontia.Compute(stage, root, codequality.ModuleDir(root), changed)
+	if d.Stage == "" {
+		return
+	}
+	_, _ = regressiontia.Emit(req.Workspace, d)
 }
 
 func init() {
