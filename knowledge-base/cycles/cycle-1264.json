@@ -1,0 +1,175 @@
+{
+  "cycle": 1264,
+  "run_id": "01KZ4VTFKQ40JAY162Y7J3GMFF",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 148813,
+      "started_at": "2026-08-03T22:28:47Z",
+      "ended_at": "2026-08-03T22:31:17Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 5722,
+        "cache_read": 560821,
+        "cache_write": 47885
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 52176,
+      "started_at": "2026-08-03T22:33:18Z",
+      "ended_at": "2026-08-03T22:34:11Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1239,
+        "cache_read": 149603,
+        "cache_write": 35592
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 74096,
+      "started_at": "2026-08-03T22:34:11Z",
+      "ended_at": "2026-08-03T22:35:25Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 3223,
+        "cache_read": 157149,
+        "cache_write": 43091
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 678531,
+      "started_at": "2026-08-03T22:35:25Z",
+      "ended_at": "2026-08-03T22:46:44Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 3007,
+        "output": 38781,
+        "cache_read": 4289845,
+        "cache_write": 111638
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 35866,
+      "started_at": "2026-08-03T22:46:44Z",
+      "ended_at": "2026-08-03T23:21:12Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 650095,
+      "started_at": "2026-08-03T23:21:12Z",
+      "ended_at": "2026-08-03T23:32:03Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 18,
+        "output": 17756,
+        "cache_read": 607894,
+        "cache_write": 66247
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|6095b8a8af50",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: ./cmd/evolve: unit tests FAIL [engine"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1264",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1639577,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 678531,
+    "by_archetype_ms": {
+      "build": 35866,
+      "control": 650095,
+      "plan": 953616
+    },
+    "total_tokens": {
+      "input": 3059,
+      "output": 66721,
+      "cache_read": 5765312,
+      "cache_write": 304453
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 18,
+        "output": 17756,
+        "cache_read": 607894,
+        "cache_write": 66247
+      },
+      "plan": {
+        "input": 3041,
+        "output": 48965,
+        "cache_read": 5157418,
+        "cache_write": 238206
+      }
+    },
+    "wasted_tokens": {
+      "input": 18,
+      "output": 17756,
+      "cache_read": 607894,
+      "cache_write": 66247
+    },
+    "cache_hit_ratio": 0.9994696943036431
+  }
+}
