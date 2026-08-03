@@ -454,15 +454,40 @@ func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_DefaultCLIAndAggPathWhenProfileSilent covers
-// dispatchparallel.go:109-111 (cli default "claude") and 147-149 (aggregate
-// path default to <workspace>/<agent>-report.md when output_artifact absent).
-func TestDispatchParallel_DefaultCLIAndAggPathWhenProfileSilent(t *testing.T) {
+// TestDispatchParallel_SilentCLIIsAnError pins the cycle-1262 replacement for
+// the old `cli = "claude"` default. dispatch-parallel is a passthrough — it
+// never chooses the CLI its workers run — so a profile that declares none is
+// unresolvable and must fail loudly here exactly as it does in Run and
+// ValidateProfile, rather than being tiered against an invented default.
+func TestDispatchParallel_SilentCLIIsAnError(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
 	_ = os.MkdirAll(ws, 0o755)
-	// Profile omits "cli" and "output_artifact".
+	// Profile omits "cli".
 	profile := `{"role":"scout","parallel_eligible":true,"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
+	opts := dispatchHappyOpts(t, profile)
+	opts.InspectCap = func(_, cli string) (capability.Inspection, error) {
+		t.Errorf("capability inspected with cli=%q; resolution must abort before this", cli)
+		return capability.Inspection{}, nil
+	}
+	_, err := DispatchParallel(context.Background(), DispatchParallelRequest{
+		Agent: "scout", Cycle: 0, WorkspacePath: ws, ProjectRoot: tmp,
+	}, opts)
+	if err == nil || !strings.Contains(err.Error(), "cli unresolved") {
+		t.Errorf("got %v, want a 'cli unresolved' error", err)
+	}
+}
+
+// TestDispatchParallel_DefaultAggPathWhenProfileSilent covers the aggregate-path
+// default (<workspace>/<agent>-report.md) taken when the profile declares no
+// output_artifact. The profile declares a cli, since an absent one now aborts
+// before this branch is reached (see TestDispatchParallel_SilentCLIIsAnError).
+func TestDispatchParallel_DefaultAggPathWhenProfileSilent(t *testing.T) {
+	tmp := t.TempDir()
+	ws := filepath.Join(tmp, "ws")
+	_ = os.MkdirAll(ws, 0o755)
+	// Profile omits "output_artifact".
+	profile := `{"role":"scout","cli":"antigravity","parallel_eligible":true,"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
 	opts := dispatchHappyOpts(t, profile)
 	var inspectedCLI string
 	opts.InspectCap = func(_, cli string) (capability.Inspection, error) {
@@ -475,8 +500,8 @@ func TestDispatchParallel_DefaultCLIAndAggPathWhenProfileSilent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	if inspectedCLI != "claude" {
-		t.Errorf("cli default=%q, want claude", inspectedCLI)
+	if inspectedCLI != "agy" {
+		t.Errorf("cli=%q, want agy (detectcli.Canonical reached from dispatch-parallel)", inspectedCLI)
 	}
 	wantAgg := filepath.Join(ws, "scout-report.md")
 	if res.AggregatePath != wantAgg {

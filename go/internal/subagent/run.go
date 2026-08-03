@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
@@ -243,9 +244,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		cli = matchField(profileBody, reFieldCLI)
 		source = "profile"
 	}
-	if cli == "antigravity" {
-		cli = "agy"
-	}
+	cli = detectcli.Canonical(cli)
 	if cli == "" {
 		return RunResult{}, fmt.Errorf("subagent/run: cli unresolved for agent %s", req.Agent)
 	}
@@ -333,9 +332,21 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 	}
 
 	// Step 12: build adapter env + exec.
+	//
+	// The ProjectRoot fallback is deliberate — a non-worktree dispatch has no lane
+	// worktree and must still run — but it is never what a FLEET lane wants: an
+	// orchestrator that forgot to propagate WorktreePath silently points the agent
+	// at the main repo tree, which is exactly the shape the tree-diff guard kills a
+	// lane for. Announce it on the Warns channel callers already log, so the
+	// fallback is diagnosable from the run record instead of inferred after the
+	// lane dies.
+	warns := append([]string(nil), insp.Warns...)
 	worktreePath := req.WorktreePath
 	if worktreePath == "" {
 		worktreePath = req.ProjectRoot
+		warns = append(warns, fmt.Sprintf(
+			"[subagent-run] WARN agent=%s cycle=%d: WorktreePath not propagated — WORKTREE_PATH falls back to the project root %s; this agent will run against the main tree",
+			req.Agent, req.Cycle, worktreePath))
 	}
 	promptFile, err := os.CreateTemp("", "evolve-subagent-prompt-*.txt")
 	if err != nil {
@@ -380,7 +391,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		ChallengeToken: token,
 		ExitCode:       exitCode,
 		DurationMS:     durationMS,
-		Warns:          insp.Warns,
+		Warns:          warns,
 	}
 
 	// Step 13: verify artifact via the one verification SSOT (contract.go).

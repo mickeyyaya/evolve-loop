@@ -227,3 +227,29 @@ than re-tested (single-source).
 
 B1–B6 of the agent-bridge hardening program are complete. The dispatch contract is enforced by
 invariants I1–I10, each backed by tests.
+
+## CLI-name and worktree resolution authority (cycle-1262)
+
+Three dispatch entry points share one profile-derived resolution. Their authorities are now single-sourced:
+
+**Alias SSOT.** `detectcli.Canonical(cli)` (`go/internal/detectcli/detectcli.go`) is the only place the
+`antigravity` → `agy` rewrite lives — the CLI is *declared* as `antigravity` but its adapter, capability
+manifest and PATH binary are all named `agy`. It is called from `subagent/run.go` (Step 3),
+`subagent/validateprofile.go` and `subagent/dispatchparallel.go` (Step 4), replacing three inline copies of
+the same `if cli == "antigravity"` block. Every other name, including `""`, passes through unchanged so the
+callers' `cli unresolved` guards keep firing.
+
+**dispatch-parallel is a passthrough, not a chooser.** Nothing upstream hands it a CLI
+(`cmd/evolve/cmd_subagent.go` builds `DispatchParallelRequest` without one), and it does not decide what its
+workers run: each worker re-enters `evolve subagent run` → `subagent.Run` → `resolvellm.Resolve`, which reads
+the same profile. The CLI it reads is used solely to inspect capability for the quality tier. It therefore
+reads the one authority (the profile's `cli` field), canonicalises it, and **errors** when nothing resolves —
+the previous `cli = "claude"` literal was a second, divergent routing authority that silently tiered an
+unresolvable profile against claude's manifest while `Run`/`ValidateProfile` hard-failed on the same input.
+
+**The `WORKTREE_PATH` fallback is loud.** `subagent.Run` still falls back to `ProjectRoot` when
+`RunRequest.WorktreePath` is empty (non-worktree dispatch must keep working), but the fallback now appends a
+WARN to `RunResult.Warns` naming the env var and the path. A fleet lane whose orchestrator failed to propagate
+its worktree points the agent at the main tree — the exact shape the tree-diff guard kills a lane for — and
+that is now diagnosable from the run record instead of inferred post-mortem. The warn is conditional: a
+supplied worktree emits nothing.

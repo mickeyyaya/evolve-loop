@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/aggregator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
@@ -117,12 +118,21 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	}
 
 	// Step 4: resolve quality tier (via capability).
-	cli := matchField(profileBody, reFieldCLI)
+	//
+	// dispatch-parallel is a PASSTHROUGH, not a chooser: nothing upstream hands it
+	// a CLI (cmd_subagent.go:460 builds the request without one) and it does not
+	// pick the CLI its workers run — each worker re-enters `subagent run`, which
+	// resolves through resolvellm from this same profile. The CLI read here is the
+	// profile's own declaration, used solely to inspect capability for the quality
+	// tier. So it must read the one authority (the profile's `cli` field, exactly
+	// what resolvellm.Resolve reads), canonicalise through the one alias table, and
+	// fail loudly when nothing resolves — as Run and ValidateProfile already do.
+	// The old `cli = "claude"` literal was a second, divergent routing authority:
+	// it silently tiered an unresolvable profile against claude's manifest.
+	cli := detectcli.Canonical(matchField(profileBody, reFieldCLI))
 	if cli == "" {
-		cli = "claude"
-	}
-	if cli == "antigravity" {
-		cli = "agy"
+		return DispatchParallelResult{},
+			fmt.Errorf("dispatch-parallel: cli unresolved for agent %s", req.Agent)
 	}
 	capDir := req.CapabilityDir
 	if capDir == "" {

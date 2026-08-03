@@ -13,6 +13,7 @@ import (
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
@@ -134,10 +135,8 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		source = "profile"
 		resolvedModel = ""
 	}
-	// Cross-name resolver: antigravity → agy
-	if cli == "antigravity" {
-		cli = "agy"
-	}
+	// Cross-name resolver: antigravity → agy (detectcli owns the alias table).
+	cli = detectcli.Canonical(cli)
 	if cli == "" {
 		return ValidateProfileResult{}, fmt.Errorf("subagent/validate: cli unresolved for agent %s", req.Agent)
 	}

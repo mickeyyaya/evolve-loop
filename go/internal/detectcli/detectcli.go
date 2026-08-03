@@ -64,6 +64,24 @@ func Detect(opts Options) Result {
 	return Result{CLI: "unknown", Reason: "no probe matched"}
 }
 
+// Canonical is the single authority for CLI-name aliases.
+//
+// The Antigravity CLI is declared as "antigravity" by detection (Detect above)
+// and by some profiles, but its adapter, capability manifest and PATH binary
+// are all named "agy". Every dispatch entry point used to carry its own inline
+// copy of that rewrite (subagent/run.go, subagent/dispatchparallel.go,
+// subagent/validateprofile.go) — three copies of one naming decision, three
+// places to drift. This function owns it.
+//
+// Every other name is returned unchanged, including "": the callers' downstream
+// "cli unresolved" guards must keep firing on an empty CLI.
+func Canonical(cli string) string {
+	if cli == "antigravity" {
+		return "agy"
+	}
+	return cli
+}
+
 // osGetenv is a thin wrapper for the default Env seam.
 func osGetenv(name string) string {
 	return osGetenvImpl(name)
