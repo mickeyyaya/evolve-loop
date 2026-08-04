@@ -194,14 +194,32 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	}
 	out := make([]string, 0, len(fails)+len(namingFails))
 	for _, f := range fails {
-		head := f.Output
-		if len(head) > 400 {
-			head = head[:400] + "…"
-		}
-		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, head))
+		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
 	}
 	out = append(out, namingFails...)
 	return out
+}
+
+// floorFailureDiagnosticMax bounds one failing package's recorded output. The
+// reason is not aesthetics: this text lands in the phase's failure reason and
+// is what the next attempt's builder is handed as the whole story.
+const floorFailureDiagnosticMax = 400
+
+// floorFailureDiagnostic trims a failing package's `go test` output to the
+// TAIL, not the head.
+//
+// Cycle-1268 is the record of why the direction matters: the floor kept
+// output[:400], but `go test` writes its `--- FAIL` lines, panics and stack
+// traces at the END, after whatever the package logged on the way. The recorded
+// reason was therefore 400 bytes of repeated `[engine] WARN: Deps.TokenResolver
+// is nil` and nothing else — the operator was handed noise from exactly the
+// region where the diagnosis was not. Keeping the tail costs the same bytes and
+// carries the verdict lines.
+func floorFailureDiagnostic(output string) string {
+	if len(output) <= floorFailureDiagnosticMax {
+		return output
+	}
+	return "…" + output[len(output)-floorFailureDiagnosticMax:]
 }
 
 // buildTagVisiblePackages drops changed packages that have NO Go files under

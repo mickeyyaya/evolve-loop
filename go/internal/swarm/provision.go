@@ -57,6 +57,13 @@ type gitWorkerProvisioner struct {
 	// Empty ⇒ the built-in <root>/.evolve/worktrees default. Replaces the former
 	// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
 	baseOverride string
+
+	// retry carries the knobs of the SHARED `git worktree add` retry loop
+	// (gitexec.WorktreeAddRetry). This is the highest-contention site in the
+	// tree — N workers provision concurrently against the same .git — so the
+	// bound and backoff come from gitexec rather than a swarm-local copy of the
+	// constants. Zero value = production defaults (real sleep).
+	retry gitexec.WorktreeAddRetry
 }
 
 // git returns the gitexec.Git rooted at dir, defaulting to the production
@@ -82,7 +89,20 @@ func gitFailReason(code int, err error) string {
 // be nil (skipped) — supply core.LinkGuardDeps at the composition root.
 // baseOverride is the resolved policy.json worktree.base ("" ⇒ default location).
 func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string), baseOverride string) WorkerProvisioner {
-	return gitWorkerProvisioner{LinkGuardDeps: linkGuardDeps, baseOverride: baseOverride}
+	return gitWorkerProvisioner{
+		LinkGuardDeps: linkGuardDeps,
+		baseOverride:  baseOverride,
+		retry: gitexec.WorktreeAddRetry{
+			// Same shared classifier core and the operator CLI pass: N
+			// concurrent workers make this the highest-contention site, so it
+			// must keep absorbing collisions — but a permanent failure here
+			// costs 6s per worker for nothing.
+			Retryable: gitexec.RetryableWorktreeAddFailure,
+			OnRetry: func(attempt, attempts, code int, _ string) {
+				fmt.Fprintf(os.Stderr, "[swarm] retry %d/%d: git worktree add after retryable rc=%d\n", attempt, attempts-1, code)
+			},
+		},
+	}
 }
 
 // worktreeBase resolves the worker worktree base. An absolute baseOverride
@@ -144,7 +164,7 @@ func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, bran
 		_ = os.RemoveAll(wt)
 	}
 
-	if _, stderr, code, err := g.git(projectRoot).Capture(ctx, "worktree", "add", "-B", branch, wt, base); err != nil || code != 0 {
+	if _, stderr, code, err := g.git(projectRoot).AddWorktreeWithRetry(ctx, g.retry, "-B", branch, wt, base); err != nil || code != 0 {
 		return "", fmt.Errorf("git worktree add -B %s %s %s: %s: %s", branch, wt, base, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	g.link(wt, projectRoot)

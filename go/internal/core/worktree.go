@@ -115,30 +115,46 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	// the downstream alarm chain is correct and must stay armed (the refuted
 	// PR #400 is the record of what happens when the alarm is silenced
 	// instead). verifylock is the precedent for cross-lane git serialization.
-	var stderr string
-	var code int
-	for attempt := 0; attempt < worktreeAddAttempts; attempt++ {
-		if attempt > 0 {
-			worktreeAddRetrySleep(time.Duration(attempt) * 2 * time.Second)
-			fmt.Fprintf(os.Stderr, "[worktree] retry %d/%d: git worktree add -B %s after transient rc=%d\n", attempt, worktreeAddAttempts-1, branch, code)
-		}
-		_, stderr, code, err = gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
-		if err == nil && code == 0 {
-			linkGuardDeps(wt, projectRoot, cycle)
-			return wt, nil
-		}
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.AddWorktreeWithRetry(
+		context.Background(), worktreeAddRetry(branch), "-B", branch, wt, startRef)
+	if err != nil || code != 0 {
+		return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
 	}
-	return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
+	linkGuardDeps(wt, projectRoot, cycle)
+	return wt, nil
 }
-
-// worktreeAddAttempts bounds the provisioning retry: first try + two retries.
-// Two is enough for lock-window collisions at the standing fleet width; a
-// third identical failure is a real condition the fail-fast must surface.
-const worktreeAddAttempts = 3
 
 // worktreeAddRetrySleep is the inter-attempt backoff clock — a seam so the
 // package tests count sleeps instead of paying them.
 var worktreeAddRetrySleep = time.Sleep
+
+// worktreeAddRetry binds core's test seam + announcement to the shared
+// gitexec retry loop. The attempt bound lives in gitexec
+// (DefaultWorktreeAddAttempts) and nowhere else, so core, swarm and the
+// operator CLI can never drift to different bounds. Sleep is wrapped in a
+// closure rather than passed directly because worktreeAddRetrySleep is a var
+// the tests swap — the value must be read at call time, not at config time.
+// Retryable is supplied from here rather than left nil: without it the loop
+// paid the full 2s+4s ladder on PERMANENT failures, and core is the caller that
+// 33 cmd/evolve tests reach transitively over a non-repository t.TempDir()
+// (33 × 6s = 198s in a package the build floor runs with -timeout 120s). A
+// classifier that exists in gitexec but is never passed leaves that tax exactly
+// where it was.
+//
+// The announcement says "retryable", not "transient": OnRetry fires for every
+// failure the classifier did not rule out, which is not the same as a failure
+// established to be contention. Claiming transience it has not classified is
+// how a permanent rc=128 came to be logged as contention 33 times per run.
+func worktreeAddRetry(branch string) gitexec.WorktreeAddRetry {
+	return gitexec.WorktreeAddRetry{
+		Sleep:     func(d time.Duration) { worktreeAddRetrySleep(d) },
+		Retryable: gitexec.RetryableWorktreeAddFailure,
+		OnRetry: func(attempt, attempts, code int, _ string) {
+			fmt.Fprintf(os.Stderr, "[worktree] retry %d/%d: git worktree add -B %s after retryable rc=%d\n",
+				attempt, attempts-1, branch, code)
+		},
+	}
+}
 
 // laneStartRef resolves the ref a FRESH lane branch is cut from.
 //
@@ -205,7 +221,11 @@ func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) 
 		_ = os.RemoveAll(wt)
 	}
 	branch := rs.CycleBranch()
-	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "add", "-B", branch, wt, startRef)
+	// Same transient-contention retry as Create: a continuation is provisioned
+	// under exactly the same concurrent multi-lane lock window, with the added
+	// insult that a collision here drops SALVAGED work on the floor.
+	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.AddWorktreeWithRetry(
+		context.Background(), worktreeAddRetry(branch), "-B", branch, wt, startRef)
 	if err != nil || code != 0 {
 		return "", fmt.Errorf("git worktree add -B %s %s %s: rc=%d err=%v: %s", branch, wt, startRef, code, err, stderr)
 	}

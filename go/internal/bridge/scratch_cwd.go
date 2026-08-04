@@ -20,12 +20,31 @@ import (
 // MkdirAll failure leaves Worktree empty so the caller degrades to its prior
 // behavior rather than aborting a probe.
 func applyScratchCwd(cfg *Config) {
-	if cfg == nil || cfg.Worktree != "" || cfg.Workspace == "" {
+	if cfg == nil || cfg.Worktree != "" {
 		return
 	}
-	dir := filepath.Join(cfg.Workspace, "bridge-scratch-cwd")
+	cfg.Worktree = ScratchCwd(cfg.Workspace, "bridge-scratch-cwd")
+}
+
+// ScratchCwd is the single source for "no worktree ⇒ a disposable, owned,
+// isolated working directory": it MkdirAll's name under workspace and returns
+// the absolute path, or "" when no workspace is owned or the directory cannot
+// be created — the caller then keeps its own prior fallback rather than
+// aborting. Reaped with the workspace, so it never leaks.
+//
+// applyScratchCwd above is the probe-launch policy over it. The other consumer
+// is the retro phase (phases/retro/retro.go), which under a fleet supervisor
+// must hand the bridge a real cwd or its launch is refused outright by
+// errWorktreeRequired. Both need the same directory; only one implementation of
+// "mint it" may exist, or the two drift on the leak-safety properties (owned
+// dir, never main, never process cwd) that are the whole point.
+func ScratchCwd(workspace, name string) string {
+	if workspace == "" || name == "" {
+		return ""
+	}
+	dir := filepath.Join(workspace, name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return
+		return ""
 	}
-	cfg.Worktree = dir
+	return dir
 }

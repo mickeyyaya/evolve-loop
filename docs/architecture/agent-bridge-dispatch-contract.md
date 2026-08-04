@@ -164,6 +164,34 @@ is a real conformance gap. All 14 roles pass.
 | I8 | Every registry role satisfies I1/I3–I6 uniformly | `conformance_test.go` (fake-bridge, table over `agentRoles`) |
 | I9 | Fan-out honors its concurrency cap + isolates workers | `fanoutdispatch` race tests (observed bound, high-N partial-failure) |
 | I10 | Allow-list ↔ profiles stay single-sourced; reaping releases sessions | `conformance_registry_test.go` (role↔profile drift-guard); `internal/swarm` reap tests |
+| I11 | Under a fleet supervisor the launch cwd is an OWNED directory; the phase supplies it, the guard never widens | `errWorktreeRequired` (`driver_tmux_repl.go`, `recipe_adapter.go`); `bridge.ScratchCwd` + `retro.retroWorktree`; `retro_worktree_fallback_test.go`, ACS `TestC1255_001/002` |
+
+### I11 — Fleet worktree fail-closed: the PHASE supplies the cwd
+
+Under `EVOLVE_FLEET=1` the tmux and recipe drivers refuse a launch with no explicit worktree
+(`errWorktreeRequired`) rather than fall back to `os.Getwd()` — a process-cwd fallback would run the
+agent over another lane's tree, or over main. That refusal is correct and must stay bit-for-bit
+intact; the failure mode it created is that a phase with no worktree is simply **lost**.
+
+`retrospective` was the live instance (cycle-1255): a lane whose worktree was torn down, or never
+provisioned after exhausted retries, dispatched retro with `Worktree == ""` and the knowledge-capture
+phase FAILed on every hit of that window — a failure in the failure-handler. The fix is supplied by
+the phase, not by relaxing the guard: `retro.retroWorktree` mints a disposable cwd under the workspace
+it already owns (`bridge.ScratchCwd(workspace, "retro-scratch-cwd")`), which is legitimate because
+retro is read-mostly and Evaluate-archetype.
+
+The two shapes deliberately NOT used, both of which would satisfy "non-empty" while reintroducing the
+defect the guard exists to prevent:
+
+- the shared main tree (`ProjectRoot`) — refuted in PR #400; **worktree is the write-authority predicate**;
+- the dispatching process's cwd — the exact leak the guard closes.
+
+With no owned workspace there is nowhere safe to mint, so retro leaves `Worktree` empty and the bridge
+decides exactly as before — never a fabricated path, and never a hard error (GAP 9: a failure in the
+failure-handler must not abort the batch). `bridge.ScratchCwd` is the single mint implementation,
+shared with the probe-launch policy `applyScratchCwd` (boot-smoke / health canary), so the
+leak-safety properties — owned dir, reaped with the workspace, never main, never process cwd — cannot
+drift between the two consumers.
 
 ## B5 — Fan-out concurrency stability
 

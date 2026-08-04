@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -14,9 +15,25 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
+
+// worktreeGitRunner is the command seam `evolve worktree create` provisions
+// through, mirroring core's gitRunner and swarm's newGit precedents. It exists
+// so the operator path — previously a raw exec.Command with no injection point
+// and therefore no test coverage at all — can be driven in the fast tier.
+var worktreeGitRunner sysexec.RunFunc = sysexec.DefaultRunner
+
+// worktreeAddRetry is the operator path's share of the single retry contract
+// (bound + backoff live in gitexec). Tests swap in a sleep recorder.
+//
+// Retryable is the SAME shared classifier core and swarm pass, so an operator
+// running `evolve worktree create` outside a repository fails immediately with
+// git's own message instead of waiting out a 6s ladder that cannot help.
+var worktreeAddRetry = gitexec.WorktreeAddRetry{Retryable: gitexec.RetryableWorktreeAddFailure}
 
 // absWorktreeRoot absolutizes a worktree subcommand's --project-root (default
 // ".") so the recorded worktree path and base dir are cwd-independent — the
@@ -79,11 +96,15 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 	// CLI provisions (and `cleanup` later locates) the SAME path the in-process
 	// core.gitWorktree provisioner uses, and concurrent worktrees never collide.
 	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", "--detach", wt, "HEAD")
-	var ebuf bytes.Buffer
-	cmd.Stderr = &ebuf
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(stderr, "evolve worktree create: git: %v\n%s", err, ebuf.String())
+	// Routes through the SHARED gitexec retry helper (not a raw exec.Command)
+	// for two reasons: the operator path was the last unretried `worktree add`
+	// call site, and the raw path could only ever report "exit status 255" from
+	// err — going through gitexec surfaces git's exit code AND its own stderr, so
+	// an operator can tell lane contention from a real fault.
+	_, gitErr, code, err := gitexec.Git{Dir: projectRoot, Exec: worktreeGitRunner}.
+		AddWorktreeWithRetry(context.Background(), worktreeAddRetry, "--detach", wt, "HEAD")
+	if err != nil || code != 0 {
+		fmt.Fprintf(stderr, "evolve worktree create: git: worktree add --detach %s HEAD: rc=%d err=%v\n%s", wt, code, err, gitErr)
 		return 1
 	}
 	fmt.Fprintln(stdout, wt)

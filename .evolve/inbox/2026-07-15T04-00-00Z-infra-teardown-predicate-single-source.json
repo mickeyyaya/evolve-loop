@@ -27,5 +27,28 @@
     "reconcile-transient-terminal-error (the quota-false-FAIL fix that introduced IsInfraTeardownError \u2014 this is its DRY-consolidation follow-up)",
     "never_duplicate_centralize_via_design_patterns (standing single-source-with-projection rule)"
   ],
+  "status": "verified-complete",
+  "resolved_at": "2026-08-04",
+  "resolved_by_cycle": 1267,
+  "resolution": {
+    "verdict": "Consolidation is COMPLETE and now has a durable proof. No code change was required in cycle-1267; every union site already calls IsInfraTeardownError and every excluded site was confirmed to be a genuinely different predicate. A future scout must NOT re-pick this item as open.",
+    "durable_proof": [
+      "go/internal/core/infra_teardown_single_source_test.go :: TestInfraTeardownUnion_SpelledExactlyOnce — the (timeout OR transient) union appears exactly once in non-test core source, inside IsInfraTeardownError",
+      "go/internal/core/infra_teardown_timeout_only_test.go :: TestTimeoutOnlySites_NotWidenedToUnion — failure_hook.go and failure_learning.go still reference ErrArtifactTimeout ALONE, never the union helper",
+      "go/internal/core/infra_teardown_timeout_only_test.go :: TestWritePhaseFailureDiag_TimeoutOnlyNotWidened — behavioural pin: timeout maps to exit 81 and a transient failure is never relabelled 81"
+    ],
+    "site_semantics": [
+      "go/internal/core/errors.go:81 IsInfraTeardownError — THE single source: errors.Is(ErrArtifactTimeout) || errors.Is(ErrTransientBridgeFailure)",
+      "go/internal/core/orchestrator.go:60 optionalInfraSkip — UNION, migrated (the item's most-notable target)",
+      "go/internal/core/cyclerun_dispatch.go:238 retry guard — UNION, migrated",
+      "go/internal/core/retry_opts.go:174 retry guard — UNION, migrated",
+      "go/internal/core/cyclerun_epilogue.go:52 epilogue cause classifier — UNION, migrated",
+      "go/internal/core/retry_backoff.go:55 isTransientBridgeError — TRANSIENT-ONLY component, correctly kept separate (must NOT collapse)",
+      "go/internal/core/retry_backoff.go:62 bridgeExitCode — TIMEOUT-ONLY (timeout maps to exit 81; a transient failure carries its own exit code), correctly excluded",
+      "go/internal/core/failure_hook.go:79 adviseOnUnclassifiedFailure — TIMEOUT-ONLY (only the timeout family carries a classifiable pane), correctly excluded",
+      "go/internal/core/failure_learning.go:215 writePhaseFailureDiag — TIMEOUT-ONLY (81 is the timeout exit code), correctly excluded",
+      "go/internal/core/evaluate_batch.go (the item's ~99 candidate) — no longer references either sentinel; the candidate is stale"
+    ]
+  },
   "operator_note": "Queued 2026-07-15 from the cycle-835 quota-fix review. Both reviewers (go-reviewer WARNING-nit + code-simplifier reported-not-edited) converged on this exact finding. Weight 0.7: real maintainability/drift risk on the integrity kernel, but zero active correctness bug (all sites are individually correct + tested today). Implementer MUST verify per-site semantics before replacing \u2014 this item's whole risk is a blind widen of a timeout-only or transient-only site into the union."
 }

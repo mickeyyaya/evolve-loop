@@ -350,6 +350,10 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	// changing, so non-flag cycles pay no `go run` cost.
 	if completed == PhaseBuild {
 		o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
+		// Derive the covering-test corpus for test-amplification (inserted after
+		// build) so the agent is TOLD its in-scope tests instead of Grepping the
+		// whole repo for them. Best-effort: writes nothing when underivable.
+		writeCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath)
 		// Deterministic false-green backstop: run the changed packages' unit
 		// tests AFTER the regen (so the tested tree matches what audit binds) and
 		// record ground-truth. Best-effort; never aborts — audit is the backstop.
@@ -360,6 +364,13 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 			o.buildSelfCheck(ctx, cs.ActiveWorktree)
 		}
 	}
+	// Runs after EVERY worktree phase, not just build: test-amplification is
+	// inserted after build, but a RESUME past build never sees PhaseBuild
+	// complete in this process, so the branch above cannot fire and the phase
+	// would silently degrade to an unscoped whole-repo search. No-op (no stat
+	// miss, no derivation) once the corpus exists, so a normal cycle pays this
+	// exactly once.
+	ensureCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath)
 }
 
 // normalizeDerivedProjections regenerates each GENERATED projection whose

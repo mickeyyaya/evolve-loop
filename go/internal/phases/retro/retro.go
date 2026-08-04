@@ -20,7 +20,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -61,6 +64,45 @@ func New(c Config) *Phase {
 }
 
 func (p *Phase) Name() string { return phaseName }
+
+// retroWorktree resolves the working directory this retro launch is dispatched
+// against.
+//
+// A provisioned worktree passes through verbatim — a fallback that fired
+// unconditionally would strand every normal retro in an empty scratch dir with
+// no repo. The fallback exists for one window only: under a fleet supervisor the
+// bridge drivers REFUSE a launch with no explicit worktree (errWorktreeRequired,
+// bridge/driver_tmux_repl.go:27) instead of falling back to the process cwd, so a
+// lane whose worktree was torn down (or never provisioned after exhausted retries)
+// loses its retrospective entirely — a failure in the failure-handler. Retro is
+// read-mostly and Evaluate-archetype, so a disposable cwd under the workspace it
+// already owns clears the guard.
+//
+// The two shapes deliberately NOT used: the shared main tree (req.ProjectRoot —
+// refuted by PR #400; worktree is the write-authority predicate) and the
+// dispatching process cwd (the exact leak the guard closes). With no owned
+// workspace there is nowhere safe to mint, so this returns "" and the bridge
+// decides exactly as it does today — never a fabricated path. The guard itself is
+// untouched: the fix is supplied by the phase.
+func retroWorktree(req core.PhaseRequest) string {
+	if req.Worktree != "" || !fleetMode(req) {
+		return req.Worktree
+	}
+	return gobridge.ScratchCwd(req.Workspace, "retro-scratch-cwd")
+}
+
+// fleetMode reads the fleet flag through the SAME key + parser the bridge guard
+// uses (ipcenv.FleetKey + envchain.BoolValue, driver_tmux_repl.go:117), so the
+// phase and the guard can never disagree about which launches fail closed. The
+// request env wins; the process env is the fallback, matching the driver's own
+// env-chain lookup order.
+func fleetMode(req core.PhaseRequest) bool {
+	v := req.Env[ipcenv.FleetKey]
+	if v == "" {
+		v = os.Getenv(ipcenv.FleetKey)
+	}
+	return envchain.BoolValue(v, false)
+}
 
 func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	start := p.nowFn()
@@ -111,7 +153,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Model:        p.model,
 		Prompt:       prompt,
 		Workspace:    req.Workspace,
-		Worktree:     req.Worktree,
+		Worktree:     retroWorktree(req),
 		ArtifactPath: artifactPath,
 		Agent:        "retrospective",
 		Cycle:        req.Cycle,

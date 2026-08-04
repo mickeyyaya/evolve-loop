@@ -25,7 +25,16 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+// `worktree create` now provisions through the SHARED bounded retry, whose
+// backoff is a real time.Sleep in production. Without this no-op, every test in
+// this package whose fixture makes `worktree add` fail permanently (a non-repo
+// root) pays the full 2s+4s ladder for a failure that was never transient.
+// Mirrors core's worktree_retry_test.go init(); tests that COUNT sleeps install
+// their own recorder and restore this default.
+func init() { worktreeAddRetry.Sleep = func(time.Duration) {} }
 
 func requireGit(t *testing.T) {
 	t.Helper()

@@ -27,6 +27,29 @@ func TestApplyScratchCwd_PointsProbeAtScratchUnderWorkspace(t *testing.T) {
 	}
 }
 
+// ScratchCwd is the exported mint step the retro phase shares with the probe
+// policy above: it must create the named dir under the owned workspace, and it
+// must return "" (never a fabricated path) when there is no workspace to own it
+// or no name — the caller then keeps its own prior fallback.
+func TestScratchCwd_MintsUnderWorkspaceAndFailsOpen(t *testing.T) {
+	ws := t.TempDir()
+	got := ScratchCwd(ws, "retro-scratch-cwd")
+
+	want := filepath.Join(ws, "retro-scratch-cwd")
+	if got != want {
+		t.Fatalf("ScratchCwd = %q, want %q", got, want)
+	}
+	if fi, err := os.Stat(got); err != nil || !fi.IsDir() {
+		t.Fatalf("ScratchCwd did not create the directory: err=%v", err)
+	}
+	if got := ScratchCwd("", "retro-scratch-cwd"); got != "" {
+		t.Errorf("ScratchCwd(no workspace) = %q, want empty — a path outside any owned dir is the leak surface", got)
+	}
+	if got := ScratchCwd(ws, ""); got != "" {
+		t.Errorf("ScratchCwd(no name) = %q, want empty — the workspace root itself is not a disposable scratch dir", got)
+	}
+}
+
 // A real phase already carries its worktree — applyScratchCwd must never touch it
 // (the degraded-mode os.Getwd() fallback in runTmuxREPL stays the phase path).
 func TestApplyScratchCwd_NoOpWhenWorktreeSet(t *testing.T) {

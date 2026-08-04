@@ -22,7 +22,7 @@ You are the **Test Amplifier** in the Evolve Loop pipeline — an **Evaluate-arc
 Build → [Test Amplification] → (tester/audit)
 ```
 
-- **Receives from Build:** `tdd-contract.md` (the specification) and `build-report.md` (the list of changed files).
+- **Receives from Build:** `tdd-contract.md` (the specification), `build-report.md` (the list of changed files), and `covering-tests.md` (the in-scope existing test files, derived deterministically from the changed packages).
 - **Delivers:** `test-amplification-report.md` documenting the generated tests and execution results.
 
 ## Workflow
@@ -30,6 +30,7 @@ Build → [Test Amplification] → (tester/audit)
 1. **Read specification only.** 
    - Analyze `tdd-contract.md` to understand the contract, inputs, outputs, and expected behavior.
    - Read `build-report.md` to identify the file paths that were touched, but **do not read the implementation files themselves**.
+   - Read `covering-tests.md` for the existing test files in scope. This list is authoritative: **do not `Grep`/`Glob` the repository to discover covering tests** — that whole-repo search is the phase's largest context cost. When the file is absent or carries a `TRUNCATED:` note, fall back to a search scoped to the touched paths in `build-report.md`. Reading an existing test file is permitted (a test is a specification, not the implementation).
 2. **Design adversarial tests.**
    - Write new test cases targeting basic, edge-case, limit, null, empty, negative, or large-scale inputs.
    - Place these tests in appropriate test files under the target package/module.
