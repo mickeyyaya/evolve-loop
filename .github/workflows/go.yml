@@ -8,6 +8,7 @@ on:
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
       - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.evolve/phases/**'  # TestPhaseCatalog_* (go/internal/phasespec) scans the on-disk phase catalog; a phases-only change broke main invisibly (2026-08-04: cycle-1262 minted a metadata-less stub, #404 fixed it, and NEITHER triggered this workflow).
+      - '.evolve/profiles/**'  # TestSmoke_RealProfiles + TestRepoPersonaProfilePairing (go/internal/{profiles,phasecoherence}) validate the tracked on-disk profiles; tracked stubs broke the v22.13.0 release suite and #406's fix ALSO minted no run (2026-08-04, same day as the phases gap).
       - '.github/workflows/go.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'skills/**'  # TestSkills_NoDrift (go/cmd/evolve) asserts SKILL.md is in sync with the profiles/registry SSOTs; a skills/ change can break it.
       - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.evolve/phases/**'  # TestPhaseCatalog_* (go/internal/phasespec) scans the on-disk phase catalog; a phases-only change broke main invisibly (2026-08-04: cycle-1262 minted a metadata-less stub, #404 fixed it, and NEITHER triggered this workflow).
+      - '.evolve/profiles/**'  # TestSmoke_RealProfiles + TestRepoPersonaProfilePairing (go/internal/{profiles,phasecoherence}) validate the tracked on-disk profiles; tracked stubs broke the v22.13.0 release suite and #406's fix ALSO minted no run (2026-08-04, same day as the phases gap).
       - '.github/workflows/go.yml'
 
 permissions:
