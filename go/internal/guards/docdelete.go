@@ -38,27 +38,32 @@ func (d *DocDelete) Decide(_ context.Context, in core.GuardInput) core.GuardDeci
 	if rmDocsRe.MatchString(cmd) {
 		return core.GuardDecision{
 			Allow:  false,
-			Reason: "rm against docs/ or knowledge-base/ is forbidden — archive instead (mv to knowledge-base/research/archived-YYYY-MM-DD/<file>); set workflow.allow_doc_delete=true to bypass",
+			Reason: "rm against docs/ or knowledge-base/ is forbidden — archive instead (mv to docs/private/research/archived-YYYY-MM-DD/<file>); set workflow.allow_doc_delete=true to bypass",
 		}
 	}
 	for _, m := range mvDocsRe.FindAllStringSubmatch(cmd, -1) {
 		src, dst := m[1], m[2]
-		if isDocPath(src) && !isArchiveDest(dst) {
+		if isDocPath(src) && !isDocsDest(dst) {
 			return core.GuardDecision{
 				Allow:  false,
-				Reason: "mv from docs/ must target knowledge-base/research/archived-YYYY-MM-DD/",
+				Reason: "mv out of docs//knowledge-base must land under docs/ (archive home: docs/private/research/archived-YYYY-MM-DD/) — moving content OUT of the doc root is a deletion",
 			}
 		}
 	}
 	return core.GuardDecision{Allow: true}
 }
 
-var archiveDestRe = regexp.MustCompile(`knowledge-base/research/archived-\d{4}-\d{2}-\d{2}/`)
-
 func isDocPath(p string) bool {
 	return regexp.MustCompile(`(^|/)(docs|knowledge-base)/`).MatchString(p)
 }
 
-func isArchiveDest(p string) bool {
-	return archiveDestRe.MatchString(p)
+// isDocsDest reports whether the mv destination stays inside the single
+// documentation root. Since the 2026-08-05 doc-root consolidation, any move
+// whose destination is under docs/ is a reorganization, not a deletion — this
+// includes the archive home docs/private/research/archived-YYYY-MM-DD/.
+// knowledge-base/ is deliberately NOT a valid destination: its research/
+// subtree is retired (content lives in docs/research), and cycles/ is a
+// runtime write surface, not documentation.
+func isDocsDest(p string) bool {
+	return regexp.MustCompile(`(^|/)docs/`).MatchString(p)
 }

@@ -77,3 +77,15 @@ roots had accreted; both research trees moved into `docs/research/`:
 | `knowledge-base/cycles/` | **not moved** — runtime write surface (`cmd_loop_outcome.go`); see `knowledge-base/README.md` |
 
 All in-docs links rewritten in the same commit; `kb/` removed entirely.
+
+Second pass (same PR): `knowledge-base/research/` **subdirectories** (10
+research packages + `flag-campaign-plan.json`) moved to `docs/research/`; the
+three `archived-YYYY-MM-DD/` dirs moved to `docs/private/research/` (the
+documented agent-excluded archive tree). Three durable ACS predicates that
+pinned old literal paths were repointed (cycle42 cache-ttl, cycle1168 tracker,
+cycle1289 researchDoc) — intent preserved, paths updated. The `docdelete`
+guard's archive convention was updated in the same commit
+(`go/internal/guards/docdelete.go`): mv from a doc root must land under
+`docs/`; the archive home is now `docs/private/research/archived-YYYY-MM-DD/`;
+`knowledge-base/` is retired as a destination (`cycles/` remains a runtime
+write surface).

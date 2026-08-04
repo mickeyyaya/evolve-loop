@@ -79,7 +79,7 @@ func TestC42_005_P6CitationFix(t *testing.T) {
 func TestC42_006_PNew17Exists(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")
-	kb := filepath.Join(root, "knowledge-base", "research", "cache-ttl-march-2026-impact.md")
+	kb := filepath.Join(root, "docs", "research", "cache-ttl-march-2026-impact.md")
 
 	if _, err := os.Stat(doc); err != nil {
 		t.Skipf("roadmap missing: %v", err)

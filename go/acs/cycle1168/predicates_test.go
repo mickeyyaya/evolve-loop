@@ -33,7 +33,7 @@ import (
 )
 
 // trackerPath is the code-audit tracker whose row this cycle corrects.
-const trackerPath = "knowledge-base/research/code-audit-2026-07/README.md"
+const trackerPath = "docs/research/code-audit-2026-07/README.md"
 
 // itemID is the audit item (and this cycle's fleet_scope todo-id).
 const itemID = "evaluate-batch-retry-parity"
