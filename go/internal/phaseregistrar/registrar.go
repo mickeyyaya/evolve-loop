@@ -69,6 +69,21 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 		cfg.Dispatch.Sandbox.ReadOnlyRepo = false // a writer needs to write
 	}
 
+	// Mint-time SELECT-metadata default (docs/chronicle/2026-08-minted-stub-class.md).
+	// A minted phase is forced Optional just above, so a config carrying neither
+	// Description nor WhenToUse persists a phase.json that trips phasespec's
+	// TestPhaseCatalog_OptionalPhasesHaveSelectMetadata the moment ship's
+	// whole-tree bind sweeps the stub into git tracking — a repo-wide, CI-only
+	// failure invisible to per-cycle changed-scope, hand-fixed four times (#399,
+	// #404, #406, #407). Defaulting here, at the one seam every mint funnels
+	// through, makes the artifact contract-safe by construction rather than by
+	// advisor diligence. The condition mirrors the guard's own AND over both
+	// fields: an advisor that supplied EITHER one keeps its text verbatim.
+	if cfg.Description == "" && cfg.WhenToUse == "" {
+		cfg.Description = fmt.Sprintf(mintedStubDescriptionFmt, cfg.Name)
+		cfg.WhenToUse = mintedStubWhenToUse
+	}
+
 	spec := cfg.Spec()
 	if violations := phasespec.ValidateUserSpec(spec); len(violations) > 0 {
 		return Result{}, fmt.Errorf("phaseregistrar: invalid spec %q: %s", spec.Name, strings.Join(violations, "; "))
@@ -81,6 +96,23 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 	prof := cfg.ToProfile()
 	if !nameRE.MatchString(prof.Name) {
 		return Result{}, fmt.Errorf("phaseregistrar: derived profile name %q must be lowercase kebab-case", prof.Name)
+	}
+
+	// A PERSISTED profile with no driver is the fourth instance of the same
+	// class (#406): once tracked it fails the repo-contract suites
+	// (profiles.TestSmoke_RealProfiles, TestRepoPersonaProfilePairing) and, at
+	// dispatch preflight, resolves to no CLI at all. "No known driver" is not a
+	// coherence question the auditor can weigh — it is a hard launch failure
+	// discovered hours later, so reject the mint instead of writing the stub.
+	//
+	// Scoped to ProfilesDir != "" deliberately: with persistence off, Register
+	// is a pure factory that cannot leak an artifact into the tree, and an
+	// absent dispatch block is the legitimate, checked-in shape of every
+	// .evolve/phases/*/phase.json — which the campaign study path registers
+	// persistence-free (cmd/evolve/cmd_campaign.go:403). Guarding the artifact
+	// where the artifact is created keeps that path working.
+	if r.ProfilesDir != "" && cfg.Dispatch.CLI == "" {
+		return Result{}, fmt.Errorf("phaseregistrar: phase %q has no dispatch.cli; refusing to mint a driverless profile stub", spec.Name)
 	}
 
 	// Clamp dispatch against the config's own guardrails (envelope +
@@ -151,6 +183,17 @@ func (r Registrar) persist(spec phasespec.PhaseSpec, prof profiles.Profile) erro
 	}
 	return nil
 }
+
+// mintedStubDescriptionFmt / mintedStubWhenToUse are the honest reserved-intent
+// SELECT metadata a runtime-minted phase carries when the advisor supplied
+// none. They follow the #404 precedent — state what the phase actually is and
+// steer the router AWAY from selecting an undefined stub — rather than padding
+// phasespec's metadataAllowlist, whose stated remedy is "add metadata, do not
+// pad the allowlist" and which is only allowed to shrink.
+const (
+	mintedStubDescriptionFmt = "Runtime-minted stub for %q; its behavior is defined by the mint-time prompt, not by this catalog entry."
+	mintedStubWhenToUse      = "Not selectable on merit: a runtime-minted stub with no advisor-supplied selection criteria. Give it real metadata before relying on it."
+)
 
 // nameRE constrains a derived profile name to lowercase kebab-case — the same
 // rule phasespec applies to phase names, enforced here on the (advisor-

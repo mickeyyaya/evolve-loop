@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -351,5 +352,189 @@ func TestRegister_RegistryAppendFails_RejectsBeforePersist(t *testing.T) {
 	}
 	if fixtures.FilePresent(filepath.Join(r.PhasesDir, "minted-reviewer", "phase.json")) {
 		t.Error("phase spec persisted despite registry failure")
+	}
+}
+
+// --- Mint-time catalog-contract safety (docs/chronicle/2026-08-minted-stub-class.md) ---
+//
+// Register persists a phase.json + profile stub built from the advisor-supplied
+// config. Empty Description/WhenToUse mints a stub that fails the repo-wide
+// phasespec.TestPhaseCatalog_OptionalPhasesHaveSelectMetadata once ship's
+// whole-tree bind tracks it; an empty dispatch.cli mints a driverless profile
+// that fails the profiles repo-contract suites and dies at dispatch preflight.
+// Four instances (#399, #404, #406, #407) were hand-fixed before the class was
+// closed at this seam; these are its permanent regressions.
+
+// repoRootDir resolves the repo root from this test file's own path — never the
+// process cwd, which differs between the main tree and a cycle worktree.
+func repoRootDir(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate test file")
+	}
+	// .../go/internal/phaseregistrar/registrar_test.go → up 3 to the repo root.
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
+}
+
+// metadataLessCfg is validCfg with the hazard shape: an unknown phase name and
+// no advisor-supplied SELECT metadata. The name is letters-only and multi-word
+// because phasespec's user-phase name floor rejects digits.
+func metadataLessCfg() phaseconfig.PhaseConfig {
+	cfg := validCfg()
+	cfg.Name = "minted-catalog-probe"
+	cfg.Description = ""
+	cfg.WhenToUse = ""
+	return cfg
+}
+
+// guardCondition is the EXACT predicate
+// TestPhaseCatalog_OptionalPhasesHaveSelectMetadata applies to every merged
+// catalog entry. Restated here so this regression tracks the guard's real
+// semantics rather than a paraphrase of them.
+func guardCondition(s phasespec.PhaseSpec) bool {
+	return s.Optional && s.WhenToUse == "" && s.Description == ""
+}
+
+// TestRegister_UnknownPhaseNameStaysCatalogGreen is the wiring proof: mint an
+// unknown phase name through the LIVE Register (real clamp, real atomicwrite
+// persistence) into a temp project root, then reload it through the production
+// phasespec.MergedCatalog — the same loader the guard test uses — and apply the
+// guard's own condition. Asserting on the returned spec alone would not prove
+// the round-trip through disk and the real catalog loader stays green.
+func TestRegister_UnknownPhaseNameStaysCatalogGreen(t *testing.T) {
+	proj := t.TempDir()
+
+	// The merge path is builtin-registry + user overlay, so seed the real
+	// built-in registry: a merge over a missing registry is a different path.
+	regRel := filepath.Join("docs", "architecture", "phase-registry.json")
+	registry, err := os.ReadFile(filepath.Join(repoRootDir(t), regRel))
+	if err != nil {
+		t.Fatalf("read built-in phase registry: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(proj, "docs", "architecture"), 0o755); err != nil {
+		t.Fatalf("mkdir registry dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, regRel), registry, 0o644); err != nil {
+		t.Fatalf("seed built-in phase registry: %v", err)
+	}
+
+	r := Registrar{
+		Bridge:      fakeBridge{},
+		Prompts:     prompts.NewFromFS(fstest.MapFS{}),
+		ProfilesDir: filepath.Join(proj, ".evolve", "profiles"),
+		PhasesDir:   filepath.Join(proj, ".evolve", "phases"), // the discovery root
+	}
+	cfg := metadataLessCfg()
+	if _, err := r.Register(cfg); err != nil {
+		t.Fatalf("Register(unknown name, no metadata) must succeed with defaults, not reject: %v", err)
+	}
+
+	cat, _, _, err := phasespec.MergedCatalog(proj)
+	if err != nil {
+		t.Fatalf("MergedCatalog after mint: %v", err)
+	}
+	var found bool
+	for _, s := range cat.All() {
+		if s.Name != cfg.Name {
+			continue
+		}
+		found = true
+		if guardCondition(s) {
+			t.Errorf("minted phase %q reached the merged catalog without SELECT metadata — TestPhaseCatalog_OptionalPhasesHaveSelectMetadata would fail on it (Description=%q WhenToUse=%q)",
+				s.Name, s.Description, s.WhenToUse)
+		}
+	}
+	if !found {
+		t.Fatalf("minted phase %q is absent from the merged catalog; the mint never reached the discovery root %s", cfg.Name, r.PhasesDir)
+	}
+}
+
+// TestRegister_MetadataLessMint_DefaultsSelectMetadata pins both halves of the
+// default: the returned spec AND the persisted artifact. Defaulting only in
+// memory would still write the contract-breaking file that CI trips over.
+func TestRegister_MetadataLessMint_DefaultsSelectMetadata(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := metadataLessCfg()
+
+	res, err := r.Register(cfg)
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if guardCondition(res.Spec) {
+		t.Errorf("returned spec trips the catalog guard: Optional=%v Description=%q WhenToUse=%q",
+			res.Spec.Optional, res.Spec.Description, res.Spec.WhenToUse)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(r.PhasesDir, cfg.Name, "phase.json"))
+	if err != nil {
+		t.Fatalf("read persisted phase.json: %v", err)
+	}
+	var onDisk phasespec.PhaseSpec
+	if err := json.Unmarshal(raw, &onDisk); err != nil {
+		t.Fatalf("parse persisted phase.json: %v", err)
+	}
+	if guardCondition(onDisk) {
+		t.Errorf("persisted phase.json trips the catalog guard: Description=%q WhenToUse=%q (raw=%s)",
+			onDisk.Description, onDisk.WhenToUse, string(raw))
+	}
+}
+
+// TestRegister_AdvisorMetadata_NotClobbered is the boundary: the guard's
+// condition is an AND over both fields, so the default must fire only when BOTH
+// are empty. An advisor that described its phase keeps that text verbatim — an
+// unconditional default would silently overwrite real selection criteria.
+func TestRegister_AdvisorMetadata_NotClobbered(t *testing.T) {
+	const want = "Reviews the diff for envelope escapes."
+	r := newRegistrar(t)
+	cfg := metadataLessCfg()
+	cfg.Description = want // WhenToUse stays empty: the guard is already satisfied
+
+	res, err := r.Register(cfg)
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if res.Spec.Description != want {
+		t.Errorf("advisor Description clobbered: got %q, want %q", res.Spec.Description, want)
+	}
+	if res.Spec.WhenToUse != "" {
+		t.Errorf("WhenToUse defaulted despite a non-empty Description: got %q", res.Spec.WhenToUse)
+	}
+}
+
+// TestRegister_DriverlessCLI_Rejected is the negative regression: a mint that
+// would PERSIST a profile with no CLI is rejected, and nothing is written.
+func TestRegister_DriverlessCLI_Rejected(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := metadataLessCfg()
+	cfg.Dispatch.CLI = "" // no driver
+
+	_, err := r.Register(cfg)
+	fixtures.RequireErrContains(t, err, "driverless profile stub")
+	if fixtures.FilePresent(filepath.Join(r.ProfilesDir, cfg.Name+".json")) {
+		t.Error("driverless profile persisted despite rejection")
+	}
+	if fixtures.FilePresent(filepath.Join(r.PhasesDir, cfg.Name, "phase.json")) {
+		t.Error("phase spec persisted despite a rejected driverless mint")
+	}
+}
+
+// TestRegister_DriverlessCLI_AllowedWithoutPersistence pins the guard's scope:
+// with ProfilesDir empty, Register is a pure factory that writes nothing, so a
+// config with no dispatch block still registers. This is the shape of every
+// checked-in .evolve/phases/*/phase.json and the campaign study path
+// (cmd/evolve/cmd_campaign.go:403) registers exactly that way — a blanket
+// rejection would break it.
+func TestRegister_DriverlessCLI_AllowedWithoutPersistence(t *testing.T) {
+	r := Registrar{Bridge: fakeBridge{}, Prompts: prompts.NewFromFS(fstest.MapFS{})}
+	cfg := metadataLessCfg()
+	cfg.Dispatch.CLI = ""
+
+	res, err := r.Register(cfg)
+	if err != nil {
+		t.Fatalf("a persistence-free registration of a dispatch-less phase must succeed; got %v", err)
+	}
+	if res.Runner == nil {
+		t.Fatal("expected a runner")
 	}
 }
