@@ -60,7 +60,7 @@ Full inventory with file references in §A of the local survey; condensed:
 |---|---|---|---|
 | Unified deliverable contract + `RenderContractTail` (ADR-0034) | generation-point | Motivating class was ~60% of fix commits; tail-placement restatement got compliance the prefix block did not; batch-19+ `bad_verdict` = **zero** after the tail landed | Saturates at model capability: agy ignored the identical contract 7/7 — "format adherence is a model property past some point, not a prompt property" |
 | Contract gate + self-check + breaker | post-hoc gate | Same `Verify` for agent self-check and host gate (cannot drift); verify-read race closed with a 500ms grace window | Breaker is a **fail-open ratchet**: 3 live CIRCUIT OPEN firings, all on a weak-CLI phase — a systematically non-compliant CLI demotes enforce→advisory |
-| Correction/retry ladder (≤2, salvage→live-fix→re-dispatch) | retry-correction | Salvage rung deterministic ("would have fixed 265 in milliseconds"); correction prompts empirically work on capable models | Re-dispatches the **same CLI**; `cli_fallback` fires only on infra exits, never contract blocks — the batch-18 hole, fix still queued at 0.95 |
+| Correction/retry ladder (≤2, salvage→live-fix→re-dispatch) | retry-correction | Salvage rung deterministic ("would have fixed 265 in milliseconds"); correction prompts empirically work on capable models | Same-CLI re-dispatch was the batch-18 hole; **landed** since — identity-gated CLI escalation (cycle-1289) plus, for phases already on the top family, a breaker-neutral salvage re-prompt (cycle-1300, `061345a4`; §6.2). Residual ceiling: `cli_fallback` itself still fires only on infra exits, and the top-family rung can only re-prompt the same model |
 | Verdict sentinel + file-authoritative transport (ADR-0072) | transport | Killed the verdict-format-drift class; "pane never a verdict source" | **The worst incidents were the transport's own**: 862–899 false-FAIL storm (10 cycles, 3 green features discarded in a livelock) was the harness forging FAILs, not agents misbehaving |
 | EGPS / ACS predicates (v11 Go-native, TDD-authored, red-team) | verification-by-predicate | 2026-08-04 review live-mutated shipped predicates: **zero tautological, zero tampered, all 7 FAILs honest** | Contention flakes ≈ 20% of waste; dead-red corpus pollution; green-by-skip latent traps |
 | Adversarial audit (Opus vs Sonnet, evidence-demanding) | adversarial review | Best catch-rate in the system (examples in §1); exactly what the judge-bias literature prescribes (cross-family, self-preference bias arXiv:2410.21819) | WARN prescriptions had **no post-ship enforcement** (F3); its own deliverable was the top contract-violator on a weak CLI |
@@ -133,7 +133,7 @@ layer needs a mechanism, not another patch.
 
 | # | Move | Layer | Why this rank | Risk (named) | Queue state |
 |---|---|---|---|---|---|
-| 1 | **Contract-block CLI escalation** — on the 2nd contract block, re-dispatch the phase on the strongest available family (design already in the item) | L1/retry | Already-proven class (agy 7/7 twice); the literature's "escalate on capability ceiling"; the item has been stranded while its class recurred — worst fix-latency instance | Cost of strong-family retries; needs the fingerprint breaker integration | **queued 0.95 — promote to next wave** |
+| 1 | **Contract-block CLI escalation** — on the 2nd contract block, re-dispatch the phase on the strongest available family (design already in the item) | L1/retry | Already-proven class (agy 7/7 twice); the literature's "escalate on capability ceiling"; the item has been stranded while its class recurred — worst fix-latency instance | Cost of strong-family retries; needs the fingerprint breaker integration | **landed** — cycle-1289 identity gate (§6.1) + cycle-1300 top-family salvage rung (§6.2, `061345a4`); item consumed cycle-1304 |
 | 2 | **Schema-aligned salvage layer** (BAML-SAP pattern, in-harness Go): lenient, *logged*, bounded extraction of fenced/mislabeled JSON, displaced sentinels, trailing commas — before any retry/rejection | L2 | Converts whole-cycle losses to zero-cost saves across all four CLIs; no constraint tax; production data says 8–15% of calls are recoverable-malformed | Coercion masking semantic drift — every coercion logged + surfaced in audit; never invent values | **NEW — filed 0.9** |
 | 3 | **Two-stage verdict minting**: phase writes free-form report; a cheap constrained extractor (headless `claude -p --json-schema`, or Ollama grammar-constrained = hard guarantee at zero API cost) mints the machine JSON from report+workspace | L2 | The decoder-free realization of "reason free, constrain the envelope"; removes sentinel burden from reasoning agents entirely; subsumes `verdict-sentinel-as-tool-call` (0.86) | A faithful extractor can mint a well-formed *wrong* verdict — must fail-on-ambiguity and cross-check against artifacts (move 5) | extend existing 0.86 item |
 | 4 | **Retry ladder economics alignment**: keep cap=2; on 2nd failure escalate the *critic/diagnoser*, not just the generator; integrate with the fingerprint breaker so identical failures don't burn the cap | L1/L3 | Directly from the repair-economics literature; our ladder is right-shaped, mis-aimed | Double-billing curves; budget per cycle | fold into item #1's landing |
@@ -203,6 +203,44 @@ escalates — the discriminator against a raw-equality fix), EDGE (hot breaker, 
 prior reason ⇒ escalation still fires). 10/10 contract-escalation tests PASS.
 Live escalation-firing counts remain to be measured against the baseline in §6
 (contract-gate CIRCUIT OPEN firings = 3 at the time of writing).
+
+### 6.2 Landed — top-family salvage rung (cycle-1300, closes item rank 1)
+
+**Issue.** The live inbox item's `[LIVE EVIDENCE 2026-08-05]` addendum recorded the
+first strong-family block series: a `claude-tmux` adversarial-review phase blocked
+twice on the same defect, escalation correctly reported *"no other CLI family
+available in its chain"* — and the circuit opened anyway.
+
+**Gap.** The ladder had exactly one remedy for an identical second block, and that
+remedy is *buy a different family*. A phase already dispatched on the strongest
+family has nothing to buy, so §6.1's identity gate fired, found no target, and the
+gate fell through to demotion. That is the breaker's fail-open ratchet reached
+without any repair having been attempted — and the demotion record could not tell
+that case apart from one where a remedy ran and failed, because `escalated=false`
+alone spans both.
+
+**Solution.** `composeContractSalvageRetry`
+(`go/internal/core/contract_escalation.go`) adds a second rung: when the escalation
+target is empty, round 2 spends its budget on the *diagnosis* instead — a structured
+re-prompt carrying the validator's verbatim output and requiring each bracketed
+`[violation_code]` to be answered by naming the exact heading or path it refers to.
+It is breaker-neutral by construction: no extra dispatch, no extra correction
+consumed, `ReviewResult.Blocks` untouched, so the circuit still opens on the third
+strike as the last resort. `contractDispatch.salvageRetried` then rides alongside
+`escalated=` in the demotion WARN and the `contract_gate_demoted` ledger entry, so
+"salvage attempted and failed" is legible as distinct from "no remedy was possible".
+This is the repair-economics prescription (arXiv:2306.09896) the item cited, applied
+where a family swap is unavailable.
+
+**Measured before/after.** `go/internal/core/contract_salvage_retry_test.go` drives
+the real `Orchestrator.RunCycle` across six axes: fires when no other family exists;
+does NOT fire when an escalation target does exist (the discriminator against a
+blanket second rung); not on the first block; not on a non-contract rejection;
+ledger records `salvage_attempted`; WARN distinguishes attempt from no-remedy.
+`go test ./internal/core/... -run Contract` PASS. Escalation-firing and
+CIRCUIT-OPEN counts still measure against the §6 baseline (3 firings, all
+weak-CLI adversarial-review). With this rung landed, the rank-1 portfolio item was
+consumed in cycle-1304 (`.evolve/inbox/consumed/2026-08-04T07-15-00Z-contract-block-cli-escalation.json`).
 
 ## Sources (online track)
 
