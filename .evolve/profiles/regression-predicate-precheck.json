@@ -1,9 +1,0 @@
-{
-  "name": "regression-predicate-precheck",
-  "role": "regression-predicate-precheck",
-  "cli": "claude",
-  "model_tier_default": "deep",
-  "sandbox": {
-    "enabled": true
-  }
-}
