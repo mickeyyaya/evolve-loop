@@ -1,20 +1,26 @@
 {
-  "id": "ship-push-only-recovery",
-  "title": "ship has no sanctioned path to push attested-but-stranded commits — GIT_PUSH_REJECTED recovery dead-ends at 'no staged changes; nothing to ship'",
-  "weight": 0.72,
-  "kind": "defect",
-  "priority": "medium",
-  "campaign": "loop-reliability-2026-08",
-  "summary": "Reproduced live 2026-08-02 on the runtime plane. Sequence: (1) evolve ship creates commit 16c8f8bc (commit-gate attested d4799eb2) but origin/main had moved (#396) -> GIT_PUSH_REJECTED, 'local commit preserved... reconcile with evolve sync-main'; (2) sync-main merges origin in (merge ff09b899), tree now CLEAN and 2 attested commits ahead; (3) re-running ship: 'no staged changes; nothing to ship' — and bare git push is (correctly) guard-denied. The recovery the ship error prescribes cannot complete through any sanctioned command. Workaround that resolved it: file the next legitimate inbox change and let that ship carry the stranded commits — works at a batch boundary but is a coincidence of having pending bookkeeping, not a path. Fix shape: ship detects clean-tree-but-ahead-of-origin where every local commit is either commit-gate attested, a cycle ship, or a sync-main merge of such — and completes the push under the same atomic-ship verifications (prefix gate, SELF_SHA, ledger), refusing if ANY unattested commit is in the ahead set. NOT a bypass: it extends attestation checking to the push-only case.",
   "acceptance": [
     "RED: reproduce the strand in a fixture repo (ship -> reject -> sync-main -> ship reports nothing to ship while ahead>0)",
     "ship (or a dedicated subcommand) pushes an all-attested ahead set; refuses with a named error if any ahead commit lacks provenance",
     "the GIT_PUSH_REJECTED error text names the completing command instead of dead-ending at sync-main",
     "go test -race ./internal/phases/ship/ PASS; apicover clean"
   ],
-  "files": ["go/internal/phases/ship/gitops.go", "go/internal/phases/ship/native.go"],
+  "campaign": "loop-reliability-2026-08",
+  "connects_to": [
+    "ship-addall-staging-surface"
+  ],
+  "created_at": "2026-08-02T15:50:00Z",
   "deps": [],
-  "connects_to": ["ship-addall-staging-surface"],
+  "files": [
+    "go/internal/phases/ship/gitops.go",
+    "go/internal/phases/ship/native.go"
+  ],
+  "id": "ship-push-only-recovery",
+  "kind": "defect",
+  "notes": "[2026-08-04 3rd LIVE INSTANCE, root condition identified] Console PR merges to origin mid-batch strand ALL lane ships when the plane holds unpushed ship commits at merge time (true divergence, no FF): #408's merge stranded 15 commits incl. the cycle-1283 rank-1 CRITICAL fix; every lane push failed GIT_PUSH_REJECTED and recovery burned re-audit rounds. #404-#407 were absorbed only because the plane happened to be FF-able. Resolution dance: queue-gate-ship (strand) -> manual conflict merge (add/add on the review doc; git merge --continue passes the guard) -> next ship FFs. FIX SHAPE: either sync-plane-before-console-merge as a train postcondition, or a push-only recovery command usable mid-batch.",
+  "priority": "medium",
   "source": "console-2026-08-02 pre-launch cleanup, reproduced live",
-  "created_at": "2026-08-02T15:50:00Z"
+  "summary": "Reproduced live 2026-08-02 on the runtime plane. Sequence: (1) evolve ship creates commit 16c8f8bc (commit-gate attested d4799eb2) but origin/main had moved (#396) -> GIT_PUSH_REJECTED, 'local commit preserved... reconcile with evolve sync-main'; (2) sync-main merges origin in (merge ff09b899), tree now CLEAN and 2 attested commits ahead; (3) re-running ship: 'no staged changes; nothing to ship' \u2014 and bare git push is (correctly) guard-denied. The recovery the ship error prescribes cannot complete through any sanctioned command. Workaround that resolved it: file the next legitimate inbox change and let that ship carry the stranded commits \u2014 works at a batch boundary but is a coincidence of having pending bookkeeping, not a path. Fix shape: ship detects clean-tree-but-ahead-of-origin where every local commit is either commit-gate attested, a cycle ship, or a sync-main merge of such \u2014 and completes the push under the same atomic-ship verifications (prefix gate, SELF_SHA, ledger), refusing if ANY unattested commit is in the ahead set. NOT a bypass: it extends attestation checking to the push-only case.",
+  "title": "ship has no sanctioned path to push attested-but-stranded commits \u2014 GIT_PUSH_REJECTED recovery dead-ends at 'no staged changes; nothing to ship'",
+  "weight": 0.8
 }
