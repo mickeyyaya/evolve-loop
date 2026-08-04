@@ -127,3 +127,19 @@ Grouped by theme:
 | [refactoring-tools-landscape.md](private/research/refactoring-tools-landscape.md) | Tool landscape |
 | [synthetic-data-generation.md](private/research/synthetic-data-generation.md) | Synthetic data techniques |
 | [agent-failure-tracing.md](private/research/agent-failure-tracing.md) | Failure tracing + classification |
+
+## Merged 2026-08-05 (from kb/research and knowledge-base/research)
+
+Research packages: [deliverable-alignment-2026-08](research/deliverable-alignment-2026-08/README.md) ·
+[failed-loop-analysis-2026-07](research/failed-loop-analysis-2026-07/README.md) ·
+[graph-engineering-2026-08](research/graph-engineering-2026-08/README.md) ·
+[llm-output-stability-2026-07](research/llm-output-stability-2026-07/README.md) ·
+[token-optimization-2026](research/token-optimization-2026/README.md)
+
+Plus 12 single-file notes from knowledge-base/research (lessons-and-resolutions,
+verdict-classifier drift, flag-reduction design, token histories, et al.) — see
+`docs/research/`.
+
+**The engineering chronicle** — workstream-level narratives (problem /
+approaches / decision / results / retro) — lives at
+[docs/chronicle/](chronicle/README.md).

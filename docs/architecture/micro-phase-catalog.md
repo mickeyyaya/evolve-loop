@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-05
 **Status:** Approved design; implementation queued as evolve-loop cycle goals (3 waves)
-**Research basis:** [knowledge-base/research/micro-phase-catalog-research-2026-06-05.md](../../knowledge-base/research/micro-phase-catalog-research-2026-06-05.md) (2-round web research: 106-agent adversarially-verified deep-research + 3 targeted gap-fill agents)
-**Builds on:** ADR-0024 (phase advisor), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts), [user-defined-phases.md](user-defined-phases.md), [missing-development-phases-2026-06-03](../../knowledge-base/research/missing-development-phases-2026-06-03.md)
+**Research basis:** [docs/research/micro-phase-catalog-research-2026-06-05.md](../research/micro-phase-catalog-research-2026-06-05.md) (2-round web research: 106-agent adversarially-verified deep-research + 3 targeted gap-fill agents)
+**Builds on:** ADR-0024 (phase advisor), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts), [user-defined-phases.md](user-defined-phases.md), [missing-development-phases-2026-06-03](../research/missing-development-phases-2026-06-03.md)
 
 ---
 

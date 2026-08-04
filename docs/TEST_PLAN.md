@@ -89,7 +89,7 @@ Per-guard specifics:
 - **ship**: canonical script path (`legacy/scripts/lifecycle/ship.sh`) allowlists every ship-verb (`git commit`, `git push`, `gh release create|edit`).
 - **phase**: denies the `Agent` tool when `cycle-state.json:cycle_id != 0`; allows otherwise.
 - **role**: per-phase write allowlist (build: workspace + worktree; audit: workspace only); always-safe paths (`/tmp/`, `$HOME/.claude/`).
-- **docdelete**: blocks `rm` against `docs/` or `knowledge-base/`; blocks `mv` from `docs/` unless dest is `knowledge-base/research/archived-YYYY-MM-DD/`.
+- **docdelete**: blocks `rm` against `docs/` or `knowledge-base/`; blocks `mv` from `docs/` unless dest is `docs/research/archived-YYYY-MM-DD/`.
 - **quota**: per-agent + per-bucket counter, resets per process (Phase 1 in-memory); Phase 2 persists into `cycle-state.json:research_usage`.
 - **chain**: thin wrapper over `ledger.Verify`; missing ledger reference returns Allow=false with a deterministic reason.
 

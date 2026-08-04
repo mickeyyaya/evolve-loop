@@ -94,7 +94,7 @@ If a future Claude Code version honors `.gitattributes export-ignore` during plu
   top-level `knowledge-base/` directory. The runtime-exclusion semantics are unchanged; only
   the path moved. See `docs/MOVED.md` for the full old→new mapping.
 - **Cycle 13** — 42 files were deleted from `docs/research/` because they bloated agent
-  context. The same 42 files were later restored under the (then-named) `knowledge-base/research/`
+  context. The same 42 files were later restored under the (then-named) `docs/research/`
   folder, which is what now lives at `docs/private/research/`.
 
 ## Recovery procedure

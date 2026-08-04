@@ -64,7 +64,7 @@ const (
 
 	// researchDoc is the append-only target of T2. It already exists (created by
 	// PR #409); this cycle adds the fingerprint-gate addendum to it.
-	researchDoc = "kb/research/deliverable-alignment-2026-08/README.md"
+	researchDoc = "docs/research/deliverable-alignment-2026-08/README.md"
 )
 
 // goDir returns the module dir; `go test -C <goDir>` makes every invocation

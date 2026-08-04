@@ -386,7 +386,7 @@ Utilities: `legacy/scripts/utility/research-cache.sh check <task_id>` (exits 0=H
 
 ## v10.0.0 — Execution-Grounded Process Supervision (EGPS)
 
-**BREAKING CHANGE:** verdict-bearing artifact moved from `audit-report.md` (prose verdict + confidence scalar) to `acs-verdict.json` (binary `verdict: PASS|FAIL` from predicate exit codes). WARN level removed; fluent-by-default WARN-ship behavior removed. Full design: `docs/architecture/egps-v10.md`. Research: `knowledge-base/research/execution-grounded-process-supervision-2026.md`.
+**BREAKING CHANGE:** verdict-bearing artifact moved from `audit-report.md` (prose verdict + confidence scalar) to `acs-verdict.json` (binary `verdict: PASS|FAIL` from predicate exit codes). WARN level removed; fluent-by-default WARN-ship behavior removed. Full design: `docs/architecture/egps-v10.md`. Research: `docs/research/execution-grounded-process-supervision-2026.md`.
 
 **Why:** cycles 30–39 demonstrated indirect reward hacking via confidence-cliff calibration (verdicts cluster at 0.78–0.87, just at WARN/PASS boundary, then ship anyway). Per Skalse et al. (NeurIPS 2022), no auditor-side patch can fix this — only changing signal source from model claim to sandbox exit code does.
 

@@ -38,7 +38,7 @@ stop_reason: "error"
 
 ## Part 2: Root Cause (from dispatched research dossier)
 
-A deep-research agent was dispatched with WebSearch + WebFetch to investigate codex 0.134's behavior. **Full dossier:** [knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md) (29 KB, 8 sections, cited).
+A deep-research agent was dispatched with WebSearch + WebFetch to investigate codex 0.134's behavior. **Full dossier:** [docs/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md) (29 KB, 8 sections, cited).
 
 **Two-layer cause.**
 
@@ -197,8 +197,8 @@ The `source=env(EVOLVE_AUDITOR_CLI)` attribution confirms the launch path: `pars
 
 - **Plan that motivated WS-A..F:** `~/.claude/plans/lexical-booping-hamster.md`
 - **Cycle-119 incident report:** [cycle-119-artifact-timeout-and-cross-cli-trust.md](./cycle-119-artifact-timeout-and-cross-cli-trust.md)
-- **Codex 0.134 deep-dive dossier:** [knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
-- **Ollama control-surface dossier (WS-F):** [knowledge-base/research/ollama-control-surface-2026.md](../../knowledge-base/research/ollama-control-surface-2026.md)
+- **Codex 0.134 deep-dive dossier:** [docs/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
+- **Ollama control-surface dossier (WS-F):** [docs/research/ollama-control-surface-2026.md](../research/ollama-control-surface-2026.md)
 - **Shipped PRs (this campaign):**
   - PR #20 (WS-A) `1ad0753` — paths.AbsoluteRoot helper
   - PR #21 (WS-D) `8339e57` — optional-phase soft-fail + empty-output quota classify

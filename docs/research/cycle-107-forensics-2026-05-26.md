@@ -107,7 +107,7 @@ bash legacy/scripts/failure/state-prune.sh --classification code-audit-fail
 | `go/cmd/evolve/cmd_guard.go` | MODIFIED — `list-audit-fails` subcommand intercept + `runListAuditFails` impl |
 | `go/cmd/evolve/cmd_guard_list_audit_fails_test.go` | NEW — 5 CLI tests (table, JSON, missing-state, empty-state, flag-after-subcommand) |
 | `CLAUDE.md` | MODIFIED — added 3 rows: `FinalVerdict` label, `cycle_label` schema convention, `Operator commands` section |
-| `knowledge-base/research/cycle-107-forensics-2026-05-26.md` | NEW — this document |
+| `docs/research/cycle-107-forensics-2026-05-26.md` | NEW — this document |
 
 ## Coverage + race
 

@@ -68,7 +68,7 @@ The `Incubating… (12m · ↑54k tokens)` spinner and the per-second pane redra
 signal that exists**: a `claude-tmux`/`codex-tmux`/`agy-tmux` agent in one long "Incubating"
 turn commits no scrollback lines to `stdout.log` and writes no workspace artifact until the
 turn ends — both filesystem signals stay flat for minutes, indistinguishable from a hang. The
-fix in `knowledge-base/research/observer-false-stall-tmux-liveness-2026-06-02.md` added a tmux
+fix in `docs/research/observer-false-stall-tmux-liveness-2026-06-02.md` added a tmux
 `capture-pane` animation-hash probe **precisely because** the spinner advancing each second is
 the proof-of-life. Filtering the spinner out of the **liveness** path would reintroduce that
 false-stall bug.
@@ -187,11 +187,11 @@ The general rule: **structured channel for content; TUI pane for liveness; never
   — why the observer is live again in the Go path.
 - [ADR-0027 — Completion contracts] (artifact / stdout / git Strategy) — the completion
   protocol the drivers use (see `go/internal/bridge/completion.go`).
-- `knowledge-base/research/stdout-noise-profile-2026-05-26.md` — measured 7.6% retention
+- `docs/research/stdout-noise-profile-2026-05-26.md` — measured 7.6% retention
   (200 KB → 15 KB), the `stream_event` 86%-of-lines finding.
-- `knowledge-base/research/observer-false-stall-tmux-liveness-2026-06-02.md` — the
+- `docs/research/observer-false-stall-tmux-liveness-2026-06-02.md` — the
   think-then-dump false-stall lesson; why Channel B must stay raw.
-- `knowledge-base/research/tmux-repl-cli-behavior-2026-05-26.md` — boot markers, no
+- `docs/research/tmux-repl-cli-behavior-2026-05-26.md` — boot markers, no
   alt-screen, capture timing.
 - `docs/architecture/phase-observer.md`, `docs/architecture/observer-severity.md` — observer
   envelope + severity vocabulary.

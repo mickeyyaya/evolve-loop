@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-06
 **Status:** Approved design; implementation queued as evolve-loop cycle goals (5 domain waves + 1 integration cycle) on branch `feat/domain-phase-catalog`
-**Research basis:** [knowledge-base/research/domain-phase-catalog-research-2026-06-06.md](../../knowledge-base/research/domain-phase-catalog-research-2026-06-06.md) (5-domain cited web research)
+**Research basis:** [docs/research/domain-phase-catalog-research-2026-06-06.md](../research/domain-phase-catalog-research-2026-06-06.md) (5-domain cited web research)
 **Builds on:** [micro-phase-catalog.md](micro-phase-catalog.md) (the software catalog — same design principles, naming rule, and additive-first decision), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts)
 
 ---

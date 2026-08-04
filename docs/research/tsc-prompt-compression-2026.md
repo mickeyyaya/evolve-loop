@@ -1,8 +1,8 @@
 # Telegraphic Semantic Compression (TSC) — Research Dossier — 2026-05-12
 
-> **Archive note:** This file lives in `knowledge-base/research/` and is excluded from agent context per `feedback_knowledge_base_stewardship.md`. Persistent reference for future Scouts evaluating prompt-compression work in evolve-loop personas, skills, and reference docs.
+> **Archive note:** This file lives in `docs/research/` and is excluded from agent context per `feedback_knowledge_base_stewardship.md`. Persistent reference for future Scouts evaluating prompt-compression work in evolve-loop personas, skills, and reference docs.
 >
-> **Companion dossier:** `knowledge-base/research/token-reduction-2026-may.md` (cycle 15) covered LLMLingua family, PSMAS, ACON, TOON, MindStudio Progressive Disclosure. This file *extends* that dossier specifically for the **Telegraphic Semantic Compression (TSC)** technique flagged by operator on 2026-05-12 (end of $50 batch that shipped 3 cycles: `d73eabf`, `c7b49bc`, `0e4bff1`).
+> **Companion dossier:** `docs/research/token-reduction-2026-may.md` (cycle 15) covered LLMLingua family, PSMAS, ACON, TOON, MindStudio Progressive Disclosure. This file *extends* that dossier specifically for the **Telegraphic Semantic Compression (TSC)** technique flagged by operator on 2026-05-12 (end of $50 batch that shipped 3 cycles: `d73eabf`, `c7b49bc`, `0e4bff1`).
 
 ## 1. Operator request (verbatim)
 
@@ -127,7 +127,7 @@ Apply TSC **only** to:
 |---|---|---|
 | Over-compression breaks parser-dependent content | HIGH | Section-level discipline (anti-list above); manual review of diff |
 | Semantic drift changes instruction meaning | HIGH | Mutation testing + adversarial Auditor + A/B verification |
-| Aesthetic loss (human readability) | MEDIUM | Add a top-of-file comment: "TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md" |
+| Aesthetic loss (human readability) | MEDIUM | Add a top-of-file comment: "TSC applied — see docs/research/tsc-prompt-compression-2026.md" |
 | Cache invalidation per edit | LOW | Batch all TSC for a single file in ONE commit; the next cycle gets a stable cache prefix |
 | Reward-hacking enabler if `## Anti-Goals` compressed too aggressively | HIGH | Permanent anti-goal: do NOT TSC behavioral discipline sections |
 | Default-on promotion premature | MEDIUM | Require 2 verification cycles + measurable token delta + no quality regression before promoting |
@@ -168,7 +168,7 @@ Apply TSC **only** to:
 
 ## 12. Related prior work in this repo
 
-- `knowledge-base/research/token-reduction-2026-may.md` — cycle-15 dossier covering broader 2026 prompt-compression ecosystem.
+- `docs/research/token-reduction-2026-may.md` — cycle-15 dossier covering broader 2026 prompt-compression ecosystem.
 - `docs/architecture/token-economics-2026.md` — cycle-11 forensics; baseline cost model.
 - `docs/architecture/token-reduction-roadmap.md` — P1-P8 + P-NEW-1..5 + P-C20 + P-NEW-7/8/9 actionable roadmap (cycle 24 batch shipped P-NEW-1, P-NEW-3 in part via `c7b49bc` and `d73eabf`; P-NEW-7 via `0e4bff1`). `P-NEW-6 (TSC application)` candidate for cycle 25.
 - `agents/evolve-builder-reference.md` — example of a Layer-3 reference file.

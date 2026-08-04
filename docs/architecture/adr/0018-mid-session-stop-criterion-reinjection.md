@@ -6,7 +6,7 @@
 | Date | 2026-05-19 |
 | Cycle (research) | 87 |
 | Cycle (implementation) | 88 |
-| Author | Scout cycle-87 via `knowledge-base/research/agentic-pipeline-enforcement-2026.md` |
+| Author | Scout cycle-87 via `docs/research/agentic-pipeline-enforcement-2026.md` |
 
 ---
 
@@ -18,7 +18,7 @@
 
 ## Context
 
-Cycle-86 produced a `turn-overrun` abnormal event: the intent agent ran 12 turns against a ceiling of 10. Research deposited in cycle-87 (`knowledge-base/research/agentic-pipeline-enforcement-2026.md`, Finding 3) identifies the root cause as **instruction adherence attenuation**:
+Cycle-86 produced a `turn-overrun` abnormal event: the intent agent ran 12 turns against a ceiling of 10. Research deposited in cycle-87 (`docs/research/agentic-pipeline-enforcement-2026.md`, Finding 3) identifies the root cause as **instruction adherence attenuation**:
 
 > "A significant within-session attenuation effect where LLM agent compliance decreases by approximately 5.6% per generated function." — ACM AISystems 2024 (https://dl.acm.org/doi/full/10.1145/3703412.3703439)
 
@@ -61,6 +61,6 @@ For agents with `max_turns > 8`, inject a compressed re-statement of the STOP CR
 
 ## References
 
-- Research dossier: `knowledge-base/research/agentic-pipeline-enforcement-2026.md` (Finding 3)
+- Research dossier: `docs/research/agentic-pipeline-enforcement-2026.md` (Finding 3)
 - Source paper: "Methodology for Quality Assurance Testing of LLM-based Multi-Agent Systems." ACM AISystems 2024. https://dl.acm.org/doi/full/10.1145/3703412.3703439
 - Cycle-86 abnormal event evidence: `.evolve/runs/cycle-86/abnormal-events.jsonl` (`turn-overrun` entry)

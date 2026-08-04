@@ -229,6 +229,6 @@ Local track: `docs/architecture/deliverable-contract.md` · ADR-0034/0039/0042/
 `docs/operations/false-fail-recovery-862-899.md` ·
 `docs/operations/change-log-2026-07-30.md` ·
 `docs/operations/batch-integrity-review-2026-08-04.md` ·
-`kb/research/llm-output-stability-2026-07/` ·
-`kb/research/failed-loop-analysis-2026-07/` · live runtime state
+`docs/research/llm-output-stability-2026-07/` ·
+`docs/research/failed-loop-analysis-2026-07/` · live runtime state
 (`contract-gate-breaker.json`, `pipeline-escalation.json`, run dirs).

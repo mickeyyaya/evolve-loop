@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-06-05
 - Extends: ADR-0035 (spec-derived deliverable contracts), ADR-0034 (unified deliverable contract), ADR-0024 (dynamic phase routing / PhaseAdvisor)
-- Companion design doc: [phase-plugin-system.md](../phase-plugin-system.md) · Research: [micro-phase-catalog-research-2026-06-05.md](../../../knowledge-base/research/micro-phase-catalog-research-2026-06-05.md)
+- Companion design doc: [phase-plugin-system.md](../phase-plugin-system.md) · Research: [micro-phase-catalog-research-2026-06-05.md](../../research/micro-phase-catalog-research-2026-06-05.md)
 
 ## Context
 

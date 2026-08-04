@@ -3,7 +3,7 @@
 > **Status: RESOLVED (v10.18.0)** — default flipped to `EVOLVE_OBSERVER_ENFORCE=1` (cycle 100). Phase-watchdog retained as DEPRECATED opt-out for one release window.
 > **Severity:** MEDIUM (operator overhead, no integrity breach; real work shipped in every observed case)
 > **Date range:** 2026-05-19 → 2026-05-20 (v10.16.0 → v10.17.0 batch)
-> **Forensic dossiers:** [`watchdog-post-memo-sigterm-pattern`](../../knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md), [`acs-promote-recovery-dance`](../../knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md), [`dual-root-plugin-pattern-bite`](../../knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md)
+> **Forensic dossiers:** [`watchdog-post-memo-sigterm-pattern`](../research/watchdog-post-memo-sigterm-pattern-2026-05-20.md), [`acs-promote-recovery-dance`](../research/acs-promote-recovery-dance-2026-05-20.md), [`dual-root-plugin-pattern-bite`](../research/dual-root-plugin-pattern-bite-2026-05-20.md)
 
 ## Summary
 
@@ -53,7 +53,7 @@ Cycle 97 fired a *different* detector (`subagent-run.sh` INTEGRITY-FAIL on stale
 
 When the operator raised the watchdog default from 240 → 600s via `ad07d25`, the change took effect for the **project repo** (`~/ai/claude/evolve-loop/`) but NOT for the **running plugin install** (`~/.claude/plugins/marketplaces/evolve-loop/`). The dispatcher's `find` expression in `skills/evolve-loop/SKILL.md` explicitly resolves to the plugin install, not the project repo. Cycles 96-98 required env-var override (`EVOLVE_INACTIVITY_THRESHOLD_S=600`) on the dispatcher invocation to apply the new default.
 
-This is **architectural**, not a defect — the plugin install is the runtime-vetted release; the project repo is the source of truth. Closure required publishing v10.17.0 via `release-pipeline.sh`, which propagates the change via marketplace sync. See [`dual-root-plugin-pattern-bite`](../../knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md) for the full path topology.
+This is **architectural**, not a defect — the plugin install is the runtime-vetted release; the project repo is the source of truth. Closure required publishing v10.17.0 via `release-pipeline.sh`, which propagates the change via marketplace sync. See [`dual-root-plugin-pattern-bite`](../research/dual-root-plugin-pattern-bite-2026-05-20.md) for the full path topology.
 
 ## The recovery dance (operator workaround)
 
@@ -76,7 +76,7 @@ git worktree remove --force <cycle worktree>
 git branch -D evolve/cycle-N
 ```
 
-See [`acs-promote-recovery-dance`](../../knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md) §4 for the full runbook.
+See [`acs-promote-recovery-dance`](../research/acs-promote-recovery-dance-2026-05-20.md) §4 for the full runbook.
 
 ## What we shipped (short-term mitigation)
 
@@ -99,7 +99,7 @@ done
 
 **Alternative: tool-event detection.** Watchdog reads stream-json events from orchestrator stdout, counts `tool_use` messages as activity. Higher implementation cost; equivalently reliable.
 
-**Companion fix: ACS promote in ship.sh post-commit hook.** Move the `promote-acs-to-regression.sh` invocation INTO `ship.sh` post-commit, so the promote and the feat-commit land in the same orchestrator turn (gap < 10s, well within any watchdog threshold). Eliminates 5 chore commits per batch. See [`acs-promote-recovery-dance`](../../knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md) §4 Long-term Fix.
+**Companion fix: ACS promote in ship.sh post-commit hook.** Move the `promote-acs-to-regression.sh` invocation INTO `ship.sh` post-commit, so the promote and the feat-commit land in the same orchestrator turn (gap < 10s, well within any watchdog threshold). Eliminates 5 chore commits per batch. See [`acs-promote-recovery-dance`](../research/acs-promote-recovery-dance-2026-05-20.md) §4 Long-term Fix.
 
 ## Lessons for operators
 
@@ -119,10 +119,10 @@ Default flipped to `EVOLVE_OBSERVER_ENFORCE=1` in v10.18.0 (cycle 100). Phase-ob
 
 ## Cross-references
 
-- [`knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md`](../../knowledge-base/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md) — full pattern analysis with mechanism table
-- [`knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md`](../../knowledge-base/research/acs-promote-recovery-dance-2026-05-20.md) — recovery runbook
-- [`knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md`](../../knowledge-base/research/dual-root-plugin-pattern-bite-2026-05-20.md) — propagation mechanics
-- [`knowledge-base/research/v10-17-0-release-debrief.md`](../../knowledge-base/research/v10-17-0-release-debrief.md) — multi-cycle synthesis and roadmap
-- [`knowledge-base/research/phase-watchdog-stall-detection-cycle-89.md`](../../knowledge-base/research/phase-watchdog-stall-detection-cycle-89.md) — origin of the watchdog
+- [`docs/research/watchdog-post-memo-sigterm-pattern-2026-05-20.md`](../research/watchdog-post-memo-sigterm-pattern-2026-05-20.md) — full pattern analysis with mechanism table
+- [`docs/research/acs-promote-recovery-dance-2026-05-20.md`](../research/acs-promote-recovery-dance-2026-05-20.md) — recovery runbook
+- [`docs/research/dual-root-plugin-pattern-bite-2026-05-20.md`](../research/dual-root-plugin-pattern-bite-2026-05-20.md) — propagation mechanics
+- [`docs/research/v10-17-0-release-debrief.md`](../research/v10-17-0-release-debrief.md) — multi-cycle synthesis and roadmap
+- [`docs/research/phase-watchdog-stall-detection-cycle-89.md`](../research/phase-watchdog-stall-detection-cycle-89.md) — origin of the watchdog
 - `docs/architecture/phase-observer.md` — watchdog/observer design (predates this incident)
 - Memory: `feedback_orchestrator_hang_false_breach` — operator pattern: check `git log -1 main` first

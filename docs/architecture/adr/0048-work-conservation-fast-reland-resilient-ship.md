@@ -3,7 +3,7 @@
 - **Status:** Proposed (design-first; build in approved slices, like ADR-0046 L3)
 - **Date:** 2026-06-13
 - **Driver:** the cycles 243–248 batch retrospective (P1/P2/P5,
-  `knowledge-base/research/batch-retrospective-cycles-243-248-2026-06-07.md`) — three
+  `docs/research/batch-retrospective-cycles-243-248-2026-06-07.md`) — three
   inbox proposals (`graduated-enforcement`, `content-addressed-audit-reuse`,
   `ship-transactionality`) that share one theme: **the loop destroys or re-does work it
   has already proven safe.** A 60-second-fixable report defect aborts a whole cycle; a

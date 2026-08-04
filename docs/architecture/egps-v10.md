@@ -6,7 +6,7 @@
 > tests (`//go:build acs`) under `go/acs/{cycle<N>,regression,redteam}/`, not bash `acs/cycle-N/*.sh`.
 > See ADR-0042 + `go/acs/README.md` for the current contract; the bash format below is historical.
 
-> Unified architectural pattern that replaces model-claimed verdicts with sandbox exit codes. Subsumes the 5 gaming signals diagnosed in cycles 30–39 (AC-by-grep, confidence cliff, recurring isolation breach, self-referential tautological-eval, carryover work-shifting). Research basis: [knowledge-base/research/execution-grounded-process-supervision-2026.md](../../knowledge-base/research/execution-grounded-process-supervision-2026.md).
+> Unified architectural pattern that replaces model-claimed verdicts with sandbox exit codes. Subsumes the 5 gaming signals diagnosed in cycles 30–39 (AC-by-grep, confidence cliff, recurring isolation breach, self-referential tautological-eval, carryover work-shifting). Research basis: [docs/research/execution-grounded-process-supervision-2026.md](../research/execution-grounded-process-supervision-2026.md).
 
 ## One sentence
 
@@ -156,7 +156,7 @@ Cycles 41+ accumulate the regression suite organically. Backfill of cycles 30–
 
 ## Research citations (short list)
 
-Full bibliography in `knowledge-base/research/execution-grounded-process-supervision-2026.md`. Most directly load-bearing:
+Full bibliography in `docs/research/execution-grounded-process-supervision-2026.md`. Most directly load-bearing:
 
 - [Skalse et al. NeurIPS 2022](https://arxiv.org/abs/2209.13085) — the impossibility result for unhackable scalar proxies
 - [Lightman et al. OpenAI 2023, PRM800K](https://arxiv.org/abs/2305.20050) — process supervision beats outcome supervision

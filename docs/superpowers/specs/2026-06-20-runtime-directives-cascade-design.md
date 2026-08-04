@@ -21,7 +21,7 @@ machine-**global** layer and a **per-loop** layer — that every loop re-reads a
 **start of each cycle** and that are **injected into every phase agent's prompt**. The
 main session edits one Markdown file; all loops converge on the next cycle boundary,
 without restart. It is the *delivery mechanism* for standards such as the
-[Flag → Parameter Conversion Standard](../../../knowledge-base/research/flag-parameter-conversion-standard.md)
+[Flag → Parameter Conversion Standard](../../research/flag-parameter-conversion-standard.md)
 (the first concrete L0 directive).
 
 ## Goals / Non-goals

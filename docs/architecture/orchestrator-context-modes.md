@@ -17,7 +17,7 @@ Selection is **per-agent**, declared in `.evolve/profiles/<agent>.json:context_m
 
 ## Why this exists
 
-Before cycle 97 (v10.10.0), every phase agent received the same kitchen-sink context block: full `state.json`, full `scout-report`, full `build-report`, full `audit-report`, full `retrospective` if present. Measurements from `knowledge-base/research/cycle-21-cost-attribution.md` showed the Orchestrator phase alone was burning 8-15 K tokens per cycle on context the role didn't act on. The Builder doesn't reason about retrospective theory; the Auditor doesn't need Scout's raw research notes (it has the build-report).
+Before cycle 97 (v10.10.0), every phase agent received the same kitchen-sink context block: full `state.json`, full `scout-report`, full `build-report`, full `audit-report`, full `retrospective` if present. Measurements from `docs/research/cycle-21-cost-attribution.md` showed the Orchestrator phase alone was burning 8-15 K tokens per cycle on context the role didn't act on. The Builder doesn't reason about retrospective theory; the Auditor doesn't need Scout's raw research notes (it has the build-report).
 
 Cycle 97 shipped two structural changes:
 
@@ -78,7 +78,7 @@ Full-mode emission still happens for `scout-report.md`, `build-report.md`, etc. 
 
 ## Measured impact
 
-From `knowledge-base/research/v10-17-0-release-debrief.md` per-cycle breakdown:
+From `docs/research/v10-17-0-release-debrief.md` per-cycle breakdown:
 
 | Cycle | Orchestrator phase tokens (estimated) | Mode |
 |---|---|---|
@@ -123,8 +123,8 @@ All paths are designed to **degrade to full mode** rather than fail. Under-feedi
 - `docs/architecture/context-window-control.md` — `EVOLVE_PROMPT_MAX_TOKENS` soft cap and autotrim behavior
 - `docs/architecture/sequential-write-discipline.md` — companion: `parallel_eligible` field on profiles
 - `docs/architecture/token-economics-2026.md` — full token-cost roadmap (P1–P8)
-- `knowledge-base/research/cycle-21-cost-attribution.md` — original measurement that motivated digest mode
-- `knowledge-base/research/v10-17-0-release-debrief.md` §2 — cycle 97 ship and post-ship measurement
+- `docs/research/cycle-21-cost-attribution.md` — original measurement that motivated digest mode
+- `docs/research/v10-17-0-release-debrief.md` §2 — cycle 97 ship and post-ship measurement
 - ACS predicates that lock this contract:
   - `acs/regression-suite/cycle-97/001-orchestrator-profile-has-context-mode-digest.sh`
   - `acs/regression-suite/cycle-97/002-role-context-builder-honors-profile-context-mode.sh`

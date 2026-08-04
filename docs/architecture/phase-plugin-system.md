@@ -2,7 +2,7 @@
 
 **Status:** Shipped (branch `feat/phase-plugin-system`, 2026-06-05)
 **ADR:** [0038-structured-phase-plugin-system.md](adr/0038-structured-phase-plugin-system.md)
-**Research:** [micro-phase-catalog-research-2026-06-05.md](../../knowledge-base/research/micro-phase-catalog-research-2026-06-05.md) · [micro-phase-catalog.md](micro-phase-catalog.md)
+**Research:** [micro-phase-catalog-research-2026-06-05.md](../research/micro-phase-catalog-research-2026-06-05.md) · [micro-phase-catalog.md](micro-phase-catalog.md)
 
 ## 1. The request
 

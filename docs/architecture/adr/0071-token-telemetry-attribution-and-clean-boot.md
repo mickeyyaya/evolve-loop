@@ -5,8 +5,8 @@
 | Status | Accepted |
 | Date | 2026-07-17 |
 | Affects | `go/internal/tokenusage` (resolver), all `.evolve/profiles/*.json` (launch flags) |
-| Detail record | [knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md](../../../knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md) |
-| Design | [part4-per-phase-boot-context.md](../../../knowledge-base/research/token-optimization-2026/part4-per-phase-boot-context.md) |
+| Detail record | [docs/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md](../../research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md) |
+| Design | [part4-per-phase-boot-context.md](../../research/token-optimization-2026/part4-per-phase-boot-context.md) |
 
 ## Context
 
