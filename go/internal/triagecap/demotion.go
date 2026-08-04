@@ -190,28 +190,90 @@ func reliefConsumedBy(projectRoot string, older, newer int) (int, bool) {
 	return *m.RelievedCycle, true
 }
 
+// RemedyStatus is the demotion ledger's answer to "what happened about the
+// suspected gate defect?" — a CLOSED vocabulary, so a reader switches on
+// three cases and no more. The record previously carried only the prose
+// `action` narrative, which meant the outcome had to be reconstructed from
+// elsewhere (commit 29915424 explained two demotions in a queue chore commit
+// body because the ledger itself could not answer).
+type RemedyStatus string
+
+const (
+	// RemedyPending is the honest value at file time: the demotion just
+	// fired and no remedy decision has been made yet.
+	RemedyPending RemedyStatus = "pending"
+	// RemedySalvageAttempted records that a salvage of the suspected gate
+	// defect was tried.
+	RemedySalvageAttempted RemedyStatus = "salvage_attempted"
+	// RemedyNoRemedyPossible records the terminal conclusion that the
+	// defect admits no remedy.
+	RemedyNoRemedyPossible RemedyStatus = "no_remedy_possible"
+)
+
+// NormalizeRemedyStatus maps any input onto the closed vocabulary. Anything
+// that is not a canonical value — blank, unknown, wrong case, whitespace
+// padded — falls back to RemedyPending rather than being echoed verbatim: an
+// unvalidated string must never reach the ledger, and the field must never be
+// a silent blank.
+func NormalizeRemedyStatus(s string) RemedyStatus {
+	switch RemedyStatus(s) {
+	case RemedySalvageAttempted:
+		return RemedySalvageAttempted
+	case RemedyNoRemedyPossible:
+		return RemedyNoRemedyPossible
+	default:
+		return RemedyPending
+	}
+}
+
+// DemotionLedgerRecord is the wire shape of the auto-filed demotion defect —
+// the durable ledger entry for one demotion event, identified by the
+// older/newer cycle pair its filename embeds.
+type DemotionLedgerRecord struct {
+	ID              string       `json:"id"`
+	Action          string       `json:"action"`
+	Priority        string       `json:"priority"`
+	Weight          float64      `json:"weight"`
+	RelievedCycle   int          `json:"relieved_cycle"`
+	RemedyStatus    RemedyStatus `json:"remedy_status"`
+	EvidencePointer string       `json:"evidence_pointer"`
+	InjectedAt      string       `json:"injected_at"`
+	InjectedBy      string       `json:"injected_by"`
+}
+
+// NewDemotionLedgerRecord builds the record for one demotion event. status is
+// caller-declared — nothing in state.json says whether a salvage was
+// attempted, so it cannot be inferred here — and is normalized, so a junk
+// value degrades to pending instead of poisoning the vocabulary. A future
+// consumer (retro/audit) may rewrite the file to record the terminal outcome;
+// the filename's pair identity is what makes that rewrite addressable.
+func NewDemotionLedgerRecord(currentCycle, older, newer int, detail string, status RemedyStatus) DemotionLedgerRecord {
+	return DemotionLedgerRecord{
+		ID: fmt.Sprintf("auto-heuristic-demotion-triagecap-c%d-c%d", older, newer),
+		Action: fmt.Sprintf("The triage capacity clamp rejected two consecutive cycles with a byte-identical reason template (%s) — a determinism artifact, so the gate itself is the suspect (ADR-0046 Layer 2; precedent: cycles 301/302 phantom floors). The gate ran SHADOW for cycle %d only and now enforces again. Investigate the clamp's counter against the rejected artifacts in .evolve/runs/, fix with a TDD pin replaying them, and verify with `evolve guard triage-floors`.",
+			detail, currentCycle),
+		Priority:        "HIGH",
+		Weight:          0.7,
+		RelievedCycle:   currentCycle,
+		RemedyStatus:    NormalizeRemedyStatus(string(status)),
+		EvidencePointer: fmt.Sprintf(".evolve/runs/cycle-%d + cycle-%d triage artifacts; state.json failedApproaches; docs/architecture/adr/0046-gate-epistemics-and-self-deploy.md (Layer 2)", older, newer),
+		InjectedAt:      time.Now().UTC().Format(time.RFC3339),
+		InjectedBy:      "triagecap-demotion",
+	}
+}
+
 // autoFileDemotionDefect writes the demotion's inbox defect once per pair
 // (the filename embeds the evidence cycles, so a re-review or a retry of
 // the same demoted cycle cannot duplicate it); relieved_cycle records which
-// cycle consumed the pair's one-cycle relief. Best-effort: a write failure
-// only loses the defect file, never the demotion log line.
-func autoFileDemotionDefect(projectRoot string, currentCycle, older, newer int, detail string) {
+// cycle consumed the pair's one-cycle relief, and status records the remedy
+// outcome the caller declares. Best-effort: a write failure only loses the
+// defect file, never the demotion log line.
+func autoFileDemotionDefect(projectRoot string, currentCycle, older, newer int, detail string, status RemedyStatus) {
 	path := demotionDefectPath(projectRoot, older, newer)
 	if _, err := os.Stat(path); err == nil {
 		return
 	}
-	item := map[string]any{
-		"id": fmt.Sprintf("auto-heuristic-demotion-triagecap-c%d-c%d", older, newer),
-		"action": fmt.Sprintf("The triage capacity clamp rejected two consecutive cycles with a byte-identical reason template (%s) — a determinism artifact, so the gate itself is the suspect (ADR-0046 Layer 2; precedent: cycles 301/302 phantom floors). The gate ran SHADOW for cycle %d only and now enforces again. Investigate the clamp's counter against the rejected artifacts in .evolve/runs/, fix with a TDD pin replaying them, and verify with `evolve guard triage-floors`.",
-			detail, currentCycle),
-		"priority":         "HIGH",
-		"weight":           0.7,
-		"relieved_cycle":   currentCycle,
-		"evidence_pointer": fmt.Sprintf(".evolve/runs/cycle-%d + cycle-%d triage artifacts; state.json failedApproaches; docs/architecture/adr/0046-gate-epistemics-and-self-deploy.md (Layer 2)", older, newer),
-		"injected_at":      time.Now().UTC().Format(time.RFC3339),
-		"injected_by":      "triagecap-demotion",
-	}
-	data, err := json.Marshal(item)
+	data, err := json.Marshal(NewDemotionLedgerRecord(currentCycle, older, newer, detail, status))
 	if err != nil {
 		return
 	}

@@ -148,7 +148,11 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 				r.logf("[triage-cap] demotion relief for the c%d/c%d pair already consumed by cycle %d — enforcing (one-cycle relief)", older, newer, by)
 			} else {
 				r.logf("[triage-cap] DEMOTED to shadow for cycle %d — %s; gate defect suspected (ADR-0046 L2). Would-block: %s", cycle, why, reason)
-				autoFileDemotionDefect(in.ProjectRoot, cycle, older, newer, why)
+				// At file time the demotion has only just fired, so the
+				// honest declared outcome is pending — a later consumer
+				// rewrites it to the terminal salvage_attempted /
+				// no_remedy_possible.
+				autoFileDemotionDefect(in.ProjectRoot, cycle, older, newer, why, RemedyPending)
 				return core.ReviewResult{Approve: true}
 			}
 		}

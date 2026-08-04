@@ -2,6 +2,7 @@ package triagecap
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,5 +205,110 @@ func TestCapReviewer_NoRunJSONStaysEnforcing(t *testing.T) {
 	r, in, _ := newDemotionFixture(t, "", pair)
 	if res := r.Review(context.Background(), in); res.Approve {
 		t.Fatal("without a readable cycle_id the gate must keep enforcing")
+	}
+}
+
+// --- cycle-1301: remedy_status on the demotion ledger record ---------------
+//
+// The auto-filed record is the DURABLE ledger entry for a demotion event, but
+// it only ever carried a prose `action` narrative: nothing on it says whether a
+// salvage of the suspected gate defect was ATTEMPTED or whether the loop
+// concluded NO REMEDY was possible. Commit 29915424 had to explain two gate
+// demotions in a queue chore commit body for exactly that reason. remedy_status
+// is caller-declared (the writer has no way to infer it), defaults to `pending`
+// at file time, and carries a CLOSED vocabulary — an unknown value normalises
+// to pending rather than being written through, so a downstream reader can
+// switch on three cases and no more.
+
+func TestNormalizeRemedyStatus(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want RemedyStatus
+	}{
+		{"canonical pending", "pending", RemedyPending},
+		{"canonical salvage_attempted", "salvage_attempted", RemedySalvageAttempted},
+		{"canonical no_remedy_possible", "no_remedy_possible", RemedyNoRemedyPossible},
+		{"blank is never written", "", RemedyPending},
+		{"unknown value is not echoed", "gave-up-ish", RemedyPending},
+		{"wrong case is not canonical", "No_Remedy_Possible", RemedyPending},
+		{"padded value is not canonical", "\tpending\n", RemedyPending},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeRemedyStatus(tc.in); got != tc.want {
+				t.Errorf("NormalizeRemedyStatus(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNewDemotionLedgerRecord_DeclaredOutcomes(t *testing.T) {
+	const detail = "identical rejection template in cycles 301 and 302 (hash deadbeefdeadbeef)"
+
+	t.Run("declared terminal outcomes reach the record", func(t *testing.T) {
+		for _, want := range []RemedyStatus{RemedyPending, RemedySalvageAttempted, RemedyNoRemedyPossible} {
+			rec := NewDemotionLedgerRecord(303, 301, 302, detail, want)
+			if rec.RemedyStatus != want {
+				t.Errorf("RemedyStatus = %q, want %q", rec.RemedyStatus, want)
+			}
+		}
+	})
+
+	t.Run("junk normalises to pending", func(t *testing.T) {
+		rec := NewDemotionLedgerRecord(303, 301, 302, detail, RemedyStatus("nonsense"))
+		if rec.RemedyStatus != RemedyPending {
+			t.Errorf("RemedyStatus = %q, want %q — an unvalidated status must never reach the ledger", rec.RemedyStatus, RemedyPending)
+		}
+	})
+
+	t.Run("identity and relief bookkeeping unchanged", func(t *testing.T) {
+		var rec DemotionLedgerRecord = NewDemotionLedgerRecord(303, 301, 302, detail, RemedySalvageAttempted)
+		if rec.ID != "auto-heuristic-demotion-triagecap-c301-c302" {
+			t.Errorf("ID = %q, want the pair-identity slug", rec.ID)
+		}
+		if rec.RelievedCycle != 303 {
+			t.Errorf("RelievedCycle = %d, want 303", rec.RelievedCycle)
+		}
+		if !strings.Contains(rec.EvidencePointer, "cycle-301") || !strings.Contains(rec.EvidencePointer, "cycle-302") {
+			t.Errorf("EvidencePointer = %q, want it to name both evidence cycles", rec.EvidencePointer)
+		}
+		if !strings.Contains(rec.Action, detail) {
+			t.Errorf("Action = %q, want it to quote the demotion detail", rec.Action)
+		}
+		if rec.Priority != "HIGH" || rec.Weight != 0.7 || rec.InjectedBy != "triagecap-demotion" || rec.InjectedAt == "" {
+			t.Errorf("record metadata drifted: priority=%q weight=%v injectedBy=%q injectedAt=%q",
+				rec.Priority, rec.Weight, rec.InjectedBy, rec.InjectedAt)
+		}
+	})
+}
+
+func TestCapReviewer_LedgerRecordDefaultsToPendingRemedy(t *testing.T) {
+	// Wiring proof through the REAL reviewer: the production call site must
+	// thread a status, and at file time the honest value is `pending`.
+	pair := []FailEntry{{Cycle: 301, Summary: summary301}, {Cycle: 302, Summary: summary302}}
+	r, in, root := newDemotionFixture(t, "303", pair)
+	if res := r.Review(context.Background(), in); !res.Approve {
+		t.Fatalf("demoted gate must approve (shadow semantics), got reject: %s", res.Reason)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "auto-heuristic-demotion-triagecap-c301-c302.json"))
+	if err != nil {
+		t.Fatalf("reading the auto-filed ledger record: %v", err)
+	}
+	var got struct {
+		RemedyStatus  *string `json:"remedy_status"`
+		RelievedCycle *int    `json:"relieved_cycle"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("ledger record must be valid JSON: %v", err)
+	}
+	if got.RemedyStatus == nil {
+		t.Fatalf("ledger record carries no remedy_status field: %s", raw)
+	}
+	if *got.RemedyStatus != string(RemedyPending) {
+		t.Errorf("remedy_status = %q, want %q at file time", *got.RemedyStatus, RemedyPending)
+	}
+	if got.RelievedCycle == nil || *got.RelievedCycle != 303 {
+		t.Errorf("relieved_cycle regressed: %v", got.RelievedCycle)
 	}
 }
