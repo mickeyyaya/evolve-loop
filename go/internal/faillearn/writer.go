@@ -91,10 +91,11 @@ func (c writeConfig) preserveDiagnosis(ev FailureEvent, runDir string, cause err
 	b.WriteString("This degraded artifact preserves the analysis so it can be requeued by hand or\n")
 	b.WriteString("reconciled by the next continuation.\n\n")
 	b.WriteString("## Remediation items that are still UNQUEUED\n\n")
-	if len(c.inboxItems) == 0 {
+	unqueued := c.unqueuedItems()
+	if len(unqueued) == 0 {
 		b.WriteString("- (none recorded)\n")
 	}
-	for _, it := range c.inboxItems {
+	for _, it := range unqueued {
 		fmt.Fprintf(&b, "- `%s` — %s\n", it.ID, it.Title)
 	}
 	b.WriteString("\n")

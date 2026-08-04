@@ -498,3 +498,29 @@ what the first of them left open, and the mode defect its own audit raised.
   the `go/acs/cycleNNNN/predicates_test.go` path convention) is DEFERRED, queued as
   `audit-eval-existence-path-convention` — a different surface from the ledger, and
   deferring it in the record is the opposite of the laundering this review tracks.
+
+## Landing — cycle-1292, continuation of 1290
+
+The 1290 landing note above closes with two accounting notes of its own; its audit
+raised two more. Both are closed here.
+
+- **The unbacked deferral is now backed (1290-D1).** The claim above that 1287's F2
+  is "DEFERRED, queued as `audit-eval-existence-path-convention`" was false on disk
+  when it was written — no such item existed under `.evolve/inbox`, because the
+  audit phase's role guard denies writes outside its workspace and so the audit
+  that raised the deferral could not file it. The queue entry now exists
+  (`.evolve/inbox/2026-08-04T22-40-00Z-audit-eval-existence-path-convention.json`),
+  filed by the build phase, and is verified through the real consumer
+  (`inboxbatch.LoadDir`) by `TestC1292_004` — a stat on a filename would have
+  greened on an item the loader drops. 1287-F2 itself stays DEFERRED: it is the
+  audit eval gate, a different surface from this ledger.
+- **The degraded artifact no longer overclaims (1290-D2).** `writeInboxItems`
+  writes one file per item and returns on the first failure, so items before it are
+  already queued; `preserveDiagnosis` listed all of them as "still UNQUEUED". FIXED,
+  per the record in `defect-dispositions.json`, by `writeConfig.unqueuedItems`,
+  which reads the inbox back and names only what is genuinely absent. The 1255
+  ordering is unreversed — `retrospective-report.md` stays absent on every failure
+  arm and `WriteArtifacts` still returns the error — and the no-under-claim half
+  (total failure, and failure at index 0) is pinned so the cheap "drop the first
+  entry" fix cannot pass. `inbox_transactional_test.go` and
+  `inbox_failure_degraded_test.go` are byte-identical.

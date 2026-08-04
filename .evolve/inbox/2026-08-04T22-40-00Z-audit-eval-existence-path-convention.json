@@ -1,0 +1,22 @@
+{
+  "id": "audit-eval-existence-path-convention",
+  "title": "Audit eval-existence check keys on .evolve/evals/<slug>.md while this era's acceptance criteria live in go/acs/cycleNNNN/predicates_test.go — reconcile the two path conventions",
+  "kind": "loop-reliability",
+  "priority": "medium",
+  "weight": 0.7,
+  "campaign": "continuation-defect-ledger",
+  "files": [
+    "go/internal/phases/audit/",
+    "go/acs/"
+  ],
+  "connects_to": [],
+  "deps": [],
+  "injected_by": "cycle-1292-build-continuation-defect-ledger",
+  "evidence": "Carried forward as 1287-F2 (DEFERRED) in .evolve/runs/cycle-1290/defect-dispositions.json. Both governed documents — docs/architecture/continuation-defect-ledger.md:216 and docs/operations/batch-integrity-review-2026-08-04.md:498 — asserted the item was 'queued as audit-eval-existence-path-convention', but no such file existed under .evolve/inbox (cycle-1290 audit: 'ls .evolve/inbox | grep -i eval-existence' -> no match). The audit phase's role guard denies writes outside its workspace, so the audit that found the gap could not file it; it was raised as cycle-1290 D1 and carried forward OPEN. This file is that queue entry — filed by cycle-1292's build phase, which does hold write authority over the tracked .evolve/inbox path.",
+  "notes": "Scope is the AUDIT EVAL GATE, deliberately NOT the defect ledger — a different surface, which is why 1287-F2 stays DEFERRED in the ledger lineage rather than being closed by it. The gate checks for .evolve/evals/<task-slug>.md; the acceptance criteria of this era are materialised as ACS predicates in go/acs/cycleNNNN/predicates_test.go. Decide which is authoritative (or accept either) instead of leaving two conventions in force, and make the gate's failure message name the path it actually looked for.",
+  "acceptance": [
+    "RED first: a reproducer showing a cycle whose acceptance criteria exist only as go/acs/cycleNNNN/predicates_test.go is scored eval-missing by the audit eval-existence check.",
+    "The gate accepts (or explicitly rejects, with a message naming the path it looked for) each convention; no cycle can be both fully covered and eval-missing.",
+    "cd go && go test ./internal/phases/audit/... N/N PASS, no regression."
+  ]
+}

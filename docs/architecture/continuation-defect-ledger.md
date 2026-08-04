@@ -226,3 +226,36 @@ has been created yet); there the error is still returned but no diagnosis is
 published, because inventing a cwd-relative location is worse than not publishing.
 Pinned by `TestWriteArtifacts_InboxFailureWithNoRunDirStillErrors`, and recorded
 here rather than papered over.
+
+## Cycle-1292 continuation — the two defects cycle-1290 handed forward
+
+Fourth hop of the `continuation-defect-ledger` lineage (1285 → 1287 → 1290 →
+1292). Both entries were RED in the committed reproducer before this landing and
+are now tree-resident locks in `go/internal/faillearn/inbox_partial_write_test.go`
+and `go/acs/cycle1292/predicates_test.go`.
+
+| Defect | Sev | Issue | Gap | Solution |
+|---|---|---|---|---|
+| 1290-D1 | MEDIUM | Both governed documents asserted 1287-F2 was "DEFERRED, queued as `audit-eval-existence-path-convention`" — false on disk: no such item existed under `.evolve/inbox`. An unbacked deferral claim, inside the very lane that exists to catch unbacked claims | The audit phase's role guard denies writes outside its workspace, so the audit that raised the deferral could not file the queue entry its own record cited | The queue entry now exists: `.evolve/inbox/2026-08-04T22-40-00Z-audit-eval-existence-path-convention.json`, filed by the BUILD phase (which does hold write authority over the tracked `.evolve/inbox` path). Pinned by `TestC1292_004`, which drives the real consumer `inboxbatch.LoadDir` rather than stat-ing a filename — a file the loader drops backs no deferral claim |
+| 1290-D2 | MEDIUM | `writeInboxItems` is not atomic across items: it writes one file per item and returns on the FIRST failure, so items before the failing one are already queued. `preserveDiagnosis` nonetheless listed EVERY configured item as "still UNQUEUED", overclaiming which remediation was lost | `preserveDiagnosis` held only `c.inboxItems` and so could not tell queued from unqueued | `writeConfig.unqueuedItems` READS THE INBOX BACK and names only the items that are absent, or occupied by different content under our id. Reading the queue — rather than slicing at the failure index — is what makes it right for the states an index cannot describe: an item filed by a concurrent fleet lane under the same deterministic id is queued; an id collision is not |
+
+**Disposition.** Both are FIXED, per the records in `defect-dispositions.json` for
+this lineage. `1287-F2` itself stays DEFERRED — a different surface (the audit
+eval gate, not this lane) — and that deferral is now backed by a real queue entry
+rather than by prose.
+
+**Why read-back, not a failure index.** The degraded artifact's claim is about
+what is in the QUEUE, so the queue is what the claim is checked against. Any doubt
+— no inbox dir, an unaddressable id, an unreadable file — reports UNQUEUED, so the
+failure direction stays "name work that may already be filed" over "lose work";
+re-filing an identical item is idempotent by `writeIfAbsent`'s same-content rule,
+while an omitted item is work nobody goes looking for.
+
+**Known ceiling.** The read-back is a point-in-time observation. A concurrent lane
+that files one of our ids in the window between the failed write and the degraded
+artifact's publication would be reported as unqueued; the direction is the safe
+one, and no cross-lane lock is worth taking on a failure path. `WriteArtifacts`
+still returns the error and `retrospective-report.md` is still absent on every
+failure arm — accuracy is an ADDITION to failing loudly, never a replacement for
+it (`TestWriteArtifacts_PartialWrite_TotalFailureNamesEveryItem` and
+`..._FirstItemFailsNamesEveryItem` pin the no-under-claim half).

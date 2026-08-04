@@ -73,23 +73,14 @@ func (c writeConfig) writeInboxItems() error {
 		return nil
 	}
 	for _, it := range c.inboxItems {
-		if strings.TrimSpace(it.ID) == "" {
-			return fmt.Errorf("faillearn: inbox item %q has no id — an unaddressable remediation item cannot be reconciled later", it.Title)
-		}
-		// The id is concatenated into a path below, so it must be a BARE
-		// filename. Rejection, not sanitisation: a silently rewritten id
-		// produces an item nobody can address by the id they filed it under,
-		// which is the same erasure this package exists to stop. The only
-		// current caller emits [a-z0-9-] slugs, so this is a guard on a newly
-		// exported API — the next caller is the one that would fall in.
-		if it.ID != filepath.Base(it.ID) || it.ID == "." || it.ID == ".." || strings.ContainsRune(it.ID, filepath.Separator) {
-			return fmt.Errorf("faillearn: inbox item id %q is not a bare filename — an id that resolves to a path would write the item outside the inbox", it.ID)
+		path, err := c.itemPath(it)
+		if err != nil {
+			return err
 		}
 		body, err := json.MarshalIndent(it, "", "  ")
 		if err != nil {
 			return fmt.Errorf("faillearn: encode inbox item %s: %w", it.ID, err)
 		}
-		path := filepath.Join(c.inboxDir, it.ID+".json")
 		skipped, err := writeIfAbsent(path, body)
 		if err != nil {
 			return fmt.Errorf("faillearn: write inbox item %s: %w", it.ID, err)
@@ -116,4 +107,76 @@ func (c writeConfig) writeInboxItems() error {
 		}
 	}
 	return nil
+}
+
+// itemPath resolves the inbox file an item is — or would be — filed under, and
+// is the single place the addressability rules live, so the writer and the
+// after-the-fact reconciliation below can never disagree about which file an id
+// names.
+//
+// The id is concatenated into a path, so it must be a BARE filename. Rejection,
+// not sanitisation: a silently rewritten id produces an item nobody can address
+// by the id they filed it under, which is the same erasure this package exists
+// to stop. The only current caller emits [a-z0-9-] slugs, so this is a guard on
+// a newly exported API — the next caller is the one that would fall in.
+func (c writeConfig) itemPath(it InboxItem) (string, error) {
+	if strings.TrimSpace(it.ID) == "" {
+		return "", fmt.Errorf("faillearn: inbox item %q has no id — an unaddressable remediation item cannot be reconciled later", it.Title)
+	}
+	if it.ID != filepath.Base(it.ID) || it.ID == "." || it.ID == ".." || strings.ContainsRune(it.ID, filepath.Separator) {
+		return "", fmt.Errorf("faillearn: inbox item id %q is not a bare filename — an id that resolves to a path would write the item outside the inbox", it.ID)
+	}
+	return filepath.Join(c.inboxDir, it.ID+".json"), nil
+}
+
+// unqueuedItems returns the configured items that are NOT in the queue, read
+// back from disk rather than inferred from where the write stopped.
+//
+// cycle-1290 D2: writeInboxItems is not atomic across items — it writes one file
+// per item and returns on the FIRST failure, so every item before the failing one
+// is already queued. preserveDiagnosis had only c.inboxItems to work from and so
+// listed ALL of them as "still UNQUEUED", overclaiming which remediation was lost
+// and sending the operator (or the next continuation) looking for work that is
+// already filed.
+//
+// Reading the inbox back — rather than returning the failure index from
+// writeInboxItems and slicing — is deliberate: the artifact's claim is about what
+// is in the queue, so the queue is what it should be checked against. That also
+// keeps it right for the states an index cannot describe: an item written by a
+// CONCURRENT fleet lane under the same deterministic id (queued, though this call
+// did not write it), and an id collision where a DIFFERENT item occupies our name
+// (unqueued, though the file exists).
+func (c writeConfig) unqueuedItems() []InboxItem {
+	unqueued := make([]InboxItem, 0, len(c.inboxItems))
+	for _, it := range c.inboxItems {
+		if !c.itemReachedInbox(it) {
+			unqueued = append(unqueued, it)
+		}
+	}
+	return unqueued
+}
+
+// itemReachedInbox reports whether it is on disk in the inbox under its own id
+// AND carrying its own content. Same-content is the queued test, not mere
+// existence: a file holding a different item under our id is the DEF-4 collision,
+// where our remediation reached no queue at all. Any doubt — no inbox dir, an
+// unaddressable id, an unreadable file — reports UNQUEUED, so the failure
+// direction stays "name work that may already be filed" rather than "lose work".
+func (c writeConfig) itemReachedInbox(it InboxItem) bool {
+	if c.inboxDir == "" {
+		return false
+	}
+	path, err := c.itemPath(it)
+	if err != nil {
+		return false
+	}
+	body, err := json.MarshalIndent(it, "", "  ")
+	if err != nil {
+		return false
+	}
+	existing, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(body))
 }
