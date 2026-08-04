@@ -303,6 +303,28 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	applyCIGate(h.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
 		"%d new go/internal/<pkg>(s) changed this cycle are absent from .apicover-enforce — the apicover -enforce gate silently skips them (new-package blind spot). Add each to go/.apicover-enforce + an apicover_named_test.go before ship. Offenders: %s")
 
+	// Continuation defect-ledger reconciliation (F1(i)): a lane resuming a
+	// FAILed cycle's work must account for every defect that cycle's audit
+	// raised. Unaccounted ⇒ FAIL, named by id. A no-op for the ordinary
+	// non-continuation cycle (no manifest ⇒ nothing inherited), so the green
+	// path is unperturbed.
+	ledgerDiags, ledgerBlocked := reconcileContinuationDefects(req)
+	diags = append(diags, ledgerDiags...)
+	if ledgerBlocked {
+		overrode("continuation defect-ledger")
+	}
+
+	// Closure-citation gate (F1 clause 3): the reconcile above governs the
+	// LEDGER, but the 1272 laundering happened in PROSE — "the CRITICAL is
+	// verified closed", no record named, no cycle blocked. A report that asserts
+	// a prior cycle's defect is closed must name the per-defect disposition
+	// record on the same line. Invisible to the overwhelming majority of reports,
+	// which make no closure claim at all.
+	if closureDiags := closureClaimDiagnostics(artifact); len(closureDiags) > 0 {
+		diags = append(diags, closureDiags...)
+		overrode("closure-claim citation")
+	}
+
 	// Auditor-vs-gate coherence record — ONE per Classify call, emitted here so
 	// it covers EVERY gate above rather than the EGPS block alone (inbox item
 	// `verdict-coherence-auditor-vs-egps`, 4th recurrence: cycles 87/352/456).
@@ -376,6 +398,27 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Severity: "error",
 			Message:  "audit-report.md is non-empty with red_count=0 but declares no parseable verdict — treating as FAIL. Declare it as '## Verdict' + a bold verdict on the next line, or inline as '**Verdict: PASS**'.",
 		})
+	}
+
+	// Defect-ledger emit (F1(i)), LAST so it sees the final verdict: a rejection
+	// leaves an addressable, id-bearing record of what was wrong, which the next
+	// continuation is graded against above. Best-effort by design — the ledger
+	// is a record OF the rejection, so failing to write it must not change the
+	// rejection, but it is never silent.
+	//
+	// FAIL *and* WARN: a WARN-shipped cycle that still self-reports structured
+	// defects would otherwise leave the next continuation nothing to inherit —
+	// a laundering channel left open by the mechanism that exists to close
+	// laundering. emitDefectLedger mints nothing when the verdict carries no
+	// structured defects, so widening the trigger cannot make the reconcile gate
+	// vacuous by minting empty ledgers on every warned cycle.
+	if verdict == core.VerdictFAIL || verdict == core.VerdictWARN {
+		if err := emitDefectLedger(artifact, req); err != nil {
+			diags = append(diags, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("defect ledger: could not record this cycle's defects (%s) — a later continuation will have nothing to reconcile against", err.Error()),
+			})
+		}
 	}
 	return verdict, diags, string(core.PhaseShip)
 }

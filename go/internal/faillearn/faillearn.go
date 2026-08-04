@@ -115,7 +115,7 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 		Type:             "failure-lesson",
 		Category:         "episodic",
 		PreventiveAction: preventiveAction(ev),
-		Defects:          structuredDefects(ev),
+		Defects:          StructuredDefects(ev),
 		FailureContext: struct {
 			FailedStep    string `yaml:"failedStep"`
 			ErrorCategory string `yaml:"errorCategory"`
@@ -136,11 +136,15 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 	return id, body
 }
 
-// structuredDefects returns the defect list when it carries REAL content
+// StructuredDefects returns the defect list when it carries REAL content
 // (ADR-0039 §7 self-reported defects) — a list that merely echoes the
 // synthesized summary adds nothing over Description, so it is omitted
 // (keeps pre-v2 lessons byte-identical via omitempty).
-func structuredDefects(ev FailureEvent) []string {
+//
+// Exported because the inbox remediation path (core.writeDeterministicLearning)
+// must apply the SAME rule: two definitions of "is this a real defect?" drift,
+// and the lesson and the queue would then disagree about what happened.
+func StructuredDefects(ev FailureEvent) []string {
 	if len(ev.Defects) == 1 && ev.Defects[0] == ev.Summary {
 		return nil
 	}

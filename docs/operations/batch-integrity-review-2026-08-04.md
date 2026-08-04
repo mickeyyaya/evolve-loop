@@ -337,3 +337,139 @@ the two now at the top of the queue.
 
 All five review items carry the docs requirement: their landings must extend
 this file (or link a doc) in the same issue/gap/solution format.
+
+---
+
+## Landing — cycle-1285, `continuation-defect-ledger` (F1, all three clauses)
+
+Cycle-1279 built the ledger, cycle-1282's audit rejected it with six defects,
+and cycle-1285 is that rejection's continuation. Per operating-policy §3.8 the
+landing is recorded here in issue/gap/solution form, one entry per defect.
+
+### F1(i)-a — the gate trusted its own graded input
+
+- **Issue.** A pre-planted `<workspace>/defect-ledger.json` marking the
+  inherited ids `FIXED` produced a **PASS with zero disposition evidence**, and
+  the ID-keyed merge substituted the planted row's text for the inherited
+  defect's under the real id. The tamper-evident record ended up holding the
+  tamperer's text. (cycle-1282 audit DEF-1, CRITICAL, `TestPOC_A`.)
+- **Gap.** `reconcileContinuationDefects` read disposition state out of
+  `current` — a file the graded phase agent is permitted to write — on the
+  strength of a comment asserting a provenance the code never established.
+- **Solution.** Inherited rows are now rebuilt from the ANCESTOR on every pass
+  and their status is derived only from `defect-dispositions.json`; the
+  trusted-row arm is deleted. `current` contributes only this cycle's own
+  emitted defects. Retry idempotency comes from the persisted disposition
+  artifact, which is re-validated each pass. Regression lock:
+  `TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition`.
+
+### F1(i)-b — "evidence" meant "any file that exists"
+
+- **Issue.** Three CRITICALs closed while citing `/etc/hosts`, the continuation
+  manifest, and the claim's own `defect-dispositions.json`. (DEF-2, HIGH,
+  `TestPOC_B`/`TestPOC_C`.)
+- **Gap.** `evidenceResolves` only `os.Stat`ed the citation under either root,
+  with a raw-absolute-path branch and no traversal or symlink check.
+- **Solution.** Four rules: relative-only, no `..` escape after `Clean`,
+  PROJECT-ROOT resolution only (the workspace is this cycle's own agent-authored
+  ephemera — citing it is self-vouching; a real artifact stays citable by its
+  path from the root), and an explicit reject of the mechanism's own bookkeeping
+  (`defect-dispositions.json`, `defect-ledger.json`,
+  `continuation-manifest.json`). `Lstat` rejects symlinks. Ceiling stated in
+  code: existence-plus-provenance, not diff-membership; the upgrade path to
+  changed-set resolution is named there. Lock:
+  `TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect` (5 cases).
+
+### F1(i)-c — 32-bit ids and a last-row-wins index
+
+- **Issue.** `defectID` truncated SHA-256 to 4 bytes over agent-chosen text, and
+  the merge index resolved a duplicated id to the LAST row, shadowing the
+  inherited entry. (DEF-3, MEDIUM, `TestPOC_D`.)
+- **Gap.** The comment claimed collisions were absorbed by a dedupe that is
+  keyed on Text, not ID.
+- **Solution.** Ids widened to 16 bytes; the FIRST row wins the index; an
+  inherited id whose text differs from the ancestor's is a **blocking, named**
+  diagnostic rather than a silent rewrite, and the ancestor's text is restored.
+  Locks: `TestAdversarial_ShadowedIDIsLoudAndBlocking`,
+  `TestDefectID_IsWideEnoughToResistASecondPreimage`.
+
+### F1(ii) — the "transactional" inbox guarantee did not hold
+
+- **Issue.** `writeIfAbsent` returned `nil` on an existing file, so a
+  deterministic `retro-<cycle>-<slug>` filename already on disk (concurrent
+  fleet lane at width 3, or stale same-cycle state) **dropped the remediation
+  item** while `WriteArtifacts` reported success — the exact 1255 state. (DEF-4,
+  MEDIUM.)
+- **Gap.** The ordering fix guarded a write *error*; the likelier outcome was a
+  silent *skip*, which nothing observed.
+- **Solution.** `writeIfAbsent` now reports whether it skipped. The inbox caller
+  tolerates a skip only when the file on disk is byte-identical (an idempotent
+  retry) and fails loudly, naming the id, when it is not. Locks:
+  `TestWriteInboxItems_CollidingFilenameIsNotSilentlyDropped`,
+  `TestWriteInboxItems_IdenticalItemIsIdempotent`.
+
+### F1 — unbounded agent-authored growth
+
+- **Issue.** Neither the defect count nor the per-defect text length was bounded
+  in `emitDefectLedger` or `retroRemediationItems`. (DEF-6, LOW.)
+- **Gap.** Both inputs come from an agent-authored verdict sentinel.
+- **Solution.** 64 entries / 2000 runes in the ledger, 32 items / 500 runes in
+  the inbox. Overflow is RECORDED — the ledger mints one OPEN marker row a
+  continuation must inherit, and the inbox cap warns on stderr — because a cap
+  that erases defects is laundering wearing a resource-limit costume. Lock:
+  `TestEmitDefectLedger_CapsUnboundedDefects`.
+
+### F1 clause (3) — closure by assertion
+
+- **Issue.** The 1255 → 1268 → 1270 → 1272 chain closed a named CRITICAL with
+  the words "verified closed" and nothing else. The ledger above mints a record;
+  nothing obliged a report to point at it.
+- **Gap.** No gate read audit PROSE for closure claims; the reconcile gate
+  governs the ledger, not the narrative that ships beside it.
+- **Solution.** `closureClaimOffenders` (`go/internal/phases/audit/closure_claim.go`)
+  flags, per LINE, any claim that a prior cycle's defect is closed which does not
+  name `defect-dispositions.json` or `defect-ledger.json` **on that same line** —
+  line-scoped because a whole-document reading would let one incidental mention
+  vouch for twenty unevidenced claims. Wired into the real verdict seam
+  (`hooks.Classify`, beside the reconcile gate) so it forces FAIL, quoting each
+  offender. "closed" without a cycle reference is prose, not a claim, so ordinary
+  reports are unperturbed. Locks: `TestC1285_401`–`404`.
+
+### Accounting (DEF-5)
+
+Cycle-1282's D1 and D3 were graded FIXED on predicates that never constructed
+adversarial input. Per §3.9 they were **REOPENED** for this cycle and are closed
+here by the adversarial locks named above, which reproduce the 1282 PoCs against
+the production `hooks.Classify` seam.
+
+## Landing — cycle-1287, continuation of 1285
+
+Cycle-1285's own adversarial review reproduced five defects against the
+production seam and the cycle was FAILed rather than shipped on the strength of
+its green suite. That reproducer is now tree-resident
+(`go/internal/phases/audit/repro_cycle1285_test.go`,
+`go/internal/core/repro_cycle1285_test.go`).
+All five are closed, each with its own `defect-dispositions.json` record.
+The issue/gap/solution table is in
+`docs/architecture/continuation-defect-ledger.md`, whose closure records name
+`defect-dispositions.json` as this cycle's own gate requires.
+
+Two accounting notes, per §3.9:
+
+- **F1's fix is at the root, not the symptom.** The abort ordering in
+  `faillearn/writer.go` — a retrospective may not claim remediation that never
+  reached the queue — is deliberate and was NOT reversed. The defect was the
+  colliding id that triggered the abort, and that is what was fixed. The
+  residual (a disk-level inbox failure still suppresses the retrospective) is
+  named here rather than closed.
+- **One reproducer assertion was strengthened, none weakened.** The F1 case
+  SKIPPED itself once the ids stopped colliding, which would have made the fix
+  green the test by stepping over it — the green-by-skip pattern this review
+  files as a finding. Distinct ids are now asserted, so the three damage checks
+  execute.
+
+Base drift was resolved by taking `main`'s versions verbatim for the four files
+this lane never edited (`phases/retro/retro.go`, `router/router.go`, and the
+`bridge` `IsDir` rename their tests depend on), so the 1255-D1 stale-worktree
+fix and the ADR-0038 SELECT metadata contract survive the landing rather than
+being reintroduced as defects — pinned by `TestC1287_001` and `TestC1287_002`.

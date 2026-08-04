@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -439,10 +442,128 @@ func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, sum
 		}
 	}
 	lessonsDir := filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "instincts", "lessons")
-	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir); err != nil {
+	// F1(ii): the retrospective's remediation must reach the QUEUE, not just the
+	// report. Only SELF-REPORTED structured defects are filed — the synthesized
+	// summary echo (ev.Defects == []string{summary}) is a restatement of the
+	// failure, not an actionable item, and filing it would be inbox noise.
+	//
+	// The filter is faillearn.StructuredDefects, the one rule the lesson writer
+	// already applies — NOT a `structured != nil` proxy for it. That proxy did
+	// not implement the claim above: phasecontract.ReadFailureBlock returns a
+	// block whenever Class != "", and ev.Defects is overwritten only when the
+	// block carries defects, so a classed-but-defectless block left the summary
+	// echo in place and filed it as a priority-H bug.
+	var opts []faillearn.Option
+	if defects := faillearn.StructuredDefects(ev); len(defects) > 0 {
+		if items := retroRemediationItems(fl.CycleRequest.ProjectRoot, fl.Cycle, defects); len(items) > 0 {
+			opts = append(opts, faillearn.WithInbox(filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "inbox"), items))
+		}
+	}
+	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir, opts...); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: deterministic fallback write: %v\n", err)
 	}
 	o.recordRecurrenceClosure(fl.CycleRequest.ProjectRoot, ev.Classification, fl.Cycle)
+}
+
+// retroRemediationItems turns a failed phase's self-reported defects into
+// inbox remediation todos (batch-integrity-review-2026-08-04.md F1(ii)): the
+// 1255 defect was a retrospective that "filed" two items which never reached
+// the queue, so nothing downstream could ever work them.
+//
+// Ids are stable per (cycle, defect) so a re-run of the floor is idempotent
+// (faillearn's writeIfAbsent keeps the first write). Weight comes from policy,
+// never a literal here (feedback_phase_settings_from_config_not_code); a load
+// failure still files at the compiled safe default rather than dropping the
+// remediation.
+func retroRemediationItems(projectRoot string, cycle int, defects []string) []faillearn.InboxItem {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: policy load for remediation weight: %v (using compiled default)\n", err)
+	}
+	weight := pol.RetroAutofileDefaultWeight()
+	items := make([]faillearn.InboxItem, 0, len(defects))
+	for _, d := range defects {
+		// cycle-1282 DEF-6: defects[] and each line are agent-authored and
+		// previously unbounded, so one verdict sentinel could file hundreds of
+		// inbox files with megabyte titles — a queue nobody can triage is a queue
+		// that hides the real item. Both caps are RECORDED below, never silent.
+		if len(items) >= remediationMaxItems {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: cycle-%d self-reported %d defects; filing the first %d as remediation items and dropping the rest — fix the emitter or raise remediationMaxItems\n", cycle, len(defects), remediationMaxItems)
+			break
+		}
+		title := truncateRunes(strings.TrimSpace(d), remediationTitleMaxRunes)
+		slug := remediationSlug(title)
+		if title == "" || slug == "" {
+			continue // an unnameable defect yields no addressable item
+		}
+		items = append(items, faillearn.InboxItem{
+			ID:       fmt.Sprintf("retro-%d-%s-%s", cycle, slug, remediationFingerprint(title)),
+			Title:    title,
+			Weight:   weight,
+			Kind:     "bug",
+			Priority: "H",
+			// Non-empty provenance is load-bearing: inboxbatch.ConsoleRouted
+			// treats an empty injected_by as operator-authored.
+			InjectedBy: "faillearn-failure-floor",
+		})
+	}
+	return items
+}
+
+// remediationSlugMaxRunes bounds the id's derived tail so a long defect line
+// cannot produce an unwieldy filename. remediationMaxItems and
+// remediationTitleMaxRunes bound the queue itself (cycle-1282 DEF-6).
+const (
+	remediationSlugMaxRunes  = 60
+	remediationMaxItems      = 32
+	remediationTitleMaxRunes = 500
+)
+
+// remediationFingerprint is the id's injective tail: a short digest of the
+// FULL defect title, appended unconditionally.
+//
+// cycle-1285 F1 (HIGH). remediationSlug is lossy twice over — it stops at
+// remediationSlugMaxRunes, and it collapses every run of non-alphanumerics to
+// one hyphen. Two ordinary defect lines from the same subsystem that diverge
+// only after rune 60 (or only in punctuation) therefore minted ONE inbox id.
+// The DEF-4 collision check then correctly refused to drop the second item,
+// WriteArtifacts returned before the retrospective was written, and the caller
+// downgraded that to a stderr WARN: a failing cycle produced no retrospective,
+// no lesson, and one item for two defects — the cycle-1255 state, reached
+// through the mechanism built to prevent it, on defect text the failing agent
+// chose.
+//
+// Unconditional rather than "only when truncated": a length test does not cover
+// the punctuation collapse, and a rule with no branch cannot be wrong about
+// which branch applies. The slug stays in the id because a human triaging
+// `.evolve/inbox` reads it; the digest is what makes the id addressable.
+func remediationFingerprint(title string) string {
+	sum := sha256.Sum256([]byte(title))
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// remediationSlug lowercases a defect line and maps runs of non-alphanumerics
+// to single hyphens, matching the inbox's existing id shape. It is NOT
+// injective — see remediationFingerprint, which is what makes the id unique.
+func remediationSlug(s string) string {
+	var b strings.Builder
+	prevHyphen := false
+	for _, r := range strings.ToLower(s) {
+		if b.Len() >= remediationSlugMaxRunes {
+			break
+		}
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevHyphen = false
+		default:
+			if !prevHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+				prevHyphen = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
 
 // recordRecurrenceClosure is gap-G1 production wiring (cycle-662): the

@@ -17,8 +17,8 @@ func TestStructuredDefectsOmitSingleSummaryDuplicate(t *testing.T) {
 		Now:         time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
 	}
 
-	if got := structuredDefects(ev); got != nil {
-		t.Fatalf("structuredDefects() = %#v, want nil for single duplicate defect", got)
+	if got := StructuredDefects(ev); got != nil {
+		t.Fatalf("StructuredDefects() = %#v, want nil for single duplicate defect", got)
 	}
 
 	_, body := RenderLessonYAML(ev)
@@ -36,14 +36,14 @@ func TestStructuredDefectsRetainIndependentDefects(t *testing.T) {
 		},
 	}
 
-	got := structuredDefects(ev)
+	got := StructuredDefects(ev)
 	if len(got) != 2 {
-		t.Fatalf("structuredDefects() length = %d, want 2: %#v", len(got), got)
+		t.Fatalf("StructuredDefects() length = %d, want 2: %#v", len(got), got)
 	}
 	joined := strings.Join(got, "\n")
 	for _, want := range ev.Defects {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("structuredDefects() missing %q in %#v", want, got)
+			t.Fatalf("StructuredDefects() missing %q in %#v", want, got)
 		}
 	}
 }
