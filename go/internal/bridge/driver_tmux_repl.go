@@ -120,7 +120,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		workingDir, _ = os.Getwd()
 		fmt.Fprintf(deps.Stderr, "%s WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", pfx, workingDir)
 	}
-	if !isDir(workingDir) {
+	if !IsDir(workingDir) {
 		fmt.Fprintf(deps.Stderr, "%s working dir does not exist: %s\n", pfx, workingDir)
 		return ExitBadFlags, nil
 	}

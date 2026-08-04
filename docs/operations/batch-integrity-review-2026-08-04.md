@@ -123,6 +123,42 @@ never reached the inbox (a live instance of the known lesson-to-action gap).
   (iii) A closure claim in CHANGELOG/bookkeeping ships must cite the
   per-defect disposition artifact. Wiring proofs mandatory for all three.
 
+#### F1 landing record — cycle-1283 (2026-08-04)
+
+Recorded per operating-policy §3.8 (issue/gap/solution on every fix) and §3.9
+(ledger writes derive from diffs, not from the prescription). The *concrete*
+half of F1's solution has landed; the *class* half has not.
+
+**Issue.** As above: a torn-down fleet lane's `cs.ActiveWorktree` kept naming a
+pruned directory, `retroWorktree` tested for `""` rather than for the bridge
+guard's predicate, and the lane's retrospective was lost to a silent
+`ExitBadFlags` refusal.
+
+**Gap.** What the prescription above asked for and what actually shipped are not
+the same set, and this doc exists because collapsing that distinction is how the
+1255 CRITICAL got laundered in the first place. Landed in cycle-1283:
+`retroWorktree` now falls back on `fleetMode(req) && !gobridge.IsDir(...)`
+(`go/internal/phases/retro/retro.go`); the teardown callback clears the record
+via `clearActiveWorktree` on successful `Cleanup` only, leaving a *preserved*
+worktree's path intact so `--resume` can still reclaim it
+(`go/internal/core/cyclerun.go`); `isDir` was exported as `bridge.IsDir` so the
+phase and the guard cannot drift apart. **Not landed** — the basket siblings this
+section promised would ride the same commit were triage-deferred out of the
+cycle-1283 fleet scope and remain OPEN: 1255-D4 (`IsRegular` in the corpus Walk
+— status not re-verified this cycle), 1267-F2 (`DirectImporters`
+unbounded parse), 1267-F3 / 1270-R-1 (`ScratchCwd` symlink hardening). The
+*class* fix `continuation-defect-ledger` (weight 0.95) is likewise still queued,
+not shipped.
+
+**Solution.** Verified by `go/acs/cycle1283` (5 predicates: 001/003 discriminate
+against base `9b129565`, 002/004 pin the anti-over-widening axes, 005 asserts
+this landing record), plus `retro_stale_worktree_test.go` and
+`cyclerun_worktree_teardown_test.go`. The CHANGELOG's cycle-1272
+`retro-fleet-worktree-dispatch` "already implemented" line is struck and
+corrected in the same landing, with the reason the machine guard missed it: the
+guard re-ran the cited proof but never checked that the proof covered the claim.
+Detail: [fix-2026-08-04-retro-stale-worktree-fallback.md](fix-2026-08-04-retro-stale-worktree-fallback.md).
+
 ### F2 — TIA "shadow soak": real dormant code under a false active-status record
 
 **Issue.** The batch's headline feature — regression Test-Impact-Analysis

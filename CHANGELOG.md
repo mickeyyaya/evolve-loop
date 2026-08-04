@@ -7,9 +7,21 @@ All notable changes to this project will be documented in this file.
 Both fleet-scope backlog items pinned to cycle-1272 were investigated and found **already-implemented**; no production change was required. They are recorded here as verified-closed so they stop re-appearing as open backlog.
 
 - `infra-teardown-predicate-single-source` — already implemented. The infra-teardown predicate is single-sourced as `IsInfraTeardownError` in `go/internal/core/errors.go`; every consumer (`orchestrator.go`, `cyclerun_dispatch.go`, `runner.go`) calls it directly rather than re-spelling the condition. Proof: `TestInfraTeardownUnion_SpelledExactlyOnce` in `go/internal/core` — PASS.
-- `retro-fleet-worktree-dispatch` — already implemented. Retro's worktree resolution yields a real workspace-owned directory under fleet dispatch, satisfying the bridge guard predicate. Proof: `TestRetroWorktree_FleetScratchCwdSatisfiesBridgeGuardPredicate` in `go/internal/phases/retro` — PASS.
+- ~~`retro-fleet-worktree-dispatch` — already implemented.~~ **Corrected in cycle-1283 — this closure was wrong.** It held only for the `req.Worktree == ""` shape. The shape a torn-down fleet lane actually produces is a **non-empty but stale** path (`cs.ActiveWorktree`, never cleared at teardown), which passed through the `== ""` condition verbatim into the bridge guard's refusal — the cycle-1255 CRITICAL was still live when this line was written. The cited proof `TestRetroWorktree_FleetScratchCwdSatisfiesBridgeGuardPredicate` is genuine but pins only the empty shape, so the machine guard below could not catch the over-claim: it re-ran a test that was never about the open half. Closed for real below.
 
-Closure is machine-guarded, not merely asserted: the cycle-1272 acceptance predicates re-run both cited tests and require an explicit pass line, so this entry goes red if either proof breaks or is renamed.
+Closure is machine-guarded, not merely asserted: the cycle-1272 acceptance predicates re-run both cited tests and require an explicit pass line, so this entry goes red if either proof breaks or is renamed. That guard is necessary but **not sufficient** — it verifies the cited proof still passes, not that the proof covers the claim (see the correction above).
+
+---
+
+## Fixed — retro stale-worktree fallback, the open half of the cycle-1255 CRITICAL (cycle-1283, 2026-08-04)
+
+A fleet lane whose worktree had been torn down lost its retrospective entirely — a failure in the failure-handler, so the cycle that most needed a post-mortem was the one that could not produce one. `cs.ActiveWorktree` was write-only: the teardown callback pruned the directory but nothing cleared the record naming it, and retro's fallback tested for `""` rather than for the bridge guard's own predicate.
+
+- `go/internal/phases/retro/retro.go` — `retroWorktree` falls back to the workspace-owned scratch cwd when `fleetMode(req) && !gobridge.IsDir(req.Worktree)`. Empty and stale are one contract; a live worktree still passes through verbatim and non-fleet dispatch is untouched.
+- `go/internal/core/cyclerun.go` — the lane-teardown callback calls `clearActiveWorktree` once `Cleanup` **succeeds**, removing the dangling reference at its source. A **preserved** worktree deliberately keeps its path, since `--resume` / `evolve cycle reset` reclaim the lane by it.
+- `isDir` was exported as `bridge.IsDir` rather than re-derived in the phase — a launch-refusal predicate with two definitions can drift, and this defect is what that drift costs.
+
+Full issue/gap/solution record: [docs/operations/fix-2026-08-04-retro-stale-worktree-fallback.md](docs/operations/fix-2026-08-04-retro-stale-worktree-fallback.md); landing entry under Finding F1 in [docs/operations/batch-integrity-review-2026-08-04.md](docs/operations/batch-integrity-review-2026-08-04.md).
 
 ---
 

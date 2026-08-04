@@ -468,7 +468,12 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
 				return
 			}
-			_ = o.worktree.Cleanup(req.ProjectRoot, wtPath)
+			if cerr := o.worktree.Cleanup(req.ProjectRoot, wtPath); cerr != nil {
+				// The tree may still be on disk — leave the path named so
+				// resume/reset can still reach it.
+				return
+			}
+			o.clearActiveWorktree(wtPath)
 		})
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
@@ -490,6 +495,37 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		mainDirtyBaseline: mainDirtyBaseline,
 		consoleLeased:     consoleLeased,
 	}, run, nil
+}
+
+// clearActiveWorktree drops a PRUNED worktree path from the persisted cycle
+// state. cs.ActiveWorktree was write-only until cycle-1278: the teardown above
+// deleted the directory but left the record naming it, so the next reader
+// (retro's dispatch, resume, checkpoint) handed a deleted path to the bridge,
+// whose IsDir guard refuses the launch — the cycle-1255 CRITICAL's root cause.
+// Widening retroWorktree's fallback contains that symptom; this removes it.
+//
+// Read-modify-write against storage rather than rewriting the newCycleRun-era
+// local: by teardown the cycle run has persisted phase progress through its own
+// CycleState copy, and writing the stale init snapshot back would discard it.
+// The path guard makes this a no-op when the record has since moved on (a lane
+// re-provisioned, or the field already cleared) — only the tree we just pruned
+// gets unnamed. A detached context is deliberate: teardown runs on the exit
+// path, where the cycle context is routinely already done (same reason as the
+// abnormal epilogue's epilogueCtx).
+func (o *Orchestrator) clearActiveWorktree(wtPath string) {
+	ctx := context.Background()
+	cs, err := o.storage.ReadCycleState(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree teardown: cycle-state read failed, pruned path %s left named: %v\n", wtPath, err)
+		return
+	}
+	if cs.ActiveWorktree != wtPath {
+		return
+	}
+	cs.ActiveWorktree = ""
+	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree teardown: cycle-state write failed, pruned path %s left named: %v\n", wtPath, err)
+	}
 }
 
 // cyclePlan carries the pre-loop planning outputs the dispatch loop threads into

@@ -141,7 +141,7 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 		return AuthInfo{Hint: "Run `codex login` or set OPENAI_API_KEY + BRIDGE_ALLOW_OPENAI_API_KEY=1"}
 	case "agy":
 		for _, d := range []string{filepath.Join(home, ".config", "agy"), filepath.Join(home, ".agy"), filepath.Join(home, "Library", "Application Support", "Antigravity")} {
-			if isDir(d) {
+			if IsDir(d) {
 				return AuthInfo{Configured: true, Source: "file:" + d, SubscriptionType: "google-ai"}
 			}
 		}

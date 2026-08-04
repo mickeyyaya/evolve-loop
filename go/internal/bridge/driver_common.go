@@ -164,8 +164,14 @@ func regularFileNonEmpty(path string) bool {
 	return err == nil && fi.Mode().IsRegular() && fi.Size() > 0
 }
 
-// isDir reports whether path is an existing directory.
-func isDir(path string) bool {
+// IsDir reports whether path is an existing directory. Exported because the
+// fleet worktree guard below (driver_tmux_repl.go: `if !IsDir(workingDir)` →
+// ExitBadFlags) is a launch-refusal predicate that callers OUTSIDE this package
+// must be able to test against before dispatching — a phase that re-derives it
+// locally can drift from the guard and strand a lane (cycle-1278: retro handed
+// the bridge a torn-down lane's stale worktree and lost the retrospective).
+// One predicate, one definition.
+func IsDir(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
 }

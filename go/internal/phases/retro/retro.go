@@ -68,15 +68,22 @@ func (p *Phase) Name() string { return phaseName }
 // retroWorktree resolves the working directory this retro launch is dispatched
 // against.
 //
-// A provisioned worktree passes through verbatim — a fallback that fired
+// A LIVE provisioned worktree passes through verbatim — a fallback that fired
 // unconditionally would strand every normal retro in an empty scratch dir with
 // no repo. The fallback exists for one window only: under a fleet supervisor the
-// bridge drivers REFUSE a launch with no explicit worktree (errWorktreeRequired,
-// bridge/driver_tmux_repl.go:27) instead of falling back to the process cwd, so a
-// lane whose worktree was torn down (or never provisioned after exhausted retries)
-// loses its retrospective entirely — a failure in the failure-handler. Retro is
-// read-mostly and Evaluate-archetype, so a disposable cwd under the workspace it
-// already owns clears the guard.
+// bridge drivers REFUSE a launch whose working dir does not clear the guard —
+// empty is refused as errWorktreeRequired (bridge/driver_tmux_repl.go:27) and a
+// non-existent path is refused at gobridge.IsDir (driver_tmux_repl.go:123,
+// ExitBadFlags, stderr only, no error return) — instead of falling back to the
+// process cwd. Either way a lane whose worktree was torn down (or never
+// provisioned after exhausted retries) loses its retrospective entirely — a
+// failure in the failure-handler. Retro is read-mostly and Evaluate-archetype,
+// so a disposable cwd under the workspace it already owns clears the guard.
+//
+// The condition is the guard's own predicate, not a string shape: a torn-down
+// fleet lane hands retro a NON-EMPTY but stale path (cs.ActiveWorktree), and
+// testing only for "" would pass it straight into the refusal. Both no-worktree
+// shapes are one contract (cycle-1278; the empty half alone was cycle-1270).
 //
 // The two shapes deliberately NOT used: the shared main tree (req.ProjectRoot —
 // refuted by PR #400; worktree is the write-authority predicate) and the
@@ -85,7 +92,7 @@ func (p *Phase) Name() string { return phaseName }
 // decides exactly as it does today — never a fabricated path. The guard itself is
 // untouched: the fix is supplied by the phase.
 func retroWorktree(req core.PhaseRequest) string {
-	if req.Worktree != "" || !fleetMode(req) {
+	if !fleetMode(req) || gobridge.IsDir(req.Worktree) {
 		return req.Worktree
 	}
 	return gobridge.ScratchCwd(req.Workspace, "retro-scratch-cwd")
