@@ -390,7 +390,7 @@ func TestContractCorrection_CircuitOpenWarnsAndFilesItem(t *testing.T) {
 func TestFormatContractGateDemotionWarn(t *testing.T) {
 	t.Parallel()
 	reason := "triage deliverable failed contract: [missing_failure_block] schema_version 2 required"
-	got := formatContractGateDemotionWarn("triage", "agy-tmux", true, reason)
+	got := formatContractGateDemotionWarn("triage", "agy-tmux", contractDispatch{escalated: true}, reason)
 	for _, want := range []string{"WARN", "CONTRACT GATE DEMOTED", "triage", "agy-tmux", "advisory", "missing_failure_block"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("demotion WARN missing %q: %s", want, got)
@@ -401,7 +401,7 @@ func TestFormatContractGateDemotionWarn(t *testing.T) {
 	}
 	// The unconditional "escalation was attempted" claim is exactly the kind of
 	// line an operator trusts and acts on: it must be false only when it is false.
-	notTried := formatContractGateDemotionWarn("triage", "agy-tmux", false, reason)
+	notTried := formatContractGateDemotionWarn("triage", "agy-tmux", contractDispatch{}, reason)
 	if !strings.Contains(notTried, "did NOT run") {
 		t.Errorf("escalated=false must NOT claim escalation was attempted: %s", notTried)
 	}

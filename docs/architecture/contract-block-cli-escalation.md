@@ -36,8 +36,34 @@ profile's own chain behind it. The phase's routing and the profile on disk are u
 non-compliance lives on the rare failure path while the same CLI ships the common path fine.
 `escalationAllowed` runs every candidate through `policy.ValidatePin`, so an escalation can never
 route a phase to a CLI family its operator forbade via `allowed_clis`. A phase whose whole chain is
-one family, and that family is the universal fallback's, has no target — the ladder then behaves
-exactly as it did before this feature.
+one family, and that family is the universal fallback's, has no target — that case is the salvage
+retry's, below.
+
+## Salvage retry: the trigger with no target (cycle-1300)
+
+`contractEscalationCLI` returns `ok=false` when a phase's whole dispatch chain is one CLI family:
+there is nowhere to escalate to. Before cycle-1300 the ladder then did **nothing** — the same
+incapable CLI got the same plain directive a third time and the breaker opened, so the ratchet failed
+*open* purely for want of an escalation target (inbox `contract-block-cli-escalation`, LIVE EVIDENCE
+2026-08-05).
+
+The remedy is a **structured re-prompt** (`composeContractSalvageRetry`): the correction the ladder
+was already going to send is enriched with the contract validator's output **verbatim** under
+`contractSalvageRetryDirectiveHeading`, plus an instruction to address each bracketed
+`[violation_code]` by naming the exact section or path it refers to. Round 2's budget buys the
+*diagnosis* when it cannot buy a different CLI family (repair economics, arXiv:2306.09896).
+
+Three invariants, each pinned by a test in `go/internal/core/contract_salvage_retry_test.go`:
+
+- **Breaker-neutral.** It adds no dispatch, spends no extra correction, and does not touch
+  `ModelRoutingCLI` (there is no other family — that is the premise). `ReviewResult.Blocks`, the
+  breaker's own counter, is untouched by the remedy, so the circuit still opens on the third strike
+  as the last resort.
+- **Disjoint from escalation.** It fires only on the `ok=false` arm, so a phase *with* a real
+  cross-family target escalates exactly as before and never also re-prompts — one block's budget is
+  never spent twice.
+- **Same trigger window as escalation.** Block 2 with a shared defect identity; never the first
+  block, never a `Blocks == 0` non-contract rejection.
 
 ## Defect identity (cycle-1291)
 
@@ -89,6 +115,20 @@ intersection between unrelated defects.
 ## Demotion is still recorded
 
 When the breaker opens anyway, `noteContractGateDemotion` emits a stderr WARN naming the phase, the
-CLI, whether escalation ran and the last violation; appends a `contract_gate_demoted` ledger entry;
-and stages an autofile intent through `dispositionrouter` (never a direct `.evolve/inbox` write,
-which races `inboxmover.Claim`). All three are best-effort — the gate has already decided.
+CLI, **which remedy ran** and the last violation; appends a `contract_gate_demoted` ledger entry; and
+stages an autofile intent through `dispositionrouter` (never a direct `.evolve/inbox` write, which
+races `inboxmover.Claim`). All three are best-effort — the gate has already decided.
+
+The ledger `Action` carries both remedy facts, side by side:
+
+```
+demote enforce->advisory: cli=<cli> escalated=<bool> salvage_attempted=<bool> blocks=<n>: <reason>
+```
+
+`salvage_attempted` rides *alongside* `escalated`, never instead of it — a salvage retry is not an
+escalation. The two are what let recurrence analytics separate the three distinct diagnoses a demotion
+can carry: a different CLI family was tried and also failed (`escalated=true`), a structured re-prompt
+was tried and the CLI still could not comply (`salvage_attempted=true`), or no remedy was possible at
+all (both false). `formatContractGateDemotionWarn` reports the same three cases in prose and takes the
+whole `contractDispatch` for that reason: its "escalation did NOT run" line is one an operator trusts
+and acts on, so it must be false only when it is false.

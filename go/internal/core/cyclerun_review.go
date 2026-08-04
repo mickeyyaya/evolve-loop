@@ -51,6 +51,12 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		// escalation was tried (it is a no-op for a phase whose whole chain is
 		// one CLI family).
 		escalated := false
+		// salvageRetried latches once the no-escalation-target remedy (scoping
+		// constraint 5) has turned a correction into a structured re-prompt, so
+		// the demotion record can distinguish "a remedy was tried and failed"
+		// from "no remedy was possible". Disjoint from escalated by construction:
+		// the remedy fires only where contractEscalationCLI found no target.
+		salvageRetried := false
 		// prevBlockIdentity is the defect identity (violation-code set +
 		// normalized reason) of the block that
 		// triggered the previous correction on THIS ladder ("" ⇒ none seen yet,
@@ -130,7 +136,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				case sr.Relocated && sr.Verified:
 					// Never-upgrades-verdict: the relocated artifact faces
 					// the SAME gate — the breaker-touching FINAL outcome.
-					rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated})
+					rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetried: salvageRetried})
 					res := interaction.ResultRejectedAgain
 					if rr.Approve {
 						res = interaction.ResultAccepted
@@ -166,18 +172,31 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			// THIS re-dispatch only — the profile and the phase's own routing are
 			// untouched, and the soft overlay keeps the original chain behind the
 			// escalated primary. No target (already on the universal family with
-			// no other family configured) ⇒ the ladder behaves exactly as before.
+			// no other family configured) ⇒ the correction becomes a structured
+			// re-prompt on the SAME routing instead (scoping constraint 5) — the
+			// ladder no longer falls through unremedied there.
 			// The count alone is not the signature: the block must also be the
 			// SAME defect as the one that triggered the previous correction
 			// (contractBlocksShareIdentity, scoping constraint 4) — two different
 			// violations are two honest defects, not an incapable CLI.
+			salvageRetry := false
 			if rr.Blocks >= contractEscalateAtBlock && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
 				failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
-				if esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI); ok && esc != dr.phaseReq.ModelRoutingCLI {
+				esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI)
+				switch {
+				case ok && esc != dr.phaseReq.ModelRoutingCLI:
 					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive contract blocks on cli=%s; correction %d re-dispatches on cli=%s (contract blocks never trigger cli_fallback, which is how a mis-formatting CLI used to demote the gate). The phase's primary routing is unchanged.\n",
 						next, rr.Blocks, failedCLI, corr, esc)
 					dr.phaseReq.ModelRoutingCLI = esc
 					escalated = true
+				case !ok:
+					// The two remedies are disjoint: this arm is reached only when
+					// there is genuinely no other family to escalate to, so one
+					// block's round-2 budget is never spent on both.
+					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
+						next, rr.Blocks, failedCLI, corr)
+					salvageRetry = true
+					salvageRetried = true
 				}
 			}
 			// Carry THIS block's identity to the next iteration: identity is
@@ -215,6 +234,9 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				})
 			}
 			directive := composeCorrection(rr.Reason)
+			if salvageRetry {
+				directive = composeContractSalvageRetry(rr.Reason)
+			}
 			if cr.o.cfg.PhaseRecovery == config.StageEnforce {
 				// Evidence-enriched re-dispatch (I2 rung 3): kernel-verified
 				// facts only — never agent self-assessment. Shadow keeps
@@ -257,7 +279,7 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			// rin.Response is refreshed for reviewer consistency; the deliverable
 			// reviewer reads the filesystem (workspace/worktree), not this field.
 			rin.Response = dr.resp
-			rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated})
+			rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetried: salvageRetried})
 			if rr.Approve {
 				recordCorrection(interaction.ResultAccepted)
 			} else {

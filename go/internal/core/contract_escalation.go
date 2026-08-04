@@ -45,6 +45,20 @@ package core
 //     round 2's budget should not buy a different CLI family for them. The
 //     trigger is therefore gated on failure IDENTITY as well as count — see
 //     contractBlocksShareIdentity.
+//
+//  5. A TRIGGER WITH NO TARGET STILL GETS A REMEDY (cycle-1300, from this item's
+//     LIVE EVIDENCE note of 2026-08-05). When a phase's whole dispatch chain is
+//     one CLI family, contractEscalationCLI returns ok=false and — before this
+//     cycle — the ladder did nothing at all: the same incapable CLI got the same
+//     plain directive a third time and the breaker opened, so the ratchet failed
+//     OPEN purely because there was nowhere to escalate to. The TOP-FAMILY
+//     remedy is a structured re-prompt (composeContractSalvageRetry) on the
+//     re-dispatch the ladder was already performing. It is disjoint from
+//     escalation — a phase WITH a target escalates and does not re-prompt, so one
+//     block's budget is never spent twice — and it is BREAKER-NEUTRAL: no extra
+//     dispatch, no extra correction, no change to ModelRoutingCLI (there is no
+//     other family: that is the whole premise), so the circuit still opens on the
+//     third strike as the last resort.
 
 import (
 	"fmt"
@@ -71,6 +85,35 @@ const contractEscalateAtBlock = 2
 // TestUniversalContractFallbackMatchesLLMRouteDefault so the two cannot drift.
 const universalContractFallbackCLI = "claude-tmux"
 
+// contractSalvageRetryDirectiveHeading marks a correction directive as a
+// STRUCTURED RE-PROMPT rather than the plain rejection framing composeCorrection
+// emits — the TOP-FAMILY remedy for the case constraint 5 below describes.
+const contractSalvageRetryDirectiveHeading = "## Contract Salvage Retry — verbatim validator output"
+
+// composeContractSalvageRetry is the remedy for a contract block that WOULD have
+// escalated but has nowhere to escalate to (scoping constraint 5). It enriches
+// the correction the ladder was already going to re-dispatch: same CLI, same
+// round, same budget — only the directive changes, from a paraphrasable
+// rejection notice into an explicit diagnosis carrying the validator's output
+// VERBATIM under a distinct heading.
+//
+// Breaker-neutral by construction: it adds no dispatch and consumes no extra
+// correction, so ReviewResult.Blocks — the breaker's own counter — is untouched
+// by the remedy itself and the circuit still opens on the third strike as the
+// last resort. The repair-economics rationale (arXiv:2306.09896, cited by the
+// inbox item) is to spend the harder round's budget on the DIAGNOSIS when buying
+// a different CLI family is not on the menu.
+func composeContractSalvageRetry(reason string) string {
+	return composeCorrection(reason) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
+		"This is the second consecutive block reporting the SAME defect, and no other CLI family is " +
+		"available to escalate to — this is the last correction before the contract gate's circuit " +
+		"breaker opens and the gate stops enforcing for the rest of this run.\n\n" +
+		"The contract validator's output, verbatim:\n\n" + reason + "\n\n" +
+		"Do not re-summarize it. Take each bracketed [violation_code] above in turn, state the exact " +
+		"section heading or file path that code refers to, then re-emit the whole deliverable at the " +
+		"contracted path with that specific defect closed. Do not change unrelated files."
+}
+
 // ledgerKindContractGateDemoted is the ledger Kind recorded when the contract
 // gate's breaker opens. The demotion used to be one stderr line and therefore
 // invisible in the cycle record; as a ledger entry it is bound to the cycle's
@@ -81,9 +124,15 @@ const ledgerKindContractGateDemoted = "contract_gate_demoted"
 // cli is the routing override in force ("" ⇒ resolve the profile/env default) and
 // escalated records whether a contract-block escalation put it there — so the
 // demotion WARN can state truthfully whether escalation was tried.
+//
+// salvageRetried is the same fact for the OTHER remedy: a demotion where a
+// structured re-prompt was tried and failed is a different diagnosis from one
+// where no remedy was possible at all, and an escalated=false entry alone cannot
+// separate them (which is the exact ambiguity the live-evidence note reports).
 type contractDispatch struct {
-	cli       string
-	escalated bool
+	cli            string
+	escalated      bool
+	salvageRetried bool
 }
 
 // contractEscalationProfile resolves the profile governing a phase, plus the
@@ -260,13 +309,20 @@ func (cr *cycleRun) escalationAllowed(phase Phase, cli string, prof *profiles.Pr
 
 // formatContractGateDemotionWarn renders the operator-facing line for a contract
 // gate that demoted itself. It names the PHASE, the CLI the blocks are
-// attributable to, whether CLI escalation actually ran, and the last violation —
-// the batch-19 line named none of the four, which is why the same class recurred
+// attributable to, WHICH remedy actually ran, and the last violation — the
+// batch-19 line named none of the four, which is why the same class recurred
 // twice before anyone noticed.
-func formatContractGateDemotionWarn(phase, cli string, escalated bool, reason string) string {
+//
+// It takes the whole contractDispatch rather than a bare escalated bool because
+// there are now two remedies to report and "did NOT run" is a line an operator
+// trusts and acts on: it must be false only when it is false.
+func formatContractGateDemotionWarn(phase, cli string, d contractDispatch, reason string) string {
 	tried := "CLI escalation did NOT run for this phase (no other CLI family available in its chain, or the block count opened the circuit first)"
-	if escalated {
+	switch {
+	case d.escalated:
 		tried = "CLI escalation already ran and the escalated CLI failed the contract too"
+	case d.salvageRetried:
+		tried = "no other CLI family was available to escalate to, so a structured re-prompt salvage retry attempted the repair on the same CLI — and that CLI failed the contract too"
 	}
 	return fmt.Sprintf("[orchestrator] WARN CONTRACT GATE DEMOTED: phase %s on cli=%s tripped the contract-gate circuit breaker — the gate is now advisory (enforce→advisory) for the rest of this run, so later phases ship UNGATED. %s. Last violation: %s",
 		phase, cli, tried, reason)
@@ -287,7 +343,7 @@ func formatContractGateDemotionWarn(phase, cli string, escalated bool, reason st
 // the cycle's outcome (the gate has already decided to approve).
 func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, blocks int, reason string) {
 	cli := cr.contractDispatchCLI(phase, d.cli)
-	warn := formatContractGateDemotionWarn(string(phase), cli, d.escalated, reason)
+	warn := formatContractGateDemotionWarn(string(phase), cli, d, reason)
 	fmt.Fprintln(os.Stderr, warn)
 	if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 		TS:    cr.o.now().UTC().Format(time.RFC3339),
@@ -297,7 +353,12 @@ func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, bl
 		// Action carries the decision verb + evidence so the demotion survives
 		// beyond transient stderr (a Kind/Role-only entry is the content-free
 		// fingerprint shape that blinded the breaker diagnostics in cycle-1117).
-		Action:   fmt.Sprintf("demote enforce->advisory: cli=%s escalated=%v blocks=%d: %s", cli, d.escalated, blocks, reason),
+		//
+		// salvage_attempted rides ALONGSIDE escalated= (never instead of it): the
+		// two remedies are disjoint, so recurrence analytics reading this entry
+		// can tell "no remedy was possible" from "a structured re-prompt was
+		// tried and the CLI still could not comply".
+		Action:   fmt.Sprintf("demote enforce->advisory: cli=%s escalated=%v salvage_attempted=%v blocks=%d: %s", cli, d.escalated, d.salvageRetried, blocks, reason),
 		ExitCode: 0,
 	}); lerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", ledgerKindContractGateDemoted, lerr)
