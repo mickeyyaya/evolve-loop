@@ -1,0 +1,15 @@
+{
+  "connects_to": [
+    ".evolve/release-journal/22.13.0-20260804T005753Z.json",
+    "go/internal/profiles",
+    "go/internal/phasecoherence"
+  ],
+  "created_at": "2026-08-04T02:10:00Z",
+  "fix": "Add the repo-contract scanner suites (internal/profiles, internal/phasecoherence, internal/phasespec \u2014 the tests that validate TRACKED config on disk) to release-preflight's gate-suite list, or run the full suite preflight when the release diff touches .evolve/. Wiring proof: a preflight run against a tree with a deliberately-tracked invalid profile stub must FAIL before tagging.",
+  "id": "release-preflight-repo-contract-suites",
+  "kind": "pipeline-repair",
+  "notes": "The #394 demote-on-failure net worked (v22.13.0 -> prerelease, v22.12.1 stayed Latest). Fix-first precedent: v22.12.0 assetless -> #393/#394.",
+  "summary": "v22.13.0: preflight PASSed ('all 2 gate-test suites green') while tracked profile stubs violated TestSmoke_RealProfiles + TestRepoPersonaProfilePairing; the breakage surfaced only in release.yml's full suite AFTER the tag was published, costing an assetless demoted release (2nd occurrence of the class after v22.12.0's e2e timeout).",
+  "title": "Release preflight runs only 2 gate-test suites \u2014 repo-contract tests (profiles/phasecoherence/phasespec catalog scanners) are unverified until the post-tag suite fails",
+  "weight": 0.8
+}
