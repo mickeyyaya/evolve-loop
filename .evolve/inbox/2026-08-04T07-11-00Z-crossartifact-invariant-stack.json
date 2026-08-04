@@ -1,10 +1,10 @@
 {
   "connects_to": [
     "go/internal/coherence/",
-    "kb/research/deliverable-alignment-2026-08/README.md"
+    "docs/research/deliverable-alignment-2026-08/README.md"
   ],
   "created_at": "2026-08-04T07:11:00Z",
-  "fix": "SWE-agent rule enforced: each invariant ships ADVISORY until its false-positive rate is evidenced ~0 (the 1054/1060 breaker lesson), then graduates to blocking. DOCS per 3.8 into kb/research/deliverable-alignment-2026-08/README.md.",
+  "fix": "SWE-agent rule enforced: each invariant ships ADVISORY until its false-positive rate is evidenced ~0 (the 1054/1060 breaker lesson), then graduates to blocking. DOCS per 3.8 into docs/research/deliverable-alignment-2026-08/README.md.",
   "id": "crossartifact-invariant-stack",
   "kind": "feature",
   "notes": "Ranked #5 in the strategy; complements (never replaces) the adversarial audit.",

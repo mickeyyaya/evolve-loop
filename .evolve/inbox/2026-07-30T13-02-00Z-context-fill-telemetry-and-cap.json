@@ -5,7 +5,7 @@
     "inbox: tokenopt-role-scoped-instruction-digests",
     "inbox: tokenopt-handoff-digests",
     "inbox: test-amplification-context-scope",
-    "kb/research/llm-output-stability-2026-07/README.md"
+    "docs/research/llm-output-stability-2026-07/README.md"
   ],
   "created_at": "2026-07-30T13:02:00Z",
   "fix": "(1) Record per-phase fill telemetry alongside the existing token usage: prompt tokens at dispatch as a fraction of the model's effective window (a per-family constant, conservative \u2014 e.g. 200K for 1M-advertised). (2) Emit a WARN past a policy-configured fill threshold (default 60%) naming the phase and the largest contributors. (3) Correlate: a small report over the dossier corpus joining fill% at dispatch against the cycle's verdict \u2014 that is the evidence that promotes or demotes the whole tokenopt band. Config in policy.json (never Go literals); no flags.",

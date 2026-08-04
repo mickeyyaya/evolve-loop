@@ -3,7 +3,7 @@
     "go/internal/phasecontract/sentinel.go",
     "go/internal/bridge/",
     "inbox: contract-block-cli-escalation",
-    "kb/research/llm-output-stability-2026-07/README.md"
+    "docs/research/llm-output-stability-2026-07/README.md"
   ],
   "created_at": "2026-07-30T13:04:00Z",
   "fix": "Where the phase's CLI exposes tool/function calling, have the agent emit the verdict via a tiny declared tool (phase, verdict, failure block) instead of appending a prose comment line; the bridge captures the structured call as the authoritative signal and the prose report stays human-facing. Keep the prose sentinel as the documented fallback for CLIs without tools (Strangler Fig, exactly like the existing sentinel-then-regex ladder). This removes the format-adherence failure class at the source for the CLIs that can support it, and removes the last-line fragility for everyone on that path.",

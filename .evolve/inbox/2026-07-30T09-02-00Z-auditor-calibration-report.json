@@ -2,10 +2,10 @@
   "connects_to": [
     "knowledge-base/cycles/",
     "go/internal/core/failure_digest.go",
-    "kb/research/failed-loop-analysis-2026-07/README.md"
+    "docs/research/failed-loop-analysis-2026-07/README.md"
   ],
   "created_at": "2026-07-30T09:02:00Z",
-  "fix": "evolve audit calibration (opscmd): walk knowledge-base/cycles/*.json + runs/*/audit-fail-reason.json, tabulate narrative-vs-gate agreement matrix + per-defect-class breakdown, emit markdown to kb/research/. Follow-up (separate): persona rubric adjustment driven by the table, never by anecdote.",
+  "fix": "evolve audit calibration (opscmd): walk knowledge-base/cycles/*.json + runs/*/audit-fail-reason.json, tabulate narrative-vs-gate agreement matrix + per-defect-class breakdown, emit markdown to docs/research/. Follow-up (separate): persona rubric adjustment driven by the table, never by anecdote.",
   "id": "auditor-calibration-report",
   "kind": "observability",
   "notes": "From the 2026-07-30 literature review. | pass-rate directive 2026-07-30: RAISED \u2014 the (narrative,gate) disagreement rate directly measures wasted generations; tells us which side errs before we tune either.",

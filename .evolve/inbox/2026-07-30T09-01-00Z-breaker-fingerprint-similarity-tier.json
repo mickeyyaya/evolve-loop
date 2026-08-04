@@ -2,7 +2,7 @@
   "connects_to": [
     "go/internal/core/failure_digest.go",
     "go/internal/core/blocker_breaker.go",
-    "kb/research/failed-loop-analysis-2026-07/README.md"
+    "docs/research/failed-loop-analysis-2026-07/README.md"
   ],
   "created_at": "2026-07-30T09:01:00Z",
   "fix": "In the breaker population pass: for digests not matching any exact-fingerprint group, compute normalized-token LCS ratio pairwise within the batch window (N is small, <=20 digests; O(N^2 * L^2) is trivial); band >=0.9 joins the group. Pin with the historical pairs that SHOULD have banded (1146/1148 duration variants pre-#370) and pairs that must NOT (1137/1139/1143 distinct defects).",

@@ -1,10 +1,10 @@
 {
   "connects_to": [
     ".evolve/profiles/",
-    "kb/research/deliverable-alignment-2026-08/README.md"
+    "docs/research/deliverable-alignment-2026-08/README.md"
   ],
   "created_at": "2026-08-04T07:12:00Z",
-  "fix": "Wire deliverable.Verify into a Stop hook for claude-tmux phase profiles (with the stop_hook_active escape); measure per-CLI enforcement asymmetry so stats stay comparable. DOCS per 3.8 into kb/research/deliverable-alignment-2026-08/README.md.",
+  "fix": "Wire deliverable.Verify into a Stop hook for claude-tmux phase profiles (with the stop_hook_active escape); measure per-CLI enforcement asymmetry so stats stay comparable. DOCS per 3.8 into docs/research/deliverable-alignment-2026-08/README.md.",
   "id": "claude-stop-hook-finish-gate",
   "kind": "feature",
   "notes": "Ranked #6; also note Ollama grammar enforcement (format=json-schema) is available TODAY for the local leg \u2014 fold into the two-stage extractor item (verdict-sentinel-as-tool-call 0.86).",

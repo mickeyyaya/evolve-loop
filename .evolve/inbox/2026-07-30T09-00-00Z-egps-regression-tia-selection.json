@@ -2,7 +2,7 @@
   "connects_to": [
     "go/internal/acssuite/acssuite.go",
     "go/internal/changedpkgs/changedpkgs.go",
-    "kb/research/failed-loop-analysis-2026-07/README.md"
+    "docs/research/failed-loop-analysis-2026-07/README.md"
   ],
   "created_at": "2026-07-30T09:00:00Z",
   "fix": "In acssuite runGoTest: partition ./acs/regression/... by predicate package's declared target packages (predicates already grep/shell specific packages \u2014 derive mapping from acs metadata or a manifest); select intersect(changedpkgs). Config via policy.json gates block (stage: off|shadow|enforce, shadow logs would-skip counts first). Full-corpus triggers: batch boundary, any red in selected set, weekly floor. Wiring proof: predicate pinning that an out-of-selection regression still runs at the boundary sweep.",

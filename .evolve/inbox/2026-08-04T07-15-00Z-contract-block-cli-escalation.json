@@ -2,14 +2,14 @@
   "connects_to": [
     "go/internal/core/orchestrator.go",
     "go/internal/llmroute/",
-    "kb/research/deliverable-alignment-2026-08/README.md",
+    "docs/research/deliverable-alignment-2026-08/README.md",
     "docs/operations/change-log-2026-07-30.md"
   ],
   "created_at": "2026-08-04T07:15:00Z",
-  "fix": "In the correction ladder: after the 2nd contract block on one phase-dispatch, escalate the re-dispatch to the strongest healthy family the phase's allowed_clis permits (advisor/llmroute-mediated, pin-respecting), carrying the verbatim validator error. Align with repair economics (arXiv:2306.09896): cap total rounds at 2, spend round-2 budget on the stronger CRITIC/diagnoser; integrate with the fingerprint breaker so identical blocks share identity. Wiring proof: a fixture phase emitting two identical violations on a weak driver must re-dispatch on the strong family and the ledger must record the escalation. DOCS per operating-policy 3.8 into kb/research/deliverable-alignment-2026-08/README.md.",
+  "fix": "In the correction ladder: after the 2nd contract block on one phase-dispatch, escalate the re-dispatch to the strongest healthy family the phase's allowed_clis permits (advisor/llmroute-mediated, pin-respecting), carrying the verbatim validator error. Align with repair economics (arXiv:2306.09896): cap total rounds at 2, spend round-2 budget on the stronger CRITIC/diagnoser; integrate with the fingerprint breaker so identical blocks share identity. Wiring proof: a fixture phase emitting two identical violations on a weak driver must re-dispatch on the strong family and the ledger must record the escalation. DOCS per operating-policy 3.8 into docs/research/deliverable-alignment-2026-08/README.md.",
   "id": "contract-block-cli-escalation",
   "kind": "pipeline-repair",
-  "notes": "Strategy rank #1 (2026-08-04 deliverable-alignment evaluation). Original item (2026-07-29, 0.95) existed only in the tracked snapshot \u2014 absent from the live queue, a live instance of the very stranding it documents.",
+  "notes": "Strategy rank #1 (2026-08-04 deliverable-alignment evaluation). Original item (2026-07-29, 0.95) existed only in the tracked snapshot \u2014 absent from the live queue, a live instance of the very stranding it documents. | [LIVE EVIDENCE 2026-08-05] First observed strong-family block series: claude-tmux adversarial-review, escalation correctly reported 'no other CLI family available in its chain' -> circuit opened anyway. The ladder needs a TOP-FAMILY remedy distinct from escalate (salvage attempt / structured re-prompt / breaker-neutral verify-retry) so the ratchet cannot fail open when there is nowhere to escalate.",
   "priority": "P1",
   "summary": "Format adherence is a model property past a ceiling: agy emitted 7/7 byte-identical contract violations across both batch-18 lanes (circuit demoted the gate; console mitigated with a profile repin #375), then the class recurred batch-21 (triage cycle-1215, v1 sentinel without schema-2 failure block, 3 blocks, single-writer phase demoted) WHILE the original fix item sat stranded in processing/ \u2014 fix latency was itself the failure. cli_fallback fires only on infra exits [80 81 85 124 127], never on contract blocks; the correction ladder re-prompts the same incapable model up to the cap.",
   "title": "Contract-block CLI escalation: on the 2nd identical contract violation, re-dispatch the phase on the strongest available family \u2014 corrections today re-dispatch the SAME CLI that already proved incapable",
