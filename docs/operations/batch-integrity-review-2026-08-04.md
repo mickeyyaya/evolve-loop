@@ -473,3 +473,28 @@ this lane never edited (`phases/retro/retro.go`, `router/router.go`, and the
 `bridge` `IsDir` rename their tests depend on), so the 1255-D1 stale-worktree
 fix and the ADR-0038 SELECT metadata contract survive the landing rather than
 being reintroduced as defects — pinned by `TestC1287_001` and `TestC1287_002`.
+
+## Landing — cycle-1290, continuation of 1287
+
+The 1287 landing note above closes with two accounting notes; this cycle closes
+what the first of them left open, and the mode defect its own audit raised.
+
+- **The named residual is closed, not renamed.** "A disk-level inbox failure still
+  suppresses the retrospective" is FIXED, per the record in
+  `defect-dispositions.json` for this lineage: `faillearn/writer.go` now publishes
+  the diagnosis as `retrospective-unqueued.md` — explicitly marked UNQUEUED and
+  naming every remediation item that reached no queue — while the abort ordering
+  stays exactly as 1287 defended it. `retrospective-report.md` is still absent on
+  that arm, and `WriteArtifacts` still returns the error; the four pre-existing
+  transactional locks pass with `inbox_transactional_test.go` unmodified.
+- **The floor now publishes at the mode it documents.** 1287's own audit F1: the
+  floor's artifacts landed 0600 while `internal/atomicwrite` enforces 0644 for
+  every other published artifact — unreadable to the other fleet lanes and the
+  operator who are the intended readers. FIXED, per the record in
+  `defect-dispositions.json`, by chmod-ing the temp file before the publishing
+  link. The mode is now pinned by a tree-resident test, which is what let the 1285
+  publish-path rewrite drop it unnoticed in the first place.
+- **One item stays open by decision.** 1287's F2 (audit eval-existence check vs.
+  the `go/acs/cycleNNNN/predicates_test.go` path convention) is DEFERRED, queued as
+  `audit-eval-existence-path-convention` — a different surface from the ledger, and
+  deferring it in the record is the opposite of the laundering this review tracks.

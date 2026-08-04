@@ -1,10 +1,28 @@
 package faillearn
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
+
+// publishedMode is the mode every published runtime artifact lands at —
+// the same literal internal/atomicwrite.Bytes documents and enforces
+// (atomicwrite.go:61-63). The floor's own artifacts are read by the OTHER
+// fleet lanes and by the operator, so os.CreateTemp's 0600 (which is not
+// umask-derived and therefore cannot be configured away) is a defect, not a
+// stricter default.
+const publishedFileMode fs.FileMode = 0o644
+
+// unqueuedRetroName is the DEGRADED retrospective: the diagnosis published when
+// the remediation queue write failed. Deliberately NOT retrospective-report.md —
+// that name means "the remediation is queued", and the 1255 invariant is that it
+// may never appear otherwise. A distinct name keeps the invariant exact while
+// letting the failure analysis outlive the queue write.
+const unqueuedRetroName = "retrospective-unqueued.md"
 
 // WriteArtifacts persists the deterministic learning artifacts for a
 // failure event: retrospective-report.md into runDir and the failure
@@ -26,7 +44,7 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 		opt(&cfg)
 	}
 	if err := cfg.writeInboxItems(); err != nil {
-		return err
+		return cfg.preserveDiagnosis(ev, runDir, err)
 	}
 
 	id, lesson := RenderLessonYAML(ev)
@@ -42,6 +60,50 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 		return fmt.Errorf("faillearn: write lesson %s: %w", id, err)
 	}
 	return nil
+}
+
+// preserveDiagnosis publishes the failure analysis under unqueuedRetroName after
+// the queue write failed, and returns cause unchanged so the caller still fails
+// loudly. Preserving the diagnosis is an ADDITION to the abort, never a
+// replacement for it.
+//
+// The residual the cycle-1287 landing named rather than closed: the abort
+// ordering is correct — a retrospective may not claim remediation that reached no
+// queue — but an unwritable inbox left ZERO artifacts on disk, so the analysis of
+// the failure died together with the failure it described, and the next
+// continuation had to re-derive it. The degraded artifact carries the diagnosis
+// plus the ids of every item that did NOT reach the queue, which is the work that
+// would otherwise be lost.
+//
+// A failure to publish the degraded artifact is joined onto cause rather than
+// replacing it: the queue failure is the diagnosis the caller acts on.
+func (c writeConfig) preserveDiagnosis(ev FailureEvent, runDir string, cause error) error {
+	// Loop-scope fatals have no cycle workspace. An empty runDir means there is
+	// no place to publish into, not that the process cwd is one.
+	if runDir == "" {
+		return cause
+	}
+	var b bytes.Buffer
+	b.WriteString("<!-- faillearn: degraded retrospective — remediation UNQUEUED -->\n\n")
+	b.WriteString("# UNQUEUED — this diagnosis reached no remediation queue\n\n")
+	fmt.Fprintf(&b, "The remediation queue write failed (`%v`), so `retrospective-report.md` was\n", cause)
+	b.WriteString("deliberately NOT written: on disk, that name asserts the remediation was queued.\n")
+	b.WriteString("This degraded artifact preserves the analysis so it can be requeued by hand or\n")
+	b.WriteString("reconciled by the next continuation.\n\n")
+	b.WriteString("## Remediation items that are still UNQUEUED\n\n")
+	if len(c.inboxItems) == 0 {
+		b.WriteString("- (none recorded)\n")
+	}
+	for _, it := range c.inboxItems {
+		fmt.Fprintf(&b, "- `%s` — %s\n", it.ID, it.Title)
+	}
+	b.WriteString("\n")
+	b.Write(RenderRetrospectiveMarkdown(ev))
+
+	if _, err := writeIfAbsent(filepath.Join(runDir, unqueuedRetroName), b.Bytes()); err != nil {
+		return errors.Join(cause, fmt.Errorf("faillearn: write %s: %w", unqueuedRetroName, err))
+	}
+	return cause
 }
 
 // writeIfAbsent atomically writes data to path unless it already exists, and
@@ -80,6 +142,16 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	}
 	defer os.Remove(tmp.Name())
 	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return false, err
+	}
+	// Chmod the TEMP, before it is linked — never the destination. os.CreateTemp
+	// creates at 0600, os.Link preserves it, and the link publishes the inode
+	// itself, so the mode must be right before publication or the artifact is
+	// briefly (and then permanently) 0600. Chmod-ing path instead would also
+	// rewrite the mode of a PRESERVED pre-existing artifact on the skip path,
+	// which writeIfAbsent's contract says must be left entirely alone.
+	if err := tmp.Chmod(publishedFileMode); err != nil {
 		tmp.Close()
 		return false, err
 	}

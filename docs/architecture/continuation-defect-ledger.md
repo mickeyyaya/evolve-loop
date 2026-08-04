@@ -191,3 +191,38 @@ A workspace with BOTH the manifest and `lane-scope.json` destroyed is not
 recoverable from the registry alone, because arming on any registry entry would
 block every ordinary cycle in a project where any lane ever preserved work. This
 is recorded rather than papered over.
+
+## Cycle-1290 continuation — the two defects cycle-1287 handed forward
+
+Third hop of the `continuation-defect-ledger` lineage (1285 → 1287 → 1290). Both
+entries were RED in the committed reproducer before this landing and are now
+tree-resident locks in `go/internal/faillearn/writer_mode_test.go` and
+`go/internal/faillearn/inbox_failure_degraded_test.go`.
+
+| Defect | Sev | Issue | Gap | Solution |
+|---|---|---|---|---|
+| 1287-F1 (defects[0]) | MEDIUM | The failure floor published its own artifacts — `retrospective-report.md`, `lessons/*.yaml`, `.evolve/inbox/*.json` — at 0600, while every other runtime artifact publishes 0644 | `os.CreateTemp` creates at 0600 and `os.Link` preserves it; the 1285 stat-then-write → link-publish rewrite dropped the mode silently because nothing in the tree pinned it | `tmp.Chmod(publishedFileMode)` on the TEMP before the link, so the published inode carries `internal/atomicwrite`'s documented 0644. Chmod-ing the destination was rejected: it would also rewrite the mode of a PRESERVED pre-existing artifact on the skip path |
+| 1287 residual (UNQUEUED diagnosis) | MEDIUM | A disk-level inbox failure aborted before any artifact was written, so the failure ANALYSIS died with the queue write and the next continuation had to re-derive it | The abort ordering is correct and load-bearing; what was missing is that "do not claim the remediation was queued" had been implemented as "write nothing at all" | `preserveDiagnosis` publishes the analysis under the distinct name `retrospective-unqueued.md`, marked UNQUEUED and naming every item that reached no queue. The ordering is unreversed and `WriteArtifacts` still returns the error |
+
+**Disposition.** Both are FIXED, per the records in `defect-dispositions.json` for
+this lineage: the mode parity by `TestC1290_001` /
+`TestWriteArtifacts_PublishedArtifactsHaveMode0644`, the unqueued-diagnosis
+residual by `TestC1290_002` / `TestWriteArtifacts_InboxFailureWritesUnqueuedRetro`.
+Cycle-1287's F2 (audit eval-existence path convention) stays DEFERRED in
+`defect-dispositions.json`, queued as `audit-eval-existence-path-convention` —
+a different surface, not this lane's.
+
+**Why a distinct filename.** `retrospective-report.md` on disk ASSERTS that the
+remediation reached the queue; that is the 1255 invariant, pinned by
+`inbox_transactional_test.go`, which this landing left byte-identical (predicate
+`TestC1290_004`). Reusing the canonical name for a degraded artifact would have
+required weakening that lock — the signal that the design, not the contract, is
+wrong. `retrospective-unqueued.md` cannot be mistaken for a complete retrospective
+by any reader or gate that keys on the canonical name.
+
+**Known ceiling.** The degraded artifact is written only when a `runDir` exists.
+Loop-scope fatals call `WriteArtifacts` with an empty `runDir` (no cycle workspace
+has been created yet); there the error is still returned but no diagnosis is
+published, because inventing a cwd-relative location is worse than not publishing.
+Pinned by `TestWriteArtifacts_InboxFailureWithNoRunDirStillErrors`, and recorded
+here rather than papered over.
