@@ -149,9 +149,17 @@ stdout is ONE JSON envelope; exit 0/2/10/1:
  "persona":"agents/evolve-x.md","inventory_rebuilt":true}
 ```
 
-`--mint <file|->` accepts `{name, prompt, tier, cli, writes_source}` (the advisor's
-MintSpec + a name) and synthesizes spec + persona — the mint-persistence path. The
-runtime mint flow stays ephemeral and untouched.
+`--mint <file|->` accepts `{name, prompt, tier, cli, writes_source, description,
+when_to_use}` (the advisor's MintSpec + a name) and synthesizes spec + persona — the
+mint-persistence path. The runtime mint flow stays ephemeral and untouched.
+
+`description`/`when_to_use` are the SELECT metadata (ADR-0038) and use the same JSON
+keys as `phasespec.PhaseSpec`, so `mintConfigsFrom` threads them straight onto the
+minted spec. Both are optional (`omitempty`) — a metadata-less mint block mints exactly
+as before. Supplying them is how a minted phase satisfies the catalog metadata gate
+(`TestPhaseCatalog_OptionalPhasesHaveSelectMetadata`) on its own, instead of having its
+name padded into `metadataAllowlist` after the fact (#404, #406). Already-allowlisted
+legacy stubs predate this and are backfilled separately.
 
 ### 3.6 The skill (`skills/phase-create/`)
 

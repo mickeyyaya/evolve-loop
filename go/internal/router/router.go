@@ -223,6 +223,13 @@ type MintSpec struct {
 	Prompt string `json:"prompt"`
 	Tier   string `json:"tier,omitempty"`
 	CLI    string `json:"cli,omitempty"`
+	// Description/WhenToUse are the advisor's SELECT metadata (ADR-0038),
+	// carrying the SAME json keys phasespec.PhaseSpec uses so the minter can
+	// thread them through without a vocabulary translation. Optional: omitted
+	// metadata mints exactly as before (cycle-1275 — the minter now satisfies
+	// the catalog metadata contract itself instead of metadataAllowlist padding).
+	Description string `json:"description,omitempty"`
+	WhenToUse   string `json:"when_to_use,omitempty"`
 	// WritesSource is tri-state so omitted advisor output can take the safe
 	// minted-phase default while an explicit false remains a read-only opt-out.
 	WritesSource *bool `json:"writes_source,omitempty"`

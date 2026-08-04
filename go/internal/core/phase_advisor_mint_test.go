@@ -88,3 +88,70 @@ func TestPhaseAdvisor_MintRunFalse_StillCollected(t *testing.T) {
 		t.Errorf("run:false mint must still be collected; got %+v", plan.MintPhases)
 	}
 }
+
+// TestPhaseAdvisor_PlanMintCarriesSelectMetadata proves the minter satisfies the
+// catalog SELECT-metadata contract itself (cycle-1275): description/when_to_use
+// supplied in the advisor's mint block land on the minted PhaseSpec, which is
+// exactly what TestPhaseCatalog_OptionalPhasesHaveSelectMetadata reads. Before
+// this, every minted phase reached the catalog metadata-less and the gate was
+// satisfied by padding metadataAllowlist after the fact (#404, #406).
+func TestPhaseAdvisor_PlanMintCarriesSelectMetadata(t *testing.T) {
+	t.Parallel()
+	stdout := `[{"phase":"schema-drift-check","run":true,"justification":"wire types changed","mint":{"prompt":"drift persona","tier":"balanced","description":"Reports wire-schema drift.","when_to_use":"Select when router wire structs change."}}]`
+	plan, err := NewPhaseAdvisor(&fakeBridge{stdout: stdout}).Plan(baseRouteInput())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if len(plan.MintPhases) != 1 {
+		t.Fatalf("MintPhases=%d, want 1", len(plan.MintPhases))
+	}
+	mc := plan.MintPhases[0]
+	if mc.Description != "Reports wire-schema drift." {
+		t.Errorf("minted Description=%q, want the advisor's value", mc.Description)
+	}
+	if mc.WhenToUse != "Select when router wire structs change." {
+		t.Errorf("minted WhenToUse=%q, want the advisor's value", mc.WhenToUse)
+	}
+}
+
+// TestPhaseAdvisor_PlanMintWithoutMetadata_StaysEmpty pins backward
+// compatibility: a mint block with no metadata keys mints exactly as before —
+// empty metadata, every other field carried, no error.
+func TestPhaseAdvisor_PlanMintWithoutMetadata_StaysEmpty(t *testing.T) {
+	t.Parallel()
+	stdout := `[{"phase":"legacy-probe","run":true,"mint":{"prompt":"legacy persona","tier":"deep"}}]`
+	plan, err := NewPhaseAdvisor(&fakeBridge{stdout: stdout}).Plan(baseRouteInput())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if len(plan.MintPhases) != 1 {
+		t.Fatalf("MintPhases=%d, want 1", len(plan.MintPhases))
+	}
+	if mc := plan.MintPhases[0]; mc.Description != "" || mc.WhenToUse != "" {
+		t.Errorf("metadata-less mint invented metadata: %q / %q", mc.Description, mc.WhenToUse)
+	}
+	if plan.MintPhases[0].Prompt != "legacy persona" {
+		t.Errorf("legacy mint prompt regressed: %q", plan.MintPhases[0].Prompt)
+	}
+}
+
+// TestPlanPrompt_DocumentsMintMetadata proves the advisor is INSTRUCTED to
+// supply the metadata — an unadvertised field is never emitted. Both
+// prompt-assembly paths must document it: composePlanPrompt (persona,
+// PRODUCTION) and buildPlanPrompt (legacy inline fallback), the pair that
+// diverged at #293.
+func TestPlanPrompt_DocumentsMintMetadata(t *testing.T) {
+	t.Parallel()
+	persona := NewPhaseAdvisor(&fakeBridge{}, WithPersona("You are the evolve router."))
+	prompts := map[string]string{
+		"legacy":  buildPlanPrompt(baseRouteInput()),
+		"persona": persona.composePlanPrompt(baseRouteInput(), "routing-plan.json"),
+	}
+	for name, got := range prompts {
+		for _, want := range []string{`"description"`, `"when_to_use"`} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s plan prompt missing %s — advisor never told to supply SELECT metadata", name, want)
+			}
+		}
+	}
+}

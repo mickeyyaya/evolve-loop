@@ -510,6 +510,8 @@ func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("(fast|balanced|deep — never a raw model name). Minted phases are always optional and clamped by the kernel; ")
 	b.WriteString("they can never reach ship without audit. Omit \"mint\" for existing phases. Minted phases default to ")
 	b.WriteString("writes_source:true; set \"writes_source\":false only for phases that never edit source.\n")
+	b.WriteString("ALSO supply \"description\" (one line: what the phase produces) and \"when_to_use\" (the signal that should trigger ")
+	b.WriteString("SELECTing it) — this is the SELECT metadata a later cycle reads to reuse your phase instead of minting a duplicate.\n")
 
 	b.WriteString("\nYou MAY also propose a dispatch \"cli\" and abstract \"tier\" (fast|balanced|deep — never a raw model name) ")
 	b.WriteString("for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.\n")
@@ -522,7 +524,7 @@ func writePlanResponseSchema(b *strings.Builder) {
 
 	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
 	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},`)
-	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude"}}]`)
+	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it produces>","when_to_use":"<when to select it>"}}]`)
 	b.WriteString("\n")
 }
 
@@ -998,9 +1000,14 @@ func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig 
 			writesSource = *e.Mint.WritesSource
 		}
 		out = append(out, phaseconfig.PhaseConfig{
-			PhaseSpec: phasespec.PhaseSpec{Name: e.Phase, WritesSource: writesSource},
-			Dispatch:  phaseconfig.Dispatch{CLI: e.Mint.CLI, ModelTierDefault: e.Mint.Tier},
-			Prompt:    e.Mint.Prompt,
+			PhaseSpec: phasespec.PhaseSpec{
+				Name:         e.Phase,
+				WritesSource: writesSource,
+				Description:  e.Mint.Description,
+				WhenToUse:    e.Mint.WhenToUse,
+			},
+			Dispatch: phaseconfig.Dispatch{CLI: e.Mint.CLI, ModelTierDefault: e.Mint.Tier},
+			Prompt:   e.Mint.Prompt,
 		})
 	}
 	return out
