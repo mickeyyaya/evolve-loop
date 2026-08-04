@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
@@ -58,6 +59,14 @@ type Entry struct {
 	// rolls up. A legacy log written before this field parses to a zero value
 	// (never an error) — that degrades to "absent", never a fabricated count.
 	Tokens cyclestate.TokenUsage `json:"tokens,omitempty"`
+	// ContextFillRatio/ContextWindowHot (cycle-1271) are the derived twin of
+	// Tokens: how full the model's context window got, from the counts above
+	// over contextfill.WindowSizeForTier(ResolvedModel). Both omitempty, so an
+	// entry whose tier was not resolvable emits NEITHER key — a reader can tell
+	// "unknown fill" from a genuine 0.0. A legacy log written before this change
+	// parses to the zero value: absent, never a fabricated ratio.
+	ContextFillRatio float64 `json:"context_fill_ratio,omitempty"`
+	ContextWindowHot bool    `json:"context_window_hot,omitempty"`
 }
 
 // Path is the timing-log path for a cycle workspace.
@@ -98,6 +107,14 @@ type Summary struct {
 	TokensByArchetype map[string]cyclestate.TokenUsage `json:"tokens_by_archetype"`
 	WastedTokens      cyclestate.TokenUsage            `json:"wasted_tokens"`
 	CacheHitRatio     float64                          `json:"cache_hit_ratio"`
+	// Hot-phase rollup (cycle-1271): the cycle-level twin of the per-entry
+	// context-fill fields — how many phases ran at/above contextfill.HotThreshold
+	// and which ones, so "the build was starved for room" is answerable from the
+	// durable record. Derived through contextfill.IsHot rather than a re-declared
+	// comparison, so the INCLUSIVE boundary has exactly one definition. An entry
+	// with no resolvable tier (ratio absent ⇒ 0) is never reported hot.
+	HotPhaseCount int      `json:"hot_phase_count"`
+	HotPhases     []string `json:"hot_phases,omitempty"`
 }
 
 // Rollup aggregates entries into a Summary. Archetype-less entries (legacy logs
@@ -126,6 +143,10 @@ func Rollup(entries []Entry) Summary {
 		s.TokensByArchetype[arch] = addTokens(s.TokensByArchetype[arch], e.Tokens)
 		if e.Verdict == "FAIL" {
 			s.WastedTokens = addTokens(s.WastedTokens, e.Tokens)
+		}
+		if contextfill.IsHot(e.ContextFillRatio) {
+			s.HotPhaseCount++
+			s.HotPhases = append(s.HotPhases, e.Phase)
 		}
 	}
 	if denom := s.TotalTokens.Input + s.TotalTokens.CacheRead; denom > 0 {

@@ -177,7 +177,13 @@
           "additionalProperties": {"$ref": "#/definitions/TokenUsage"}
         },
         "wasted_tokens": {"$ref": "#/definitions/TokenUsage", "description": "Usage spent by FAIL-verdict entries — work that did not ship."},
-        "cache_hit_ratio": {"type": "number", "description": "cache_read/(input+cache_read) over the whole cycle; 0 when there was no input."}
+        "cache_hit_ratio": {"type": "number", "description": "cache_read/(input+cache_read) over the whole cycle; 0 when there was no input."},
+        "hot_phase_count": {"type": "integer", "description": "Phases whose context_fill_ratio reached contextfill.HotThreshold (0.85, inclusive). Entries with no resolvable tier (ratio absent) are never counted."},
+        "hot_phases": {
+          "type": "array",
+          "description": "Names of the phases counted by hot_phase_count. Omitted when none ran hot.",
+          "items": {"type": "string"}
+        }
       }
     },
     "TokenUsage": {

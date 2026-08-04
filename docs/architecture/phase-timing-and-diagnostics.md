@@ -15,6 +15,10 @@ The JSON payload is an array of objects, where each object contains the followin
 - `verdict` (string): The canonical verdict resolved for the phase (e.g. `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
 - `cost_usd` (number): The financial cost accrued by LLM calls during this phase.
 - `attempt_count` (integer): The number of attempts executed during this phase.
+- `context_fill_ratio` (number, optional): How full the model's context window got on the terminal attempt — `contextfill.FillRatio` over `contextfill.WindowSizeForTier(resolved_model)`. **Omitted** when the tier was not resolvable, so an absent key means "unknown", never a genuine `0.0`. Not clamped at `1.0`: a phase that overran its window stays distinguishable from one that just fit.
+- `context_window_hot` (boolean, optional): `true` when `context_fill_ratio` reached the inclusive `contextfill.HotThreshold` (0.85). Omitted when false or unknown.
+
+Legacy logs written before a field existed parse to its zero value rather than erroring — every addition to this schema is additive and degrades to "absent". `Rollup()` summarises the hot phases at cycle level as `hot_phase_count` / `hot_phases`. Design detail: `docs/architecture/context-window-control.md` § Telemetry wiring.
 
 ### Example Payload
 
@@ -32,7 +36,10 @@ The JSON payload is an array of objects, where each object contains the followin
     "duration_ms": 48720,
     "verdict": "PASS",
     "cost_usd": 0.3812,
-    "attempt_count": 2
+    "attempt_count": 2,
+    "resolved_model": "deep",
+    "context_fill_ratio": 0.95,
+    "context_window_hot": true
   }
 ]
 ```

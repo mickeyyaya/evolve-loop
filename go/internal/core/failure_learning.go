@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -83,6 +84,21 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 	}
 }
 
+// contextFillFor derives the terminal attempt's context-window occupancy for one
+// phase outcome. ResolvedModel already IS the tier the attempt ran at (phases/
+// runner sets it from tieredRes.Tier), so it is the honest lookup key; anything
+// that is not a canonical tier yields a zero window and contextfill's
+// ErrInvalidWindow, which degrades to (0, false). Unknown fill is recorded as
+// ABSENT (both fields omitempty), never as a guessed window, and the error never
+// propagates — a phase's timing record must not be lost over a missing tier.
+func contextFillFor(out recovery.PhaseOutcome) (ratio float64, hot bool) {
+	ratio, err := contextfill.FillRatio(out.Tokens, contextfill.WindowSizeForTier(out.ResolvedModel))
+	if err != nil {
+		return 0, false
+	}
+	return ratio, contextfill.IsHot(ratio)
+}
+
 // recordPhaseOutcome is the C1 recording chokepoint (ADR-0044): EVERY
 // terminal disposition of a dispatched phase — happy advance AND each abort
 // return (exhausted retries, non-canonical verdict, review-gate reject,
@@ -102,6 +118,9 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	out.EndedAt = o.now().UTC().Format(time.RFC3339)
 	out.Archetype = o.phaseArchetype(out.Phase)
 	result.PhasesRun = append(result.PhasesRun, Phase(out.Phase))
+	// Context fill is derived HERE for the same reason EndedAt/Archetype are: the
+	// single chokepoint owns the projection, so every terminal path records it.
+	fillRatio, windowHot := contextFillFor(out)
 	*timings = append(*timings, phaseTimingEntry{
 		Phase:         out.Phase,
 		DurationMS:    out.DurationMS,
@@ -116,6 +135,9 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		ModelSource:   out.ModelSource,
 		ResolvedModel: out.ResolvedModel,
 		Tokens:        out.Tokens,
+
+		ContextFillRatio: fillRatio,
+		ContextWindowHot: windowHot,
 	})
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still

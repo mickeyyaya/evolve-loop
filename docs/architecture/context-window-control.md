@@ -181,23 +181,54 @@ loop routes to today shares a 200k-token window). The upgrade path, when that st
 holding, is a per-model registry keyed off the resolved model id (mirroring
 `internal/modelcatalog`'s tables) with this function kept as the tier-level fallback.
 
-### Deliberately deferred (nothing imports this package yet)
+### Telemetry wiring (cycle-1271)
 
-The package ships as measurement-only; three follow-ups are queued, in dependency
-order, and are **not** wired in cycle-1269:
+The derivation is persisted to the durable per-cycle record. `internal/core`'s
+`recordPhaseOutcome` — the ADR-0044 C1 chokepoint and sole writer of
+`phase-timing.json` — derives the ratio for **every** terminal phase disposition,
+and `phasetiming.Rollup` summarises it at cycle level:
 
-1. `wire-context-fill-stage` — the `Off`/`Advisory`/`Enforce` dial from
-   `.evolve/policy.json` (the `internal/cyclebudget` Stage precedent), plus a
-   `ContextFill` field persisted on `phasetiming.Entry`. Default-off, byte-identical
-   to today when the policy key is absent.
-2. `context-fill-hint-prompt-injection` — an advisory `ContextBudgetHint` line beside
-   the existing `TurnBudgetHint` injection (`internal/phases/runner/runner.go`).
-3. Enforce-stage behavior (interrupting an in-flight phase at the high-water mark)
-   — needs its own design pass on safely halting a live tmux REPL session.
+| Field | Where | Meaning |
+|---|---|---|
+| `context_fill_ratio` | `phasetiming.Entry` | window occupancy of the terminal attempt (`omitempty`) |
+| `context_window_hot` | `phasetiming.Entry` | `contextfill.IsHot(ratio)` — at/above the 0.85 threshold (`omitempty`) |
+| `hot_phase_count` | `phasetiming.Summary` | how many phases ran hot this cycle |
+| `hot_phases` | `phasetiming.Summary` | which ones, by name |
+
+Two contracts hold the wiring honest:
+
+- **The tier is read, never invented.** `PhaseOutcome.ResolvedModel` already *is*
+  the tier the terminal attempt ran at (`internal/phases/runner/runner.go` sets it
+  from `tieredRes.Tier`), so it is the lookup key. Anything that is not a canonical
+  tier — a concrete model id, an empty legacy value — yields a `0` window and
+  `ErrInvalidWindow`, which degrades to both fields zero. The error never
+  propagates: a phase's timing record must not be lost over a missing tier.
+- **Unknown fill is absent, not `0`.** Both entry fields are `omitempty`, so a
+  reader can distinguish "we could not tell" from a genuine `0.0` occupancy, and a
+  `phase-timing.json` written before cycle-1271 still parses to the zero value.
+
+Both packages import `contextfill`; **nothing else may** — it stays a leaf, and a
+cycle-1271 ACS predicate re-checks the real build graph each run.
+
+### Still deliberately deferred
+
+Measurement and telemetry are wired; *behaviour* is not. Two follow-ups remain, in
+dependency order:
+
+1. `context-fill-stage-dial` — the `Off`/`Advisory`/`Enforce` dial from
+   `.evolve/policy.json` (the `internal/cyclebudget` Stage precedent). Default-off,
+   byte-identical to today when the policy key is absent.
+2. `context-fill-advisory-prompt-hint` — an advisory `ContextBudgetHint` line beside
+   the existing `TurnBudgetHint` injection (`internal/phases/runner/runner.go`);
+   depends on (1).
+
+Enforce-stage behaviour (interrupting an in-flight phase at the high-water mark)
+needs its own design pass on safely halting a live tmux REPL session.
 
 When (1) lands it should **reconcile with, not duplicate,** `context-monitor.json`
 above: same hazard, two measurement points (pre-dispatch prompt bytes vs. realized
-window occupancy).
+window occupancy). The `hot_phases` rollup is the evidence that should set its
+threshold — soak it before choosing an enforce trigger.
 
 ## See also
 

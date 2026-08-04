@@ -5,10 +5,13 @@
 // into the one number that says whether the phase was running out of room:
 // occupancy over the model's context-window size.
 //
-// This package is the pure derivation only — a stdlib+cyclestate leaf with no
-// wiring. Persisting the ratio (a phasetiming.Entry field), the off/advisory/
-// enforce Stage dial, and the advisory prompt hint are deliberately DEFERRED to
-// follow-up cycles; nothing imports this package yet.
+// This package is the pure derivation only — a stdlib+cyclestate leaf. As of
+// cycle-1271 it is wired into the durable telemetry record and NOWHERE else:
+// internal/core's recordPhaseOutcome (the ADR-0044 C1 chokepoint) derives the
+// ratio onto phasetiming.Entry, and phasetiming.Rollup summarises the hot
+// phases through IsHot. Those two packages are the whole importer set — keep it
+// that way. The off/advisory/enforce Stage dial and the advisory prompt hint
+// remain deliberately DEFERRED to follow-up cycles.
 package contextfill
 
 import (
