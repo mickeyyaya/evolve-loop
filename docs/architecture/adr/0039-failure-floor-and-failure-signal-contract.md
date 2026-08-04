@@ -121,6 +121,16 @@ contract's fallback):
 - **Carrier**: the verdict sentinel (ADR-0033) extends to `schema_version: 2` with an optional
   `failure` block — `{"class", "defects": [...], "evidence_paths": [...]}` — one contracted
   artifact, one parser, v1-compatible forever (absent block legal for PASS and old artifacts).
+- **Selection is tail-anchored** (cycle-1299): a report may contain several sentinel-shaped
+  substrings — prose routinely QUOTES the syntax (contract examples, review commentary) — so
+  `ParseVerdictSentinelFull` walks candidates from the END and returns the LAST one that
+  unmarshals, carries a non-empty `verdict`, and is not a placeholder echo (cycle-603).
+  Invalid candidates are SKIPPED, never fatal. Rationale: a producer emits its real verdict at
+  the tail, after the prose. First-match selection let a quoted decoy win, and an elided decoy
+  (`{"verdict":…}`) blanked the read entirely — cycle-1298's adversarial-review report carried
+  five quoted decoys ahead of a well-formed `verdict=FAIL`, read as "no sentinel", fired
+  `[bad_verdict]` ×3 and circuit-opened the contract gate enforce→advisory. Single-sentinel
+  documents (the common case) are unaffected.
 - **Contract conditionality**: contracts with `RequireFailureContext` make a missing/empty
   failure block on FAIL/WARN a Violation (`failure-context-missing`) → the existing
   correction-retry machinery re-dispatches with the exact reason.

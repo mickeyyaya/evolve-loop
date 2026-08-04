@@ -77,24 +77,37 @@ func isPlaceholderEcho(f *FailureBlock) bool {
 // well-formed one was found. v1 and v2 lines both parse (an absent failure
 // block is legal); a missing/malformed/verdict-less sentinel yields ok=false
 // so the caller falls back to its legacy parser (tolerant reader).
+//
+// Selection is TAIL-ANCHORED: candidates are walked from the END of the
+// document and the LAST valid one wins. A producer emits its real verdict at
+// the tail, while prose earlier in the same report routinely QUOTES the
+// sentinel shape (contract examples, review commentary). First-match selection
+// let those decoys win — or, when a decoy's JSON was elided, blanked the read
+// entirely (cycle-1298: five quoted decoys buried a real verdict=FAIL and
+// circuit-opened the contract gate). Invalid candidates are skipped, not fatal,
+// so a placeholder echo trailing the real sentinel no longer destroys it.
+// Single-sentinel documents — the overwhelmingly common case — are unchanged.
 func ParseVerdictSentinelFull(content string) (VerdictSentinel, bool) {
-	m := sentinelRE.FindStringSubmatch(content)
-	if m == nil {
-		return VerdictSentinel{}, false
+	matches := sentinelRE.FindAllStringSubmatch(content, -1)
+	for i := len(matches) - 1; i >= 0; i-- {
+		if s, ok := parseSentinelPayload(matches[i][1]); ok {
+			return s, true
+		}
 	}
+	return VerdictSentinel{}, false
+}
+
+// parseSentinelPayload validates ONE candidate payload. A candidate counts only
+// when it unmarshals, carries a verdict, and is not a prompt-echoed contract
+// example: a sentinel whose failure block still holds literal placeholder
+// tokens can only be the Deliverable Contract's own printed example captured
+// from scrollback, never a real agent verdict (cycle-603).
+func parseSentinelPayload(payload string) (VerdictSentinel, bool) {
 	var s VerdictSentinel
-	if err := json.Unmarshal([]byte(m[1]), &s); err != nil {
+	if err := json.Unmarshal([]byte(payload), &s); err != nil {
 		return VerdictSentinel{}, false
 	}
-	if s.Verdict == "" {
-		return VerdictSentinel{}, false
-	}
-	// Reject a prompt-echoed contract example: a sentinel whose failure block
-	// still carries literal placeholder tokens can only be the Deliverable
-	// Contract's own printed example captured from scrollback, never a real
-	// agent verdict (cycle-603). Falling through to ok=false means the caller's
-	// legacy parser runs instead of silently misclassifying off the example.
-	if isPlaceholderEcho(s.Failure) {
+	if s.Verdict == "" || isPlaceholderEcho(s.Failure) {
 		return VerdictSentinel{}, false
 	}
 	return s, true
