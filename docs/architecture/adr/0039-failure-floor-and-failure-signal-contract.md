@@ -131,6 +131,14 @@ contract's fallback):
   five quoted decoys ahead of a well-formed `verdict=FAIL`, read as "no sentinel", fired
   `[bad_verdict]` ×3 and circuit-opened the contract gate enforce→advisory. Single-sentinel
   documents (the common case) are unaffected.
+- **One parser, no exceptions** (cycle-1303): every consumer of the sentinel reads through
+  `phasecontract.ParseVerdictSentinelFull`. The release gate was the last holdout — it hand-rolled
+  a second scanner (`machineVerdictRE`/`markerVerdict`) that was tail-anchored but had no
+  placeholder-echo guard, so a Deliverable-Contract example captured from scrollback stayed
+  authoritative to `evolve release` long after cycle-603 closed that class everywhere else. It now
+  delegates (`internal/releasepreflight/releasepreflight.go:588`); what stays local is the release
+  gate's own POLICY — normalise the verdict, accept only PASS/WARN/FAIL, otherwise fall through to
+  the prose scan. Rule: duplicate the mapping if you must, never the parse.
 - **Contract conditionality**: contracts with `RequireFailureContext` make a missing/empty
   failure block on FAIL/WARN a Violation (`failure-context-missing`) → the existing
   correction-retry machinery re-dispatches with the exact reason.

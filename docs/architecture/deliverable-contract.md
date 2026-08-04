@@ -244,6 +244,40 @@ Producers emit `<!-- evolve-verdict: {"phase":"audit","verdict":"PASS","schema_v
 The audit classifier and the verifier read the sentinel **first**, then fall back to the legacy
 regex-on-prose, so older reports still classify. This removes the verdict-format-drift class.
 
+### Selection is tail-anchored (cycle-1298)
+
+A report may contain **several** strings matching the sentinel shape. Only the last valid one is the
+producer's actual verdict; the earlier ones are prose — contract examples the agent was shown, review
+commentary quoting a verdict it is discussing, scrollback echoes. `ParseVerdictSentinelFull`
+(`go/internal/phasecontract/sentinel.go`) therefore walks candidates from the **END** of the document
+and returns the **last** one that unmarshals, carries a non-empty verdict, and is not a placeholder
+echo. Invalid candidates are **skipped, never fatal**. Documents with a single sentinel — the
+overwhelmingly common case — are unaffected.
+
+First-match selection was the original rule and it was wrong in two directions:
+
+- a quoted decoy **outranked** the real verdict, so a report discussing a `PASS` shipped as `PASS`;
+- worse, when a decoy's JSON was **elided** for readability (`{"verdict":"FAIL",…}`), the unmarshal
+  failed and the whole read returned not-found — blanking a real verdict rather than merely
+  misreading it.
+
+In **cycle-1298** the second shape hit an adversarial-review report whose prose quoted the sentinel
+five times before emitting a genuine `verdict=FAIL` at the tail. The gate read nothing, treated the
+absent verdict as non-blocking, and effectively demoted itself from enforce to advisory on the one
+report that was trying to stop the cycle. That live artifact is checked in verbatim as the regression
+fixture `go/internal/phasecontract/testdata/cycle1298-quoted-decoys.md`.
+
+**If you write a new sentinel reader, read the shared parser instead.** `internal/deliverable` calls
+`phasecontract.ParseVerdictSentinelFull`/`ParseVerdictSentinel` directly (`deliverable.go:257,327`) —
+one implementation, no second copy to drift. Coverage:
+`go/internal/phasecontract/sentinel_tailanchor_test.go`, which runs the cycle-1298 fixture through
+the parser, asserts first-match selection gives the *wrong* answer on those same bytes (so the
+fixture cannot silently stop discriminating), and proves the production reader `ReadFailureBlock`
+inherits the rule.
+
+**Producer-side rule:** emit your verdict sentinel **once, at the tail** of the report. If you must
+quote sentinel syntax in prose, quoting it earlier in the document is safe by construction.
+
 ## Rollout / rollback
 
 - Ship at the enforce default; run one `gates.contract_gate=shadow` policy cycle pre-merge to confirm no

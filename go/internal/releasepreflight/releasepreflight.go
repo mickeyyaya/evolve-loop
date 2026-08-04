@@ -38,6 +38,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
@@ -571,41 +573,28 @@ func makeInlineVerdictRE(strict bool) *regexp.Regexp {
 // awk-based fallback in bash. We scan up to 5 lines after the heading.
 var verdictHeadingRE = regexp.MustCompile(`(?i)^#+\s+(?:[0-9]+\.\s+)?Verdict\s*$`)
 
-// machineVerdictRE captures the JSON object of the auditor's machine-readable
-// marker `<!-- evolve-verdict: {…} -->` — the structured SSOT emitted for
-// exactly this check. The capture ends at the first `}` that precedes `-->`
-// (`(.+?})\s*-->`), so it spans a full nested-object payload yet is NOT fooled
-// by a `-->` literal inside a JSON string value (which would otherwise truncate
-// the capture and silently drop the marker). The captured object is JSON-parsed
-// by markerVerdict, never regex-scraped, so it is immune to prose variation
-// (e.g. `**PASS.**` with a trailing period, which the prose forms below miss).
-var machineVerdictRE = regexp.MustCompile(`evolve-verdict:\s*(.+?})\s*-->`)
-
-// verdictMarker is the auditor's machine-readable verdict payload.
-type verdictMarker struct {
-	Verdict string `json:"verdict"`
-}
-
 // markerVerdict returns the report's authoritative machine-readable verdict
-// (upper-cased PASS/WARN/FAIL) and whether any valid marker was present. When
-// multiple markers appear (e.g. a quoted prior-cycle verdict in a context
-// section plus the report's own), the LAST one — the report's own final verdict
-// — wins, so a stray earlier PASS can never silence a later FAIL. Each candidate
-// is JSON-parsed (robust to nested fields), not regex-scraped.
+// (upper-cased PASS/WARN/FAIL) and whether any valid marker was present.
+//
+// Sentinel parsing is NOT done here: it delegates to
+// phasecontract.ParseVerdictSentinelFull, the project's single source of truth
+// for the `<!-- evolve-verdict: {…} -->` marker. That parser is tail-anchored
+// (the report's own final verdict wins over a quoted prior-cycle one, cycle-1298)
+// and rejects a Deliverable-Contract example echoed from scrollback (cycle-603) —
+// guarantees this call site used to miss because it hand-rolled a second scanner.
+// What stays local is releasepreflight's own POLICY: normalising the verdict and
+// accepting only the three the release gate understands, so an unrecognised
+// verdict falls through to the prose scan exactly as before.
 func markerVerdict(body string) (string, bool) {
-	var last string
-	var found bool
-	for _, m := range machineVerdictRE.FindAllStringSubmatch(body, -1) {
-		var vm verdictMarker
-		if json.Unmarshal([]byte(strings.TrimSpace(m[1])), &vm) != nil {
-			continue
-		}
-		switch v := strings.ToUpper(strings.TrimSpace(vm.Verdict)); v {
-		case "PASS", "WARN", "FAIL":
-			last, found = v, true
-		}
+	s, ok := phasecontract.ParseVerdictSentinelFull(body)
+	if !ok {
+		return "", false
 	}
-	return last, found
+	switch v := strings.ToUpper(strings.TrimSpace(s.Verdict)); v {
+	case "PASS", "WARN", "FAIL":
+		return v, true
+	}
+	return "", false
 }
 
 // boldPassRE / boldWarnRE match a bold-wrapped verdict token with at most one
