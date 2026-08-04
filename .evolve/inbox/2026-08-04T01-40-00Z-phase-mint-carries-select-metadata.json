@@ -1,0 +1,15 @@
+{
+  "connects_to": [
+    ".evolve/phases/ship-stage-hygiene-check/phase.json",
+    "go/internal/phasespec/catalog_metadata_test.go",
+    "2026-07-30T09-00-00Z-egps-regression-tia-selection"
+  ],
+  "created_at": "2026-08-04T01:40:00Z",
+  "fix": "Make the minter satisfy the catalog contract at mint time: either (a) mint with a self-describing stub template (description='Runtime-minted stub for <name>; not yet defined' + when_to_use marking it non-selectable) that the guard accepts explicitly, or (b) mint into an untracked staging area (.evolve/phases-pending/) promoted only with metadata. Wiring proof: a test that mints an unknown phase name through the LIVE mint path and asserts the merged catalog stays guard-green.",
+  "id": "phase-mint-carries-select-metadata",
+  "kind": "pipeline-repair",
+  "notes": "Same sweep mechanism as the gate-wiring-proof incident (#399) and cycle-1262 audit F3. Manifest gate (shadow) observed but could not block.",
+  "summary": "cycle-1262's scout window minted .evolve/phases/ship-stage-hygiene-check/phase.json with empty description/when_to_use; ship's whole-tree bind tracked it; TestPhaseCatalog_OptionalPhasesHaveSelectMetadata went RED on main (both platforms) \u2014 the guard is repo-wide but per-cycle changed-scope never runs it (scope disease costume #4). Console-first fix added honest metadata to THIS stub; the CLASS remains: every future mint of an unknown phase name re-creates the hazard.",
+  "title": "Runtime phase-mint writes metadata-less stubs that break the repo-wide catalog guard when ship sweeps them into tracking",
+  "weight": 0.85
+}
