@@ -51,6 +51,13 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		// escalation was tried (it is a no-op for a phase whose whole chain is
 		// one CLI family).
 		escalated := false
+		// prevBlockIdentity is the defect identity (violation-code set +
+		// normalized reason) of the block that
+		// triggered the previous correction on THIS ladder ("" ⇒ none seen yet,
+		// e.g. a breaker left hot by an earlier cycle). It gates the escalation
+		// trigger on defect identity, not just block count. The zero value
+		// means no block seen yet.
+		var prevBlockIdentity contractBlockIdentity
 		rr := cr.reviewDeliverable(next, rin, contractDispatch{cli: baseRoutingCLI})
 		// Contract-correction retry: on a deliverable-contract reject,
 		// re-dispatch the phase with the violation injected as a
@@ -160,7 +167,11 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			// untouched, and the soft overlay keeps the original chain behind the
 			// escalated primary. No target (already on the universal family with
 			// no other family configured) ⇒ the ladder behaves exactly as before.
-			if rr.Blocks >= contractEscalateAtBlock {
+			// The count alone is not the signature: the block must also be the
+			// SAME defect as the one that triggered the previous correction
+			// (contractBlocksShareIdentity, scoping constraint 4) — two different
+			// violations are two honest defects, not an incapable CLI.
+			if rr.Blocks >= contractEscalateAtBlock && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
 				failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
 				if esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI); ok && esc != dr.phaseReq.ModelRoutingCLI {
 					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive contract blocks on cli=%s; correction %d re-dispatches on cli=%s (contract blocks never trigger cli_fallback, which is how a mis-formatting CLI used to demote the gate). The phase's primary routing is unchanged.\n",
@@ -169,6 +180,10 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 					escalated = true
 				}
 			}
+			// Carry THIS block's identity to the next iteration: identity is
+			// compared against the immediately preceding block, matching the
+			// blocker breaker's own consecutive-identical-fingerprint semantics.
+			prevBlockIdentity = newContractBlockIdentity(rr.Reason)
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
 				Cycle:    cr.cycle,

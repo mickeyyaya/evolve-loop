@@ -158,6 +158,52 @@ instrumented (the salvage layer's first deliverable is the *measurement*);
 whole-cycle losses to deliverable failures this week = documented per-cycle in
 the batch integrity review.
 
+### 6.1 Landed — fingerprint-gated CLI escalation (cycle-1289, item rank 1)
+
+**Issue.** The contract-block CLI escalation landed by PR #390
+(`go/internal/core/contract_escalation.go`) triggered on a raw counter: the
+correction ladder in `go/internal/core/cyclerun_review.go` escalated whenever
+`ReviewResult.Blocks >= contractEscalateAtBlock` (2). `Blocks` counts *blocks*,
+not *defects*, so it never asked whether block 2 was the same violation as
+block 1.
+
+**Gap.** Two genuinely DIFFERING contract violations on one phase — block 1
+misses a section heading, block 2 misses the verdict sentinel — read as one
+incapable-CLI signature and spent round 2's budget on a different CLI family.
+That is over-eager escalation: two honest defects the same CLI can fix, not a
+CLI that cannot render the contract. It also meant the escalation ladder and the
+blocker breaker carried two unrelated notions of "this failed twice" — the
+ambiguity the live inbox item (weight 0.96) named as
+*"integrate with the fingerprint breaker so identical blocks share identity"*.
+
+**Solution.** The trigger is now gated on failure IDENTITY as well as count.
+`contractBlocksShareIdentity` (`contract_escalation.go`) compares the current
+block's reason against the block that triggered the previous correction, using
+the blocker breaker's OWN primitive — `normalizeReasonForFingerprint`
+(`go/internal/core/failure_digest.go`) — rather than a second hashing scheme.
+Because that primitive projects a reason onto its defect identity (dropping
+identity-noise such as go-test duration tokens and narrative verdicts), two
+blocks reporting the *same* defect in verbatim-different text still escalate,
+where raw string equality would have wrongly suppressed them.
+
+The rule is deliberately **"prior reason known AND differing ⇒ suppress"**, not
+"equal ⇒ escalate". The contract-gate breaker is process-global, so a cycle that
+aborted mid-ladder leaves it HOT and the next phase can arrive at `Blocks >= 2`
+on its ladder's FIRST block — with no prior reason to compare. Under an
+equality-only rule that case would silently stop escalating, deleting the
+hot-breaker escape hatch PR #390's review established on purpose. Family
+selection (`contractEscalationCLI`) and the `policy.ValidatePin` guardrail
+(`escalationAllowed`) are untouched.
+
+**Measured before/after.** Behavior is exercised by the three-axis suite in
+`go/internal/core/contract_escalation_test.go`, driving the real
+`Orchestrator.RunCycle`: NEGATIVE (differing reasons ⇒ no escalation, RED before
+this change), SEMANTIC (same defect, duration-token-different text ⇒ still
+escalates — the discriminator against a raw-equality fix), EDGE (hot breaker, no
+prior reason ⇒ escalation still fires). 10/10 contract-escalation tests PASS.
+Live escalation-firing counts remain to be measured against the baseline in §6
+(contract-gate CIRCUIT OPEN firings = 3 at the time of writing).
+
 ## Sources (online track)
 
 Anthropic structured outputs (platform.claude.com, Nov 2025) · OpenAI

@@ -142,6 +142,14 @@ check and the harness's post-phase gate can never drift.
   - The trigger is `ReviewResult.Blocks` — the gate's own consecutive-block count — never a
     re-counted correction ordinal (the two desync when the global counter arrives hot or the salvage
     rung consumes a block without a re-dispatch).
+  - The count alone is not the signature (cycle-1289): the block must also be the **same defect** as
+    the one that triggered the previous correction, compared through the blocker breaker's own
+    identity primitive `normalizeReasonForFingerprint` (`internal/core/failure_digest.go`) rather
+    than a second hashing scheme — so two blocks reporting one defect in verbatim-different text
+    (duration tokens, narrative verdicts) still escalate. Two DIFFERING violations are two honest
+    defects, not an incapable CLI, and do not escalate. The rule is *prior reason known AND
+    differing ⇒ suppress*: when the breaker arrives HOT from an earlier cycle there is no prior
+    reason on this ladder, and escalation still gets its shot before the third strike.
   - `Blocks == 0` never escalates. The other gates chained at the same seam (evalgate, topngate,
     triagecap, the build floor) keep no block counter; their rejections are task-binding/capacity
     failures, not format-compliance failures, so a different CLI is not the remedy.

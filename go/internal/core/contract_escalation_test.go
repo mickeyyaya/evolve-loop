@@ -65,6 +65,12 @@ type escalationProbe struct {
 	// approveAfter (>0) approves once this many reviews have happened, so a test
 	// can stop the ladder after a chosen number of blocks.
 	approveAfter int
+	// reasonPerBlock, when non-empty, supplies the violation text per consecutive
+	// block (block n uses index n-1, the last entry repeating for later blocks).
+	// Empty ⇒ every block reports the same reason, which is what the pre-cycle-1289
+	// tests assume. This is the ONE axis the fingerprint gate turns on: whether
+	// block 2's violation is the SAME defect as block 1's.
+	reasonPerBlock []string
 
 	lastCLI    string   // ModelRoutingCLI of the most recent dispatch
 	dispatched []string // ModelRoutingCLI per dispatch, in order
@@ -99,6 +105,13 @@ func (p *escalationProbe) Review(_ context.Context, in ReviewInput) ReviewResult
 	}
 	p.blocks++
 	reason := p.phase + " deliverable failed contract: [missing_section] required section 'Findings' not found"
+	if n := len(p.reasonPerBlock); n > 0 {
+		idx := p.blocks - 1
+		if idx >= n {
+			idx = n - 1
+		}
+		reason = p.reasonPerBlock[idx]
+	}
 	if p.blocks >= p.threshold {
 		return ReviewResult{Approve: true, Demoted: true, Reason: reason, Blocks: p.blocks}
 	}
@@ -459,5 +472,310 @@ func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	}
 	if plan.Candidates[0] != universalContractFallbackCLI {
 		t.Errorf("universalContractFallbackCLI=%q but llmroute's no-profile default is %q — the escalation target must be the same universal fallback the dispatch resolver uses", universalContractFallbackCLI, plan.Candidates[0])
+	}
+}
+
+// ============================================================================
+// cycle-1289 — FINGERPRINT-GATED ESCALATION TRIGGER
+//
+// The gap the landed PR #390 mechanism leaves open: the trigger at
+// cyclerun_review.go counts blocks (`rr.Blocks >= contractEscalateAtBlock`) and
+// never asks whether block 2 is the SAME defect as block 1. Two genuinely
+// different contract violations on one phase (block 1 misses a section heading,
+// block 2 misses the verdict sentinel) then read as one incapable-CLI signature
+// and spend round 2's budget on a different family for no reason. The inbox item
+// (.evolve/inbox/2026-08-04T07-15-00Z-contract-block-cli-escalation.json) states
+// the fix: "integrate with the fingerprint breaker so identical blocks share
+// identity" — i.e. reuse failure_digest.go's normalizeReasonForFingerprint, the
+// blocker breaker's OWN identity primitive, rather than invent a second one.
+//
+// Three axes, encoded below and by the pre-existing tests:
+//
+//	NEGATIVE  differing violations       → NO escalation  (TestContractCorrection_DifferingBlockReasonsDoNotEscalate)
+//	POSITIVE  same defect, noisy text    → escalates      (TestContractCorrection_NormalizedIdenticalReasonsEscalate)
+//	EDGE      no prior reason observed   → escalates      (TestContractCorrection_HotBreakerEscalatesOnFirstCorrection, above)
+//
+// The EDGE axis is load-bearing and is why the gate is "prior reason known AND
+// differing ⇒ suppress", not "equal ⇒ escalate": a breaker left HOT by an
+// earlier cycle arrives at Blocks>=2 on this ladder's FIRST block, so there is
+// no prior reason to compare. Requiring equality there would silently delete the
+// hot-breaker escape hatch that PR #390's review established.
+// ============================================================================
+
+// TestContractCorrection_DifferingBlockReasonsDoNotEscalate is the NEGATIVE
+// acceptance criterion: block 2 carrying a DIFFERENT violation than block 1 is
+// two honest defects, not one incapable CLI, so correction 2 must re-dispatch on
+// the phase's own routing exactly as it did before the escalation feature landed.
+func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found",
+			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found",
+		},
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — block 2's violation (%q) DIFFERS from block 1's (%q), so the two blocks are not one incapable-CLI signature and escalation must not fire",
+			probe.dispatched[2], probe.reasonPerBlock[1], probe.reasonPerBlock[0])
+	}
+}
+
+// TestContractCorrection_NormalizedIdenticalReasonsEscalate is the POSITIVE
+// acceptance criterion AND the proof that the gate reuses the blocker breaker's
+// identity primitive instead of comparing raw strings. The two reasons name the
+// same defect and differ only in a go-test duration token — exactly the
+// identity-noise class normalizeReasonForFingerprint (failure_digest.go) folds to
+// "<dur>". A raw `block1.Reason == block2.Reason` comparison would suppress this
+// escalation; the fingerprint-normalized one must still escalate.
+func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found (1.478s)",
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found (1.495s)",
+		},
+	}
+	// Guard the fixture itself: if these two reasons ever stop being
+	// normalization-equal, this test would pass for the wrong reason.
+	if a, b := normalizeReasonForFingerprint(probe.reasonPerBlock[0]), normalizeReasonForFingerprint(probe.reasonPerBlock[1]); a != b {
+		t.Fatalf("fixture invalid: the two reasons must normalize identically, got %q vs %q", a, b)
+	}
+	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
+		t.Fatal("fixture invalid: the two reasons must differ VERBATIM, else raw string equality would also pass")
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "codex-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — the two blocks are the SAME defect under normalizeReasonForFingerprint (they differ only in a duration token), so the second consecutive block must still escalate",
+			probe.dispatched[2])
+	}
+}
+
+// ============================================================================
+// CYCLE-1291 — VIOLATION-CODE-SET IDENTITY (the cycle-1289 audit defect)
+//
+// cycle-1289 shipped contractBlocksShareIdentity as a WHOLE-STRING compare of
+// normalizeReasonForFingerprint(reason). The audit rejected it HIGH:
+//
+//	"contractBlocksShareIdentity compares whole summarize() strings, so a
+//	 partially-repaired violation set (subset) reads as a different defect and
+//	 suppresses [escalation]"
+//	(.evolve/runs/cycle-1289/audit-fail-reason.json)
+//
+// The reason under comparison is deliverable.summarize() — a "; "-joined
+// rendering of EVERY violation on that block ("[code] message"). So when block 1
+// reports {missing_section, missing_verdict} and the correction closes ONE of
+// them, block 2 reports {missing_verdict} alone. That is the SAME defect getting
+// partially repaired — the strongest possible incapable-CLI signature, since the
+// CLI demonstrably cannot close the remaining violation — yet the two rendered
+// strings differ verbatim, normalizeReasonForFingerprint (which masks only
+// durations and narrative verdicts, never violation-set MEMBERSHIP) leaves them
+// differing, and the escalation is suppressed exactly when it is most warranted.
+//
+// The fix is to compare violation-CODE SETS, not rendered text. deliverable.
+// Violation.Code is the stable identity primitive (go/internal/deliverable/
+// deliverable.go:33-36) and is untouched by prose rewording or violation order.
+// Same defect ⇔ the two blocks' code sets INTERSECT.
+//
+// IMPORT-CYCLE CONSTRAINT (cycle-644 reachability obligation — compiler-proven
+// this cycle, do not re-litigate): internal/deliverable imports internal/core
+// (reviewer.go:12, verifier.go:18) and core imports deliverable NOWHERE. So
+// core.ReviewResult can NOT carry []deliverable.Violation — that is an import
+// cycle and the criterion would be permanently unsatisfiable. The code set must
+// reach core as plain data (codes parsed out of the rendered Reason, or a
+// []string field on ReviewResult). These tests pin BEHAVIOUR through the real
+// RunCycle ladder and deliberately do NOT pin either shape.
+//
+// Four axes, all driven through the production caller (RunCycle → reviewAndGuard):
+//
+//	POSITIVE  subset repair    {A,B} → {B}     → escalates  (001, THE audit defect)
+//	POSITIVE  superset regress {B}   → {A,B}   → escalates  (002)
+//	NEGATIVE  disjoint sets    {A,B} → {C,D}   → NO escalate (003)
+//	EDGE      reordered/reworded same set      → escalates  (004)
+//	EDGE      no [code] token at all           → escalates  (005, fail-safe)
+// ============================================================================
+
+// TestContractCorrection_SubsetRepairStillEscalates is THE cycle-1289 audit
+// defect, encoded. Block 1 carries two violations; the correction closes the
+// first, so block 2 carries only the second — a strict SUBSET of block 1's code
+// set. Under whole-string identity the two summaries differ verbatim and the
+// escalation is suppressed. Under code-set identity the sets intersect on
+// missing_verdict, the blocks are one partially-repaired defect, and the second
+// consecutive block must still escalate off the failing CLI family.
+func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found; [missing_verdict] no VERDICT sentinel line found",
+			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found",
+		},
+	}
+	// Guard the fixture: the defect only exists if the two rendered reasons
+	// differ verbatim AND stay differing after fingerprint normalization —
+	// otherwise the pre-fix whole-string compare would already have escalated
+	// and this test would pass for the wrong reason.
+	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
+		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
+	}
+	if a, b := normalizeReasonForFingerprint(probe.reasonPerBlock[0]), normalizeReasonForFingerprint(probe.reasonPerBlock[1]); a == b {
+		t.Fatalf("fixture invalid: the two reasons must stay DIFFERENT under normalizeReasonForFingerprint (else the pre-fix compare already escalates), got %q == %q", a, b)
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "codex-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — block 2's violation codes {missing_verdict} are a SUBSET of block 1's {missing_section, missing_verdict}, i.e. the same defect partially repaired, so the second consecutive block MUST still escalate. Suppressing here is the cycle-1289 audit defect (whole-string compare of summarize() output).",
+			probe.dispatched[2])
+	}
+}
+
+// TestContractCorrection_SupersetRegressionStillEscalates is the subset case's
+// mirror: the correction not only failed to close block 1's violation, it added
+// a second one. A SUPERSET is at least as strong an incapable-CLI signature as a
+// subset, and whole-string identity suppresses it for the identical reason.
+func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found",
+			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found; [missing_section] required section 'Findings' not found",
+		},
+	}
+	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
+		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "codex-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — block 2's codes {missing_verdict, missing_section} are a SUPERSET of block 1's {missing_verdict}: the original violation is still open and the correction added another, so the second consecutive block MUST still escalate",
+			probe.dispatched[2])
+	}
+}
+
+// TestContractCorrection_DisjointViolationSetsDoNotEscalate is the NEGATIVE
+// axis, and the guard against "fix the subset case by escalating on everything".
+// Two MULTI-violation blocks sharing NO code are two honest, unrelated defects —
+// scoping constraint 4's original intent — so correction 2 must re-dispatch on
+// the phase's own routing (empty ModelRoutingCLI override), exactly as before
+// the escalation feature landed. An implementation that simply deleted the
+// identity gate to make the subset test pass fails here.
+func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found; [empty_artifact] deliverable is zero bytes",
+			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found; [bad_trailer] Evolve-Phase trailer malformed",
+		},
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — block 1's codes {missing_section, empty_artifact} and block 2's {missing_verdict, bad_trailer} are DISJOINT, so these are two honest defects and escalation must NOT fire (scoping constraint 4)",
+			probe.dispatched[2])
+	}
+}
+
+// TestContractCorrection_ReorderedViolationSetEscalates is the EDGE axis on
+// rendering instability. summarize() joins violations in slice order and quotes
+// their messages verbatim, so ONE defect set can render two ways across blocks
+// (different order, reworded message text). Code-SET identity is invariant to
+// both; any residual text-shaped comparison is not.
+func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	probe := &escalationProbe{
+		phase:     "build",
+		threshold: neverDemotingThreshold,
+		reasonPerBlock: []string{
+			"build deliverable failed contract: [missing_section] required section 'Findings' not found; [missing_verdict] no VERDICT sentinel line found",
+			"build deliverable failed contract: [missing_verdict] VERDICT sentinel line is absent; [missing_section] section 'Findings' is missing",
+		},
+	}
+	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
+		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "codex-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — both blocks carry the SAME code set {missing_section, missing_verdict}, differing only in violation ORDER and message wording, so the second consecutive block MUST still escalate",
+			probe.dispatched[2])
+	}
+}
+
+// TestContractCorrection_UncodedReasonsFallBackToTextIdentity is the fail-safe
+// EDGE axis. Not every rejection reason on this path is a summarize() rendering
+// carrying "[code]" tokens, and a code-set implementation that extracts ZERO
+// codes from both blocks must not conclude "empty ∩ empty = ∅ ⇒ different
+// defect" — that would silently delete the escalation ladder for every
+// non-summarize reason shape. Two IDENTICAL code-less reasons are self-evidently
+// the same defect and must still escalate.
+func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
+	root := t.TempDir()
+	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
+	const uncoded = "build deliverable failed contract: artifact absent at the contracted path"
+	probe := &escalationProbe{
+		phase:          "build",
+		threshold:      neverDemotingThreshold,
+		reasonPerBlock: []string{uncoded, uncoded},
+	}
+	if strings.Contains(uncoded, "[") {
+		t.Fatal("fixture invalid: the reason must carry NO bracketed violation code")
+	}
+
+	if _, err := runEscalationCycle(t, root, probe); err == nil {
+		t.Fatal("expected the cycle to abort after corrections are exhausted (no CLI complies); got nil")
+	}
+	if len(probe.dispatched) != 3 {
+		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
+	}
+	if probe.dispatched[2] != "codex-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — both blocks report the IDENTICAL code-less reason %q, so they are the same defect; a code-set gate that reads two empty sets as \"different\" would delete the ladder for every non-summarize reason shape",
+			probe.dispatched[2], uncoded)
 	}
 }

@@ -37,11 +37,20 @@ package core
 //     the build floor). Those are task-binding or capacity rejections, not
 //     format-compliance failures, so a different CLI is not the remedy and the
 //     ladder behaves exactly as before.
+//
+//  4. ONLY AN IDENTICAL BLOCK ESCALATES (cycle-1289). ReviewResult.Blocks counts
+//     blocks, not defects: two genuinely DIFFERENT contract violations on one
+//     phase (block 1 misses a section heading, block 2 misses the verdict
+//     sentinel) are two honest defects, not one incapable-CLI signature, and
+//     round 2's budget should not buy a different CLI family for them. The
+//     trigger is therefore gated on failure IDENTITY as well as count — see
+//     contractBlocksShareIdentity.
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
@@ -146,6 +155,93 @@ func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (st
 		return universalContractFallbackCLI, true
 	}
 	return "", false
+}
+
+// contractBlocksShareIdentity reports whether the contract block now on the
+// ladder is the SAME defect as the block that triggered the previous correction,
+// which is the second half of the escalation trigger (scoping constraint 4).
+//
+// Identity is the block's VIOLATION-CODE SET, not its rendered text (cycle-1291,
+// repairing the cycle-1289 audit defect). The reason under comparison is
+// deliverable.summarize() — a "; "-joined rendering of EVERY violation on the
+// block as "[code] message" — so a whole-string compare reads a PARTIALLY
+// REPAIRED defect set as a different defect: block 1 reports
+// {missing_section, missing_verdict}, the correction closes one, block 2 reports
+// {missing_verdict} alone, the two strings differ, and the escalation is
+// suppressed exactly where the incapable-CLI signature is strongest (the CLI
+// demonstrably cannot close the remaining violation). Superset regressions and
+// re-ordered/re-worded renderings of ONE set fail the same way.
+//
+// deliverable.Violation.Code is the stable identity primitive, untouched by
+// prose rewording or violation order, so two blocks are the SAME defect exactly
+// when their code sets INTERSECT — which covers subset, superset and equal, and
+// still separates the disjoint sets constraint 4 exists to keep apart. The codes
+// reach here as plain data parsed out of the rendered reason: internal/deliverable
+// imports internal/core (reviewer.go, verifier.go) and core imports deliverable
+// nowhere, so a []deliverable.Violation field on ReviewResult would be an import
+// cycle.
+//
+// FAIL-SAFE: not every reason on this path is a summarize() rendering. When
+// EITHER block yields no code, identity falls back to failure_digest.go's
+// normalizeReasonForFingerprint — the blocker breaker's own primitive, which
+// projects a reason onto its defect identity by dropping identity-noise tokens
+// (go-test durations, narrative verdicts). Reading "no codes on either side" as
+// "∅ ∩ ∅ ⇒ different defect" would silently delete the ladder for every
+// non-summarize reason shape.
+//
+// The rule is "prior reason known AND differing ⇒ suppress", NOT "equal ⇒
+// escalate". The difference is the hot-breaker edge: the contract-gate breaker is
+// process-global, so a cycle that aborted mid-ladder leaves it hot and the next
+// phase can arrive at Blocks >= contractEscalateAtBlock on its ladder's FIRST
+// block — where no prior block exists to compare. Requiring equality there would
+// silently delete the escape hatch that constraint 2 deliberately keeps open, so
+// the zero-value prev (no block observed yet) reports true.
+func contractBlocksShareIdentity(prev contractBlockIdentity, reason string) bool {
+	if !prev.observed {
+		return true
+	}
+	cur := newContractBlockIdentity(reason)
+	if len(prev.codes) > 0 && len(cur.codes) > 0 {
+		for code := range cur.codes {
+			if _, ok := prev.codes[code]; ok {
+				return true
+			}
+		}
+		return false
+	}
+	return cur.normalized == prev.normalized
+}
+
+// contractBlockIdentity is ONE contract block's defect identity, computed once
+// per block by the caller and carried forward to the next iteration: the set of
+// violation codes the block reported, plus the fingerprint-normalized reason the
+// code-less fail-safe compares. observed distinguishes "a prior block reported
+// no codes and an empty reason" from "no prior block at all" (the hot-breaker
+// edge) — a distinction the previous empty-string sentinel could not make.
+type contractBlockIdentity struct {
+	observed   bool
+	normalized string
+	codes      map[string]struct{}
+}
+
+// contractViolationCodeRE matches the "[code]" tokens deliverable.summarize()
+// emits. The class is deliberately narrow — code-shaped tokens only, no spaces —
+// so bracketed prose inside a violation MESSAGE cannot masquerade as a code and
+// fabricate an intersection between two unrelated defects.
+var contractViolationCodeRE = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
+
+// newContractBlockIdentity projects one block's rejection reason onto its defect
+// identity. Both projections are computed eagerly: which one the comparison uses
+// depends on the OTHER block, so neither can be deferred.
+func newContractBlockIdentity(reason string) contractBlockIdentity {
+	id := contractBlockIdentity{observed: true, normalized: normalizeReasonForFingerprint(reason)}
+	for _, m := range contractViolationCodeRE.FindAllStringSubmatch(reason, -1) {
+		if id.codes == nil {
+			id.codes = make(map[string]struct{})
+		}
+		id.codes[m[1]] = struct{}{}
+	}
+	return id
 }
 
 // escalationAllowed keeps the escalation inside the guardrails that bound the
