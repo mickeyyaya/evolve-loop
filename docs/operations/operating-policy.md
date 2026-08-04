@@ -86,6 +86,22 @@ undiagnosable. Its blast radius is every subsequent cycle.
    `/commit`); ships via `evolve ship` classes; releases via `evolve release`.
 7. **Fail loudly.** Every degraded path WARNs with specifics; "missing
    artifact" errors are writer defects; silent narrowing is treated as a bug.
+8. **Issue/gap/solution docs on every fix (operator directive, 2026-08-04).**
+   Every fix — console PR or loop cycle — lands with documentation in
+   **issue / gap / solution** format: what was wrong, why the existing net
+   missed it, and how the change closes it, in enough detail that a reader can
+   audit the claim against the diff. Extend the relevant review/incident doc
+   (e.g. [batch-integrity-review-2026-08-04](batch-integrity-review-2026-08-04.md))
+   or link a new doc in the same format.
+9. **Ledger writes derive from diffs, not labels.** Queue records, CHANGELOG
+   closure claims, and memory ledgers must be written from the ship's actual
+   diff (`git show --stat`) and, for "activated/landed" claims, from runtime
+   artifact evidence — never from lane labels or verdict events. A
+   continuation lane's audit must account for the ORIGINAL rejecting audit's
+   defect list with per-defect dispositions (FIXED/DEFERRED/OPEN).
+   *Evidence: the 2026-08-04 batch integrity review — a reproduced CRITICAL
+   laundered to "verified closed" across four locally-honest hops, and a
+   dormant feature recorded as actively soaking.*
 
 ## 4. Failure handling (the routed-not-fatal contract)
 
