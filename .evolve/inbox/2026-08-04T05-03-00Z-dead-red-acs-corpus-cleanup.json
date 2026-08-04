@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    "docs/operations/batch-integrity-review-2026-08-04.md",
+    "go/acs/cycle1257/predicates_test.go",
+    "go/acs/cycle1259/predicates_test.go"
+  ],
+  "created_at": "2026-08-04T05:03:00Z",
+  "fix": "Replace with honest tombstone files citing the redesign (regressiontia) or delete; verify the EGPS skipped_count drops accordingly. DOCS REQUIRED (operator directive 2026-08-04): the landing must include/extend an issue/gap/solution section in docs/operations/batch-integrity-review-2026-08-04.md (or a linked doc in the same format).",
+  "id": "dead-red-acs-corpus-cleanup",
+  "kind": "cleanup",
+  "summary": "Shipped inside fcdd466e (~550 lines) from cycles whose audits FAILED; they reference TestGoLaneSelection_*/CHANGED_PACKAGES acssuite internals that never existed at any commit. Skip-guarded so suites stay green, but they pollute the corpus and inflate the apparent cycles-1257-1260 delivery.",
+  "title": "go/acs/cycle1257 + cycle1259 predicate files are permanently red-by-construction (abandoned acssuite-internal design) \u2014 tombstone or remove",
+  "weight": 0.75
+}

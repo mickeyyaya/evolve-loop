@@ -1,0 +1,15 @@
+{
+  "connects_to": [
+    ".evolve/runs/cycle-1259/audit-report.md",
+    ".evolve/runs/cycle-1263/audit-report.md",
+    "docs/operations/batch-integrity-review-2026-08-04.md",
+    "go/internal/core/integrity_surface.go"
+  ],
+  "created_at": "2026-08-04T05:04:00Z",
+  "fix": "Admission check at triage commit-time: any top_n card whose target paths intersect IsProtectedSurface is rejected/re-routed console-side (same predicate, second route). Wiring proof: a fixture triage decision naming acssuite/ must be refused on the fleet-todo route. DOCS REQUIRED (operator directive 2026-08-04): the landing must include/extend an issue/gap/solution section in docs/operations/batch-integrity-review-2026-08-04.md (or a linked doc in the same format).",
+  "id": "triage-protected-surface-admission",
+  "kind": "pipeline-repair",
+  "summary": "integrity_surface.go protects acssuite/; triage committed acssuite-internal designs three times; each lane burned to an honest FAIL. Named 'the highest-value fix available' by BOTH the 1259 and 1263 audits \u2014 never queued (vanished-defect class). #349's PartitionConsole(IsProtectedSurface) screens only the inbox route, not the fleet-todo/scout route these took.",
+  "title": "Triage keeps committing protected-surface tasks the builder cannot legally write \u2014 sank cycles 1257, 1259, 1263 (three full lanes)",
+  "weight": 0.9
+}
