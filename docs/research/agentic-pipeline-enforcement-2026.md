@@ -8,9 +8,9 @@
 | status | accepted-research-only — implementation slotted cycle-88 |
 | produced-by | Scout cycle-87 |
 
-> **Archive note:** Produced by Scout in cycle 87 (research-deposit cycle). Lives in `knowledge-base/research/`; excluded from agent context per `feedback_knowledge_base_stewardship.md`. Move this file to `knowledge-base/research/agentic-pipeline-enforcement-2026.md` at ship time.
+> **Archive note:** Produced by Scout in cycle 87 (research-deposit cycle). Lives in `docs/research/`; excluded from agent context per `feedback_knowledge_base_stewardship.md`. Move this file to `docs/research/agentic-pipeline-enforcement-2026.md` at ship time.
 >
-> **Companion dossiers:** `knowledge-base/research/self-correcting-pipelines-ghosh-2026.md` (Ghosh self-correction patterns), `knowledge-base/research/execution-grounded-process-supervision-2026.md` (EGPS/reward-hacking fixes).
+> **Companion dossiers:** `docs/research/self-correcting-pipelines-ghosh-2026.md` (Ghosh self-correction patterns), `docs/research/execution-grounded-process-supervision-2026.md` (EGPS/reward-hacking fixes).
 
 ## Why This Dossier
 

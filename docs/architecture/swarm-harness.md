@@ -1,7 +1,7 @@
 # Swarm Harness — Operator & Developer Guide
 
 > Living guide for the multi-tmux-LLM-CLI subagent swarm harness. Design rationale: [ADR-0032](adr/0032-swarm-harness.md).
-> Research record: [knowledge-base/research/swarm-concurrency-2026-05.md](../../knowledge-base/research/swarm-concurrency-2026-05.md).
+> Research record: [docs/research/swarm-concurrency-2026-05.md](../research/swarm-concurrency-2026-05.md).
 >
 > **Status:** v4 — COMPLETE + WIRED (HEAD `32bae0f`). The full pipeline is live: planner+validator,
 > per-worker isolation (registry/reaper/provisioner), parallel dispatcher, merge-train (writer) +

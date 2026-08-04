@@ -141,5 +141,5 @@ Pipeline-class phases and reviews run deep/top.
 
 Related: [runtime-reference.md](runtime-reference.md) ·
 [control-flags.md](../architecture/control-flags.md) · ADRs 0064/0072/0073/0074/0075/0077 ·
-[lessons-and-resolutions-2026-07](../../knowledge-base/research/lessons-and-resolutions-2026-07.md)
+[lessons-and-resolutions-2026-07](../research/lessons-and-resolutions-2026-07.md)
 (the incident evidence behind every rule above).

@@ -3,7 +3,7 @@
 > Status: **Accepted — partially implemented** (2026-05-27). Replaces the fixed `mandatory_spine`
 > routing model (ADR-era dynamic-routing, PR #4) with a *minimal conditional floor* + an LLM
 > **PhaseAdvisor** that justifies each phase's inclusion. Motivated by the first live `advisory`+`llm`
-> cycle (cycle-108) — see `knowledge-base/research/cycle-108-routing-live-data.md`. Builds on the
+> cycle (cycle-108) — see `docs/research/cycle-108-routing-live-data.md`. Builds on the
 > dynamic-routing kernel (`go/internal/router`, `core.PhaseAdvisor`) already on `main`.
 >
 > **Implementation status:** foundational slices (digest widening, PhaseAdvisor rename, `phase-plan.json`
@@ -91,7 +91,7 @@ scout with `exit=81 ExitArtifactTimeout`: the agent wrote `<cycle>/workspace/sco
 (runner.go:210). Intermittent across cycles (106/108 hit it; 103/104/107 didn't) = agent-compliance variance
 against an ambiguous contract. Two-sided fix: (a) unambiguous doc (bare filename for the polled artifact);
 (b) runner polls both `<ws>/X` ∥ `<ws>/workspace/X` + emits a louder-than-timeout diagnostic listing what
-*did* appear. Details: `knowledge-base/research/cycle-108-routing-live-data.md`.
+*did* appear. Details: `docs/research/cycle-108-routing-live-data.md`.
 
 ## Sequence
 
@@ -107,7 +107,7 @@ against an ambiguous contract. Two-sided fix: (a) unambiguous doc (bare filename
 
 ## References
 
-- `knowledge-base/research/cycle-108-routing-live-data.md` — live data + bug forensics
+- `docs/research/cycle-108-routing-live-data.md` — live data + bug forensics
 - `[[project_dynamic_routing_progress]]` — dynamic-routing kernel deep detail (PR #4)
 - `[[project_incident_history]]` — why audit-for-ship stays pinned
 - PR #4 (routing, `53ed48b`), PR #5 (bridge, `c9302d7`)

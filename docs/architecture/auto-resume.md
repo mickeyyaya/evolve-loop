@@ -242,4 +242,4 @@ EVOLVE_QUOTA_RESET_HOURS=0.05 /evo:loop --budget-usd 5 "smoke test"
 - `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — Layer 3 DISPATCH_RC=5 path
 - `.agents/skills/loop/SKILL.md` — Layer 3 SKILL handler
 - `docs/architecture/checkpoint-resume.md` — v9.1.0 baseline this builds on
-- `knowledge-base/research/auto-resume-design.md` — research dossier
+- `docs/research/auto-resume-design.md` — research dossier

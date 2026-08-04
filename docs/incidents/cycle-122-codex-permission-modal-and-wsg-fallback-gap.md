@@ -93,7 +93,7 @@ But the cycle's per-run paths — `.evolve/runs/cycle-122/` (the workspace where
 
 The **bridge's** host sandbox profile (`go/internal/bridge/sandbox_wrap.go:89-139`) correctly grants both `req.Workspace` AND `req.Worktree` as writable to the codex subprocess — so the host sandbox is not the constraint. The constraint is **inside codex itself**.
 
-**This was anticipated.** The cycle-121 research dossier ([`knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md`](../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)) listed "Fix A — pre-trust worktree paths in `~/.codex/config.toml`" as a known-but-deferred remediation. Cycle-122 made the deferral cost concrete.
+**This was anticipated.** The cycle-121 research dossier ([`docs/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md`](../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)) listed "Fix A — pre-trust worktree paths in `~/.codex/config.toml`" as a known-but-deferred remediation. Cycle-122 made the deferral cost concrete.
 
 ### Flaw F2 — WS-G fallback chain excludes `exit=81`
 
@@ -229,8 +229,8 @@ The composition-root wiring restores the pre-v12 bash-dispatcher behavior. For e
 - **ADR-0029 CLI fallback chain (the WS-G doc this incident extends):** [../architecture/adr/0029-cli-fallback-chain-and-per-agent-overrides.md](../architecture/adr/0029-cli-fallback-chain-and-per-agent-overrides.md)
 - **ADR-0030 Phase-observer auto-spawn (this incident's new architectural decision):** [../architecture/adr/0030-phase-observer-autospawn-in-evolve-loop.md](../architecture/adr/0030-phase-observer-autospawn-in-evolve-loop.md)
 - **ADR-0023 live-injection and launch rules:** [../architecture/adr/0023-live-injection-and-launch-rules.md](../architecture/adr/0023-live-injection-and-launch-rules.md) (relevant to the F4 deferred follow-up)
-- **Codex 0.134 root-cause dossier:** [../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md) (Fix A in section 0 is what Fix 1 here implements)
-- **Ollama control-surface dossier:** [../../knowledge-base/research/ollama-control-surface-2026.md](../../knowledge-base/research/ollama-control-surface-2026.md)
+- **Codex 0.134 root-cause dossier:** [../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md) (Fix A in section 0 is what Fix 1 here implements)
+- **Ollama control-surface dossier:** [../research/ollama-control-surface-2026.md](../research/ollama-control-surface-2026.md)
 - **Live forensic artifacts (sealed at V1):**
   - `.evolve/runs/cycle-122/scout-events.ndjson` (87 KB)
   - `.evolve/runs/cycle-122/triage-events.ndjson` (41 KB, ends with the "Perusing… (1m 34s · ↑ 4.7k tokens)" turn that triggered the tdd handoff)

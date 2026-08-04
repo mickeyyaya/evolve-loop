@@ -74,4 +74,4 @@ The revert restores Emergency Exit to turn 12, Hard Stop to turn 14, and removes
 
 - ADR-0009: `docs/architecture/adr/0009-p2-turn-budget-inert.md` — confirms `max_turns` is advisory-only
 - Scout report C73: `.evolve/runs/cycle-73/scout-report.md`
-- Token economics research: `knowledge-base/research/` (P1-P8 roadmap)
+- Token economics research: `docs/research/` (P1-P8 roadmap)

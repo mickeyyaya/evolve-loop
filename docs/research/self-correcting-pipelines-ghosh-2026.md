@@ -1,8 +1,8 @@
 # Self-Correcting Multi-Agent Pipelines — Research Dossier — 2026-05-13
 
-> **Archive note:** Lives in `knowledge-base/research/`; excluded from agent context per `feedback_knowledge_base_stewardship.md`. Persistent reference for Scouts evaluating self-correction pattern adoption in evolve-loop. Future dossiers citing this work should reference this file, not the Medium URL (URL rot risk).
+> **Archive note:** Lives in `docs/research/`; excluded from agent context per `feedback_knowledge_base_stewardship.md`. Persistent reference for Scouts evaluating self-correction pattern adoption in evolve-loop. Future dossiers citing this work should reference this file, not the Medium URL (URL rot risk).
 >
-> **Companion dossiers:** `knowledge-base/research/tsc-prompt-compression-2026.md` (cycle 24 — TSC token reduction), `knowledge-base/research/token-reduction-2026-may.md` (cycle 15 — broader compression ecosystem).
+> **Companion dossiers:** `docs/research/tsc-prompt-compression-2026.md` (cycle 24 — TSC token reduction), `docs/research/token-reduction-2026-may.md` (cycle 15 — broader compression ecosystem).
 
 ## 1. Source
 
@@ -96,6 +96,6 @@ In one sentence: self-correcting pipelines require detection + diagnosis + corre
 
 ## 9. Citation Discipline
 
-Future dossiers citing this work: reference `knowledge-base/research/self-correcting-pipelines-ghosh-2026.md`, not the Medium URL. Reason: URL rot; the Medium post may move or be deleted; the dossier is stable in the repo.
+Future dossiers citing this work: reference `docs/research/self-correcting-pipelines-ghosh-2026.md`, not the Medium URL. Reason: URL rot; the Medium post may move or be deleted; the dossier is stable in the repo.
 
 The eight patterns summarized in this dossier are interpretations based on operator plan analysis and CLAUDE.md context. The Ghosh article (Medium, 2026-02-28) is the primary source; consult it directly for verbatim pattern definitions.

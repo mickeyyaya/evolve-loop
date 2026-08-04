@@ -26,7 +26,7 @@ The design generalized the **headless** model ("the CLI streams to a log file; t
 
 ## The corrected architecture — `tmux pipe-pane` as the live source
 
-`tmux pipe-pane -o 'cat >> <file>'` is tmux's purpose-built primitive: it streams **all** pane output to a file **as it is produced** — no polling, no fragile viewport-delta extraction. Validated viable here: all three REPL CLIs render to the **normal pane (no alt-screen)** (`knowledge-base/research/tmux-repl-cli-behavior-2026-05-26.md:33-35`), so the stream linearizes into a transcript (the same content the at-exit `capture-pane` dump already produces successfully for `phasestream.Produce`).
+`tmux pipe-pane -o 'cat >> <file>'` is tmux's purpose-built primitive: it streams **all** pane output to a file **as it is produced** — no polling, no fragile viewport-delta extraction. Validated viable here: all three REPL CLIs render to the **normal pane (no alt-screen)** (`docs/research/tmux-repl-cli-behavior-2026-05-26.md:33-35`), so the stream linearizes into a transcript (the same content the at-exit `capture-pane` dump already produces successfully for `phasestream.Produce`).
 
 ```
 tmux pane (live)

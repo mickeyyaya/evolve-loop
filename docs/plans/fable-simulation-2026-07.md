@@ -1,7 +1,7 @@
 # Design: Fable 5 Simulation — ONE general fable across all LLMs, capability-class scaled (evidence from Opus 4.8 / GPT-5.5 / Gemini 3.5 Flash profiling)
 
 > Status: authored by Fable 5 on its final availability day (2026-07-07). The content layers only Fable could author (thinking.md, COMPACT.md, the universal-rule folds) ship immediately; mechanical slices are loop-implemented from this doc.
-> Research base: `knowledge-base/research/fable-simulation-2026/{model-profiles,behavior-transfer}.md` + the live-session extraction embedded in `skills/fable/references/*`.
+> Research base: `docs/research/fable-simulation-2026/{model-profiles,behavior-transfer}.md` + the live-session extraction embedded in `skills/fable/references/*`.
 
 ## Goal & honest ceiling
 

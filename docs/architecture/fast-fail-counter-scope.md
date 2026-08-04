@@ -85,4 +85,4 @@ The cycle-93 case wouldn't trigger fast-fail (durations were 214/341/471s, all >
 - Persona update: `agents/evolve-orchestrator.md` (STOP CRITERION extension paragraph)
 - ACS predicates: `acs/regression-suite/cycle-94/002-fast-fail-counter-logic.sh`, `acs/regression-suite/cycle-94/003-orchestrator-fast-fail-stop-criterion.sh`
 - Lesson YAML: `.evolve/instincts/lessons/cycle-94-retry-fast-fail-pattern.yaml`
-- Research dossier (cycle-93 origin): `knowledge-base/research/cycle-93-trust-kernel-breach-2026-05-20.md`
+- Research dossier (cycle-93 origin): `docs/research/cycle-93-trust-kernel-breach-2026-05-20.md`

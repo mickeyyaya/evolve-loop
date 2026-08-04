@@ -1,6 +1,6 @@
 # Model Discovery & Live Tier→Model Catalog
 
-> Retro-documented 2026-06-05 from the shipped implementation (PR #31, Steps 10a/10b; 10c wiring landed in follow-ups). Closes the documentation gap found by the PR↔ADR audit ([knowledge-base/research/pr-adr-documentation-audit-2026-06-05.md](../../knowledge-base/research/pr-adr-documentation-audit-2026-06-05.md)). Companion docs: [step9-llm-config-removal.md](step9-llm-config-removal.md) (why the catalog owns `tier → model`), [policy-config.md](policy-config.md) (pins bypass the catalog).
+> Retro-documented 2026-06-05 from the shipped implementation (PR #31, Steps 10a/10b; 10c wiring landed in follow-ups). Closes the documentation gap found by the PR↔ADR audit ([docs/research/pr-adr-documentation-audit-2026-06-05.md](../research/pr-adr-documentation-audit-2026-06-05.md)). Companion docs: [step9-llm-config-removal.md](step9-llm-config-removal.md) (why the catalog owns `tier → model`), [policy-config.md](policy-config.md) (pins bypass the catalog).
 
 ## Request / requirement
 

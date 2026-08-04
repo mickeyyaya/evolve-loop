@@ -74,4 +74,4 @@ agent-callable self-check and a host-side gate. Five layers:
 - Rollback: `EVOLVE_CONTRACT_GATE=off` (byte-identical to pre-feature).
 
 See `docs/architecture/deliverable-contract.md` (operator guide) and
-`knowledge-base/research/ai-harness-deliverable-contract-2026-06-03.md` (external research).
+`docs/research/ai-harness-deliverable-contract-2026-06-03.md` (external research).

@@ -3,7 +3,7 @@
 Status: ACCEPTED (2026-06-04), AMENDED (2026-06-04, RT0–RT5) · Builds on: ADR-0020 (event stream), ADR-0023 (live injection), ADR-0030 (observer autospawn), ADR-0036 (content-vs-liveness channel protocol)
 
 > **⚠ Implementation correction (RT0–RT5).** A holistic review + a **real live capture**
-> ([`knowledge-base/research/tmux-live-capture-2026-06-04/`](../../../knowledge-base/research/tmux-live-capture-2026-06-04/NOTES.md))
+> ([`docs/research/tmux-live-capture-2026-06-04/`](../../research/tmux-live-capture-2026-06-04/NOTES.md))
 > disproved three assumptions in the original decision below. The shipped channel differs:
 >
 > 1. **Live content source is `<agent>-pane.live`, not `<agent>-stdout.log`.** A tmux driver's

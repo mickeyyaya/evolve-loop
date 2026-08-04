@@ -11,7 +11,7 @@
 
 Agent persona files were written for human readers — full sentences, articles, auxiliary verbs, filler phrases. Loaded into every subagent invocation, they inflated token costs with no semantic value for machine consumers that parse intent directly from keywords and structure.
 
-The token-reduction campaign (cycles 15–24) identified persona verbosity as a high-ROI target. Research in `knowledge-base/research/tsc-prompt-compression-2026.md` evaluated several techniques:
+The token-reduction campaign (cycles 15–24) identified persona verbosity as a high-ROI target. Research in `docs/research/tsc-prompt-compression-2026.md` evaluated several techniques:
 
 - **LLMLingua-2**: neural compression; runtime latency; additional dependency; degrades prompt-cache hit rates.
 - **Manual summarization**: lossy; destroys precision; cannot be mechanically applied or verified.
@@ -58,4 +58,4 @@ First application:
 ## Cross-reference
 
 - `docs/architecture/token-reduction-roadmap.md` — P-NEW-3 (Scout TSC, cycle 24), P-NEW-5 (Builder TSC, cycle 26).
-- `knowledge-base/research/tsc-prompt-compression-2026.md` — canonical rule table and rationale (excluded from agent context by archival policy; reference only).
+- `docs/research/tsc-prompt-compression-2026.md` — canonical rule table and rationale (excluded from agent context by archival policy; reference only).
