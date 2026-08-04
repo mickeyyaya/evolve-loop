@@ -46,6 +46,13 @@ node_modules/
 .evolve/profiles/*
 !.evolve/profiles/*.json
 !.evolve/profiles/*.md
+# ... but runtime-minted profile STUBS (empty cli, no persona pairing) must NOT ride
+# into tracking: TestSmoke_RealProfiles + TestRepoPersonaProfilePairing validate every
+# tracked profile, and the v22.13.0 release burned on exactly this (2026-08-04; same
+# class as the gate-wiring-proof stubs below). Dispatch reads them from DISK — leave
+# the files in place, just never track them until they satisfy the repo contracts.
+.evolve/profiles/ship-stage-hygiene-check.json
+.evolve/profiles/regression-predicate-precheck.json
 # ... and except the directory marker for failure-lessons. Generated lesson
 # YAMLs (inst-L*.yaml) are per-project runtime state and remain ignored, but
 # the .keep marker ships so the directory exists in fresh installs.
