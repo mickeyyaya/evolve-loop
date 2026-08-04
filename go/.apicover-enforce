@@ -515,3 +515,11 @@
 # floor's buildTagVisiblePackages filter keeps them from re-triggering (2).
 # Pinned by TestAPICoverEnforceDoesNotEnrollModernACSPackages.
 ./internal/regressiontia
+
+# context-fill telemetry (cycle-1269, new-package graduation): stdlib+cyclestate
+# leaf that derives a context-window fill ratio from the TokenUsage counts
+# phase-timing.json already persists (FillRatio/IsHot/WindowSizeForTier/
+# HotThreshold/ErrInvalidWindow), named+exercised by contextfill_test.go and
+# apicover_named_test.go. Pure derivation only — the Stage dial, phasetiming
+# persistence and prompt hint are deferred follow-ups.
+./internal/contextfill

@@ -143,6 +143,62 @@ behavior as if cost had hit first.
   upper bound for English text. The cap_pct measurement is conservative
   — actual token counts are typically 80-95% of the byte-based estimate.
 
+## Context-fill ratio — `internal/contextfill` (cycle-1269)
+
+The autotrim/monitor machinery above measures the **assembled prompt** against an
+operator-set byte-heuristic cap (`EVOLVE_PROMPT_MAX_TOKENS`, default 30000).
+That is a *pre-dispatch* view: it says nothing about how much of the **model's
+real context window** a phase ended up occupying once its own output, cache reads
+and cache writes are counted.
+
+`go/internal/contextfill` closes that gap on the measurement side. It is a pure
+stdlib+`cyclestate` leaf — a derivation over data the loop **already** persists
+(`cyclestate.TokenUsage` per phase, rolled up into `<workspace>/phase-timing.json`
+by `internal/phasetiming`), so it needs no new instrumentation of the tmux or
+headless drivers:
+
+```go
+const HotThreshold = 0.85                 // inclusive: >= 0.85 of the window is "hot"
+var  ErrInvalidWindow error               // a window we cannot identify is an error, not a guess
+func FillRatio(tokens cyclestate.TokenUsage, windowSize int) (float64, error)
+func IsHot(ratio float64) bool
+func WindowSizeForTier(tier string) int   // "fast"/"balanced"/"deep"/"top"; unknown => 0
+```
+
+Two design points are load-bearing:
+
+- **Occupancy is the whole token record.** `Input + Output + CacheRead + CacheWrite`
+  all consume window space; summing only `Input`+`Output` under-reports fill by
+  more than half on cache-heavy phases — exactly the phases under pressure.
+- **The ratio is never clamped at 1.0, and an unknown window is never defaulted.**
+  Telemetry that saturates at "full" cannot distinguish a phase that just fit from
+  one that overran by 50%, which is the entire diagnostic value. Likewise an
+  unrecognised tier reports `0` from `WindowSizeForTier`, which flows into
+  `FillRatio` as `ErrInvalidWindow` rather than a fabricated fill number.
+
+`WindowSizeForTier` is deliberately a flat per-**tier** stub (every Claude tier the
+loop routes to today shares a 200k-token window). The upgrade path, when that stops
+holding, is a per-model registry keyed off the resolved model id (mirroring
+`internal/modelcatalog`'s tables) with this function kept as the tier-level fallback.
+
+### Deliberately deferred (nothing imports this package yet)
+
+The package ships as measurement-only; three follow-ups are queued, in dependency
+order, and are **not** wired in cycle-1269:
+
+1. `wire-context-fill-stage` — the `Off`/`Advisory`/`Enforce` dial from
+   `.evolve/policy.json` (the `internal/cyclebudget` Stage precedent), plus a
+   `ContextFill` field persisted on `phasetiming.Entry`. Default-off, byte-identical
+   to today when the policy key is absent.
+2. `context-fill-hint-prompt-injection` — an advisory `ContextBudgetHint` line beside
+   the existing `TurnBudgetHint` injection (`internal/phases/runner/runner.go`).
+3. Enforce-stage behavior (interrupting an in-flight phase at the high-water mark)
+   — needs its own design pass on safely halting a live tmux REPL session.
+
+When (1) lands it should **reconcile with, not duplicate,** `context-monitor.json`
+above: same hazard, two measurement points (pre-dispatch prompt bytes vs. realized
+window occupancy).
+
 ## See also
 
 - `docs/architecture/checkpoint-resume.md` — paired capability for cost
