@@ -54,7 +54,7 @@ Concretely, two unmet needs for phases that run for minutes under a tmux-REPL dr
 
 The headline lesson: **two plausible designs were disproven by capturing real terminal
 output**, and the real fixtures caught bugs a fabricated test never would. The captures are
-committed at `knowledge-base/research/tmux-live-capture-2026-06-04/` (and mirrored as test
+committed at `docs/research/tmux-live-capture-2026-06-04/` (and mirrored as test
 fixtures under `go/internal/bridge/panestream/testdata/<cli>/{thinking,answer,final}.txt`).
 
 ### 2.1 Live content source — three candidates
@@ -217,6 +217,6 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 - [ADR-0036](adr/0036-content-vs-liveness-channel-protocol.md) — content vs liveness channels.
 - [ADR-0023](adr/0023-live-injection-and-launch-rules.md) — the inbox / `evolve bridge send`.
 - [ADR-0030](adr/0030-phase-observer-autospawn-in-evolve-loop.md) — the observer the producer rides on.
-- `knowledge-base/research/tmux-live-capture-2026-06-04/NOTES.md` — the real-capture evidence
+- `docs/research/tmux-live-capture-2026-06-04/NOTES.md` — the real-capture evidence
   that drove the `pipe-pane`→`capture-pane` pivot and the busy/idle redesign.
 - Design/FIX specs: `docs/superpowers/specs/2026-06-04-bidirectional-channel-{design,FIX}.md`.

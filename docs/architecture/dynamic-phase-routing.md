@@ -135,7 +135,7 @@ Each decision is recorded as a `routing-decision-N.json` artifact in the cycle w
 |---|---|
 | Kernel on `main` | Yes — `config` + `router` + `core.PhaseAdvisor`, fully unit-tested + the `routingtest` "Lego" scenario framework |
 | Default | Off — `WithRouting` is opt-in; absent it, the orchestrator runs legacy Stage:Off |
-| First live run | cycle-108 (`advisory`+`llm`) — proved the proposer emits valid strict JSON end-to-end; see `knowledge-base/research/cycle-108-routing-live-data.md` |
+| First live run | cycle-108 (`advisory`+`llm`) — proved the proposer emits valid strict JSON end-to-end; see `docs/research/cycle-108-routing-live-data.md` |
 | Known evolution | ADR-0024 (Proposed): shrink the hard mandatory set to a single conditional invariant + rename `RoutingProposer`→`PhaseAdvisor`, hybrid cadence, `phase-plan.json` |
 
 ## Anti-patterns and guards

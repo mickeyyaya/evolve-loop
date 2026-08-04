@@ -96,7 +96,7 @@ the commit/push atomicity).
 
 ## 5. References
 
-- Campaign retrospective: `knowledge-base/research/campaign-retrospective-cycles-215-231-2026-06-06.md`
+- Campaign retrospective: `docs/research/campaign-retrospective-cycles-215-231-2026-06-06.md`
 - Refactor plan: `~/.claude/plans/gleaming-finding-kahn.md` → branch `worktree-failure-floor` (ADR-0039)
 - Sealed runs: `.evolve/runs/cycle-24{3,4,5,6,7,8}*` (243/244/245/248 carry operator-written
   retrospective records per the retro-always discipline; 246/247 have orchestrator failure records)

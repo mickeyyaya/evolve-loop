@@ -160,8 +160,8 @@ After that, ANY profile can name them in `cli` or `cli_fallback` and `--cli phas
 
 - **Plan:** `~/.claude/plans/lexical-booping-hamster.md` (WS-G section was added post cycle-121 surfacing)
 - **Cycle-121 incident report:** [../../incidents/cycle-121-codex-repl-boot-timeout-and-ws-g-multi-cli.md](../../incidents/cycle-121-codex-repl-boot-timeout-and-ws-g-multi-cli.md)
-- **Codex 0.134 root-cause dossier:** [../../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
-- **Ollama control-surface dossier:** [../../../knowledge-base/research/ollama-control-surface-2026.md](../../../knowledge-base/research/ollama-control-surface-2026.md)
+- **Codex 0.134 root-cause dossier:** [../../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
+- **Ollama control-surface dossier:** [../../research/ollama-control-surface-2026.md](../../research/ollama-control-surface-2026.md)
 - **Builds on ADR-0022** (LaunchIntent→Realizer) — the per-CLI realization layer this ADR's chain dispatches into.
 - **Builds on ADR-0051** (setup-onboarding) — the `allowed_clis` envelope constraint that gates which CLIs can appear in a profile's chain.
 - **Related ADR-0024** (dynamic phase routing) — orthogonal axis; PhaseAdvisor chooses WHICH phases run; ADR-0029 chooses WHICH CLI runs a chosen phase.

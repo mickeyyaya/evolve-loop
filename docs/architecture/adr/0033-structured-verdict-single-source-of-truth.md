@@ -26,7 +26,7 @@ Two enabling mechanisms already landed but are not used by these phases:
 - **`phasespec.ClassifyRules{RequireSections, VerdictOnPass}`** — documented as *"the declarative verdict spec — replaces per-phase Go Classify"*; `specrunner.evaluateClassify` runs it (`specrunner.go:100`).
 - **`core.VerdictReason{Status, Summary, Taxonomy}`** (smart-advisor framework) — structures the verdict *output*, but `ReasonFromDiagnostics` consumes the prose-grep classifiers' Diagnostics (`verdict.go:48`). It enriches the output of the brittle front door without fixing the input.
 
-Full failure-class analysis: [knowledge-base/research/verdict-and-gate-proxy-failure-class-2026-06-03.md](../../../knowledge-base/research/verdict-and-gate-proxy-failure-class-2026-06-03.md).
+Full failure-class analysis: [docs/research/verdict-and-gate-proxy-failure-class-2026-06-03.md](../../research/verdict-and-gate-proxy-failure-class-2026-06-03.md).
 
 ## Decision
 
@@ -93,6 +93,6 @@ but not required.
 
 ## Related
 
-- Failure-class note: [verdict-and-gate-proxy-failure-class-2026-06-03.md](../../../knowledge-base/research/verdict-and-gate-proxy-failure-class-2026-06-03.md)
-- Instance diagnosis: [verdict-classifier-template-drift-2026-06-02.md](../../../knowledge-base/research/verdict-classifier-template-drift-2026-06-02.md)
+- Failure-class note: [verdict-and-gate-proxy-failure-class-2026-06-03.md](../../research/verdict-and-gate-proxy-failure-class-2026-06-03.md)
+- Instance diagnosis: [verdict-classifier-template-drift-2026-06-02.md](../../research/verdict-classifier-template-drift-2026-06-02.md)
 - Mechanisms: `go/internal/phasespec/phasespec.go` (`ClassifyRules`), `go/internal/core/verdict.go` (`VerdictReason`), `go/internal/phases/specrunner/specrunner.go`

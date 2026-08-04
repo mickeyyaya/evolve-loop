@@ -180,7 +180,7 @@ Add `--ask-for-approval=never` (or codex 0.134's equivalent) to the codex-tmux l
 
 **Files:** `go/internal/bridge/manifests/codex-tmux.json` (add the flag to `launch_flags`); `go/internal/bridge/driver_codextmux_test.go` (test asserting the flag is present in `launchCmd`).
 
-**Risk:** if the flag's exact spelling has changed in codex 0.134, the launch will fail with `unknown flag`. Mitigation: research current codex CLI flag set first (the dossier `knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md` may already document this).
+**Risk:** if the flag's exact spelling has changed in codex 0.134, the launch will fail with `unknown flag`. Mitigation: research current codex CLI flag set first (the dossier `docs/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md` may already document this).
 
 ### Fix G2 — Implicit cross-CLI fallback chain when profile.cli_fallback is empty
 
@@ -243,7 +243,7 @@ Cycle-124 V1-V3 verification then re-runs the cycle-123 multi-CLI fan-out and as
 - **Cycle-122 incident report (precursor):** [./cycle-122-codex-permission-modal-and-wsg-fallback-gap.md](./cycle-122-codex-permission-modal-and-wsg-fallback-gap.md)
 - **Cycle-122 remediation plan (executed in full):** `~/.claude/plans/iterative-chasing-thunder.md`
 - **The matrix invariant memory this incident reaffirms:** `feedback-any-cli-any-phase-any-model-invariant`
-- **Codex 0.134 research dossier (Fix A is what Fix 1 implemented; codex flag set for G1a should be researched here first):** [../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../../knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
+- **Codex 0.134 research dossier (Fix A is what Fix 1 implemented; codex flag set for G1a should be researched here first):** [../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md](../research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md)
 - **ADR-0029 CLI fallback chain (G2 amends this):** [../architecture/adr/0029-cli-fallback-chain-and-per-agent-overrides.md](../architecture/adr/0029-cli-fallback-chain-and-per-agent-overrides.md)
 - **ADR-0030 phase-observer auto-spawn (Fix 3, which DID work):** [../architecture/adr/0030-phase-observer-autospawn-in-evolve-loop.md](../architecture/adr/0030-phase-observer-autospawn-in-evolve-loop.md)
 - **Live forensic artifacts (cycle-123, sealed via `evolve cycle reset` after this incident lands):** `.evolve/runs/cycle-123/`

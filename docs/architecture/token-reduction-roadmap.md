@@ -556,11 +556,11 @@ Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-crea
 1. Run `claude --help | grep -i cache` to confirm if `--cache-ttl` flag exists in installed version
 2. Inspect `~/.claude/config.json` or equivalent for TTL overrides
 3. Test: invoke `claude -p` with explicit cache breakpoint and measure TTL via API metadata
-4. Document result in `knowledge-base/research/cache-ttl-march-2026-impact.md`
+4. Document result in `docs/research/cache-ttl-march-2026-impact.md`
 
 **Source:** Anthropic TTL change 2026-03-06 (GitHub claude-code issue #56307); Anthropic SDK `cache_control.ttl` (SDK docs 2026); arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) — cache-safety constraints for multi-turn agents.
 
-See `knowledge-base/research/cache-ttl-march-2026-impact.md` for full research dossier.
+See `docs/research/cache-ttl-march-2026-impact.md` for full research dossier.
 
 ---
 

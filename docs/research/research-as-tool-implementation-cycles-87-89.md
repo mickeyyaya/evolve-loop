@@ -69,7 +69,7 @@ See companion dossier: `phase-watchdog-stall-detection-cycle-89.md`.
 
 ## Failed approaches (negative-result documentation)
 
-- **Hermes-agent as Anthropic proxy.** Earlier research showed hermes is NOT an HTTP proxy — it's a chat agent using OpenAI SDK internally. The `hermes proxy start` command was fabricated; corrected in `knowledge-base/research/hermes-agent-proxy-integration.md`. Informs Phase 0E (Proxy & Auth Routing Abstraction): never assume an unverified CLI command works.
+- **Hermes-agent as Anthropic proxy.** Earlier research showed hermes is NOT an HTTP proxy — it's a chat agent using OpenAI SDK internally. The `hermes proxy start` command was fabricated; corrected in `docs/research/hermes-agent-proxy-integration.md`. Informs Phase 0E (Proxy & Auth Routing Abstraction): never assume an unverified CLI command works.
 - **Single broad upfront research phase.** Today's Phase 1 was always-on broad research that fed only Scout. Cycle 87+88 replaced this with per-agent on-demand research. Trade-off: Scout still does broad research itself (verified equivalent task quality); benefit: 6 other agents now have research access too.
 
 ## Cost analysis

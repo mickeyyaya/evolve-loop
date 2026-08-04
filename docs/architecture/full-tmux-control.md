@@ -343,7 +343,7 @@ See [ADR-0031](adr/0031-recipe-engine-and-capability-catalog.md).
   `docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md`
 - **codex 0.134 research dossier**: discovered the `--yolo` flag's
   undocumented existence + empirical verification.
-  `knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md`
+  `docs/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md`
 - **Live-CLI parity tests**: real-tmux integration coverage proving the
   full READ → DECIDE → INJECT loop fires correctly against actual
   codex / claude / agy binaries.

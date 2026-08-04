@@ -1,6 +1,6 @@
 # PR ↔ ADR/Design-Doc Documentation Audit (2026-06-05)
 
-> Request: verify every merged PR maps to an ADR or design document; create documentation for anything genuinely uncovered. Scope: all **60 merged** PRs in #1–#62 (#37 and #48 were closed without merge — out of scope). Method: two parallel audit agents (PRs 1–31, 32–62) extracted doc references from each PR body, verified files on disk, and keyword-searched `docs/architecture{,/adr}/`, `docs/superpowers/`, `knowledge-base/research/` for unreferenced coverage; the two candidate gaps were then adversarially re-verified by hand.
+> Request: verify every merged PR maps to an ADR or design document; create documentation for anything genuinely uncovered. Scope: all **60 merged** PRs in #1–#62 (#37 and #48 were closed without merge — out of scope). Method: two parallel audit agents (PRs 1–31, 32–62) extracted doc references from each PR body, verified files on disk, and keyword-searched `docs/architecture{,/adr}/`, `docs/superpowers/`, `docs/research/` for unreferenced coverage; the two candidate gaps were then adversarially re-verified by hand.
 
 ## Verdict
 
@@ -24,7 +24,7 @@
 | Unified config / step 9 | #30, #41, #43, #44, #46, #47 | `policy-config.md`, `step9-llm-config-removal.md`, `setup-onboarding.md` (ADR-0027-setup) |
 | Model catalog | #31 | **was the gap** → `model-discovery-and-catalog.md` (written 2026-06-05) |
 | Test architecture | #8, #33, #35, #36, #40 | `testing-strategy.md` |
-| Verdict/deliverable contracts | #53, #54, #55, #60 | ADR-0033, ADR-0034, `deliverable-contract.md`, `knowledge-base/research/verdict-and-gate-proxy-failure-class-2026-06-03.md`, `docs/superpowers/specs/2026-06-04-orchestrator-contract-correction-retry-design.md` |
+| Verdict/deliverable contracts | #53, #54, #55, #60 | ADR-0033, ADR-0034, `deliverable-contract.md`, `docs/research/verdict-and-gate-proxy-failure-class-2026-06-03.md`, `docs/superpowers/specs/2026-06-04-orchestrator-contract-correction-retry-design.md` |
 | Cycle reset | #9 | `auto-resume.md` |
 | N/A (test/CI/revert/non-arch) | #2, #3, #34, #38, #39, #45, #49, #52, #57, #61, #62 | — |
 

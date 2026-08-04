@@ -10,8 +10,11 @@ import (
 // DocDelete is the port of scripts/hooks/doc-deletion-guard.sh.
 // Rules:
 //   - rm command targeting docs/** or knowledge-base/** → DENY
-//   - mv from docs/** or knowledge-base/** → DENY unless dest is
-//     knowledge-base/research/archived-YYYY-MM-DD/
+//   - mv from docs/** or knowledge-base/** → DENY unless the dest stays under
+//     docs/ (reorganization within the single doc root is never a deletion;
+//     the archive home is docs/private/research/archived-YYYY-MM-DD/ since
+//     the 2026-08-05 doc-root consolidation — knowledge-base/research/ is
+//     retired as an archive target)
 //   - constructor policy can bypass
 //   - Edit / Write tools pass through (cannot delete files in place)
 func TestDocDelete_Name(t *testing.T) {
@@ -84,10 +87,39 @@ func TestDocDelete_AllowsMvToArchive(t *testing.T) {
 	g := NewDocDelete(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
-		ToolInput: map[string]any{"command": "mv docs/old.md knowledge-base/research/archived-2026-05-22/old.md"},
+		ToolInput: map[string]any{"command": "mv docs/old.md docs/private/research/archived-2026-05-22/old.md"},
 	})
 	if !dec.Allow {
-		t.Errorf("mv to archive dir must allow, got: %s", dec.Reason)
+		t.Errorf("mv to the docs-private archive home must allow, got: %s", dec.Reason)
+	}
+}
+
+func TestDocDelete_AllowsConsolidationIntoDocs(t *testing.T) {
+	g := NewDocDelete(false)
+	cases := []string{
+		"git mv knowledge-base/research/x.md docs/research/x.md",
+		"git mv knowledge-base/research/token-optimization-2026 docs/research/token-optimization-2026",
+		"mv docs/research/a.md docs/chronicle/a.md",
+	}
+	for _, cmd := range cases {
+		dec := g.Decide(context.Background(), core.GuardInput{
+			ToolName:  "Bash",
+			ToolInput: map[string]any{"command": cmd},
+		})
+		if !dec.Allow {
+			t.Errorf("%q denied (moves INTO docs/ are reorganization, not deletion): %s", cmd, dec.Reason)
+		}
+	}
+}
+
+func TestDocDelete_DeniesMvToLegacyArchiveHome(t *testing.T) {
+	g := NewDocDelete(false)
+	dec := g.Decide(context.Background(), core.GuardInput{
+		ToolName:  "Bash",
+		ToolInput: map[string]any{"command": "mv docs/old.md knowledge-base/research/archived-2026-09-01/old.md"},
+	})
+	if dec.Allow {
+		t.Error("legacy archive home (knowledge-base/research/archived-*) is retired — must deny")
 	}
 }
 

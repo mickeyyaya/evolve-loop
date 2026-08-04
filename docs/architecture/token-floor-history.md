@@ -81,8 +81,8 @@ via `Read`.
 Cut the **per-turn boot base** (claude system prompt + tool schemas + MCP + skills +
 CLAUDE.md, re-read on *every* turn as `cache_read`) via config-injected launch flags in
 each phase's `extra_flags_by_cli.claude-tmux` — no Go changes. Full record:
-[part5-campaign-implementation-2026-07-17.md](../../knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md);
-design: [part4](../../knowledge-base/research/token-optimization-2026/part4-per-phase-boot-context.md).
+[part5-campaign-implementation-2026-07-17.md](../research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md);
+design: [part4](../research/token-optimization-2026/part4-per-phase-boot-context.md).
 
 | lever | flags | per-turn base |
 |---|---|---|

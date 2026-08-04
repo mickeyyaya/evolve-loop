@@ -6,7 +6,7 @@ exposed each weakness, the mechanic for running it, and the recurring gotchas �
 operator can resume or re-run without rediscovering them.
 
 Goal: drive `len(flagregistry.All)` toward 0 (`no_feature_flags`) by rewiring every `EVOLVE_*`
-env reader to policy.json / DI / cobra flag / split-const IPC. Plan: `knowledge-base/research/flag-campaign-plan.json` (v3) + `flag-reduction-47-to-0-design-2026-06-21.md`.
+env reader to policy.json / DI / cobra flag / split-const IPC. Plan: `docs/research/flag-campaign-plan.json` (v3) + `flag-reduction-47-to-0-design-2026-06-21.md`.
 
 ## Trajectory (this session)
 
@@ -33,7 +33,7 @@ Each weakness shipped a green verdict over a defect; each became a deterministic
 ## Running the campaign
 
 - **Launch (detached, claude-only, gated):**
-  `nohup env EVOLVE_FLAG_CAMPAIGN=1 EVOLVE_CLI=claude-tmux EVOLVE_SANDBOX=on ./go/bin/evolve campaign run --plan knowledge-base/research/flag-campaign-plan.json --project-root <worktree> --concurrency 1 < /dev/null > campaign.log 2>&1 &`
+  `nohup env EVOLVE_FLAG_CAMPAIGN=1 EVOLVE_CLI=claude-tmux EVOLVE_SANDBOX=on ./go/bin/evolve campaign run --plan docs/research/flag-campaign-plan.json --project-root <worktree> --concurrency 1 < /dev/null > campaign.log 2>&1 &`
   - `EVOLVE_FLAG_CAMPAIGN=1` activates `flagprogress`; it reaches the gate by plain environment inheritance — the launch sets it on the orchestrator, the host-side `acssuite` passes `os.Environ()` through, and the per-cycle `go test -tags acs` subprocess inherits it (the predicate reads `os.Getenv`).
   - `EVOLVE_CLI=claude-tmux` pins all phases to claude (precedence `EVOLVE_<AGENT>_CLI` > `EVOLVE_CLI` > profile.cli > default); the per-cycle usage-probe still boots agy/codex to *check* quota but never *dispatches* to them. Cross-family auditor≠builder is a preference, not a hard gate — claude-only audit still ships (opus-auditor vs sonnet-builder = model separation).
   - `EVOLVE_SANDBOX=on` (NOT `=1` — grammar is `auto|on|off`); nested-Claude auto-skips the inner sandbox (macOS `sandbox_apply()` EPERM would hang REPL boot).

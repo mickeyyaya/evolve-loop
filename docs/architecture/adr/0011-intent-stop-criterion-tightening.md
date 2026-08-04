@@ -73,4 +73,4 @@ The revert removes the `## STOP CRITERION` section from `agents/evolve-intent.md
 - ADR-0010: `docs/architecture/adr/0010-scout-stop-criterion-tightening.md` — scout calibration template
 - Intent report C74: `.evolve/runs/cycle-74/intent.md`
 - Scout report C74: `.evolve/runs/cycle-74/scout-report.md`
-- Token economics research: `knowledge-base/research/` (P1-P8 roadmap)
+- Token economics research: `docs/research/` (P1-P8 roadmap)

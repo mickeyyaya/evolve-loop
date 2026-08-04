@@ -91,7 +91,7 @@ and agent-context-eligible. Never delete — archive to `knowledge-base/`.
 ### `knowledge-base/`
 
 Long-form archival dossiers excluded from agent context by `.gitignore` scope.
-Subdirectories: `knowledge-base/research/` (deep research), `knowledge-base/research/archived-YYYY-MM-DD/`
+Subdirectories: `docs/research/` (deep research), `docs/research/archived-YYYY-MM-DD/`
 (superseded docs). The loop queries it via the `go/internal/research` KB
 package (`NewFileKB`, roots from `EVOLVE_KB_SEARCH_PATHS`).
 

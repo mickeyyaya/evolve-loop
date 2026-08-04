@@ -123,8 +123,8 @@ Anchored context injection is the practice of tagging discrete sections of a str
 
 ## Research Cross-References
 
-- `knowledge-base/research/token-reduction-2026-may.md` — Sources 1–14, broader token-reduction campaign
-- `knowledge-base/research/tsc-prompt-compression-2026.md` — TSC prompt compression techniques
+- `docs/research/token-reduction-2026-may.md` — Sources 1–14, broader token-reduction campaign
+- `docs/research/tsc-prompt-compression-2026.md` — TSC prompt compression techniques
 - `docs/architecture/token-economics-2026.md` — P1–P8 optimization roadmap (canonical actionable ref)
 - `scripts/lifecycle/role-context-builder.sh` — implementation of `emit_artifact_with_anchors`
 - `scripts/tests/anchor-extract-test.sh` — unit tests for anchor extraction (Tests 1–5)

@@ -25,7 +25,7 @@ Three cycle milestones delivered this subsystem:
 - **Cycle 88 (Phase B):** Retired the Phase-1 dispatch path, added `gate_intent_to_discover`, wired Scout with inline research using the new plumbing.
 - **Cycle 89 (Phase C):** Widened KB-first access to 6 non-Scout personas, published this ADR, and surfaced 4 env vars in CLAUDE.md.
 
-Implementation dossier: [`knowledge-base/research/research-as-tool-implementation-cycles-87-89.md`](../../knowledge-base/research/research-as-tool-implementation-cycles-87-89.md).
+Implementation dossier: [`docs/research/research-as-tool-implementation-cycles-87-89.md`](../research/research-as-tool-implementation-cycles-87-89.md).
 
 ---
 
@@ -47,7 +47,7 @@ All 6 non-Scout persona files (`evolve-intent.md`, `evolve-triage.md`, `evolve-t
 
 ### When NOT to escalate
 
-- Architecture questions answerable from `docs/` or `knowledge-base/research/`
+- Architecture questions answerable from `docs/` or `docs/research/`
 - Code questions answerable by reading the current source tree
 - Questions about this repo's own conventions
 
@@ -109,7 +109,7 @@ Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` a
 | Research tool | `workflow.allow_deep_research` | `false` | When `true`, lifts the per-agent quota cap. Does not disable hook telemetry. |
 | Research tool | `EVOLVE_RESEARCH_QUOTA_SOFT` | *(planned)* | Soft quota: allows over-quota calls but emits WARN in guards.log. Not yet implemented in `research-quota-gate.sh` as of cycle-89. |
 | Research tool | `EVOLVE_RESEARCH_HOOK_DISABLED` | `0` | When `1`, hook is a no-op but counters still increment (telemetry-only mode). |
-| Research tool | `EVOLVE_KB_SEARCH_PATHS` | `knowledge-base/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `kb-search.sh`. |
+| Research tool | `EVOLVE_KB_SEARCH_PATHS` | `docs/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `kb-search.sh`. |
 
 ---
 

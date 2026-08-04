@@ -83,5 +83,5 @@ inviolate.
 
 - [docs/architecture/full-tmux-control.md](../full-tmux-control.md)
 - [docs/architecture/cli-capability-matrix.md](../cli-capability-matrix.md)
-- [knowledge-base/research/llm-cli-control-surfaces-2026-05.md](../../../knowledge-base/research/llm-cli-control-surfaces-2026-05.md)
+- [docs/research/llm-cli-control-surfaces-2026-05.md](../../research/llm-cli-control-surfaces-2026-05.md)
 - ADR-0022 (LaunchIntent/Realizer), ADR-0023 (live injection + keystroke).

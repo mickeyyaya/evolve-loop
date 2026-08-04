@@ -238,7 +238,7 @@ threshold — soak it before choosing an enforce trigger.
   and ROI-ordered optimization roadmap.
 - `docs/architecture/token-floor-history.md` — campaign-by-campaign
   static-context floor measurements (see **Campaign E — clean-boot, 2026-07-17**).
-- `knowledge-base/research/token-optimization-2026/part4-per-phase-boot-context.md`
+- `docs/research/token-optimization-2026/part4-per-phase-boot-context.md`
   + `part5-campaign-implementation-2026-07-17.md` — the **clean-boot** campaign: cut the
   per-turn boot base ~64K→~19–32K via config-injected launch flags (`extra_flags_by_cli`),
   measured **−39% cache_read/cycle**. Complementary lever to autotrim: autotrim trims the

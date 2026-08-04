@@ -17,7 +17,7 @@ When `EVOLVE_PSMAS_SKIP=1` is set, the Triage agent emits a `phase_skip[]` recom
 | `medium` | `[]` | always |
 | `large` | `[]` | always (would be blocked at gate; should not reach this path) |
 
-**Default-off rationale:** the foundation shipped without A/B verification. Until token-savings are measured against five historical cycle reruns (deferred to a future cycle per `knowledge-base/research/v10-17-0-release-debrief.md` §2), the feature is operator-flag-gated. Behavior is byte-identical to v10.10 when `EVOLVE_PSMAS_SKIP` is unset.
+**Default-off rationale:** the foundation shipped without A/B verification. Until token-savings are measured against five historical cycle reruns (deferred to a future cycle per `docs/research/v10-17-0-release-debrief.md` §2), the feature is operator-flag-gated. Behavior is byte-identical to v10.10 when `EVOLVE_PSMAS_SKIP` is unset.
 
 ## Why this exists
 
@@ -170,7 +170,7 @@ The ≥20% threshold from the cycle-98 lesson is met on a per-estimate basis.
 
 ## Roadmap
 
-Per `knowledge-base/research/v10-17-0-release-debrief.md`:
+Per `docs/research/v10-17-0-release-debrief.md`:
 
 1. **A/B verification** (cycle 99: DEFER — see section above) — ≥3 live cycles with `EVOLVE_PSMAS_SKIP=1` and observed ≥20% reduction gate the FLIP verdict.
 2. **Mutation testing extension** — add `psmas_safe: bool` field to lesson YAMLs. When a lesson's failure-mode could only be caught by the retrospective phase, mark unsafe; Triage refuses to skip retrospective on cycles that touch lesson-relevant files.
@@ -182,7 +182,7 @@ Per `knowledge-base/research/v10-17-0-release-debrief.md`:
 - `docs/architecture/sequential-write-discipline.md` — companion: parallel vs sequential phase execution
 - `docs/architecture/control-flags.md` — full env-var control surface
 - `docs/architecture/token-economics-2026.md` §P3 — original P3 plan
-- `knowledge-base/research/v10-17-0-release-debrief.md` — release retrospective + A/B verification deferral
+- `docs/research/v10-17-0-release-debrief.md` — release retrospective + A/B verification deferral
 - ACS predicates that lock this contract:
   - `acs/regression-suite/cycle-98/001-triage-schema-documents-phase-skip.sh`
   - `acs/regression-suite/cycle-98/002-orchestrator-honors-phase-skip-with-precedence.sh`

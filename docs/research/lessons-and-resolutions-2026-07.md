@@ -1,6 +1,6 @@
 # Evolve-Loop: Lessons & Resolutions — the July 2026 Pipeline-Hardening Campaign
 
-> **Landing path:** `knowledge-base/research/lessons-and-resolutions-2026-07.md`
+> **Landing path:** `docs/research/lessons-and-resolutions-2026-07.md`
 > (same home as the canonical cycles 215–231 retrospective).
 > **Scope:** cycles ~850–1033, releases v22.3.0 → v22.7.0, 2026-07-14 → 2026-07-22.
 > **Audience:** anyone (human or agent) who needs to understand *why the pipeline
@@ -291,9 +291,9 @@ Secondary lessons: (1) the persona docs carry a hard combined-line budget (751) 
 
 ## 7. Source index
 
-- `knowledge-base/research/campaign-retrospective-cycles-215-231-2026-06-06.md` — the unifying diagnosis
-- `knowledge-base/research/fail-analysis-pass-rate-2026-07-21.md` — the 13-FAIL clustering
-- `knowledge-base/research/token-usage-history-2026-07-20.md` — token-efficiency baseline
+- `docs/research/campaign-retrospective-cycles-215-231-2026-06-06.md` — the unifying diagnosis
+- `docs/research/fail-analysis-pass-rate-2026-07-21.md` — the 13-FAIL clustering
+- `docs/research/token-usage-history-2026-07-20.md` — token-efficiency baseline
 - `docs/architecture/adr/0072-*` (system-failure policy) · `0073-*` (mint registry)
 - PRs #337–#348; releases v22.3.0 `1961925b` · v22.4.2 `94aa6629` · v22.5.0 `0fc1c332` · v22.6.0 `59950d59` · v22.7.0 `a312a60f`
 - `.evolve/instincts/lessons/` — per-cycle lesson corpus (267+ entries; 59% generic floor noise — see chronicle campaign for the classification)

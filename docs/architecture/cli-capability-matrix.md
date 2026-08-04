@@ -5,7 +5,7 @@
 > truth is `go/internal/bridge/capabilities/catalogs/<cli>.json`, surfaced by
 > `evolve bridge capabilities --cli=<cli>` and validated against live `/help`
 > by `evolve bridge introspect --cli=<cli>`. Research backing:
-> [knowledge-base/research/llm-cli-control-surfaces-2026-05.md](../../knowledge-base/research/llm-cli-control-surfaces-2026-05.md).
+> [docs/research/llm-cli-control-surfaces-2026-05.md](../research/llm-cli-control-surfaces-2026-05.md).
 
 ## At a glance
 

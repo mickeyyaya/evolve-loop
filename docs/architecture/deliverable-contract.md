@@ -1,7 +1,7 @@
 # Deliverable Contract + Self-Check (operator guide)
 
 > Design: [ADR-0034](adr/0034-unified-deliverable-contract.md). Research:
-> [knowledge-base/research/ai-harness-deliverable-contract-2026-06-03.md](../../knowledge-base/research/ai-harness-deliverable-contract-2026-06-03.md).
+> [docs/research/ai-harness-deliverable-contract-2026-06-03.md](../research/ai-harness-deliverable-contract-2026-06-03.md).
 
 The deliverable contract makes every phase agent write its deliverable to the **exact contracted
 path** in the **right shape**, lets the agent **self-check** before finishing, and gives the
