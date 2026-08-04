@@ -110,12 +110,22 @@ func RenderEntry(version, fromRef, toRef string, now time.Time, b Buckets) strin
 	return sb.String()
 }
 
+// appendBucket renders one `### <heading>` section. Identical items collapse to
+// a single bullet, keeping first-occurrence order: a merge can make one commit
+// reachable by two paths, which rendered the same bullet twice (CHANGELOG.md
+// [22.13.1], both ending `(#406)`). Dedup is per-bucket, so the same text
+// legitimately classified into two sections still renders once in each.
 func appendBucket(sb *strings.Builder, heading string, items []string) {
 	if len(items) == 0 {
 		return
 	}
 	fmt.Fprintf(sb, "### %s\n\n", heading)
+	seen := make(map[string]bool, len(items))
 	for _, item := range items {
+		if seen[item] {
+			continue
+		}
+		seen[item] = true
 		fmt.Fprintf(sb, "- %s\n", item)
 	}
 	sb.WriteString("\n")

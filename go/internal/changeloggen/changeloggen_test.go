@@ -372,3 +372,29 @@ func TestBucketsEmpty(t *testing.T) {
 		t.Errorf("non-zero should not be empty")
 	}
 }
+
+// TestRenderEntry_DedupsIdenticalBulletsWithinBucket is the regression test for
+// the verbatim-duplicated `(#406)` bullet shipped in CHANGELOG.md [22.13.1]: a
+// merge made one commit reachable by two paths, so ClassifyAll produced the same
+// rendered item twice inside one bucket.
+func TestRenderEntry_DedupsIdenticalBulletsWithinBucket(t *testing.T) {
+	const dup = "un-track runtime-minted profile stubs (#406)"
+	b := ClassifyAll([]Commit{
+		{SHA: "a", Subject: "fix: " + dup},
+		{SHA: "b", Subject: "fix: " + dup},
+		{SHA: "c", Subject: "fix: something else (#407)"},
+		{SHA: "d", Subject: "feat: " + dup}, // same text, different bucket
+	})
+	got := RenderEntry("22.13.1", "v22.13.0", "HEAD", time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC), b)
+
+	if n := strings.Count(got, "- "+dup+"\n"); n != 2 {
+		t.Errorf("want %q twice (once per bucket), got %d\n%s", dup, n, got)
+	}
+	if n := strings.Count(got, "- something else (#407)\n"); n != 1 {
+		t.Errorf("dedup dropped a distinct bullet: got %d, want 1\n%s", n, got)
+	}
+	fixed := got[strings.Index(got, "### Fixed"):]
+	if n := strings.Count(fixed, "- "+dup+"\n"); n != 1 {
+		t.Errorf("Fixed bucket kept %d copies of the duplicate, want 1\n%s", n, fixed)
+	}
+}
