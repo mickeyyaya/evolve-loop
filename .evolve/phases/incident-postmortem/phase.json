@@ -1,6 +1,5 @@
 {
   "name": "incident-postmortem",
-  "kind": "llm",
   "archetype": "evaluate",
   "optional": true,
   "description": "Structured 4-section debrief to prevent incident recurrence when root causes go unrecorded.",
@@ -17,10 +16,10 @@
   },
   "classify": {
     "require_sections": [
-      "Incident Summary",
-      "Root Cause Analysis",
-      "Remediation Steps",
-      "Prevention Plan"
+      "Impact",
+      "Timeline",
+      "Root Cause",
+      "Action Items"
     ],
     "verdict_on_pass": "PASS",
     "require_failure_context": true
