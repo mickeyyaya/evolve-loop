@@ -274,6 +274,13 @@ type Orchestrator struct {
 	// (the composition root wires the closure; core never imports modelcatalog).
 	catalogRefresh func(ctx context.Context) error
 
+	// catalogRefreshStage optionally reports the resolved catalog.refresh_stage
+	// (WithCatalogRefreshStage) so the per-cycle catalog_refresh ledger entry
+	// can record WHICH stage produced the outcome — the audit trail the
+	// refresh_stage=shadow soak reads instead of stderr scrollback. nil ⇒ the
+	// outcome is still stamped, with an empty stage (never a fabricated one).
+	catalogRefreshStage func() string
+
 	// modelCatalogLookup is the optional live model-catalog resolvability check
 	// (WithModelCatalogLookup) injected into router.ClampPlanModelRouting. Nil
 	// (default) ⇒ the catalog-resolvability gate is skipped (guardrail
@@ -602,6 +609,15 @@ func WithObserver(o Observer) Option {
 // it once per cycle before any phase runs and only WARNs on error (never blocks).
 func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 	return func(o *Orchestrator) { o.catalogRefresh = fn }
+}
+
+// WithCatalogRefreshStage injects the resolved catalog.refresh_stage accessor
+// stamped into the per-cycle catalog_refresh ledger entry. Optional: without
+// it the outcome entry is still appended, carrying an empty stage rather than
+// a guess. Read at cycle start (the operator can edit policy.json between
+// cycles), which is why it is an accessor and not a plain string.
+func WithCatalogRefreshStage(fn func() string) Option {
+	return func(o *Orchestrator) { o.catalogRefreshStage = fn }
 }
 
 // WithModelCatalogLookup injects the model resolvability check (cycle-440

@@ -586,9 +586,28 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state State, cs CycleState, cycle int) cyclePlan {
 	// Cycle-start live-model-catalog refresh (TTL-gated inside the closure).
 	// Best-effort: a slow/failed refresh WARNs and never blocks the cycle.
+	// Outcome + resolved stage go to the ledger (same shape as the
+	// operator_directives stamp below) so the refresh_stage soak has a
+	// queryable trail; the stamp itself is best-effort too and never blocks.
 	if o.catalogRefresh != nil {
+		action := "ok"
 		if err := o.catalogRefresh(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
+			action = "failed"
+		}
+		stage := ""
+		if o.catalogRefreshStage != nil {
+			stage = o.catalogRefreshStage()
+		}
+		if err := o.ledger.Append(ctx, LedgerEntry{
+			TS:      o.now().UTC().Format(time.RFC3339),
+			Cycle:   cycle,
+			Role:    "orchestrator",
+			Kind:    "catalog_refresh",
+			Action:  action,
+			Message: stage,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN catalog-refresh ledger stamp failed: %v\n", err)
 		}
 	}
 

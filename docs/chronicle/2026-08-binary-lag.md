@@ -130,6 +130,37 @@ rebuild-repin-relaunch sequences in the operator log.
   after this landing): the chain-boundary hook for `--until-inbox-empty`
   deployments, and surfacing refresh events in the dossier/loop summary.
 
+## Follow-up landings (cycle-1353)
+
+Two gaps this chronicle left open are now closed in code:
+
+- **`chain-boundary-binary-refresh-stop`** — the "concurrent double-launch"
+  bullet in `cmd_loop_boot_refresh.go`'s DOCUMENTED INTENT block was an
+  *accepted risk* resting on "simultaneous loop launches are already excluded
+  operationally". That assumption was stale: the fleet runs N≥1 concurrent
+  lanes off ONE shared `go/bin/evolve`, so a boot-time rebuild+re-exec can
+  swap the binary out from under a live batch — the standing rule is "NEVER
+  rebuild the plane binary mid-batch". `bootRefreshFleetLaneFn` now ENFORCES
+  it: a fresh per-run `.lease` (`internal/runlease`, the same heartbeat gc
+  reads for liveness) anywhere under `<EvolveDir>/runs/` stops the refresh
+  before rebuild or exec. Fail-open is preserved and extended — a lease check
+  that *errors* also stops the refresh, because an unproven-idle plane is not
+  a safe one. The two conditions WARN with distinguishable text ("a concurrent
+  fleet lane is active" vs "fleet-lane check unverifiable") so an operator
+  scanning stderr can tell *known unsafe* from *unknown*.
+- **`chain-summary-refresh-event-field`** — "surfacing refresh events" now has
+  its first half. The cycle-start model-catalog refresh (`planCycle`,
+  `internal/core/cyclerun.go`) was silent on success and stderr-only on
+  failure; it now appends a `catalog_refresh` ledger entry mirroring the
+  `operator_directives` stamp six lines below it — `Action` is `ok`/`failed`,
+  `Message` carries the resolved `catalog.refresh_stage` (wired from
+  `policy.CatalogConfig().RefreshStage` at the composition root via
+  `core.WithCatalogRefreshStage`). The `refresh_stage=shadow` soak reads a
+  queryable trail instead of scrollback. Not covered: a distinct `skipped`
+  outcome — the injected refresher's `func(ctx) error` contract returns `nil`
+  for both a TTL-skip and a real refresh, so distinguishing them needs a
+  wider signature (deferred).
+
 ## Links
 [2026-08-batch-integrity-review.md](2026-08-batch-integrity-review.md) (§3.9) ·
 [2026-08-push-strand.md](2026-08-push-strand.md) (the sibling operational-gap

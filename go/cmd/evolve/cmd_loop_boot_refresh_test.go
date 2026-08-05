@@ -90,6 +90,24 @@ func swapExecTargetOK(t *testing.T) {
 	bootRefreshExecTargetFn = func(projectRoot string) (bool, string, error) { return true, "go/bin/evolve", nil }
 }
 
+// swapFleetLaneCheck installs a fake for the fleet-lane-concurrency guard
+// (chain-boundary-binary-refresh-stop): bootRefreshFleetLaneFn reports
+// whether ANOTHER fleet lane is concurrently active, so the plane-binary
+// self-heal can refuse to rebuild mid-batch (the standing rule: "NEVER
+// rebuild plane binary mid-batch"). Returns a pointer to the live call count
+// so callers can assert the seam was actually consulted.
+func swapFleetLaneCheck(t *testing.T, active bool, err error) *int {
+	t.Helper()
+	calls := 0
+	prev := bootRefreshFleetLaneFn
+	t.Cleanup(func() { bootRefreshFleetLaneFn = prev })
+	bootRefreshFleetLaneFn = func(cfg loopConfig) (bool, error) {
+		calls++
+		return active, err
+	}
+	return &calls
+}
+
 func writeMarker(t *testing.T, evolveDir, head string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(evolveDir, bootRefreshMarkerFile), []byte(head+"\n"), 0o644); err != nil {
@@ -527,5 +545,88 @@ func TestBootBinaryRefresh_NonPlaneExecutableRefusesHeal(t *testing.T) {
 	}
 	if !strings.Contains(errBuf.String(), "non-plane") {
 		t.Fatalf("refusal must be announced, got: %s", errBuf.String())
+	}
+}
+
+// TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh pins
+// chain-boundary-binary-refresh-stop AC1: the documented "accepted risk"
+// (cmd_loop_boot_refresh.go:37-40, "simultaneous loop launches are already
+// excluded operationally") is now an ENFORCED guard — a confirmed
+// concurrently-active fleet lane must stop the refresh before either
+// rebuild or exec fires, closing the gap against the standing memory rule
+// "NEVER rebuild plane binary mid-batch".
+func TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
+	calls := swapFleetLaneCheck(t, true, nil)
+	var errBuf bytes.Buffer
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	if *calls != 1 {
+		t.Fatalf("fleet-lane guard must be consulted exactly once, got %d calls", *calls)
+	}
+	if spy.rebuildCalls != 0 || spy.execCalls != 0 {
+		t.Fatalf("a concurrently active fleet lane must stop the refresh before rebuild/exec, spy=%+v", spy)
+	}
+	if res.Rebuilt {
+		t.Fatalf("a concurrently active fleet lane must not report Rebuilt: %+v", res)
+	}
+	if !strings.Contains(errBuf.String(), "concurrent") {
+		t.Fatalf("the active-lane skip must WARN distinctly (mentioning the concurrent lane), got: %s", errBuf.String())
+	}
+}
+
+// TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen pins AC2: an
+// UNVERIFIABLE lease/lane check (the guard itself errored) must fail open
+// the same way every other uncertainty in this function does — skip the
+// refresh and boot as-is — NOT crash and NOT proceed to rebuild on an
+// unproven "no concurrent lane" assumption.
+func TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
+	swapFleetLaneCheck(t, false, os.ErrPermission)
+	var errBuf bytes.Buffer
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	if spy.rebuildCalls != 0 || spy.execCalls != 0 {
+		t.Fatalf("a lease-check error must fail open (skip refresh, never rebuild on unverified state), spy=%+v", spy)
+	}
+	if res.Rebuilt {
+		t.Fatalf("a lease-check error must not report Rebuilt: %+v", res)
+	}
+	if !strings.Contains(errBuf.String(), "WARN") {
+		t.Fatalf("a lease-check error must WARN, got: %s", errBuf.String())
+	}
+}
+
+// TestBootBinaryRefresh_FleetLaneWarningsAreDistinguishable pins AC3: a
+// confirmed active lane and an unverifiable lease check are DIFFERENT
+// operator-facing conditions (one is "known unsafe", the other is "unknown")
+// and must not collapse into the same WARN text — an operator scanning
+// stderr needs to tell "another lane is really running" apart from "the
+// check itself broke".
+func TestBootBinaryRefresh_FleetLaneWarningsAreDistinguishable(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
+	swapFleetLaneCheck(t, false, os.ErrPermission)
+	var errBuf bytes.Buffer
+	_ = bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	if strings.Contains(errBuf.String(), "concurrent lane active") {
+		t.Fatalf("a lease-check ERROR is not a confirmed active lane — the WARN text must not claim one, got: %s", errBuf.String())
+	}
+}
+
+// TestBootBinaryRefresh_NoConcurrentLaneProceedsNormally is the regression
+// guard: a confirmed-inactive fleet lane (the common case) must leave the
+// existing stale+go-delta rebuild-then-exec behavior byte-identical.
+func TestBootBinaryRefresh_NoConcurrentLaneProceedsNormally(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
+	swapRepinSuccess(t)
+	swapExecTargetOK(t)
+	swapFleetLaneCheck(t, false, nil)
+	evolveDir := t.TempDir()
+	var errBuf bytes.Buffer
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: evolveDir}, &errBuf)
+	if !res.Rebuilt || spy.rebuildCalls != 1 || spy.execCalls != 1 {
+		t.Fatalf("no concurrent lane must preserve the existing rebuild+exec behavior: res=%+v spy=%+v", res, spy)
 	}
 }

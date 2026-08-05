@@ -35,9 +35,13 @@ package main
 //     next pick; moving the call earlier would put it before the resume
 //     branch and violate the resume exclusion above.
 //   - Concurrent double-launch can race two rebuilds of go/bin/evolve
-//     (non-atomic tool copy) — accepted: simultaneous loop launches are
-//     already excluded operationally (lease at cycle level; single-operator
-//     plane), and a torn binary fails ENOEXEC into the fail-open path.
+//     (non-atomic tool copy). No longer an accepted risk resting on an
+//     operational assumption: bootRefreshFleetLaneFn ENFORCES it. The fleet
+//     runs N>=1 concurrent lanes, so "simultaneous launches are excluded
+//     operationally" was stale relative to the real topology; the standing
+//     rule is "NEVER rebuild the plane binary mid-batch". A fresh per-run
+//     .lease anywhere under <EvolveDir>/runs stops the refresh, and an
+//     unverifiable check stops it too (fail-open like every other step).
 //   - A repin-success + exec-failure boot runs with intra-batch skew: the old
 //     loop image continues while subprocesses exec'ing go/bin/evolve get the
 //     new code. Traced safe at ship time (verifySelfSHA hashes the file, not
@@ -52,8 +56,10 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -93,7 +99,44 @@ var (
 	// rebuild one file and re-exec another — a silent no-op heal on a mined
 	// pin (review finding 5).
 	bootRefreshExecTargetFn = defaultBootRefreshExecTarget
+	// bootRefreshFleetLaneFn reports whether ANOTHER fleet lane is
+	// concurrently active. The plane binary is shared by every lane, so a
+	// mid-batch rebuild+re-exec swaps the executable out from under running
+	// lanes (the stale-binary false-FAIL class, 2026-08-05). The heal is a
+	// convenience; a live batch is not. Both "yes" and "cannot tell" skip.
+	bootRefreshFleetLaneFn = defaultBootRefreshFleetLane
 )
+
+// defaultBootRefreshFleetLane reports a concurrently active fleet lane from
+// the shared per-run .lease heartbeat (internal/runlease — the same contract
+// gc reads to classify a run dir as live). A fresh lease under
+// <EvolveDir>/runs/<run>/ means some lane is mid-cycle right now. An
+// unreadable runs/ dir or an unparsable lease is an ERROR, not a "no": the
+// caller must not rebuild on an unproven-safe plane.
+func defaultBootRefreshFleetLane(cfg loopConfig) (bool, error) {
+	runsDir := filepath.Join(cfg.EvolveDir, "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // no runs ever recorded — nothing can be live
+		}
+		return false, err
+	}
+	now := time.Now()
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		l, ok, rerr := runlease.Read(filepath.Join(runsDir, e.Name()))
+		if rerr != nil {
+			return false, rerr
+		}
+		if ok && runlease.Fresh(l, now, runlease.DefaultTTL) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func defaultBootRefreshExecTarget(projectRoot string) (bool, string, error) {
 	self, err := os.Executable()
@@ -208,6 +251,20 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		return res
 	}
 	res.Stale = true
+
+	// Fleet-lane concurrency guard: the rebuild rewrites go/bin/evolve, the
+	// binary every concurrently running lane execs its subprocesses from.
+	// Checked BEFORE the marker is consumed so a skipped boot leaves the next
+	// one's staleness judgment untouched.
+	laneActive, lerr := bootRefreshFleetLaneFn(cfg)
+	if lerr != nil {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN fleet-lane check unverifiable (%v) — cannot prove the plane is idle, so refusing to rebuild the shared binary; booting as-is\n", lerr)
+		return res
+	}
+	if laneActive {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: a concurrent fleet lane is active (fresh run lease) — refusing to rebuild the plane binary mid-batch; the heal lands at the next idle boot\n")
+		return res
+	}
 
 	// Marker carries the healed-to HEAD (VALUE semantics, review finding 2):
 	// refuse only when the prior heal targeted this SAME head — a rebuild

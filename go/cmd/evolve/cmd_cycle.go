@@ -656,6 +656,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
 	// inside the closure). Opt out via policy.json "catalog":{"auto_refresh":false}.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
+	// The stage the refresher above ran under, stamped into the per-cycle
+	// catalog_refresh ledger entry (the shadow-soak's audit trail).
+	opts = append(opts, core.WithCatalogRefreshStage(func() string { return pol.CatalogConfig().RefreshStage }))
 
 	// Catalog-resolvability gate for advisor model routing (cycle-440 MR4a).
 	// router.ClampPlanModelRouting clears a proposed {cli,tier} that cannot
