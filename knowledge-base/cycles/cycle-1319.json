@@ -1,0 +1,237 @@
+{
+  "cycle": 1319,
+  "run_id": "01KZ7SVQHSR95GFRR38J8ZNHB4",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 247607,
+      "started_at": "2026-08-05T01:52:34Z",
+      "ended_at": "2026-08-05T01:56:42Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 64,
+        "output": 14996,
+        "cache_read": 2044027,
+        "cache_write": 68870
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 57858,
+      "started_at": "2026-08-05T01:58:54Z",
+      "ended_at": "2026-08-05T01:59:52Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1672,
+        "cache_read": 124008,
+        "cache_write": 39781
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 133860,
+      "started_at": "2026-08-05T01:59:52Z",
+      "ended_at": "2026-08-05T02:02:06Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 7641,
+        "cache_read": 1043345,
+        "cache_write": 62235
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 420971,
+      "started_at": "2026-08-05T02:02:06Z",
+      "ended_at": "2026-08-05T02:09:08Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 68,
+        "output": 34597,
+        "cache_read": 3240587,
+        "cache_write": 114250
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 535866,
+      "started_at": "2026-08-05T02:09:08Z",
+      "ended_at": "2026-08-05T02:18:56Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 68,
+        "output": 24514,
+        "cache_read": 3579401,
+        "cache_write": 97323
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 151883,
+      "started_at": "2026-08-05T02:18:56Z",
+      "ended_at": "2026-08-05T02:21:28Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 34,
+        "output": 8239,
+        "cache_read": 1157902,
+        "cache_write": 70210
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 274351,
+      "started_at": "2026-08-05T02:21:28Z",
+      "ended_at": "2026-08-05T02:28:10Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 27,
+        "output": 13508,
+        "cache_read": 1099058,
+        "cache_write": 80382
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 108,
+      "started_at": "2026-08-05T02:28:10Z",
+      "ended_at": "2026-08-05T02:28:10Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 282785,
+      "started_at": "2026-08-05T02:28:10Z",
+      "ended_at": "2026-08-05T02:32:53Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 28,
+        "output": 17173,
+        "cache_read": 1002377,
+        "cache_write": 65869
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "ship|unknown|1da5c58dd848",
+    "pre_class": "unknown",
+    "reasons": [
+      "phase ship: ship: native: [PERSONA_COHERENCE_MISMATCH/integrity @verify-class] persona coherence check failed: incident-postmortem: contradiction: tool \"view_file\" is disallowed by profile; incident-p"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1319",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2105289,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 535866,
+    "by_archetype_ms": {
+      "build": 535866,
+      "control": 282893,
+      "evaluate": 426234,
+      "plan": 860296
+    },
+    "total_tokens": {
+      "input": 335,
+      "output": 122340,
+      "cache_read": 13290705,
+      "cache_write": 598920
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 68,
+        "output": 24514,
+        "cache_read": 3579401,
+        "cache_write": 97323
+      },
+      "control": {
+        "input": 28,
+        "output": 17173,
+        "cache_read": 1002377,
+        "cache_write": 65869
+      },
+      "evaluate": {
+        "input": 61,
+        "output": 21747,
+        "cache_read": 2256960,
+        "cache_write": 150592
+      },
+      "plan": {
+        "input": 178,
+        "output": 58906,
+        "cache_read": 6451967,
+        "cache_write": 285136
+      }
+    },
+    "wasted_tokens": {
+      "input": 28,
+      "output": 17173,
+      "cache_read": 1002377,
+      "cache_write": 65869
+    },
+    "cache_hit_ratio": 0.9999747950498983,
+    "hot_phase_count": 6,
+    "hot_phases": [
+      "scout",
+      "fault-localization",
+      "tdd",
+      "build",
+      "bug-reproduction",
+      "audit"
+    ]
+  }
+}
