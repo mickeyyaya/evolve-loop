@@ -8,6 +8,7 @@ package ship
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -38,14 +39,21 @@ type Config struct {
 	// not a config.Stage, because manifest.go's seam is value-compared against
 	// ManifestGateEnforce. Zero value "" = shadow (byte-identical).
 	ManifestGate string
+	// RepoContractGate threads policy.json gates.repo_contract_gate into the
+	// ship-time repo-contract scanner pack (repocontract.go). Zero value ""
+	// = off for construction-site safety; the cmd_cycle wiring test asserts
+	// the production site threads the resolved default ("enforce") so the
+	// cycle-1064 silently-unwired trap cannot recur.
+	RepoContractGate string
 }
 
 // Phase implements core.PhaseRunner for the ship stage.
 type Phase struct {
-	runner       CmdRunner
-	nowFn        func() time.Time
-	phaseIO      config.Stage
-	manifestGate string
+	runner           CmdRunner
+	nowFn            func() time.Time
+	phaseIO          config.Stage
+	manifestGate     string
+	repoContractGate string
 }
 
 func New(c Config) *Phase {
@@ -53,7 +61,7 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate}
+	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -134,6 +142,11 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 // runNative dispatches to the native Go ship implementation. Translates
 // PhaseRequest → Options, then RunResult → PhaseResponse.
 func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string, start time.Time) (core.PhaseResponse, error) {
+	// Repo-contract scanner pack BEFORE bind/push: a repo-wide guard suite
+	// RED in this lane must fail the ship here, not on main (repocontract.go).
+	if gerr := runRepoContractGate(ctx, p.repoContractGate, req.ProjectRoot, os.Stderr); gerr != nil {
+		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", gerr)
+	}
 	opts := p.shipOptions(req, msg)
 	res, err := Run(ctx, opts)
 	durationMS := p.nowFn().Sub(start).Milliseconds()

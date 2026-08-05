@@ -135,7 +135,12 @@ const (
 	// re-running audit can never re-establish the precondition, only re-declaring
 	// the path in a phase report can. Mirrors CodeCommitPrefixGate, the sibling
 	// ship-local gate that already owns a code.
-	CodeManifestGate       ShipErrorCode = "MANIFEST_GATE"
+	CodeManifestGate ShipErrorCode = "MANIFEST_GATE"
+	// CodeRepoContractGate (2026-08-05): the ship-time repo-contract scanner
+	// pack found a repo-wide guard suite RED in the lane worktree — pushing
+	// would turn main red (the week's four scope-disease landings). Distinct
+	// code so the ledger/debugger can tell a contract block from git failures.
+	CodeRepoContractGate   ShipErrorCode = "REPO_CONTRACT_GATE"
 	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
 	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
