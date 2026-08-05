@@ -4,7 +4,7 @@ description: Use when the user invokes /evo:loop or asks to run autonomous impro
 argument-hint: "(--resume | [--cycles N] [strategy] <goal>)"
 ---
 
-# Evolve Loop v22.13
+# Evolve Loop v22.14
 
 > Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evo:loop` or asks to run improvement cycles.
 
