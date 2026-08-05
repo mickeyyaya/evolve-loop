@@ -31,7 +31,6 @@ import (
 // restores them on cleanup. Each fake records its invocation.
 type refreshSpy struct {
 	headCalls, deltaCalls, rebuildCalls, execCalls int
-	execEnv                                        []string
 	orderLog                                       []string
 }
 
@@ -55,9 +54,8 @@ func swapRefreshSeams(t *testing.T, head string, headErr error, delta bool, delt
 		spy.orderLog = append(spy.orderLog, "rebuild")
 		return rebuildErr
 	}
-	bootRefreshExecFn = func(env []string) error {
+	bootRefreshExecFn = func() error {
 		spy.execCalls++
-		spy.execEnv = env
 		spy.orderLog = append(spy.orderLog, "exec")
 		return execErr
 	}
@@ -92,6 +90,22 @@ func swapExecTargetOK(t *testing.T) {
 	bootRefreshExecTargetFn = func(projectRoot string) (bool, string, error) { return true, "go/bin/evolve", nil }
 }
 
+func writeMarker(t *testing.T, evolveDir, head string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(evolveDir, bootRefreshMarkerFile), []byte(head+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func readMarker(t *testing.T, evolveDir string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(evolveDir, bootRefreshMarkerFile))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
 func sha256Hex(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -117,8 +131,9 @@ func TestBootBinaryRefresh_StaleWithGoDeltaRebuildsThenExecs(t *testing.T) {
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
 	swapRepinSuccess(t)
 	swapExecTargetOK(t)
+	evolveDir := t.TempDir()
 	var errBuf bytes.Buffer
-	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: evolveDir}, &errBuf)
 	if !res.Stale || !res.Rebuilt {
 		t.Fatalf("stale+go-delta must rebuild: %+v", res)
 	}
@@ -128,14 +143,8 @@ func TestBootBinaryRefresh_StaleWithGoDeltaRebuildsThenExecs(t *testing.T) {
 	if strings.Join(spy.orderLog, ",") != "rebuild,exec" {
 		t.Fatalf("exec must follow rebuild, got order %v", spy.orderLog)
 	}
-	found := false
-	for _, e := range spy.execEnv {
-		if strings.HasPrefix(e, bootRefreshedEnv+"=") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("re-exec env must carry the %s marker (refresh-loop prevention), env=%v", bootRefreshedEnv, spy.execEnv)
+	if got := readMarker(t, evolveDir); got != "eeee23def456fffffffffffffffffffffffffff0" {
+		t.Fatalf("marker file must carry the healed-to HEAD before exec (refresh-loop prevention), got %q", got)
 	}
 }
 
@@ -170,9 +179,10 @@ func TestBootBinaryRefresh_SecondRefreshAttemptAvertsLoop(t *testing.T) {
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
 	// Marker carries the healed-to HEAD (value semantics): refusing is correct
 	// ONLY when we are still stale at the SAME target — a no-op rebuild.
-	t.Setenv(bootRefreshedEnv, "eeee23def456fffffffffffffffffffffffffff0")
+	evolveDir := t.TempDir()
+	writeMarker(t, evolveDir, "eeee23def456fffffffffffffffffffffffffff0")
 	var errBuf bytes.Buffer
-	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: evolveDir}, &errBuf)
 	if spy.rebuildCalls != 0 || spy.execCalls != 0 || res.Rebuilt {
 		t.Fatalf("marker set + still stale must NOT re-exec again (refresh loop), spy=%+v", spy)
 	}
@@ -347,26 +357,38 @@ func TestBootBinaryRefresh_NewStalenessAfterPriorHealReheals(t *testing.T) {
 	swapRepinSuccess(t)
 	swapExecTargetOK(t)
 	// Prior heal targeted a DIFFERENT head — this is legitimate new staleness,
-	// not a refresh loop (the reviewer's chain-mode finding).
-	t.Setenv(bootRefreshedEnv, "0ldhead0000000000000000000000000000000000")
+	// not a refresh loop (the reviewer's chain-mode finding). File marker is
+	// consume-once and REPLACED with the new target (the env-var design was
+	// retired: darwin resolves duplicate env first-wins, and the flag-ceiling
+	// gate forbids new EVOLVE_* readers).
+	evolveDir := t.TempDir()
+	writeMarker(t, evolveDir, "0ldhead0000000000000000000000000000000000")
 	var errBuf bytes.Buffer
-	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}, &errBuf)
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: evolveDir}, &errBuf)
 	if spy.rebuildCalls != 1 || spy.execCalls != 1 || !res.Rebuilt {
 		t.Fatalf("new staleness after a prior heal must re-heal, spy=%+v res=%+v", spy, res)
 	}
-	var markers []string
-	for _, e := range spy.execEnv {
-		if strings.HasPrefix(e, bootRefreshedEnv+"=") {
-			markers = append(markers, e)
-		}
+	if got := readMarker(t, evolveDir); got != "eeee23def456fffffffffffffffffffffffffff0" {
+		t.Fatalf("marker must be REPLACED with the NEW healed-to head, got %q", got)
 	}
-	// N1 (empirically verified darwin semantics): duplicate entries resolve
-	// FIRST-wins in the child — the marker must REPLACE, never append.
-	if len(markers) != 1 {
-		t.Fatalf("exec env must carry EXACTLY ONE marker entry (duplicates are first-wins-invisible in the child), got %v", markers)
+}
+
+// Exec failure must consume the marker: the old binary continues this boot,
+// and the NEXT launch should judge staleness fresh, not inherit this
+// attempt's target.
+func TestBootBinaryRefresh_ExecFailureRemovesMarker(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, os.ErrPermission)
+	swapRepinSuccess(t)
+	swapExecTargetOK(t)
+	evolveDir := t.TempDir()
+	var errBuf bytes.Buffer
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: "/proj", EvolveDir: evolveDir}, &errBuf)
+	if !res.Rebuilt {
+		t.Fatalf("rebuild succeeded: %+v", res)
 	}
-	if markers[0] != bootRefreshedEnv+"=eeee23def456fffffffffffffffffffffffffff0" {
-		t.Fatalf("marker must carry the NEW healed-to head, got %v", markers[0])
+	if got := readMarker(t, evolveDir); got != "" {
+		t.Fatalf("failed exec must remove the marker, found %q", got)
 	}
 }
 

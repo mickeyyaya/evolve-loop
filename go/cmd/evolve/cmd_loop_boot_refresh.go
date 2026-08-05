@@ -17,8 +17,9 @@ package main
 // place. The re-exec'd process's existing boot machinery (auto-repin,
 // recovery, preflight) then runs on the new binary. EVERY step is fail-open:
 // any failure WARNs and boots the old binary — a stale batch is yesterday's
-// status quo, a bricked loop is worse. A marker env var caps the self-heal at
-// one attempt per boot chain so a rebuild that does not change the stamp can
+// status quo, a bricked loop is worse. A consume-once marker FILE
+// (.evolve/boot-refresh-marker, value = healed-to HEAD) caps the self-heal
+// at one attempt per target so a rebuild that does not change the stamp can
 // never re-exec forever.
 //
 // DOCUMENTED INTENT (adversarial review 2026-08-05, findings 3/4/6):
@@ -56,10 +57,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// bootRefreshedEnv marks a process that was already re-exec'd by the boot
-// refresh once. Internal loop-prevention state, not an operator dial: it is
-// set only on the re-exec'd child's environment, never read from config.
-const bootRefreshedEnv = "EVOLVE_BOOT_BINARY_REFRESHED"
+// bootRefreshMarkerFile (under EvolveDir) records the healed-to HEAD of the
+// last boot refresh, consumed exactly once by the next boot. A FILE, not an
+// env var, deliberately: the flag-ceiling gate forbids new EVOLVE_* readers
+// (target: zero), and darwin resolves duplicate env entries first-wins —
+// making an appended env marker invisible to the child (adversarial-review
+// N1, empirically verified). File semantics have neither hazard.
+const bootRefreshMarkerFile = "boot-refresh-marker"
 
 type bootBinaryRefreshResult struct {
 	Stale   bool // binary build-commit differs from HEAD with a go/ source delta
@@ -135,14 +139,15 @@ func defaultBootRefreshRebuild(projectRoot string, stderr io.Writer) error {
 }
 
 // defaultBootRefreshExec replaces the current process with the freshly built
-// binary at the same executable path, same argv, environment plus the
-// loop-prevention marker. On success it never returns.
-func defaultBootRefreshExec(env []string) error {
+// binary at the same executable path, same argv and environment (the
+// loop-prevention marker travels as a consume-once FILE, not env). On
+// success it never returns.
+func defaultBootRefreshExec() error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	return syscall.Exec(self, os.Args, env)
+	return syscall.Exec(self, os.Args, os.Environ())
 }
 
 // shipPinPresent reports whether state.json carries an expected_ship_sha pin.
@@ -205,10 +210,14 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	res.Stale = true
 
 	// Marker carries the healed-to HEAD (VALUE semantics, review finding 2):
-	// refuse only when a prior heal in this exec chain targeted this SAME
-	// head — a rebuild that did not change the stamp. New staleness at a
-	// later chain boundary (different head) legitimately re-heals.
-	if prior := os.Getenv(bootRefreshedEnv); prior == head {
+	// refuse only when the prior heal targeted this SAME head — a rebuild
+	// that did not change the stamp. New staleness (different head)
+	// legitimately re-heals. Consume-once: read + remove, so a stale marker
+	// can never outlive the boot that observed it.
+	markerPath := filepath.Join(cfg.EvolveDir, bootRefreshMarkerFile)
+	priorB, _ := os.ReadFile(markerPath)
+	_ = os.Remove(markerPath)
+	if prior := strings.TrimSpace(string(priorB)); prior == head {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN still stale after refresh (binary %s, HEAD %s) — rebuild did not change the stamp; refusing a second re-exec and booting as-is\n", binCommit, head[:12])
 		return res
 	}
@@ -241,17 +250,15 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		}
 	}
 
-	// N1 (re-review, empirically verified on darwin): duplicate env entries are
-	// resolved FIRST-wins by the child and the appended duplicate is blanked —
-	// so the marker must REPLACE any prior entry, never append beside it.
-	env := make([]string, 0, len(os.Environ())+1)
-	for _, e := range os.Environ() {
-		if !strings.HasPrefix(e, bootRefreshedEnv+"=") {
-			env = append(env, e)
-		}
+	// Write the marker (atomic per repo convention) BEFORE exec; if exec
+	// fails, remove it — the old binary continues and the next launch should
+	// judge staleness fresh, not inherit this attempt's target.
+	tmp := markerPath + ".tmp"
+	if werr := os.WriteFile(tmp, []byte(head+"\n"), 0o644); werr == nil {
+		_ = os.Rename(tmp, markerPath)
 	}
-	env = append(env, bootRefreshedEnv+"="+head)
-	if err := bootRefreshExecFn(env); err != nil {
+	if err := bootRefreshExecFn(); err != nil {
+		_ = os.Remove(markerPath)
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN re-exec failed (%v) — booting the old binary (rebuilt copy is on disk and pin-reconciled for the next launch)\n", err)
 	}
 	return res

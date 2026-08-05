@@ -80,6 +80,15 @@ semantics — refuse only a same-target no-op rebuild); the exec target is
 verified against `go/bin/evolve` BEFORE rebuilding; resume exclusion and the
 bounded double-prune are documented intent in the file header.
 
+A third forcing function then improved the design again: the flag-ceiling
+gate (`TestRegistry_FlagCeiling`, target zero flags) refused the marker's
+registry row — so the env-var marker was retired for a **consume-once file**
+(`.evolve/boot-refresh-marker`), which simultaneously satisfies the ceiling
+AND eliminates the darwin duplicate-env first-wins hazard (re-review N1) at
+the root instead of working around it. Three independent guards — the
+adversarial reviewer, the SELF_SHA classifier's design, and the flag ceiling
+— each made the mechanism structurally better than the version I first wrote.
+
 ## Implementation
 `cmd_loop_boot_refresh.go`, called in `runLoop` immediately before
 `bootRecoverFn` (a stale binary should not run recovery logic either). All
