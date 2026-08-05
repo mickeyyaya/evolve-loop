@@ -19,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -28,7 +27,7 @@ import (
 )
 
 // Interactive policy values for the typed profile policy and the per-agent
-// request override EVOLVE_<AGENT>_INTERACTIVE_POLICY. The bridge
+// request override via policy.json's interactive_policies. The bridge
 // prepends a deterministic policy block to the prompt body so phase
 // agents self-resolve interactive prompts (AskUserQuestion, y/N) without
 // blocking the autonomous loop. See docs/architecture/plan-mode-dispatch.md
@@ -210,7 +209,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	// optimal. See injectContract. Skill overlays sit at the persona altitude
 	// (just above the profile Rules): stable per phase/tier, so cache-coherent.
 	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
-	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.Agent, req.Env, req.InteractivePolicy))
+	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.ProjectRoot, req.Agent, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
 	withSkills := injectSkillOverlays(withRules, req)
 	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
@@ -252,33 +251,17 @@ func validate(req core.BridgeRequest) error {
 }
 
 // resolvePolicy returns the effective interactive policy for the given agent.
-// The request-local env is the explicit override surface and profilePolicy is
-// the typed profile value resolved by the runner. Process env is intentionally
-// excluded so the profile remains the persistent SSOT.
-//
-// Effective precedence:
-//
-//  1. reqEnv[EVOLVE_<AGENT>_INTERACTIVE_POLICY]
-//  2. profilePolicy
-//  3. PolicyRecommendedOrFirst (default-on autonomy posture)
-func resolvePolicy(agent string, reqEnv map[string]string, profilePolicy string) string {
-	if agent != "" {
-		if v := reqEnv[perAgentPolicyEnv(agent)]; v != "" {
-			return v
-		}
+// policy.json is the explicit override surface and profilePolicy is
+// the typed profile value resolved by the runner.
+func resolvePolicy(projectRoot string, agent string, profilePolicy string) string {
+	pol := policy.InteractivePolicyFor(projectRoot, agent)
+	if pol != "recommended_or_first" {
+		return pol
 	}
 	if profilePolicy != "" {
 		return profilePolicy
 	}
 	return PolicyRecommendedOrFirst
-}
-
-// perAgentPolicyEnv maps an agent name to the per-agent override env
-// key: "scout" → "EVOLVE_SCOUT_INTERACTIVE_POLICY"; hyphens become
-// underscores so "tdd-engineer" → "EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY".
-// Delegates to envchain.PhaseEnvKey so the naming rule lives in one place.
-func perAgentPolicyEnv(agent string) string {
-	return envchain.PhaseEnvKey(agent, "INTERACTIVE_POLICY")
 }
 
 // injectPolicyPrefix prepends the policy block to the prompt body based

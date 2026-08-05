@@ -7,6 +7,8 @@ package bridge
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -241,44 +243,42 @@ func TestLaunch_AutoYesPolicy_InjectsAlternatePrefix(t *testing.T) {
 	}
 }
 
-func TestResolvePolicy_PrecedenceOrder(t *testing.T) {
-	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
-	t.Setenv("EVOLVE_SCOUT_INTERACTIVE_POLICY", PolicyEscalate)
-
-	if got := resolvePolicy("scout", nil, ""); got != PolicyRecommendedOrFirst {
-		t.Errorf("process env must be ignored: got=%q want=%q", got, PolicyRecommendedOrFirst)
+func writePolicyJson(t *testing.T, dir, content string) {
+	t.Helper()
+	dotEvolve := filepath.Join(dir, ".evolve")
+	if err := os.MkdirAll(dotEvolve, 0755); err != nil {
+		t.Fatal(err)
 	}
-	if got := resolvePolicy("scout", map[string]string{"EVOLVE_SCOUT_INTERACTIVE_POLICY": PolicyRecommendedOrFirst}, PolicyAutoYes); got != PolicyRecommendedOrFirst {
-		t.Errorf("reqEnv per-agent should win: got=%q want=%q", got, PolicyRecommendedOrFirst)
-	}
-	if got := resolvePolicy("builder", nil, PolicyEscalate); got != PolicyEscalate {
-		t.Errorf("profile should be used: got=%q want=%q", got, PolicyEscalate)
+	if err := os.WriteFile(filepath.Join(dotEvolve, "policy.json"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func TestResolvePolicy_DefaultWhenAllUnset(t *testing.T) {
-	if got := resolvePolicy("builder", nil, ""); got != PolicyRecommendedOrFirst {
+func TestResolvePolicy_PolicyJsonHasPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	writePolicyJson(t, dir, `{"workflow": {"interactive_policy": "auto_yes", "interactive_policies": {"scout": "escalate"}}}`)
+
+	if got := resolvePolicy(dir, "scout", PolicyRecommendedOrFirst); got != PolicyEscalate {
+		t.Errorf("policy.json per-agent should win: got=%q want=%q", got, PolicyEscalate)
+	}
+	if got := resolvePolicy(dir, "builder", PolicyEscalate); got != PolicyAutoYes {
+		t.Errorf("policy.json global should win over profile: got=%q want=%q", got, PolicyAutoYes)
+	}
+}
+
+func TestResolvePolicy_ProfilePolicyHasPrecedenceIfDefault(t *testing.T) {
+	dir := t.TempDir()
+	// no policy.json, or empty interactive_policy falls back to default "recommended_or_first",
+	// so profilePolicy should be returned.
+	if got := resolvePolicy(dir, "scout", PolicyEscalate); got != PolicyEscalate {
+		t.Errorf("profile should be used when policy.json is empty: got=%q want=%q", got, PolicyEscalate)
+	}
+}
+
+func TestResolvePolicy_DefaultWhenUnset(t *testing.T) {
+	dir := t.TempDir()
+	if got := resolvePolicy(dir, "builder", ""); got != PolicyRecommendedOrFirst {
 		t.Errorf("default policy got=%q want=%q", got, PolicyRecommendedOrFirst)
-	}
-}
-
-func TestResolvePolicy_EmptyAgent_FallsThroughToProfile(t *testing.T) {
-	if got := resolvePolicy("", nil, PolicyAutoYes); got != PolicyAutoYes {
-		t.Errorf("empty agent should fall through to profile: got=%q want=%q", got, PolicyAutoYes)
-	}
-}
-
-func TestPerAgentPolicyEnv_HyphenToUnderscore(t *testing.T) {
-	cases := map[string]string{
-		"scout":         "EVOLVE_SCOUT_INTERACTIVE_POLICY",
-		"builder":       "EVOLVE_BUILDER_INTERACTIVE_POLICY",
-		"tdd-engineer":  "EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY",
-		"plan-reviewer": "EVOLVE_PLAN_REVIEWER_INTERACTIVE_POLICY",
-	}
-	for agent, want := range cases {
-		if got := perAgentPolicyEnv(agent); got != want {
-			t.Errorf("perAgentPolicyEnv(%q)=%q, want %q", agent, got, want)
-		}
 	}
 }
 
@@ -292,25 +292,6 @@ func TestInjectPolicyPrefix_UnknownValueDefaultsToRecommendedOrFirst(t *testing.
 func TestInjectPolicyPrefix_EscalateReturnsBodyUnchanged(t *testing.T) {
 	if got := injectPolicyPrefix("body", PolicyEscalate); got != "body" {
 		t.Errorf("escalate should pass through unchanged; got=%q", got)
-	}
-}
-
-func TestLaunch_PerAgentEnvOverrides_GlobalDefault(t *testing.T) {
-	env := map[string]string{"EVOLVE_SCOUT_INTERACTIVE_POLICY": PolicyEscalate}
-
-	if scoutBody := runOnce(t, "scout", "scout body", env); strings.Contains(scoutBody, "Subagent Interactive Policy") || !strings.Contains(scoutBody, "scout body") {
-		t.Errorf("scout per-agent escalate not honored; got %q", truncate(scoutBody, 120))
-	}
-	if builderBody := runOnce(t, "builder", "builder body", env); !strings.HasPrefix(builderBody, "## Subagent Interactive Policy (recommended_or_first)") {
-		t.Errorf("builder should still get default block; got first 80 chars: %q", truncate(builderBody, 80))
-	}
-}
-
-func TestLaunch_ProcessEnvDoesNotOverrideTypedPolicy(t *testing.T) {
-	t.Setenv("EVOLVE_INTERACTIVE_POLICY", PolicyAutoYes)
-	body := runOnceWithPolicy(t, "builder", "builder body", nil, PolicyEscalate)
-	if strings.Contains(body, "Subagent Interactive Policy") || !strings.Contains(body, "builder body") {
-		t.Errorf("typed policy should ignore process env (escalate → no policy block); got %q", truncate(body, 120))
 	}
 }
 

@@ -61,10 +61,10 @@ func ResolveNoOS(key string, reqEnv map[string]string, profile, def string) stri
 //
 //	PhaseEnvKey("build", "PERMISSION_MODE") → "EVOLVE_BUILD_PERMISSION_MODE"
 //	PhaseEnvKey("tdd-engineer", "MODEL")    → "EVOLVE_TDD_ENGINEER_MODEL"
-//	PhaseEnvKey("scout", "INTERACTIVE_POLICY") → "EVOLVE_SCOUT_INTERACTIVE_POLICY"
+//	PhaseEnvKey("scout", "MODEL")    → "EVOLVE_SCOUT_MODEL"
 //
 // Centralizing the transformation here prevents subtle drift between
-// PERMISSION_MODE, MODEL, INTERACTIVE_POLICY, PLAN_INPUT, PLAN_OUTPUT
+// PERMISSION_MODE, MODEL, PLAN_INPUT, PLAN_OUTPUT
 // and any future per-phase env knob.
 func PhaseEnvKey(phase, suffix string) string {
 	upper := strings.ReplaceAll(strings.ToUpper(phase), "-", "_")

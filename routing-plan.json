@@ -1,0 +1,32 @@
+[
+  {
+    "phase": "triage",
+    "run": true,
+    "justification": "Required spine phase to prioritize carryover defects."
+  },
+  {
+    "phase": "bug-reproduction",
+    "run": true,
+    "justification": "Inserted due to previous audit failures (audit.failure_class == code-audit-fail) to ensure the failing tests can be demonstrably reproduced."
+  },
+  {
+    "phase": "build",
+    "run": true,
+    "justification": "Address the missing defect-dispositions.json and ignored .evolve/evals issues from previous cycles."
+  },
+  {
+    "phase": "cicd-pipeline-audit",
+    "run": true,
+    "justification": "Evaluate infrastructure and CI/CD pipelines to ensure no secrets are leaked and configurations are secure."
+  },
+  {
+    "phase": "audit",
+    "run": true,
+    "justification": "Verify that all inherited defects are dispositioned and the build contract is met."
+  },
+  {
+    "phase": "ship",
+    "run": true,
+    "justification": "Ship the fixes for the accumulated audit and ship failures."
+  }
+]

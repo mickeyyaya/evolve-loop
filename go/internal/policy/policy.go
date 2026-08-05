@@ -795,6 +795,8 @@ type WorkflowPolicy struct {
 	SizeBudgetMultipliers map[string]float64 `json:"size_budget_multipliers,omitempty"`
 	RemediablePhases      []string           `json:"remediable_phases,omitempty"`
 	BuildFloor            *bool              `json:"build_floor,omitempty"`
+	InteractivePolicy     string             `json:"interactive_policy,omitempty"`
+	InteractivePolicies   map[string]string  `json:"interactive_policies,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -842,7 +844,9 @@ type WorkflowConfig struct {
 	// installed+authed CLIs via bridge.Doctor and appends the phase-allowlisted
 	// ones to the chain instead of halting (any_cli_any_phase invariant). Set
 	// workflow.universal_fallback=false to hard-pin to the configured chain.
-	UniversalFallback bool
+	UniversalFallback   bool
+	InteractivePolicy   string
+	InteractivePolicies map[string]string
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -866,6 +870,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		RemediablePhases:      []string{"coverage-gate"},
 		BuildFloorEnforced:    true,
 		SizeBudgetMultipliers: map[string]float64{"trivial": 1.0, "small": 1.0, "medium": 1.25, "large": 1.5},
+		InteractivePolicy:     "recommended_or_first",
 	}
 	if p.Workflow == nil {
 		return c
@@ -917,6 +922,24 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	if p.Workflow.BuildFloor != nil {
 		c.BuildFloorEnforced = *p.Workflow.BuildFloor
 	}
+	if p.Workflow.InteractivePolicy != "" {
+		c.InteractivePolicy = p.Workflow.InteractivePolicy
+	}
+	if p.Workflow.InteractivePolicies != nil {
+		c.InteractivePolicies = make(map[string]string)
+		for k, v := range p.Workflow.InteractivePolicies {
+			c.InteractivePolicies[k] = v
+		}
+	}
+	if p.Workflow.RemediationRounds != nil {
+		c.RemediationRounds = *p.Workflow.RemediationRounds
+	}
+	if p.Workflow.RemediablePhases != nil {
+		c.RemediablePhases = p.Workflow.RemediablePhases
+	}
+	if p.Workflow.BuildFloor != nil {
+		c.BuildFloorEnforced = *p.Workflow.BuildFloor
+	}
 	return c
 }
 
@@ -933,6 +956,24 @@ func StrictAuditFor(projectRoot string) bool {
 		return false
 	}
 	return pol.WorkflowConfig().StrictAudit
+}
+
+// InteractivePolicyFor returns the interactive policy for the specified agent.
+// It loads the policy.json from the project root and returns the per-agent
+// override if configured, falling back to the global policy, and finally
+// defaulting to "recommended_or_first".
+func InteractivePolicyFor(projectRoot string, agent string) string {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return "recommended_or_first"
+	}
+	cfg := pol.WorkflowConfig()
+	if agent != "" && cfg.InteractivePolicies != nil {
+		if v, ok := cfg.InteractivePolicies[agent]; ok && v != "" {
+			return v
+		}
+	}
+	return cfg.InteractivePolicy
 }
 
 // RetryPolicy is the .evolve/policy.json "retry" block.

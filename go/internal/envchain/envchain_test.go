@@ -64,7 +64,7 @@ func TestPhaseEnvKey_CanonicalForm(t *testing.T) {
 		{"intent", "PERMISSION_MODE", "EVOLVE_INTENT_PERMISSION_MODE"},
 		{"triage", "MODEL", "EVOLVE_TRIAGE_MODEL"},
 		{"tdd", "PLAN_INPUT", "EVOLVE_TDD_PLAN_INPUT"},
-		{"audit", "INTERACTIVE_POLICY", "EVOLVE_AUDIT_INTERACTIVE_POLICY"},
+		{"audit", "MODEL", "EVOLVE_AUDIT_MODEL"},
 		{"tdd-engineer", "MODEL", "EVOLVE_TDD_ENGINEER_MODEL"},
 		{"plan-reviewer", "PERMISSION_MODE", "EVOLVE_PLAN_REVIEWER_PERMISSION_MODE"},
 	}

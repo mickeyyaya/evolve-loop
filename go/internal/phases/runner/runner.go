@@ -754,11 +754,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if permissionMode == "" && prof != nil {
 		permissionMode = prof.PermissionMode
 	}
-	// Interactive policy follows the same profile-SSOT model: explicit
-	// per-phase request env, then typed profile. Process env and the retired
-	// global flag are intentionally excluded.
-	interactivePolicy := req.Env[envchain.PhaseEnvKey(profileName, "INTERACTIVE_POLICY")]
-	if interactivePolicy == "" && prof != nil {
+	// Interactive policy follows the profile-SSOT model: the bridge resolves
+	// the explicit policy.json override surface, and the runner passes the
+	// typed profile default here.
+	var interactivePolicy string
+	if prof != nil {
 		interactivePolicy = prof.InteractivePolicy
 	}
 	// Facet B: resolve the per-agent launch-time system prompt / rules
