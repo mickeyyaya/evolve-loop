@@ -76,7 +76,7 @@ Post-P1 (hypothetical replay of cycle-93 with P1 active):
 
 The cycle-93 case wouldn't trigger fast-fail (durations were 214/341/471s, all > 5s). The counter only catches structural failures (sandbox-EPERM, missing binary). For the incomplete-report scenario, a different mechanism (Builder turn-budget guidance, shipped in cycle 96) addresses it.
 
-**The fast-fail counter is specifically for structural failures**, not slow/incomplete agents. For slow agents, see [`docs/architecture/watchdog-stall-detection.md`](watchdog-stall-detection.md).
+**The fast-fail counter is specifically for structural failures**, not slow/incomplete agents. For slow agents, see [`docs/research/phase-watchdog-stall-detection-cycle-89.md`](../research/phase-watchdog-stall-detection-cycle-89.md).
 
 ## References
 

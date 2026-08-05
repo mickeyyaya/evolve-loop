@@ -6,7 +6,7 @@
 
 The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and, optionally, a number of cycles; leave the count off and the advisor decides how many the work needs. It runs unattended: it finds the work, plans it, writes it, has a *different* model adversarially review it, ships only what passes deterministic checks, and turns every failure into a durable lesson the next cycle reads automatically.
 
-Over 1,000 autonomous cycles in, the trust layer is structural, not aspirational: **typed routing authority** keeps operator-owned control-plane work out of autonomous lanes entirely (ADR-0074); a **build handoff floor** rejects a red build before it ever reaches review; **graduated remediation** fixes a correct implementation's minor defect in-phase instead of discarding the work; and a **failure-disposition contract** classifies every failed cycle — honest rejection, pipeline fault, or operator-owned — and routes it where it can actually be fixed. The full evidence trail lives in [knowledge-base/research/lessons-and-resolutions-2026-07.md](knowledge-base/research/lessons-and-resolutions-2026-07.md).
+Over 1,300 autonomous cycles in, the trust layer is structural, not aspirational: **typed routing authority** keeps operator-owned control-plane work out of autonomous lanes entirely (ADR-0074); a **build handoff floor** rejects a red build before it ever reaches review; **graduated remediation** fixes a correct implementation's minor defect in-phase instead of discarding the work; and a **failure-disposition contract** classifies every failed cycle — honest rejection, pipeline fault, or operator-owned — and routes it where it can actually be fixed. The full evidence trail lives in [docs/research/lessons-and-resolutions-2026-07.md](docs/research/lessons-and-resolutions-2026-07.md).
 
 ### You steer, it drives
 
@@ -30,7 +30,7 @@ The entire external surface is small enough to list — everything else the loop
 - Classifies every failure (honest rejection / pipeline fault / operator-owned), salvages the preserved worktree so effort is never wasted, quarantines poison tasks that can't pass, and files the follow-up work into its own backlog.
 - Checkpoints every phase boundary so `--resume` always works, recovers orphaned state after crashes, and turns every failure into a durable lesson the next cycle reads.
 
-It works with Claude Code, Gemini CLI, and Codex CLI — and can route a different LLM to each stage of the work.
+It works with four CLI families — Claude Code, Codex CLI, Antigravity (agy), and local models via Ollama — and can route a different LLM to each stage of the work.
 
 > **Prefer to see it?** The same story — the moved bottleneck, the pillars, the self-caught incident — is laid out visually on the **[Evolve Loop landing page](https://mickeyyaya.github.io/evolve-loop/)** (flagship version: **[noir](https://mickeyyaya.github.io/evolve-loop/noir/)**).
 
@@ -38,7 +38,7 @@ It works with Claude Code, Gemini CLI, and Codex CLI — and can route a differe
 
 ## Quick Start
 
-**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Codex CLI](https://github.com/openai/codex) — and a repo you want to improve. The installer auto-installs the rest (`git`, `jq`, `tmux`).
+**Prerequisites:** one supported CLI — [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex CLI](https://github.com/openai/codex), or [Antigravity](https://antigravity.google) (local models via [Ollama](https://ollama.com) are also routable) — and a repo you want to improve. The installer auto-installs the rest (`git`, `jq`, `tmux`).
 
 **Install — one line.** Detects your OS/arch, downloads the prebuilt `evolve` binary (or builds from source as a fallback), and installs evolve for the CLI(s) you have:
 
@@ -127,7 +127,7 @@ Give each feature its own loop and run them **in parallel** — each in its own 
 evolve fleet --count 3 --goal-hash <hash> --plan backlog.json
 ```
 
-Or run a separate `/evo:loop` in each of several git worktrees — one per feature, each on the CLI you prefer (Claude · Codex · Gemini). Either way, isolation is by **worktree + branch**, so concurrent loops can't corrupt each other; the merge to `main` is **serialized** for safety. It's safe parallelism across **independent** work — bounded by your machine and your LLM rate limits, not magic infinite scale.
+Or run a separate `/evo:loop` in each of several git worktrees — one per feature, each on the CLI you prefer (Claude · Codex · Antigravity · Ollama). Either way, isolation is by **worktree + branch**, so concurrent loops can't corrupt each other; the merge to `main` is **serialized** for safety. It's safe parallelism across **independent** work — bounded by your machine and your LLM rate limits, not magic infinite scale.
 
 ---
 
@@ -152,8 +152,8 @@ If you only read one section, read this. These are the things Evolve Loop is bui
 - **Catch the AI gaming its own success criteria.** Adversarial cross-family review, deterministic verdicts, mutation testing that rejects fake tests, and a tamper-evident ledger together make "lie about being done" structurally hard — not just discouraged by a prompt.
 - **Get smarter every run.** Failures are distilled into lesson files that are fed back into the next cycle's planning. Mistakes don't repeat; the system compounds.
 - **Survive long unattended runs.** Quota walls, rate limits, and context-window failures are expected. Work in flight is checkpointed and resumable rather than discarded.
-- **Stay vendor-flexible.** Route Scout to Gemini, the builder to Claude Sonnet, the auditor to Claude Opus — whatever mix you trust — without changing the pipeline.
-- **Run lean on context.** Each phase boots with only the context it needs — the redundant tool schemas, MCP servers, skills, and repo instructions that every turn silently re-reads are stripped per phase (config-injected, no code changes). Measured **~39% fewer context tokens per cycle**, so long unattended runs cost less and hit context walls later. Full record: [token-optimization campaign](knowledge-base/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md).
+- **Stay vendor-flexible.** Route Scout to Antigravity's Gemini, the builder to Claude Sonnet, the auditor to Claude Opus — whatever mix you trust, including local models via Ollama — without changing the pipeline.
+- **Run lean on context.** Each phase boots with only the context it needs — the redundant tool schemas, MCP servers, skills, and repo instructions that every turn silently re-reads are stripped per phase (config-injected, no code changes). Measured **~39% fewer context tokens per cycle**, so long unattended runs cost less and hit context walls later. Full record: [token-optimization campaign](docs/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md).
 
 It is **not** a benchmark-chasing code-writing agent. It's the governance and trust layer you put *around* one.
 
@@ -287,7 +287,7 @@ USER → Scout → (model A writes failing tests) → (model B writes code)
                             ship → a durable lesson is written
 ```
 
-**Versus other long-running agent skills** (`/goal`, self-evolving/self-improving agents, skill frameworks): those typically gate on a small validator LLM or skill-described exit criteria, keep memory in conversation or a notes file, run on one CLI, and treat anti-gaming as convention. Evolve Loop's verdict is deterministic check exit codes, its memory is durable lesson files fed back into planning, it routes across Claude/Gemini/Codex per phase, and its anti-gaming is structural at three layers.
+**Versus other long-running agent skills** (`/goal`, self-evolving/self-improving agents, skill frameworks): those typically gate on a small validator LLM or skill-described exit criteria, keep memory in conversation or a notes file, run on one CLI, and treat anti-gaming as convention. Evolve Loop's verdict is deterministic check exit codes, its memory is durable lesson files fed back into planning, it routes across Claude/Codex/Antigravity/Ollama per phase, and its anti-gaming is structural at three layers.
 
 **Versus the famous code-writing agents** (Devin, OpenHands, SWE-agent, Aider): those optimize *how well the agent solves the task*, usually benchmarked on SWE-bench. Evolve Loop sits on a different axis — it's a **trust-and-governance pipeline** that can *drive* those agents and adds the verification, learning, and recovery layer on top. It isn't competing on raw coding ability; it's deciding whether the code is safe to merge **unattended**. Pick by your single biggest constraint: human-in-the-loop control (Aider), hands-off autonomy (Devin/OpenHands), or **unattended trust** (Evolve Loop).
 
@@ -321,6 +321,7 @@ The README is the surface; the depth lives in `docs/`:
 
 - **Concepts (teaching-first):** [overview](docs/concepts/overview.md) · [self-evolution](docs/concepts/self-evolution.md) · [trust architecture](docs/concepts/trust-architecture.md) · [error recovery](docs/concepts/error-recovery.md) · [pluggability](docs/concepts/pluggability.md)
 - **Architecture (reference-first):** [docs/architecture/](docs/architecture/) — per-phase mechanics, the check-suite format, the routing kernel, the checkpoint-resume protocol.
+- **Engineering chronicle (narratives):** [docs/chronicle/](docs/chronicle/README.md) — workstream-level stories of what was built, why, and what it taught.
 - **Incidents (case studies):** [docs/incidents/](docs/incidents/) — the self-caught bugs, in forensic detail.
 - **Decisions:** [docs/architecture/adr/](docs/architecture/adr/) — every architectural choice, with context and consequence.
 - **See it visually:** the **[landing page](https://mickeyyaya.github.io/evolve-loop/)** — the whole pitch (bottleneck → pillars → self-caught incident → quick start) as one scrollable page.
@@ -341,6 +342,8 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 | Version | Date | Notes |
 |---|---|---|
+| v22.14 | Aug 5 | Ship-time **repo-contract scanner pack** (default enforce — lane ships can no longer red `main`) + boot-time **binary staleness self-heal** (`boot.binary_refresh=auto`); engineering chronicle (17 narratives) + doc-root consolidation into `docs/` |
+| v22.13 | Aug 4 | Composed-gate apicover check now enforces (six-recurrence warnship class); bounded retry on worktree provisioning; a failed publish demotes its own assetless tag listing; channel-e2e deflake |
 | v22.12 | Jul 30 | Deep-tier artifact budgets (six missing_artifact deaths in one day) + contract-gate CLI escalation; verified-bytes single read; e2e budget moved into the make recipe — the assetless-tag class — and a failed publish now demotes its own listing |
 | v22.11 | Jul 30 | FAIL-side attempt accounting reaches fleet lanes (ADR-0079 `cycleoutcome` seam); red predicates become self-diagnosing — full-stream evidence files + bounded-retry outcome |
 | v22.10 | Jul 29 | **Runtime/console plane separation (ADR-0080)** — the loop owns its checkout; hub-resident console lease; verification single-flight |
@@ -365,8 +368,6 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v21.1 | Jun 24 | Prebuilt binaries for 13 Unix targets + install.sh OS/arch detection |
 | v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the strict-audit gate dial |
 | v20.4 | Jun 24 | Public OSS-mirror release automation |
-| v22.13 | Aug 4 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.14 | Aug 5 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 

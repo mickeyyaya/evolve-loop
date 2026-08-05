@@ -32,7 +32,7 @@ On one machine that is allowed to reach GitHub, download the approved artifact
 and its checksums **once**:
 
 ```sh
-V=v22.2.0   # the release you are adopting
+V=v22.14.0  # the release you are adopting
 base="https://github.com/mickeyyaya/evolve-loop/releases/download/$V"
 curl -fsSLO "$base/evolve_darwin_all.tar.gz"
 curl -fsSLO "$base/checksums.txt"

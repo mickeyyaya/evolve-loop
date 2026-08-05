@@ -14,7 +14,7 @@ live here as Go packages — there is no bash dispatcher.
 
 - `go/cmd/` — entry points. `go/cmd/evolve/` is the `evolve` CLI (loop,
   cycle, ship, guard, doctor, release, …); `go/cmd/apicover/` is the
-  public-API coverage tool — all 128 internal packages are graduated into
+  public-API coverage tool — all internal packages are graduated into
   its hard-fail enforce gate (SSOT list: `go/.apicover-enforce`; ADR-0050
   Phase 5, complete as of v19.0.0). **`./acs/cycle<N>` predicate packages are
   NOT enrolled** (cycle-1147): they export nothing, so there is no API surface
@@ -24,7 +24,7 @@ live here as Go packages — there is no bash dispatcher.
   for three attempts. The legacy `./acs/cycle9..661` entries predate that run
   and are grandfathered behind `core.buildTagVisiblePackages`; the ceiling is
   pinned by `TestAPICoverEnforceDoesNotEnrollModernACSPackages`.
-- `go/internal/` — 128 internal packages implementing the pipeline.
+- `go/internal/` — 152 internal packages implementing the pipeline.
   Phase-1 modularization leaf packages: `go/internal/gitexec`
   (git-CLI isolation leaf, depends only on `go/internal/sysexec`),
   `go/internal/log` (unified Console logger), and `go/internal/envchain`
@@ -55,11 +55,6 @@ specific pipeline role. See `agents/AGENTS.md` for authoring conventions.
 CLI/model adapter definitions and capability metadata for the LLM drivers
 the loop can dispatch to (claude, codex, gemini, …).
 
-### `commit-gate/`
-
-Ship-gate assets: attestation schema and the commit-gate runner support
-used by the sanctioned `evolve ship` path.
-
 ### `schemas/`
 
 JSON schemas for the loop's structured artifacts and contracts.
@@ -70,8 +65,8 @@ Example configurations and sample inputs for the loop.
 
 ### `knowledge/`
 
-Curated knowledge assets (distinct from `knowledge-base/`, which holds
-gitignore-scoped archival dossiers).
+Curated knowledge assets (distinct from `knowledge-base/`, which is a
+runtime write surface for per-cycle dossiers).
 
 ### `skills/`
 
@@ -85,15 +80,18 @@ for cross-CLI auto-discovery. Git tracks content at the canonical path.
 Runtime reference documentation: architecture decision records (`docs/architecture/`),
 operations guides (`docs/operations/`), per-version release notes
 (`docs/operations/release-notes/`), incident reports (`docs/incidents/`),
-and research references (`docs/research/`). Files here are team-shareable
-and agent-context-eligible. Never delete — archive to `knowledge-base/`.
+the merged research tree (`docs/research/`, consolidated 2026-08-05), and the
+engineering chronicle (`docs/chronicle/`). Files here are team-shareable
+and agent-context-eligible except `docs/private/` (agent-context-excluded).
+Never delete — archive to `docs/private/research/archived-YYYY-MM-DD/`
+(see `docs/MOVED.md`; `knowledge-base/` is retired as an archive destination).
 
 ### `knowledge-base/`
 
-Long-form archival dossiers excluded from agent context by `.gitignore` scope.
-Subdirectories: `docs/research/` (deep research), `docs/research/archived-YYYY-MM-DD/`
-(superseded docs). The loop queries it via the `go/internal/research` KB
-package (`NewFileKB`, roots from `EVOLVE_KB_SEARCH_PATHS`).
+Runtime write surface, NOT documentation. `knowledge-base/cycles/` receives
+per-cycle dossier JSON committed by loop lanes (`go/cmd/evolve/cmd_loop_outcome.go`).
+The research notes that previously lived in `knowledge-base/research/` moved to
+`docs/research/` (2026-08-05; see `docs/MOVED.md`). Do not add documentation here.
 
 ### `.evolve/`
 
@@ -121,12 +119,15 @@ read-only status/observability wrappers (`status`, `health`, `cost`,
 `preflight`, `verify-chain`). These are convenience entry points, separate
 from the `evolve` CLI in `go/cmd/evolve/`.
 
-### `tests/`
+### `commands/`
 
-Integration and trust-kernel test scripts. One-off test scripts written by
-Builder for a specific cycle live here until cleaned up. Not the same as
-`go/acs/` — `tests/` is for infrastructure validation, `go/acs/` is for
-behavioral acceptance criteria.
+Command-surface markdown files (one per skill: `audit.md`, `build.md`, …)
+projected as CLI slash commands (ADR-0067 command-surface reintroduction).
+
+### `landing/`
+
+Landing-page site: a standalone Go module (`cmd/`, `internal/`, `templates/`,
+`assets/`) that builds the project website. Not part of the `go/` runtime.
 
 ## Key files at repo root
 
