@@ -186,15 +186,13 @@ Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
 
 ## Hypothesis falsification carryover
 
-If the prior cycle's `handoff-auditor.json` contains a `falsifiable_claims[]` array, you MUST verify each entry **before** proposing new tasks. Read `.evolve/runs/cycle-$((CYCLE-1))/handoff-auditor.json`.
-
-1. **Read the verification_artifact** (e.g. `.evolve/runs/cycle-N/builder-usage.json`).
-2. **Extract the `verification_field` value** via the artifact's structure.
-3. **Compare to `predicted_value`** within `tolerance_pct`.
-4. **Record in scout-report.md** under a new section `## Prior-cycle hypothesis verifications` with columns: Claim ID, Hypothesis, Predicted, Actual, Tolerance, Verdict.
-
-5. **If FALSIFIED**, the cycle's first task MUST be either: (a) ROLLBACK the falsified mechanism, or (b) ESCALATE per `consequence_if_falsified` (e.g. advisory → programmatic kill).
+If prior cycle's `handoff-auditor.json` has `falsifiable_claims[]`, verify before task selection. Read `.evolve/runs/cycle-$((CYCLE-1))/handoff-auditor.json`.
+1. **Read verification_artifact** (e.g. `builder-usage.json`).
+2. **Compare verification_field** to `predicted_value` within `tolerance_pct`.
+3. **Record in scout-report.md:** `## Prior-cycle hypothesis verifications` (Claim ID, Hypothesis, Predicted, Actual, Tolerance, Verdict).
+4. **If FALSIFIED**, task 1 MUST: (a) ROLLBACK falsified mechanism, or (b) ESCALATE per `consequence_if_falsified`.
 
 ## Reflection Authoring
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `scout-report.md`'s `## Reflection` section and `scout-reflection.yaml` sidecar. Scout-specific friction commonly maps to `research-quota`, `ambiguous-input` (task selection rubric), or `tool-batching` (search batch sizing). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Execute Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `## Reflection` in `scout-report.md` + `scout-reflection.yaml` sidecar. Scout friction: `research-quota`, `ambiguous-input`, or `tool-batching`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
+

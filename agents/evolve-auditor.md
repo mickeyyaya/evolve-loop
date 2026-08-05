@@ -160,6 +160,8 @@ reference `egps-computation` — predicate validation and suite execution.
 
 **WARN prescriptions (F3):** when a WARN names a concrete remediation (a foreseen risk with a known fix, not itself a defect — e.g. "run `git add -f X` or `dropIgnoredPaths` will silently drop it"), populate the sentinel's `failure.prescription` array (`phasecontract.FailureBlock.Prescription`), distinct from `failure.defects`. A named-but-unstructured prescription living only in report prose is never enforced and silently vanishes on the next continuation (cycle-1258 lesson) — `emitDefectLedger` mints an addressable OPEN row from `prescription` even when `defects` is empty, tagged `"PRESCRIPTION: <text>"`, and the same reconcile/evidence gate that blocks an unaccounted defect blocks an unaccounted prescription too. See [continuation-defect-ledger.md](../docs/architecture/continuation-defect-ledger.md).
 
+**Continuation dispositions — you PRODUCE `defect-dispositions.json` (MANDATORY):** on a continuation (workspace holds `continuation-manifest.json`/`next-cycle-brief.json`, or the root registry binds this lane to an ancestor `defect-ledger.json`) write `<workspace>/defect-dispositions.json` BEFORE emitting your verdict — `{"dispositions":[{"id","status","evidence","reason"}]}`, one entry per inherited id read from the ancestor's `.evolve/runs/cycle-<N>/defect-ledger.json` (`entries[].id` with `status: OPEN`). `status` is exactly `FIXED` (with `evidence` that RESOLVES: repo-relative, no `..` escape, a regular file existing under the project root OR this lane's worktree, optional `:line`/`:line-line`/`:line:col` suffix, never the mechanism's own `defect-ledger.json`/`defect-dispositions.json`/`continuation-manifest.json`) or `DEFERRED` (with a non-empty `reason`). **Re-authored IN FULL every cycle — an ancestor's copy is NEVER read or inherited**; `reconcileContinuationDefects` rebuilds inherited status from THIS workspace's file on every pass, so omitting an id because "the parent fixed it" blocks the cycle. Skipping this file is why cycles 1320/1339/1340 died on `(no disposition)` regardless of build quality; absent/short coverage now fails by name (`disposition-preflight: MISSING` / `INCOMPLETE`). Schema: [continuation-defect-ledger.md](../docs/architecture/continuation-defect-ledger.md).
+
 **Downstream consumer note:** On `FAIL`/`WARN`, orchestrator invokes `evolve-retrospective` with YOUR audit report:
 - Write each defect's **root cause** explicitly — vague descriptions → vague lessons.
 - Consistent severity labels (`HIGH`/`MEDIUM`/`LOW`), ID prefixes (`H1`, `M1`, `L1`).
@@ -222,13 +224,11 @@ INFORMATIONAL only — absence does not fail audit, contents do not feed `red_co
 reference `handoff-json` — structured sidecar schema and required fields.
 
 ## POSTHOC verification
-
-For each criterion in build-report:
-1. **Detect truthable metrics** — build-report quoting any of 8 metrics from [docs/architecture/posthoc-schema.md](../docs/architecture/posthoc-schema.md) MUST use `pending <!-- POSTHOC: <command> -->`, not bare values. Bare-quoted truthable metric → **refuse PASS**, emit `posthoc-violation` defect (HIGH).
-2. **Execute every POSTHOC command** — run each `<!-- POSTHOC: <cmd> -->`, capture output, substitute ground-truth in audit-report.md. Quote actual exit codes verbatim — never author-prose `# exit 0` text.
-3. **AC-existence verification** — for AC "file X exists" or "command Y exits 0": run literal command, quote output. **No authored-prose verification.**
-4. **Ground-truth vs Builder narrative** — prose contradicting POSTHOC values → `claim-discrepancy` defect (HIGH).
-5. **INERT marker compliance** — verify INERT carries `re_attempt_by_cycle: N` with N ≤ current_cycle + 5. Missing deadline = `inert-no-deadline` defect (P5 violation).
+1. **Detect truthable metrics** — POSTHOC pattern required for 8 metrics. Bare metric → **refuse PASS**, emit `posthoc-violation` (HIGH).
+2. **Execute every POSTHOC command** — capture output, substitute ground-truth in report. Quote exit codes verbatim (no authored `# exit 0`).
+3. **AC-existence verification** — run literal command, quote output. No authored-prose verification.
+4. **Ground-truth vs Builder narrative** — prose contradicting POSTHOC → `claim-discrepancy` (HIGH).
+5. **INERT marker compliance** — verify `re_attempt_by_cycle: N` (N ≤ +5). Missing deadline = `inert-no-deadline` (P5).
 
 ## Constitutional audit checklist
 

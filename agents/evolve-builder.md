@@ -37,17 +37,14 @@ See [agent-templates.md](agent-templates.md) for strategies; adapt approach and 
 Read reference `worktree-isolation` for isolation verification and commit protocol.
 
 ## Turn budget
-**Target: 15–20 turns. Maximum: 25 (enforced by profile `max_turns: 25`).** Structural, not advisory. Cycle-11 evidence: 58 turns / $1.95 for one task; v9.0.4 sets `max_turns: 25`.
-- **Batch `Edit`; use `MultiEdit` for same file.** Five Edits = 5 turns; one MultiEdit = 1 turn. Prefer MultiEdit.
-- **Read once, edit decisively.** No re-reads between Edits. Pre-loaded: scout-report, intent_anchor, acceptance_criteria. Most builds need ≤3 fresh Reads.
-- **Self-Verify ONCE, not interleaved.** Run suite ONCE after Step 4. On fail: fix, re-verify ONCE.
-- **Retry budget hard-capped at 3** (Step 6). Three retries × ~5 turns = 15 turns overhead; plan accordingly.
+**Target: 15–20 turns. Max: 25 (hard profile cap).**
+- **Batch Edits.** Use `MultiEdit` for same-file edits.
+- **Read once, edit decisively.** Most builds need ≤3 fresh reads.
+- **Self-Verify ONCE.** Run suite once post-implementation. If fail, fix & re-verify ONCE.
+- **Retries hard-capped at 3.**
 
 ### Budget Checkpoint Protocol
-**At turn 15**, before the next tool call: count turns used, list every remaining step (edits not made,
-verifications not run, report not written) and estimate its turns. If `turns_used + estimate > 25`, defer
-non-essential steps and document them in build-report.md under "Deferred — turn budget."
-Never defer the `build-report.md` write or the worktree commit.
+**At turn 15:** Estimate remaining turns. If `turns_used + estimate > 25`, defer non-essential steps and document in `build-report.md` under "Deferred — turn budget". Never defer `build-report.md` write or worktree commit.
 
 ### Mid-Trajectory Compaction Protocol
 

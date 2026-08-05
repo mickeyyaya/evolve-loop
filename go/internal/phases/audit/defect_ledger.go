@@ -245,7 +245,10 @@ func truncateRunes(s string, max int) string {
 //     accounting; `/etc/hosts` exists on every host and proves nothing.
 //  2. NO ESCAPE. After Clean, a leading ".." leaves the root — the workspace
 //     sits three levels down, so traversal is reachable, not theoretical.
-//  3. PROJECT ROOT only, never the workspace-as-a-second-root. The workspace is
+//  3. PROJECT ROOT or this lane's WORKTREE, never the workspace. A citation is
+//     resolved under the project root first and, failing that, under
+//     req.Worktree — an unmerged lane's fix is only ever in its own worktree
+//     (cycle-1340; the 1320→1330 deadlock). The workspace is still barred: it is
 //     this cycle's own agent-authored ephemera; citing it is the graded party
 //     vouching for itself. Real workspace artifacts remain citable by their
 //     path FROM the root (".evolve/runs/cycle-N/audit-report.md"), which is
@@ -268,9 +271,13 @@ func evidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
 	}
 	// Strip at most a ":line" and a ":col" suffix; anything else is part of the
 	// path (a Windows drive letter is not reachable here — these are repo paths).
+	// A ":line-line" RANGE counts as one locator: it is the house citation style
+	// in build and audit reports, and leaving it glued to the path made every
+	// range citation unresolvable under EVERY root (cycle-1340, defect
+	// ddda7857a — a real file, present in both roots, rejected anyway).
 	for i := 0; i < 2; i++ {
 		idx := strings.LastIndex(path, ":")
-		if idx <= 0 || !isAllDigits(path[idx+1:]) {
+		if idx <= 0 || !isLineLocator(path[idx+1:]) {
 			break
 		}
 		path = path[:idx]
@@ -300,14 +307,50 @@ func evidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
 	if req.ProjectRoot == "" {
 		return false, fmt.Sprintf("evidence %q cannot be resolved: no project root on the phase request", citation)
 	}
-	info, err := os.Lstat(filepath.Join(req.ProjectRoot, clean))
-	if err != nil {
+	// Two roots, project root FIRST. A continuation lane's fix lives in the
+	// lane's own worktree and reaches the project root only when the lane
+	// merges — which is exactly what this gate blocks when the citation
+	// misses. Cycles 1320→1323→1325→1330 each cited a real, worktree-resident
+	// file and each was rejected identically: the gate demanded evidence it
+	// structurally prevented from existing. The worktree is a FALLBACK, not a
+	// replacement, and it is reached only after rules 1-4 above have already
+	// run — so a self-citation or an escape is refused under either root.
+	roots := []string{req.ProjectRoot}
+	if req.Worktree != "" && req.Worktree != req.ProjectRoot {
+		roots = append(roots, req.Worktree)
+	}
+	var lastMode os.FileMode
+	sawIrregular := false
+	for _, root := range roots {
+		info, err := os.Lstat(filepath.Join(root, clean))
+		if err != nil {
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			lastMode, sawIrregular = info.Mode(), true
+			continue
+		}
+		return true, ""
+	}
+	if sawIrregular {
+		return false, fmt.Sprintf("evidence %q is not a regular file (mode %s)", citation, lastMode)
+	}
+	if len(roots) == 1 {
 		return false, fmt.Sprintf("evidence %q resolves to no file under the project root", citation)
 	}
-	if !info.Mode().IsRegular() {
-		return false, fmt.Sprintf("evidence %q is not a regular file (mode %s)", citation, info.Mode())
+	return false, fmt.Sprintf("evidence %q resolves to no file under the project root or this lane's worktree", citation)
+}
+
+// isLineLocator reports whether s is a source locator that may be shaved off a
+// citation: a line number ("570") or a line range ("570-588"). Anything else —
+// including a bare "-", "570-" or "notaline" — is part of the filename and is
+// kept, so a claim can never be satisfied by a different file than it names.
+func isLineLocator(s string) bool {
+	if isAllDigits(s) {
+		return true
 	}
-	return true, ""
+	lo, hi, ok := strings.Cut(s, "-")
+	return ok && isAllDigits(lo) && isAllDigits(hi)
 }
 
 // isAllDigits reports whether s is a non-empty run of ASCII digits.
@@ -452,6 +495,7 @@ func reconcileAgainstAncestor(req core.PhaseRequest, cont continuation.Continuat
 	if blocked {
 		return diags, true
 	}
+	diags = append(diags, dispositionPreflight(req, cont.Cycle, ancestor.Entries, claims)...)
 
 	// D1 / cycle-1282 DEF-1: the inherited rows are rebuilt from the ANCESTOR on
 	// every pass and their status is derived ONLY from defect-dispositions.json,
@@ -544,6 +588,50 @@ func reconcileAgainstAncestor(req core.PhaseRequest, cont continuation.Continuat
 		return diags, true
 	}
 	return diags, false
+}
+
+// The two NAMED markers the disposition pre-flight emits. They are deliberately
+// distinct from the per-id "(no disposition)" switch text: an operator reading a
+// blocked continuation must be able to see that the ARTIFACT as a whole is
+// absent or short, not infer it from N unrelated-looking per-id gripes. MISSING
+// and INCOMPLETE stay separate because the operator action differs — author the
+// file from scratch vs finish the one that exists.
+const (
+	dispositionPreflightMissingMarker    = "disposition-preflight: MISSING"
+	dispositionPreflightIncompleteMarker = "disposition-preflight: INCOMPLETE"
+)
+
+// dispositionPreflight grades the disposition ARTIFACT's completeness against
+// the ancestor's OPEN set, before the per-id reconcile runs (cycle-1342 F4).
+// The per-id switch already blocks correctly; what it never did was fail loudly
+// BY NAME on the file itself, so a future auditor that simply forgets to write
+// it reads N per-id complaints and no statement of the actual gap.
+//
+// It is silent — necessarily, as the anti-no-op half — whenever the ancestor
+// carries no OPEN entries or every one of them is covered. A pre-flight that
+// fires on every continuation proves nothing.
+func dispositionPreflight(req core.PhaseRequest, ancestorCycle int, ancestor []defectEntry, claims map[string]defectEntry) []core.Diagnostic {
+	var open, uncovered []string
+	for _, a := range ancestor {
+		if a.Status != defectStatusOpen {
+			continue // already dispositioned upstream — nothing is owed for it here
+		}
+		open = append(open, a.ID)
+		if _, has := claims[a.ID]; !has {
+			uncovered = append(uncovered, a.ID)
+		}
+	}
+	if len(open) == 0 || len(uncovered) == 0 {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(req.Workspace, defectDispositionFile)); err != nil {
+		return []core.Diagnostic{{Severity: "error",
+			Message: fmt.Sprintf("defect ledger: %s — this workspace holds no %s at all, so 0 of %d defect(s) inherited from cycle-%d are dispositioned. This file is re-authored IN FULL every cycle; an ancestor's copy is never inherited. Write one entry per inherited id, status FIXED (with resolvable evidence) or DEFERRED (with a reason).",
+				dispositionPreflightMissingMarker, defectDispositionFile, len(open), ancestorCycle)}}
+	}
+	return []core.Diagnostic{{Severity: "error",
+		Message: fmt.Sprintf("defect ledger: %s — %s covers %d of %d defect(s) inherited from cycle-%d; uncovered: [%s]. Every inherited id needs its own entry in THIS cycle's file.",
+			dispositionPreflightIncompleteMarker, defectDispositionFile, len(open)-len(uncovered), len(open), ancestorCycle, strings.Join(uncovered, ", "))}}
 }
 
 // readDispositions loads the continuation's disposition claims keyed by defect
