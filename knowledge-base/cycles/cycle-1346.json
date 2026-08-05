@@ -1,0 +1,231 @@
+{
+  "cycle": 1346,
+  "run_id": "01KZ9AS08PQFRE5T7GRB36SQT8",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 303489,
+      "started_at": "2026-08-05T16:09:12Z",
+      "ended_at": "2026-08-05T16:14:16Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 56,
+        "output": 12712,
+        "cache_read": 1890591,
+        "cache_write": 98621
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 58947,
+      "started_at": "2026-08-05T16:16:44Z",
+      "ended_at": "2026-08-05T16:17:43Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 745,
+        "cache_read": 120147,
+        "cache_write": 30947
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 177401,
+      "started_at": "2026-08-05T16:17:43Z",
+      "ended_at": "2026-08-05T16:20:41Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 32,
+        "output": 13425,
+        "cache_read": 956102,
+        "cache_write": 55860
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 245664,
+      "started_at": "2026-08-05T16:20:41Z",
+      "ended_at": "2026-08-05T16:24:47Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 46,
+        "output": 13705,
+        "cache_read": 1782525,
+        "cache_write": 62021
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 318143,
+      "started_at": "2026-08-05T16:24:48Z",
+      "ended_at": "2026-08-05T16:30:57Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 49,
+        "output": 18557,
+        "cache_read": 2017204,
+        "cache_write": 86255
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 2778,
+      "started_at": "2026-08-05T16:30:57Z",
+      "ended_at": "2026-08-05T16:31:00Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 2258,
+      "started_at": "2026-08-05T16:31:00Z",
+      "ended_at": "2026-08-05T16:31:03Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 1866,
+      "started_at": "2026-08-05T16:31:03Z",
+      "ended_at": "2026-08-05T16:31:05Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 389309,
+      "started_at": "2026-08-05T16:31:05Z",
+      "ended_at": "2026-08-05T16:37:34Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 39,
+        "output": 26352,
+        "cache_read": 1736140,
+        "cache_write": 83682
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "ship|unknown|96f17cfe3dfe",
+    "pre_class": "unknown",
+    "reasons": [
+      "phase ship: ship: native: [GIT_STAGE_FAILED/transient @atomic-ship] ship: git add failed (rc=1): \u003cnil\u003e: The following paths are ignored by one of your .gitignore files: .evolve/evals hint: Use -f if y"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1346",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1499855,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "retro",
+    "longest_ms": 389309,
+    "by_archetype_ms": {
+      "build": 245664,
+      "control": 396211,
+      "evaluate": 318143,
+      "plan": 539837
+    },
+    "total_tokens": {
+      "input": 228,
+      "output": 85496,
+      "cache_read": 8502709,
+      "cache_write": 417386
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 46,
+        "output": 13705,
+        "cache_read": 1782525,
+        "cache_write": 62021
+      },
+      "control": {
+        "input": 39,
+        "output": 26352,
+        "cache_read": 1736140,
+        "cache_write": 83682
+      },
+      "evaluate": {
+        "input": 49,
+        "output": 18557,
+        "cache_read": 2017204,
+        "cache_write": 86255
+      },
+      "plan": {
+        "input": 94,
+        "output": 26882,
+        "cache_read": 2966840,
+        "cache_write": 185428
+      }
+    },
+    "wasted_tokens": {
+      "input": 39,
+      "output": 26352,
+      "cache_read": 1736140,
+      "cache_write": 83682
+    },
+    "cache_hit_ratio": 0.9999731857357052,
+    "hot_phase_count": 4,
+    "hot_phases": [
+      "scout",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  }
+}
