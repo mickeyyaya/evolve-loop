@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Documented — `evolve loop --reset --fingerprint` operator flag (cycle-1333, 2026-08-05)
+
+The blocker-breaker fingerprint-ack mechanism (`--reset --fingerprint <fp>`, ADR-0072 extension, implemented cycle-1332) had zero mention in the operator-facing runtime reference — an operator hitting a recurring identical-fingerprint halt had no documented way to unblock it short of reading the Go source. Docs-only; no production code changed.
+
+- `docs/operations/runtime-reference.md` — new bullet under "Operator commands (write a verdict file)" describing the flag, its `--reset` gating, the `.evolve/resolved-fingerprints.json` ledger it appends to, and the `BlockerBreakerConfig.AckedFingerprints` field that consumes it.
+- See `go/internal/core/blocker_breaker.go` and `go/cmd/evolve/cmd_loop_fingerprint_ack_test.go` (`TestRunLoop_FingerprintAck_AppendsLedgerRecord`) for the underlying implementation and test coverage, both unchanged by this entry.
+
+---
+
 ## Verified closed — cycle-1272 fleet-scope items (2026-08-04)
 
 Both fleet-scope backlog items pinned to cycle-1272 were investigated and found **already-implemented**; no production change was required. They are recorded here as verified-closed so they stop re-appearing as open backlog.
