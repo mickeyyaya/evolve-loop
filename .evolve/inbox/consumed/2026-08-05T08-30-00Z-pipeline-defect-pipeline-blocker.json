@@ -1,0 +1,19 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1329"
+  ],
+  "consumed_at": "2026-08-05T08:30:00Z",
+  "consumed_by": "console-2026-08-05: fingerprint ship|unknown|76d0f4fca190 = REPO_CONTRACT_GATE blocks from the two in-flight lanes' PRE-#415 worktrees: the gate's first live firings were TRUE POSITIVES (runtime-minted stub profiles fail the pairing suite on disk) with a blind spot (lanes blocked on stubs they did not author); the reasoned-allowlist fix MERGED BEFORE THE HALT (#415 23515d12) but in-flight lanes carry their cut-time trees, so both burned their ship budgets on the stale guard and the identical fingerprints honestly tripped the ceiling. No code change needed \u2014 every post-#415 tree is clean (verified with the stubs present on disk). The relaunch doubles as the boot binary self-heal's first live firing.",
+  "created_at": "2026-08-05T09:23:41Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-08-05T09:23:41Z. Evidence: failure fingerprint \"ship|unknown|76d0f4fca190\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|unknown|76d0f4fca190)",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1329. The pipeline forged a verdict (category=pipeline-blocker): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 failure fingerprint \"ship|unknown|76d0f4fca190\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|unknown|76d0f4fca190)",
+  "weight": 0.99
+}
