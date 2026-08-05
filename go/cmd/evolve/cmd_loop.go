@@ -346,6 +346,13 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// terminal-gate verdict) — boot-knowable and cycle-fatal. HALT here, pre-scout,
 	// so no cycle spends a ~32-40 min lane + LLM budget on a ship doomed from boot
 	// (8 cycles wasted, 625-634). The operator recipe already reached stderr.
+	//
+	// Binary-lag self-heal (2026-08-05 retro, cmd_loop_boot_refresh.go) runs
+	// FIRST: if the loop's own landed fixes advanced HEAD past this binary's
+	// build stamp with a go/ delta, rebuild and re-exec — a stale binary
+	// should not run recovery logic either. Fail-open; on a successful
+	// re-exec the call never returns.
+	bootBinaryRefreshFn(cfg, stderr)
 	if br := bootRecoverFn(ctx, cfg, deps.Ledger, stderr); br.HaltSelfSHA {
 		lr.StopReason = "self_sha_boot_halt"
 		lr.emit(stdout)
