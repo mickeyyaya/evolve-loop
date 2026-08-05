@@ -334,6 +334,18 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
 		return
 	}
+	// ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-
+	// blocker Task 1): a ship dispatch error is a real, diagnosed failure — the
+	// ONLY chokepoint a ship error ever passes through (unlike audit, ship has
+	// no success-path FAIL verdict; every ship failure is an err!=nil dispatch
+	// error, so this is the sole record site, mirroring persistFloorFailReasons'
+	// audit-phase chokepoint). Set in orchestrator memory (never a workspace
+	// file — same trust boundary as AuditFailReasons) so the coherence floor
+	// can tell "audit+ACS green but ship legitimately rejected" apart from a
+	// forged verdict. Cleared on ship re-dispatch by resetFloorFailReason.
+	if fl.Failed == PhaseShip {
+		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
+	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
 
 	retroRunner, ok := o.runners[PhaseRetro]

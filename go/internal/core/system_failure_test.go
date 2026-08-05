@@ -230,6 +230,51 @@ func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
 	}
 }
 
+// TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt — cycle-1329
+// (pipeline-defect-pipeline-blocker, scout Task 1). The audit + ACS both
+// recorded PASS (161/161 green), but the SHIP phase legitimately rejected the
+// cycle post-audit (REPO_CONTRACT_GATE: "repo-contract scanner pack RED ...
+// pushing would red main"). That is a real, explained ship-phase failure — a
+// coherent task-level outcome (retro + continue) — NOT a forged verdict.
+// Before this fix, SubstantiveError was computed from cs.AuditFailReasons
+// alone, so this exact shape (green audit + green ACS + recorded FAIL) was
+// indistinguishable from cycles 862→899's genuine forgery and halted the
+// batch (3x identical-fingerprint recurrence, ship|unknown|76d0f4fca190).
+func TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt(t *testing.T) {
+	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
+	dir := t.TempDir()
+	writeVerdicts(t, dir, "PASS", "PASS") // audit-report PASS + acs-verdict.json PASS, exactly cycle-1329's shape
+	cs := CycleState{CycleID: 1329, WorkspacePath: dir,
+		ShipFailReasons: []string{
+			"repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main; " +
+				"fix the violation in-lane (the four suites: phasespec, profiles, phasecoherence, routingtest)",
+		}}
+
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig != nil {
+		t.Errorf("a diagnosed ship-phase failure (green audit + green ACS, real ship-gate rejection) must be "+
+			"a coherent task failure (no halt), got %+v", sig)
+	}
+}
+
+// TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField —
+// regression guard: adding the ship-phase carrier must not disturb the
+// existing audit-phase-only signal. AuditFailReasons alone (ShipFailReasons
+// empty/nil) still suppresses the halt exactly as the cycles-930/931/932 fix
+// already covers (TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt);
+// this test additionally pins that an EMPTY ShipFailReasons never itself
+// contributes a false explanation when AuditFailReasons is also empty.
+func TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField(t *testing.T) {
+	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
+	dir := t.TempDir()
+	writeVerdicts(t, dir, "PASS", "PASS")
+	cs := CycleState{CycleID: 1330, WorkspacePath: dir} // both AuditFailReasons and ShipFailReasons nil/empty
+
+	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig == nil {
+		t.Fatal("with neither AuditFailReasons nor ShipFailReasons populated, an unexplained FAIL with green " +
+			"artifacts must still halt — the new carrier must not weaken the existing forgery floor")
+	}
+}
+
 // TestRecordFloorVerdictFailure_PersistsAuditFailReason — the wiring: the shared
 // floor-verdict recorder (live loop + resume path) must stamp the downgrade
 // reasons into cs.AuditFailReasons (the coherence floor's authoritative source)

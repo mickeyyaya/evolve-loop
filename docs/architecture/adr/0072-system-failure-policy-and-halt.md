@@ -143,6 +143,56 @@ writing the ledger entry as part of *inbox consumption itself* (`kind:
 production caller to wire into; the CLI `--fingerprint` path above is the
 sanctioned operator-driven alternative until that caller exists.
 
+## Extension: ship-phase explained-failure carrier (cycle 1338)
+
+The same cycle-1329 halt (`ship|unknown|76d0f4fca190`) exposed a second, more
+fundamental gap upstream of the ack-ledger workaround above: the coherence
+floor's `SubstantiveError` signal (`coherence.VerdictInputs.SubstantiveError`,
+consumed by `detectVerdictIncoherence` in `system_failure.go` and its twin
+`buildFailureDossier` in `failure_dossier.go`) was computed from
+`cs.AuditFailReasons` alone. That carrier is populated only at the audit
+floor-verdict chokepoint (`persistFloorFailReasons`, called with
+`failed == PhaseAudit`); a post-audit **ship-phase** dispatch error (e.g. the
+`REPO_CONTRACT_GATE` rejection that actually caused cycle 1329 — a real,
+correctly-firing repo-wide guard, not a forged verdict) never touched it. A
+green audit (161/161 ACS) + green ACS + a legitimate ship-gate FAIL was
+therefore indistinguishable from an actual forged verdict, and repeated
+firings of the same (new, default-ON) `repocontract.go` guard would keep
+reproducing this exact false-positive class independent of the ack ledger.
+
+Fix (the `pipeline-defect-pipeline-blocker` P0 inbox item, dual-call-site,
+mirroring the `AuditFailReasons` shape/lifecycle exactly):
+
+- `cyclestate.CycleState.ShipFailReasons []string` — the ship-phase twin of
+  `AuditFailReasons`. Set in orchestrator memory (never a workspace file, the
+  same trust boundary `AuditFailReasons` documents) at the ONE chokepoint a
+  ship dispatch error ever passes through — `recordFailureLearning` when
+  `fl.Failed == PhaseShip` — since ship has no success-path FAIL verdict the
+  way audit does; every ship failure is an `err != nil` dispatch error.
+  Cleared on ship re-dispatch by the existing `resetFloorFailReason`, extended
+  to handle `PhaseShip` alongside `PhaseAudit`.
+- `SubstantiveError` at both `system_failure.go:184` and
+  `failure_dossier.go:86` now reads
+  `len(cs.AuditFailReasons) > 0 || len(cs.ShipFailReasons) > 0` — the
+  cycle-1046 lockstep discipline this ADR's own code comments require.
+- Compounding fix: `classifyPreClass`'s `gate-block` rule
+  (`failure_digest.go`) gained needles for the repo-contract gate's actual
+  message vocabulary (`"repo-contract"`, `"would red main"`,
+  `"scanner pack"`), so this failure class fingerprints distinctly instead of
+  falling into the `"unknown"` bucket that let 3 recurrences look identical
+  enough to trip the Rule B breaker in the first place.
+
+Wiring proof:
+`TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt` and
+`TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField`
+(`system_failure_test.go`) replay cycle-1329's exact input shape (recorded
+FAIL, audit=PASS, acs=PASS, `ShipFailReasons` set) through the real
+`detectVerdictIncoherence` call site and assert no halt, while pinning the
+existing audit-phase-only behavior unchanged; `failure_dossier_test.go`'s
+`ship_phase_explained_no_floor_candidate` covers the `buildFailureDossier`
+twin; `failure_digest_test.go`'s `c1329_ship_repo_contract_gate` case covers
+the classifier fix.
+
 ## Implementation slices (one campaign)
 
 - **S1 — Policy schema + loader:** `failure_policy` struct in `internal/policy` + compiled defaults + policy.json block. TDD.

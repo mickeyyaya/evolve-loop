@@ -95,6 +95,9 @@ func resetFloorFailReason(cs *CycleState, phase Phase) {
 	if phase == PhaseAudit {
 		cs.AuditFailReasons = nil
 	}
+	if phase == PhaseShip {
+		cs.ShipFailReasons = nil
+	}
 	if cs.WorkspacePath != "" {
 		_ = os.Remove(floorFailReasonPath(cs.WorkspacePath, phase))
 	}
@@ -181,7 +184,7 @@ func (o *Orchestrator) detectVerdictIncoherence(ctx context.Context, cs CycleSta
 		Audit:            audit,
 		ACS:              acs,
 		AuditRan:         auditRan,
-		SubstantiveError: len(cs.AuditFailReasons) > 0,
+		SubstantiveError: len(cs.AuditFailReasons) > 0 || len(cs.ShipFailReasons) > 0,
 		DeliverableValid: deliverableValid,
 	})
 	if coh.Reconciled {

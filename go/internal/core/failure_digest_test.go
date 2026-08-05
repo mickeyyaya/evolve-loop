@@ -63,6 +63,16 @@ func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
 		{"c999_statemap_severed", "build", "statemap severed: guard aborted the build->audit transition", "guard-abort"},
 		{"c949_predicate_compile", "audit", "ACS predicates failed to compile (predicates_test.go build error)", "verdict-fail"},
 		{"infra_quota", "build", "bridge quota exhausted (85); infra teardown mid-phase", "infra-error"},
+		// c1329 (pipeline-defect-pipeline-blocker Task 2): the ship-time
+		// repo-contract-gate rejection's actual message vocabulary. Before
+		// this fix no needle matched it, so it fell into "unknown" —
+		// indistinguishable from every other unclassified failure, which let
+		// 3 recurrences trip the identical-fingerprint breaker
+		// (ship|unknown|76d0f4fca190) and false-halt the batch.
+		{"c1329_ship_repo_contract_gate", "ship",
+			"repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main; " +
+				"fix the violation in-lane (the four suites: phasespec, profiles, phasecoherence, routingtest)",
+			"gate-block"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

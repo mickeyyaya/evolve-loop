@@ -129,6 +129,20 @@ type CycleState struct {
 	// record and cycle finalization resumes without a false halt (the resume
 	// path already trusts cycle-state.json wholesale).
 	AuditFailReasons []string `json:"audit_fail_reasons,omitempty"`
+	// ShipFailReasons: the SHIP-phase's explained-failure carrier, the
+	// post-audit twin of AuditFailReasons (pipeline-defect-pipeline-blocker
+	// Task 1, cycle-1329). Set at the ship error-record chokepoint
+	// (recordFailureLearning, fl.Failed==PhaseShip) from the orchestrator's
+	// own in-process record of the ship error — never a workspace file, to
+	// preserve the same trust boundary AuditFailReasons documents above —
+	// and cleared on ship re-dispatch (resetFloorFailReason). The ADR-0072
+	// coherence floor folds this in alongside AuditFailReasons so a green
+	// audit + green ACS cycle that legitimately fails at ship (e.g. a
+	// repo-contract-gate rejection) is diagnosed as a coherent task failure,
+	// not misclassified as a forged verdict. Additive omitempty; persisted so
+	// a crash between the ship error record and cycle finalization resumes
+	// without a false halt.
+	ShipFailReasons []string `json:"ship_fail_reasons,omitempty"`
 	// FailedAt: the cycle's failure history (mirrors State.FailedAt), carried on
 	// the per-cycle checkpoint so the ADR-0072 S4 evidence dossier can compose
 	// its non-progress counters (same-class recurrence, repeat count) from

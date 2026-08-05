@@ -131,7 +131,31 @@ func TestFailureDossier(t *testing.T) {
 		}
 	})
 
-	// (d) STRUCTURED SYSTEM: the audit self-declares a system-level class
+	// (d) SHIP-PHASE EXPLAINED (cycle-1329, pipeline-defect-pipeline-blocker
+	// Task 1's failure_dossier.go twin): green audit + green ACS, but a real
+	// post-audit ship-gate rejection (REPO_CONTRACT_GATE) is recorded via
+	// cs.ShipFailReasons. The dossier's SubstantiveError computation
+	// (failure_dossier.go:86) must fold this carrier in exactly like
+	// system_failure.go:184 does — a diagnosed ship failure is coherent, so
+	// it must NOT propose the verdict-incoherence floor candidate. This is
+	// the dual-call-site lockstep the cycle-1046 comment requires: fixing
+	// only system_failure.go and leaving this twin stale reproduces the
+	// exact bug class.
+	t.Run("ship_phase_explained_no_floor_candidate", func(t *testing.T) {
+		dir := t.TempDir()
+		writeVerdicts(t, dir, "PASS", "PASS")
+		cs := CycleState{CycleID: 1329, WorkspacePath: dir,
+			ShipFailReasons: []string{
+				"repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main",
+			}}
+
+		d := buildFailureDossier(cs, VerdictFAIL, fp)
+		if d.FloorCandidate != "" {
+			t.Errorf("FloorCandidate = %q, want empty (ship-phase failure is diagnosed, not forged)", d.FloorCandidate)
+		}
+	})
+
+	// (e) STRUCTURED SYSTEM: the audit self-declares a system-level class
 	// structurally → AuditDeclared.Level maps to system via the policy table →
 	// the dossier proposes the infra-systemic floor candidate deterministically
 	// (caught even in orchestrator-absent fallback).
