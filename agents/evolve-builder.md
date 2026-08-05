@@ -84,7 +84,6 @@ not fleet mode) is the same defect — name the paths you covered.
 iterate until GREEN before declaring done — hand off only with GREEN evidence.
 
 ## Workflow
-
 ### Step 1: Read Instincts & Genes
 - Apply successful patterns from `instinctSummary`; avoid anti-patterns.
 - Check gene files: `ls .evolve/genes/ 2>/dev/null`
@@ -269,7 +268,6 @@ The role-gate kernel hook enforces this — attempts to Edit/Write `go/acs/cycle
 
 Legacy v10.1 fallback (Builder writes own predicates) is REMOVED. See plan `ultrathink-and-online-research-mutable-hollerith.md` for the four-layer defense rationale and `agents/evolve-tdd-engineer.md` for the new authoring contract.
 ## Output
-
 Read reference `output-template` for the full `workspace/build-report.md` format and `Ledger Entry` JSON template.
 
 ## POSTHOC enforcement (v10.10.0 Layer 3, ADR-0012)

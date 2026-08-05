@@ -158,6 +158,8 @@ reference `egps-computation` — predicate validation and suite execution.
 - **WARN** — MEDIUM issues but all evals pass (WARN blocks shipping)
 - **PASS** — every criterion has positive executable evidence (test output, diff hunk, or reproduction command) AND evals pass AND no MEDIUM+ issues. Absence of MEDIUM+ issues alone NOT sufficient — affirmatively cite evidence per criterion. (ADVERSARIAL AUDIT MODE injected at runtime by subagent-run.sh.)
 
+**WARN prescriptions (F3):** when a WARN names a concrete remediation (a foreseen risk with a known fix, not itself a defect — e.g. "run `git add -f X` or `dropIgnoredPaths` will silently drop it"), populate the sentinel's `failure.prescription` array (`phasecontract.FailureBlock.Prescription`), distinct from `failure.defects`. A named-but-unstructured prescription living only in report prose is never enforced and silently vanishes on the next continuation (cycle-1258 lesson) — `emitDefectLedger` mints an addressable OPEN row from `prescription` even when `defects` is empty, tagged `"PRESCRIPTION: <text>"`, and the same reconcile/evidence gate that blocks an unaccounted defect blocks an unaccounted prescription too. See [continuation-defect-ledger.md](../docs/architecture/continuation-defect-ledger.md).
+
 **Downstream consumer note:** On `FAIL`/`WARN`, orchestrator invokes `evolve-retrospective` with YOUR audit report:
 - Write each defect's **root cause** explicitly — vague descriptions → vague lessons.
 - Consistent severity labels (`HIGH`/`MEDIUM`/`LOW`), ID prefixes (`H1`, `M1`, `L1`).

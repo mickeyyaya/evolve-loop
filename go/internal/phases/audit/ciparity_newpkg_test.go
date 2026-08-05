@@ -35,6 +35,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -110,6 +111,57 @@ func TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged(t *testing.T)
 	}
 	if len(off) == 0 {
 		t.Fatalf("apicoverNewPackageGraduationDefault(new ungraduated internal/brandnew) = (%v,nil), want offenders", off)
+	}
+}
+
+// TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix —
+// cycle-1329 AC1 (audit-warn-prescription-gate): the audit offender line for
+// an ungraduated package must carry the SAME copy-pasteable prescription the
+// build-entry seam already emits (graduationPrescription /
+// phase_bindings_graduation.go:81), not just the terse "add it + an
+// apicover_named_test.go" sentence the offender line has today. This is the
+// exact fixture from TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged
+// (new ungraduated go/internal/brandnew), re-asserted against the OFFENDER
+// STRING CONTENT rather than merely its non-emptiness — the assertion this
+// task adds. Today's offender string is the terse sentence, so this is RED
+// until the audit seam is wired to the relocated ciparity prescription
+// helper (Beyond-the-Ask / Research→Implementation Map hypothesis 1).
+func TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix(t *testing.T) {
+	root, goDir := goWorktree(t)
+	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(goDir, "internal", "brandnew"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "internal", "brandnew", "x.go"), []byte("package brandnew\n\n// Exported is real surface.\nfunc Exported() int { return 1 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
+		[]byte(`{"thrusts":[{"files_new":["go/internal/brandnew/x.go"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
+	if err != nil {
+		t.Fatalf("apicoverNewPackageGraduationDefault: unexpected error %v", err)
+	}
+	if len(off) != 1 {
+		t.Fatalf("apicoverNewPackageGraduationDefault(new ungraduated internal/brandnew) = %v, want exactly 1 offender", off)
+	}
+	joined := strings.Join(off, "\n")
+	// AC1: the literal .apicover-enforce append line — not a generic
+	// instruction — must be present verbatim.
+	if !strings.Contains(joined, "append this line to go/.apicover-enforce:  ./internal/brandnew") {
+		t.Errorf("offender %q does not carry the literal .apicover-enforce append line — want the same copy-pasteable prescription the build seam emits (phase_bindings_graduation.go:81 graduationPrescription)", joined)
+	}
+	// AC1: the literal apicover_named_test.go path to create — not a generic
+	// instruction — must be present verbatim.
+	if !strings.Contains(joined, "go/internal/brandnew/apicover_named_test.go") {
+		t.Errorf("offender %q does not carry the literal apicover_named_test.go path — want the same copy-pasteable prescription the build seam emits", joined)
 	}
 }
 

@@ -136,7 +136,7 @@ func emitDefectLedger(artifact string, req core.PhaseRequest) error {
 		return nil
 	}
 	s, ok := phasecontract.ParseVerdictSentinelFull(artifact)
-	if !ok || s.Failure == nil || len(s.Failure.Defects) == 0 {
+	if !ok || s.Failure == nil || (len(s.Failure.Defects) == 0 && len(s.Failure.Prescription) == 0) {
 		return nil
 	}
 	doc, existed, err := readDefectLedger(req.Workspace)
@@ -152,14 +152,14 @@ func emitDefectLedger(artifact string, req core.PhaseRequest) error {
 	}
 	added := false
 	overflow := 0
-	for _, text := range s.Failure.Defects {
+	appendLedgerEntry := func(text string) {
 		text = truncateRunes(text, defectTextMaxRunes)
 		if known[text] {
-			continue // same defect re-reported on a retry — one row, not two
+			return // same defect/prescription re-reported on a retry — one row, not two
 		}
 		if len(doc.Entries) >= defectLedgerMaxEntries {
 			overflow++
-			continue
+			return
 		}
 		known[text] = true
 		doc.Entries = append(doc.Entries, defectEntry{
@@ -168,6 +168,17 @@ func emitDefectLedger(artifact string, req core.PhaseRequest) error {
 			Status: defectStatusOpen,
 		})
 		added = true
+	}
+	for _, text := range s.Failure.Defects {
+		appendLedgerEntry(text)
+	}
+	for _, text := range s.Failure.Prescription {
+		// Tagged distinguishably from Defects (F3, scout report Hypothesis
+		// 2): a prescription describes a named fix for a foreseen risk, not
+		// something itself wrong — an operator reading defect-ledger.json
+		// must be able to tell the two apart without a second ledger or a
+		// schema-breaking Kind field.
+		appendLedgerEntry("PRESCRIPTION: " + text)
 	}
 	if overflow > 0 {
 		// One OPEN row standing for the truncated tail. It has no per-defect

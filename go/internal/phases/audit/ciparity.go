@@ -682,7 +682,7 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 			fmt.Fprintf(os.Stderr, "[audit] graduation deferred: %s has no production .go surface (test-only/absent) — enrollment obligation re-raises when production code lands\n", pkg)
 			continue
 		}
-		offenders = append(offenders, fmt.Sprintf("%s: new package absent from go/.apicover-enforce — add it + an apicover_named_test.go", pkg))
+		offenders = append(offenders, fmt.Sprintf("%s: new package absent from go/.apicover-enforce — the repo-wide apicover unnamed-export gate never inspects it. Make EXACTLY these edits:\n%s", pkg, ciparity.GraduationPrescription([]string{pkg})))
 	}
 	return offenders, nil
 }

@@ -35,6 +35,13 @@ type FailureBlock struct {
 	Class         string   `json:"class"`
 	Defects       []string `json:"defects,omitempty"`
 	EvidencePaths []string `json:"evidence_paths,omitempty"`
+	// Prescription carries a WARN's named remediation as structured content
+	// (F3, docs/operations/batch-integrity-review-2026-08-04.md:215-238):
+	// distinct from Defects because a prescription describes a fix for a
+	// foreseen risk, not something itself wrong. Kept as a separate field
+	// (not merged into Defects) so downstream consumers can tag entries
+	// distinguishably rather than losing that distinction.
+	Prescription []string `json:"prescription,omitempty"`
 }
 
 // VerdictSentinel is the full parsed sentinel payload.
@@ -58,12 +65,12 @@ var sentinelRE = regexp.MustCompile(`<!--\s*evolve-verdict:\s*(\{.*?\})\s*-->`)
 var placeholderRE = regexp.MustCompile(`^\s*<[^<>]+>\s*$`)
 
 // isPlaceholderEcho reports whether the failure block carries a contract-example
-// placeholder token in any Defects/EvidencePaths entry.
+// placeholder token in any Defects/EvidencePaths/Prescription entry.
 func isPlaceholderEcho(f *FailureBlock) bool {
 	if f == nil {
 		return false
 	}
-	for _, entries := range [][]string{f.Defects, f.EvidencePaths} {
+	for _, entries := range [][]string{f.Defects, f.EvidencePaths, f.Prescription} {
 		for _, e := range entries {
 			if placeholderRE.MatchString(e) {
 				return true

@@ -57,6 +57,20 @@ continuation and would make the gate below vacuous. Re-emission on a retry
 merges by text rather than replacing, because replacement is deletion by another
 name.
 
+**Prescriptions (cycle-1327, F3).** A WARN's failure block may also carry
+`prescription: []string` — a named remediation for a *foreseen risk*, not
+something itself wrong (e.g. cycle-1258: "run `git add -f X` or
+`dropIgnoredPaths` will silently drop it"). Auditors should populate this
+field, distinct from `defects[]`, whenever a WARN verdict prescribes a
+concrete fix that must not be allowed to silently vanish. `emitDefectLedger`
+mints an OPEN row for each prescription exactly as it does for defects, tagged
+`"PRESCRIPTION: <text>"` so an operator reading `defect-ledger.json` can tell
+"what was wrong" from "a foreseen risk's named fix" without a second ledger or
+a schema-breaking `Kind` field. The reconcile/evidence gate below treats a
+prescription-sourced entry identically to a defect-sourced one — same ids,
+same disposition rules, no parallel mechanism. A WARN with an empty (or
+absent) `prescription[]` and no `defects[]` still mints nothing.
+
 **Reconcile.** A cycle whose workspace holds a `continuation-manifest.json`
 (the existing `internal/continuation` lineage marker — no parallel field was
 invented) loads its ancestor's ledger from
