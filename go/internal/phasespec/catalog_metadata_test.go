@@ -27,7 +27,7 @@ var metadataAllowlist = map[string]bool{
 	"dependency-audit": true, "dependency-map": true, "doc-sync": true,
 	"error-handling-scan": true, "fault-localization": true, "flake-rerun-scan": true,
 	"forces-analysis": true, "frontend-design-review": true, "fuzz-probe": true,
-	"idempotency-check": true, "incident-postmortem": true, "intent": true,
+	"idempotency-check": true, "intent": true,
 	"license-provenance-audit": true, "locale-format-check": true, "market-sizing": true,
 	"memo": true, "metric-tree": true, "migration-safety-check": true,
 	"mutation-gate": true, "observability-design": true, "okr-draft": true,
