@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    ".evolve/inbox/consumed/2026-08-05T08-30-00Z-pipeline-defect-pipeline-blocker.json",
+    "go/cmd/evolve/cmd_loop.go"
+  ],
+  "consumed_by": "LANDED by the loop itself same-day (\u00a73.9 diff-verified at batch boundary 2026-08-06): 7838dab4 cmd_loop_blockerbreaker.go (--reset --fingerprint breaker ack) + 7d2da9d2/47ddfde6 cmd_inbox_ackfingerprint.go (+tests, consumption wiring clears fingerprints transactionally) + d323284e failure_digest/failure_learning identity plumbing. Both gaps this item named (manual state surgery for breaker records; consumed-P0 fingerprints never cleared) are mechanized. Live-exercised during the cycle-1348 halt recovery: evolve loop --reset --fingerprint 'ship|unknown|96f17cfe3dfe'.",
+  "created_at": "2026-08-05T09:40:00Z",
+  "fix": "An explicit ack: consuming a pipeline-defect P0 (move to consumed/ with consumed_by) should mark its fingerprint resolved in the recurrence ledger transactionally \u2014 or `evolve loop --reset` gains a --fingerprint <fp> operator arg with ledger audit. Wiring proof: fixture with 3x records + consumed P0 must relaunch clean; without consumption must still halt.",
+  "id": "recurrence-ack-for-consumed-p0",
+  "kind": "pipeline-repair",
+  "notes": "Filed live 2026-08-05 during the double re-halt. | SECOND GAP same incident: the breaker sweeps runs/cycle-N from lastCycleNumber+1, and FAILED ships never advance the number \u2014 so resolved failures stay 'in-batch' across relaunches forever (three re-halts: fresh launch, --reset launch, post-record-removal launch; cycle reset declined \u2014 no stranded marker). Operator repair = manual lastCycleNumber advance. The ack fix must clear BOTH stores (failedApproaches records AND the batch-window derivation).",
+  "priority": "P1",
+  "summary": "Cycle-1329's gate-block fingerprint (records classified cycle-mid-execution-fail) re-tripped the boot breaker on TWO relaunches AFTER the fix merged (#415) and the P0 was consumed with narrative; evolve loop --reset prunes only infrastructure-{systemic,transient}+ship-gate-config classes. The operator remedy was a manual state.json surgery (documented in the consumed P0), which is exactly the toil-and-tamper-surface the sanctioned flows exist to avoid.",
+  "title": "No ack path for a resolved breaker fingerprint: consumed P0 + merged fix still re-halts every relaunch until the 7-day failedApproaches expiry",
+  "weight": 0.9
+}

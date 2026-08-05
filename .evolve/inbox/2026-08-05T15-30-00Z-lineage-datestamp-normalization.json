@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "LineageKey groups gpt-4o-2024-08-06 with gpt-4o-2024-11-20 (same line, different dated snapshots) so PromoteLatest promotes to the newer date.",
+    "Size/tag suffixes are NOT collapsed: llama3.1:8b vs llama3.1:70b and qwen2.5-coder:32b keep distinct keys (digit-run stripping must not eat capability-bearing digits).",
+    "NewestInLineage (or a composed date comparator) orders dated snapshots correctly (2024-11-20 > 2024-08-06).",
+    "TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation is replaced per its own migration note (cases move to mustMatch with collision review).",
+    "decisionVersion bumped in fingerprint.go + decisionSurfacePin updated (the ratchet test enforces the look).",
+    "go vet ./..., -race, apicover -enforce green on internal/modelquery."
+  ],
+  "connects_to": [
+    "model-latest-selection branch (feat/model-latest-selection, adversarial-review finding 3 — MEDIUM, deliberately deferred as fail-safe no-promotion)",
+    "docs/architecture/model-discovery-and-catalog.md 'Known limitation' paragraph"
+  ],
+  "created_at": "2026-08-05T15:30:00Z",
+  "files": [
+    "go/internal/modelquery/lineage.go (key normalization)",
+    "go/internal/modelquery/newestwins.go (comparator, if date ordering is composed rather than reusing versionToken)",
+    "go/internal/modelquery/lineage_test.go + decisionversion_pin_test.go"
+  ],
+  "fix": "Extend LineageKey to strip date-shaped runs (YYYY[-MM[-DD]], 4-digit-anchored) IN ADDITION to the first dotted numeric run, so dated snapshots of one line share a bucket, while size/tag digits (:8b, :70b, 32b) survive untouched. Then dated snapshots need an ordering: either versionToken already extracts the leading date run for NewestInLineage comparison, or compose a date-aware comparator in front (mirror the FreshnessPolicy alias composition — never modify NewestInLineage's core rule). Risk to guard: any broadening of stripping re-opens capability-class collision; every new stripped shape needs a mustDiffer row proving 8b/70b, mini/base, Flash/Pro still partition.",
+  "id": "lineage-datestamp-normalization",
+  "priority": 0.55,
+  "problem": "LineageKey strips only the FIRST dotted numeric run, so date-stamped snapshot ids of the same model line (OpenAI convention gpt-4o-YYYY-MM-DD) land in distinct lineage buckets and PromoteLatest is a permanent no-op for them — the classifier's first pick is frozen (silent staleness, the inverse failure of the downgrade the keyer prevents). Latent, not live: none of the four current CLIs report dated ids; pinned deliberately in TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation.",
+  "source": "console-session adversarial review of feat/model-latest-selection (go-reviewer finding 3), 2026-08-05",
+  "title": "LineageKey: normalize date-stamped snapshot ids so same-line dated releases promote"
+}

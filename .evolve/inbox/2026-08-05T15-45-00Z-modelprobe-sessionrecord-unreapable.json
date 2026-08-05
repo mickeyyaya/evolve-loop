@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The model-probe picker capture's tmux session registry is written where the crash-orphan reaper actually sweeps (per sessionrecord.PathIn's own doc: reap-discoverable only under .evolve/runs/cycle-<N>/), OR the probe path is explicitly excluded from registry-based reaping with a reasoned comment and the orphan-socket GC covers it.",
+    "A probe process killed mid-/model-capture leaves no unreaped tmux session after the next GC sweep (regression test or live-verified).",
+    "go vet ./..., -race green on touched packages."
+  ],
+  "connects_to": [
+    "adversarial round-2 review of feat/model-latest-selection (footnote: pre-existing, NOT introduced by the scratch-workspace change — Workspace was projectRoot before, equally non-cycle-shaped)",
+    "tmux_session_gc shipped infra (the sweep this registry is supposed to feed)"
+  ],
+  "created_at": "2026-08-05T15:45:00Z",
+  "files": [
+    "go/internal/bridge/recipe_adapter.go (sessionrecord.Append call site, ~line 83)",
+    "go/internal/sessionrecord/sessionrecord.go (PathIn discovery contract)",
+    "go/cmd/evolve/cmd_models_live.go (probe workspace wiring)"
+  ],
+  "fix": "Route the picker-capture path's sessionrecord to a reap-discoverable location (a live registry must be visible to a CONCURRENT reaper — archiving after exit is useless, so this is a write-target fix, not a salvage-on-teardown fix), or document + wire the probe's tmux sessions into the orphan-socket GC that already runs at cycle start.",
+  "id": "modelprobe-sessionrecord-unreapable",
+  "priority": 0.45,
+  "problem": "bridgeModelCapturer's recipe path writes the tmux crash-recovery session registry via sessionrecord.Append(PathIn(cfg.Workspace)) — but the probe's Workspace has never been a cycle-<N> path (projectRoot before 2026-08-05, scratch temp dir after), and the registry's own contract says it is only reap-discoverable under .evolve/runs/cycle-<N>/. A probe crashed mid-capture therefore leaves a tmux session the registry-based reaper never finds (the cycle-start orphan-socket GC is the only net). Pre-existing gap, surfaced by the round-2 adversarial review of the model-latest branch.",
+  "source": "console-session adversarial review round 2 (go-reviewer footnote), 2026-08-05",
+  "title": "Model-probe tmux session registry is written where no reaper looks"
+}

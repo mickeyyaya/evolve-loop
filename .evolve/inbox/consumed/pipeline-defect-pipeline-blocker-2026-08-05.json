@@ -1,0 +1,18 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1348"
+  ],
+  "consumed_by": "FIXED console-first same evening (operating-policy pipeline-fixes-console-first): root cause was NOT the verdict-surface path the template guessed \u2014 it was a tracked-corpus/gitignore-ladder split: .evolve/evals is a tracked corpus whose NEW files were born ignored (no re-include), check-ignore exempts tracked-content dirs so dropIgnoredPaths kept the pathspec, git add -A refused rc=1 deterministically -> 3x identical fingerprint ship|unknown|96f17cfe3dfe -> breaker HALT (cycles 1345/1346/1348). Fix PR #418 (squash 42e37af2): scoped .gitignore carve-out + birth-coherence pin in the ship-time repo-contract pack (phasecoherence/gitignore_birth_test.go) + docs/incidents/cycle-1348-evals-birth-ignored-batch-halt.md. Two-round adversarial review APPROVE (both MEDIUMs folded in). Recovery: fingerprint reset + fresh relaunch (boot self-heal deploys this + the stranded worktree-evidence fallback 16a2cbc6 + #417 in one rebuild).",
+  "created_at": "2026-08-05T17:22:37Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-08-05T17:22:37Z. Evidence: failure fingerprint \"ship|unknown|96f17cfe3dfe\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|unknown|96f17cfe3dfe)",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1348. The pipeline forged a verdict (category=pipeline-blocker): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 failure fingerprint \"ship|unknown|96f17cfe3dfe\" recurred 3\u00d7 in one batch (ceiling 3) \u2014 identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|unknown|96f17cfe3dfe)",
+  "weight": 0.99
+}

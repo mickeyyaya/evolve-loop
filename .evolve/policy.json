@@ -12,7 +12,8 @@
     "proactive_probe": true
   },
   "catalog": {
-    "auto_refresh": false
+    "auto_refresh": false,
+    "refresh_stage": "shadow"
   },
   "acs": {
     "go_timeout_s": 600
