@@ -97,7 +97,11 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 		cat, srcLbl = detectRefresh(rep), "setup detect"
 	case "live", "":
 		srcLbl = "live /model (detect fallback)"
-		cat, err = liveRefresh(ctx, rep, o.Project, stderr)
+		// The live catalog is the prior: its candidates_hash lets an
+		// unchanged offering reuse the stored tier map with zero
+		// classifier calls. A read failure just means no reuse.
+		prior, _ := modelcatalog.Read(o.EvolveDir)
+		cat, err = liveRefresh(ctx, rep, o.Project, o.EvolveDir, prior, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve models refresh: unknown --source %q (live|detect)\n", o.Source)
 		return 10

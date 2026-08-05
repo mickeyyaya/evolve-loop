@@ -131,7 +131,8 @@ check and the harness's post-phase gate can never drift.
   `.evolve/contract-gate-breaker.json`; a clean cycle resets it (half-open). The counter is
   **global** (not per-phase, per-cycle or per-lane), so a cycle that aborted mid-ladder can leave it
   hot — which is why the escalation below keys off the gate's reported count, not a local ordinal.
-- **CLI escalation before the breaker** (`internal/core/contract_escalation.go`): a contract block
+- **CLI escalation before the breaker** (`internal/core/contract_escalation.go`; full design:
+  [contract-block-cli-escalation.md](contract-block-cli-escalation.md)): a contract block
   never triggers the profile's `cli_fallback` chain (that fires only on infra exits
   `{80,81,85,124,127}`), so a CLI that systematically mis-formats a deliverable used to burn every
   correction and open the circuit — a format failure silently WEAKENING the gate (batch-19
@@ -156,6 +157,14 @@ check and the harness's post-phase gate can never drift.
   - The failed family comes from the CLI that **actually ran** (routing override > `EVOLVE_*_CLI` >
     profile, via `llmroute.Resolve`), not from `profile.cli` — which would compute the family from a
     CLI that never dispatched. Same-family siblings (`claude-tmux`/`claude-p`) are not escalations.
+  - **No cross-family target ⇒ breaker-neutral salvage retry** (cycle-1300): when the phase's whole
+    dispatch chain is one CLI family there is nowhere to escalate, so the same trigger instead
+    enriches the correction with the contract validator's output **verbatim** (a structured
+    re-prompt, `composeContractSalvageRetry`). It adds no dispatch, never touches `ModelRoutingCLI`,
+    and leaves `ReviewResult.Blocks` — the breaker's own counter — untouched, so the circuit still
+    opens on the third strike as the last resort. Disjoint from escalation by construction: a phase
+    *with* a real cross-family target escalates and never also re-prompts. Together the two rungs are
+    the block-recovery ladder that runs before the breaker demotes the gate.
   - Candidates are validated with `policy.ValidatePin`, so a profile's `allowed_clis` bounds the
     escalation exactly as it bounds an operator pin.
   - Applied to `PhaseRequest.ModelRoutingCLI` on **that re-dispatch only** (a soft overlay: escalated

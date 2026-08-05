@@ -2,8 +2,10 @@
 
 > Reference documents available to evolve-loop. The split:
 >
-> - **Active references** (5 files, in `docs/research/`) — cited by runtime
->   personas/skills/scripts; loaded into agent context during cycles.
+> - **Active references** (5 files; 4 in `docs/private/research/archived-2026-05-19/`,
+>   `eval-grader-best-practices.md` at `docs/`) — cited by runtime
+>   personas/skills/scripts. (`docs/research/` itself now holds the merged
+>   research tree — see the 2026-08-05 section below.)
 > - **Archived references** (42 files, in `docs/private/research/`) — for
 >   contributor reference; explicitly excluded from agent context via the
 >   trust kernel (deny_subpaths + Layer-B filter). See
@@ -16,7 +18,7 @@
 
 | Bucket | Path | Documents | LOC |
 |---|---|---|---|
-| Active | `docs/research/` | 5 | 1,220 |
+| Active | `docs/private/research/archived-2026-05-19/` + `docs/` | 5 | 1,220 |
 | Archived | `docs/private/research/` | 42 | 7,737 |
 | **Total available** | — | **47** | **8,957** |
 
@@ -28,11 +30,11 @@ These load into agent runtime context. Cited by the listed runtime artifact.
 
 | Doc | Purpose | Used By |
 |-----|---------|---------|
-| [accuracy-self-correction.md](research/accuracy-self-correction.md) | CoT verification and anti-conformity checks | evolve-auditor.md |
-| [eval-grader-best-practices.md](research/eval-grader-best-practices.md) | Eval grader precision and mutation resistance | eval-runner.md |
-| [evaluator-research.md](research/evaluator-research.md) | Evaluator agent design rationale — 14 papers, 8 benchmarks | evaluator/SKILL.md |
-| [performance-profiling.md](research/performance-profiling.md) | Token attribution and cost baselines | docs/index.md |
-| [token-optimization-guide.md](research/token-optimization-guide.md) | Per-cycle token + cost optimization | docs/index.md |
+| [accuracy-self-correction.md](private/research/archived-2026-05-19/accuracy-self-correction.md) | CoT verification and anti-conformity checks | evolve-auditor.md |
+| [eval-grader-best-practices.md](eval-grader-best-practices.md) | Eval grader precision and mutation resistance | eval-runner.md |
+| [evaluator-research.md](private/research/archived-2026-05-19/evaluator-research.md) | Evaluator agent design rationale — 14 papers, 8 benchmarks | evaluator/SKILL.md |
+| [performance-profiling.md](private/research/archived-2026-05-19/performance-profiling.md) | Token attribution and cost baselines | docs/index.md |
+| [token-optimization-guide.md](private/research/archived-2026-05-19/token-optimization-guide.md) | Per-cycle token + cost optimization | docs/index.md |
 
 ---
 
@@ -130,11 +132,16 @@ Grouped by theme:
 
 ## Merged 2026-08-05 (from kb/research and knowledge-base/research)
 
-Research packages: [deliverable-alignment-2026-08](research/deliverable-alignment-2026-08/README.md) ·
+Research packages: [code-audit-2026-07](research/code-audit-2026-07/README.md) ·
+[deliverable-alignment-2026-08](research/deliverable-alignment-2026-08/README.md) ·
 [failed-loop-analysis-2026-07](research/failed-loop-analysis-2026-07/README.md) ·
 [graph-engineering-2026-08](research/graph-engineering-2026-08/README.md) ·
 [llm-output-stability-2026-07](research/llm-output-stability-2026-07/README.md) ·
-[token-optimization-2026](research/token-optimization-2026/README.md)
+[merge-concurrency-2026](research/merge-concurrency-2026/README.md) ·
+[token-concurrency-2026](research/token-concurrency-2026/README.md) ·
+[token-optimization-2026](research/token-optimization-2026/README.md) —
+plus three note dirs without READMEs: `research/coding-craft-2026/`,
+`research/fable-simulation-2026/`, `research/tmux-live-capture-2026-06-04/`.
 
 Plus 12 single-file notes from knowledge-base/research (lessons-and-resolutions,
 verdict-classifier drift, flag-reduction design, token histories, et al.) — see

@@ -92,7 +92,12 @@ var createTemp = func(dir, pattern string) (tempFile, error) {
 // the first run transparently triggers a refresh. Malformed JSON is an error
 // — a corrupt cache should be surfaced, not silently treated as empty.
 func Read(evolveDir string) (Catalog, error) {
-	p := pathFor(evolveDir)
+	return readCatalogFile(pathFor(evolveDir))
+}
+
+// readCatalogFile implements the shared read contract for the live and shadow
+// catalog files (missing → zero catalog, corrupt → error).
+func readCatalogFile(p string) (Catalog, error) {
 	raw, err := os.ReadFile(p)
 	if errors.Is(err, fs.ErrNotExist) {
 		return Catalog{}, nil
@@ -110,6 +115,24 @@ func Read(evolveDir string) (Catalog, error) {
 // Write persists the catalog to evolveDir atomically (temp file + rename), so
 // a crash mid-write never leaves a torn cache. evolveDir is created if absent.
 func Write(evolveDir string, c Catalog) error {
+	// Retain the outgoing catalog only once the replacement is fully written
+	// and about to land — a failed marshal/write must not rotate .prev.
+	// writeCatalogFile invokes the hook between temp-close and rename.
+	return writeCatalogFileWithPreRename(evolveDir, FileName, c, func() { retainPrevious(evolveDir) })
+}
+
+// writeCatalogFile atomically writes c to basename under evolveDir with no
+// pre-rename hook (the shadow path: no .prev rotation).
+func writeCatalogFile(evolveDir, basename string, c Catalog) error {
+	return writeCatalogFileWithPreRename(evolveDir, basename, c, nil)
+}
+
+// writeCatalogFileWithPreRename is the one atomic write path for catalog
+// files: temp file + fsync + rename, with an optional hook that runs after the
+// replacement is durably written but before it lands (Write's .prev
+// retention). The createTemp seam is preserved so store's failure-injection
+// tests keep driving every error path.
+func writeCatalogFileWithPreRename(evolveDir, basename string, c Catalog, preRename func()) error {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		return fmt.Errorf("modelcatalog: mkdir %s: %w", evolveDir, err)
 	}
@@ -119,7 +142,7 @@ func Write(evolveDir string, c Catalog) error {
 	}
 	data = append(data, '\n')
 
-	tmp, err := createTemp(evolveDir, FileName+".*.tmp")
+	tmp, err := createTemp(evolveDir, basename+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("modelcatalog: tempfile: %w", err)
 	}
@@ -140,10 +163,10 @@ func Write(evolveDir string, c Catalog) error {
 		cleanup()
 		return fmt.Errorf("modelcatalog: close temp: %w", err)
 	}
-	// Retain the outgoing catalog only once the replacement is fully written
-	// and about to land — a failed marshal/write must not rotate .prev.
-	retainPrevious(evolveDir)
-	if err := os.Rename(tmpName, pathFor(evolveDir)); err != nil {
+	if preRename != nil {
+		preRename()
+	}
+	if err := os.Rename(tmpName, filepath.Join(evolveDir, basename)); err != nil {
 		cleanup()
 		return fmt.Errorf("modelcatalog: rename: %w", err)
 	}

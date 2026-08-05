@@ -20,9 +20,9 @@
 | [model-routing.md](reference/model-routing.md) | Tier-based model selection rules |
 | [configuration.md](reference/configuration.md) | Configuration schema and domain detection |
 | [reference/scout-discovery.md](reference/scout-discovery.md) | Codebase scanning and hotspot detection |
-| [accuracy-self-correction.md](research/accuracy-self-correction.md) | CoT verification and anti-conformity checks |
-| [performance-profiling.md](research/performance-profiling.md) | Token attribution and cost baselines |
-| [eval-grader-best-practices.md](research/eval-grader-best-practices.md) | Eval grader precision and mutation resistance |
+| [accuracy-self-correction.md](private/research/archived-2026-05-19/accuracy-self-correction.md) | CoT verification and anti-conformity checks |
+| [performance-profiling.md](private/research/archived-2026-05-19/performance-profiling.md) | Token attribution and cost baselines |
+| [eval-grader-best-practices.md](eval-grader-best-practices.md) | Eval grader precision and mutation resistance |
 
 ## Architecture
 
@@ -40,17 +40,19 @@
 
 | Document | Purpose |
 |----------|---------|
-| [release-protocol.md](release/release-protocol.md) | Push/tag/release/propagate vocabulary + self-healing pipeline |
-| [release-archive.md](release/release-archive.md) | Per-version implementation notes (v8.21–current) |
-| [release-notes/index.md](release-notes/index.md) | Per-version release-notes index |
+| [publishing-releases.md](guides/publishing-releases.md) | Push/tag/release/propagate vocabulary + self-healing pipeline |
+| [release-archive.md](operations/release-archive.md) | Per-version implementation notes (v8.21–current) |
+| [release-notes/index.md](operations/release-notes/index.md) | Per-version release-notes index |
 
 ## Research Notes
 
 | Document | Purpose |
 |----------|---------|
-| [evaluator-research.md](research/evaluator-research.md) | Evaluator agent design rationale |
-| [token-optimization-guide.md](research/token-optimization-guide.md) | Per-cycle token + cost optimization |
+| [evaluator-research.md](private/research/archived-2026-05-19/evaluator-research.md) | Evaluator agent design rationale |
+| [token-optimization-guide.md](private/research/archived-2026-05-19/token-optimization-guide.md) | Per-cycle token + cost optimization |
 | [research-index.md](research-index.md) | Full research-paper index |
+| [research/](research-index.md) | Merged research tree (2026-08-05): research packages + single-file notes from the former `kb/` and `knowledge-base/research/` roots |
+| [chronicle/README.md](chronicle/README.md) | Engineering chronicle — workstream-level narratives (problem / approaches / decision / results / retro) |
 
 ## Reports
 
@@ -78,3 +80,4 @@
 | [ADR 0005](adr/0005-tsc-application.md) | TSC Application to Persona Files | 24–26 | Accepted |
 | [ADR 0006](adr/0006-layer-p-memo-handoff-template.md) | Layer-P Memo Phase Contract | 24–25 | Accepted |
 | [ADR 0007](adr/0007-inbox-injection-protocol.md) | Inbox-Injection Protocol | 27 | Accepted |
+| [ADR 0009](adr/0009-phase-handoff-schemas.md) | Phase Handoff Schemas (C2) | 63 | Accepted |

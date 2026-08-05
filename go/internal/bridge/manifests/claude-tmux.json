@@ -27,6 +27,11 @@
     "deep": "opus",
     "top": "opus"
   },
+  "model_freshness": {
+    "prefer": "alias",
+    "alias_ids": ["opus", "sonnet", "haiku"],
+    "note": "claude resolves the bare family alias to that family's newest release at LAUNCH (verified 2026-07-27: --model opus -> canonicalModel claude-opus-5). The alias is strictly fresher than any concrete id the catalog could cache; caching opus-4.6 would FREEZE the version."
+  },
   "params": {
     "permission": {
       "channel": "flag",

@@ -30,6 +30,9 @@ type CLISnapshot struct {
 	// SourceDetect). Empty defaults to SourceDetect — a snapshot of unknown
 	// provenance is treated as the non-authoritative kind.
 	Source string
+	// CandidatesHash is the decision-input fingerprint passed through to
+	// CLIEntry.CandidatesHash. Optional; empty for detect-derived snapshots.
+	CandidatesHash string
 }
 
 // BuildFromSnapshots assembles a Catalog from per-CLI snapshots, stamping
@@ -60,7 +63,7 @@ func BuildFromSnapshots(snaps []CLISnapshot, fetchedAt time.Time) Catalog {
 		if source == "" {
 			source = SourceDetect
 		}
-		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Source: source}
+		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Source: source, CandidatesHash: s.CandidatesHash}
 	}
 	return cat
 }

@@ -227,7 +227,7 @@ done
   doc's runtime-side dataset)
 - [`control-flags.md`](control-flags.md) — full flag inventory
   including the v9.0.0 opt-in `EVOLVE_*` flags referenced here
-- [`docs/release-protocol.md`](../release-protocol.md) — publish
+- [`docs/guides/publishing-releases.md`](../guides/publishing-releases.md) — publish
   vocabulary (push / tag / release / propagate / publish / ship)
 - Memory: `reference_token_optimization_research.md` (internal operator memory — not in this repo)
   — 2026 production-state research (earlier campaign — pairs with this doc)
