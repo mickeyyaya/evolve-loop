@@ -1839,6 +1839,17 @@ type CatalogPolicy struct {
 	// Claude models"). Nil/absent ⇒ no constraint — byte-identical to today for
 	// every CLI that does not opt in.
 	AllowedFamilies map[string][]string `json:"allowed_families,omitempty"`
+
+	// RefreshStage stages the cycle-start refresh WRITE path: "off" (no
+	// refresh), "shadow" (full live pipeline, writes model-catalog.shadow.json
+	// + would-change diff lines, never the live catalog — dispatch is
+	// byte-identical to off), "enforce" (writes the live catalog via Commit —
+	// today's behavior when auto_refresh is on). Absent ⇒ derived from
+	// AutoRefresh (true ⇒ enforce, false ⇒ off) so existing deployments keep
+	// their exact behavior. Unknown values resolve to "off" — the closed-
+	// vocabulary fail-safe (merge_gate precedent): a typo disables the write,
+	// it never silently arms one.
+	RefreshStage string `json:"refresh_stage,omitempty"`
 }
 
 // CatalogConfig returns the catalog configuration with defaults resolved.
@@ -1847,6 +1858,7 @@ func (p Policy) CatalogConfig() CatalogPolicy {
 	enabled := true
 	out := CatalogPolicy{AutoRefresh: &enabled}
 	if p.Catalog == nil {
+		out.RefreshStage = resolveRefreshStage("", enabled)
 		return out
 	}
 	if p.Catalog.AutoRefresh != nil {
@@ -1855,7 +1867,25 @@ func (p Policy) CatalogConfig() CatalogPolicy {
 	// Pass AllowedFamilies through unchanged — nil stays nil ("no constraint");
 	// never default to an empty map (callers/tests distinguish nil from empty).
 	out.AllowedFamilies = p.Catalog.AllowedFamilies
+	out.RefreshStage = resolveRefreshStage(p.Catalog.RefreshStage, *out.AutoRefresh)
 	return out
+}
+
+// resolveRefreshStage maps the raw refresh_stage string to the resolved stage.
+// Explicit known values pass through; absent derives from autoRefresh
+// (back-compat: true ⇒ enforce, false ⇒ off); unknown fails safe to off.
+func resolveRefreshStage(raw string, autoRefresh bool) string {
+	switch raw {
+	case "off", "shadow", "enforce":
+		return raw
+	case "":
+		if autoRefresh {
+			return "enforce"
+		}
+		return "off"
+	default:
+		return "off"
+	}
 }
 
 // ACSConfig configures the ACS Go lane timeout.

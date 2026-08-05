@@ -4,9 +4,10 @@
 // modelquery sits above it: it queries each installed CLI for the models it
 // currently offers (Lister), classifies those raw model ids into the abstract
 // tiers fast/balanced/deep (Classifier — an LLM call, the one judgment step),
-// and assembles a fresh Catalog. It therefore imports both modelcatalog and
-// bridge; keeping it separate is what lets modelcatalog stay a dependency-free
-// leaf.
+// and assembles a fresh Catalog. It imports modelcatalog (NOT bridge — live
+// CLI dispatch is injected through the Lister/PromptDispatcher seams by the
+// composition root in cmd/evolve); keeping it separate is what lets
+// modelcatalog stay a dependency-free leaf.
 //
 // Robustness contract: a per-CLI live failure (the CLI can't be driven, the
 // classifier errors, or either returns nothing) is logged and falls back to
@@ -56,6 +57,18 @@ type RefreshDeps struct {
 	// cross-family id never reaches classification. A CLI with no entry (nil
 	// slice) is unconstrained — every listed id passes through unfiltered.
 	AllowedFamilies map[string][]string
+	// Prior is the catalog from the previous refresh. When a CLI's
+	// family-filtered candidate list fingerprints identically to its prior
+	// entry — and that entry is live-sourced with full canonical-tier
+	// coverage — the prior tier map is reused WITHOUT a classifier call
+	// (zero LLM calls on an unchanged offering; the fix for tier flap on
+	// identical inputs). Zero value ⇒ nothing reusable, classify as always.
+	Prior modelcatalog.Catalog
+	// Freshness is the per-CLI freshness policy (declared in the bridge
+	// manifest's model_freshness block, threaded here as plain values by the
+	// composition root). A missing entry is the zero policy: newest concrete
+	// version wins.
+	Freshness map[string]FreshnessPolicy
 	// Now stamps the catalog's FetchedAt; defaults to time.Now.
 	Now func() time.Time
 	// Log is the WARN sink; defaults to io.Discard.
@@ -80,13 +93,14 @@ func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error
 
 	snaps := make([]modelcatalog.CLISnapshot, 0, len(deps.CLIs))
 	for _, cli := range deps.CLIs {
-		tiers, available := liveTiers(ctx, cli, deps, log)
+		tiers, available, hash := liveTiers(ctx, cli, deps, log)
 		if len(tiers) > 0 {
 			// Live-queried → authoritative; only these entries drive dispatch
 			// (modelcatalog.DispatchModel gates on SourceLive).
 			snaps = append(snaps, modelcatalog.CLISnapshot{
 				CLI: cli, Ready: true, TierModels: tiers,
 				Available: available, Source: modelcatalog.SourceLive,
+				CandidatesHash: hash,
 			})
 			continue
 		}
@@ -104,18 +118,21 @@ func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error
 	return modelcatalog.BuildFromSnapshots(snaps, now().UTC()), nil
 }
 
-// liveTiers runs the List → Classify pipeline for one CLI. It returns empty
-// tiers (signalling fallback) on any error or empty result, but still returns
-// the enumerated ids as the audit trail when listing succeeded.
-func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer) (tiers map[string]string, available []string) {
+// liveTiers runs the List → [reuse-gate] → Classify → Promote → Complete
+// pipeline for one CLI. It returns empty tiers (signalling fallback) on any
+// error or empty result, but still returns the enumerated ids as the audit
+// trail when listing succeeded. hash is the decision-input fingerprint of the
+// family-filtered candidates, stored on the entry so the NEXT refresh can
+// reuse it.
+func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer) (tiers map[string]string, available []string, hash string) {
 	ids, err := deps.Lister.List(ctx, cli)
 	if err != nil {
 		fmt.Fprintf(log, "[modelquery] WARN %s: list models: %v\n", cli, err)
-		return nil, nil
+		return nil, nil, ""
 	}
 	if len(ids) == 0 {
 		fmt.Fprintf(log, "[modelquery] WARN %s: CLI offered no models\n", cli)
-		return nil, nil
+		return nil, nil, ""
 	}
 	// Family gate: restrict candidates to this CLI's allowed families BEFORE
 	// classification (D7). A nil/absent allow-list is "no constraint" and
@@ -124,13 +141,43 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer)
 		ids = FilterByFamily(ids, allowed...)
 		if len(ids) == 0 {
 			fmt.Fprintf(log, "[modelquery] WARN %s: no models in allowed families %v; skipping\n", cli, allowed)
-			return nil, nil
+			return nil, nil, ""
 		}
+	}
+	fp := Fingerprint(FingerprintInput{
+		CLI: cli, Candidates: ids,
+		Policy: deps.Freshness[cli], Tiers: modelcatalog.CanonicalTiers,
+	})
+	// Reuse gate: an unchanged offering keeps the prior tier map with ZERO
+	// classifier calls. Reuse requires all three conditions, not just the
+	// hash match — a detect entry must never be laundered into an
+	// authoritative one, and a tier-incomplete prior must reclassify once
+	// rather than stay sticky forever.
+	if prior, ok := deps.Prior.CLIs[cli]; ok &&
+		prior.CandidatesHash != "" && prior.CandidatesHash == fp &&
+		prior.Source == modelcatalog.SourceLive &&
+		coversCanonicalTiers(prior.TierModels) {
+		return prior.TierModels, ids, fp
 	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
 	if err != nil {
 		fmt.Fprintf(log, "[modelquery] WARN %s: classify models: %v\n", cli, err)
-		return nil, ids
+		return nil, ids, ""
 	}
-	return mapped, ids
+	// The classifier keeps the qualitative decision (which line serves the
+	// tier); promotion keeps the numeric one (newest version of that line,
+	// alias-aware per the CLI's freshness policy); completion fills any tier
+	// the reply omitted from the nearest-neighbour ladder.
+	return CompleteTiers(PromoteLatest(mapped, ids, deps.Freshness[cli])), ids, fp
+}
+
+// coversCanonicalTiers reports whether tiers maps every canonical tier to a
+// non-empty model — the reuse gate's full-coverage condition.
+func coversCanonicalTiers(tiers map[string]string) bool {
+	for _, tier := range modelcatalog.CanonicalTiers {
+		if tiers[tier] == "" {
+			return false
+		}
+	}
+	return true
 }
