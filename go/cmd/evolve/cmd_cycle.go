@@ -451,7 +451,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
-		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate}),
+		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate}),
 		core.PhaseRetro: retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
