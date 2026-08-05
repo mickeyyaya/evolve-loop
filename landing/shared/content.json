@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v22.7.0",
+    "version": "v22.14.0",
     "mentalModel": "CI/CD for AI-written code",
     "oneLiner": "Any agent can write code. Evolve Loop is the AI-driven process that plans it, reviews it, heals its own mistakes, and decides what's safe to merge.",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process — not an opinion — decides whether it ships.",
@@ -44,12 +44,12 @@
   },
   "proofBar": [
     {
-      "value": "1,040+",
+      "value": "1,320+",
       "label": "autonomous cycles shipped"
     },
     {
-      "value": "3 CLIs",
-      "label": "Claude Code · Codex · Gemini"
+      "value": "4 CLIs",
+      "label": "Claude Code · Codex · Antigravity · Ollama"
     },
     {
       "value": "Apache-2.0",
@@ -625,17 +625,17 @@
     {
       "title": "Self-healing",
       "claim": "Failures don't derail it — they teach it.",
-      "proof": "When something breaks, the pipeline catches it, recovers, and turns the failure into a lasting rule. Correct work with a minor defect gets fixed in-phase instead of thrown away (graduated remediation); every failed cycle is classified — honest rejection, pipeline fault, or operator-owned — and routed where it can actually be fixed. The same mistake doesn't get to happen twice."
+      "proof": "When something breaks, the pipeline catches it, recovers, and turns the failure into a lasting rule. Correct work with a minor defect gets fixed in-phase instead of thrown away (graduated remediation); every failed cycle is classified — honest rejection, pipeline fault, or operator-owned — and routed where it can actually be fixed. The same mistake doesn't get to happen twice. It even heals its own runtime: when fixes land on main, the loop rebuilds and re-executes itself at the next boot — no operator hands required."
     },
     {
       "title": "An independent second mind",
       "claim": "Built to challenge the work, not rubber-stamp it.",
-      "proof": "A separate reviewer — a different model entirely — tries to break each change before it ships. No one grading their own homework."
+      "proof": "A separate reviewer — a different model entirely — tries to break each change before it ships, and keeps blocking until every named defect is fixed or honestly deferred. No one grading their own homework: real fixes here have taken two adversarial rounds, and the mechanism that tracks defect dispositions was itself hardened through five."
     },
     {
       "title": "Any model. No lock-in.",
       "claim": "The best LLM for each job — mix and match.",
-      "proof": "Run Claude, Gemini, and Codex side by side and route the strongest model to each role. Switch whenever you like; your process never depends on one vendor."
+      "proof": "Run Claude, Codex, Antigravity, and local models via Ollama side by side, routing the strongest model to each role — and when a model can't meet the output contract, the pipeline escalates the phase to a stronger family automatically. Switch whenever you like; your process never depends on one vendor."
     }
   ],
   "comparison": {
@@ -736,8 +736,8 @@
       {
         "n": "9",
         "label": "Publish",
-        "command": "evolve release 22.7.0",
-        "note": "A self-healing release pipeline: preflight gates, changelog, atomic version bump, CI-verified publish, auto-rollback on failure. One command, no ceremony."
+        "command": "evolve release 22.14.0",
+        "note": "A self-healing release pipeline: preflight gates, changelog, atomic version bump, CI-verified publish — and if the remote suite fails, the release auto-demotes so \"latest\" never points at a broken build."
       }
     ],
     "setup": {
@@ -821,7 +821,8 @@
       "evolve-install: checksum verified",
       "evolve-install: detected AI CLI(s): claude codex",
       "Installation complete!",
-      "evolve-install: installed: evolve 22.1.0 → ~/.local/bin/evolve",
+      "evolve-install: installed: evolve 22.14.0 → ~/.local/bin/evolve",
+      "evolve-install: binary fingerprint (SHA256): b411f12e…  — verify before you trust",
       "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
     ],
     "nextSteps": [
@@ -848,7 +849,7 @@
         "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
       }
     ],
-    "noAccount": "Pin a version: EVO_VERSION=v22.7.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+    "noAccount": "Pin a version: EVO_VERSION=v22.14.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
   },
   "inboxLab": {
     "kicker": "Continuous development",
