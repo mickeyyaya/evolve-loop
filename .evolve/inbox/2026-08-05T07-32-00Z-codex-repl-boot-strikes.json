@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    "go/internal/bridge/driver_codex.go",
+    "go/internal/clihealth/"
+  ],
+  "created_at": "2026-08-05T07:32:00Z",
+  "fix": "Root-cause the codex REPL boot timeout (driver boot marker? version freeze interaction? tmux env?), add the boot transcript to the bench record, and after fix verify strikes reset and dispatch chains start primary again.",
+  "id": "codex-repl-boot-strikes",
+  "kind": "bugfix",
+  "notes": "Filed from the overnight throughput deep-dive.",
+  "summary": "Preflights 2026-08-04/05 report codex-tmux benched (repl_boot_timeout, strikes=9). With codex benched and agy relegated for contract quality, claude-tmux carries most phases; observed verdict cadence (~1 per 30min at width-3 commitment) implies effective width ~1-1.5. Width degradation is a direct throughput tax (fleet_width_always_respected).",
+  "title": "codex-tmux benched at 9 repl_boot_timeout strikes \u2014 fleet effectively runs narrower than the width-3 commitment",
+  "weight": 0.8
+}

@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    "go/cmd/evolve/cmd_loop_chain.go",
+    "go/internal/core",
+    "docs/chronicle/2026-08-batch-integrity-review.md"
+  ],
+  "created_at": "2026-08-05T07:30:00Z",
+  "fix": "At each batch boundary (and chain re-entry), when origin/main contains ship-verified commits newer than the running binary's build SHA: rebuild, run the reset-sha integrity flow with an auditable 'boundary-refresh' authorization class (NOT silent), and re-exec the loop. Refuse mid-batch (lanes in flight). Wiring proof: a fixture batch whose main advances mid-batch must relaunch on the new binary at the boundary with the repin ledgered.",
+  "id": "auto-refresh-binary-at-boundary",
+  "kind": "pipeline-repair",
+  "notes": "Three of this week's halts were binary-lag shaped. The refresh is deterministic operator toil \u2014 exactly what Rule 5 says belongs in code.",
+  "priority": "P1",
+  "summary": "Overnight 2026-08-05 measured cost: the sentinel tail-anchor fix landed at cycle-1301 (64f8620e) but cycles 1302-1309 kept running the OLD first-match parser \u2014 3 wasted cycles on the audit-warn lane (1298/1308/1309, all parser-distortion casualties) plus the cycle-1309 identical-fingerprint batch HALT, on a defect that was already fixed in the repo. Same shape as the escalation/salvage mechanisms sitting inert for a full day. Every refresh today was manual operator work (rebuild + reset-sha -operator + relaunch).",
+  "title": "Binary lag: the loop executes a frozen binary while its own fixes land on main \u2014 auto rebuild+repin+re-exec at batch boundaries when origin has advanced",
+  "weight": 0.94
+}
