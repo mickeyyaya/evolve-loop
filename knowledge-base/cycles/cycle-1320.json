@@ -1,0 +1,47 @@
+{
+  "cycle": 1320,
+  "run_id": "01KZ7SVQJ166K8FD87ANCVK21Q",
+  "goal": "9d22f7f9398fa4e2fc8c2a77c8315a906816e20057ec26c8f437295cf59ca517",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|unknown|7af37ee970cc",
+    "pre_class": "unknown",
+    "reasons": [
+      "defect ledger: 5 defect(s) inherited from cycle-1317 are unaccounted for [d32c1c36e23feec999aa1fd32cf7f7191 (no disposition), d095ee8658d7cf8991ba96d74da4efd54 (no disposition), dd8a9d647a72c8e346ed60"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1320",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
