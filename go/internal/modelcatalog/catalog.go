@@ -54,6 +54,13 @@ type CLIEntry struct {
 	// TierFallbacks[tier] is used instead. Absent or exhausted chains degrade
 	// to the single-shot behavior (ok=false → manifest fallback at the caller).
 	TierFallbacks map[string][]string `json:"tier_fallbacks,omitempty"`
+	// CandidatesHash fingerprints the decision inputs (candidate ids, freshness
+	// policy, tier vocabulary, algorithm version) that produced TierModels —
+	// written by the refresh pipeline (modelquery.Fingerprint) and consulted on
+	// the next refresh to skip the classifier LLM call when the offering is
+	// unchanged. Absent never matches, so pre-existing catalogs classify once
+	// and then stabilize.
+	CandidatesHash string `json:"candidates_hash,omitempty"`
 }
 
 // modelForTier resolves the entry's model for tier: the primary TierModels

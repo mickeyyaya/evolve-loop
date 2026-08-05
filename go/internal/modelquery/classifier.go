@@ -92,8 +92,21 @@ func sanitizeTierMap(parsed map[string]string, offered []string) map[string]stri
 	return out
 }
 
+// tierBriefs is the one-line judgment brief per canonical tier. Every
+// modelcatalog.CanonicalTiers member MUST have an entry — the prompt is
+// generated from that vocabulary (never a hardcoded tier list, which is how
+// tier_models.top used to be silently deleted on every refresh).
+var tierBriefs = map[string]string{
+	"fast":     "cheapest / lowest-latency",
+	"balanced": "mid capability/cost",
+	"deep":     "most capable for hard work",
+	"top":      "the frontier tier — the single most capable model offered",
+}
+
 // buildClassifyPrompt is deterministic so identical inputs cache the same way at
-// the LLM layer. It instructs the model to pick one offered id per tier.
+// the LLM layer. It instructs the model to pick one offered id per tier. The
+// tier block and the JSON template are generated from
+// modelcatalog.CanonicalTiers so a canonical tier can never be omitted.
 func buildClassifyPrompt(targetCLI string, ids []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "You map LLM model ids to capability tiers for the %q CLI.\n", targetCLI)
@@ -102,12 +115,16 @@ func buildClassifyPrompt(targetCLI string, ids []string) string {
 		fmt.Fprintf(&b, "  - %s\n", id)
 	}
 	b.WriteString("\nPick the single best model id for each tier:\n")
-	b.WriteString("  fast     = cheapest / lowest-latency\n")
-	b.WriteString("  balanced = mid capability/cost\n")
-	b.WriteString("  deep     = most capable\n")
-	b.WriteString("If fewer than three distinct models exist, reuse the closest id.\n")
+	for _, tier := range modelcatalog.CanonicalTiers {
+		fmt.Fprintf(&b, "  %-8s = %s\n", tier, tierBriefs[tier])
+	}
+	b.WriteString("If fewer distinct models exist than tiers, reuse the closest id.\n")
 	b.WriteString("Reply with ONLY this JSON, no prose:\n")
-	b.WriteString(`{"fast":"<id>","balanced":"<id>","deep":"<id>"}`)
+	parts := make([]string, 0, len(modelcatalog.CanonicalTiers))
+	for _, tier := range modelcatalog.CanonicalTiers {
+		parts = append(parts, fmt.Sprintf(`"%s":"<id>"`, tier))
+	}
+	b.WriteString("{" + strings.Join(parts, ",") + "}")
 	return b.String()
 }
 

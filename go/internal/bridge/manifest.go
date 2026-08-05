@@ -69,6 +69,20 @@ type ManifestPrompt struct {
 
 // Manifest is a per-CLI capability manifest (schema v1). Drives probe
 // tiering, the REPL prompt marker, and the auto-respond rule set.
+// ModelFreshness is a manifest-declared fact about how a CLI's "latest within
+// a lineage" is chosen. Prefer "alias" marks a CLI that resolves the bare
+// family alias to its newest release at LAUNCH (the alias is then strictly
+// fresher than any concrete id a catalog could cache); the zero value is the
+// enumerating-CLI default — newest concrete version.
+type ModelFreshness struct {
+	// Prefer selects the freshness rule: "alias" or "" (newest_version).
+	Prefer string `json:"prefer,omitempty"`
+	// AliasIDs are the ids the CLI self-resolves, in preference order.
+	AliasIDs []string `json:"alias_ids,omitempty"`
+	// Note documents the evidence for the declaration (informational).
+	Note string `json:"note,omitempty"`
+}
+
 type Manifest struct {
 	CLI    string `json:"cli"`
 	Binary string `json:"binary"`
@@ -109,6 +123,15 @@ type Manifest struct {
 	// ChatGPTDefaultModel is the model substituted when a ChatGPT-auth launch
 	// resolves to a non-safe model. MUST be a member of ChatGPTSafeModels.
 	ChatGPTDefaultModel string `json:"chatgpt_default_model,omitempty"`
+	// ModelFreshness declares how this CLI's "latest model within a lineage"
+	// is chosen by the catalog-refresh pipeline. It is a fact about the CLI
+	// binary (like ChatGPTSafeModels), not an operator preference: claude
+	// resolves a bare family alias to that family's newest release at launch,
+	// so its manifest prefers the alias; enumerating CLIs omit the block and
+	// get the zero value (newest concrete version wins). Consumed by the
+	// composition root in cmd/evolve, which maps it to
+	// modelquery.FreshnessPolicy — modelquery never imports bridge.
+	ModelFreshness ModelFreshness `json:"model_freshness,omitempty"`
 	// Params is the declarative per-CLI realization table: how each high-level
 	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
 	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.
