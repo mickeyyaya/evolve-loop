@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-06-14T21:02:48.207414+08:00",
-  "project_root": "~/ai/claude/evolve-loop-phase-plugin",
-  "phase_count": 79,
+  "generated_at": "2026-08-05T07:57:42.597052+08:00",
+  "project_root": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1313",
+  "phase_count": 83,
   "phases": [
     {
       "name": "accessibility-audit",
@@ -185,7 +185,7 @@
       "tier": "auto",
       "agent": "evolve-bug-reproduction",
       "description": "Produce a FAIL_TO_PASS reproduction that demonstrably fails on the current tree, BEFORE any patch.",
-      "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build \u2014 reproduce-first anchors the fix and raises resolution rates.",
+      "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build — reproduce-first anchors the fix and raises resolution rates.",
       "categories": [
         "bugfix"
       ],
@@ -202,6 +202,7 @@
       "source": "builtin",
       "archetype": "build",
       "kind": "llm",
+      "writes_source": true,
       "tier": "auto",
       "agent": "evolve-build",
       "artifact": "build-report.md"
@@ -253,7 +254,7 @@
       "required_sections": [
         "## Cacheable Surfaces",
         "## Cache Strategy",
-        "## Invalidation & TTL"
+        "## Invalidation \u0026 TTL"
       ],
       "after": "triage"
     },
@@ -307,7 +308,7 @@
       "artifact": "cicd-pipeline-audit-report.md",
       "required_sections": [
         "## Workflow Changes",
-        "## Supply-Chain & Secret Findings",
+        "## Supply-Chain \u0026 Secret Findings",
         "## Verdict"
       ],
       "emits_verdict": true,
@@ -383,7 +384,7 @@
       ],
       "artifact": "container-hardening-scan-report.md",
       "required_sections": [
-        "## Container & Manifest Changes",
+        "## Container \u0026 Manifest Changes",
         "## Hardening Findings",
         "## Verdict"
       ],
@@ -484,8 +485,8 @@
       ],
       "artifact": "data-model-design-report.md",
       "required_sections": [
-        "## Entities & Relationships",
-        "## Schema & Indexes",
+        "## Entities \u0026 Relationships",
+        "## Schema \u0026 Indexes",
         "## Access Patterns"
       ],
       "after": "triage"
@@ -680,15 +681,21 @@
       "optional": true,
       "tier": "auto",
       "agent": "evolve-incident-postmortem",
+      "description": "Structured 4-section debrief to prevent incident recurrence when root causes go unrecorded.",
+      "when_to_use": "When an incident recurs because the root cause was previously unrecorded.",
+      "categories": [
+        "bugfix",
+        "security"
+      ],
       "artifact": "incident-postmortem-report.md",
       "required_sections": [
-        "## Impact",
-        "## Timeline",
-        "## Root Cause",
-        "## Action Items"
+        "## Incident Summary",
+        "## Root Cause Analysis",
+        "## Remediation Steps",
+        "## Prevention Plan"
       ],
       "emits_verdict": true,
-      "after": "triage"
+      "after": "build"
     },
     {
       "name": "intent",
@@ -715,7 +722,7 @@
       "artifact": "license-provenance-audit-report.md",
       "required_sections": [
         "## New Dependencies",
-        "## License & Provenance Findings",
+        "## License \u0026 Provenance Findings",
         "## Verdict"
       ],
       "emits_verdict": true,
@@ -763,13 +770,39 @@
     },
     {
       "name": "memo",
-      "source": "builtin",
+      "source": "user",
+      "root": ".evolve/phases",
       "archetype": "control",
       "kind": "llm",
       "optional": true,
       "tier": "auto",
       "agent": "evolve-memo",
-      "artifact": "memo.md"
+      "artifact": "memo.md",
+      "required_sections": [
+        "## Artifact Index",
+        "## Skill Suggestions",
+        "## carryoverTodo Guidance"
+      ],
+      "after": "ship"
+    },
+    {
+      "name": "merge-to-main-gate",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-merge-to-main-gate",
+      "description": "Verifies a completed milestone's already-integrated work is ready to be promoted to main and emits a PASS/WARN/FAIL promotion-readiness verdict plus merge_gate.* signals.",
+      "when_to_use": "Invoked by the campaign executor at a milestone/wave boundary (per the cadence advisor) to gate promoting accumulated, audited integration-branch work to main — never per-cycle.",
+      "artifact": "merge-to-main-gate-report.md",
+      "required_sections": [
+        "## Readiness Evidence",
+        "## Milestone Status",
+        "## Verdict"
+      ],
+      "emits_verdict": true
     },
     {
       "name": "metric-tree",
@@ -844,7 +877,7 @@
       "required_sections": [
         "## Critical Paths",
         "## Instrumentation Plan",
-        "## SLOs & Alerts"
+        "## SLOs \u0026 Alerts"
       ],
       "after": "triage"
     },
@@ -947,6 +980,29 @@
       "after": "triage"
     },
     {
+      "name": "preliminary-study",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-preliminary-study",
+      "description": "Researches a campaign goal and produces a verified, dependency-aware campaign plan for operator review.",
+      "when_to_use": "Use before a multi-cycle campaign when the goal needs research-backed decomposition into dependency-ordered cycle tasks.",
+      "artifact": "campaign-plan.json",
+      "required_sections": [
+        "## Research Scope",
+        "## Knowledge Capsules",
+        "## Decomposition Plan",
+        "## Dependency and Concurrency Rationale",
+        "## Anti-Over-Decomposition Justification",
+        "## Critical Unknowns",
+        "## Verdict"
+      ],
+      "after": "intent"
+    },
+    {
       "name": "premise-challenge",
       "source": "user",
       "root": ".evolve/phases",
@@ -1046,7 +1102,7 @@
       "required_sections": [
         "## Failure Modes",
         "## Resilience Strategy",
-        "## Fallback & Degradation"
+        "## Fallback \u0026 Degradation"
       ],
       "after": "triage"
     },
@@ -1132,7 +1188,7 @@
       "artifact": "rollout-plan-report.md",
       "required_sections": [
         "## Deploy Strategy",
-        "## Feature Flags & Kill Switch",
+        "## Feature Flags \u0026 Kill Switch",
         "## Rollback Triggers"
       ],
       "after": "triage"
@@ -1183,6 +1239,18 @@
       "artifact": "scout-report.md"
     },
     {
+      "name": "scout-scan",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-scout-scan",
+      "description": "MAP-step slice scanner for scout map-reduce (dispatched by the scout phase, not the spine). Off by default; activated via ScoutDecompose=enforce.",
+      "artifact": "scout-scan-report.md"
+    },
+    {
       "name": "secret-leak-scan",
       "source": "user",
       "root": ".evolve/phases",
@@ -1229,6 +1297,19 @@
       "artifact": ""
     },
     {
+      "name": "ship-stage-hygiene-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-ship-stage-hygiene-check",
+      "description": "Reconcile the paths ship is about to stage against the cycle's declared manifest (build-report/test-report): flag out-of-manifest files, runtime-minted .evolve stubs, and cross-lane leaks BEFORE ship binds the whole worktree tree.",
+      "when_to_use": "Insert before ship when the cycle touched .evolve config surfaces or when the ship manifest gate (shadow) has been reporting out-of-manifest paths — the whole-tree bind sweeps silent additions into tracking (the gate-wiring-proof and cycle-1262 stub incidents). Runtime-minted cycle-1262; config stub, no gates wired yet.",
+      "artifact": "ship-stage-hygiene-check-report.md"
+    },
+    {
       "name": "smell-scan",
       "source": "user",
       "root": ".evolve/phases",
@@ -1260,6 +1341,7 @@
       "archetype": "plan",
       "kind": "llm",
       "optional": true,
+      "writes_source": true,
       "tier": "auto",
       "agent": "evolve-tdd",
       "artifact": "tdd-contract.md"
@@ -1393,7 +1475,8 @@
     "bugfix": [
       "bug-reproduction",
       "error-handling-scan",
-      "flake-rerun-scan"
+      "flake-rerun-scan",
+      "incident-postmortem"
     ],
     "caching": [
       "cache-strategy-scan",
@@ -1445,6 +1528,7 @@
     ],
     "security": [
       "authz-gap-scan",
+      "incident-postmortem",
       "secret-leak-scan"
     ],
     "supply-chain": [
@@ -1472,10 +1556,10 @@
       "fault-localization",
       "forces-analysis",
       "fuzz-probe",
-      "incident-postmortem",
       "intent",
       "market-sizing",
       "memo",
+      "merge-to-main-gate",
       "metric-tree",
       "mutation-gate",
       "okr-draft",
@@ -1484,14 +1568,17 @@
       "plan-review",
       "post-ship-monitor",
       "prd-draft",
+      "preliminary-study",
       "retrospective",
       "risk-register",
       "rollback-plan",
       "runbook-draft",
       "scope-baseline",
       "scout",
+      "scout-scan",
       "security-scan",
       "ship",
+      "ship-stage-hygiene-check",
       "smell-scan",
       "spec-verify",
       "tdd",

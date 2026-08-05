@@ -1,37 +1,34 @@
 {
   "name": "incident-postmortem",
+  "kind": "llm",
   "archetype": "evaluate",
-  "agent": "evolve-incident-postmortem",
-  "inputs": {
-    "files": [
-      ".evolve/runs/cycle-{cycle}/scout-report.md"
-    ],
-    "signals": []
-  },
+  "optional": true,
+  "description": "Structured 4-section debrief to prevent incident recurrence when root causes go unrecorded.",
+  "when_to_use": "When an incident recurs because the root cause was previously unrecorded.",
+  "categories": [
+    "bugfix",
+    "security"
+  ],
+  "inputs": {},
   "outputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/incident-postmortem-report.md"
-    ],
-    "signals": [
-      "postmortem.action_items_count"
     ]
   },
   "classify": {
     "require_sections": [
-      "Impact",
-      "Timeline",
-      "Root Cause",
-      "Action Items"
-    ]
+      "Incident Summary",
+      "Root Cause Analysis",
+      "Remediation Steps",
+      "Prevention Plan"
+    ],
+    "verdict_on_pass": "PASS",
+    "require_failure_context": true
   },
   "routing": {
-    "insert_when": [
-      {
-        "field": "scout.goal_type",
-        "op": "==",
-        "value": "ops-incident"
-      }
-    ]
+    "insert_when": [],
+    "skip_when": null
   },
-  "after": "triage"
+  "gates": {},
+  "after": "build"
 }

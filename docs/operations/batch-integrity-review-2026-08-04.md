@@ -256,6 +256,21 @@ intersect `IsProtectedSurface` is rejected/re-routed console-side (same
 predicate, second route). Wiring proof: a fixture triage decision naming
 `acssuite/` must be refused on the fleet-todo route.
 
+**Landed** (cycle-1313, `go/internal/phases/triage/triage.go`
+`hooks.Classify` — `protectedTopNViolation`/`topNSectionBody`): `Classify`
+now parses each `## top_n` card's `files={a;b;c}` (brace) and bare
+`files=a;b;c` encodings and FAILs the artifact, citing the offending card id
+and path, the moment any segment intersects `guards.IsProtectedSurface` —
+independent of the existing inbox-only `PartitionConsole` prompt screen at
+`triage.go:121`, so the fleet-todo/scout route (unscreened by route #1) is
+now covered too. Regression lock:
+`go/internal/phases/triage/protected_surface_admission_test.go`
+(`TestTriageClassify_RejectsProtectedSurfaceTopNCard_BraceSyntax`,
+`_BareSyntax`, `_RejectsAmongMultipleCards_NamesOffendingIdOnly`,
+`_AllowsNonProtectedTopNCard`, `_NoFilesSegmentIsUnaffected`); ACS
+acceptance predicates in `go/acs/cycle1313/predicates_test.go`
+(`TestC1313_001`–`004`, `-tags acs`).
+
 ### F5 — Dead-red predicate corpus pollution
 
 **Issue.** `fcdd466e` shipped `go/acs/cycle1257/` and `go/acs/cycle1259/`

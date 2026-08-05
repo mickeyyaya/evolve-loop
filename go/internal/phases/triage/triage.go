@@ -146,26 +146,94 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 	if verdict != core.VerdictPASS {
 		return verdict, diags, string(core.PhaseTDD)
 	}
+	trimmed := strings.TrimSpace(artifact)
+	body, hasSection := topNSectionBody(trimmed)
 	// Extra triage invariant: ## top_n must contain at least one list item.
-	if !hasTopNItems(strings.TrimSpace(artifact)) {
+	if !hasSection || !listItemRE.MatchString(body) {
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message:  "## top_n section has no list items",
 		}}, string(core.PhaseTDD)
 	}
+	// F4 (docs/operations/batch-integrity-review-2026-08-04.md): the prompt-side
+	// inboxbatch.PartitionConsole screen (inboxBatchesSection above) only ever
+	// sees items sourced from .evolve/inbox — it cannot see a top_n card the LLM
+	// wrote from the fleet-todo/scout route. This is the second, independent,
+	// commit-time admission check guards.IsProtectedSurface needs: any top_n
+	// card whose files={...} (or bare files=...) segment names a protected
+	// control-plane path is refused here, regardless of how the card originated.
+	if id, path, hit := protectedTopNViolation(body); hit {
+		return core.VerdictFAIL, []core.Diagnostic{{
+			Severity: "error",
+			Message: fmt.Sprintf(
+				"top_n card %q names protected surface %q — control-plane changes go through the console route (operator-gated), not lane top_n",
+				id, path),
+		}}, string(core.PhaseTDD)
+	}
 	return core.VerdictPASS, nil, string(core.PhaseTDD)
 }
 
-func hasTopNItems(trimmed string) bool {
+// topNSectionBody returns the ## top_n section content (everything after the
+// heading up to the next "## " heading or end of artifact), or ok=false when
+// no "## top_n" heading is present. trimmed must already be whitespace-trimmed.
+func topNSectionBody(trimmed string) (body string, ok bool) {
 	loc := topNHeadingRE.FindStringIndex(trimmed)
 	if loc == nil {
-		return false
+		return "", false
 	}
-	body := trimmed[loc[1]:]
+	body = trimmed[loc[1]:]
 	if next := nextHeadingRE.FindStringIndex(body); next != nil {
 		body = body[:next[0]]
 	}
-	return listItemRE.MatchString(body)
+	return body, true
+}
+
+// topNItemIDRE captures the id token of a "- id: description ..." top_n list
+// item (the same id shape triage-report.md's real output and every existing
+// fixture use).
+var topNItemIDRE = regexp.MustCompile(`(?m)^[-*]\s+([^:\n]+):`)
+
+// filesFieldRE matches a top_n card's files= field in either the brace-
+// delimited encoding inboxbatch.RenderMarkdown emits (files={a;b;c}) or the
+// bare, comma-terminated encoding real cycle output also uses (files=a;b;c).
+var filesFieldRE = regexp.MustCompile(`files=(?:\{([^}]*)\}|([^,\n]*))`)
+
+// protectedTopNViolation scans body (a ## top_n section's content) line by
+// line for the first list item whose files= segment names a path
+// guards.IsProtectedSurface treats as pipeline control plane. It returns the
+// offending card's id and the offending path; ok is false when no card
+// violates. Only the first hit is reported — Classify FAILs the whole
+// artifact on any single violation, so further scanning adds no value.
+func protectedTopNViolation(body string) (id, path string, ok bool) {
+	for _, line := range strings.Split(body, "\n") {
+		if !listItemRE.MatchString(line) {
+			continue
+		}
+		filesMatch := filesFieldRE.FindStringSubmatch(line)
+		if filesMatch == nil {
+			continue
+		}
+		filesRaw := filesMatch[1]
+		if filesRaw == "" {
+			filesRaw = filesMatch[2]
+		}
+		for _, f := range strings.Split(filesRaw, ";") {
+			f = strings.TrimSpace(f)
+			// Strip a trailing "(note)" annotation, e.g. "role.go (allowance)".
+			if idx := strings.Index(f, "("); idx >= 0 {
+				f = strings.TrimSpace(f[:idx])
+			}
+			if f == "" || !guards.IsProtectedSurface(f) {
+				continue
+			}
+			cardID := ""
+			if idMatch := topNItemIDRE.FindStringSubmatch(line); idMatch != nil {
+				cardID = strings.TrimSpace(idMatch[1])
+			}
+			return cardID, f, true
+		}
+	}
+	return "", "", false
 }
 
 // Config holds the dependencies for constructing a triage Phase: the bridge
