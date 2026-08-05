@@ -18,8 +18,11 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "quarantine" {
 		return runInboxQuarantine(args[1:], stdin, stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "ack-fingerprint" {
+		return runInboxAckFingerprint(args[1:], stdout, stderr)
+	}
 	if len(args) < 1 || args[0] != "batches" {
-		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine> ...")
+		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine|ack-fingerprint> ...")
 		return 10
 	}
 	asJSON := false

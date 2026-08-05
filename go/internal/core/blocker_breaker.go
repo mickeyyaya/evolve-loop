@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -136,6 +137,50 @@ func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolv
 		return fmt.Errorf("resolved-fingerprints.json: %w", err)
 	}
 	return nil
+}
+
+// consumptionFingerprintRe anchors on the literal `fingerprint` token
+// (never a bare pipe-delimited substring — a `docs/a|b|c.md` path or any
+// other triplet-shaped text with no `fingerprint` keyword must not match)
+// followed by an optional `=`, an optional opening quote, and the
+// pipe|pipe|pipe triplet shape every failure fingerprint takes
+// (failure_digest.go). Matches both consumed_by's unquoted
+// `fingerprint ship|unknown|76d0f4fca190` and notes' quoted
+// `fingerprint "ship|unknown|76d0f4fca190"` shapes with one pattern.
+var consumptionFingerprintRe = regexp.MustCompile(`fingerprint\s*=?\s*"?([A-Za-z0-9_.\-]+\|[A-Za-z0-9_.\-]+\|[A-Za-z0-9_.\-]+)"?`)
+
+// ParseConsumptionFingerprint extracts a failure fingerprint from free text
+// (a pipeline-defect item's consumed_by narrative or auto-filed notes
+// field). Fails closed (ok=false) when no `fingerprint <triplet>` token is
+// present — it never guesses from a pipe-delimited substring alone.
+func ParseConsumptionFingerprint(text string) (string, bool) {
+	m := consumptionFingerprintRe.FindStringSubmatch(text)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// ConsumePipelineDefectFingerprint is the single writer path for
+// transactional inbox consumption acking the blocker-breaker ledger: it
+// extracts the fingerprint from consumedBy, falling back to notes when
+// consumedBy carries none, and appends it to resolved-fingerprints.json via
+// AppendResolvedFingerprint. Returns an error — and writes NOTHING to the
+// ledger — when neither field carries a parseable fingerprint, so a P0
+// consumed with no diagnosable fingerprint is never silently swallowed into
+// the ledger as an empty/garbage entry.
+func ConsumePipelineDefectFingerprint(evolveDir, consumedBy, notes, resolvedBy string, resolvedAt time.Time) (string, error) {
+	fp, ok := ParseConsumptionFingerprint(consumedBy)
+	if !ok {
+		fp, ok = ParseConsumptionFingerprint(notes)
+	}
+	if !ok {
+		return "", fmt.Errorf("ConsumePipelineDefectFingerprint: no fingerprint token found in consumed_by or notes")
+	}
+	if err := AppendResolvedFingerprint(evolveDir, fp, resolvedBy, resolvedAt); err != nil {
+		return "", err
+	}
+	return fp, nil
 }
 
 // BlockerVerdict is the breaker's decision. Halt=true means the batch must
