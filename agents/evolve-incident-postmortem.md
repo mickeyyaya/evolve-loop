@@ -2,7 +2,7 @@
 name: incident-postmortem
 description: "Structured 4-section debrief to prevent incident recurrence when root causes go unrecorded."
 model: "balanced"
-tools: ["view_file", "grep_search", "run_command"]
+tools: ["Read", "Grep", "Glob", "Bash"]
 output-format: "markdown"
 ---
 # Pipeline Phase: Incident Postmortem
