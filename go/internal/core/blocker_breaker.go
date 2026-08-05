@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // BlockerBreakerConfig carries the policy ceilings (policy.FailureThresholds
@@ -45,6 +46,96 @@ type BlockerBreakerConfig struct {
 	// fingerprint rule (batch-6: three DIFFERENT failures shared one empty
 	// fingerprint).
 	UnexplainedCeiling int
+	// AckedFingerprints excludes acknowledged fingerprints from Rule B's
+	// identical-fingerprint count (the .evolve/resolved-fingerprints.json
+	// ledger — LoadResolvedFingerprints/AppendResolvedFingerprint). This is
+	// the fix for the cycle-1329 recurrence: a fingerprint whose root cause
+	// was already diagnosed and consumed kept re-tripping the breaker on
+	// every relaunch because the breaker had no memory across invocations.
+	// The exclusion is scoped to ONE named fingerprint at a time, never a
+	// blanket Rule B disable — a different, unacked fingerprint still halts
+	// at the ceiling unchanged. Nil/empty = no exclusions (zero value,
+	// byte-identical behavior for every pre-existing caller).
+	AckedFingerprints map[string]bool
+}
+
+// ResolvedFingerprint is one record in the ack ledger
+// (.evolve/resolved-fingerprints.json) — an append-only JSON array an
+// operator (or, eventually, transactional inbox consumption) writes to mark
+// a failure fingerprint's root cause diagnosed and fixed, so the blocker
+// breaker stops re-halting on it.
+type ResolvedFingerprint struct {
+	Fingerprint string `json:"fingerprint"`
+	ResolvedAt  string `json:"resolved_at"`
+	ResolvedBy  string `json:"resolved_by"`
+}
+
+// resolvedFingerprintsFile is the ledger's filename under evolveDir.
+const resolvedFingerprintsFile = "resolved-fingerprints.json"
+
+// LoadResolvedFingerprints reads the ack ledger and returns the set of
+// acknowledged fingerprints. A missing file returns an empty set with NO
+// error — fail-open, mirroring CollectBatchFailureDigests' own tolerance for
+// a healthy run that never wrote one.
+func LoadResolvedFingerprints(evolveDir string) (map[string]bool, error) {
+	raw, err := os.ReadFile(filepath.Join(evolveDir, resolvedFingerprintsFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]bool{}, nil
+		}
+		return nil, fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	var records []ResolvedFingerprint
+	if err := json.Unmarshal(raw, &records); err != nil {
+		return nil, fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	out := make(map[string]bool, len(records))
+	for _, r := range records {
+		if r.Fingerprint != "" {
+			out[r.Fingerprint] = true
+		}
+	}
+	return out, nil
+}
+
+// AppendResolvedFingerprint atomically appends one ack record to the ledger,
+// creating it if absent. Read-modify-write followed by a tmp+rename atomic
+// write (the project's shell-convention `mv "${f}.tmp.$$"` mirrored in Go:
+// os.Rename is atomic on the same filesystem) — no reader ever observes a
+// partially-written ledger.
+func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolvedAt time.Time) error {
+	if strings.TrimSpace(fingerprint) == "" {
+		return fmt.Errorf("AppendResolvedFingerprint: fingerprint must not be empty")
+	}
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		return fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	path := filepath.Join(evolveDir, resolvedFingerprintsFile)
+	var records []ResolvedFingerprint
+	if raw, err := os.ReadFile(path); err == nil {
+		if uerr := json.Unmarshal(raw, &records); uerr != nil {
+			return fmt.Errorf("resolved-fingerprints.json: %w", uerr)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	records = append(records, ResolvedFingerprint{
+		Fingerprint: fingerprint,
+		ResolvedAt:  resolvedAt.UTC().Format(time.RFC3339),
+		ResolvedBy:  resolvedBy,
+	})
+	buf, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, buf, 0o644); err != nil {
+		return fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("resolved-fingerprints.json: %w", err)
+	}
+	return nil
 }
 
 // BlockerVerdict is the breaker's decision. Halt=true means the batch must
@@ -110,6 +201,9 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 		counts := map[string]int{}
 		for _, d := range digests {
 			if d.Fingerprint == "" || isUnexplainedDigest(d) {
+				continue
+			}
+			if cfg.AckedFingerprints[d.Fingerprint] {
 				continue
 			}
 			counts[d.Fingerprint]++

@@ -74,12 +74,19 @@ type loopConfig struct {
 	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
 	Resume            bool `json:"resume,omitempty"`
 	Reset             bool `json:"reset,omitempty"`
-	ConsensusAudit    bool `json:"consensus_audit,omitempty"`
-	DryRun            bool `json:"dry_run,omitempty"`
-	ForceFresh        bool `json:"force_fresh,omitempty"`
-	SkipPreflight     bool `json:"skip_preflight,omitempty"`
-	SkipPreflightBoot bool `json:"skip_preflight_boot,omitempty"`
-	BypassPolicy      bool `json:"bypass_policy,omitempty"`
+	// Fingerprint is the operator-driven --fingerprint <fp> arg: with --reset,
+	// acknowledges this exact failure fingerprint in
+	// .evolve/resolved-fingerprints.json so the blocker-breaker's Rule B
+	// excludes it going forward (ADR-0072 extension operator unblock — the
+	// cycle-1329 recurrence fix). Empty = no-op, byte-identical pre-existing
+	// --reset behavior.
+	Fingerprint       string `json:"fingerprint,omitempty"`
+	ConsensusAudit    bool   `json:"consensus_audit,omitempty"`
+	DryRun            bool   `json:"dry_run,omitempty"`
+	ForceFresh        bool   `json:"force_fresh,omitempty"`
+	SkipPreflight     bool   `json:"skip_preflight,omitempty"`
+	SkipPreflightBoot bool   `json:"skip_preflight_boot,omitempty"`
+	BypassPolicy      bool   `json:"bypass_policy,omitempty"`
 	// ChainMode is the resolved batch-chaining opt-in: the --until-inbox-empty
 	// CLI parameter ORed with policy.json chain.enabled. When set, runLoop
 	// drives runLoopBatch repeatedly at the batch boundary (cmd_loop_chain.go)
@@ -269,6 +276,18 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[loop] --reset: %v\n", err)
 		} else if pr.Removed > 0 {
 			fmt.Fprintf(stderr, "[loop] --reset: pruned %d failedApproaches (infrastructure-{systemic,transient} + ship-gate-config) (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+		}
+		// --reset --fingerprint <fp>: the blocker-breaker fingerprint-ack
+		// operator unblock (cycle-1329 recurrence fix). Appends to the ack
+		// ledger BEFORE the failedApproaches prune above ran its course, so a
+		// single --reset invocation both clears stale approach records AND
+		// stops the SAME fingerprint from re-tripping Rule B on relaunch.
+		if cfg.Fingerprint != "" {
+			if err := core.AppendResolvedFingerprint(cfg.EvolveDir, cfg.Fingerprint, "operator-reset", time.Now().UTC()); err != nil {
+				fmt.Fprintf(stderr, "[loop] --reset --fingerprint: %v\n", err)
+			} else {
+				fmt.Fprintf(stderr, "[loop] --reset --fingerprint: acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", cfg.Fingerprint)
+			}
 		}
 	}
 

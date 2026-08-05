@@ -13,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func writeDigestFixture(t *testing.T, evolveDir string, cycle int, fingerprint, preClass string) {
@@ -66,6 +69,43 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 	if _, halted := blockerBreakerHalt(evolveDir, root, 12, io.Discard); halted {
 		t.Fatal("digests at or before batchStartCycle must be out of scope")
 	}
+}
+
+// TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt is the P1 item's
+// explicit wiring-proof fixture: the actual loop-boot call site
+// (blockerBreakerHalt) replaying the cycle-1329 incident (3x identical-
+// fingerprint digests on disk) must NOT halt once the ack ledger carries a
+// matching record, and must still halt (unchanged ADR-0072 behavior) when
+// the ledger is absent.
+func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
+	fp := "ship|unknown|76d0f4fca190"
+
+	t.Run("unacked still halts", func(t *testing.T) {
+		root := t.TempDir()
+		evolveDir := filepath.Join(root, ".evolve")
+		writeDigestFixture(t, evolveDir, 1329, fp, "gate-block")
+		writeDigestFixture(t, evolveDir, 1330, fp, "gate-block")
+		writeDigestFixture(t, evolveDir, 1331, fp, "gate-block")
+
+		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard); !halted {
+			t.Fatal("3x identical-fingerprint digests with no ack must still halt (ADR-0072 floor unweakened)")
+		}
+	})
+
+	t.Run("acked fingerprint excluded", func(t *testing.T) {
+		root := t.TempDir()
+		evolveDir := filepath.Join(root, ".evolve")
+		writeDigestFixture(t, evolveDir, 1329, fp, "gate-block")
+		writeDigestFixture(t, evolveDir, 1330, fp, "gate-block")
+		writeDigestFixture(t, evolveDir, 1331, fp, "gate-block")
+		if err := core.AppendResolvedFingerprint(evolveDir, fp, "operator-reset", time.Now().UTC()); err != nil {
+			t.Fatalf("seed ack ledger: %v", err)
+		}
+
+		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard); halted {
+			t.Fatal("an acked fingerprint replaying the exact incident must not re-halt the batch")
+		}
+	})
 }
 
 func TestBlockerBreakerHalt_QuietOnHealthyBatch(t *testing.T) {

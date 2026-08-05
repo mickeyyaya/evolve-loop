@@ -33,10 +33,16 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		fp = policy.DefaultSystemFailurePolicy()
 	}
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
+	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
+	if lerr != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: resolved-fingerprints ledger unreadable (%v) — proceeding without exclusions\n", lerr)
+		acked = nil
+	}
 	v := core.EvaluateBlockerBreaker(digests, core.BlockerBreakerConfig{
 		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
 		IdenticalFingerprintCeiling: fp.Thresholds.IdenticalFingerprintHaltCeiling,
 		UnexplainedCeiling:          fp.Thresholds.UnexplainedFailuresHaltCeiling,
+		AckedFingerprints:           acked,
 	})
 	if !v.Halt {
 		return 0, false

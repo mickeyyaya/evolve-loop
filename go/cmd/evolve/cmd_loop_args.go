@@ -27,6 +27,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		resume            bool
 		dryRun            bool
 		reset             bool
+		fingerprint       string
 		consensusAudit    bool
 		forceFresh        bool
 		skipPreflight     bool
@@ -44,6 +45,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.BoolVar(&resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
+	fs.StringVar(&fingerprint, "fingerprint", "", "with --reset, acknowledge this failure fingerprint in .evolve/resolved-fingerprints.json so the blocker-breaker excludes it (ADR-0072 extension operator unblock)")
 	fs.BoolVar(&consensusAudit, "consensus-audit", false, "opt-in cross-CLI auditor consensus mode")
 	fs.BoolVar(&forceFresh, "force-fresh", false, "start fresh even if an unfinished cycle exists (history NOT sealed; use evolve cycle reset to seal)")
 	fs.BoolVar(&skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
@@ -176,6 +178,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		MaxCyclesExplicit: cyclesFlag > 0 || maxCyclesFlag > 0 || posCycles > 0,
 		Resume:            resume,
 		Reset:             reset,
+		Fingerprint:       fingerprint,
 		ConsensusAudit:    consensusAudit,
 		DryRun:            dryRun,
 		ForceFresh:        forceFresh,

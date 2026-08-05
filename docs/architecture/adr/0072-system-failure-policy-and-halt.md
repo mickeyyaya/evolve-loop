@@ -111,6 +111,38 @@ That HIGHEST rule ("NEVER stop queue/loop") is **refined, not broken**: it gover
 - **Negative / cost:** an autonomous overnight run now *halts* on a system-level failure instead of grinding — by design, this is the point (better to halt-and-wait than burn tokens repeating). Mitigation: the auto-filed P0 pipeline-repair item + escalation dossier make resumption a fast, guided fix.
 - **Testing:** deterministic layers (coherence signal, floor, non-progress counters, quarantine routing, escalation write) are unit-tested TDD-first; the orchestrator decision is contract-tested against `failure-decision.json` schema with the deterministic fallback exercised when the artifact is absent.
 
+## Extension: resolved-fingerprint ack ledger (cycle 1332)
+
+The mid-batch pipeline-blocker breaker (`core.EvaluateBlockerBreaker`, Rule B
+"identical-fingerprint") re-scans `.evolve/runs/cycle-N/failure-digest.json`
+fresh on every relaunch with no memory across invocations. Incident: cycle
+1329 halted on fingerprint `ship|unknown|76d0f4fca190`; its root cause was
+fixed and the P0 inbox item consumed **twice** in one day, yet the SAME
+fingerprint re-tripped the breaker on every subsequent relaunch, because (a)
+the breaker has no concept of "already diagnosed and consumed" and (b)
+`lastCycleNumber` does not advance on a halted/FAILed cycle, so the offending
+digest never leaves the batch window.
+
+Fix: an append-only ack ledger, `.evolve/resolved-fingerprints.json`
+(`{fingerprint, resolved_at, resolved_by}[]`), loaded via
+`core.LoadResolvedFingerprints` and threaded into
+`BlockerBreakerConfig.AckedFingerprints` — Rule B's identical-fingerprint
+loop excludes any digest whose fingerprint is in that set. The exclusion is
+scoped to the exact fingerprint acked; a *different* recurring fingerprint
+still halts at the ceiling unchanged (no blanket Rule B disable). An operator
+writes the ledger via `evolve loop --reset --fingerprint <fp>`
+(`core.AppendResolvedFingerprint`, wired in `cmd_loop.go`'s existing
+`--reset` block); `cmd_loop_blockerbreaker.go` loads the ledger before every
+`EvaluateBlockerBreaker` call. Wiring proof: `TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt`
+replays the exact 3x-identical-fingerprint incident shape through the real
+`blockerBreakerHalt` call site with and without the ack record.
+
+Deferred (out of this cycle's scope, unscoped design decision): transactionally
+writing the ledger entry as part of *inbox consumption itself* (`kind:
+"pipeline-repair"` items) — today inbox consumption has no existing Go
+production caller to wire into; the CLI `--fingerprint` path above is the
+sanctioned operator-driven alternative until that caller exists.
+
 ## Implementation slices (one campaign)
 
 - **S1 — Policy schema + loader:** `failure_policy` struct in `internal/policy` + compiled defaults + policy.json block. TDD.
