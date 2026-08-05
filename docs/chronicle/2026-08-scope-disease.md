@@ -176,6 +176,21 @@ regression proof."*
   main). No recurrence data yet post-fix; the measure of success is that the
   *next* config-dir break fails a PR check instead of main.
 
+### Interim class fix (2026-08-05): the ship-time repo-contract scanner pack
+
+Costume #5 (incident-postmortem, cycle-1313) proved the class outruns
+point-fixes, and TIA-enforce is gated on impact-surface manifests that do not
+exist yet. The interim class fix landed console-side: the SHIP phase now runs
+the four incident-proven repo-wide guard packages (phasespec, profiles,
+phasecoherence, routingtest) in the lane worktree BEFORE bind/push
+(`internal/phases/ship/repocontract.go`, dial
+`gates.repo_contract_gate`, default **enforce** — a deliberate deviation from
+shadow-first, justified because the pack is existing deterministic FP≈0 repo
+tests whose breakage IS a red main). A RED pack fails the lane's ship with the
+dedicated `REPO_CONTRACT_GATE` code instead of redding main and storming the
+operator's CI email. All five costumes would have been caught in-lane by this
+gate. Wiring pinned against the cycle-1064 silently-unwired trap.
+
 ## Retrospective — what we learned
 
 - **Per-cycle green is a statement about the changed scope, not about main.**

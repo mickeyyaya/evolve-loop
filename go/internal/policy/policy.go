@@ -1392,17 +1392,28 @@ type GatesPolicy struct {
 	// untracked-leak shape) are LOGGED before the gate is allowed to block a
 	// cycle. "enforce" fails the ship closed with core.CodeManifestGate.
 	ManifestGate string `json:"manifest_gate,omitempty"`
+
+	// RepoContractGate is the ship-time repo-contract scanner pack's dial
+	// (internal/phases/ship/repocontract.go). Unlike ManifestGate it defaults
+	// to "enforce": the scanners are the deterministic repo-wide guard suites
+	// (phasespec, profiles, phasecoherence, routingtest) whose breakage IS a
+	// red main — four lane landings redded main in the week of 2026-08-04
+	// (artifact-bytes, phase metadata, profile stubs, incident-postmortem),
+	// each a CI-email storm; FP≈0 because a failing scanner here fails on
+	// main's next run by construction. "off" disables.
+	RepoContractGate string `json:"repo_contract_gate,omitempty"`
 }
 
 // GatesConfig is the resolved gate configuration with defaults applied.
 type GatesConfig struct {
-	ContractGate   string
-	EvalGate       string
-	TriageCapGate  string
-	ReviewGate     string
-	ReportSizeGate string
-	TopNGate       string
-	ManifestGate   string
+	ContractGate     string
+	EvalGate         string
+	TriageCapGate    string
+	ReviewGate       string
+	ReportSizeGate   string
+	TopNGate         string
+	ManifestGate     string
+	RepoContractGate string
 }
 
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
@@ -1415,6 +1426,10 @@ func (p Policy) GatesConfig() GatesConfig {
 		ReportSizeGate: "shadow", // shadow/warn first, per the Slice S1 inbox spec
 		TopNGate:       "enforce",
 		ManifestGate:   "shadow", // shadow-first, mirroring ReportSizeGate (cycle-1064)
+		// enforce-default deviation from shadow-first, justified: the pack is
+		// existing deterministic repo tests (FP≈0), and every failure mode it
+		// gates was a LIVE red-main incident in the preceding week.
+		RepoContractGate: "enforce",
 	}
 	if p.Gates == nil {
 		return c
@@ -1439,6 +1454,9 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	if p.Gates.ManifestGate != "" {
 		c.ManifestGate = p.Gates.ManifestGate
+	}
+	if p.Gates.RepoContractGate != "" {
+		c.RepoContractGate = p.Gates.RepoContractGate
 	}
 	return c
 }
