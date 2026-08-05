@@ -104,6 +104,15 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		"evaluator":   "persona projected from skills/evaluator",
 		"inspirer":    "persona projected from skills/inspirer",
 		"tool-policy": "shared tool-policy fragment, not an agent",
+		// Runtime-minted profile stubs for catalog phases whose personas are
+		// not yet authored: the minter completes phase->profile pairing at
+		// dispatch time, these files are gitignored (never tracked), and the
+		// ship-time repo-contract gate would otherwise block EVERY lane on
+		// stubs it did not author (first live firing, cycle ~1326). The
+		// allowlist-shrink ratchet applies: author the persona, delete the
+		// entry. Persona completion tracked on phase-mint-carries-select-metadata.
+		"ship-stage-hygiene-check":      "runtime-minted stub; persona pending (queue: phase-mint class)",
+		"regression-predicate-precheck": "runtime-minted stub; persona pending (queue: phase-mint class)",
 	}
 
 	agentEntries, err := os.ReadDir(filepath.Join(root, "agents"))
