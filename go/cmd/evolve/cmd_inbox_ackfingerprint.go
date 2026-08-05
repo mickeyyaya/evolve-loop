@@ -10,14 +10,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
-	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // inboxItemFingerprintFields is the minimal subset of an inbox item's JSON
@@ -35,20 +30,16 @@ func runInboxAckFingerprint(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	itemPath := args[0]
-	raw, err := os.ReadFile(itemPath)
+	// Shares ackItemFingerprint with the reconciler and `evolve inbox consume`
+	// (cmd_inbox_consume.go) — one extraction path, one ledger writer.
+	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
+	fp, found, err := ackItemFingerprint(evolveDir, itemPath, "inbox-consumption")
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox ack-fingerprint: %v\n", err)
 		return 1
 	}
-	var item inboxItemFingerprintFields
-	if err := json.Unmarshal(raw, &item); err != nil {
-		fmt.Fprintf(stderr, "inbox ack-fingerprint: %s: %v\n", itemPath, err)
-		return 1
-	}
-	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
-	fp, err := core.ConsumePipelineDefectFingerprint(evolveDir, item.ConsumedBy, item.Notes, "inbox-consumption", time.Now().UTC())
-	if err != nil {
-		fmt.Fprintf(stderr, "inbox ack-fingerprint: %s: %v\n", itemPath, err)
+	if !found {
+		fmt.Fprintf(stderr, "inbox ack-fingerprint: %s: no fingerprint token found in consumed_by or notes\n", itemPath)
 		return 1
 	}
 	fmt.Fprintf(stdout, "inbox ack-fingerprint: acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", fp)

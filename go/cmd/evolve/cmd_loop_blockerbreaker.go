@@ -33,6 +33,12 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		fp = policy.DefaultSystemFailurePolicy()
 	}
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
+	// The ack ledger is a PROJECTION of the consumed inbox corpus: sweep
+	// .evolve/inbox/consumed/ into it before loading, so a P0 that was consumed
+	// by ANY route (including a bare `mv`, which is how the cycle-1335 P0 got
+	// there) stops re-halting the breaker without an operator remembering the
+	// manual `evolve inbox ack-fingerprint` step.
+	reconcileConsumedFingerprints(evolveDir, stderr)
 	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
 	if lerr != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: resolved-fingerprints ledger unreadable (%v) — proceeding without exclusions\n", lerr)

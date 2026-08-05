@@ -170,6 +170,33 @@ func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
 	return state.LastCycleNumber, nil
 }
 
+// readBatchWindowFloor returns the cycle number the blocker breaker's batch
+// window starts above: max(LastCycleNumber, LastAllocatedCycleNumber).
+//
+// Two counters with two meanings. LastCycleNumber tracks cycles COMPLETED —
+// an aborted cycle exits through abnormalEpilogue, which writes its failure
+// digest but returns before finalizeCycle, so the counter never advances past
+// it. LastAllocatedCycleNumber tracks cycles DISPATCHED: it advances at mint
+// time (alloc.go — "a crashed run BURNS its number"). A time boundary belongs
+// on the dispatch counter, otherwise the digests of aborted cycles stay inside
+// `> floor` on every relaunch and Rule B re-trips before any cycle runs (the
+// cycle-1335 triple re-halt: lastCycleNumber=1325 while cycles 1326/1328/1329
+// had aborted with one shared fingerprint).
+//
+// max, not a bare swap: allocateCycle falls back to LastCycleNumber+1 when
+// storage is not a StateUpdater, so a legacy state can carry a zero lease —
+// anchoring on it alone would zero the window and re-collect all of runs/.
+func readBatchWindowFloor(ctx context.Context, st core.Storage) (int, error) {
+	state, err := st.ReadState(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if state.LastAllocatedCycleNumber > state.LastCycleNumber {
+		return state.LastAllocatedCycleNumber, nil
+	}
+	return state.LastCycleNumber, nil
+}
+
 // unfinishedCycle reports whether cycle-state describes a cycle that started
 // but never completed — its id is ahead of lastCycleNumber. A clean cycle
 // advances lastCycleNumber to its own id on completion (orchestrator), so a

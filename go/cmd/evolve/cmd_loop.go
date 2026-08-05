@@ -521,8 +521,12 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 
 	// Pipeline-blocker breaker scope: only failures from THIS batch count
 	// (digests of cycles > batchStartCycle), so a historic blocker that was
-	// already fixed can never halt a fresh healthy run.
-	batchStartCycle, _ := readLastCycleNumber(context.Background(), deps.Storage)
+	// already fixed can never halt a fresh healthy run. The floor is the
+	// ALLOCATION lease, not the completion counter — an aborted cycle writes a
+	// digest without ever advancing LastCycleNumber, and anchoring on that
+	// counter kept re-collecting those digests on every relaunch
+	// (readBatchWindowFloor, cmd_loop_control.go).
+	batchStartCycle, _ := readBatchWindowFloor(context.Background(), deps.Storage)
 
 	for i := 0; i < effectiveMax; i++ {
 		// A SIGINT/SIGTERM that lands between cycles stops cleanly here.
