@@ -105,14 +105,30 @@ node_modules/
 # (ADR-0035 authoring path: .evolve/phases/<name>/agent.md) must ship too —
 # without this line, ship's plain `git add -A` silently drops them.
 !.evolve/phases/*/agent.md
-# NOTE (issue-#11 / cycle-176): a self-evolve cycle (ee77067) un-ignored .evolve/
-# (`!.evolve/` + `!.evolve/evals/`) to "track evals". That broke a LOAD-BEARING
-# invariant — recoverBuildLeak (go/internal/core/orchestrator.go) and the audit
-# assume .evolve/ is fully gitignored; un-ignoring it exposed ~300 eval files to
-# `git status`, which the leak-recovery then tried to relocate/`git add` and
-# aborted the cycle. Reverted to keep .evolve/ runtime state ignored. Versioning
-# eval definitions, if desired, must be a deliberate redesign that also updates the
-# recovery/audit machinery — not a blanket un-ignore.
+# ... and except the EGPS eval definitions. The tracked eval corpus has existed
+# since 2026-06-01 and eval-materialization lanes DELIVER new evals — but this
+# re-include was missing, so every new eval was born ignored: check-ignore could
+# not flag the pathspec (tracked content exempts the dir), ship staging kept it,
+# and `git add` refused the whole .evolve/evals pathspec (rc=1) — the
+# cycle-1345/1346/1348 identical-fingerprint batch HALT (2026-08-05). Scoped to
+# *.md, mirroring the phases/profiles ladder idiom.
+!.evolve/evals/
+.evolve/evals/*
+!.evolve/evals/*.md
+# NOTE (issue-#11 / cycle-176, updated 2026-08-05): a self-evolve cycle (ee77067)
+# un-ignored .evolve/ WHOLESALE (`!.evolve/`) to "track evals". That broke a
+# then-LOAD-BEARING invariant — recoverBuildLeak and the audit assumed .evolve/
+# fully gitignored — and was reverted, with the note that versioning evals needs
+# a deliberate redesign, not a blanket un-ignore. That redesign has since
+# happened piecemeal: leak recovery gives .evolve/evals and .evolve/phases
+# DELIBERATE per-prefix handling (core/leak_recovery.go evolveDeliverablePrefixes)
+# while the generic .evolve/ skip covers the rest; ship staging drops ignored
+# declared paths (dropIgnoredPaths); and eval-quality gates validate eval
+# content. The scoped `.evolve/evals/*.md` ladder above is the missing final
+# piece — the tracked corpus the revert left in place is now consistent with
+# the ignore rules. Blanket `!.evolve/` remains forbidden; the birth-coherence
+# pin (go/internal/phasecoherence/gitignore_birth_test.go) now enforces
+# corpus↔ladder consistency both ways.
 .claude/evolve/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
