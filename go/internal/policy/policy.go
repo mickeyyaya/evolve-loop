@@ -101,6 +101,10 @@ type Policy struct {
 	// Observer configures phase liveness observation and watchdog behavior.
 	// Absent ⇒ built-in defaults apply.
 	Observer *ObserverPolicy `json:"observer,omitempty"`
+
+	// Boot configures boot-time self-heals (binary staleness refresh).
+	// Absent ⇒ compiled defaults (binary_refresh=auto).
+	Boot *BootPolicy `json:"boot,omitempty"`
 	// CIWatch configures the post-push GitHub CI watch and the release
 	// preflight CI hard-gate. Absent ⇒ built-in defaults apply (enabled,
 	// 900s timeout, 30s poll). See policy_ciwatch.go.
@@ -992,6 +996,28 @@ type SwarmPolicy struct {
 type SwarmConfig struct {
 	Stage    string
 	PortBase int
+}
+
+// BootPolicy is the .evolve/policy.json "boot" block.
+type BootPolicy struct {
+	// BinaryRefresh selects the boot-time binary staleness self-heal
+	// (cmd_loop_boot_refresh.go; docs/chronicle/2026-08-binary-lag.md):
+	// "auto" (default) rebuilds + re-execs when the running binary's build
+	// stamp is behind HEAD with a go/ source delta; "off" disables it for
+	// deliberate old-binary pins (incident bisects). Unknown words resolve to
+	// "auto" — the self-heal is integrity posture, so a typo must not
+	// silently disable it.
+	BinaryRefresh string `json:"binary_refresh,omitempty"`
+}
+
+// BootBinaryRefresh resolves the boot.binary_refresh stage word: "off" iff
+// the operator wrote exactly "off"; everything else (absent block, empty,
+// unknown) is "auto".
+func (p Policy) BootBinaryRefresh() string {
+	if p.Boot != nil && p.Boot.BinaryRefresh == "off" {
+		return "off"
+	}
+	return "auto"
 }
 
 // WorktreePolicy is the .evolve/policy.json "worktree" block. Replaces the

@@ -81,6 +81,7 @@ refuted fix (e.g. PR #400) is often the most instructive content in an entry.
 - [The push-strand class: console merges vs a live batch](2026-08-push-strand.md)
 
 ### Process & meta
+- [Binary lag: fixes on main while the loop executes the past](2026-08-binary-lag.md)
 - [The batch integrity review: gaming lives in status accounting](2026-08-batch-integrity-review.md)
 - [The continuation defect ledger: five rounds to an honest mechanism](2026-08-continuation-defect-ledger.md)
 - [Contract-block CLI escalation: the fix whose delay was the finding](2026-08-contract-block-escalation.md)

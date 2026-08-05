@@ -1,6 +1,0 @@
-{
-  "name": "ci-parity-preflight",
-  "role": "ci-parity-preflight",
-  "cli": "claude-tmux",
-  "model_tier_default": "balanced"
-}
