@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-07-01
 Relates to:
-- [ADR-0047](0047-single-source-with-projection.md) — single-source-with-projection; DetectorFor is the fallback projection
+- [ADR-0047](0047-surface-classification-and-channel-separation.md) — single-source-with-projection; DetectorFor is the fallback projection
 - [ADR-0065](0065-per-phase-binary-integrity.md) — per-phase integrity; SignalCenter lives inside the liveness package boundary
 - Campaign: signal-center S2 (cycle 430); S1 landed cycle 429
 

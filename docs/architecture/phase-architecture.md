@@ -1,6 +1,6 @@
 # Phase Architecture — Deep Dive
 
-> Full-detail walkthrough of every phase in an evolve-loop cycle. Pipeline diagram + per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior. Companion to [release-protocol.md](../release/release-protocol.md) and [architecture/tri-layer.md](tri-layer.md).
+> Full-detail walkthrough of every phase in an evolve-loop cycle. Pipeline diagram + per-phase: who runs, when, inputs, what it checks/does, outputs, model selection, version-specific behavior. Companion to [publishing-releases.md](../guides/publishing-releases.md) and [architecture/tri-layer.md](tri-layer.md).
 
 ## Pipeline diagram
 

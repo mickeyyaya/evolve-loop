@@ -1,12 +1,12 @@
 # AGENTS.md — Cross-CLI Canonical Instructions
 
-> **Read this file first if you are an AI agent (Claude Code, Codex CLI, Gemini CLI, or generic) working in this repository.** It is the source-of-truth for cross-CLI invariants. CLI-specific runtime details live in companion files: [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md). All three reference back to this document.
+> **Read this file first if you are an AI agent (Claude Code, Codex CLI, Antigravity/agy, Ollama, Gemini CLI, or generic) working in this repository.** It is the source-of-truth for cross-CLI invariants. CLI-specific runtime details live in companion files: [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md). All three reference back to this document.
 >
 > **Operating policy (canonical):** [docs/operations/operating-policy.md](docs/operations/operating-policy.md) carries the environment-independent process rules — pipeline-integrity handling (console-first, maximum reasoning), queue/routing authority, engineering standards, failure-handling contract, release policy — each with the incident evidence behind it. A clean environment inherits the full policy from the repo alone; session memory is only an advisory mirror.
 
 ## What evolve-loop is
 
-A self-evolving development pipeline that orchestrates 4 specialized agents (Scout, Builder, Auditor, Orchestrator) through 6 lean phases per cycle (Calibrate → Intent → Scout → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce phase ordering, role-scoped write paths, atomic ship semantics, ledger SHA verification, and v8.37+ tamper-evident hash-chained recording.
+A self-evolving development pipeline that orchestrates specialized phase agents (Intent, Scout, Triage, TDD, Builder, Auditor, plus retro/memo) through a fixed spine per cycle (Intent → Scout → Triage → [TDD] → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce phase ordering, role-scoped write paths, atomic ship semantics, ledger SHA verification, and v8.37+ tamper-evident hash-chained recording.
 
 > **Runtime note (Go-only):** The Go binary (`go/bin/evolve`) is the sole runtime entrypoint. The bash `legacy/scripts/` tree were removed in the Go-only consolidation — there is no bash fallback. Every operation below is a native `evolve <subcommand>` or a function in `go/internal/...`. For the history of the bash→Go port, see [docs/migration-from-bash.md](docs/migration-from-bash.md).
 
@@ -15,7 +15,7 @@ A self-evolving development pipeline that orchestrates 4 specialized agents (Sco
 These rules apply regardless of which CLI you are running under. They are STRUCTURAL — enforced by kernel hooks, not by prompt instructions.
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record in that exact order. The phase-gate kernel hook (`evolve guard phase`) denies any subagent invocation that violates the sequence. The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag; use is logged loudly and considered a CRITICAL violation.
+Phases run Scout → Builder → Auditor → Ship/Record in that exact order. Phase ORDER is enforced by the Go orchestrator state machine (`go/internal/core`); the phase-gate kernel hook (`evolve guard phase`, rewired per ADR-0075 onto the `Agent|Task` matcher) denies in-process subagent dispatch while a cycle is active. The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag; use is logged loudly and considered a CRITICAL violation.
 
 ### 2. Subagents are spawned through the native bridge, never via in-process tool calls
 Every phase agent is spawned by the native runner (`evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher driven by `evolve loop` / `evolve cycle run`). This is enforced by the kernel hook. The in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex) is **denied during a cycle**. Reason: in-process subagents bypass profile-scoped permissions and the tamper-evident ledger.
@@ -38,13 +38,13 @@ Auditor writes `audit-report.md`, and the ship gate is the binary `acs-verdict.j
 Prior failures are recorded in `state.json:failedApproaches[]` with structured classifications (infrastructure-transient, code-audit-fail, code-audit-warn, etc.). The native failure-adapter (`go/internal/core`) returns deterministic decisions; the orchestrator follows them verbatim. Default mode is fluent (would-have-blocked rules emit awareness, not BLOCK). Strict mode (`.evolve/policy.json` → `workflow.strict_audit: true`) restores legacy block-on-recurring behavior.
 
 ### 8. Cost adaptation (v8.35.0+)
-The auditor profile defaults to Opus, but the native diff-complexity check (`go/internal/core`) auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
+The auditor profile defaults to Opus, but the native diff-complexity check (`go/internal/subagent`, modeltier) auto-downgrades to Sonnet for trivial diffs (≤3 files, ≤100 lines, no security paths). Saves ~$1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus regardless.
 
 ### 9. Knowledge Stewardship Rule (Day-One)
 
-> **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. Place runtime references in `docs/research/`, archival dossiers in `knowledge-base/research/`. **Never delete; always archive.** When superseding a doc, MOVE it to `knowledge-base/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
+> **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. All documentation lives under `docs/` — research notes in `docs/research/` (the former `knowledge-base/research/` tree moved there 2026-08-05; see [docs/MOVED.md](docs/MOVED.md)). `knowledge-base/` is a runtime write surface only (`cycles/` dossiers), not documentation. **Never delete; always archive.** When superseding a doc, MOVE it to `docs/private/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
 
-Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination is the canonical archival path. Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
+Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination lands under `docs/` (archive home: `docs/private/research/archived-YYYY-MM-DD/`; `knowledge-base/` is deliberately NOT a valid destination). Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
 
 ## 12 Core agent rules
 
@@ -76,9 +76,11 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 - **Codex CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md` (this directory exists as symlinks to `skills/<name>/`). Codex reads this AGENTS.md as its canonical config. Driven by the native codex bridge driver (`go/internal/bridge/driver_codex*.go`): NATIVE when `codex` is on PATH and supports non-interactive prompts, HYBRID (delegates to `claude`) otherwise, DEGRADED as a last resort (pipeline still completes; reduced isolation). Capability tier visible via `evolve bridge probe`.
 
-- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. `gemini` is a distinct CLI identity with its own adapter metadata (`adapters/gemini.sh`, `gemini.capabilities.json`); there is **no** dedicated `driver_gemini*.go` bridge driver. A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`, documented in-code as "Gemini-backed"), but `gemini` and `agy`/`antigravity` are separate CLI identities — only `antigravity → agy` is name-resolved (see the Antigravity bullet below).
+- **Gemini CLI**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. `gemini` is a distinct CLI identity with its own adapter metadata (`adapters/gemini.capabilities.json`); there is **no** dedicated `driver_gemini*.go` bridge driver. A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`, documented in-code as "Gemini-backed"), but `gemini` and `agy`/`antigravity` are separate CLI identities — only `antigravity → agy` is name-resolved (see the Antigravity bullet below).
 
 - **Antigravity CLI (agy)**: skills auto-discovered at `.agents/skills/<name>/SKILL.md`. Driven by the native agy bridge driver (`go/internal/bridge/driver_agy*.go`): NATIVE mode (`agy -p`) when the agy binary is on PATH; HYBRID when claude on PATH; DEGRADED otherwise. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap). See [reference/agy-runtime.md](skills/loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
+
+- **Ollama (local models)**: driven by the native ollama tmux-REPL bridge driver (`go/internal/bridge/driver_ollamatmux.go`), which launches `ollama run <model>` in a tmux pane and reuses the shared REPL completion-detection machinery. A routing target for local models — no skill/plugin surface of its own. Research record: [docs/research/ollama-control-surface-2026.md](docs/research/ollama-control-surface-2026.md).
 
 - **Generic / unsupported CLI**: see [skills/loop/reference/generic-runtime.md](skills/loop/reference/generic-runtime.md). Tool name translation tables at `skills/loop/reference/<platform>-tools.md`.
 
@@ -86,7 +88,7 @@ This file covers the universal contract. CLI-specific runtime details live in co
 
 If you are an AI agent activating in this repository:
 
-1. **Identify your CLI**: Claude Code, Codex, Gemini, Antigravity (agy), or other.
+1. **Identify your CLI**: Claude Code, Codex, Antigravity (agy), Ollama, Gemini, or other.
 2. **Read your CLI-specific overlay**: CLAUDE.md, GEMINI.md, or `docs/architecture/platform-compatibility.md`.
 3. **Read this AGENTS.md** in full — the cross-CLI invariants apply to you.
 4. **Discover available skills**: scan `.agents/skills/*/SKILL.md` (cross-CLI standard) or `skills/*/SKILL.md` (Claude Code primary).
@@ -97,7 +99,6 @@ Skill files use YAML frontmatter (`name`, `description`) followed by markdown in
 ## Trust boundary summary
 
 The pipeline's safety properties stack into three tiers:
-## Trust boundary summary
 
 | Tier | Layer | What it catches |
 |---|---|---|
@@ -125,7 +126,7 @@ To prevent context saturation from accumulated tool results:
 - **No Post-Report Turns**: Once the phase report (scout/build/audit/orchestrator) is written, STOP. Turn accumulation after report completion is a critical cost driver.
 
 ### 3. Flag → Parameter Conversion Standard (flag-reduction campaign)
-When a cycle converts an `EVOLVE_*` env flag into a typed input parameter, the conversion is "done" ONLY when it meets the **[Flag → Parameter Conversion Standard](knowledge-base/research/flag-parameter-conversion-standard.md)**: (1) the resolution package is environment-agnostic (no `os.Getenv`/`LookupEnv`/`Environ` — enforced by `paramPackages` in `go/internal/policy/param_env_agnostic_test.go`, which the conversion MUST enroll the package in); (2) it ships an env-free, black-box, public-API test suite covering the full field × edge-case matrix; (3) every exported parameter API at 100% coverage with `apicover -enforce` exit 0. Tests drive behavior ONLY through input parameters — never `t.Setenv`. Reference template: `internal/quotareset` + `internal/policy` config accessors.
+When a cycle converts an `EVOLVE_*` env flag into a typed input parameter, the conversion is "done" ONLY when it meets the **[Flag → Parameter Conversion Standard](docs/research/flag-parameter-conversion-standard.md)**: (1) the resolution package is environment-agnostic (no `os.Getenv`/`LookupEnv`/`Environ` — enforced by `paramPackages` in `go/internal/policy/param_env_agnostic_test.go`, which the conversion MUST enroll the package in); (2) it ships an env-free, black-box, public-API test suite covering the full field × edge-case matrix; (3) every exported parameter API at 100% coverage with `apicover -enforce` exit 0. Tests drive behavior ONLY through input parameters — never `t.Setenv`. Reference template: `internal/quotareset` + `internal/policy` config accessors.
 
 ### 4. Minimalism (always-on)
 Every coding change takes the laziest solution that actually works — the ladder (YAGNI → stdlib → native/`policy.json` config → already-present dependency → one line → minimum), no unrequested abstraction, deletion over addition, shortest working diff; mark a deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path. The cut is in scope, NEVER in safety: input validation, error handling, security, accessibility, explicit requests, and the pipeline gates (RED test / safety invariants / eval+contract gates / ship floor) are never simplified away. Full ruleset: **[skills/minimalism/SKILL.md](skills/minimalism/SKILL.md)** (adapted from ponytail, MIT).

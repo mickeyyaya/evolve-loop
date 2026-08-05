@@ -6,7 +6,7 @@ Accepted — Slices 2–5 implemented on branch `cycle-9f00fd60-5` (cycles 1–4
 
 - **Date:** 2026-06-19
 - **Driver:** An operator request to run multiple independent `evolve loop` processes concurrently without collision — each loop owning its own git worktree, its own `.evolve/` state tree, and its own slice of host resources (tmux sessions, LLM CLI slots).
-- **Evidence:** [concurrency-architecture-2026-06-18.md](../research/concurrency-architecture-2026-06-18.md) — implementation spec for Slices 2–6 (sibling-worktree architecture).
+- **Evidence:** [concurrency-architecture-2026-06-18.md](../../research/concurrency-architecture-2026-06-18.md) — implementation spec for Slices 2–6 (sibling-worktree architecture).
 - **Relates to:** ADR-0049 (concurrent multi-cycle execution — fleet model, a DIFFERENT topology; see §Relationship to ADR-0049 below), ADR-0032 (swarm harness, intra-cycle parallelism).
 
 ## Problem

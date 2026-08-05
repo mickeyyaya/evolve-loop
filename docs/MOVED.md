@@ -45,7 +45,7 @@ for the architectural rationale.
 
 | Path | Reason |
 |---|---|
-| `docs/research/*.md` (5 files) | Already in the right place. These are agent-accessible research citations; the `docs/research/` files are the agent-excluded archive. |
+| `docs/research/*.md` (5 files) | Kept at the time; since archived — now in `docs/private/research/archived-2026-05-19/` (except `eval-grader-best-practices.md`, live at `docs/`). `docs/research/` itself now holds the merged research tree (see the 2026-08-05 section below). |
 | `docs/architecture/`, `docs/reference/`, `docs/incidents/`, `docs/reports/` | No path change. |
 
 ## How to update your links

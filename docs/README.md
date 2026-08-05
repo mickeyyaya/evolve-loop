@@ -24,8 +24,9 @@ docs/
 ├── guides/                    ← how-to (operational tasks)
 ├── reference/                 ← per-agent technique manuals
 ├── architecture/              ← cross-role system design (reference)
-│   └── adr/                   ← runtime/engine ADRs (0001-0051, canonical corpus)
-├── research/                  ← agent-readable research records (load on demand)
+│   └── adr/                   ← runtime/engine ADRs (0001-0083, canonical corpus)
+├── research/                  ← merged research tree (2026-08-05): packages + notes (load on demand)
+├── chronicle/                 ← engineering chronicle — workstream-level narratives
 ├── operations/                ← release process, ops history
 ├── incidents/                 ← forensic post-mortems (incl. cycle-61 v10.7 case study)
 ├── reports/                   ← eval results, benchmarks
@@ -90,11 +91,11 @@ access. See `private/README.md` and `architecture/private-context-policy.md` for
 mechanism. (Note: that policy doc still describes a third, bash-only filter layer from before
 the v12.0.0 legacy/ removal; it is equally stale and has no current Go reimplementation.)
 
-`docs/research/` (sibling to `docs/`) is the **archival** counterpart: research dossiers
-that informed design decisions but are too voluminous to load into agent context. It's NOT
-kernel-blocked (operators and `kb-search.sh` can read it) but it IS excluded from default
-auto-loading. See [`knowledge-base/README.md`](../knowledge-base/README.md) for the bucket policy
-and promotion criteria.
+`docs/research/` is the **archival** counterpart: research dossiers (merged from the former
+`kb/` and `knowledge-base/research/` roots on 2026-08-05) that informed design decisions but
+are too voluminous to load into agent context. It's NOT kernel-blocked but it IS excluded
+from default auto-loading. See [`research-index.md`](research-index.md) for the index and
+[`MOVED.md`](MOVED.md) for the consolidation mapping.
 
 ## Where each old path went
 

@@ -58,6 +58,6 @@ Validation runs via `bash legacy/scripts/tests/validate-handoff-artifact.sh --ar
 ## References
 
 - Source contract: `schemas/handoff/*.schema.json` (8 files)
-- Reference table: [`.agents/skills/evolve-loop/reference/output-contracts.md`](../../.agents/skills/evolve-loop/reference/output-contracts.md)
+- Reference table: [`skills/loop/reference/output-contracts.md`](../../skills/loop/reference/output-contracts.md)
 - Validator: `legacy/scripts/tests/validate-handoff-artifact.sh`
 - Predecessor ADR: [ADR 0006](0006-layer-p-memo-handoff-template.md)
