@@ -121,7 +121,7 @@ func isQuoteDelim(r []rune, i int) bool {
 	case '"':
 		return true
 	case '\'':
-		return !(i > 0 && isLetterRune(r[i-1]) && i+1 < len(r) && isLetterRune(r[i+1]))
+		return i == 0 || !isLetterRune(r[i-1]) || i+1 >= len(r) || !isLetterRune(r[i+1])
 	}
 	return false
 }

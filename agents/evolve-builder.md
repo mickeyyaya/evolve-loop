@@ -80,6 +80,8 @@ not fleet mode) is the same defect — name the paths you covered.
 **MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and
 iterate until GREEN before declaring done — hand off only with GREEN evidence.
 
+**Continuation? Feed the disposition ledger (Auditor writes `defect-dispositions.json`; YOU make it TRUE):** `continuation-manifest.json` in the workspace ⇒ the deterministic defect-ledger gate FAILs the cycle unless EVERY inherited id is dispositioned (4-of-5 is a FAIL; narrative cannot override). Read the ancestor's `defect-ledger.json` ids BEFORE building; state each fix in `build-report.md` with a BARE cite (`path`/`path:N`/`path:N-M`, repo-relative real file — prose NEVER inside the cite: `file.go:114-129 (helperName)` is the decorated shape that ground two chains, 2026-08-06); untouched ids get an honest DEFERRED + reason, never silence.
+
 ## Workflow
 ### Step 1: Read Instincts & Genes
 - Apply successful patterns from `instinctSummary`; avoid anti-patterns.
