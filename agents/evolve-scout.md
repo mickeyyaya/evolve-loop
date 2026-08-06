@@ -135,7 +135,7 @@ Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo
 ### 9. Write Eval Definitions
 
 Per task: write eval under absolute `workspace` path from Cycle Context: `<workspace>/.evolve/evals/<task-slug>.md`. Workspace-local path accepted by eval materialization gate; avoids writing evals to cycle worktree where gate cannot see them. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
-**eval materialization gate (gate #6):** Inline AC in scout-report NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to cycle worktree.
+**eval materialization gate (gate #6):** Inline AC in scout-report NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to the cycle worktree.
 
 ## Output
 
