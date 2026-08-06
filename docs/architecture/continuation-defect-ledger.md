@@ -115,6 +115,38 @@ The production caller is `Orchestrator.writeDeterministicLearning`
 that is a restatement of the failure, not an actionable item. Item weight comes
 from `policy.RetroAutofileDefaultWeight()`, never a literal at the call site.
 
+### 3. Unconditional prescription carryover (cycle-1375, F3)
+
+The Reconcile step above is a strong gate but a **scoped** one: it fires only
+when the *current* cycle's workspace holds a `continuation-manifest.json`
+binding it to the ledger-holding ancestor. The ordinary case — triage/scout
+select the next lane by task content, never by ledger lineage — never forms
+that binding, so an OPEN `"PRESCRIPTION: "` row from a WARN-shipped cycle was
+silently dropped at ship with no gate ever consulting it again. cycle-1258's
+own prescription ("materialize `.evolve/evals/artifact-ready-crosspoll-debounce.md`,
+`git add -f` past `.gitignore`") sat OPEN and unenforced across the
+1233→1249→1252→1254→1258 salvage chain as the live instance of exactly this
+gap.
+
+`MergeWorkspacePrescriptionCarryover` (`go/internal/core/prescription_carryover.go`)
+closes it without touching the Reconcile gate's hardened arming logic. It is a
+cycle-terminal hook — called from `finalizeCycle`
+(`go/internal/core/cyclerun.go`) immediately beside `MergeWorkspaceCarryover`,
+whose tolerant-decode/dedup/TTL pattern it mirrors exactly — that reads
+`<workspace>/defect-ledger.json` unconditionally (no continuation-manifest
+required), keeps only `status == "OPEN"` entries whose `text` carries the
+`"PRESCRIPTION: "` prefix `emitDefectLedger` already writes, and merges one
+`state.CarryoverTodos` entry per surviving row. `carryoverTodos` is the
+**already-mandatory** channel scout's Deliverable Contract enforces when
+non-empty, so from the next cycle onward every WARN prescription reaches an
+operator-visible decision point regardless of continuation binding. A
+`FIXED`/`DEFERRED` prescription is left alone — it is already resolved and
+must not re-nag. This is deliberately a second, independent read path over the
+same ledger rows, not a widening of `reconcileAgainstAncestor`'s arming rules:
+that file carries a dense history of subtle anti-laundering bypass defects
+(cycle-1285 F2, cycle-1282 DEF-1/2/3) that a carryover-based fix avoids
+touching.
+
 ## Degrade posture (deliberately asymmetric)
 
 | Situation | Behavior | Why |

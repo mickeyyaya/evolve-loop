@@ -279,6 +279,13 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// they reach the next cycle's planner through the same serialized RMW.
 	MergeWorkspaceCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
 
+	// F3 (batch-integrity-review-2026-08-04.md): a WARN-shipped audit's OPEN
+	// "PRESCRIPTION: " defect-ledger rows must reach the next cycle's carryover
+	// flow unconditionally — not only when a later cycle happens to be bound as
+	// a formal continuation of the ledger-holding cycle (reconcileAgainstAncestor's
+	// arming scope). Mirrors MergeWorkspaceCarryover immediately above.
+	MergeWorkspacePrescriptionCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
+
 	state.LastCycleNumber = cycle
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {
 		return preserveWorktree, fmt.Errorf("write state: %w", perr)

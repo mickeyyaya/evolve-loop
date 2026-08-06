@@ -539,3 +539,40 @@ raised two more. Both are closed here.
   (total failure, and failure at index 0) is pinned so the cheap "drop the first
   entry" fix cannot pass. `inbox_transactional_test.go` and
   `inbox_failure_degraded_test.go` are byte-identical.
+
+## Landing — cycle-1377, F3 closure (`audit-warn-prescriptions-unenforced`)
+
+F3's own gap ("the prescription was never applied") is closed. The eval file
+`.evolve/evals/artifact-ready-crosspoll-debounce.md` is now git-tracked (`git
+ls-files --error-unmatch` succeeds) and present at HEAD — it shipped in commit
+`8ec1d209` ("salvage snapshot (ADR-0076 continuation-on-fail)"), which this
+cycle's HEAD already contains; no further add was needed. `TestC1258_005_PermanentEvalEntryExistsAndItsEvidenceRuns`
+(`go/acs/cycle1258/predicates_test.go:318`) — the predicate F3 named as the
+latent-RED trap — now passes for real, and all five `cycle1258` predicates
+(001–005) are green: `cd go && go test -tags acs -count=1 ./acs/cycle1258/...`
+→ PASS. No production code change was required; the debounce fix itself
+(`artifactDetector` in `go/internal/bridge`) predates this cycle and was
+already covered by predicates 001–004.
+
+F3's class rule — "a WARN-ship whose audit carries a named PRESCRIPTION must
+record it as a carryover that blocks the item's consumption until applied or
+explicitly waived" — was **already mechanized independently** in cycle-1327
+(`audit-warn-prescription-gate`): `go/internal/phases/audit/defect_ledger.go`
+sources `Failure.Prescription` into a tagged, blocking OPEN ledger entry, and
+`TestDefectLedger_WarnPrescription` / `TestReconcile_WarnPrescriptionBlocks` /
+`TestAudit_WarnWithoutPrescription_NoRegression` are green (`go test
+./internal/phases/audit/... -run Prescription` — 4/4 PASS, 0.4s). This
+cycle's own continuation chain is live proof the blocking half works: cycles
+1369/1373/1375 were each halted at the audit gate for exactly the class of
+unaccounted-defect reason F3's class rule demands, and this cycle's
+`defect-dispositions.json` reconciles all 12 defects the gate named inherited
+from cycle-1369 before landing.
+
+Two narrower gaps surfaced by this reconciliation are DEFERRED, not silently
+dropped (see `defect-dispositions.json` for full reasoning): (1) the
+diagnostic-only `.evolve/prescription-backlog.json` mechanism still has no
+scout-side reader — wiring `carryover_merge.go`/scout's carryover step is
+out-of-scope M/L work for this narrow S-lane; (2) scout-report.md templates
+still omit an explicit `Slug:` field per task (confirmed still true in this
+cycle's own `scout-report.md`) — a prompt/template fix, not a code defect in
+this diff. Both are recommended as companion inbox items.
