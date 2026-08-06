@@ -366,7 +366,7 @@ func appendChainBoundaryRefreshLog(evolveDir string, batch int, res phaseintegri
 	if err != nil {
 		return fmt.Errorf("open boundary-refresh log: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(append(buf, '\n')); err != nil {
 		return fmt.Errorf("write boundary-refresh log: %w", err)
 	}

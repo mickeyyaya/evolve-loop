@@ -207,8 +207,8 @@ func TestPhasePolicy_ProducerAndEnabled(t *testing.T) {
 	cfg.PhaseEnable["plan-review"] = config.EnableOff
 	// Explicit type binding so the PhasePolicy identifier is named in the test AST
 	// (apicover's coverage signal) and is the real producer's return type.
-	var p PhasePolicy = NewPhasePolicy(cfg)
-
+	p := NewPhasePolicy(cfg)
+	var _ PhasePolicy = p
 	if !p.Enabled("build", RoutingSignals{}) {
 		t.Errorf("PhasePolicy.Enabled(build) = false, want true (mandatory)")
 	}

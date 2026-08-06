@@ -123,6 +123,11 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		return core.ReviewResult{Approve: true}
 	}
 
+	// Observability-only, strictly after the OK branch and strictly before any
+	// decision is computed: record what a future salvage stage WOULD have
+	// recovered from this bad_verdict. Never reads a decision, never writes one.
+	recordBadVerdictBaseline(roots, in.Phase, res, r.logf)
+
 	reason := summarize(in.Phase, res)
 
 	// Report-size handoff-budget is warn-only below its own enforce dial

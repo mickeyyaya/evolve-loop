@@ -132,7 +132,7 @@ func StageIntent(escalationsDir string, in Intent) (string, error) {
 		if oerr != nil {
 			return fmt.Errorf("dispositionrouter: open staging file: %w", oerr)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if _, werr := f.Write(append(line, '\n')); werr != nil {
 			return fmt.Errorf("dispositionrouter: append intent: %w", werr)
 		}

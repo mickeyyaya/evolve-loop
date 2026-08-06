@@ -89,9 +89,10 @@ func ParseTestJSON(r io.Reader, cycle int) (Verdict, error) {
 	for _, name := range order {
 		p := preds[name]
 		v.Total++
-		if p.Verdict == "FAIL" {
+		switch p.Verdict {
+		case "FAIL":
 			v.RedCount++
-		} else if p.Verdict == "SKIP" {
+		case "SKIP":
 			v.SkipCount++
 		}
 		v.Predicates = append(v.Predicates, *p)

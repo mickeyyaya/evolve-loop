@@ -242,6 +242,119 @@ CIRCUIT-OPEN counts still measure against the §6 baseline (3 firings, all
 weak-CLI adversarial-review). With this rung landed, the rank-1 portfolio item was
 consumed in cycle-1304 (`.evolve/inbox/consumed/2026-08-04T07-15-00Z-contract-block-cli-escalation.json`).
 
+## 7. Baseline — the recoverable-malformed `bad_verdict` rate, measured (cycle-1389)
+
+**Issue.** §6 recorded the recoverable-malformed rate on our own CLIs as *"not
+yet instrumented (the salvage layer's first deliverable is the measurement)"*.
+The rank-2 portfolio item `schema-aligned-salvage-layer` proposes a lenient
+extraction pass that recovers a clearly-intended verdict a strict parse
+rejected. Building that pass without a measured rate would be speculative: the
+whole case for it rests on how often a `bad_verdict` block is a *shape* problem
+rather than a genuinely absent verdict.
+
+**Gap.** `deliverable.Verify` reported `bad_verdict` as a single undifferentiated
+code. Nothing in the pipeline distinguished "the agent emitted a verdict we
+could plainly read but rejected on shape" from "the agent emitted no verdict at
+all" — so the salvage layer's addressable population was unknown, and unknowable
+from the existing logs.
+
+**Solution (this cycle — instrumentation only, no extraction).**
+`go/internal/deliverable/salvage_instrument.go` adds a pure, log-only
+classifier, `ClassifyBadVerdict(content string) BadVerdictClassification`, over
+the exact bytes the verdict was computed from (`Result.Content`, the single-read
+seam). It recognises the three shapes the portfolio item names — a
+fenced/mislabeled JSON payload (`fenced-json`), a sentinel payload with a
+trailing comma (`trailing-comma`), and a bare unwrapped verdict object in prose
+(`displaced-line`) — and reports `Recoverable=false, Pattern=""` for anything
+with no verdict-bearing JSON at all. **No coercion ships**: `Result.OK` and
+`Result.Violations` are untouched, and the gate's block/approve decision is
+byte-identical with and without the classifier.
+
+**Wiring proof.** The classifier is not a dead helper. It is reached from the
+real host contract gate, `deliverable.Reviewer.Review` — the seam
+`cmd/evolve/cmd_cycle.go:620` wires behind `core.DeliverableReviewer` — strictly
+*after* the `res.OK` branch, so it can observe only failures and can influence
+no decision:
+
+```go
+// go/internal/deliverable/reviewer.go — Reviewer.Review
+if res.OK {
+	resetBreaker(bp)
+	return core.ReviewResult{Approve: true}
+}
+// Observability-only, strictly after the OK branch and strictly before any
+// decision is computed: record what a future salvage stage WOULD have
+// recovered from this bad_verdict. Never reads a decision, never writes one.
+recordBadVerdictBaseline(roots, in.Phase, res, r.logf)
+
+reason := summarize(in.Phase, res)
+```
+
+`recordBadVerdictBaseline` (`salvage_instrument.go`) fires only when the result
+carries `CodeBadVerdict`, and appends one JSONL record — `phase`,
+`artifact_path`, `recoverable`, `pattern`, `reason` — to
+`.evolve/bad-verdict-baseline.jsonl` via the existing `log.SidecarWriter`. A
+write failure is logged and swallowed: telemetry never outranks the gate's
+fail-safe posture.
+
+**Measured baseline.** Produced by driving the production reviewer
+(`NewReviewerWithCatalogStageReportSize`, the exact `cmd_cycle.go:620`
+constructor) at `ContractGate=enforce, PhaseIO=enforce` over this repo's entire
+historical deliverable corpus — every `audit`/`build`/`scout`/`triage`/`tdd`
+report under `.evolve/runs/cycle-*/` — and counting the resulting
+`.evolve/bad-verdict-baseline.jsonl` in this cycle's worktree. Counts below are
+`wc -l` / `uniq -c` on that file, not estimates. The sweep is deterministic —
+two independent runs produced byte-identical tallies — and the sidecar it wrote
+is preserved as `.evolve/runs/cycle-1389/bad-verdict-baseline.jsonl` so the
+counts below can be re-derived rather than taken on trust:
+
+| Measure | Count |
+|---|---|
+| Deliverables reviewed | 5528 |
+| `bad_verdict` blocks (baseline records written) | 167 |
+| — classifier-**recoverable** | **15 (9.0%)** |
+| — `fenced-json` | 13 |
+| — `displaced-line` | 2 |
+| — `trailing-comma` | 0 |
+| — not recoverable | 152 (91.0%) |
+| Phases affected | `audit` only (167/167) |
+
+**What the numbers say — and the honest caveat.** Two findings, and one
+qualification that must travel with them.
+
+1. *The addressable rate is ~9%, and one shape dominates it.* Of 167 blocks,
+   only 15 carry a recoverable JSON verdict, and 13 of those 15 are
+   `fenced-json` — an agent rendering the payload as displayable JSON instead of
+   the sentinel comment. `trailing-comma` never occurred once in 5528 reports,
+   despite being the shape the portfolio item led with. A salvage stage built to
+   the item's original three-shape spec would spend two-thirds of its surface on
+   patterns with zero observed incidence.
+2. *The 91% is not a salvage problem at all.* Sampling the not-recoverable
+   records (`cycle-1`, `cycle-10`, `cycle-100` audit reports) shows zero
+   occurrences of the string `evolve-verdict`: these are legacy **prose-verdict**
+   reports written before the sentinel existed. No JSON-shape salvage layer can
+   recover them, because there is no JSON to salvage — they are recovered today
+   by the legacy prose fallback (`deliverable.go:342-348`), which is exactly what
+   `PhaseIO=enforce` gates off.
+3. *Caveat — this is a counterfactual sweep, not observed production traffic.*
+   Production runs below `PhaseIO=enforce`, where the prose fallback rescues most
+   of these; §6's "`bad_verdict` = 0 since the contract tail" remains true of
+   live cycles. The sweep answers a different, and the actually decision-relevant,
+   question: *if PhaseIO were promoted to enforce, what would break and how much
+   of it is mechanically recoverable?* The historical corpus skews toward early
+   cycles, so the 91% legacy share is an upper bound on what a promotion would
+   hit today.
+
+**Consequence for the portfolio.** The extraction/coercion pass stays deferred,
+now on evidence rather than on caution — and its scope is narrower than proposed:
+`fenced-json` is the only shape with a non-trivial observed rate, so a
+single-shape recovery would capture 13 of the 15 addressable cases for a
+fraction of the surface. The real prerequisite for a `PhaseIO=enforce` promotion
+is not the salvage layer at all but a decision about legacy prose-only reports.
+The `salvage-enforce-stage-dial` item stays deferred: a rollout dial for a stage
+that does not exist is premature. This section is the measurement §6 asked for;
+re-run it after any promotion and append the delta.
+
 ## Sources (online track)
 
 Anthropic structured outputs (platform.claude.com, Nov 2025) · OpenAI

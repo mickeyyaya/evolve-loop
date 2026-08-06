@@ -10,6 +10,7 @@
 package log
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,7 +100,7 @@ func (w *SidecarWriter) EmitAbnormal(ev Event) error {
 	if err != nil {
 		return fmt.Errorf("log: open sidecar %s: %w", w.path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(buf); err != nil {
 		return fmt.Errorf("log: append sidecar %s: %w", w.path, err)
 	}
@@ -159,7 +160,7 @@ func EmitPhase(logger *slog.Logger, phase, event string, extra map[string]any) {
 	for k, v := range extra {
 		attrs = append(attrs, slog.Any(k, v))
 	}
-	logger.LogAttrs(nil, slog.LevelInfo, "phase", argsToAttrs(attrs)...)
+	logger.LogAttrs(context.TODO(), slog.LevelInfo, "phase", argsToAttrs(attrs)...)
 }
 
 func argsToAttrs(args []any) []slog.Attr {

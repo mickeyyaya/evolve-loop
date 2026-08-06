@@ -150,7 +150,7 @@ func parseEval(path string) ([]string, Expectations, error) {
 	if err != nil {
 		return nil, Expectations{}, fmt.Errorf("verifyeval: open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var commands []string
 	var expect Expectations

@@ -141,9 +141,9 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return false, err
 	}
 	// Chmod the TEMP, before it is linked — never the destination. os.CreateTemp
@@ -153,7 +153,7 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	// rewrite the mode of a PRESERVED pre-existing artifact on the skip path,
 	// which writeIfAbsent's contract says must be left entirely alone.
 	if err := tmp.Chmod(publishedFileMode); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return false, err
 	}
 	if err := tmp.Close(); err != nil {
