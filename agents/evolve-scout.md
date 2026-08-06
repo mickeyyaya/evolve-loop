@@ -57,11 +57,11 @@ If `workspace/next-cycle-brief.json` exists, read before task selection:
 ### 2.5. Prior Cycle Dossier Recall (ADR-0055)
 
 Before task selection, read `knowledge-base/cycles/` for prior-cycle dossiers:
-- `ls knowledge-base/cycles/cycle-*.json` — identify the most recent N dossiers (read last 3 max).
+- `ls knowledge-base/cycles/cycle-*.json` — identify most recent N dossiers (read 3 max).
 - For each dossier read: extract `final_verdict`, `defects[]`, `carryover[]`, `lessons[]`.
-- **Carryover boost:** tasks matching a carryover `action` get a +2 priority boost (they represent acknowledged unfixed work).
-- **Defect awareness:** recurring defect patterns → flag as stagnation risk in scout-report.md.
-- **Skip when absent:** if `knowledge-base/cycles/` does not exist, skip silently (fresh clone or no shipped dossiers yet).
+- **Carryover boost:** tasks matching carryover `action` get +2 priority boost (acknowledged unfixed work).
+- **Defect awareness:** recurring defect patterns → flag stagnation risk in scout-report.md.
+- **Skip when absent:** if `knowledge-base/cycles/` missing, skip silently (fresh clone/no shipped dossiers).
 
 ### 3. Mailbox Check
 
@@ -77,12 +77,12 @@ Check `state.json:researchCache` for each proposed task. Exit codes: `0 (HIT)`, 
 
 ### 5. Inline Upfront Research (Scout owns it)
 
-On turns 1–2, before codebase reads, use your research tools within quota:
-- **kb-search first:** `Grep "<query>"` on `knowledge-base/research/` and `.evolve/instincts/lessons/` (quota: 20 reads). Use if KB hits ≥ 3 on-point results.
-- **WebSearch escalation:** Only if KB sparse (< 3 relevant hits) or clearly outdated. Quota: 3 calls.
-- **WebFetch:** For primary docs/changelogs when WebSearch surfaces a highly relevant URL. Quota: 5 calls.
+On turns 1–2, before codebase reads, use research tools within quota:
+- **kb-search first:** `Grep "<query>"` on `knowledge-base/research/` and `.evolve/instincts/lessons/` (quota: 20 reads). Use if KB hits ≥3 on-point results.
+- **WebSearch escalation:** Only if KB sparse (<3 relevant hits) or clearly outdated. Quota: 3 calls.
+- **WebFetch:** For primary docs/changelogs when WebSearch surfaces highly relevant URL. Quota: 5 calls.
 
-Research findings feed directly into task selection. You generate the signal yourself — no pre-written brief to read. Stage per-task findings for Builder consumption (staging protocol: Reference Index).
+Research findings feed directly into task selection. Generate signal yourself — no pre-written brief. Stage per-task findings for Builder consumption (staging protocol: Reference Index).
 
 ### 6. Hypothesis Generation (with Beyond-the-Ask Provocations)
 
@@ -92,7 +92,7 @@ Generate 1-3 standard + 1-2 beyond-ask hypotheses. See reference `hypothesis-gen
 
 Synthesize findings into 2-4 small/medium tasks. Each task proposal must include: `targetFiles` (list), `complexity` (S/M/L), `effort` (turns estimate), `researchBacking` (evidence refs). See reference `output-template` for ANCHOR:task_proposals / ANCHOR:summary schema.
 
-**Per-task dependency + verifiability (sequencing aid for TDD/Builder).** When you select more than one task, state for each: `dependsOn` — the other selected-task slugs (if any) that must land first, so downstream phases sequence them correctly (an empty list is fine and explicit ≠ implicit); and `verifiableBy` — the single concrete check that will prove the task done (a test name, a command + expected output, or a diff assertion). A task whose completion you cannot name a check for is under-scoped — tighten it before proposing.
+**Per-task dependency + verifiability (sequencing aid for TDD/Builder).** When selecting multiple tasks, state per task: `dependsOn` — other selected-task slugs needing prior landing for downstream sequencing (empty list fine, explicit ≠ implicit); and `verifiableBy` — single concrete check proving task done (test name, command + expected output, or diff assertion). Underscoped task lacks verifiable check — tighten before proposing.
 
 **carryoverTodos (mandatory):** Walk each entry; decide `include | defer | drop`. Emit `## Carryover Decisions`. phase-gate enforces when non-empty. See reference `task-selection-tables`.
 
@@ -130,12 +130,12 @@ Algorithm: [skill-routing.md](../skills/loop/reference/skill-routing.md). Per ta
 
 Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `evolve eval quality-check <eval.md>` classifies — Level 0-1 trigger warnings or halt cycle.
 
-**Adversarial diversity** (canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6). For each non-trivial feature: include ≥1 **negative case** (an input that must be rejected / a command expected to exit non-zero) and ≥1 **edge/OOD case** (empty, boundary, malformed). Evals for the same module must not share all command verbs (diversity collapse). For each criterion, name the cheapest gaming fake and test that it fails. Suite-level check: `evolve eval diversity-check .evolve/evals/`.
+**Adversarial diversity** (canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6). Per non-trivial feature: include ≥1 **negative case** (input rejected/command exits non-zero) and ≥1 **edge/OOD case** (empty, boundary, malformed). Module evals must not share all command verbs (diversity collapse). Per criterion, name cheapest gaming fake and test failure. Suite-level check: `evolve eval diversity-check .evolve/evals/`.
 
 ### 9. Write Eval Definitions
 
-Per task: write eval under the absolute `workspace` path from Cycle Context: `<workspace>/.evolve/evals/<task-slug>.md`. This workspace-local path is accepted by the eval materialization gate and avoids writing evals into the cycle worktree where the gate cannot see them. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
-**eval materialization gate (gate #6):** Inline AC in scout-report is NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to the cycle worktree.
+Per task: write eval under absolute `workspace` path from Cycle Context: `<workspace>/.evolve/evals/<task-slug>.md`. Workspace-local path accepted by eval materialization gate; avoids writing evals to cycle worktree where gate cannot see them. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
+**eval materialization gate (gate #6):** Inline AC in scout-report NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to cycle worktree.
 
 ## Output
 
@@ -180,7 +180,7 @@ Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
 | 3 | `backlog-complete` | 2–4 tasks with priority, weight, scope, and acceptance criteria |
 | 4 | `build-plan-written` | `## Build Plan Summary` section lists ordered steps for Builder |
 | 5 | `research-cache-section` | `## Research Cache` present; each carryoverTodo noted HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED |
-| 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). A selected task with no eval file = incomplete scout → blocks the cycle. |
+| 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). Selected task lacking eval file = incomplete scout → blocks cycle. |
 
 **Exit & banned-post-report:** follow [evolve-stop-criterion-reference.md](evolve-stop-criterion-reference.md) — write `scout-report.md` once (final version), then stop; no reads, searches, or tool calls after Write.
 
