@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A cycle that FAILs from a phase-level/infra error (launch refusal, timeout, abort) records that error into state FailReasons — 'FinalVerdict: FAIL' with FailReasons null/empty becomes structurally impossible (bytestability/regression test).",
+    "The recorded reason carries the failure-adapter class and the originating phase (e.g. 'phase router: bridge launch refused: fleet mode: explicit worktree required'), so retros and the identical-fingerprint breaker get real identities instead of content-free fingerprints (the bc2e3236 lesson, task-FAIL variant).",
+    "The known mechanism from instance 1 is fixed or itemized: advisor/router REPLAN dispatch under fleet mode launched without a designated worktree and was correctly refused (cycle-1358 router-launch-error.txt) — either designate the worktree on the replan path or fall back to a sanctioned scratch cwd for the router agent.",
+    "go vet ./..., -race green on touched packages."
+  ],
+  "connects_to": [
+    "THREE instances in one night (2026-08-06 relaunched batch): cycle-1358 (router launch refused: fleet mode explicit worktree required, after a 165s router run with unmeasured tokens); add-gitignore-residual-tracked-guard cycle (~1365-era, mechanism undetermined, during a codex boot-bench window); chain-boundary-binary-refresh-verify-closed cycle (~1370-era, mechanism undetermined)",
+    "verdict_source_fix_insufficient / v22.4.2 (closed the false-HALT variant of verdict incoherence; this is the silent task-FAIL variant)",
+    "AuditFailReasons plumbing 8e2afef0 (the audit-side reasons pipe exists; phase-infra errors bypass it)"
+  ],
+  "created_at": "2026-08-06T06:20:00Z",
+  "files": [
+    "go/internal/core/ (cycle outcome sealing — route phase/infra errors into FailReasons)",
+    "go/internal/bridge/ or router dispatch path (replan worktree designation)"
+  ],
+  "fix": "Two halves: (1) outcome sealing — when a cycle fails from a phase error rather than an audit verdict, write the phase error (class + phase + message head) into FailReasons before sealing, so no FAIL is reason-less; (2) the one diagnosed mechanism — the router replan dispatch must designate a worktree (or sanctioned scratch) under fleet mode instead of being refused.",
+  "id": "null-failreasons-capture",
+  "priority": 0.85,
+  "problem": "Cycles can seal 'FinalVerdict: FAIL' with FailReasons null when the failure happens at phase-infra level (launch refusal/abort) instead of audit. Three instances in one night. Cost: retros fingerprint nothing (content-free identity — the exact defect class bc2e3236 fixed for gate-blocks), the breaker cannot see genuine recurrence, and infra failures hide behind task-shaped FAILs.",
+  "source": "console-session monitor triage, third-instance threshold reached 2026-08-06",
+  "title": "No FAIL without a reason — seal phase-infra errors into FailReasons (and fix the router replan worktree refusal)"
+}
