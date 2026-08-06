@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -87,6 +88,25 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 	spec := cfg.Spec()
 	if violations := phasespec.ValidateUserSpec(spec); len(violations) > 0 {
 		return Result{}, fmt.Errorf("phaseregistrar: invalid spec %q: %s", spec.Name, strings.Join(violations, "; "))
+	}
+
+	// Bare CLI family name resolution (cycle 1325, mint-profile-driver-suffix):
+	// bridge.DriverFor already projects a bare family name ("claude") onto its
+	// concrete driver ("claude-tmux") for every other dispatch call site
+	// (subagent, consensusdispatch) — Register was the one mint choke point
+	// that skipped it, so an advisor-minted bare name reached disk unresolved
+	// and preflight's exact-match LookupDriver rejected it hours later at the
+	// next loop launch (the batch-15 incident this closes). Resolved BEFORE
+	// ToProfile() so the persisted profile carries the resolved name, and
+	// rejected outright (not silently persisted) when the resolved name is
+	// not itself a registered driver — an unresolvable family name must fail
+	// mint loudly, never at the next launch's preflight halt.
+	if cfg.Dispatch.CLI != "" {
+		resolved := bridge.DriverFor(cfg.Dispatch.CLI)
+		if _, ok := bridge.LookupDriver(resolved); !ok {
+			return Result{}, fmt.Errorf("phaseregistrar: phase %q dispatch.cli %q does not resolve to a registered driver (resolved %q); refusing to mint an unresolvable profile", spec.Name, cfg.Dispatch.CLI, resolved)
+		}
+		cfg.Dispatch.CLI = resolved
 	}
 
 	// The dispatch profile is persisted under (and the runner looks it up by)

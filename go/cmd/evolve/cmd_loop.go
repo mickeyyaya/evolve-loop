@@ -569,6 +569,25 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		// (never collapses to defaults). A widening from Count==1 mid-batch
 		// needs the dispatch binary too, so resolve it here if not yet held.
 		fleetCfg = reloadFleetConfigAtWaveBoundary(cfg.EvolveDir, fleetCfg, stderr)
+
+		// auto-refresh-binary-at-boundary (cycle 1325): the same self-heal
+		// runLoopChain already gets at every chain boundary (cycle 1314),
+		// applied here so a chain-less `evolve loop --max-cycles N` /
+		// fleet run does not keep dispatching on a binary origin/main has
+		// moved past (cycles 1302-1309). Checked at this wave boundary —
+		// before any lane/wave dispatch starts this iteration — never
+		// mid-lane. A true result means a re-exec is imminent/terminal
+		// (mirrors runLoopChain's own handling); stop this iteration
+		// cleanly, the new process resumes on the next launch.
+		if maybeRefreshChainBoundary(cfg, i+1, stderr) {
+			lr.StopReason = "loop_boundary_refresh_reexec"
+			if entry, err := lastChainBoundaryRefreshLogEntry(cfg.EvolveDir); err == nil {
+				lr.BoundaryRefresh = entry
+			}
+			lr.emit(stdout)
+			return 0
+		}
+
 		if (shouldRunWave(fleetCfg) || shouldRunPool(fleetCfg)) && waveBinPath == "" {
 			if bp, err := os.Executable(); err == nil {
 				waveBinPath = bp

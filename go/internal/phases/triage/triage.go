@@ -13,7 +13,9 @@
 package triage
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -99,7 +101,109 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if section := inboxBatchesSection(req.ProjectRoot); section != "" {
 		b.WriteString(section)
 	}
+	// Carry-forward candidate filter (cycle 1325, inbox item
+	// scout-carryforward-real-cherrypick-filter): cycle-962 built a
+	// deterministic, zero-LLM landability screen
+	// (core.CarryforwardCandidateLandable) but never wired it into triage's
+	// own candidate-selection path, leaving it a second, uninvoked oracle
+	// while the LLM kept picking from raw `git merge-tree`'s 1-arg
+	// non-3-way form (cycle-826: mis-selected an already-superseded orphan).
+	// Rendered last for the same reason as inbox_batches; "main" matches
+	// the base every other production caller of the carryforward filter
+	// family uses (ClassifyFleetRebaseCandidate call sites).
+	//
+	// Bounded (cycle-1356, closing inherited defect d803ddb6 — a prior
+	// cycle-1343 disposition claimed this was already bounded; it was not):
+	// context.Background() would let one slow/hung `git merge-tree` per
+	// branch stall prompt composition on triage's critical path
+	// indefinitely, so the call is wrapped in a deadline sized for the
+	// worst case the section itself caps (carryforwardCandidatesMaxBranches
+	// branches probed at a few hundred ms of git subprocess work each).
+	ctx, cancel := context.WithTimeout(context.Background(), carryforwardCandidatesTimeout)
+	defer cancel()
+	if section := CarryforwardCandidatesSection(ctx, req.ProjectRoot, "main"); section != "" {
+		b.WriteString(section)
+	}
 	return b.String()
+}
+
+// carryforwardCandidatesTimeout bounds the context ComposePrompt hands
+// CarryforwardCandidatesSection — sized for carryforwardCandidatesMaxBranches
+// branches at a few hundred ms of `git merge-tree` work each (cycle-1356,
+// closing inherited defect d803ddb6: this advisory section must never stall
+// triage's critical path on an unbounded git subprocess sweep).
+const carryforwardCandidatesTimeout = 8 * time.Second
+
+// carryforwardCandidatesMaxBranches caps how many local cycle-* branches
+// CarryforwardCandidatesSection probes with core.CarryforwardCandidateLandable
+// (each probe is a real `git merge-tree` dry-run — not free). Branches are
+// examined newest-committed-first so the cap drops the stalest candidates,
+// never the freshest (sibling inboxBatchesSection caps via
+// inboxbatch.DefaultMaxItems for the same reason: an uncapped local sweep
+// grows linearly with the branch set and was measured at 150+ branches /
+// 10s+ of blocking git work — cycle-1343 defect dba64c28 / d803ddb6).
+const carryforwardCandidatesMaxBranches = 40
+
+// CarryforwardCandidatesSection renders the deterministic carry-forward
+// candidate list for the triage prompt: the local `cycle-*` branches in dir
+// that core.CarryforwardCandidateLandable reports landable onto base (a real
+// 3-way merge dry-run, not already superseded) — the exact cycle-962 filter
+// left uninvoked. Fail-open like inboxBatchesSection: an unresolved dir/base,
+// a git-infrastructure error, or zero landable candidates all render "",
+// never blocking triage (which still runs its own selection independently).
+//
+// Bounded (cycle-1356): branches are listed newest-committed-first and
+// probing stops after carryforwardCandidatesMaxBranches — truncation is
+// surfaced via a trailing "(partial: N of M branches probed)" line, never
+// silent, so an operator/auditor can tell the list is incomplete without
+// re-deriving the branch count by hand.
+func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string {
+	if dir == "" || base == "" {
+		return ""
+	}
+	cmd := exec.CommandContext(ctx, "git", "for-each-ref",
+		"--sort=-committerdate", "--format=%(refname:short)", "refs/heads/cycle-*")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	var refs []string
+	for _, ref := range strings.Split(string(out), "\n") {
+		ref = strings.TrimSpace(ref)
+		if ref == "" || ref == base {
+			continue
+		}
+		refs = append(refs, ref)
+	}
+	total := len(refs)
+	truncated := total > carryforwardCandidatesMaxBranches
+	if truncated {
+		refs = refs[:carryforwardCandidatesMaxBranches]
+	}
+	var landable []string
+	for _, ref := range refs {
+		ok, err := core.CarryforwardCandidateLandable(ctx, dir, ref, base)
+		if err != nil || !ok {
+			continue
+		}
+		landable = append(landable, ref)
+	}
+	if len(landable) == 0 {
+		return ""
+	}
+	var sect strings.Builder
+	fmt.Fprintf(&sect, "- carryforward_candidates: %d local cycle-* branch(es) pre-screened as landable "+
+		"(clean 3-way merge onto %s, not already superseded) by the deterministic filter — prefer cherry-picking "+
+		"one of these over re-discovering the same work:\n", len(landable), base)
+	for _, ref := range landable {
+		fmt.Fprintf(&sect, "  - %s\n", ref)
+	}
+	if truncated {
+		fmt.Fprintf(&sect, "  - (partial: %d of %d branches probed, newest-committed-first; %d older branch(es) not screened)\n",
+			len(refs), total, total-len(refs))
+	}
+	return sect.String()
 }
 
 // inboxBatchesSection renders the deterministic backlog grouping for the

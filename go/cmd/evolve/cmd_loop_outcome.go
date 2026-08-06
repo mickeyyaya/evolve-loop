@@ -50,6 +50,11 @@ type loopResult struct {
 	// in lane subprocesses is counted at all. Zero = unknown ⇒ no corpus read (an
 	// unbounded read would report the all-time total as this batch's).
 	batchFirstCycle int
+	// BoundaryRefresh mirrors chainResult.BoundaryRefresh for the non-chain
+	// wave/fleet boundary path (auto-refresh-binary-at-boundary, cycle 1325's
+	// caller): nil-when-clean, populated with the last boundary-refresh-log.jsonl
+	// entry only when this batch's stop is "loop_boundary_refresh_reexec".
+	BoundaryRefresh *chainBoundaryRefreshLogEntry `json:"boundary_refresh,omitempty"`
 }
 
 type cycleOutcomeEntry struct {
