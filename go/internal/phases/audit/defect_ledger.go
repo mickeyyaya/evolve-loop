@@ -269,6 +269,20 @@ func evidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
 	if path == "" {
 		return false, "no evidence"
 	}
+	// Drop ONE trailing parenthetical annotation ("path:114-129 (helperName
+	// now cycle-scoped)") before locator stripping: two independent chains
+	// decorated otherwise-valid cites this way (cycles 1356/1360) and ground
+	// on "resolves to no file" every round, ACCRETING ledger entries faster
+	// than they closed. The annotation is dropped, never resolved; every
+	// rejection below still applies to the stripped path — an
+	// annotation-only cite (" (…)" with nothing before it, LastIndex 0) and
+	// a bare "(…)" (no " (" separator) fall through unchanged and fail the
+	// path checks as before.
+	if strings.HasSuffix(path, ")") {
+		if i := strings.LastIndex(path, " ("); i > 0 {
+			path = strings.TrimSpace(path[:i])
+		}
+	}
 	// Strip at most a ":line" and a ":col" suffix; anything else is part of the
 	// path (a Windows drive letter is not reachable here — these are repo paths).
 	// A ":line-line" RANGE counts as one locator: it is the house citation style

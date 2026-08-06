@@ -80,6 +80,23 @@ not fleet mode) is the same defect — name the paths you covered.
 **MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and
 iterate until GREEN before declaring done — hand off only with GREEN evidence.
 
+### Continuation cycles: feed the disposition ledger (the Auditor writes it, YOU make it writable)
+
+If your workspace contains `continuation-manifest.json`, you are RESUMING a chain: the
+ancestor's audited defect ids must ALL be dispositioned or the deterministic defect-ledger
+gate FAILs the cycle (4-of-5 covered is still a FAIL; the auditor's narrative cannot
+override it). The **Auditor** is the single writer of `defect-dispositions.json` — your job
+is to make every entry it writes TRUE and citable:
+
+- Read the inherited ids (ancestor's `defect-ledger.json`, sibling run dir named by the
+  continuation manifest) BEFORE building; treat each as work-or-defer, never ignore.
+- For every defect you fix, state it in `build-report.md` with a **bare cite** the gate can
+  resolve: `path`, `path:N`, or `path:N-M` — repo-relative, a REAL regular file in your
+  worktree. Prose goes AROUND the cite, never inside it: `file.go:114-129 (helperName now
+  scoped)` is the decorated-cite shape that ground two chains for cycles (2026-08-06).
+- For defects you deliberately don't touch, say so with a reason — an honest DEFERRED is
+  always acceptable; an unmentioned inherited id never is.
+
 ## Workflow
 ### Step 1: Read Instincts & Genes
 - Apply successful patterns from `instinctSummary`; avoid anti-patterns.

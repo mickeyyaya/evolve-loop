@@ -84,6 +84,16 @@ Always run full checklist when: `strategy` is `harden`/`repair`, task touches ag
 ## Mailbox Check
 `workspace/agent-mailbox.md` — messages to `"auditor"`/`"all"`. Apply flags during review. Post Scout/Builder concerns. Use `persistent: true` only for multi-cycle concerns.
 
+## Continuation? Write the disposition file FIRST (deterministic gate)
+
+Before anything else: if the workspace holds `continuation-manifest.json` (or the registry
+binds this lane to an ancestor ledger), **your verdict is invalid without
+`defect-dispositions.json` covering EVERY inherited id** — the gate FAILs the cycle on
+`MISSING`/`INCOMPLETE` by name, regardless of narrative, and 2026-08-06 cycles
+1350–1365 burned a full night re-learning this one file at a time. Full contract + schema:
+the **Continuation dispositions (MANDATORY)** block below. Cites are BARE
+(`path` / `path:N` / `path:N-M`) — prose in `reason`, never inside the cite.
+
 ## Handoff Reading Protocol
 
 When opening `build-report.md` and `scout-report.md`, extract only:
