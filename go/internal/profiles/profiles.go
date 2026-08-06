@@ -74,6 +74,13 @@ type Profile struct {
 	// are set.
 	SystemPrompt     string `json:"system_prompt,omitempty"`
 	SystemPromptFile string `json:"system_prompt_file,omitempty"`
+	// DigestFile names a pre-generated role-scoped digest (go/internal/digest
+	// output) resolved relative to the profile dir when not absolute, mirroring
+	// SystemPromptFile. When set AND the file exists on disk, systemprompt.Resolve
+	// prefers its content over SystemPromptFile (cycle-1391,
+	// tokenopt-role-scoped-instruction-digests Task 2). Unset, or set but the
+	// file absent, leaves the existing precedence chain unchanged.
+	DigestFile string `json:"digest_file,omitempty"`
 	// Raw retains the on-disk bytes for callers needing un-modeled
 	// fields (e.g., parallel_subtasks, context_anchors). Populated by
 	// the loader; not part of the JSON schema.

@@ -78,8 +78,8 @@ future, that the manifest's `interactive_prompts` regex list does not yet cover.
 
 | Axis | Decision |
 |---|---|
-| Field flow | `core.BridgeRequest.SystemPrompt` ← runner-resolved from `profiles.Profile.SystemPrompt` / `SystemPromptFile`. |
-| Resolution | `systemprompt.Resolve` mirrors `resolvePolicy` precedence: `EVOLVE_<AGENT>_SYSTEM_PROMPT > EVOLVE_SYSTEM_PROMPT > profile.system_prompt > read(system_prompt_file) > ""`. |
+| Field flow | `core.BridgeRequest.SystemPrompt` ← runner-resolved from `profiles.Profile.SystemPrompt` / `DigestFile` / `SystemPromptFile`. |
+| Resolution | `systemprompt.Resolve` mirrors `resolvePolicy` precedence: `EVOLVE_<AGENT>_SYSTEM_PROMPT > EVOLVE_SYSTEM_PROMPT > profile.system_prompt > read(digest_file) > read(system_prompt_file) > ""`. `digest_file` (cycle-1391, `tokenopt-role-scoped-instruction-digests`) names a pre-generated role-scoped projection from `go/internal/digest.ProjectDigest` — read/preferred only when present on disk; absent or unset, the pre-cycle-1391 chain is unchanged. |
 | Application | `injectRulesPrefix` prepends a `## Rules` block at the **same adapter seam** as `injectPolicyPrefix` (both Go and bash paths). Order: rules < policy < body. |
 | Why the seam, not a flag | `launchCmdLine` has no shell-quoting; a multi-line system prompt routed through a `--append-system-prompt` *launch flag* would corrupt the tmux launch command. The prompt-prepend is CLI-agnostic (headless + tmux) and sidesteps quoting entirely. |
 

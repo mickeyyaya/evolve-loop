@@ -4,7 +4,12 @@
 // policy:
 //
 //	EVOLVE_<AGENT>_SYSTEM_PROMPT > EVOLVE_SYSTEM_PROMPT
-//	  > profile.system_prompt > read(profile.system_prompt_file) > ""
+//	  > profile.system_prompt > read(profile.digest_file) > read(profile.system_prompt_file) > ""
+//
+// digest_file (cycle-1391, tokenopt-role-scoped-instruction-digests Task 2)
+// names a pre-generated role-scoped digest (go/internal/digest output). When
+// set AND present on disk it wins over system_prompt_file; when unset, or
+// set but the file is absent, the pre-cycle-1391 chain is unchanged.
 package systemprompt
 
 import (
@@ -43,14 +48,31 @@ func profileDefault(agent, profileDir string) string {
 	if prof.SystemPrompt != "" {
 		return prof.SystemPrompt
 	}
-	if prof.SystemPromptFile != "" {
-		p := prof.SystemPromptFile
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(profileDir, p)
+	if prof.DigestFile != "" {
+		if content, ok := readRelativeFile(profileDir, prof.DigestFile); ok {
+			return content
 		}
-		if b, err := os.ReadFile(p); err == nil {
-			return strings.TrimRight(string(b), "\n")
+	}
+	if prof.SystemPromptFile != "" {
+		if content, ok := readRelativeFile(profileDir, prof.SystemPromptFile); ok {
+			return content
 		}
 	}
 	return ""
+}
+
+// readRelativeFile reads path (resolved relative to dir when not absolute)
+// and returns its content with trailing newlines trimmed. ok is false when
+// the file cannot be read, so callers can fall through to the next tier in
+// the precedence chain instead of returning empty.
+func readRelativeFile(dir, path string) (content string, ok bool) {
+	p := path
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(dir, p)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimRight(string(b), "\n"), true
 }

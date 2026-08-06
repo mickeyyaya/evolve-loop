@@ -9,7 +9,7 @@ import (
 // systemprompt_test.go — precedence resolution for the launch-time
 // system-prompt/rules (facet B):
 //   EVOLVE_<AGENT>_SYSTEM_PROMPT > EVOLVE_SYSTEM_PROMPT
-//     > profile.system_prompt > read(profile.system_prompt_file) > ""
+//     > profile.system_prompt > read(profile.digest_file) > read(profile.system_prompt_file) > ""
 
 func writeProfile(t *testing.T, dir, agent, json string) {
 	t.Helper()
@@ -79,6 +79,39 @@ func TestResolve_NothingSet(t *testing.T) {
 	// Missing profile is also empty, not an error.
 	if got := Resolve("nope", dir, nil); got != "" {
 		t.Errorf("missing profile: got %q, want empty", got)
+	}
+}
+
+func TestResolve_DigestFileWinsOverSystemPromptFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "digest.md"), []byte("digest content\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "rules.md"), []byte("fallback content\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProfile(t, dir, "scout", `{"name":"scout","digest_file":"digest.md","system_prompt_file":"rules.md"}`)
+	if got := Resolve("scout", dir, nil); got != "digest content" {
+		t.Errorf("got %q, want digest_file content %q to win over system_prompt_file", got, "digest content")
+	}
+}
+
+func TestResolve_DigestFileMissingFallsBackToSystemPromptFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "rules.md"), []byte("fallback content\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProfile(t, dir, "scout", `{"name":"scout","digest_file":"missing.md","system_prompt_file":"rules.md"}`)
+	if got := Resolve("scout", dir, nil); got != "fallback content" {
+		t.Errorf("got %q, want fallback to system_prompt_file content %q when digest_file is absent on disk", got, "fallback content")
+	}
+}
+
+func TestResolve_DigestFileUnsetLeavesChainUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	writeProfile(t, dir, "build", `{"name":"build","system_prompt":"be terse"}`)
+	if got := Resolve("build", dir, nil); got != "be terse" {
+		t.Errorf("got %q, want %q (digest_file addition must not affect profiles that never set it)", got, "be terse")
 	}
 }
 

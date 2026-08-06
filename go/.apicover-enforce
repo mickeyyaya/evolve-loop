@@ -523,3 +523,10 @@
 # apicover_named_test.go. Pure derivation only — the Stage dial, phasetiming
 # persistence and prompt hint are deferred follow-ups.
 ./internal/contextfill
+
+# SSOT digest projector (cycle-1391, new-package graduation): parses
+# "<!-- digest:role=ROLE -->...<!-- /digest -->" markers out of an SSOT
+# instruction source and returns only the requested role's tagged blocks.
+# Named+exercised by digest_test.go and apicover_named_test.go. Consumer:
+# go/internal/systemprompt.Resolve prefers profile.digest_file when present.
+./internal/digest
