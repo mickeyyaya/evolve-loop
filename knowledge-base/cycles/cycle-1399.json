@@ -1,0 +1,48 @@
+{
+  "cycle": 1399,
+  "run_id": "01KZKHTW00BFN9T853D133K3X7",
+  "goal": "work through the queued todo inbox tasks (.evolve/inbox) and carryover todos by priority",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|unknown|f4e5e78d3401",
+    "pre_class": "unknown",
+    "reasons": [
+      "defect ledger: defect-dispositions.json is unparseable (json: cannot unmarshal array into Go struct field .dispositions.evidence of type string) — a continuation cannot be graded against claims that",
+      "closure claim without a citation: \"The four inherited cycle-1392 defects are genuinely closed, verified by reading the\" — a report may not assert a prior cycle's defect is closed without naming the "
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1399",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
