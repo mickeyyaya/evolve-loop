@@ -84,11 +84,61 @@ type defectLedgerDoc struct {
 // continuation's builder/auditor writes: the claim, per inherited defect id.
 type defectDispositionDoc struct {
 	Dispositions []struct {
-		ID       string `json:"id"`
-		Status   string `json:"status"`
-		Evidence string `json:"evidence"`
-		Reason   string `json:"reason"`
+		ID       string              `json:"id"`
+		Status   string              `json:"status"`
+		Evidence dispositionEvidence `json:"evidence"`
+		Reason   string              `json:"reason"`
 	} `json:"dispositions"`
+}
+
+// evidenceSeparator joins a multi-citation `evidence` value into the single
+// string carried by defectEntry.Evidence and written back into
+// defect-ledger.json. It is also the token evidenceResolves splits on, so the
+// join and the resolution can never disagree about what "several citations"
+// means. ";" never appears in a repo-relative path in practice; a citation that
+// contained one was already unresolvable.
+const evidenceSeparator = "; "
+
+// dispositionEvidence is the wire type of a disposition's `evidence` field: a
+// single citation STRING or a JSON ARRAY of citation strings.
+//
+// cycle-1399. The auditor had done the work and cited it — as
+// `"evidence": ["a.go:1", "b.go:2"]`. The field was typed `string`, so
+// encoding/json refused the whole DOCUMENT ("cannot unmarshal array into Go
+// struct field .dispositions.evidence of type string") and the gate blocked on
+// "unparseable": a correct claim the gate could not read. #419's decorated-cite
+// tolerance is orthogonal — it never touches the JSON type. Two shapes are
+// natural to an authoring agent and both are now read.
+//
+// Tolerance is widened for the SHAPE only, never for the CLAIM: an unrecognised
+// shape (object, number, bool) is still rejected outright rather than degraded
+// to "" (cycle-1285 F2 — a silent degrade is the gate's cheapest bypass), and
+// every citation in an accepted array must still resolve on its own.
+type dispositionEvidence struct {
+	citations []string
+}
+
+// UnmarshalJSON accepts `"a"` and `["a","b"]`; everything else is an error,
+// which surfaces through readDispositions' blocking unparseable branch.
+func (e *dispositionEvidence) UnmarshalJSON(raw []byte) error {
+	var one string
+	if err := json.Unmarshal(raw, &one); err == nil {
+		e.citations = []string{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(raw, &many); err == nil {
+		e.citations = many
+		return nil
+	}
+	return fmt.Errorf("`evidence` must be a citation string or an array of citation strings, got %s", truncateRunes(strings.TrimSpace(string(raw)), 120))
+}
+
+// joined renders the citations as the one string the rest of the mechanism
+// carries. An empty array joins to "" — the existing "no evidence" case, not a
+// new pass: `[]` is a FIXED claim with nothing behind it.
+func (e dispositionEvidence) joined() string {
+	return strings.Join(e.citations, evidenceSeparator)
 }
 
 // readDefectLedger loads dir's ledger. Missing file → (zero, false, nil): a
@@ -264,7 +314,37 @@ func truncateRunes(s string, max int) string {
 // prove the file is in this cycle's diff or is related to the defect text.
 // Upgrade path: resolve against the changed set (`git diff --name-only
 // <manifest.base_sha>` in the worktree) once the audit hook carries the diff.
-func evidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
+// A multi-citation value (the array shape above, joined) resolves only when
+// EVERY citation resolves: "one of these files exists" would let a real cite
+// carry an invented one past the gate.
+func evidenceResolves(evidence string, req core.PhaseRequest) (bool, string) {
+	cites := splitEvidence(evidence)
+	if len(cites) == 0 {
+		return false, "no evidence"
+	}
+	for _, c := range cites {
+		if ok, why := oneEvidenceResolves(c, req); !ok {
+			return false, why
+		}
+	}
+	return true, ""
+}
+
+// splitEvidence returns the individual citations in a (possibly joined)
+// evidence value, dropping blanks — so "", " " and "; " are all "no evidence"
+// rather than a citation named "".
+func splitEvidence(evidence string) []string {
+	var out []string
+	for _, part := range strings.Split(evidence, ";") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// oneEvidenceResolves applies the four rules to a SINGLE citation.
+func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
 	path := strings.TrimSpace(citation)
 	if path == "" {
 		return false, "no evidence"
@@ -648,6 +728,22 @@ func dispositionPreflight(req core.PhaseRequest, ancestorCycle int, ancestor []d
 			dispositionPreflightIncompleteMarker, defectDispositionFile, len(open)-len(uncovered), len(open), ancestorCycle, strings.Join(uncovered, ", "))}}
 }
 
+// dispositionSchemaExample is the ONE canonical defect-dispositions.json
+// example. It is surfaced inline on rejection (cycle-1403 Task 3): the agent
+// re-authoring the file on the next dispatch does not read Go, so
+// "cannot unmarshal number into Go struct field …" names the failure without
+// naming the remedy. It is byte-for-byte the same document (as JSON) as the
+// examples in agents/evolve-auditor.md and
+// docs/architecture/continuation-defect-ledger.md — defect_ledger_doc_example_test.go
+// holds the three in sync, so there is one schema with three projections rather
+// than three schemas.
+const dispositionSchemaExample = `{"dispositions": [
+  {"id": "d0f3a7c1e59b246d8a0c4e6f13579bde2", "status": "FIXED",
+   "evidence": "go/internal/phases/audit/defect_ledger.go:267-356"},
+  {"id": "d9c8b7a6958473625140f3e2d1c0b9a87", "status": "DEFERRED",
+   "reason": "out of this lane's scope; queued as disposition-evidence-tolerant-unmarshal"}
+]}`
+
 // readDispositions loads the continuation's disposition claims keyed by defect
 // id. A MISSING file is not an error and not a pass: it yields an empty map, so
 // every inherited OPEN entry falls through to "unaccounted" and is named by id.
@@ -666,11 +762,12 @@ func readDispositions(workspace string, ancestorCycle int) (map[string]defectEnt
 	var doc defectDispositionDoc
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: %s is unparseable (%s) — a continuation cannot be graded against claims that cannot be read", defectDispositionFile, err.Error())}}, true
+			Message: fmt.Sprintf("defect ledger: %s is unparseable (%s) — a continuation cannot be graded against claims that cannot be read. Expected schema:\n%s\n(`evidence` may also be an array of citation strings; `status` is exactly FIXED — with resolvable evidence — or DEFERRED, with a reason.)",
+				defectDispositionFile, err.Error(), dispositionSchemaExample)}}, true
 	}
 	claims := make(map[string]defectEntry, len(doc.Dispositions))
 	for _, d := range doc.Dispositions {
-		claims[d.ID] = defectEntry{ID: d.ID, Status: d.Status, Evidence: d.Evidence, Reason: d.Reason}
+		claims[d.ID] = defectEntry{ID: d.ID, Status: d.Status, Evidence: d.Evidence.joined(), Reason: d.Reason}
 	}
 	return claims, nil, false
 }
