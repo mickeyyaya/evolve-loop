@@ -16,7 +16,10 @@
 package phasecoherence
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -80,6 +83,34 @@ func repoRootForPairing(t *testing.T) string {
 	return root
 }
 
+// trackedProfiles returns the basenames (sans .json) of the profiles git
+// tracks under .evolve/profiles — the Direction-B binding set. An untracked
+// profile is a runtime-minted stub (gitignored by design; the minter
+// completes phase->profile pairing at dispatch time): it never reaches a CI
+// checkout, cannot red main, and so is runtime state rather than repo
+// config. Callers fall back to binding every on-disk profile when git is
+// unavailable. Regression pin: unpaired_tracked_test.go.
+func trackedProfiles(root string) (map[string]bool, error) {
+	out, err := exec.Command("git", "-C", root, "ls-files", "--", ".evolve/profiles").Output()
+	if err != nil {
+		// exec.ExitError.Error() is just "exit status N"; the reason an
+		// operator needs ("not a git repository", ...) is on stderr.
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			return nil, fmt.Errorf("git ls-files .evolve/profiles in %s: %w: %s", root, err, strings.TrimSpace(string(ee.Stderr)))
+		}
+		return nil, fmt.Errorf("git ls-files .evolve/profiles in %s: %w", root, err)
+	}
+	set := make(map[string]bool)
+	for _, line := range strings.Split(string(out), "\n") {
+		base := filepath.Base(strings.TrimSpace(line))
+		if strings.HasSuffix(base, ".json") {
+			set[strings.TrimSuffix(base, ".json")] = true
+		}
+	}
+	return set, nil
+}
+
 // TestRepoPersonaProfilePairing is the bijection drift gate on the live tree.
 //
 // Direction A (persona → profile): every agents/evolve-<name>.md must have
@@ -98,21 +129,17 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		"operator":      "human-operator playbook, never machine-dispatched",
 		"swarm-planner": "swarm is EVOLVE_SWARM_STAGE=shadow; MUST be paired before swarm promotion (plan task CF.2)",
 	}
-	// Direction-B allowlist: profiles whose prompt source is not an
-	// agents/evolve-*.md persona.
+	// Direction-B allowlist: TRACKED profiles whose prompt source is not an
+	// agents/evolve-*.md persona. Runtime-minted stubs no longer need entries
+	// here: they are gitignored by design, so trackedProfiles excludes them
+	// structurally (the cycle-~1326 firing was patched with per-name entries;
+	// the cd49274beab2 storm, cycles 1402/1403/1405, proved that ratchet
+	// re-arms on every new mint and killed a whole batch — see
+	// unpaired_tracked_test.go).
 	profileOnly := map[string]string{
 		"evaluator":   "persona projected from skills/evaluator",
 		"inspirer":    "persona projected from skills/inspirer",
 		"tool-policy": "shared tool-policy fragment, not an agent",
-		// Runtime-minted profile stubs for catalog phases whose personas are
-		// not yet authored: the minter completes phase->profile pairing at
-		// dispatch time, these files are gitignored (never tracked), and the
-		// ship-time repo-contract gate would otherwise block EVERY lane on
-		// stubs it did not author (first live firing, cycle ~1326). The
-		// allowlist-shrink ratchet applies: author the persona, delete the
-		// entry. Persona completion tracked on phase-mint-carries-select-metadata.
-		"ship-stage-hygiene-check":      "runtime-minted stub; persona pending (queue: phase-mint class)",
-		"regression-predicate-precheck": "runtime-minted stub; persona pending (queue: phase-mint class)",
 	}
 
 	agentEntries, err := os.ReadDir(filepath.Join(root, "agents"))
@@ -143,12 +170,34 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read profiles/: %v", err)
 	}
+	tracked, terr := trackedProfiles(root)
+	if terr == nil && len(tracked) == 0 {
+		// A pathspec that matches nothing exits 0. An empty tracked set on
+		// the real tree means a misresolved root or sparse checkout, never
+		// "no profiles" — going dark here would unbind the whole gate.
+		terr = fmt.Errorf("empty tracked-profile set at %s — pathspec matched nothing", root)
+	}
+	if terr != nil {
+		// No usable git context (e.g. exported source tarball): fall back to
+		// the stricter pre-seam behavior of binding every on-disk profile.
+		t.Logf("trackedProfiles: %v — binding all on-disk profiles", terr)
+		tracked = nil
+	}
 	for _, e := range profEntries {
 		n := e.Name()
 		if e.IsDir() || !strings.HasSuffix(n, ".json") {
 			continue
 		}
 		name := strings.TrimSuffix(n, ".json")
+		if tracked != nil && !tracked[name] {
+			// Untracked = runtime-minted stub (gitignored by design; the
+			// minter pairs phase->profile at dispatch time). It never lands
+			// on main, so it is not repo config and Direction B must not
+			// bind it — binding it is what turned the live plane's ship
+			// gate red for every lane (fingerprint cd49274beab2).
+			t.Logf("untracked profile %q: runtime-minted state, not bound", name)
+			continue
+		}
 		if why, ok := profileOnly[name]; ok {
 			t.Logf("allowlisted profile-only %q: %s", name, why)
 			continue
