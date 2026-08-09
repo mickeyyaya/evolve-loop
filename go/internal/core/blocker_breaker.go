@@ -30,6 +30,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,16 @@ type BlockerBreakerConfig struct {
 	// at the ceiling unchanged. Nil/empty = no exclusions (zero value,
 	// byte-identical behavior for every pre-existing caller).
 	AckedFingerprints map[string]bool
+	// ConsecutiveFailuresCeiling halts when this many CYCLES fail
+	// back-to-back (cycle numbers n, n+1, …, no PASS between) REGARDLESS of
+	// fingerprint identity (operator directive 2026-08-10: the 2026-08-09
+	// batch burned 10 failed cycles / 0 ships before the identity-keyed rule
+	// tripped — varied failure modes evaded it for 7 extra cycles). Acked
+	// digests break the streak: a batch resumed to verify a fix must not
+	// insta-halt on the history it is verifying. 0 disables. Evaluated LAST
+	// so the specific rules above, whose reasons carry actionable repro
+	// hints, name the halt when they also trip.
+	ConsecutiveFailuresCeiling int
 }
 
 // ResolvedFingerprint is one record in the ack ledger
@@ -188,7 +199,7 @@ func ConsumePipelineDefectFingerprint(evolveDir, consumedBy, notes, resolvedBy s
 // into the same wall.
 type BlockerVerdict struct {
 	Halt        bool
-	Rule        string // "guard-class" | "identical-fingerprint"
+	Rule        string // "guard-class" | "identical-fingerprint" | "unexplained-failures" | "consecutive-failures"
 	Fingerprint string // Rule B: the recurring identity; Rule A: representative
 	Count       int
 	Reason      string
@@ -256,6 +267,35 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 				return BlockerVerdict{
 					Halt: true, Rule: "identical-fingerprint", Fingerprint: d.Fingerprint, Count: counts[d.Fingerprint],
 					Reason: fmt.Sprintf("failure fingerprint %q recurred %d× in one batch (ceiling %d) — identical failure identities cannot be distinct honest defects", d.Fingerprint, counts[d.Fingerprint], cfg.IdenticalFingerprintCeiling),
+				}
+			}
+		}
+	}
+	if cfg.ConsecutiveFailuresCeiling > 0 {
+		counted := map[int]FailureDigest{}
+		for _, d := range digests {
+			if cfg.AckedFingerprints[d.Fingerprint] {
+				continue
+			}
+			counted[d.Cycle] = d
+		}
+		cycles := make([]int, 0, len(counted))
+		for c := range counted {
+			cycles = append(cycles, c)
+		}
+		sort.Ints(cycles)
+		run := 0
+		for i, c := range cycles {
+			if i > 0 && c == cycles[i-1]+1 {
+				run++
+			} else {
+				run = 1
+			}
+			if run >= cfg.ConsecutiveFailuresCeiling {
+				d := counted[c]
+				return BlockerVerdict{
+					Halt: true, Rule: "consecutive-failures", Fingerprint: d.Fingerprint, Count: run,
+					Reason: fmt.Sprintf("%d consecutive failed cycles ending at cycle %d (ceiling %d) with mixed failure identities — a batch that cannot ship %d cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10)", run, d.Cycle, cfg.ConsecutiveFailuresCeiling, cfg.ConsecutiveFailuresCeiling),
 				}
 			}
 		}
