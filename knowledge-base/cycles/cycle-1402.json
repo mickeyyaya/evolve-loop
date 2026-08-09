@@ -1,0 +1,328 @@
+{
+  "cycle": 1402,
+  "run_id": "01KZKPHJ927NHCSSAGM4YDBH7P",
+  "goal": "work through the queued todo inbox tasks (.evolve/inbox) and carryover todos by priority",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 93787,
+      "started_at": "2026-08-09T16:45:42Z",
+      "ended_at": "2026-08-09T16:47:16Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 376,
+        "output": 5287,
+        "cache_read": 289312,
+        "cache_write": 55911
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 51424,
+      "started_at": "2026-08-09T16:49:07Z",
+      "ended_at": "2026-08-09T16:49:59Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1464,
+        "cache_read": 122374,
+        "cache_write": 32585
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 129801,
+      "started_at": "2026-08-09T16:49:59Z",
+      "ended_at": "2026-08-09T16:52:09Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 24,
+        "output": 8389,
+        "cache_read": 417777,
+        "cache_write": 43640
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 461565,
+      "started_at": "2026-08-09T16:52:09Z",
+      "ended_at": "2026-08-09T16:59:51Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 53,
+        "output": 27386,
+        "cache_read": 2043718,
+        "cache_write": 75097
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 635910,
+      "started_at": "2026-08-09T16:59:51Z",
+      "ended_at": "2026-08-09T17:10:54Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 81,
+        "output": 36757,
+        "cache_read": 4208177,
+        "cache_write": 105420
+      }
+    },
+    {
+      "name": "coverage-gate",
+      "verdict": "PASS",
+      "duration_ms": 406739,
+      "started_at": "2026-08-09T17:10:54Z",
+      "ended_at": "2026-08-09T17:17:41Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 4504,
+        "output": 25036,
+        "cache_read": 2717784,
+        "cache_write": 85457
+      }
+    },
+    {
+      "name": "adversarial-review",
+      "verdict": "PASS",
+      "duration_ms": 240025,
+      "started_at": "2026-08-09T17:17:41Z",
+      "ended_at": "2026-08-09T17:21:42Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 31,
+        "output": 13548,
+        "cache_read": 1120408,
+        "cache_write": 57684
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 447790,
+      "started_at": "2026-08-09T17:21:42Z",
+      "ended_at": "2026-08-09T17:29:10Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 84,
+        "output": 32814,
+        "cache_read": 3511366,
+        "cache_write": 103023
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 181883,
+      "started_at": "2026-08-09T17:29:10Z",
+      "ended_at": "2026-08-09T17:33:01Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 19,
+        "output": 10903,
+        "cache_read": 622956,
+        "cache_write": 69432
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "started_at": "2026-08-09T17:33:01Z",
+      "ended_at": "2026-08-09T17:33:04Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 34273,
+      "started_at": "2026-08-09T17:33:04Z",
+      "ended_at": "2026-08-09T17:33:50Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 2,
+        "output": 292,
+        "cache_read": 20722,
+        "cache_write": 24468
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "started_at": "2026-08-09T17:33:50Z",
+      "ended_at": "2026-08-09T17:33:52Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 33420,
+      "started_at": "2026-08-09T17:33:52Z",
+      "ended_at": "2026-08-09T17:34:38Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 2,
+        "output": 294,
+        "cache_read": 20722,
+        "cache_write": 24471
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "started_at": "2026-08-09T17:34:38Z",
+      "ended_at": "2026-08-09T17:34:39Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 553343,
+      "started_at": "2026-08-09T17:34:39Z",
+      "ended_at": "2026-08-09T17:43:52Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 52,
+        "output": 33377,
+        "cache_read": 2269437,
+        "cache_write": 90746
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "ship|gate-block|cd49274beab2",
+    "pre_class": "gate-block",
+    "reasons": [
+      "phase ship: ship repo-contract gate: [REPO_CONTRACT_GATE/precondition @atomic-ship] repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main; fix the violation in"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1402",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 3269960,
+    "phase_count": 15,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 635910,
+    "by_archetype_ms": {
+      "build": 635910,
+      "control": 553343,
+      "evaluate": 1344130,
+      "plan": 736577
+    },
+    "total_tokens": {
+      "input": 5234,
+      "output": 195547,
+      "cache_read": 17364753,
+      "cache_write": 767934
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 81,
+        "output": 36757,
+        "cache_read": 4208177,
+        "cache_write": 105420
+      },
+      "control": {
+        "input": 52,
+        "output": 33377,
+        "cache_read": 2269437,
+        "cache_write": 90746
+      },
+      "evaluate": {
+        "input": 4642,
+        "output": 82887,
+        "cache_read": 8013958,
+        "cache_write": 364535
+      },
+      "plan": {
+        "input": 459,
+        "output": 42526,
+        "cache_read": 2873181,
+        "cache_write": 207233
+      }
+    },
+    "wasted_tokens": {
+      "input": 52,
+      "output": 33377,
+      "cache_read": 2269437,
+      "cache_write": 90746
+    },
+    "cache_hit_ratio": 0.9996986756524343,
+    "hot_phase_count": 8,
+    "hot_phases": [
+      "scout",
+      "fault-localization",
+      "tdd",
+      "build",
+      "coverage-gate",
+      "adversarial-review",
+      "bug-reproduction",
+      "audit"
+    ]
+  }
+}
