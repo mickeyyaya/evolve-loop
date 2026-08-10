@@ -149,4 +149,12 @@ type CycleState struct {
 	// independent evidence at the retro-decision chokepoint. Additive omitempty;
 	// pre-S4 checkpoints decode/encode unchanged.
 	FailedAt []FailedRecord `json:"failed_at,omitempty"`
+	// BookkeepingRegradeAttempted bounds the bookkeeping-regrade micro-cycle
+	// (retro→audit re-dispatch when a FAIL's only explanations are
+	// bookkeeping-class) to ONCE per cycle. Orchestrator-owned like
+	// AuditFailReasons — the guard is never read from an agent-writable
+	// workspace file, so an auditor deleting a marker cannot mint itself
+	// unbounded re-audits. Additive omitempty; persisted so a crash between
+	// the regrade decision and the re-audit resumes without a second grant.
+	BookkeepingRegradeAttempted bool `json:"bookkeeping_regrade_attempted,omitempty"`
 }

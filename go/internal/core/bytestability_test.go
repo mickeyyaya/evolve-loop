@@ -47,11 +47,12 @@ var legacyCycleStateKeys = []string{
 }
 
 var additiveCycleStateKeys = []string{
-	"run_id",             // CA.5
-	"worktree_base_sha",  // cycle-156 resume parity
-	"audit_fail_reasons", // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
-	"failed_at",          // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
-	"ship_fail_reasons",  // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
+	"run_id",                        // CA.5
+	"worktree_base_sha",             // cycle-156 resume parity
+	"audit_fail_reasons",            // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
+	"failed_at",                     // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
+	"ship_fail_reasons",             // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
+	"bookkeeping_regrade_attempted", // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

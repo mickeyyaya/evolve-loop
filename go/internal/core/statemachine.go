@@ -185,7 +185,13 @@ func NewStateMachine() *StateMachine {
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
 		PhaseAudit:        {PhaseShip: true, PhaseRetro: true},
-		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true},
+		// retro→audit is the bookkeeping-regrade micro-cycle edge (bounded to
+		// once per cycle by CycleState.BookkeepingRegradeAttempted): a FAIL
+		// explained ONLY by bookkeeping gates re-runs audit on the same
+		// snapshot instead of burning a continuation lane. Same shape as the
+		// ship→audit recovery edge below; audit→ship remains artifact-gated,
+		// so the edge cannot weaken the integrity floor.
+		PhaseRetro: {PhaseShip: true, PhaseTDD: true, PhaseEnd: true, PhaseAudit: true},
 		// Ship can hand off to a recovery phase when it returns a structured
 		// ShipError (advisor-recommended recovery, Component #6/#7): the
 		// recovery Chain-of-Responsibility may route a precondition error to
