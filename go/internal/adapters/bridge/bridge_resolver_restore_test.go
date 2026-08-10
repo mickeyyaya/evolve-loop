@@ -58,12 +58,19 @@ func TestSetContractResolver_NilRestoresBuiltinOnly(t *testing.T) {
 
 // TestInjectContract_ZeroValueAdapter_DegradesToBuiltin pins the documented
 // degradation of a zero-value Adapter (resolver field nil): injectContract must
-// fall back to the built-in resolver rather than nil-panic. For a user phase the
-// built-in resolver has no entry, so the prompt body passes through unchanged.
+// fall back to the built-in resolver rather than nil-panic. For a phase the
+// built-in resolver does not know, the body now leads and the synthesized
+// path-disclosure tail follows (cycle-1424: naked pass-through starved the
+// agent of its polled artifact path); with no artifact path the body passes
+// through unchanged.
 func TestInjectContract_ZeroValueAdapter_DegradesToBuiltin(t *testing.T) {
 	var a Adapter // zero value: resolver is nil
 
-	if got := a.injectContract("BODY", "foo", "/ws/foo-report.md"); got != "BODY" {
-		t.Errorf("zero-value Adapter must degrade to built-in-only and pass an unregistered user phase through unchanged; got %q", got)
+	got := a.injectContract("BODY", "foo", "/ws/foo-report.md")
+	if !strings.HasPrefix(got, "BODY") || !strings.Contains(got, "/ws/foo-report.md") {
+		t.Errorf("unregistered phase with an artifact must keep body-first and disclose the path; got %q", got)
+	}
+	if got := a.injectContract("BODY", "foo", ""); got != "BODY" {
+		t.Errorf("no artifact path ⇒ unchanged pass-through; got %q", got)
 	}
 }

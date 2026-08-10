@@ -298,7 +298,19 @@ func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
 	}
 	c, ok := resolver.Resolve(agent)
 	if !ok {
-		return prompt
+		if artifactPath == "" {
+			return prompt
+		}
+		// Unresolved agent WITH a pollable artifact = a minted/unregistered
+		// phase. The engine will wait on artifactPath either way, so the
+		// prompt must disclose it — a naked pass-through here is exactly the
+		// cycle-1424 halt (600s artifact-timeout: the agent was never told
+		// the path). FOOTER only, not RenderContractTail: the tail embeds a
+		// `evolve phase verify <agent>` self-check that is guaranteed exit 10
+		// for a resolver-miss agent — an impossible instruction, the same
+		// class this branch exists to close (adversarial-review BLOCK).
+		c = phasecontract.Contract{Phase: agent, AgentName: agent, ArtifactName: filepath.Base(artifactPath)}
+		return prompt + phasecontract.RenderContractFooter(c, artifactPath)
 	}
 	// ADR-0050 §3.8b: at >=StageAdvisory, instruct build/scout/triage to
 	// self-report failure via a structured sentinel. Gated >=advisory (NOT
