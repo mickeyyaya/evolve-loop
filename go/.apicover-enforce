@@ -214,6 +214,11 @@
 ./internal/recovery
 ./internal/reflection
 
+# tracked-state answer for repo-wide scanners (ADR-0084 invariant 1, 2026-08-10
+# new-package graduation): stdlib+git leaf; TrackedFiles/TrackedSet asserted
+# end-to-end against a real git fixture by apicover_named_test.go.
+./internal/repostate
+
 # retro→inbox preventive-actions autofiler (cycle-657, new-package graduation):
 # stdlib-only leaf; ParsePreventiveActions/FileActions/PreventiveAction all
 # asserted by the white-box suite at internal/retrofile/retrofile_test.go.
