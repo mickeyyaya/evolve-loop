@@ -1,0 +1,35 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1406",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1410",
+    ".evolve/evals/verify-pipeline-blocker-fix-421.md"
+  ],
+  "consumed_at": "2026-08-09T23:54:22Z",
+  "consumed_by": "cycle-1410 verification lane (task verify-pipeline-blocker-fix-421). The fix itself landed console-first via PR #421 (squash 7a42d30b); this cycle is the terminal VERIFY step of the halt/fix/verify chain — no new product code. The four-suite ship-time repo-contract pack was run live from the PLANE root with the untracked runtime-minted stub .evolve/profiles/defect-disposition-ledger.json present on disk (git status: ??), and is GREEN. The pending item was removed from the live .evolve/inbox/ on the plane; its full content is preserved in this record.",
+  "created_at": "2026-08-09T20:51:57Z",
+  "fix": "RESOLVED CONSOLE-FIRST 2026-08-09 (PR #421, branch fix/pairing-untracked-profiles, squash 7a42d30b): the auto-hypothesis (verdict-surface forgery) was WRONG — the real cause was TestRepoPersonaProfilePairing Direction B binding the untracked runtime-minted stub .evolve/profiles/defect-disposition-ledger.json on the live plane (the ship gate runs the four-suite pack against the plane source tree via runtime.Caller root resolution), redding every lane ship. Fix: Direction B binds only git-TRACKED profiles (trackedProfiles via git ls-files; loud empty-set + stderr-surfaced fallbacks); fixture regression test unpaired_tracked_test.go. Verification cycle: confirm PR #421 merged, run the four-suite pack from the PLANE root with the minted stub still present (must be green), then consume this item. Residual gate hardening (diag persistence, infra-vs-test classification, scan-the-pushed-tree correctness) tracked in 2026-08-09T16-30-00Z-repocontract-gate-false-red-swallowed-diag.json (0.93).",
+  "id": "pipeline-defect-pipeline-blocker",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-08-09T20:51:57Z. Evidence: failure fingerprint \"ship|gate-block|cd49274beab2\" recurred 3× in one batch (ceiling 3, cycles 1402/1403/1405) — identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|gate-block|cd49274beab2). CONSUMED 2026-08-09T23:54:22Z after live verification of the cd49274beab2 cure; see the verification block. Distinct from the earlier 96f17cfe3dfe halt recorded in pipeline-defect-pipeline-blocker-2026-08-05.json, which remains its own record.",
+  "priority": "P0",
+  "root_cause": "CONFIRMED (supersedes the auto-filed template hypothesis below): ship-time repo-contract pack RED, not a forged verdict. TestRepoPersonaProfilePairing Direction B enumerated every .evolve/profiles/*.json on disk — including the gitignored-by-design, runtime-minted defect-disposition-ledger.json — and required a paired persona, so every audit-green lane ship was blocked with ship|gate-block|cd49274beab2 until the identical-fingerprint ceiling halted the batch.",
+  "root_cause_auto_hypothesis_rejected": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072. — REJECTED: the audit artifacts and the recorded verdict agreed; the block came from the ship-time repo-contract gate.",
+  "summary": "ADR-0072 system-failure halt at cycle 1406, fingerprint ship|gate-block|cd49274beab2. Cured by PR #421 (7a42d30b) binding Direction-B pairing to git-TRACKED profiles only; verified live in cycle 1410 and consumed.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted — failure fingerprint \"ship|gate-block|cd49274beab2\" recurred 3× in one batch (ceiling 3) — identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|gate-block|cd49274beab2)",
+  "verification": {
+    "commit": "7a42d30b82624b88cd575b30b6fe4ff473b1198b",
+    "pr": 421,
+    "verified_at": "2026-08-09T23:54:22Z",
+    "verified_in": "cycle-1410 build phase (worktree .evolve/worktrees/cycle-42824668-1410); pack run executed from the PLANE root /Users/danleemh/ai/claude/evolve-loop-runtime",
+    "preconditions": "git status --porcelain reported '?? .evolve/profiles/defect-disposition-ledger.json' on the plane immediately before the run — the exact untracked runtime-minted-stub condition that produced fingerprint cd49274beab2; git merge-base --is-ancestor 7a42d30b HEAD is true in the lane worktree.",
+    "evidence": "Live run of the ship-time four-suite repo-contract pack from the plane root with the untracked minted stub present, exit=0: `cd go && go test -count=1 ./internal/phasespec/... ./internal/profiles/... ./internal/phasecoherence/... ./internal/routingtest/...` -> ok phasespec 0.164s, ok profiles 0.262s, ok phasecoherence 0.449s, ok routingtest 0.927s (4/4 packages ok, rc=0). Narrowed re-run, exit=0: `go test -count=1 -v -run '^(TestRepoPersonaProfilePairing|TestTrackedProfiles_)' ./internal/phasecoherence` -> PASS TestRepoPersonaProfilePairing, PASS TestTrackedProfiles_MintedStubIsRuntimeStateNotRepoConfig, PASS TestTrackedProfiles_NonRepoDirFailsLoudly (3/3 PASS). This closes fingerprint ship|gate-block|cd49274beab2: the phasecoherence pairing suite is green with an untracked profile on disk, which is the condition that was RED at cycles 1402/1403/1405.",
+    "permanent_regression_pins": [
+      ".evolve/evals/verify-pipeline-blocker-fix-421.md (4 score_caps)",
+      "go/acs/cycle1410/predicates_test.go (TestC1410_001..004)",
+      "go/internal/phasecoherence/unpaired_tracked_test.go (PR #421 fixture)"
+    ]
+  },
+  "weight": 0.99
+}
