@@ -233,7 +233,7 @@ func TestRunCycle_MergesPrescriptionCarryoverIntoState(t *testing.T) {
 	result := &CycleResult{FinalVerdict: VerdictWARN}
 	state := &State{}
 
-	if _, err := o.finalizeCycle(context.Background(), cs, 1375, "same-head", "", result, state); err != nil {
+	if _, err := o.finalizeCycle(context.Background(), cs, 1375, "same-head", "", result, state, nil); err != nil {
 		t.Fatalf("finalizeCycle: %v", err)
 	}
 

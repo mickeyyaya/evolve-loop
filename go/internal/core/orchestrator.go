@@ -982,7 +982,7 @@ OuterLoop:
 	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
 	// preserveWorktree is threaded back so the exit defer (registered above)
 	// observes it; cycleCompletedNormally is set only on a clean persist.
-	preserve, ferr := o.finalizeCycle(ctx, cr.cs, cr.cycle, cr.preCycleHEAD, cr.req.ProjectRoot, &cr.result, &cr.state)
+	preserve, ferr := o.finalizeCycle(ctx, cr.cs, cr.cycle, cr.preCycleHEAD, cr.req.ProjectRoot, &cr.result, &cr.state, cr.phaseTimings)
 	if preserve {
 		cr.preserveWorktree = true
 	}
