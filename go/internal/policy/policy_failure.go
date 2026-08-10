@@ -70,6 +70,11 @@ type FailureThresholds struct {
 	// reaching this in one batch ⇒ diagnosability halt (batch-6 first-firing:
 	// three distinct reason-less failures shared one degenerate fingerprint).
 	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
+	// ConsecutiveFailuresHaltCeiling: this many cycles failing back-to-back
+	// (any fingerprints) ⇒ pipeline-blocker halt + deep-dive before further
+	// dispatch (operator directive 2026-08-10: the 2026-08-09 batch burned 10
+	// failed cycles / 0 ships before an identity-keyed rule tripped).
+	ConsecutiveFailuresHaltCeiling int `json:"consecutive_failures_halt_ceiling,omitempty"`
 	// BuildDeepEscalateAtFailures: an item whose failure_count has reached
 	// this routes its NEXT build to the deep tier (ADR-0076 D — retrying a
 	// hard item at the same tier re-fails identically). Raise-only; envelope
@@ -105,7 +110,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryCodeAuditFail:   {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
 			CategoryIntentMalformed: {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, BuildDeepEscalateAtFailures: 1},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, BuildDeepEscalateAtFailures: 1},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -150,6 +155,9 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 		}
 		if c.Thresholds.UnexplainedFailuresHaltCeiling > 0 {
 			out.Thresholds.UnexplainedFailuresHaltCeiling = c.Thresholds.UnexplainedFailuresHaltCeiling
+		}
+		if c.Thresholds.ConsecutiveFailuresHaltCeiling > 0 {
+			out.Thresholds.ConsecutiveFailuresHaltCeiling = c.Thresholds.ConsecutiveFailuresHaltCeiling
 		}
 		if c.Thresholds.BuildDeepEscalateAtFailures > 0 {
 			out.Thresholds.BuildDeepEscalateAtFailures = c.Thresholds.BuildDeepEscalateAtFailures
