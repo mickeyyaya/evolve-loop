@@ -24,11 +24,12 @@ live here as Go packages — there is no bash dispatcher.
   for three attempts. The legacy `./acs/cycle9..661` entries predate that run
   and are grandfathered behind `core.buildTagVisiblePackages`; the ceiling is
   pinned by `TestAPICoverEnforceDoesNotEnrollModernACSPackages`.
-- `go/internal/` — 152 internal packages implementing the pipeline.
+- `go/internal/` — 153 internal packages implementing the pipeline.
   Phase-1 modularization leaf packages: `go/internal/gitexec`
   (git-CLI isolation leaf, depends only on `go/internal/sysexec`),
   `go/internal/log` (unified Console logger), and `go/internal/envchain`
-  (typed env knobs). `go/internal/research` holds the KB package
+  (typed env knobs); `go/internal/repostate` (git-tracked-state answer for
+  repo-wide scanners — ADR-0084 invariant 1, 2026-08-10). `go/internal/research` holds the KB package
   (`NewFileKB`, `EVOLVE_KB_SEARCH_PATHS`).
 - `go/test/fixtures/` — shared test fixtures, including the `StressN`
   concurrency stress-barrier helper.

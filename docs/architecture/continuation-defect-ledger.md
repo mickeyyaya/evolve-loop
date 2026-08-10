@@ -328,3 +328,16 @@ still returns the error and `retrospective-report.md` is still absent on every
 failure arm — accuracy is an ADDITION to failing loudly, never a replacement for
 it (`TestWriteArtifacts_PartialWrite_TotalFailureNamesEveryItem` and
 `..._FirstItemFailsNamesEveryItem` pin the no-under-claim half).
+
+## Registry lifecycle: release at the adoption-decline site (ADR-0085, #428)
+
+The root-owned registry gained its missing delete half after the 2026-08-10
+absorbing-FAIL incident (cycles 1412/1418): a binding whose snapshot the
+adopter DECLINES (landed / base-diverged / worktree gone) is released at the
+decline site — `releaseDeclinedBinding` → `DeleteRegistryEntryIfCycle`, check
+and delete under one flock hold so a sibling lane's concurrent rebind
+survives. Lane agents still have no write path to the registry, and the
+gate's no-manifest anti-tamper block above is byte-identical: deletion of the
+WORKSPACE manifest under a live binding still blocks; declination by the
+ORCHESTRATOR now releases. Full rationale and rejected alternatives:
+[ADR-0085](adr/0085-continuation-registry-release.md).
