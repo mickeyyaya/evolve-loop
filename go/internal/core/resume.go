@@ -360,6 +360,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			for k, v := range extraEnv {
 				envSnap[k] = v
 			}
+			// Resume-path parity for the bookkeeping-regrade once-per-cycle bound
+			// (cyclerun_record.go, same recurrence class as the floor-verdict
+			// guard above): without consuming the slot HERE, a resumed cycle
+			// whose re-audit fails bookkeeping-only again regrades forever
+			// (bounded only by the resume safety counter — ~15 LLM dispatches).
+			// The next pre-phase WriteCycleState persists the consumed slot.
+			consumeBookkeepingRegradeGrant(&cs, reason)
 			result.RetroDecision = reason
 			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
 			// a floor category halts + escalates rather than looping as task-level.

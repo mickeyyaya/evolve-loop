@@ -386,10 +386,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			// which handed the audited agent a standing lever over the operator's
 			// "why did this cycle fail" surface. The reader draws the inference
 			// from the evidence beside it.
-			Message: fmt.Sprintf("verdict-conflict: auditor narrative=%s but %d deterministic gate(s) forced FAIL [%s] — "+
-				"the gate outranks the narrative (ship policy unchanged); both readings are recorded so the "+
-				"disagreement is weighable. Gate detail is in the error diagnostics beside this one.",
-				narrative, len(overrodeBy), strings.Join(overrodeBy, ", ")),
+			Message: verdictConflictMessage(narrative, overrodeBy),
 		})
 	}
 
@@ -759,6 +756,18 @@ func emitTIADecision(req core.PhaseRequest, root string) {
 		return
 	}
 	_, _ = regressiontia.Emit(req.Workspace, d)
+}
+
+// verdictConflictMessage renders the verdict-conflict record — the one place
+// its format lives. Consumers key on the prefix: core.normalizeReasonForFingerprint
+// stabilizes the `narrative=<verdict>` token, and the bookkeeping-regrade
+// classifier (core.BookkeepingConflictAuditReason) matches the record's head;
+// bookkeeping_reason_singlesource_test.go pins this producer to that matcher.
+func verdictConflictMessage(narrative string, overrodeBy []string) string {
+	return fmt.Sprintf("verdict-conflict: auditor narrative=%s but %d deterministic gate(s) forced FAIL [%s] — "+
+		"the gate outranks the narrative (ship policy unchanged); both readings are recorded so the "+
+		"disagreement is weighable. Gate detail is in the error diagnostics beside this one.",
+		narrative, len(overrodeBy), strings.Join(overrodeBy, ", "))
 }
 
 func init() {

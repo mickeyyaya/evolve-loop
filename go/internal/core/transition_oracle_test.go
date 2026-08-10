@@ -66,7 +66,7 @@ var legalityGolden = map[Phase][]Phase{
 	PhaseBuildPlanner: {PhaseBuild},
 	PhaseBuild:        {PhaseAudit},
 	PhaseAudit:        {PhaseShip, PhaseRetro},
-	PhaseRetro:        {PhaseShip, PhaseTDD, PhaseEnd},
+	PhaseRetro:        {PhaseShip, PhaseTDD, PhaseEnd, PhaseAudit},
 	PhaseShip:         {PhaseEnd, PhaseDebugger, PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip},
 	PhaseDebugger:     {PhaseShip, PhaseAudit, PhaseBuild, PhaseTDD, PhaseEnd},
 	PhaseEnd:          {},

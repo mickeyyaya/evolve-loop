@@ -18,7 +18,7 @@
       "build-planner": ["build"],
       "build": ["audit"],
       "audit": ["ship", "retrospective"],
-      "retrospective": ["ship", "tdd", "end"],
+      "retrospective": ["ship", "tdd", "end", "audit"],
       "ship": ["end", "debugger", "audit", "build", "tdd", "ship"],
       "debugger": ["ship", "audit", "build", "tdd", "end"],
       "end": []

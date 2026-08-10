@@ -57,6 +57,12 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	if sig != nil {
 		return PhaseEnd, nil, detReason, sig
 	}
+	// A granted bookkeeping regrade is a deterministic micro-recovery, decided
+	// like the floor — ABOVE the router. Letting the strategy override it to
+	// tdd/end would eat the one bounded re-audit the grant exists to provide.
+	if strings.HasPrefix(detReason, BookkeepingRegradeReasonPrefix) {
+		return detNext, extraEnv, detReason, nil
+	}
 
 	in.Current = string(PhaseRetro)
 	in.Verdict = retroVerdict
@@ -140,6 +146,16 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 	// that applies to every stage and the resume path alike.
 	if s := o.applyFailureDecisionFloor(cs, retroVerdict); s != nil {
 		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
+	}
+	// Bookkeeping regrade (below the floor, above the adapter/router): a FAIL
+	// whose only explanations are bookkeeping-contract gates while the auditor
+	// narrative was PASS/WARN re-dispatches AUDIT once in the same cycle
+	// instead of dying to a continuation re-drive. The caller
+	// (cyclerun_record) marks cs.BookkeepingRegradeAttempted on the grant, so
+	// a re-audit that fails again falls through here to the normal path.
+	if !cs.BookkeepingRegradeAttempted && BookkeepingRegradeEligible(cs.AuditFailReasons) {
+		return o.recoveryTarget(PhaseRetro, recoveryKeyBookkeepingRegrade, PhaseAudit), nil,
+			BookkeepingRegradeReasonPrefix + "meta-only audit FAIL with non-FAIL narrative; re-dispatching audit once in-cycle", nil
 	}
 	entries := entriesFromRecords(history)
 	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
