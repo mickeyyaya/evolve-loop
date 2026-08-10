@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
@@ -122,7 +123,18 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	// seam below. Empty when the landing gate refuses promotion, so the seam
 	// degrades to a pure residual drain.
 	var committedIDs []string
-	if body != nil {
+	// PASS half of the stable-failure-identity rule (PR #439 closed the FAIL
+	// half): continuation/lane cycles carry NO triage decision, so a PASS ship
+	// promoted nothing and a full bookkeeping cycle was later spent moving one
+	// JSON file. File-ABSENT only — a present decision that committed zero ids
+	// keeps the declined menu unpromoted.
+	var laneFallbackIDs []string
+	if body == nil {
+		if laneFallbackIDs = cycleoutcome.LaneScopeIDs(cycleDir); len(laneFallbackIDs) > 0 {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: no triage decision for cycle %d — committed set from lane-scope pin: %v", cid, laneFallbackIDs))
+		}
+	}
+	if body != nil || len(laneFallbackIDs) > 0 {
 		// Landing gate (cycle-598 regression, inbox-promotion-requires-landed-ship):
 		// promote to processed/ ONLY when the ship commit actually reached durable
 		// history (ancestor of HEAD or origin/<branch>). Cycle 598's push was
@@ -143,7 +155,11 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			committedIDs = inboxmover.CommittedIDs(body)
+			if body != nil {
+				committedIDs = inboxmover.CommittedIDs(body)
+			} else {
+				committedIDs = laneFallbackIDs
+			}
 			// Reconcile superseded[] — inbox items whose work shipped under a
 			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
 			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).

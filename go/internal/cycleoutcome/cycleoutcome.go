@@ -66,7 +66,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	committed := CommittedIDsFor(in.Workspace)
 	if len(committed) == 0 {
 		if _, statErr := os.Stat(filepath.Join(in.Workspace, "triage-decision.json")); os.IsNotExist(statErr) {
-			committed = laneScopeIDs(in.Workspace)
+			committed = LaneScopeIDs(in.Workspace)
 		}
 	}
 	res, err := inboxmover.ApplyCycleOutcome(inboxmover.Options{
@@ -136,12 +136,17 @@ func CommittedIDsFor(workspace string) []string {
 	return inboxmover.CommittedIDs(body)
 }
 
-// laneScopeIDs reads the lane-scope pin's todo ids from the workspace — the
-// triage-less (continuation/retry) fallback for the committed set. Mirrors
-// core.LaneScope's wire shape; this package cannot import core (import cycle),
-// and the shape is pinned by the fallback's own regression test. nil on any
-// absent/unreadable/malformed pin — the legacy whole-dir drain.
-func laneScopeIDs(workspace string) []string {
+// LaneScopeIDs reads the lane-scope pin's todo ids from the workspace — the
+// triage-less (continuation/lane) committed set, shared by BOTH outcome
+// halves: the FAIL closeout here (failure_count accounting, PR #439) and the
+// PASS promotion in phases/ship/postship.go (consumption-rides-landing-ship)
+// — one reader, so the two sides can never disagree about what a triage-less
+// cycle worked.
+// Mirrors core.LaneScope's wire shape; this package cannot import core
+// (import cycle), and the shape is pinned by the fallback's own regression
+// test. nil on any absent/unreadable/malformed pin — the legacy whole-dir
+// drain.
+func LaneScopeIDs(workspace string) []string {
 	raw, err := os.ReadFile(filepath.Join(workspace, "lane-scope.json"))
 	if err != nil {
 		return nil
