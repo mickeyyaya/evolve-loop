@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -311,7 +312,9 @@ func (o *Orchestrator) recordFailedApproachState(fl failureLearningRequest) (sum
 	// the record's stamp rather than re-deriving it (single-sourced TTL logic).
 	record.ExpiresAt = failurelog.ComputeExpiresAt(
 		failurelog.NormalizeLegacy(record.Classification), now)
-	if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
+	if idx := carryoverFingerprintIndex(fl.State.CarryoverTodos, summary); idx >= 0 {
+		refreshCarryoverExpiry(&fl.State.CarryoverTodos[idx], record.ExpiresAt)
+	} else if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
 		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
 			ID: todoID,
 			// The router prompt's own "## Carryover todos" section header already
@@ -760,6 +763,51 @@ func carryoverTodoExists(todos []CarryoverTodo, id string) bool {
 	return false
 }
 
+// carryoverCycleTokenRE matches the cycle-number tokens the two mint sites bake
+// into Action text ("cycle 1421", "cycle-1421"), so the SAME failure class
+// re-minted on a later cycle fingerprints identically.
+var carryoverCycleTokenRE = regexp.MustCompile(`(?i)\bcycle[ -]\d+`)
+
+// carryoverActionFingerprint is the cross-cycle identity of a carryover todo:
+// the Action text with cycle tokens normalized and whitespace/case folded.
+// The 2026-08-10 investigation found 124 of 254 live entries were the same few
+// failure classes duplicated per cycle (ID-keyed dedupe only), saturating the
+// router prompt's 20-slot carryover window with bookkeeping noise.
+func carryoverActionFingerprint(action string) string {
+	s := carryoverCycleTokenRE.ReplaceAllString(action, "cycle-N")
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
+}
+
+// carryoverFingerprintIndex returns the index of the entry sharing action's
+// cross-cycle fingerprint, or -1. Cross-family suppression (a defect whose
+// normalized text equals a memo/prescription carryover's) is accepted — one
+// router-window slot per failure class regardless of which writer minted it.
+func carryoverFingerprintIndex(todos []CarryoverTodo, action string) int {
+	fp := carryoverActionFingerprint(action)
+	for i, t := range todos {
+		if carryoverActionFingerprint(t.Action) == fp {
+			return i
+		}
+	}
+	return -1
+}
+
+// carryoverFingerprintExists reports whether an entry with the same
+// cross-cycle Action fingerprint is already tracked.
+func carryoverFingerprintExists(todos []CarryoverTodo, action string) bool {
+	return carryoverFingerprintIndex(todos, action) >= 0
+}
+
+// refreshCarryoverExpiry keeps a suppressed re-mint's freshness: a class that
+// keeps failing must not ride its FIRST occurrence's TTL into the boot prune
+// while its duplicates are being deduped away (diff-review MEDIUM). The later
+// stamp wins; an empty new stamp changes nothing.
+func refreshCarryoverExpiry(t *CarryoverTodo, expiresAt string) {
+	if expiresAt > t.ExpiresAt {
+		t.ExpiresAt = expiresAt
+	}
+}
+
 const maxFailureLearningSummaryChars = 500
 
 func failureLearningSummary(cycle int, failed Phase, err error) string {
@@ -782,14 +830,17 @@ func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
 		}
 		id := fmt.Sprintf("cycle-%d-defect-%d", record.Cycle, n)
 		n++
-		if !carryoverTodoExists(state.CarryoverTodos, id) {
+		action := "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + capRunes(defect, maxAdoptedDefectRunes)
+		if idx := carryoverFingerprintIndex(state.CarryoverTodos, action); idx >= 0 {
+			refreshCarryoverExpiry(&state.CarryoverTodos[idx], record.ExpiresAt)
+		} else if !carryoverTodoExists(state.CarryoverTodos, id) {
 			state.CarryoverTodos = append(state.CarryoverTodos, CarryoverTodo{
 				ID: id,
 				// Bound the defect text with the SAME cap failureLearningSummary /
 				// adoptStructuredFailure already apply, so an unbounded audit-gate
 				// diagnostic (e.g. a long strings.Join(offenders, "; ")) can't inject
 				// an arbitrarily large Action that bloats every future router prompt.
-				Action:         "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + capRunes(defect, maxAdoptedDefectRunes),
+				Action:         action,
 				Priority:       "P0",
 				FirstSeenCycle: record.Cycle,
 				CyclesUnpicked: 0,
