@@ -106,6 +106,22 @@ type Skipper interface {
 // (no file on disk). Optional for the same ISP reason as Skipper: built-in
 // phases load their agent docs from disk and must not be forced to implement
 // a no-op.
+// SecondaryArtifactsProvider is an OPTIONAL hook: phases whose contract
+// requires deliverables beyond the primary artifact (audit on continuation
+// cycles: defect-dispositions.json) return their absolute paths; the bridge
+// completion detector holds phase-complete until each exists (Phase B).
+type SecondaryArtifactsProvider interface {
+	SecondaryArtifacts(req core.PhaseRequest) []string
+}
+
+// secondaryArtifacts resolves the optional hook; nil for phases without it.
+func secondaryArtifacts(h Hooks, req core.PhaseRequest) []string {
+	if sp, ok := h.(SecondaryArtifactsProvider); ok {
+		return sp.SecondaryArtifacts(req)
+	}
+	return nil
+}
+
 type InlinePromptProvider interface {
 	InlinePromptBody() (string, bool)
 }
@@ -820,6 +836,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			RunID:               req.RunID,
 			ProjectRoot:         req.ProjectRoot,
 			ArtifactPath:        artifactPath,
+			SecondaryArtifacts:  secondaryArtifacts(b.hooks, req),
 			Agent:               phase,
 			Cycle:               req.Cycle,
 			BudgetScale:         req.BudgetScale,
