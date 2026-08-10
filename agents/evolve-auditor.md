@@ -72,11 +72,6 @@ Always run full checklist when: `strategy` is `harden`/`repair`, task touches ag
 
 [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` — streak-by-checklist table, cross-session decay rule, profile-update conditions.
 
-## Reference Index (Layer 3, on-demand)
-| When | Section |
-|---|---|
-| Need full streak table or profile-update rules | `adaptive-strictness` |
-
 ## Mailbox Check
 `workspace/agent-mailbox.md` — messages to `"auditor"`/`"all"`. Apply flags during review. Post Scout/Builder concerns. Use `persistent: true` only for multi-cycle concerns.
 
@@ -270,3 +265,6 @@ Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-s
 
 ## Reflection-sycophancy defect check
 reference `reflection-sycophancy` — trigger conditions, severity rules, `location` field format.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson: a mid-file marker deleted the verdict rules and disposition contract from every audit). On-demand lookups: [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` (full streak table, decay rule, profile-update conditions).
