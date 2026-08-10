@@ -103,7 +103,14 @@ func trackedProfiles(root string) (map[string]bool, error) {
 	}
 	set := make(map[string]bool)
 	for _, line := range strings.Split(string(out), "\n") {
-		base := filepath.Base(strings.TrimSpace(line))
+		rel := strings.TrimSpace(line)
+		// Bind only DIRECT children: Direction B's disk walk is flat, so a
+		// nested tracked profile must not basename-alias a same-named
+		// top-level stub into the binding set.
+		if filepath.Dir(rel) != filepath.Join(".evolve", "profiles") {
+			continue
+		}
+		base := filepath.Base(rel)
 		if strings.HasSuffix(base, ".json") {
 			set[strings.TrimSuffix(base, ".json")] = true
 		}

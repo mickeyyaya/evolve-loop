@@ -33,6 +33,10 @@ above and the backlog reflect the fuller parallel sweep.
 
 | Incident | Failure mode | Suspect file | Coverage | Pinning test / proposal |
 |---|---|---|---|---|
+| [2026-08-09 zero-ship batch](2026-08-09-zero-ship-batch.md) | ship gate bound untracked minted profile stubs (false RED, 3 audit-green ships blocked) | `phasecoherence/unpaired_test.go` | ✅ | `phasecoherence/unpaired_tracked_test.go` + `unpaired_tracked_edge_test.go` (stderr fidelity, empty-set, staged, nested-alias) |
+| 2026-08-09 zero-ship batch | disposition contract unsatisfiable (schema never shown; array evidence rejected as unparseable) | `phases/audit/defect_ledger.go` | ✅ | `audit/defect_ledger_evidence_shape_test.go` + `_evidence_edge_test.go` + `_schema_singlesource_test.go` |
+| 2026-08-09 zero-ship batch | varied-fingerprint failure streak never halts (10 cycles burned) | `core/blocker_breaker.go` | ✅ | `core/blocker_breaker_consecutive_test.go` + `_edge_test.go`; `policy/policy_failure_consecutive_test.go` |
+| 2026-08-09 zero-ship batch | retro completion detector cuts session after first deliverable (disposition.json never written) | `bridge/completion.go` / retro phase contract | ❌ | **GAP:** open inbox item `retro-disposition-completion-cutoff` (0.90) — fix must add a detector-waits-for-full-deliverable-set test |
 | cycle-109-116 | Go orchestrator dropped per-cycle worktree provisioning (role-gate denied all writes) | `core/orchestrator.go` | ✅ | `core/orchestrator_test.go` worktree-provision path |
 | cycle-119 | relative `--project-root` → ExitArtifactTimeout (artifact poll wrong dir) | `phases/runner/runner.go` | 🟡 | **GAP:** runner test asserting artifact path resolves absolute when root is relative |
 | cycle-121 | codex REPL boot timeout; no fallback to next CLI | `phases/runner/cli_chain.go` | 🟡 | **GAP:** cli_chain advances to next CLI on boot-timeout exit 80 |
