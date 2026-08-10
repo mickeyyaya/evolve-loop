@@ -281,6 +281,15 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 	if d.stable < artifactStableTicks {
 		return false, completionEvidence{}, "", nil
 	}
+	// The window closed — but the contract may name SECONDARY deliverables
+	// (Phase B, the single-artifact cutoff class: retro wrote its report and
+	// the session died before disposition.json). Hold completion until every
+	// secondary EXISTS non-empty; the artifact-timeout final poll above still
+	// completes without them (bounded wait), and the phase gate then names
+	// the absence loudly.
+	if missing := d.missingSecondary(); missing != "" {
+		return false, completionEvidence{}, "", nil
+	}
 	// The window closed: this artifact HAS been observed to stop changing, so
 	// the full mover — including relocateFile's cross-device copy+remove — is
 	// safe here and only here.
@@ -296,6 +305,18 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 // (renameOnlyRelocate). A relocation failure surfaces as the detector's error
 // (the wait loop logs it once); an artifact that vanished between the window's
 // last look and this call restarts the window rather than completing on nothing.
+// missingSecondary returns the first contract secondary that does not yet
+// exist non-empty, or "" when the set is satisfied (or empty — legacy
+// single-artifact phases are byte-identical).
+func (d *artifactDetector) missingSecondary() string {
+	for _, p := range d.cfg.SecondaryArtifacts {
+		if fi, err := os.Stat(p); err != nil || fi.Size() == 0 {
+			return p
+		}
+	}
+	return ""
+}
+
 func (d *artifactDetector) completeWith(move func(src, dst string) error) (bool, completionEvidence, string, error) {
 	ready, from, err := artifactCanonicalize(d.cfg, move)
 	if err != nil {

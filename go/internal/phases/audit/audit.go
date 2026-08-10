@@ -118,6 +118,21 @@ type hooks struct {
 
 func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
 func (hooks) AgentPromptName() string { return "evolve-auditor" }
+
+// SecondaryArtifacts (runner.SecondaryArtifactsProvider): on a continuation
+// cycle — the workspace carries the adopter-written continuation manifest —
+// the audit contract also requires defect-dispositions.json (ADR-0074 /
+// cycle-1285 lineage accounting). Declaring it holds session teardown until
+// the auditor writes it, closing the write-one-artifact-and-die class that
+// failed cycles 1397-1429. Non-continuation audits return nil: byte-identical
+// legacy behavior.
+func (hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
+	if _, err := os.Stat(filepath.Join(req.Workspace, "continuation-manifest.json")); err != nil {
+		return nil
+	}
+	return []string{filepath.Join(req.Workspace, "defect-dispositions.json")}
+}
+
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	return phasecontract.ArtifactFilename(string(core.PhaseAudit))
 }

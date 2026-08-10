@@ -263,6 +263,10 @@ type Config struct {
 	StdoutLog  string
 	StderrLog  string
 	Artifact   string
+	// SecondaryArtifacts: extra contract deliverables (absolute paths); the
+	// artifact completion detector requires each to EXIST before the settled
+	// primary counts as phase-complete (see completion.go).
+	SecondaryArtifacts []string
 	// Completion selects the phase-completion contract (ADR-0027): "" /
 	// "artifact" = poll for the artifact file (default, legacy); "stdout" =
 	// complete on REPL-idle for agents that print their answer (router/advisor).
@@ -365,6 +369,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 		"--stdout-log=" + stdoutLog,
 		"--stderr-log=" + stderrLog,
 		"--artifact=" + req.ArtifactPath,
+	}
+	if len(req.SecondaryArtifacts) > 0 {
+		args = append(args, "--secondary-artifacts="+strings.Join(req.SecondaryArtifacts, secondaryArtifactSep))
 	}
 	if req.Cycle > 0 {
 		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))

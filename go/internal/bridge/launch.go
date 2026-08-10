@@ -149,31 +149,32 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	}
 
 	cfg := Config{
-		CLI:              raw.cli,
-		Profile:          raw.profile,
-		Model:            effectiveModel,
-		PromptFile:       raw.promptFile,
-		Workspace:        raw.workspace,
-		StdoutLog:        raw.stdoutLog,
-		StderrLog:        raw.stderrLog,
-		Artifact:         raw.artifact,
-		Completion:       raw.completion,
-		Cycle:            cycle,
-		Worktree:         raw.worktree,
-		RunID:            raw.runID,
-		ProjectRoot:      raw.projectRoot,
-		Agent:            raw.agent,
-		PermissionMode:   permMode,
-		StreamOutput:     streamOut,
-		SessionName:      sessionName,
-		AllowBypass:      raw.allowBypass,
-		HumanInput:       raw.humanInput,
-		RequireFull:      raw.requireFull,
-		AllowedTools:     prof.AllowedTools,
-		ExtraFlags:       raw.extra,
-		Realization:      RealizeFor(raw.cli, intent),
-		AnthropicBaseURL: raw.anthropicBaseURL,
-		ArtifactTimeoutS: artifactTimeoutS,
+		CLI:                raw.cli,
+		Profile:            raw.profile,
+		Model:              effectiveModel,
+		PromptFile:         raw.promptFile,
+		Workspace:          raw.workspace,
+		StdoutLog:          raw.stdoutLog,
+		StderrLog:          raw.stderrLog,
+		Artifact:           raw.artifact,
+		SecondaryArtifacts: splitNonEmptyCSV(raw.secondaryArtifacts),
+		Completion:         raw.completion,
+		Cycle:              cycle,
+		Worktree:           raw.worktree,
+		RunID:              raw.runID,
+		ProjectRoot:        raw.projectRoot,
+		Agent:              raw.agent,
+		PermissionMode:     permMode,
+		StreamOutput:       streamOut,
+		SessionName:        sessionName,
+		AllowBypass:        raw.allowBypass,
+		HumanInput:         raw.humanInput,
+		RequireFull:        raw.requireFull,
+		AllowedTools:       prof.AllowedTools,
+		ExtraFlags:         raw.extra,
+		Realization:        RealizeFor(raw.cli, intent),
+		AnthropicBaseURL:   raw.anthropicBaseURL,
+		ArtifactTimeoutS:   artifactTimeoutS,
 	}
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
@@ -230,13 +231,32 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	return rc
 }
 
+// secondaryArtifactSep joins/splits the --secondary-artifacts flag value.
+// ASCII unit separator: argv-safe and impossible in a file path — a comma
+// separator would corrupt the round trip for any install whose project path
+// contains a comma (adversarial-review MEDIUM).
+const secondaryArtifactSep = "\x1f"
+
+// splitNonEmptyCSV splits a sep-joined flag value, dropping blanks — ""
+// yields nil so an absent --secondary-artifacts stays byte-identical to the
+// pre-Phase-B request shape.
+func splitNonEmptyCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, secondaryArtifactSep) {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // rawLaunch holds the parsed launch flags before profile-aware
 // resolution. Mirrors the local variables in bin/bridge cmd_launch.
 type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion                            string
 	permissionMode, sessionName, streamOutput, runID                           string
-	anthropicBaseURL, artifactTimeoutS                                         string
+	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts                     string
 	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
@@ -310,7 +330,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--cli": &r.cli, "--profile": &r.profile, "--model": &r.model,
 		"--prompt-file": &r.promptFile, "--workspace": &r.workspace,
 		"--stdout-log": &r.stdoutLog, "--stderr-log": &r.stderrLog,
-		"--artifact": &r.artifact, "--cycle": &r.cycle, "--worktree": &r.worktree,
+		"--artifact": &r.artifact, "--secondary-artifacts": &r.secondaryArtifacts, "--cycle": &r.cycle, "--worktree": &r.worktree,
 		"--project-root": &r.projectRoot, "--run-id": &r.runID,
 		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
