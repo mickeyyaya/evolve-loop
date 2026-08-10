@@ -1,0 +1,50 @@
+{
+  "cycle": 1412,
+  "run_id": "01KZMM65ES0JSX06N3AM56XFQ2",
+  "goal": "work through the queued todo inbox tasks (.evolve/inbox) and carryover todos by priority",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|unknown|5b60797ab143",
+    "pre_class": "unknown",
+    "reasons": [
+      "defect ledger: this workspace holds no continuation manifest, but the root-owned /Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/continuation-registry.json binds this lane's scope to cycle-1394 ",
+      "defect ledger: disposition-preflight: MISSING — this workspace holds no defect-dispositions.json at all, so 0 of 9 defect(s) inherited from cycle-1394 are dispositioned. This file is re-authored IN ",
+      "defect ledger: 9 defect(s) inherited from cycle-1394 are unaccounted for [d25eb51482598ab3b3fa4a37a34608edf (no disposition), d444d3f3a13b99ab623e185d1f96542d4 (no disposition), ddf12c02bd303cef10b269",
+      "closure claim without a citation: \"The callout was rewritten to *\"**Verified drift — closed in cycle-1412 (docs-drift-sweep-2)** — all four\" — a report may not assert a prior cycle's defect is c"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1412",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
