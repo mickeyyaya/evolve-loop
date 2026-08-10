@@ -48,6 +48,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
 		IdenticalFingerprintCeiling: fp.Thresholds.IdenticalFingerprintHaltCeiling,
 		UnexplainedCeiling:          fp.Thresholds.UnexplainedFailuresHaltCeiling,
+		ConsecutiveFailuresCeiling:  fp.Thresholds.ConsecutiveFailuresHaltCeiling,
 		AckedFingerprints:           acked,
 	})
 	if !v.Halt {
