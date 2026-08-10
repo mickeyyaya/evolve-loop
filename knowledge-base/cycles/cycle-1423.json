@@ -1,0 +1,49 @@
+{
+  "cycle": 1423,
+  "run_id": "01KZN5Z0CKJAZM18Y34K3CHC1D",
+  "goal": "work through the queued todo inbox tasks (.evolve/inbox) and carryover todos by priority",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|4d9a00e2ab04",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "defect ledger: disposition-preflight: MISSING — this workspace holds no defect-dispositions.json at all, so 0 of 3 defect(s) inherited from cycle-1421 are dispositioned. This file is re-authored IN ",
+      "defect ledger: 3 defect(s) inherited from cycle-1421 are unaccounted for [dade38f185280ba845bb479deb4e3cde9 (no disposition), d9501eb90ad3d1114d60db96a6326549a (no disposition), d21945889943222f050bd3",
+      "verdict-conflict: auditor narrative=WARN but 1 deterministic gate(s) forced FAIL [continuation defect-ledger] — the gate outranks the narrative (ship policy unchanged); both readings are recorded so"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1423",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
