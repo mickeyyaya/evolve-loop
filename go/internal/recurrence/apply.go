@@ -97,7 +97,11 @@ func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
 		}
 		for _, in := range intents {
 			key := stampKey(in)
-			if stamp[key] == opts.Cycle {
+			// Presence-checked: a missing key reads as the map zero value, and
+			// fleet boundaries pass the 0-based pool iteration as Cycle — a bare
+			// `stamp[key] == opts.Cycle` silently skipped every never-applied
+			// intent on iteration 0 (2026-08-10 enforce-flip swallow).
+			if prev, ok := stamp[key]; ok && prev == opts.Cycle {
 				continue // already applied this cycle — the idempotency guard
 			}
 			applied, aerr := applyIntent(opts, in, &res)
