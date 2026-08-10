@@ -196,27 +196,27 @@ func TestC413_008_RealAuditorDocStripsAtLeast4096Bytes(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	reduction := len(body) - len(stripped)
-	if reduction < 4096 {
-		t.Errorf("auditor doc stripped only %d bytes (want ≥4096); heading mismatch or reference tail too small\n  body=%d stripped=%d", reduction, len(body), len(stripped))
+	// Recalibrated 2026-08-10 (was 4096, latent-red since #434): that floor
+	// fossilized the auditor's operational tail below a mid-file marker —
+	// the persona-strip lobotomy incident. The marker now sits at EOF; the
+	// predicate keeps pinning the heading-prefix match against the real doc.
+	if reduction < 256 {
+		t.Errorf("auditor doc stripped only %d bytes (want ≥256: the marker tail); heading mismatch?\n  body=%d stripped=%d", reduction, len(body), len(stripped))
 	}
 }
 
-// TestC413_009_TDDEngineerDocReturnedUnchanged asserts that tdd-engineer.md
-// (which has no ## Reference Index tail) is returned byte-for-byte unchanged by
+// TestC413_009_TDDEngineerDocReturnedUnchanged asserts that a marker-less body
+// (originally the then-marker-less tdd-engineer.md) is returned byte-for-byte unchanged by
 // StripOnDemandSections. Negative/edge: confirms strip is a no-op when heading absent.
 // pre-existing GREEN: no heading in tdd-engineer.md; returns unchanged in both impls.
 func TestC413_009_TDDEngineerDocReturnedUnchanged(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "agents", "evolve-tdd-engineer.md"))
-	if err != nil {
-		t.Fatalf("read evolve-tdd-engineer.md: %v", err)
-	}
-	_, body, err := prompts.ParseFrontmatter(string(data))
-	if err != nil {
-		t.Fatalf("parse frontmatter: %v", err)
-	}
-	stripped := prompts.StripOnDemandSections(body)
-	if stripped != body {
-		t.Errorf("tdd-engineer doc was incorrectly stripped:\n  original=%d bytes\n  stripped=%d bytes\n  (docs with no Reference Index heading must be unchanged)", len(body), len(stripped))
+	// Re-anchored 2026-08-10 (persona-strip lobotomy incident): this predicate
+	// pinned tdd-engineer.md as marker-LESS (strip must be a no-op on the real
+	// doc) — contradicting cycle-415's marker requirement (latent-vs-CI, the
+	// incident's root-cause shape) and today's EOF marker. The no-op-when-
+	// heading-absent edge it exercised is preserved on a fixture body.
+	fixture := "# Agent\n\nOperational content, no reference-index heading.\n"
+	if stripped := prompts.StripOnDemandSections(fixture); stripped != fixture {
+		t.Errorf("marker-less body was incorrectly stripped:\n  original=%d bytes\n  stripped=%d bytes\n  (docs with no Reference Index heading must be unchanged)", len(fixture), len(stripped))
 	}
 }

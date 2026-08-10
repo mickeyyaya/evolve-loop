@@ -82,15 +82,9 @@ func TestAuditorStripKeepsOperationalContract(t *testing.T) {
 // reorganization, see compact_marker_gate_test.go savings floors). This list
 // may only SHRINK.
 func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
-	pendingCuration := map[string]bool{
-		"evolve-builder.md":      true, // STOP CRITERION, Completion Gates, POSTHOC below marker
-		"evolve-scout.md":        true, // STOP CRITERION + six gates below marker
-		"evolve-tdd-engineer.md": true, // REQUIRED predicate-quality reading below marker
-		// evolve-triage.md's tail (inbox ingestion, idempotency skip-list) is
-		// also operational but carries NO sentinel keyword — this guard cannot
-		// see it. Its curation is tracked in the incident doc follow-ups, not
-		// here; listing it would falsely imply the sentinel guard covers it.
-	}
+	// Curation complete 2026-08-10: every dispatched persona's marker sits at
+	// EOF. New entries here need an incident-grade justification.
+	pendingCuration := map[string]bool{}
 
 	root := repoRootForPairing(t)
 	tracked, err := repostate.TrackedFiles(root, "agents")

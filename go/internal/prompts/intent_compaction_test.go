@@ -33,8 +33,15 @@ func TestIntentCompaction_SavesAtLeast2200Bytes(t *testing.T) {
 	}
 	stripped := StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 2200 {
-		t.Errorf("intent compaction saved only %d bytes (want ≥2200); relocate ## Output contract (INTENT_MODE), ## Re-run behavior, ## Reflection Authoring below ## Reference Index in evolve-intent.md (body=%d stripped=%d)", saved, len(body), len(stripped))
+	// Floor recalibrated 2026-08-10 (was 2200): that floor DEMANDED burying the
+	// INTENT_MODE output contract and re-run behavior below the strip marker —
+	// deleting the phase's own output contract from every dispatched intent
+	// prompt, in direct contradiction of the (latent-red) C416 acs predicate
+	// that requires INTENT_MODE above the marker (persona-strip lobotomy
+	// incident). Tail = Composition + Reference only; the keep-guard
+	// phasecoherence/persona_strip_operational_test.go governs the rest.
+	if saved < 256 {
+		t.Errorf("intent compaction saved only %d bytes (want ≥256: the Composition+Reference tail); ## Reference Index heading missing? (body=%d stripped=%d)", saved, len(body), len(stripped))
 	}
 }
 
@@ -88,15 +95,25 @@ func TestIntentCompaction_ReferenceContentAbsentAfterStrip_Negative(t *testing.T
 		t.Fatalf("parse frontmatter: %v", err)
 	}
 	stripped := StripOnDemandSections(body)
-	for _, absent := range []string{
-		"## Composition",
-		// cycle-422: these must move below the marker
-		"intent-delta.md",        // unique to ## Output contract (INTENT_MODE)
-		"## Re-run behavior",     // heading of the re-run section
-		"intent-reflection.yaml", // unique to ## Reflection Authoring (v10.20.0+)
-	} {
+	// Genuine reference tail stays stripped.
+	for _, absent := range []string{"## Composition"} {
 		if strings.Contains(stripped, absent) {
-			t.Errorf("RED: on-demand content %q still appears in stripped body — relocate it below ## Reference Index in evolve-intent.md", absent)
+			t.Errorf("on-demand content %q still appears in stripped body — relocate it below ## Reference Index in evolve-intent.md", absent)
+		}
+	}
+	// INVERTED 2026-08-10 (persona-strip lobotomy incident): cycle-422 demanded
+	// these three be STRIPPED — deleting the phase's own OUTPUT CONTRACT
+	// (intent-delta.md is the delta-mode deliverable name; stripping it is a
+	// plausible cause of the intent-delta contract-path-skew defect), the
+	// re-run protocol, and the reflection sidecar duty from every dispatched
+	// prompt. Operational directives must SURVIVE stripping.
+	for _, kept := range []string{
+		"intent-delta.md",
+		"## Re-run behavior",
+		"intent-reflection.yaml",
+	} {
+		if !strings.Contains(stripped, kept) {
+			t.Errorf("operational content %q lost below ## Reference Index — it must survive into dispatched intent prompts", kept)
 		}
 	}
 }

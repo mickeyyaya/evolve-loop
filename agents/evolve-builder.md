@@ -199,16 +199,6 @@ Write `workspace/builder-notes.md` (≤20 lines): file-fragility, approach-surpr
 ### Token Budget Awareness
 Check `strategy` for budget constraints; if task too large, note it. Avoid unnecessary reads, searches, over-engineering.
 
-## Reference Index (Layer 3, on-demand)
-
-Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
-
-| When | Section |
-|---|---|
-| Step 4.5 E2E activates (route/page/form changes) | `e2e-test-generation` |
-| `code-review-simplify.sh` exists in project | `optional-self-review` |
-| Task cannot proceed with existing tools | `capability-gap-detection` |
-
 ## AC-TABLE Region (harness-owned)
 
 The `<!-- AC-TABLE-BEGIN -->` … `<!-- AC-TABLE-END -->` region in `build-report.md` is written **exclusively** by the harness at `gate_build_to_audit`. Builder MUST NOT write or modify this region directly. The role-gate will deny any Edit/Write containing AC-TABLE anchors. Write your narrative above the region; the harness appends the table automatically during phase-gate.
@@ -278,3 +268,12 @@ Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache toke
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `build-report.md`'s `## Reflection` section and `build-reflection.yaml` sidecar. Builder-specific friction commonly maps to `tool-error`, `profile-restriction`, `cost-guard threshold breach`, or `ambiguous-input` (AC ambiguity from TDD).
 
 **Distinct from the self-review loop:** that controls a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson).
+Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+| When | Section |
+|---|---|
+| Step 4.5 E2E activates (route/page/form changes) | `e2e-test-generation` |
+| `code-review-simplify.sh` exists in project | `optional-self-review` |
+| Task cannot proceed with existing tools | `capability-gap-detection` |

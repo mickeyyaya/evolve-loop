@@ -66,8 +66,12 @@ func TestC415_001_TddEngineerStripsAtLeast1500Bytes(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 1500 {
-		t.Errorf("RED: tdd-engineer compaction saved only %d bytes (want ≥1500); add ## Reference Index heading with on-demand content below it (body=%d stripped=%d)",
+	// Recalibrated 2026-08-10 (was 1500): that floor required the predicate-
+	// quality rules below the strip marker, deleting them from every dispatched
+	// tdd prompt (docs/incidents/2026-08-10-persona-strip-lobotomy.md). Marker
+	// now at EOF; the phasecoherence keep-guard governs strippable content.
+	if saved < 64 {
+		t.Errorf("tdd-engineer compaction saved only %d bytes (want ≥64: the marker section itself); ## Reference Index heading missing? (body=%d stripped=%d)",
 			saved, len(body), len(stripped))
 	}
 }
@@ -133,8 +137,12 @@ func TestC415_004_TriageStripsAtLeast1200Bytes(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 1200 {
-		t.Errorf("RED: triage compaction saved only %d bytes (want ≥1200); add ## Reference Index heading (body=%d stripped=%d)",
+	// Recalibrated 2026-08-10 (was 1200): that floor required the inbox-
+	// ingestion + idempotency-skip-list instructions below the strip marker
+	// (persona-strip lobotomy incident, queue-starvation half). Marker now at
+	// EOF with the step-3b verbose example as the genuine tail.
+	if saved < 64 {
+		t.Errorf("triage compaction saved only %d bytes (want ≥64: the marker tail); ## Reference Index heading missing? (body=%d stripped=%d)",
 			saved, len(body), len(stripped))
 	}
 }
@@ -173,7 +181,7 @@ func TestC415_005_TriageRequiredSectionsAboveMarker(t *testing.T) {
 // (absent from stripped body).
 // RED: stripped==body (no heading) → versioned sections ARE present in stripped → FAIL.
 // GREEN after builder: sections relocated below marker → absent in stripped.
-func TestC415_006_TriageVersionedSectionsAboveMarker_Negative(t *testing.T) {
+func TestC415_006_TriageOperationalSectionsSurviveStrip(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(root, "agents", "evolve-triage.md"))
 	if err != nil {
@@ -184,13 +192,17 @@ func TestC415_006_TriageVersionedSectionsAboveMarker_Negative(t *testing.T) {
 		t.Fatalf("parse frontmatter: %v", err)
 	}
 	stripped := prompts.StripOnDemandSections(body)
-	for _, versioned := range []string{
+	// INVERTED 2026-08-10 (persona-strip lobotomy incident): these sections
+	// were misclassified "versioned-historical" because their headings carry
+	// version tags — they are the inbox-ingestion and idempotency operating
+	// rules, and stripping them starved the queue. They must SURVIVE.
+	for _, kept := range []string{
 		"Idempotency skip-list (v9.6.0+)",
 		"Inbox ingestion (v9.5.0+)",
 		"Reflection Authoring (v10.20.0+)",
 	} {
-		if strings.Contains(stripped, versioned) {
-			t.Errorf("RED: versioned-historical %q still appears above ## Reference Index — relocate it below the marker in evolve-triage.md", versioned)
+		if !strings.Contains(stripped, kept) {
+			t.Errorf("operational section %q lost below ## Reference Index — it must survive into dispatched triage prompts", kept)
 		}
 	}
 }

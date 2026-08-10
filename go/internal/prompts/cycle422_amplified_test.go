@@ -113,9 +113,13 @@ func TestTriageCompaction_ByteSavings4200_Amplified(t *testing.T) {
 	}
 	stripped := StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	const minSaved = 4200
+	// Recalibrated 2026-08-10 (was 4200): the cycle-422 floor required the
+	// inbox-ingestion + idempotency-skip-list instructions below the strip
+	// marker (persona-strip lobotomy incident — the queue-starvation half).
+	// The marker now sits at EOF; the keep-guard governs strippable content.
+	const minSaved = 64
 	if saved < minSaved {
-		t.Errorf("triage compaction saved only %d bytes (want >=%d post-cycle-422); on-demand sections may have been promoted above ## Reference Index (body=%d stripped=%d)", saved, minSaved, len(body), len(stripped))
+		t.Errorf("triage compaction saved only %d bytes (want >=%d: the marker section itself); ## Reference Index heading missing? (body=%d stripped=%d)", saved, minSaved, len(body), len(stripped))
 	}
 }
 

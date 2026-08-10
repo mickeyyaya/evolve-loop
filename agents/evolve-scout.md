@@ -151,20 +151,6 @@ Required sections (in order): Discovery Summary, Key Findings, Research, Researc
 
 Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rules`.
 
-## Reference Index (Layer 3, on-demand)
-
-Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
-
-| When | Section |
-|------|---------|
-| Turn budget debugging (exceeded 12 turns) | `turn-budget-rationale` |
-| First cycle (full mode) or convergence-confirmation | `mode-discovery-detail` |
-| Writing eval definitions | `eval-integrity-rules` |
-| Eval format reference | `eval-format-template` |
-| Full scout-report.md template | `output-template` |
-| Task selection tables (carryover, difficulty, boosts) | `task-selection-tables` |
-| Cycle 1 project digest format | `project-digest-template` |
-
 ## STOP CRITERION
 
 **Halt condition:** All six gates satisfied → `Write scout-report.md` once, then stop. No further tool calls.
@@ -195,4 +181,17 @@ If prior cycle's `handoff-auditor.json` has `falsifiable_claims[]`, verify befor
 ## Reflection Authoring
 
 Execute Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `## Reflection` in `scout-report.md` + `scout-reflection.yaml` sidecar. Scout friction: `research-quota`, `ambiguous-input`, or `tool-batching`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson).
+Reference: [agents/evolve-scout-reference.md](agents/evolve-scout-reference.md)
+| When | Section |
+|------|---------|
+| Turn budget debugging (exceeded 12 turns) | `turn-budget-rationale` |
+| First cycle (full mode) or convergence-confirmation | `mode-discovery-detail` |
+| Writing eval definitions | `eval-integrity-rules` |
+| Eval format reference | `eval-format-template` |
+| Full scout-report.md template | `output-template` |
+| Task selection tables (carryover, difficulty, boosts) | `task-selection-tables` |
+| Cycle 1 project digest format | `project-digest-template` |
 

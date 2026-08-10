@@ -32,8 +32,13 @@ func TestTddEngineerCompaction(t *testing.T) {
 	}
 	stripped := StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 1500 {
-		t.Errorf("tdd-engineer compaction saved only %d bytes (want ≥1500); add ## Reference Index heading (body=%d stripped=%d)", saved, len(body), len(stripped))
+	// Floor recalibrated 2026-08-10 (was 1500): the old floor required the full
+	// Predicate Quality Requirements section (REQUIRED reading) to sit below the
+	// strip marker, deleting it from every dispatched tdd prompt with only the
+	// above-marker summary anchors surviving (persona-strip lobotomy incident).
+	// The marker now sits at EOF.
+	if saved < 64 {
+		t.Errorf("tdd-engineer compaction saved only %d bytes (want ≥64: the marker section itself); ## Reference Index heading missing? (body=%d stripped=%d)", saved, len(body), len(stripped))
 	}
 	// Behavior anchors must remain above the ## Reference Index marker.
 	// Pre-existing GREEN: with no heading, stripped==body → all anchors present.
@@ -88,11 +93,19 @@ func TestTriageCompaction(t *testing.T) {
 	}
 	stripped := StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 4200 {
-		t.Errorf("triage compaction saved only %d bytes (want ≥4200); relocate additional on-demand reference (step-3b detection example, verbose tables) below ## Reference Index in evolve-triage.md (body=%d stripped=%d)", saved, len(body), len(stripped))
+	// Floor recalibrated 2026-08-10 (was 4200): the old floor REQUIRED burying
+	// the inbox-ingestion and idempotency-skip-list instructions — operational
+	// directives misclassified as "versioned-historical" because their headings
+	// carry version tags — below the strip marker, deleting them from every
+	// dispatched triage prompt (docs/incidents/2026-08-10-persona-strip-lobotomy.md;
+	// the queue-starvation mechanism). The marker now sits at EOF; what may be
+	// stripped is governed by phasecoherence/persona_strip_operational_test.go.
+	if saved < 64 {
+		t.Errorf("triage compaction saved only %d bytes (want ≥64: the marker section itself); ## Reference Index heading missing? (body=%d stripped=%d)", saved, len(body), len(stripped))
 	}
-	// Required output sections and gate-bearing rules must survive strip (remain above marker).
-	// Pre-existing GREEN when stripped==body; regression guard fires if builder buries them.
+	// Required output sections and gate-bearing rules must survive strip —
+	// including the two the old "versioned-historical" negative wrongly forced
+	// below the marker.
 	for _, section := range []string{
 		"## top_n",
 		"## deferred",
@@ -100,21 +113,11 @@ func TestTriageCompaction(t *testing.T) {
 		"carryoverTodos",
 		"## Rationale",
 		"Operator-queue priority floor",
+		"Idempotency skip-list",
+		"Inbox ingestion",
 	} {
 		if !strings.Contains(stripped, section) {
 			t.Errorf("required section/rule %q lost below ## Reference Index — must stay above marker in evolve-triage.md", section)
-		}
-	}
-	// Negative: versioned-historical subsections must NOT appear in stripped body.
-	// RED: stripped==body → these sections ARE present → FAIL (correct RED for right reason).
-	// GREEN after builder: sections relocated below ## Reference Index → absent in stripped.
-	for _, versioned := range []string{
-		"Idempotency skip-list (v9.6.0+)",
-		"Inbox ingestion (v9.5.0+)",
-		"Reflection Authoring (v10.20.0+)",
-	} {
-		if strings.Contains(stripped, versioned) {
-			t.Errorf("versioned-historical %q still appears above ## Reference Index — relocate it below the marker in evolve-triage.md", versioned)
 		}
 	}
 }

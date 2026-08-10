@@ -138,23 +138,6 @@ intent.md should be **30-80 lines** (v9.0.2: tightened from 50-200). Frontmatter
 
 > **Re-run and delta-mode (compact):** On re-runs (`priorIntent` non-null), update changed fields, preserve accepted, re-classify `awn_class`. Always write full `intent.md` on **Prior FAIL audit** (`lastAuditVerdict=FAIL`), new carryover items, or material goal shift. Full delta-mode contract and reflection authoring in Reference Index.
 
-## Reference Index (Layer 3, on-demand)
-
-## Composition
-
-- Invoke directly when: orchestrator advances to phase=intent
-- Invoke via: `/intent` slash command (user-driven, before `/loop`) OR autonomously by the orchestrator when `intent_required==true`
-- Do not invoke from another persona.
-
-## Reference
-
-- `.evolve/research/intent-capture-patterns.md` — research grounding for this design
-- `.evolve/profiles/intent.json` — permission profile
-- `skills/intent/SKILL.md` — workflow steps + exit criteria
-- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
-- `arxiv 2409.00557` — Ask-when-Needed framework
-- `agents/evolve-orchestrator.md` — Phase Loop integration point
-
 ## Re-run behavior
 
 If `priorIntent` is non-null (this is a re-run via the user re-invoking `/intent`), read the prior intent.md and:
@@ -218,3 +201,21 @@ This is the Karpathy Rule constraint: incremental mode must never suppress premi
 ## Reflection Authoring (v10.20.0+)
 
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `intent.md`'s `## Reflection` section and `intent-reflection.yaml` sidecar. Intent has a tight 2-turn budget — keep reflection minimal (≤1 bullet per required subsection). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives — incl. the INTENT_MODE output contract and re-run behavior, which this marker previously buried (cycle-1390–1429 lesson; latent-red C416 predicate) — live ABOVE this marker, enforced by `internal/phasecoherence/persona_strip_operational_test.go`.
+
+## Composition
+
+- Invoke directly when: orchestrator advances to phase=intent
+- Invoke via: `/intent` slash command (user-driven, before `/loop`) OR autonomously by the orchestrator when `intent_required==true`
+- Do not invoke from another persona.
+
+## Reference
+
+- `.evolve/research/intent-capture-patterns.md` — research grounding for this design
+- `.evolve/profiles/intent.json` — permission profile
+- `skills/intent/SKILL.md` — workflow steps + exit criteria
+- `legacy/scripts/lifecycle/phase-gate.sh` — `gate_intent_to_research` enforces ≥1 challenged_premise + awn_class ≠ IBTC
+- `arxiv 2409.00557` — Ask-when-Needed framework
+- `agents/evolve-orchestrator.md` — Phase Loop integration point
