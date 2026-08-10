@@ -350,8 +350,6 @@ the flagged shapes and re-run; do not treat rc=1 as a blocked phase. Exit 2 mean
 entirely (a Level-0 tautological *eval*), and that one you must rewrite. Always read the
 `linted N file(s)` receipt: `linted 0` means the path was wrong and nothing was checked.
 
-## Reference Index (Layer 3, on-demand)
-
 ## Predicate Quality Requirements (cycle-85 lesson — REQUIRED reading)
 
 **Context:** Cycle 85 shipped 7 ACS predicates degenerated into `grep -qF "magic_string" file` checks — none invoked system under test. Passed when author added magic string to source regardless of bug fix. This section prevents that failure mode; equally easy in Go (`acsassert.FileContains` is Go-native `grep -qF`).
@@ -465,3 +463,6 @@ If any answer is "no", predicate is grep-only or mis-tagged. Rewrite before hand
 ## Reflection Authoring (v10.20.0+)
 
 Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `test-report.md` `## Reflection` + `tdd-reflection.yaml`. TDD friction: `ambiguous-input` (untestable ACs) or `tool-error` (predicate flakiness). Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson: this bare marker sat at line 353 of 467, deleting the predicate-quality rules from every dispatched tdd prompt).

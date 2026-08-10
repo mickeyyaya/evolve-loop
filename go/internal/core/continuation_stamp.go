@@ -256,6 +256,8 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	if err := continuation.WriteManifest(cr.cs.WorkspacePath, *c); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: workspace manifest copy: %v\n", cr.cycle, err)
 	}
+	// Disposition-skeleton preseed — see disposition_seed.go.
+	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
 	if findings := readContinuationFindings(c.FindingsPath); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}

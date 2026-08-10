@@ -38,11 +38,17 @@ func TestRealDocOnDemandStrip(t *testing.T) {
 		// audit (cycles 1390-1429, 15/30 FAILs). The marker now sits at EOF; what
 		// may be stripped is governed by phasecoherence/persona_strip_operational_test.go.
 		{"evolve-auditor", 256},
-		{"evolve-builder", 4096},      // ~35 % tail (≈6 944 B)
-		{"evolve-scout", 2048},        // ~25 % tail (≈3 717 B)
-		{"evolve-orchestrator", 512},  // ~5 % tail (≈993 B)
-		{"evolve-tdd-engineer", 1500}, // cycle-415: predicate quality + failure modes tail
-		{"evolve-triage", 1200},       // cycle-415: inbox pre-check algorithms + reflection tail
+		// Builder/scout/tdd/triage floors recalibrated 2026-08-10 alongside the
+		// auditor's (persona-strip lobotomy incident): the old floors fossilized
+		// operational tails (STOP CRITERION, POSTHOC, predicate-quality rules,
+		// inbox ingestion) below mid-file markers. Markers now sit at EOF; the
+		// keep-guard phasecoherence/persona_strip_operational_test.go governs
+		// what may be stripped.
+		{"evolve-builder", 256},
+		{"evolve-scout", 256},
+		{"evolve-orchestrator", 512}, // ~5 % tail (≈993 B)
+		{"evolve-tdd-engineer", 64},
+		{"evolve-triage", 64},
 	}
 
 	for _, tc := range mustStrip {

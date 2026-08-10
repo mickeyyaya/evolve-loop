@@ -72,8 +72,12 @@ func TestC422_001_IntentCompactionSavesBytes2200(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 2200 {
-		t.Errorf("RED: intent compaction saved only %d bytes (want ≥2200); relocate ## Output contract (INTENT_MODE), ## Re-run behavior, ## Reflection Authoring below ## Reference Index in evolve-intent.md (body=%d stripped=%d)",
+	// Recalibrated 2026-08-10 (was 2200): that floor DEMANDED burying intent's
+	// own output contract, re-run protocol, and reflection duty below the
+	// strip marker (persona-strip lobotomy incident). Tail = Composition +
+	// Reference only; the phasecoherence keep-guard governs the rest.
+	if saved < 256 {
+		t.Errorf("intent compaction saved only %d bytes (want ≥256: the Composition+Reference tail); ## Reference Index heading missing? (body=%d stripped=%d)",
 			saved, len(body), len(stripped))
 	}
 }
@@ -95,11 +99,13 @@ func TestC422_002_IntentOutputContractAbsentAfterStrip_Negative(t *testing.T) {
 		t.Fatalf("parse frontmatter: %v", err)
 	}
 	stripped := prompts.StripOnDemandSections(body)
-	// intent-delta.md is the delta-mode output file referenced only inside
-	// ## Output contract (INTENT_MODE). Its presence in stripped body proves
-	// the section was not relocated below the marker.
-	if strings.Contains(stripped, "intent-delta.md") {
-		t.Error("RED: 'intent-delta.md' still appears in stripped body — ## Output contract (INTENT_MODE) must be relocated below ## Reference Index in evolve-intent.md")
+	// INVERTED 2026-08-10 (persona-strip lobotomy incident): the original
+	// negative demanded the phase's own OUTPUT CONTRACT be stripped —
+	// intent-delta.md is the delta-mode deliverable name, and deleting it from
+	// dispatched prompts is a plausible cause of the intent-delta
+	// contract-path-skew defect. The contract must SURVIVE stripping.
+	if !strings.Contains(stripped, "intent-delta.md") {
+		t.Error("'intent-delta.md' output contract lost below ## Reference Index — it must survive into dispatched intent prompts")
 	}
 }
 
@@ -120,10 +126,12 @@ func TestC422_003_IntentRerunBehaviorAbsentAfterStrip_Negative(t *testing.T) {
 		t.Fatalf("parse frontmatter: %v", err)
 	}
 	stripped := prompts.StripOnDemandSections(body)
-	// "## Re-run behavior" is the line-anchored heading of the section.
-	// Checking for the heading confirms the entire section was moved below the marker.
-	if strings.Contains(stripped, "## Re-run behavior") {
-		t.Error("RED: '## Re-run behavior' heading still appears in stripped body — ## Re-run behavior must be relocated below ## Reference Index in evolve-intent.md")
+	// INVERTED 2026-08-10 (persona-strip lobotomy incident): the original
+	// negative demanded this section be STRIPPED — but re-run behavior is the
+	// operational protocol for every priorIntent re-dispatch; deleting it from
+	// the prompt left re-runs blind. Operational directives survive stripping.
+	if !strings.Contains(stripped, "## Re-run behavior") {
+		t.Error("'## Re-run behavior' lost below ## Reference Index — the re-run protocol must survive into dispatched intent prompts")
 	}
 }
 
@@ -144,10 +152,12 @@ func TestC422_004_IntentReflectionAuthoringAbsentAfterStrip_Negative(t *testing.
 		t.Fatalf("parse frontmatter: %v", err)
 	}
 	stripped := prompts.StripOnDemandSections(body)
-	// intent-reflection.yaml is the sidecar file referenced only inside
-	// ## Reflection Authoring (v10.20.0+). Its presence proves the section was not moved.
-	if strings.Contains(stripped, "intent-reflection.yaml") {
-		t.Error("RED: 'intent-reflection.yaml' still appears in stripped body — ## Reflection Authoring must be relocated below ## Reference Index in evolve-intent.md")
+	// INVERTED 2026-08-10 (persona-strip lobotomy incident): the original
+	// negative demanded the Reflection Authoring section be STRIPPED — but it
+	// instructs emitting the intent-reflection.yaml sidecar on EVERY run;
+	// stripping it silently killed the sidecar. Operational directives survive.
+	if !strings.Contains(stripped, "intent-reflection.yaml") {
+		t.Error("'intent-reflection.yaml' authoring instruction lost below ## Reference Index — the sidecar duty must survive into dispatched intent prompts")
 	}
 }
 
@@ -216,8 +226,14 @@ func TestC422_007_TriageCompactionSavesBytes4200(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	saved := len(body) - len(stripped)
-	if saved < 4200 {
-		t.Errorf("RED: triage compaction saved only %d bytes (want ≥4200); relocate additional on-demand reference (step-3b detection example, verbose tables) below ## Reference Index in evolve-triage.md (body=%d stripped=%d)",
+	// Recalibrated 2026-08-10 (was 4200): that floor REQUIRED burying the
+	// inbox-ingestion + idempotency-skip-list instructions below the strip
+	// marker — deleting them from every dispatched triage prompt
+	// (docs/incidents/2026-08-10-persona-strip-lobotomy.md, queue-starvation
+	// half). Marker now at EOF; the phasecoherence keep-guard governs
+	// strippable content. The predicate keeps asserting the marker EXISTS.
+	if saved < 64 {
+		t.Errorf("triage compaction saved only %d bytes (want ≥64: the marker section itself); ## Reference Index heading missing? (body=%d stripped=%d)",
 			saved, len(body), len(stripped))
 	}
 }

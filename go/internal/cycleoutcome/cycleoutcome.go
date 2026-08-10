@@ -17,6 +17,7 @@
 package cycleoutcome
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -53,13 +54,28 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	if stderr == nil {
 		stderr = io.Discard
 	}
+	// Continuation/retry cycles carry NO triage-decision.json (the
+	// continuation path binds the task directly), so the committed set
+	// resolved nil and the durable failure_count was never bumped — after 15
+	// FAILs every live inbox item sat at 0 and the TaskRetryCeiling
+	// quarantine + deep-escalation governors were unreachable (2026-08-10
+	// investigation). The lane-scope pin is the worked set on those cycles.
+	// File-ABSENT, not merely empty (diff-review MEDIUM): a fresh cycle whose
+	// triage legitimately committed zero ids must not have its lane-scope menu
+	// blamed for the failure — the pinned items were explicitly declined.
+	committed := CommittedIDsFor(in.Workspace)
+	if len(committed) == 0 {
+		if _, statErr := os.Stat(filepath.Join(in.Workspace, "triage-decision.json")); os.IsNotExist(statErr) {
+			committed = laneScopeIDs(in.Workspace)
+		}
+	}
 	res, err := inboxmover.ApplyCycleOutcome(inboxmover.Options{
 		ProjectRoot: in.ProjectRoot,
 		Stderr:      stderr,
 	}, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
 		Passed:       false,
-		CommittedIDs: CommittedIDsFor(in.Workspace),
+		CommittedIDs: committed,
 		Reason:       in.Reason,
 		Ceiling:      in.Ceiling,
 		SystemLevel:  in.SystemLevel,
@@ -118,4 +134,23 @@ func CommittedIDsFor(workspace string) []string {
 		return nil
 	}
 	return inboxmover.CommittedIDs(body)
+}
+
+// laneScopeIDs reads the lane-scope pin's todo ids from the workspace — the
+// triage-less (continuation/retry) fallback for the committed set. Mirrors
+// core.LaneScope's wire shape; this package cannot import core (import cycle),
+// and the shape is pinned by the fallback's own regression test. nil on any
+// absent/unreadable/malformed pin — the legacy whole-dir drain.
+func laneScopeIDs(workspace string) []string {
+	raw, err := os.ReadFile(filepath.Join(workspace, "lane-scope.json"))
+	if err != nil {
+		return nil
+	}
+	var scope struct {
+		TodoIDs []string `json:"todo_ids"`
+	}
+	if json.Unmarshal(raw, &scope) != nil {
+		return nil
+	}
+	return scope.TodoIDs
 }
