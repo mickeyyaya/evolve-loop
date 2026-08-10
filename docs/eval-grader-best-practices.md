@@ -186,3 +186,16 @@ grep -c "KEYWORD" script.sh | awk '{exit($1<1)}'
 # Use named stop pattern; NEVER use /^## [A-Z]/ when section header also matches [A-Z]
 awk '/^## SectionName$/,/^## NextSection/' file.md | grep -q "keyword"
 ```
+
+## Recognized grader formats (quality-check scanner, 2026-08-10)
+
+`evolve eval quality-check` parses commands from BOTH ```bash fences and the
+template's `- [code] <cmd>` grader bullets (top level only — a bullet inside
+any non-bash fence is illustration or a planted decoy and never counts).
+score_cap/evidence-graded evals are ACS-suite jurisdiction: zero bash
+commands there PASSes with a note. Zero parsed commands on anything else is a
+reasoned WARN, never a silent PASS. The template's own literal example
+round-trips through the production scanner by test
+(`internal/evalqualitycheck/vacuity_test.go`) — template drift breaks CI, not
+the gate. Background: ADR-0084 invariant 2 (#426; 281/625 live evals were
+unscanned before this).
