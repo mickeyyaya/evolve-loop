@@ -168,6 +168,12 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		for k, v := range extraEnv {
 			cr.envSnap[k] = v
 		}
+		// A granted bookkeeping regrade consumes its once-per-cycle slot HERE —
+		// orchestrator memory, at the same trust boundary as AuditFailReasons —
+		// so a re-audit that fails again falls through to the normal path
+		// instead of looping retro→audit forever. Before the gateErr prepend
+		// below, which would break the prefix match.
+		consumeBookkeepingRegradeGrant(&cr.cs, reason)
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
 		// S2 disposition gate, verdict path (mirrors recordFailureLearning's
 		// contract — cycle-1046 live gap): an absent/invalid disposition is
