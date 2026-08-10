@@ -38,6 +38,20 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 	for _, w := range warns {
 		t.Logf("discover warning: %s", w)
 	}
+	// Bind only phases from git-TRACKED dirs: untracked dirs are runtime/local
+	// state that can never reach a CI checkout (cd49274beab2 class); nil
+	// tracked set = no usable git context = bind all (stricter fallback).
+	if tracked := phasespec.TrackedUserPhaseNames(t, root); tracked != nil {
+		kept := make([]phasespec.PhaseSpec, 0, len(user))
+		for _, s := range user {
+			if !tracked[s.Name] {
+				t.Logf("untracked user phase %q: runtime/local state, not bound", s.Name)
+				continue
+			}
+			kept = append(kept, s)
+		}
+		user = kept
+	}
 	if len(user) == 0 {
 		t.Fatal("DiscoverUserSpecs found no user phases — is .evolve/phases/ present at the repo root?")
 	}

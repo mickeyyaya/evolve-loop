@@ -231,19 +231,16 @@ func TestNewFromDir_Empty_ReturnsZeroLoader(t *testing.T) {
 	}
 }
 
-// TestSmoke_RealProfiles — load every profile under .evolve/profiles/
-// and verify each has Name + Role + CLI. Skipped if dir absent. This
-// is the canary for any schema drift between bash JSON and Go types.
+// TestSmoke_RealProfiles — load every git-TRACKED profile under
+// .evolve/profiles/ (via the RealTreeProfiles funnel; untracked files are
+// runtime mints, not repo config — cd49274beab2 class) and verify each has
+// Name + Role + CLI. Skipped if dir absent. This is the canary for any
+// schema drift between bash JSON and Go types.
 func TestSmoke_RealProfiles(t *testing.T) {
-	root := "../../../.evolve/profiles"
-	if _, err := os.Stat(root); err != nil {
+	if _, err := os.Stat(realProfilesDir(t)); err != nil {
 		t.Skipf("profiles dir not reachable: %v", err)
 	}
-	l := NewFromDir(root)
-	names, err := l.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	l, names := RealTreeProfiles(t)
 	if len(names) == 0 {
 		t.Fatal("no profiles found")
 	}

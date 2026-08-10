@@ -22,14 +22,23 @@ import (
 
 func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 	t.Parallel()
-	dir := filepath.Join("..", "..", "..", ".evolve", "phases")
+	root := filepath.Join("..", "..", "..")
+	dir := filepath.Join(root, ".evolve", "phases")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Skipf("phase catalog not present at %s: %v", dir, err)
 	}
+	// Bind only git-TRACKED phase dirs: untracked dirs are runtime/local
+	// state that can never reach a CI checkout (cd49274beab2 class); nil
+	// tracked set = no usable git context = bind all (stricter fallback).
+	tracked := TrackedPhaseDirs(t, root)
 	checked := 0
 	for _, e := range entries {
 		if !e.IsDir() {
+			continue
+		}
+		if tracked != nil && !tracked[e.Name()] {
+			t.Logf("skipping .evolve/phases/%s: phase.json untracked — runtime/local state, not repo config", e.Name())
 			continue
 		}
 		path := filepath.Join(dir, e.Name(), "phase.json")

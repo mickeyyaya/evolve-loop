@@ -201,6 +201,12 @@ var profileRequiredKeys = []string{
 
 func loadProfileJSON(t *testing.T, name string) map[string]json.RawMessage {
 	t.Helper()
+	// Only git-TRACKED profiles are repo config; an untracked same-named file
+	// is a runtime mint that can never reach a CI checkout (cd49274beab2
+	// class). Nil tracked set = no usable git context = bind all.
+	if tracked := trackedRepoProfileNames(t, repoRoot()); tracked != nil && !tracked[name] {
+		t.Skipf("profile %s.json is untracked — runtime-minted state, not bound by the schema check", name)
+	}
 	rel := filepath.Join(repoRoot(), ".evolve", "profiles", name+".json")
 	data, err := os.ReadFile(rel)
 	if err != nil {
