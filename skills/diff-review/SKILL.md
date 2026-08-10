@@ -56,6 +56,17 @@ Walk the diff hunk by hunk. For each, ask BOTH lenses before moving on:
 5. Tests-vs-intent — do the new tests pin the claimed behavior, and would a
    degenerate implementation pass them? Name the missing negative case.
 
+ADR-0084 gate-integrity lenses (apply when the diff touches the matching class):
+5a. On-disk scanning — a new/changed test or gate that walks repo dirs must bind
+    only git-TRACKED state (internal/repostate); binding everything on disk is
+    the cd49274beab2 false-RED class.
+5b. Machine-graded artifact — a new/changed LLM-authored contract needs a
+    literal example single-sourced against its production reader
+    (docs/architecture/contract-single-sourcing.md three-legged test).
+5c. Gate evidence — a new/changed gate that runs a subprocess or computes a
+    verdict must persist its underlying output to the run dir and name the
+    offender in its error; a silent fail-open or empty debug field is a finding.
+
 **Simplifier lens** (the change, made smaller/clearer, behavior identical):
 6. Duplication vs one-hop neighbors — an existing helper the diff re-implements
    (your grep hop already surfaced the candidates; do not go hunting further).

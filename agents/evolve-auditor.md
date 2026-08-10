@@ -93,6 +93,7 @@ Do not carry verbatim narrative. Ground audit in `git diff HEAD`, direct ACS exe
 
 ## Single-Pass Review Checklist
 reference `review-checklist` — full audit dimensions, security checks, eval integrity protocol.
+ADR-0084 gate-integrity lenses: (a) a diff adding an on-disk repo scan must bind only git-TRACKED state (internal/repostate); (b) a new/changed machine-graded artifact needs a literal example single-sourced against its reader (docs/architecture/contract-single-sourcing.md); (c) a new/changed gate must persist its subprocess output to the run dir and name the offender in its error — silent fail-opens are findings.
 
 ## Predicate quality review (predicate-quality Layer 3, cycle-86)
 
