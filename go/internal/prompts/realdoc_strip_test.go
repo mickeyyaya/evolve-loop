@@ -32,7 +32,12 @@ func TestRealDocOnDemandStrip(t *testing.T) {
 		name    string
 		minSave int
 	}{
-		{"evolve-auditor", 4096},      // ~70 % tail (≈12 657 B)
+		// Auditor floor recalibrated 2026-08-10: the old 4096 floor ("~70 % tail")
+		// fossilized a mid-file marker that stripped the verdict rules, STOP
+		// criterion, and MANDATORY disposition contract from every dispatched
+		// audit (cycles 1390-1429, 15/30 FAILs). The marker now sits at EOF; what
+		// may be stripped is governed by phasecoherence/persona_strip_operational_test.go.
+		{"evolve-auditor", 256},
 		{"evolve-builder", 4096},      // ~35 % tail (≈6 944 B)
 		{"evolve-scout", 2048},        // ~25 % tail (≈3 717 B)
 		{"evolve-orchestrator", 512},  // ~5 % tail (≈993 B)
