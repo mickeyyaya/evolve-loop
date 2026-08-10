@@ -155,17 +155,18 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, p.model)
 
 	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
-		CLI:          cli,
-		Profile:      profilePath,
-		Model:        p.model,
-		Prompt:       prompt,
-		Workspace:    req.Workspace,
-		Worktree:     retroWorktree(req),
-		ArtifactPath: artifactPath,
-		Agent:        "retrospective",
-		Cycle:        req.Cycle,
-		Env:          req.Env,
-		Skills:       overlaySkills,
+		CLI:                cli,
+		Profile:            profilePath,
+		Model:              p.model,
+		Prompt:             prompt,
+		Workspace:          req.Workspace,
+		Worktree:           retroWorktree(req),
+		SecondaryArtifacts: []string{filepath.Join(req.Workspace, "disposition.json")},
+		ArtifactPath:       artifactPath,
+		Agent:              "retrospective",
+		Cycle:              req.Cycle,
+		Env:                req.Env,
+		Skills:             overlaySkills,
 	})
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 

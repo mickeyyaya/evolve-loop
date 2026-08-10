@@ -253,6 +253,15 @@ type BridgeRequest struct {
 	StdoutLog    string `json:"stdout_log,omitempty"`
 	StderrLog    string `json:"stderr_log,omitempty"`
 	ArtifactPath string `json:"artifact_path,omitempty"` // adapter requires non-empty
+	// SecondaryArtifacts are additional deliverables the phase contract
+	// requires beyond ArtifactPath (absolute paths). The completion detector
+	// holds phase-complete until every one EXISTS (existence only — the
+	// settle window stays primary-only, respecting the cycle-1210/1212 race
+	// design); the artifact-timeout final poll still completes without them,
+	// and the phase gate then reports the absence loudly. Closes the
+	// single-artifact cutoff class (retro disposition.json since <=1382;
+	// audit defect-dispositions.json, cycles 1397-1429; plan Phase B).
+	SecondaryArtifacts []string `json:"secondary_artifacts,omitempty"`
 	// Completion selects the phase-completion contract (ADR-0027): "" /
 	// "artifact" = poll the artifact file (default); "stdout" = complete on
 	// REPL-idle for agents that print their answer and write no file (the
