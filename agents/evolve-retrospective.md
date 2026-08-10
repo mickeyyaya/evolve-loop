@@ -113,22 +113,31 @@ machine-consumed verdict-on-the-verdict. The Go disposition gate verifies it at
 retro completion (absent/malformed/out-of-vocabulary ⇒ loud gate reason in
 RetroDecision); the S3 router consumes it for routing and escalation.
 
-Schema (all fields required):
+Literal example — this exact document passes the gate (single-sourced against
+the Go verifier by `disposition_gate_singlesource_test.go`; copy this SHAPE and
+substitute your cycle's values):
 
 ```json
 {
-  "cycle": <int>,
-  "fingerprint": "<copy VERBATIM from failure-digest.json — never invent>",
-  "recurrence": <copy VERBATIM from failure-digest.json>,
-  "legitimacy": "legit-rejection | false-rejection | infra-failure | indeterminate",
-  "root_cause": {"layer": "task-code | pipeline-code | harness | infra | eval-contract", "summary": "<one sentence>"},
-  "salvage": {"worktree_has_value": <bool>, "pointer": "<path/branch when true — REQUIRED then>"},
-  "urgency": "P0 | P1 | P2 | P3",
-  "justification": "<evidence-backed, cite artifact paths>",
-  "routing": "inbox | carryover | console | drop",
-  "proposed_item": "<inbox item id/slug when routing=inbox, else empty>"
+  "cycle": 1398,
+  "fingerprint": "ship|gate-block|cd49274beab2",
+  "recurrence": 2,
+  "legitimacy": "false-rejection",
+  "root_cause": {"layer": "pipeline-code", "summary": "ship repo-contract gate bound an untracked runtime-minted profile stub, redding every lane"},
+  "salvage": {"worktree_has_value": true, "pointer": ".evolve/worktrees/cycle-42824668-1403 (snapshot e0638346)"},
+  "urgency": "P0",
+  "justification": "audit-report.md PASS and acs-verdict.json green while ship-error.json records REPO_CONTRACT_GATE; the scanner output names TestRepoPersonaProfilePairing",
+  "routing": "console",
+  "proposed_item": ""
 }
 ```
+
+Field vocabularies (out-of-vocabulary values are rejected with the field
+named): `legitimacy` ∈ legit-rejection | false-rejection | infra-failure |
+indeterminate; `root_cause.layer` ∈ task-code | pipeline-code | harness |
+infra | eval-contract; `urgency` ∈ P0–P3; `routing` ∈ inbox | carryover |
+console | drop. `proposed_item` is the inbox item id/slug when routing=inbox,
+else empty. `salvage.pointer` is REQUIRED when `worktree_has_value` is true.
 
 Rules: `fingerprint` and `recurrence` come from the S1 assembler's
 `failure-digest.json` in the same workspace — the gate cross-checks them and

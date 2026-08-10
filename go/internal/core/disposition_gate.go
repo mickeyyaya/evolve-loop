@@ -51,6 +51,27 @@ var (
 	validRouting = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}
 )
 
+// dispositionSchemaExample is the single-sourced LEGAL example of the
+// disposition contract. The retro persona (agents/evolve-retrospective.md,
+// "Required deliverable: disposition.json") carries this exact document as its
+// literal example; disposition_gate_singlesource_test.go parses both as JSON,
+// asserts equality, and feeds this const through VerifyDisposition against a
+// matching digest — so a drifted example fails CI instead of failing the
+// agent (ADR-0084 invariant 2; the pre-2026-08-10 prose "example" was
+// placeholder pseudo-JSON that would itself have failed this fail-HARD gate).
+const dispositionSchemaExample = `{
+  "cycle": 1398,
+  "fingerprint": "ship|gate-block|cd49274beab2",
+  "recurrence": 2,
+  "legitimacy": "false-rejection",
+  "root_cause": {"layer": "pipeline-code", "summary": "ship repo-contract gate bound an untracked runtime-minted profile stub, redding every lane"},
+  "salvage": {"worktree_has_value": true, "pointer": ".evolve/worktrees/cycle-42824668-1403 (snapshot e0638346)"},
+  "urgency": "P0",
+  "justification": "audit-report.md PASS and acs-verdict.json green while ship-error.json records REPO_CONTRACT_GATE; the scanner output names TestRepoPersonaProfilePairing",
+  "routing": "console",
+  "proposed_item": ""
+}`
+
 // VerifyDisposition enforces the disposition contract for a retro workspace. It is
 // fail-HARD: absent/malformed disposition.json, out-of-vocabulary enums, a
 // fingerprint/recurrence that disagrees with failure-digest.json, or a salvage

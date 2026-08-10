@@ -32,6 +32,8 @@
     "Bash(shasum:*)",
     "Bash(jq:*)",
     "Write(.evolve/runs/cycle-*/retrospective-report.md)",
+    "Write(.evolve/runs/cycle-*/disposition.json)",
+    "Write(.evolve/runs/cycle-*/failure-decision.json)",
     "Write(.evolve/runs/cycle-*/handoff-retrospective.json)",
     "Write(.evolve/runs/cycle-*/lessons-digest.md)",
     "Write(.evolve/runs/cycle-*/carryover-todos.json)",

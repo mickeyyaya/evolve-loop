@@ -101,15 +101,23 @@ func TestCheck_WorstOf_HALTBeatsPASS(t *testing.T) {
 	}
 }
 
-// TestCheck_NonBashFencedBlock_Ignored — only bash fences are parsed.
+// TestCheck_NonBashFencedBlock_Ignored — only bash fences are parsed as
+// commands. (Since the ADR-0084 vacuity fix, an eval with zero parsed
+// commands additionally carries one explanatory WARN entry — that entry is a
+// diagnostic, not a parsed command.)
 func TestCheck_NonBashFencedBlock_Ignored(t *testing.T) {
 	path := writeEval(t, "```python\nexit(0)\n```\n")
 	r, err := Check(Options{Path: path})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Commands) != 0 {
-		t.Errorf("non-bash block should be ignored; got %+v", r.Commands)
+	for _, c := range r.Commands {
+		if strings.Contains(c.Line, "exit(0)") {
+			t.Errorf("non-bash block content was parsed as a command: %+v", c)
+		}
+	}
+	if r.Overall != LevelWarn {
+		t.Errorf("Overall = %v, want LevelWarn — a python-fence-only eval has zero real bash graders", r.Overall)
 	}
 }
 
