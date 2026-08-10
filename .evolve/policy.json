@@ -29,11 +29,14 @@
     }
   },
   "fleet": {
-    "count": 3,
+    "count": 2,
     "plan_source": "triage",
     "min_lanes": 2
   },
   "disposition": {
+    "stage": "enforce"
+  },
+  "failure_disposition": {
     "stage": "enforce"
   }
 }
