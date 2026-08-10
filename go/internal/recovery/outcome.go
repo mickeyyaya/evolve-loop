@@ -70,10 +70,14 @@ type PhaseOutcome struct {
 	// outcome (matches the attempt_count key in phase-timing.json and the
 	// usage sidecar, so the C1 data flow reads uniformly end to end).
 	AttemptCount int
-	// AbortReason is non-empty when the cycle aborted AFTER this outcome
-	// was produced (review reject, leak-recovery failure, tree-diff guard,
-	// ledger/state persistence failure). Verdict above remains the agent's
-	// own — an abort is a cycle-level disposition, never a verdict rewrite.
+	// AbortReason is non-empty when the cycle aborted after this outcome was
+	// produced (review reject, leak-recovery failure, tree-diff guard,
+	// ledger/state persistence failure) — OR when a recovery path recorded
+	// the transient it recovered FROM and continued (ship-recovery,
+	// retry_opts.go), so a non-empty AbortReason is NOT proof the cycle died
+	// here (core.backfillFailReasons leans on that distinction). Verdict
+	// above remains the agent's own — an abort is a cycle-level disposition,
+	// never a verdict rewrite.
 	AbortReason string
 	// ModelSource + ResolvedModel (T3, cycle-463) carry the phase response's
 	// per-phase model provenance through to phase-timing.json, so the dossier

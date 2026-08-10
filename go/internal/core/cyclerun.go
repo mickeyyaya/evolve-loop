@@ -209,9 +209,11 @@ func (cr *cycleRun) recordChokepointEscape(reason string) {
 // reads this AFTER finalizeCycle returns, so it MUST be threaded back to
 // RunCycle's frame (the R2 late-visibility contract); a persist error preserves
 // nothing extra here, the defer's !cycleCompletedNormally clause covers it.
-func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle int, preCycleHEAD, projectRoot string, result *CycleResult, state *State) (preserveWorktree bool, err error) {
+func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle int, preCycleHEAD, projectRoot string, result *CycleResult, state *State, timings []phaseTimingEntry) (preserveWorktree bool, err error) {
 	postCycleHEAD, _ := o.gitHEAD()
 	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
+	// No FAIL without a reason — see failreasons_backfill.go.
+	backfillFailReasons(result, timings)
 
 	// ADR-0072 Go floor: verdict-coherence. If the cycle recorded a negative
 	// verdict but the phases' own on-disk artifacts (audit-report + acs-verdict)
