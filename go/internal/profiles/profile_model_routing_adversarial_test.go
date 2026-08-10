@@ -1,7 +1,6 @@
 package profiles_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
@@ -15,13 +14,9 @@ import (
 func TestAllProfilesModelTierDefaultIsNonEmpty(t *testing.T) {
 	t.Parallel()
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 	if len(names) == 0 {
-		t.Fatal("List returned no profiles")
+		t.Fatal("RealTreeProfiles returned no profiles")
 	}
 
 	for _, name := range names {
@@ -44,11 +39,7 @@ func TestAllProfilesModelTierOverridesValuesAreCanonical(t *testing.T) {
 	t.Parallel()
 
 	canonical := canonicalTierSet()
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 
 	for _, name := range names {
 		profile, err := loader.Get(name)
@@ -77,11 +68,7 @@ func TestEnvelopeTierHierarchyOrdering(t *testing.T) {
 		tierRank[tier] = i
 	}
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 
 	for _, name := range names {
 		profile, err := loader.Get(name)
@@ -119,7 +106,7 @@ func TestRestrictedClisProfilesTiersAreDriverAgnostic(t *testing.T) {
 	canonical := canonicalTierSet()
 	drivers := swappableDriverManifests()
 	manifests := loadSwappableManifests(t, drivers)
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
+	loader, _ := profiles.RealTreeProfiles(t)
 
 	for _, name := range restricted {
 		profile, err := loader.Get(name)
@@ -149,11 +136,7 @@ func TestSubstitutabilityParityCoversMinimumProfiles(t *testing.T) {
 
 	const minExpectedProfiles = 80
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	_, names := profiles.RealTreeProfiles(t)
 	if len(names) < minExpectedProfiles {
 		t.Errorf("loaded %d profiles, want at least %d — substitutability parity coverage may be inadequate",
 			len(names), minExpectedProfiles)
@@ -183,13 +166,9 @@ func TestModelTierOverridesWithinEnvelope(t *testing.T) {
 		tierRank[tier] = i
 	}
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 	if len(names) == 0 {
-		t.Fatal("List returned no profiles")
+		t.Fatal("RealTreeProfiles returned no profiles")
 	}
 
 	for _, name := range names {

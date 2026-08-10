@@ -16,14 +16,14 @@
 package phasecoherence
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
 func TestCoherence_UnpairedPersonaWarns(t *testing.T) {
@@ -85,37 +85,17 @@ func repoRootForPairing(t *testing.T) string {
 
 // trackedProfiles returns the basenames (sans .json) of the profiles git
 // tracks under .evolve/profiles — the Direction-B binding set. An untracked
-// profile is a runtime-minted stub (gitignored by design; the minter
-// completes phase->profile pairing at dispatch time): it never reaches a CI
-// checkout, cannot red main, and so is runtime state rather than repo
-// config. Callers fall back to binding every on-disk profile when git is
-// unavailable. Regression pin: unpaired_tracked_test.go.
+// profile is an untracked runtime mint (not necessarily gitignored; the
+// minter completes phase->profile pairing at dispatch time): it never
+// reaches a CI checkout, cannot red main, and so is runtime state rather
+// than repo config. Callers fall back to binding every on-disk profile when
+// git is unavailable. Thin seam over the shared repostate helper; regression
+// pin: unpaired_tracked_test.go.
 func trackedProfiles(root string) (map[string]bool, error) {
-	out, err := exec.Command("git", "-C", root, "ls-files", "--", ".evolve/profiles").Output()
-	if err != nil {
-		// exec.ExitError.Error() is just "exit status N"; the reason an
-		// operator needs ("not a git repository", ...) is on stderr.
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			return nil, fmt.Errorf("git ls-files .evolve/profiles in %s: %w: %s", root, err, strings.TrimSpace(string(ee.Stderr)))
-		}
-		return nil, fmt.Errorf("git ls-files .evolve/profiles in %s: %w", root, err)
-	}
-	set := make(map[string]bool)
-	for _, line := range strings.Split(string(out), "\n") {
-		rel := strings.TrimSpace(line)
-		// Bind only DIRECT children: Direction B's disk walk is flat, so a
-		// nested tracked profile must not basename-alias a same-named
-		// top-level stub into the binding set.
-		if filepath.Dir(rel) != filepath.Join(".evolve", "profiles") {
-			continue
-		}
-		base := filepath.Base(rel)
-		if strings.HasSuffix(base, ".json") {
-			set[strings.TrimSuffix(base, ".json")] = true
-		}
-	}
-	return set, nil
+	// Stderr-surfaced errors, staged-counts-as-tracked, and top-level-only
+	// (no nested basename aliasing) all live in the shared helper now;
+	// unpaired_tracked_edge_test.go pins each property through this seam.
+	return repostate.TrackedSet(root, ".evolve/profiles", ".json")
 }
 
 // TestRepoPersonaProfilePairing is the bijection drift gate on the live tree.
@@ -138,8 +118,9 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 	}
 	// Direction-B allowlist: TRACKED profiles whose prompt source is not an
 	// agents/evolve-*.md persona. Runtime-minted stubs no longer need entries
-	// here: they are gitignored by design, so trackedProfiles excludes them
-	// structurally (the cycle-~1326 firing was patched with per-name entries;
+	// here: they are untracked runtime mints (not necessarily gitignored), so
+	// trackedProfiles excludes them structurally (the cycle-~1326 firing was
+	// patched with per-name entries;
 	// the cd49274beab2 storm, cycles 1402/1403/1405, proved that ratchet
 	// re-arms on every new mint and killed a whole batch — see
 	// unpaired_tracked_test.go).
@@ -197,9 +178,10 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		}
 		name := strings.TrimSuffix(n, ".json")
 		if tracked != nil && !tracked[name] {
-			// Untracked = runtime-minted stub (gitignored by design; the
-			// minter pairs phase->profile at dispatch time). It never lands
-			// on main, so it is not repo config and Direction B must not
+			// Untracked = runtime mint (untracked, not necessarily
+			// gitignored; the minter pairs phase->profile at dispatch
+			// time). It never lands on main, so it is not repo config
+			// and Direction B must not
 			// bind it — binding it is what turned the live plane's ship
 			// gate red for every lane (fingerprint cd49274beab2).
 			t.Logf("untracked profile %q: runtime-minted state, not bound", name)

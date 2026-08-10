@@ -1,26 +1,13 @@
 package profiles
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// realProfilesDir resolves the on-disk .evolve/profiles directory relative to
-// this test file, so the guard runs against the live profiles the loop ships
-// (not a fixture).
-func realProfilesDir(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "profiles")
-}
+// realProfilesDir now lives in tracked_realtree_test.go beside the tracked-set
+// funnel every real-tree test in this package goes through.
 
 // TestSpineProfilesAreDriverAgnostic enforces the driver-agnostic invariant from
 // docs/architecture/model-routing-policy.md: a spine phase profile MUST express
@@ -47,7 +34,7 @@ func TestSpineProfilesAreDriverAgnostic(t *testing.T) {
 	}
 
 	spine := []string{"scout", "triage", "tdd-engineer", "builder", "auditor", "router", "reflector"}
-	loader := NewFromDir(realProfilesDir(t))
+	loader, _ := RealTreeProfiles(t)
 
 	for _, name := range spine {
 		p, err := loader.Get(name)
@@ -81,7 +68,7 @@ func TestSpineSubstitutabilityAtParity(t *testing.T) {
 
 	spine := []string{"scout", "triage", "tdd-engineer", "builder", "auditor", "router", "reflector"}
 	altDrivers := []string{"codex", "agy", "ollama"}
-	loader := NewFromDir(realProfilesDir(t))
+	loader, _ := RealTreeProfiles(t)
 
 	for _, name := range spine {
 		p, err := loader.Get(name)
@@ -104,18 +91,12 @@ func TestAllProfilesAreDriverAgnostic(t *testing.T) {
 		canonical[tier] = true
 	}
 
-	profilesDir := realProfilesDir(t)
-	entries, err := os.ReadDir(profilesDir)
-	if err != nil {
-		t.Fatalf("read profiles dir: %v", err)
-	}
-	loader := NewFromDir(profilesDir)
+	// RealTreeProfiles binds only git-tracked profiles (untracked = runtime
+	// mints, the cd49274beab2 false-RED class) and List() already excludes
+	// non-profile JSON like tool-policy.json.
+	loader, names := RealTreeProfiles(t)
 
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" || entry.Name() == "tool-policy.json" {
-			continue
-		}
-		name := strings.TrimSuffix(entry.Name(), ".json")
+	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			p, err := loader.Get(name)
 			if err != nil {
