@@ -207,8 +207,9 @@ func truncateFindings(s string) string {
 // earlier and processing/cycle-N does not exist yet). On a valid stamped
 // claim it RE-SEEDS the cycle worktree from the salvage snapshot (CreateFrom
 // force-recreates the same lane-namespaced path, so downstream phases pick it
-// up unchanged), moves the review base to the ORIGINAL attempt's base so the
-// cumulative work is reviewed and shipped whole, copies the continuation
+// up unchanged), moves the review base to the ORIGINAL attempt's base — or to
+// main's tip when the base-advance heals a stale one (continuation_baseadvance.go);
+// either way the cumulative work is reviewed and shipped whole, copies the continuation
 // manifest into THIS cycle's workspace (ship's manifest reconciliation unions
 // the prior attempt's declared paths from it; a re-FAIL overwrites it at the
 // next preserve), and serves the prior findings to the build prompt. Every
@@ -249,6 +250,11 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	cr.cs.ActiveWorktree = wt
 	if c.BaseSHA != "" {
 		cr.cs.WorktreeBaseSHA = c.BaseSHA
+	}
+	// Base advance (cycle-1365 class) — see continuation_baseadvance.go. On
+	// success the healed base supersedes the manifest's stale one.
+	if healed := advanceContinuationBase(cr.ctx, wt, cr.cycle); healed != "" {
+		cr.cs.WorktreeBaseSHA = healed
 	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: cycle-state persist after adoption: %v\n", cr.cycle, err)
