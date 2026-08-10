@@ -318,21 +318,105 @@ func truncateRunes(s string, max int) string {
 // EVERY citation resolves: "one of these files exists" would let a real cite
 // carry an invented one past the gate.
 func evidenceResolves(evidence string, req core.PhaseRequest) (bool, string) {
-	cites := splitEvidence(evidence)
-	if len(cites) == 0 {
+	frags := splitEvidence(evidence)
+	if len(frags) == 0 {
 		return false, "no evidence"
 	}
-	for _, c := range cites {
-		if ok, why := oneEvidenceResolves(c, req); !ok {
+	cites := 0
+	for _, f := range frags {
+		// A ';'-joined fragment that is not cite-shaped is a prose ANNOTATION
+		// ("…; verified live: `go test` -> PASS") — cycles 1393/1415 rejected
+		// whole real claims on such fragments, accreting ledger entries faster
+		// than they closed. Annotations are ignored, never graded; every
+		// cite-SHAPED fragment must still resolve, and at least one is
+		// mandatory — prose alone stays inadmissible.
+		if !citeShaped(f) {
+			continue
+		}
+		cites++
+		if ok, why := oneEvidenceResolves(f, req); !ok {
 			return false, why
 		}
+	}
+	if cites == 0 {
+		return false, "no citation among annotations — prose alone is not evidence"
 	}
 	return true, ""
 }
 
-// splitEvidence returns the individual citations in a (possibly joined)
-// evidence value, dropping blanks — so "", " " and "; " are all "no evidence"
-// rather than a citation named "".
+// citeShaped reports whether a fragment is graded as a citation (must resolve)
+// rather than a prose annotation (ignored). Conservative by design: anything
+// whitespace-free that looks path-like (contains '/' or '.') is a citation, so
+// a typoed path can never demote itself into unfalsifiable prose. The optional
+// trailing parenthetical annotation is stripped first — the same allowance
+// oneEvidenceResolves grants a lone cite.
+func citeShaped(frag string) bool {
+	s := strings.TrimSpace(frag)
+	if i := strings.LastIndex(s, " ("); i > 0 && strings.HasSuffix(s, ")") {
+		s = strings.TrimSpace(s[:i])
+	}
+	if s == "" || strings.ContainsAny(s, " \t") {
+		return false
+	}
+	return strings.ContainsAny(s, "/.")
+}
+
+// inheritedDefectsPromptBlock renders the continuation-disposition duty into
+// the audit dispatch prompt: the ancestor's OPEN ids + texts and the artifact
+// they are owed in. Composed from the SAME records the gate grades against
+// (workspace manifest, registry binding fallback, ancestor ledger) on the
+// happy path — the half of "continuations must be TOLD their inherited
+// defects" the auditor owns. On the tamper corners (corrupt manifest,
+// manifest/registry cycle disagreement) the gate BLOCKS loudly while this
+// block degrades to best-effort/empty — the prompt is context, never
+// enforcement.
+func inheritedDefectsPromptBlock(req core.PhaseRequest) string {
+	if req.Workspace == "" || req.ProjectRoot == "" {
+		return ""
+	}
+	cont, isCont, err := continuation.ReadManifest(req.Workspace)
+	if err != nil || !isCont {
+		if reg, has := laneRegistryBinding(req); has {
+			cont, isCont = reg, true // manifest-less registry binding is still owed dispositions
+		}
+	}
+	if !isCont {
+		return ""
+	}
+	ancestorWS := filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cont.Cycle))
+	doc, hasLedger, err := readDefectLedger(ancestorWS)
+	if err != nil || !hasLedger {
+		return ""
+	}
+	var ids strings.Builder
+	for _, e := range doc.Entries {
+		if e.Status != defectStatusOpen {
+			continue
+		}
+		// The ledger Text is AGENT-authored (a prior cycle's verdict sentinel;
+		// this file's threat model, see defectID). Rendered single-line so an
+		// embedded "\n## …" can never masquerade as mechanism-authored prompt
+		// structure beside the MANDATORY heading.
+		text := strings.Map(func(r rune) rune {
+			if r == '\n' || r == '\r' {
+				return ' '
+			}
+			return r
+		}, truncateRunes(e.Text, 200))
+		fmt.Fprintf(&ids, "- %s: %s\n", e.ID, text)
+	}
+	if ids.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n## Inherited defect dispositions (MANDATORY)\n"+
+		"This cycle continues cycle-%d. Write <workspace>/%s BEFORE emitting your verdict, one entry per id below — status FIXED (evidence: a bare resolving cite) or DEFERRED (a non-empty reason). Ids are copied verbatim, never renumbered.\n%s",
+		cont.Cycle, defectDispositionFile, ids.String())
+}
+
+// splitEvidence returns the individual fragments of a (possibly joined)
+// evidence value — citations and prose annotations alike; citeShaped decides
+// which get graded. Blanks are dropped, so "", " " and "; " are all "no
+// evidence" rather than a citation named "".
 func splitEvidence(evidence string) []string {
 	var out []string
 	for _, part := range strings.Split(evidence, ";") {
