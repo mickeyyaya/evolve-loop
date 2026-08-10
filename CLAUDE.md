@@ -4,6 +4,16 @@
 > **Full runtime detail — env-var table, operator commands, ship classes, publishing pipeline — lives in [docs/operations/runtime-reference.md](docs/operations/runtime-reference.md).** Read it before touching loop behavior, flags, gates, or releases. Release notes: [CHANGELOG.md](CHANGELOG.md).
 > **Operating policy (canonical, environment-independent): [docs/operations/operating-policy.md](docs/operations/operating-policy.md)** — pipeline issues are fixed console-first at maximum reasoning; routing is typed plumbing; salvage before requeue; wiring proofs mandatory. The repo, not session memory, is the source of truth for these rules.
 
+## Automation Loop Guardrails
+
+- When running the evolve loop or any batch/merge-train automation, evaluate output after EVERY cycle. If 2 consecutive cycles produce zero ships (0 merged PRs), STOP the loop immediately and root-cause the pipeline before running another wave.
+- Never let a batch run more than 2 unproductive waves "to see if it self-corrects".
+- ADR-0072 reconciliation: a zero-ship streak is SYSTEM-fail evidence — HALT + P0 applies. This does not conflict with "never stop the queue", which governs task-level failures.
+
+## Status Reporting
+
+When reporting on a batch or pipeline run, always include: cycles run, ships/lanes completed (e.g. 2/2), open PR numbers, failing CI job names with failure class, and the specific next action. Do not report "running" or "in progress" as a status without these numbers.
+
 ## Session conventions
 
 - **Confirm direction first**: multi-step/multi-cycle work needs a 3-bullet plan + approval. Single-cycle bug fixes, file-path-specified tasks, and approved-plan tasks are exempt.
@@ -31,6 +41,16 @@ Maximum velocity, zero shortcuts. Worktrees are provisioned natively — agents 
 2. Read actual exports before importing/calling from a module.
 3. Run tests and report counts: `cd go && go test ./internal/<pkg>/... — N/N PASS, no regression`.
 
+## CI Failures
+
+- Classify every CI failure as flake vs. real defect before retrying. Retrying an unclassified red is not allowed.
+- File a regression issue for any failure class seen 2+ times, and link it in the PR description.
+- Ship gates: if a gate reports RED, verify the gate's own logic before assuming the code is broken (false-RED gates have shipped before).
+
+## Go Project Conventions
+
+After editing any Go file, run `gofmt -l .`, `go vet ./...`, and `go test ./...` (from the `go/` module root) before opening a PR. Add table-driven edge-case tests for any bug that was root-caused during a pipeline stall.
+
 ## Shell conventions
 
 bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date -d`. Required: `set -uo pipefail` (not `set -e`), atomic writes via `mv "${f}.tmp.$$"`, `git diff HEAD` for tree-state SHA. `skills/<name>/` is canonical; `.agents/skills/` are symlinks. Full table with reasons/portable alternatives → [runtime-reference.md](docs/operations/runtime-reference.md).
@@ -41,7 +61,7 @@ bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date
 
 ## Critical runtime facts (full table → runtime-reference.md)
 
-- Gates default-ON as **compiled Go defaults** (`internal/policy` + `internal/config`), surfaced when the policy block is absent: `eval_gate=enforce`, `contract_gate=enforce`, `repo_contract_gate=enforce` (ship-time repo-contract scanner pack, `internal/phases/ship/repocontract.go` — lane ships can no longer red main), EGPS `red_count==0` to ship, tdd phase enabled. `.evolve/policy.json` MAY override these via a `gates`/`workflow` block, but the checked-in file sets only floor/cli_health/catalog/acs/parallel_evaluate/pins/fleet/disposition — it does not contain the gate keys (don't assume policy.json is the source of the defaults).
+- Gates default-ON as **compiled Go defaults** (`internal/policy` + `internal/config`), surfaced when the policy block is absent: `eval_gate=enforce`, `contract_gate=enforce`, `repo_contract_gate=enforce` (ship-time repo-contract scanner pack, `internal/phases/ship/repocontract.go` — lane ships can no longer red main), EGPS `red_count==0` to ship, tdd phase enabled. `.evolve/policy.json` MAY override these via a `gates`/`workflow` block, but the checked-in file sets only floor/cli_health/catalog/acs/parallel_evaluate/pins/fleet/disposition/failure_disposition — it does not contain the gate keys (don't assume policy.json is the source of the defaults). Since 2026-08-10: `failure_disposition.stage=enforce` (escalation boundary LIVE, was shadow) and `fleet.count=2` (codex quota-dead until 2026-09-01; restore 3 via the wave-boundary bounce recipe when codex returns).
 - Boot self-heal: `boot.binary_refresh=auto` **compiled default** (`cmd_loop_boot_refresh.go`) — rebuild + re-exec when the running binary's build stamp is behind HEAD with a go/ delta; `off` only for deliberate old-binary pins (unknown words resolve to `auto`).
 - Contract blocks: second consecutive contract-gate block escalates the re-dispatch CLI (soft overlay, `internal/core/contract_escalation.go`) — escalation before breaker demotion; salvage rungs are breaker-neutral. Recurring identical-fingerprint halt → `evolve loop --reset --fingerprint <fp>` (acked into `.evolve/resolved-fingerprints.json`).
 - Default execution = tmux-LLM drivers (`claude-tmux` etc.); headless `claude -p` is opt-in only. Claude OAuth detected from macOS Keychain. 4 CLI families: claude, codex, agy (Antigravity), ollama.
