@@ -113,6 +113,13 @@ machine-consumed verdict-on-the-verdict. The Go disposition gate verifies it at
 retro completion (absent/malformed/out-of-vocabulary ⇒ loud gate reason in
 RetroDecision); the S3 router consumes it for routing and escalation.
 
+**WRITE ORDER IS LOAD-BEARING: write `disposition.json` (and
+`handoff-retrospective.json`) BEFORE your final `retrospective-report.md`
+write.** The session completion detector fires when the REPORT settles — a
+disposition written after the report loses the race and the gate records it
+absent (86 of 88 recent retros failed exactly this way; the ones that ordered
+the writes passed).
+
 Literal example — this exact document passes the gate (single-sourced against
 the Go verifier by `disposition_gate_singlesource_test.go`; copy this SHAPE and
 substitute your cycle's values):
