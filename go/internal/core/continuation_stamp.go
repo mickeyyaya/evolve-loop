@@ -227,6 +227,12 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	}
 	if err := validateContinuation(cr.ctx, cr.req.ProjectRoot, c); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation from cycle %d rejected (%v) — keeping fresh worktree\n", cr.cycle, c.Cycle, err)
+		// Release the declined binding, or the root-owned registry entry
+		// outlives its lineage and the defect-ledger gate's out-of-band check
+		// auto-FAILs every future lane on this scope (the 1412/1418
+		// absorbing-FAIL state). Orchestrator-side only — an agent deleting
+		// the WORKSPACE manifest still hits the gate's cycle-1285 block.
+		releaseDeclinedBinding(cr.req.ProjectRoot, scopeIDs, c)
 		return
 	}
 	seeder, ok := cr.o.worktree.(interface {
@@ -254,4 +260,29 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], c.BaseSHA)
+}
+
+// releaseDeclinedBinding removes the registry binding(s) that produced a
+// DECLINED continuation: every scope in scopeIDs whose entry names the same
+// ancestor cycle as the rejected candidate. Scopes bound to a different
+// ancestor are untouched. Best-effort with a loud line either way — a release
+// that fails leaves the pre-fix behavior (the next lane declines again), never
+// anything worse.
+func releaseDeclinedBinding(projectRoot string, scopeIDs []string, declined *continuation.Continuation) {
+	if declined == nil {
+		return
+	}
+	for _, id := range scopeIDs {
+		if id == "" {
+			continue
+		}
+		released, err := continuation.DeleteRegistryEntryIfCycle(projectRoot, id, declined.Cycle)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN continuation: releasing declined binding %q (cycle-%d) failed: %v\n", id, declined.Cycle, err)
+			continue
+		}
+		if released {
+			fmt.Fprintf(os.Stderr, "[orchestrator] continuation: RELEASED stale binding %q -> cycle-%d (adoption declined; scope restarts fresh instead of auto-FAILing the ledger gate)\n", id, declined.Cycle)
+		}
+	}
 }
