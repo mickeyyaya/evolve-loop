@@ -1,7 +1,6 @@
 package profiles_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -16,13 +15,9 @@ func TestAllProfileDefaultTiersResolveForSwappableDrivers(t *testing.T) {
 	manifests := loadSwappableManifests(t, drivers)
 	canonical := canonicalTierSet()
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List real profiles: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 	if len(names) == 0 {
-		t.Fatal("List real profiles returned no profiles")
+		t.Fatal("RealTreeProfiles returned no profiles")
 	}
 
 	for _, name := range names {
@@ -111,13 +106,9 @@ func TestAllProfilesSubstitutabilityAtParity(t *testing.T) {
 	drivers := swappableDriverManifests()
 	manifests := loadSwappableManifests(t, drivers)
 
-	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
-	names, err := loader.List()
-	if err != nil {
-		t.Fatalf("List real profiles: %v", err)
-	}
+	loader, names := profiles.RealTreeProfiles(t)
 	if len(names) == 0 {
-		t.Fatal("List real profiles returned no profiles")
+		t.Fatal("RealTreeProfiles returned no profiles")
 	}
 
 	checkTier := func(profileName, field, tier string) {

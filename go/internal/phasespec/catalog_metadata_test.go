@@ -52,9 +52,18 @@ func TestPhaseCatalog_OptionalPhasesHaveSelectMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MergedCatalog: %v", err)
 	}
+	// Built-in registry entries are always bound; user/on-disk overlay entries
+	// (cat.IsUser) bind only when their .evolve/phases/<dir>/phase.json is
+	// git-tracked — untracked dirs are runtime/local state that can never
+	// reach a CI checkout (cd49274beab2 class). Nil = no git context = bind all.
+	trackedUser := phasespec.TrackedUserPhaseNames(t, repoRoot(t))
 
 	missing := map[string]bool{}
 	for _, s := range cat.All() {
+		if trackedUser != nil && cat.IsUser(s.Name) && !trackedUser[s.Name] {
+			t.Logf("untracked user phase %q: runtime/local overlay, not bound by the metadata gate", s.Name)
+			continue
+		}
 		if s.Optional && s.WhenToUse == "" && s.Description == "" {
 			missing[s.Name] = true
 		}

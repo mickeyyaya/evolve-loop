@@ -69,15 +69,15 @@ func Check(opts Options) (Result, error) {
 	if opts.Path == "" {
 		return Result{}, fmt.Errorf("evalqualitycheck: Path required")
 	}
-	f, err := os.Open(opts.Path)
+	raw, err := os.ReadFile(opts.Path)
 	if err != nil {
 		return Result{}, fmt.Errorf("evalqualitycheck: open %s: %w", opts.Path, err)
 	}
-	defer func() { _ = f.Close() }()
 
 	res := Result{Path: opts.Path, Overall: LevelPass}
+	scoreCapGraded := scoreCapRE.Match(raw)
 
-	cmds, err := scanBashCommands(f)
+	cmds, err := scanBashCommands(strings.NewReader(string(raw)))
 	if err != nil {
 		return Result{}, fmt.Errorf("evalqualitycheck: read %s: %w", opts.Path, err)
 	}
@@ -88,23 +88,76 @@ func Check(opts Options) (Result, error) {
 			res.Overall = cl.Level
 		}
 	}
+	if len(cmds) == 0 {
+		if scoreCapGraded {
+			// score_cap/evidence-graded evals are consumed by the ACS suite,
+			// not by this bash-rigor check — zero bash commands there is the
+			// designed shape, not vacuity. Note it, don't cry wolf (the
+			// alert-fatigue half of the adversarial-review MEDIUM finding).
+			res.Commands = append(res.Commands, ClassifiedLine{
+				Line: "(score_cap-graded eval)", Level: LevelPass,
+				Reason: "no bash graders by design; scoring is consumed by the ACS suite",
+			})
+			return res, nil
+		}
+		// Zero parsed commands means this gate verified NOTHING. Returning
+		// PASS here is the vacuity that silently defeated the gate for every
+		// bullet-format eval until 2026-08-09 (ADR-0084 invariant 2) — a
+		// format the scanner cannot read and an eval with no graders must
+		// both surface, not slide through.
+		res.Overall = LevelWarn
+		res.Commands = append(res.Commands, ClassifiedLine{
+			Line: "(no commands parsed)", Level: LevelWarn,
+			Reason: "zero parsed commands — the gate verified nothing (no ```bash fence, no `[code]` grader bullet, no score_cap block)",
+		})
+	}
 	return res, nil
 }
 
-// scanBashCommands returns the non-blank, non-comment command lines found
-// inside ```bash fenced blocks of r, in order. Shared by Check (single-file
-// rigor) and CheckDiversity (suite-level diversity) so both parse evals
-// identically.
+// codeBulletRE matches the scout template's grader bullet form
+// (agents/evolve-scout-reference.md, eval-format-template anchor):
+//
+//   - `[code]` `<command>`
+//
+// The command is the second backtick span (greedy: a command may itself
+// contain backticks). [model]/[human] bullets are not bash and are not
+// matched. 281 of the 625 live evals use this form — reading only ```bash
+// fences left them all unscanned (the vacuous-gate class, ADR-0084).
+var codeBulletRE = regexp.MustCompile("^-\\s*`\\[code\\]`\\s*`(.+)`\\s*$")
+
+// scoreCapRE detects the score_cap eval form (line-anchored key), whose
+// grading is consumed by the ACS suite rather than this bash-rigor scanner —
+// zero bash commands there is designed, not vacuous.
+var scoreCapRE = regexp.MustCompile(`(?m)^\s*score_cap\s*:`)
+
+// scanBashCommands returns the non-blank, non-comment command lines found in
+// r, in order — from ```bash fenced blocks AND from the template's
+// `[code]` grader bullets. Shared by Check (single-file rigor) and
+// CheckDiversity (suite-level diversity) so both parse evals identically.
 func scanBashCommands(r io.Reader) ([]string, error) {
 	var cmds []string
-	inBash := false
+	inFence := false // inside ANY fenced block
+	inBash := false  // inside a bash-tagged fenced block specifically
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		trimmed := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(trimmed, "```") {
-			// Opening: ```bash sets inBash=true. Closing (```) or any
-			// non-bash fence sets inBash=false because "bash" is absent.
-			inBash = strings.Contains(trimmed, "bash") && !inBash
+			if inFence {
+				inFence, inBash = false, false
+			} else {
+				inFence = true
+				inBash = strings.Contains(trimmed, "bash")
+			}
+			continue
+		}
+		if !inFence {
+			// Grader bullets count ONLY at top level: a `[code]`-styled
+			// bullet inside a text/markdown fence is illustration (or a
+			// decoy planted to fake rigor — the adversarial-review BLOCK
+			// finding), never a real command.
+			if m := codeBulletRE.FindStringSubmatch(trimmed); m != nil {
+				cmds = append(cmds, strings.TrimSpace(m[1]))
+			}
 			continue
 		}
 		if !inBash {
