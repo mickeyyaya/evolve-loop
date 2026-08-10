@@ -90,9 +90,12 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 	}
 }
 
-// TestLaunch_NoTailBlockForUnregisteredAgent — non-phase bridge callers must be
-// untouched (the contract-free pass-through path stays byte-identical).
-func TestLaunch_NoTailBlockForUnregisteredAgent(t *testing.T) {
+// TestLaunch_UnregisteredAgentGetsPathDisclosureNotPrefix — an unregistered
+// agent no longer passes through naked (that was the cycle-1424 halt: the
+// engine polls ArtifactPath while the agent is never told it). It gets the
+// SYNTHESIZED minimal tail (path disclosure), but not the registered-contract
+// prefix block, and the body still leads the prompt.
+func TestLaunch_UnregisteredAgentGetsPathDisclosureNotPrefix(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-tmux", Profile: "/p", Prompt: "BODY",
@@ -101,7 +104,11 @@ func TestLaunch_NoTailBlockForUnregisteredAgent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	if strings.Contains(fe.gotReq.Prompt, "<deliverable-contract") {
-		t.Errorf("unregistered agent must get no tail block; got:\n%s", fe.gotReq.Prompt)
+	got := fe.gotReq.Prompt
+	if !strings.Contains(got, "/a.md") {
+		t.Errorf("unregistered agent must still be told its polled artifact path; got:\n%s", got)
+	}
+	if strings.Index(got, "BODY") > strings.Index(got, "/a.md") {
+		t.Errorf("synthesized disclosure must be a TAIL — body first; got:\n%s", got)
 	}
 }
