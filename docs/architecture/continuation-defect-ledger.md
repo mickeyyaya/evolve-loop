@@ -78,9 +78,32 @@ invented) loads its ancestor's ledger from
 `<workspace>/defect-dispositions.json`:
 
 ```json
-{"dispositions": [{"id": "d1", "status": "FIXED", "evidence": "go/internal/core/fleet.go:120"},
-                  {"id": "d2", "status": "DEFERRED", "reason": "out of lane scope; queued as …"}]}
+{"dispositions": [
+  {"id": "d0f3a7c1e59b246d8a0c4e6f13579bde2", "status": "FIXED",
+   "evidence": "go/internal/phases/audit/defect_ledger.go:267-356"},
+  {"id": "d9c8b7a6958473625140f3e2d1c0b9a87", "status": "DEFERRED",
+   "reason": "out of this lane's scope; queued as disposition-evidence-tolerant-unmarshal"}
+]}
 ```
+
+Every value above is **literal**, not a placeholder: ids are the ancestor
+ledger's content-hash ids (`"d" + 32 hex`, copied verbatim from
+`entries[].id` — never renumbered `d1`/`d2`), the `evidence` cite is **bare**
+(`path` / `path:N` / `path:N-M`, no trailing ` (annotation)`), and prose belongs
+in `reason`. Cycles 1397/1399/1400 each invented a different wrong shape because
+the schema was stated as a list of field *names* with no document to copy; this
+block is that document. The same example is carried in
+`agents/evolve-auditor.md` and in `dispositionSchemaExample`
+(`go/internal/phases/audit/defect_ledger.go`), which is echoed inline whenever
+the file is rejected as unparseable — one schema, three projections, held in
+sync by `defect_ledger_doc_example_test.go`.
+
+`evidence` may be a single citation string **or an array of citation strings**
+(`"evidence": ["a.go:12", "b.go:34"]`); the array is joined with `"; "` into the
+written-back ledger and **every** element must resolve. The tolerance is on the
+SHAPE only — an `evidence` that is neither a string nor an array of strings
+(an object, a number) is still rejected as unparseable rather than degraded to
+empty, and an empty array is still an unevidenced closure.
 
 Every inherited `OPEN` entry must be accounted for. Unaccounted — no
 disposition, `FIXED` without evidence, `DEFERRED` without a reason, or an
