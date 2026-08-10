@@ -140,7 +140,18 @@ const (
 	// pack found a repo-wide guard suite RED in the lane worktree — pushing
 	// would turn main red (the week's four scope-disease landings). Distinct
 	// code so the ledger/debugger can tell a contract block from git failures.
-	CodeRepoContractGate   ShipErrorCode = "REPO_CONTRACT_GATE"
+	CodeRepoContractGate ShipErrorCode = "REPO_CONTRACT_GATE"
+	// CodeRepoContractInfra (cycle-1409): the repo-contract scanner pack exited
+	// nonzero TWICE without a single test-level failure event — the toolchain
+	// died (build-cache contention, module fetch, OOM kill), the guard suites
+	// did not say "your code is broken". Deliberately NOT an alias of
+	// CodeRepoContractGate: before this split, `cmd.Run()`'s bare exit error was
+	// wrapped as a contract RED, so an infra flake blocked three audit-green
+	// ships (cycles 1402/1403/1405 — the preserved worktree re-ran 4/4 GREEN on
+	// the identical tree). The router/debugger need to tell "fix your code" from
+	// "safe to re-dispatch"; precondition-class because a re-dispatch can
+	// re-establish it, unlike a genuine contract violation.
+	CodeRepoContractInfra  ShipErrorCode = "REPO_CONTRACT_INFRA"
 	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
 	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
