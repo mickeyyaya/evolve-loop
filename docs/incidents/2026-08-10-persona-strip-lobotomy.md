@@ -85,13 +85,25 @@ system's history.
 
 ## Follow-ups
 
-- Curate builder/scout/tdd-engineer/triage tails (respecting their savings
-  floors or recalibrating them with justification), then shrink the guard's
-  exception list to empty.
-- The savings floors in `realdoc_strip_test.go` and `compact_marker_gate_test.go`
-  remain byte-count incentives; consider replacing them with an explicit
-  reference-section allowlist so "compact more" can never again compete with
-  "keep the contract".
+- ~~Curate builder/scout/tdd-engineer/triage tails~~ **DONE (follow-up landing,
+  2026-08-10 campaign)** — and the sweep found the disease was worse than appended
+  sections falling below markers: **tests actively DEMANDED the burial**.
+  Cycle-413/415/416/422 floors and negatives (unit tests AND acs predicates)
+  required stripping triage's inbox-ingestion + idempotency rules
+  (misclassified "versioned-historical" for carrying version tags in their
+  headings — the queue-starvation mechanism), tdd's predicate-quality rules,
+  and intent's own OUTPUT CONTRACT (`intent-delta.md` — a plausible cause of
+  the intent-delta contract-path-skew defect), re-run protocol, and
+  reflection duty. The latent-red C416 predicate demanding INTENT_MODE stay
+  ABOVE the marker sat in direct contradiction with the in-CI compaction test
+  demanding it below — the burial side won because it ran in CI. All five
+  personas (auditor #434; builder/scout/tdd/triage/intent follow-up) now
+  carry EOF markers; every burial pin inverted to a keep-pin with incident
+  rationale; floors recalibrated (builder 4096→256, scout 2048→256,
+  tdd 1500→64, triage 1200/4200→64, intent 2200→256); `pendingCuration`
+  is empty and self-pruning.
+- The remaining savings floors are marker-presence checks only; the
+  phasecoherence keep-guard is the authority on what may be stripped.
 
 ## Lessons
 

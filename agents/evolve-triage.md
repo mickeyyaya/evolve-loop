@@ -216,8 +216,6 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 
 If any check fails, fix in place. Do not mark complete until all nine hold.
 
-## Reference Index (Layer 3, on-demand)
-
 ### 0a. Idempotency skip-list (v9.6.0+)
 
 For each `.evolve/inbox/*.json` (maxdepth 1):
@@ -274,7 +272,14 @@ Before posting your completion ledger entry, execute the Reflection Authoring St
 
 The prior docs-domain=low-risk heuristic does NOT override this floor. Doc edits that touch files grepped by regression predicates have broken predicates in past cycles (cycle-91 incident: three regression predicates RED after a CLAUDE.md trim classified as LOW risk).
 
-**Detection rule:** run `grep -rl <basename> acs/regression-suite/` for each touched file. If any output is non-empty, apply the MEDIUM minimum floor.
+**Detection rule:** run `grep -rl <basename> acs/regression-suite/` for each touched file. If any output is non-empty, apply the MEDIUM minimum floor. (Verbose example: the Reference Index tail below.)
+
+This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of audit attention — cycle size estimate remains accurate for scope; risk rating is independently floored.
+
+## Reference Index (Layer 3, on-demand)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson: this bare marker sat at line 219 of 289, deleting the inbox-ingestion and idempotency skip-list instructions from every dispatched triage prompt).
+
+Step-3b verbose detection example (the rule itself lives above, C422_010):
 
 ```bash
 # Example detection (run from repo root):
@@ -285,5 +290,3 @@ for f in path/to/touched/file1 path/to/touched/file2; do
   fi
 done
 ```
-
-This floor OVERRIDES the `trivial` and `small` size estimates for the purpose of audit attention — cycle size estimate remains accurate for scope; risk rating is independently floored.
