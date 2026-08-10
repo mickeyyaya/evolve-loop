@@ -95,6 +95,83 @@ func writeRegistryEntryLocked(projectRoot, scopeID string, c Continuation) error
 	return nil
 }
 
+// publishRegistryLocked marshals and atomically publishes the registry map.
+// The caller MUST hold flock.WithPathLock(RegistryPath(projectRoot)) — shared
+// by the write and delete paths so the on-disk publish contract cannot
+// diverge between them.
+func publishRegistryLocked(projectRoot string, byScope map[string]Continuation) error {
+	body, err := json.MarshalIndent(byScope, "", "  ")
+	if err != nil {
+		return fmt.Errorf("continuation: marshal registry: %w", err)
+	}
+	path := RegistryPath(projectRoot)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("continuation: registry dir: %w", err)
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, body, 0o644); err != nil {
+		return fmt.Errorf("continuation: write registry: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("continuation: publish registry: %w", err)
+	}
+	return nil
+}
+
+// DeleteRegistryEntry releases scopeID's binding unconditionally. The missing
+// half of the registry lifecycle (2026-08-10 stall: entries were immortal, so
+// a binding whose snapshot had landed or whose worktree was reaped re-armed
+// the defect-ledger gate's out-of-band check on every future lane of that
+// scope — the absorbing-FAIL state, cycles 1412/1418). Deleting an absent
+// scope is a clean no-op; an empty scope id is rejected to mirror
+// WriteRegistryEntry. Callers are ORCHESTRATOR-side only — lane agents have
+// no write path to the root-owned registry, which is what keeps the gate's
+// cycle-1285 anti-tamper property intact. When the release is conditional on
+// WHICH ancestor the binding names, use DeleteRegistryEntryIfCycle — a
+// read-then-delete across two locks loses a sibling lane's concurrent rebind.
+func DeleteRegistryEntry(projectRoot, scopeID string) error {
+	if scopeID == "" {
+		return fmt.Errorf("continuation: empty scope id is not a registry key")
+	}
+	return flock.WithPathLock(RegistryPath(projectRoot), func() error {
+		byScope, err := readRegistry(projectRoot)
+		if err != nil {
+			return err
+		}
+		if _, ok := byScope[scopeID]; !ok {
+			return nil
+		}
+		delete(byScope, scopeID)
+		return publishRegistryLocked(projectRoot, byScope)
+	})
+}
+
+// DeleteRegistryEntryIfCycle releases scopeID's binding ONLY if it currently
+// names ancestor cycle — check and delete under ONE lock hold, so a sibling
+// lane that rebinds the scope between an unlocked read and this call keeps
+// its fresh binding (the TOCTOU lost-update the adversarial review blocked).
+// Returns whether a binding was released.
+func DeleteRegistryEntryIfCycle(projectRoot, scopeID string, cycle int) (bool, error) {
+	if scopeID == "" {
+		return false, fmt.Errorf("continuation: empty scope id is not a registry key")
+	}
+	released := false
+	err := flock.WithPathLock(RegistryPath(projectRoot), func() error {
+		byScope, err := readRegistry(projectRoot)
+		if err != nil {
+			return err
+		}
+		bound, ok := byScope[scopeID]
+		if !ok || bound.Cycle != cycle {
+			return nil
+		}
+		delete(byScope, scopeID)
+		released = true
+		return publishRegistryLocked(projectRoot, byScope)
+	})
+	return released, err
+}
+
 // ReadRegistryEntry returns the binding scopeID carries. An absent registry, an
 // unknown scope and a blank scope id are all clean misses (zero, false, nil) —
 // the ordinary case for every cycle that has nothing to resume. A corrupt
