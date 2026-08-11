@@ -17,6 +17,7 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,19 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
+
+// ErrAmbiguousAnchorSeq is returned when more than one DISTINCT line carries the
+// requested entry_seq, so no single line can be bound without the operator
+// naming it.
+//
+// entry_seq is not unique in real history: pre-CA.1 concurrent Appends raced the
+// tip and wrote fork siblings sharing a seq (walkChain accepts them; see its
+// FORK SIBLING carve-out). Binding the FIRST match — what this command did until
+// cycle-1433 — silently picks the EARLIER sibling, which moves the epoch anchor
+// BACKWARD and re-exposes lines the operator believed were already sealed. An
+// anchor is a trust decision, so an ambiguous one must be refused, not guessed;
+// the caller disambiguates by line SHA, which names exact bytes.
+var ErrAmbiguousAnchorSeq = errors.New("ambiguous entry_seq: carried by more than one distinct line")
 
 // resetSealKindPrefix is the Kind prefix of an IN-BAND epoch anchor: an
 // operator entry the chain itself carries (e.g. `reset-seal-cycle1189`).
@@ -149,12 +163,68 @@ func (l *FileLedger) loadAnchorSHA() string {
 	return a.AnchorLineSHA
 }
 
+// resolveAnchorLine picks the single line SHA an anchor may bind to.
+//
+// wantSHA == "": the seq must be carried by exactly ONE distinct line —
+// zero is "not found", more than one is ErrAmbiguousAnchorSeq (never a silent
+// first-match). wantSHA set: that line must exist AND carry the requested seq,
+// so a mistyped seq cannot bind an arbitrary line — the flag disambiguates
+// between siblings, it does not override the seq argument.
+//
+// Distinctness is by SHA, not by position: two byte-identical lines are one set
+// of bytes to bind and stay unambiguous.
+func resolveAnchorLine(lines [][]byte, seq int, wantSHA string) (string, error) {
+	seqOf := map[string]int{}
+	var candidates []string
+	for _, line := range lines {
+		_, e, derr := decodeLedgerLine(line)
+		if derr != nil {
+			continue
+		}
+		sha := sha256Hex(line)
+		if _, seen := seqOf[sha]; seen {
+			continue
+		}
+		seqOf[sha] = e.EntrySeq
+		if e.EntrySeq == seq {
+			candidates = append(candidates, sha)
+		}
+	}
+	if wantSHA != "" {
+		got, ok := seqOf[wantSHA]
+		if !ok {
+			return "", fmt.Errorf("ledger anchor: no line with line SHA %s (searched live tail + sealed segments)", wantSHA)
+		}
+		if got != seq {
+			return "", fmt.Errorf("ledger anchor: the named line carries entry_seq=%d, not entry_seq=%d — <entry_seq> and the line SHA must name the SAME line", got, seq)
+		}
+		return wantSHA, nil
+	}
+	switch len(candidates) {
+	case 0:
+		return "", fmt.Errorf("ledger anchor: no line with entry_seq=%d (searched live tail + sealed segments)", seq)
+	case 1:
+		return candidates[0], nil
+	default:
+		return "", fmt.Errorf("ledger anchor: %w: entry_seq=%d is carried by %d distinct lines (%s) — name the exact line to trust",
+			ErrAmbiguousAnchorSeq, seq, len(candidates), strings.Join(candidates, ", "))
+	}
+}
+
 // Anchor records an epoch-anchor at the ledger line whose entry_seq == seq,
 // binding it to that line's current SHA. After this, Verify/VerifyDeep trust the
 // pre-anchor prefix (the preserved, accepted historical damage) and validate
 // strictly from the anchor forward. Errors (leaving no anchor file) when no line
-// carries that seq. Atomic write (temp + rename).
-func (l *FileLedger) Anchor(_ context.Context, seq int, note string) error {
+// carries that seq, or when several do — see AnchorLine.
+func (l *FileLedger) Anchor(ctx context.Context, seq int, note string) error {
+	return l.AnchorLine(ctx, seq, "", note)
+}
+
+// AnchorLine is Anchor with an explicit line SHA, the disambiguation an
+// ambiguous seq (ErrAmbiguousAnchorSeq) requires: lineSHA names the exact bytes
+// to trust when siblings share a seq. An empty lineSHA is plain Anchor.
+// Atomic write (temp + rename); no anchor file is left behind on any error.
+func (l *FileLedger) AnchorLine(_ context.Context, seq int, lineSHA, note string) error {
 	// Search the FULL chain — sealed segments + live tail — not just
 	// ledger.jsonl: the ledger-1740 damage is old enough that its post-damage
 	// line has likely been sealed into a segment.
@@ -162,19 +232,9 @@ func (l *FileLedger) Anchor(_ context.Context, seq int, note string) error {
 	if err != nil {
 		return fmt.Errorf("ledger anchor: %w", err)
 	}
-	lineSHA := ""
-	for _, line := range lines {
-		_, e, derr := decodeLedgerLine(line)
-		if derr != nil {
-			continue
-		}
-		if e.EntrySeq == seq {
-			lineSHA = sha256Hex(line)
-			break // first line carrying this seq (siblings share a seq; the SHA binds the exact bytes)
-		}
-	}
-	if lineSHA == "" {
-		return fmt.Errorf("ledger anchor: no line with entry_seq=%d (searched live tail + sealed segments)", seq)
+	lineSHA, err = resolveAnchorLine(lines, seq, lineSHA)
+	if err != nil {
+		return err
 	}
 	rec := ledgerAnchor{
 		AnchorSeq:     seq,
