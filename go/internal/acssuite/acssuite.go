@@ -139,6 +139,14 @@ type Verdict struct {
 	// Warnings surfaces non-blocking anomalies (cycle-468: flaky predicates
 	// that passed on the bounded retry). Projection of Result.Flaky.
 	Warnings []string `json:"warnings,omitempty"`
+	// SuiteRoot / ProjectRoot record which roots this verdict was minted
+	// under (cycle-1434: a verdict minted with the WRONG state root red'd 3
+	// predicates the correct-root run showed green, and nothing in the
+	// artifact said so). omitempty: verdicts written before these stamps
+	// stay byte-compatible, and readers treat absence as "unstamped", never
+	// as a mismatch.
+	SuiteRoot   string `json:"suite_root,omitempty"`
+	ProjectRoot string `json:"project_root,omitempty"`
 }
 
 // Options configures Run. Root and Cycle are required.
@@ -180,7 +188,7 @@ func Run(opts Options) (Verdict, error) {
 		return Verdict{}, fmt.Errorf("acssuite: Cycle must be > 0")
 	}
 
-	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle}
+	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
 
 	// ADR-0080 P1: the suite execution is host-wide SINGLE-FLIGHT. Fleet
 	// lanes are separate processes each shelling full package suites; run

@@ -189,10 +189,36 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Message: fmt.Sprintf("probe quarantine: %s", qErr.Error())})
 	}
 	// Generate acs-verdict.json when absent and a generator is wired.
-	// Pre-staged files (operator/CI) are honored untouched. If generation
-	// writes nothing (zero predicates), the missing-file FAIL floor holds.
+	// Pre-staged files (operator/CI) are honored untouched — with one
+	// carve-out (cycle-1434): a file STAMPED with a project_root that differs
+	// from this phase's own is a foreign-root artifact (minted against the
+	// wrong plane's state; its reds/greens describe a different checkout) and
+	// is regenerated. Unstamped files keep the full honor — absence means
+	// "unstamped", never "mismatch". If generation writes nothing (zero
+	// predicates), the missing-file FAIL floor holds.
 	if h.genVerdict != nil {
-		if _, statErr := os.Stat(verdictPath); os.IsNotExist(statErr) {
+		_, statErr := os.Stat(verdictPath)
+		regen := os.IsNotExist(statErr)
+		if !regen && statErr == nil {
+			if stampedRoot, foreign := foreignRootVerdict(verdictPath, req.ProjectRoot); foreign {
+				regen = true
+				// Preserve the foreign artifact before regeneration clobbers
+				// it (review MEDIUM; the incident class was "the misdiagnosis
+				// was invisible from the file") — its reds/greens are the
+				// evidence of WHAT the wrong root saw.
+				preserved := filepath.Join(req.Workspace, "acs-verdict.foreign.json")
+				note := fmt.Sprintf(" (preserved as %s)", filepath.Base(preserved))
+				if renameErr := os.Rename(verdictPath, preserved); renameErr != nil {
+					note = fmt.Sprintf(" (preserve failed: %v)", renameErr)
+				}
+				diags = append(diags, core.Diagnostic{
+					Severity: "warning",
+					Message: fmt.Sprintf("acs-verdict.json was minted under project_root %q, not this phase's %q — foreign-root artifact regenerated (cycle-1434 class)%s",
+						stampedRoot, req.ProjectRoot, note),
+				})
+			}
+		}
+		if regen {
 			if genErr := h.genVerdict(req); genErr != nil {
 				diags = append(diags, core.Diagnostic{
 					Severity: "warning",
@@ -476,6 +502,44 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 // identical-fingerprint breaker because three DIFFERENT red predicates all
 // produced the byte-identical bare "red_count=1" reason (the cycle-1054/1060
 // constant-message collision class, at the gate-block).
+// foreignRootVerdict reports whether the verdict at path is STAMPED with a
+// project_root different from expected (cycle-1434). Both sides must be
+// non-empty — an unstamped file (pre-stamp verdicts, operator pre-stage) or
+// an unset phase root can never be "foreign". Unreadable/unparseable files
+// return false: the EGPS unreadable branch owns that failure, with its own
+// diagnostic.
+func foreignRootVerdict(path, expected string) (string, bool) {
+	if expected == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	var v struct {
+		ProjectRoot string `json:"project_root"`
+	}
+	if json.Unmarshal(data, &v) != nil || v.ProjectRoot == "" {
+		return "", false
+	}
+	if canonRootPath(v.ProjectRoot) == canonRootPath(expected) {
+		return v.ProjectRoot, false
+	}
+	return v.ProjectRoot, true
+}
+
+// canonRootPath normalizes a root for comparison, resolving symlinks when the
+// path exists (macOS: /var vs /private/var — one side stamped resolved, the
+// other not, would otherwise re-run the full single-flight suite every audit;
+// the skew can only fire TOWARD regeneration, so this is cost, not
+// correctness). A path that fails to resolve falls back to Clean.
+func canonRootPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return filepath.Clean(p)
+}
+
 func readACSVerdict(path string) (redCount int, redIDs []string, shipEligible *bool, err error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

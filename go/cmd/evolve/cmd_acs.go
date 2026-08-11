@@ -32,6 +32,30 @@ func resolveACSSuiteRoot(evolveDir string, cycle int) string {
 	return state.ActiveWorktree
 }
 
+// suiteProjectRoot resolves the plane root whose `.evolve/` holds the cycle's
+// runtime state (cycle-1434 ADR-0072 halt). The invocation already names it:
+// --evolve-dir under the caller's cwd. The anchor is the kernel-owned
+// cycle-state.json for THIS cycle — the one file only the orchestrator mints.
+// A bare runs/cycle-N directory is NOT proof: `evolve acs run` MkdirAll-mints
+// exactly that path under its own cwd, so an agent invoking it from inside a
+// cycle worktree would otherwise consecrate the WORKTREE as the plane (review
+// HIGH). File presence is the whole proof — its field values don't matter
+// here, so an empty active_worktree can never demote a real plane to the git
+// fallback. That git common-dir walk (mainProjectRoot) remains only for
+// invocations with no plane evolveDir (the issue-#12 shape) — it resolves the
+// OWNING repo, which is wrong precisely when the plane is itself a linked
+// worktree (all linked worktrees share one common dir, so the walk skips the
+// plane and lands on the console checkout).
+func suiteProjectRoot(evolveDir string, cycle int, root string) string {
+	if abs, err := filepath.Abs(evolveDir); err == nil {
+		state := filepath.Join(abs, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
+		if _, serr := os.Stat(state); serr == nil {
+			return filepath.Dir(abs)
+		}
+	}
+	return mainProjectRoot(root)
+}
+
 // mainProjectRoot resolves the MAIN project root from dir, following a git worktree
 // back to its main checkout via --git-common-dir (whose parent is the main root).
 // Predicates read `.evolve/` runtime data from there, so the suite must point
@@ -104,7 +128,7 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 			root = resolved
 		}
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: mainProjectRoot(root), Cycle: cycle})
+	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: suiteProjectRoot(evolveDir, cycle, root), Cycle: cycle})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
 		return 1
