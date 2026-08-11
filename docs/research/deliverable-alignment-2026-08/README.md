@@ -381,6 +381,57 @@ The `salvage-enforce-stage-dial` item stays deferred: a rollout dial for a stage
 that does not exist is premature. This section is the measurement §6 asked for;
 re-run it after any promotion and append the delta.
 
+### 7.1 The rate is now computed, not hand-read (cycle-1407)
+
+**Issue.** §7's own closing instruction — *"re-run it after any promotion and
+append the delta"* — was not executable. The baseline above was produced by
+driving the reviewer and reading the resulting JSONL by hand. Any operator
+asking "is the extraction stage worth building yet?" had to repeat that manual
+exercise, so the portfolio gate's deciding number was, in practice, stale
+between whoever last did the arithmetic.
+
+**Gap.** `salvage_instrument.go` had been appending
+`.evolve/bad-verdict-baseline.jsonl` since cycle-1389 and **nothing had ever
+read it back**: grepping the tree for the filename outside the writer and its
+own tests returned only the writer. Eighteen cycles of measurement with zero
+readers — the instrumentation-first mandate half-executed.
+
+**Solution.** `go/internal/deliverable/salvage_report.go` adds
+`SummarizeBadVerdictBaseline(io.Reader) (BaselineSummary, error)`, a pure fold
+over the sidecar, and `go/cmd/evolve/cmd_salvage.go` surfaces it:
+
+```
+$ evolve salvage report            # prose
+$ evolve salvage report -json      # {"total":…,"recoverable":…,"rate":…,"by_pattern":{…}}
+```
+
+Read it as follows. **`rate`** is the *recoverable-malformed* rate —
+`recoverable / total` over `bad_verdict_classified` records only — i.e. the
+share of rejected deliverables whose verdict a lenient reader could plainly have
+recovered. That share, not the raw failure count, is the extraction stage's
+addressable population. **`by_pattern`** splits the recoverable half by shape
+(`fenced-json`, `trailing-comma`, `displaced-line`), and it is the actionable
+half: the shapes have very different recovery costs, so a single headline number
+cannot size the stage. A run where one pattern dominates argues for a
+single-shape recovery (§7 found exactly that: `fenced-json`, 13 of 15 cases);
+a flat spread argues for a general parser or for not building one at all.
+Records emitted by other producers sharing the sidecar are skipped, and a torn
+JSONL line is a loud error rather than a silently-dropped denominator — an
+under-counted denominator biases the rate in the direction that flatters
+building the stage.
+
+**Also in this cycle — the classifier stopped trusting quoted sentinels.**
+`ClassifyBadVerdict` selected the *first* `evolve-verdict` span in a document.
+In adversarial-review reports that span is routinely a decoy the author quoted
+while describing a bypass, so the classifier never reached the report's own
+verdict and recorded `Recoverable=false` for reports that were plainly
+recoverable — i.e. the baseline above was measured by a reader with the same
+first-sentinel-wins defect the cycle-1298 corpus exists to document, and the
+`cycle-641` lesson names. Selection is now quote-aware and tail-anchored
+(matching `phasecontract.ParseVerdictSentinelFull`), pinned by
+`TestClassifyBadVerdict_QuotedDecoyCorpus` against that corpus in both
+directions. Any rate recorded before cycle-1407 is a floor, not a measurement.
+
 ## Sources (online track)
 
 Anthropic structured outputs (platform.claude.com, Nov 2025) · OpenAI

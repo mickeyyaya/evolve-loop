@@ -28,6 +28,8 @@ Commands:
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   dossier    Read and verify cycle dossiers
               ( dossier verify [--project-root P] )
+  salvage    Report the recoverable-malformed bad_verdict rate (read-only)
+              ( salvage report [-json] [-project-root P] )
   acs        Run ACS predicates    ( acs run --cycle N <pkg> | acs suite --cycle N )
   names      Guard naming after a rename; scans tracked files for dead tokens
               from .evolve/naming.json ( names check [--project-root P] | names fix )

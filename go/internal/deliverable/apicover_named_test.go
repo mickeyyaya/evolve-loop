@@ -161,3 +161,52 @@ func TestNewVerifierWithCatalog_ResolvesUserPhase(t *testing.T) {
 		t.Error("user-phase artifact is absent — expected violations, got OK")
 	}
 }
+
+// --- salvage baseline reporter (cycle-1407) ---------------------------------
+//
+//	const BadVerdictBaselineFile — the sidecar basename shared by the writer
+//	      (recordBadVerdictBaseline) and every reader; exercised by asserting the
+//	      writer actually creates a file of that name.
+//	type  BaselineSummary / func SummarizeBadVerdictBaseline — the fold over
+//	      that sidecar; exercised on a real two-record baseline and asserted on
+//	      Total/Recoverable/Rate/ByPattern.
+
+// TestSummarizeBadVerdictBaseline_NamesAndExercises drives the exported
+// summarizer over the exact bytes the exported filename constant points at, so
+// the constant, the struct and the function are all executed rather than merely
+// mentioned.
+func TestSummarizeBadVerdictBaseline_NamesAndExercises(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, BadVerdictBaselineFile)
+	body := `{"event_type":"bad_verdict_classified","recoverable":true,"pattern":"fenced-json"}
+{"event_type":"bad_verdict_classified","recoverable":false,"pattern":""}
+{"event_type":"phase_started"}
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write baseline: %v", err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", BadVerdictBaselineFile, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	var got BaselineSummary
+	got, err = SummarizeBadVerdictBaseline(f)
+	if err != nil {
+		t.Fatalf("SummarizeBadVerdictBaseline: %v", err)
+	}
+	if got.Total != 2 || got.Recoverable != 1 {
+		t.Errorf("Total/Recoverable = %d/%d, want 2/1 (phase_started is a foreign event)", got.Total, got.Recoverable)
+	}
+	if got.Rate != 0.5 {
+		t.Errorf("Rate = %v, want 0.5", got.Rate)
+	}
+	if got.ByPattern[SalvagePatternFencedJSON] != 1 {
+		t.Errorf("ByPattern[%q] = %d, want 1", SalvagePatternFencedJSON, got.ByPattern[SalvagePatternFencedJSON])
+	}
+	if _, ok := got.ByPattern[SalvagePatternNone]; ok {
+		t.Errorf("the empty pattern of a non-recoverable record manufactured a phantom bucket: %+v", got.ByPattern)
+	}
+}
