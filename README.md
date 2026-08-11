@@ -338,7 +338,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v22.15)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v22.16)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
@@ -369,6 +369,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the strict-audit gate dial |
 | v20.4 | Jun 24 | Public OSS-mirror release automation |
 | v22.15 | Aug 6 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v22.16 | Aug 12 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
