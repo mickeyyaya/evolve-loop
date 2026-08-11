@@ -198,7 +198,9 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 	moduleDir := filepath.Join(projectRoot, "go")
 	out := stderr
 	if scan := openScanLog(workspace, stderr); scan != nil {
-		defer scan.Close()
+		// Close error deliberately dropped: the scan log is best-effort
+		// forensics; a close failure must never turn a green pack red.
+		defer func() { _ = scan.Close() }()
 		out = io.MultiWriter(stderr, scan)
 	}
 	// Header first, so the artifact is non-empty and self-identifying even on
