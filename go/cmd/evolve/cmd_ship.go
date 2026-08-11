@@ -36,9 +36,11 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var dryRun bool
 	var bypassCommitGate bool
 	var bypassPrefixGate bool
+	var pushOnly bool
 	var projectRoot string
 	var pluginRoot string
 	fs.StringVar(&class, "class", "cycle", "commit class (cycle|manual|release|trivial)")
+	fs.BoolVar(&pushOnly, "push-only", false, "push an already-committed, provenance-verified ahead set (the sanctioned completion after GIT_PUSH_REJECTED + sync-main); commits nothing")
 	fs.BoolVar(&dryRun, "dry-run", false, "run all read-only checks but skip commit/push/release")
 	fs.BoolVar(&bypassCommitGate, "bypass-commit-gate", false, "emergency: skip manual commit-gate attestation")
 	fs.BoolVar(&bypassPrefixGate, "bypass-prefix-gate", false, "emergency: skip commit-prefix gate for manual class")
@@ -47,13 +49,20 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
-	if fs.NArg() < 1 {
-		fmt.Fprintln(stderr, `evolve ship: usage: evolve ship [--class cycle|manual|release|trivial] [--dry-run] "<commit-message>"`)
-		return 1
-	}
-	if fs.NArg() > 1 {
-		fmt.Fprintf(stderr, "evolve ship: extra positional args (only one commit message expected): %v\n", fs.Args()[1:])
-		return 1
+	if pushOnly {
+		if fs.NArg() > 0 {
+			fmt.Fprintln(stderr, "evolve ship: --push-only takes no commit message (it commits nothing)")
+			return 1
+		}
+	} else {
+		if fs.NArg() < 1 {
+			fmt.Fprintln(stderr, `evolve ship: usage: evolve ship [--class cycle|manual|release|trivial] [--dry-run] "<commit-message>" | evolve ship --push-only`)
+			return 1
+		}
+		if fs.NArg() > 1 {
+			fmt.Fprintf(stderr, "evolve ship: extra positional args (only one commit message expected): %v\n", fs.Args()[1:])
+			return 1
+		}
 	}
 
 	if projectRoot == "" {
@@ -82,6 +91,7 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		DryRun:           dryRun,
 		BypassCommitGate: bypassCommitGate,
 		BypassPrefixGate: bypassPrefixGate,
+		PushOnly:         pushOnly,
 		ProjectRoot:      projectRoot,
 		PluginRoot:       pluginRoot,
 		Stdin:            stdin,
