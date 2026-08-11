@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 // writeLaneScope pins todo ids into a workspace exactly as materializeLaneScope
@@ -73,7 +72,7 @@ func TestStampContinuationManifest_RegistersLaneScopeBinding(t *testing.T) {
 	}
 	// End-to-end with the real resolver: a LATER cycle carrying the same lane
 	// scope and no claim of its own resolves the binding.
-	got := inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, 1102, []string{"chain-boundary-loop"})
+	got := RealInboxForTest.ResolveScope(root, 1102, []string{"chain-boundary-loop"})
 	if got == nil || got.SnapshotSHA != m.SnapshotSHA {
 		t.Errorf("later cycle must resolve the lane-scope binding, got %+v", got)
 	}
@@ -192,7 +191,7 @@ func (r *laneScopeTriageRunner) Run(ctx context.Context, req PhaseRequest) (Phas
 func productionScopeResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
-		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, cycle, scopeIDs)
+		return RealInboxForTest.ResolveScope(root, cycle, scopeIDs)
 	}
 }
 

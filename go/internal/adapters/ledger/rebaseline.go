@@ -55,15 +55,23 @@ func (l *FileLedger) Rebaseline(ctx context.Context, note string) error {
 	if len(lines) == 0 {
 		return fmt.Errorf("ledger rebaseline: no ledger entries found (%s) — refusing to seal, and mint, a chain that does not exist", l.ledgerPath)
 	}
-	// Append through the normal chained path: same flock, same tip update, so a
-	// concurrent writer cannot interleave and the seal is itself hash-valid from
-	// its predecessor (sealChainsFromPrev requires exactly that before it will
-	// move the epoch anchor).
-	if err := l.Append(ctx, core.LedgerEntry{
+	// Append chained from the PHYSICAL last line, not the tip: the damage
+	// class this command exists for (out-of-band interleaved appends) leaves
+	// foreign lines PAST the tip, and sealChainsFromPrev tests the physical
+	// predecessor — a tip-chained seal binds the wrong line and is rejected
+	// (console-plane live failure 2026-08-11). Same flock as the normal path,
+	// so a concurrent chained writer cannot interleave; the tip moves to the
+	// seal so subsequent normal appends chain green from it.
+	entry := core.LedgerEntry{
 		TS:      time.Now().UTC().Format(time.RFC3339),
 		Role:    operatorRole,
 		Kind:    RebaselineKind,
 		Message: note,
+	}
+	if err := l.appendChainedFromTail(func(seq int, prevHash string) any {
+		entry.EntrySeq = seq
+		entry.PrevHash = prevHash
+		return entry
 	}); err != nil {
 		return fmt.Errorf("ledger rebaseline: append seal: %w", err)
 	}

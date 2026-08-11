@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
@@ -46,6 +47,12 @@ var (
 	// advise; Claim enforces — a triage LLM naming the item cannot move it.
 	ErrConsoleRouted = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
 )
+
+// LedgerAppender is the chained-append seam (interface at point of use);
+// satisfied by *ledger.FileLedger.
+type LedgerAppender interface {
+	AppendLifecycle(ctx context.Context, r ledger.LifecycleRecord) error
+}
 
 // validStates is the set of allowed promote targets. "quarantine" is the
 // ADR-0072 S5 terminal state: a task that has failed task_retry_ceiling times
@@ -63,9 +70,17 @@ var validStates = map[string]bool{
 type Options struct {
 	ProjectRoot string
 	InboxDir    string // defaulted to <ProjectRoot>/.evolve/inbox
-	LedgerPath  string // defaulted to <ProjectRoot>/.evolve/ledger.jsonl
-	Stderr      io.Writer
-	Now         func() time.Time
+	// LedgerPath defaults to <ProjectRoot>/.evolve/ledger.jsonl. Writes go
+	// through the chained FileLedger constructed on this path's DIRECTORY —
+	// the basename is not honored (FileLedger owns its file names).
+	LedgerPath string
+	// Ledger is the CHAINED append seam for inbox-lifecycle records —
+	// defaulted from LedgerPath's directory. Lifecycle lines are chain
+	// participants (prev_hash/entry_seq/tip like every other entry); the old
+	// raw O_APPEND path was the fleet-concurrency chain-break generator.
+	Ledger LedgerAppender
+	Stderr io.Writer
+	Now    func() time.Time
 
 	// Test seam for cycle-state.json resolution (recover-orphans).
 	ActiveCycleFn func() (string, error)
@@ -85,17 +100,26 @@ type Options struct {
 	IsProtectedPath func(path string) bool
 }
 
-// LedgerEntry is the NDJSON line written for each lifecycle transition.
+// LedgerEntry is one lifecycle transition, recorded as a CHAINED ledger
+// entry via writeLedger (from/to/reason fold into the message field).
 type LedgerEntry struct {
-	TS     string  `json:"ts"`
-	Class  string  `json:"class"`
-	Action string  `json:"action"`
-	TaskID string  `json:"task_id"`
-	From   string  `json:"from"`
-	To     string  `json:"to"`
-	Cycle  *int    `json:"cycle"`   // null when empty
-	GitSHA *string `json:"git_sha"` // null when empty
-	Reason string  `json:"reason"`
+	TS     string
+	Action string
+	TaskID string
+	From   string
+	To     string
+	Cycle  *int    // nil when no active cycle
+	GitSHA *string // nil when unknown
+	Reason string
+}
+
+// foldLifecycleMessage renders "from → to: reason", dropping the arrow
+// segment when no paths are involved (release/recover shapes set only Reason).
+func foldLifecycleMessage(from, to, reason string) string {
+	if from == "" && to == "" {
+		return reason
+	}
+	return from + " → " + to + ": " + reason
 }
 
 // resolveOpts populates defaults derived from ProjectRoot.
@@ -105,6 +129,9 @@ func (o *Options) resolveOpts() {
 	}
 	if o.LedgerPath == "" {
 		o.LedgerPath = filepath.Join(o.ProjectRoot, ".evolve", "ledger.jsonl")
+	}
+	if o.Ledger == nil {
+		o.Ledger = ledger.New(filepath.Dir(o.LedgerPath))
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -878,26 +905,38 @@ func readActiveCycle(cycleStatePath string) (string, error) {
 	return string(st.CycleID), nil
 }
 
-// writeLedger appends one NDJSON line. Best-effort: if the ledger or its
-// parent dir is unwritable, drop silently (matches bash semantics).
+// writeLedger records one inbox-lifecycle event through the CHAINED append
+// path. The old raw O_APPEND write (no prev_hash, no flock, no tip update)
+// was the per-cycle chain-break generator under fleet concurrency (item
+// ledger-fleet-concurrency-chain): every unchained line broke the walk at
+// that point AND defeated the Rebaseline seal, which binds the physical
+// predecessor. Best-effort like before — a failed telemetry append must not
+// un-move an item that already moved — but loud now, never silent.
 func writeLedger(opts Options, entry LedgerEntry) {
-	entry.TS = opts.Now().UTC().Format(time.RFC3339)
-	entry.Class = "inbox-lifecycle"
-	body, err := json.Marshal(entry)
+	if opts.Ledger == nil {
+		// Unwired seam (a direct call without resolveOpts): nothing to append
+		// into — degrade like the old best-effort path, never panic.
+		return
+	}
+	cycle := 0
+	if entry.Cycle != nil {
+		cycle = *entry.Cycle
+	}
+	gitHead := ""
+	if entry.GitSHA != nil {
+		gitHead = *entry.GitSHA
+	}
+	err := opts.Ledger.AppendLifecycle(context.Background(), ledger.LifecycleRecord{
+		TS:      opts.Now().UTC().Format(time.RFC3339),
+		Action:  entry.Action,
+		TaskID:  entry.TaskID,
+		Cycle:   cycle,
+		GitHead: gitHead,
+		Message: foldLifecycleMessage(entry.From, entry.To, entry.Reason),
+	})
 	if err != nil {
-		return
+		opts.logf("WARN: ", "ledger append (inbox-lifecycle %s %s): %v", entry.Action, entry.TaskID, err)
 	}
-	dir := filepath.Dir(opts.LedgerPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return
-	}
-	f, err := os.OpenFile(opts.LedgerPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer func() { _ = f.Close() }()
-	_, _ = f.Write(body)
-	_, _ = f.Write([]byte("\n"))
 }
 
 // intPtr returns a *int from a numeric string, or nil if empty/unparseable.

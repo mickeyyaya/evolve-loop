@@ -1,12 +1,15 @@
 package inboxmover
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 )
 
 // --- readTaskIDOrUnknown: the three "unknown" fallbacks --------------------
@@ -110,14 +113,27 @@ func TestWriteLedger_MkdirFails(t *testing.T) {
 
 func TestWriteLedger_OpenFileFails(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	// LedgerPath is itself a directory → OpenFile(O_WRONLY) fails; drops silently.
-	ledgerAsDir := filepath.Join(dir, "ledger.jsonl")
-	if err := os.MkdirAll(ledgerAsDir, 0o755); err != nil {
-		t.Fatal(err)
+	// Unwired seam (no resolveOpts): must degrade like the old best-effort
+	// path — no panic, no write.
+	writeLedger(Options{Now: time.Now}, LedgerEntry{Action: "claim"})
+
+	// A failing appender must WARN loudly and never fail the move path.
+	var buf strings.Builder
+	opts := Options{
+		Now:    time.Now,
+		Stderr: &buf,
+		Ledger: failingAppender{},
 	}
-	opts := Options{LedgerPath: ledgerAsDir, Now: time.Now}
-	writeLedger(opts, LedgerEntry{Action: "claim"}) // must not panic
+	writeLedger(opts, LedgerEntry{Action: "claim", TaskID: "t1"})
+	if !strings.Contains(buf.String(), "WARN") || !strings.Contains(buf.String(), "t1") {
+		t.Errorf("append failure must warn with the task named, got: %q", buf.String())
+	}
+}
+
+type failingAppender struct{}
+
+func (failingAppender) AppendLifecycle(context.Context, ledger.LifecycleRecord) error {
+	return errors.New("disk on fire")
 }
 
 // --- Claim: mkdir + rename failure branches --------------------------------
