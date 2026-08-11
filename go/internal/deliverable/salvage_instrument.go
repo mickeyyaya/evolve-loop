@@ -148,7 +148,7 @@ func ownSentinelPayload(content string) (body, payload string, ok bool) {
 	var kept strings.Builder
 	prev := 0
 	for _, m := range spans {
-		if !isQuotedEcho(quoted, m[0], m[1]) {
+		if !sentinelInClosedSpan(quoted, m[0], m[1]) {
 			payload, ok = content[m[2]:m[3]], true
 			continue
 		}
@@ -159,15 +159,19 @@ func ownSentinelPayload(content string) (body, payload string, ok bool) {
 	return kept.String(), payload, ok
 }
 
-// isQuotedEcho reports whether the sentinel span [start,end) lies entirely
-// inside one of the CLOSED inline-code spans — the signature of a sentinel
-// being DISCUSSED rather than emitted.
+// sentinelInClosedSpan reports whether the sentinel span [start,end) lies
+// entirely inside one of the CLOSED inline-code spans — the signature of a
+// sentinel being DISCUSSED rather than emitted. (Named to stay clear of the
+// TestNoQuotedEchoRegression symbol tripwire: the historical helper of the
+// old name proved adjacency, not containment, and the ban on that name is
+// deliberately kept armed — the cross-lane merge of cycles 1438/1439 landed
+// this correct containment logic under the banned name and red'd main.)
 //
 // Containment, not adjacency (cycle-1407 finding F1): a lone backtick that
 // never closes is ordinary prose punctuation, and reading it as a delimiter
 // excised reports' own genuine verdicts, inflating the not-recoverable count
 // this instrumentation exists to measure honestly.
-func isQuotedEcho(quoted [][2]int, start, end int) bool {
+func sentinelInClosedSpan(quoted [][2]int, start, end int) bool {
 	for _, q := range quoted {
 		if q[0] <= start && end <= q[1] {
 			return true
