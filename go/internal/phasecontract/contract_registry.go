@@ -30,6 +30,14 @@ type Roots struct {
 	Workspace string
 	Worktree  string
 	EvolveDir string
+	// DispatchedArtifact, when non-empty, is the exact artifact path the
+	// runner told the bridge to write — the verify override that makes the
+	// dispatched filename and the contract filename derive from ONE source
+	// (intent-delta-contract-path-skew: intent in DELTA mode dispatches
+	// intent-delta.md while the registry contract names intent.md, so
+	// deliverable.Verify judged a file the phase was never asked to write).
+	// Only the runner sets it; CLI/gate callers verify the contract path.
+	DispatchedArtifact string
 }
 
 // WriteTarget values. Every deliverable currently lands in either the per-cycle
