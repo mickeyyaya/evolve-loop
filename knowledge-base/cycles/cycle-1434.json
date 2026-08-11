@@ -1,0 +1,49 @@
+{
+  "cycle": 1434,
+  "run_id": "01KZQFVXFHYEPM5P5AE0X8HTZ7",
+  "goal": "Work the highest-priority open items in .evolve/inbox end-to-end: real implementation, real tests, honest gates, ship each landing so main stays green. Prefer live product and hardening items; consume each shipped item per the normal lifecycle.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|38ac8e21d918",
+    "pre_class": "gate-block",
+    "reasons": [
+      "EGPS: red_count=3 [Readme6StatesMeasuredRateNotPlaceholder Readme6CitesEvidenceByPath WriteupPreservesHistoryAndInventsNoCounts] (cycle ships only when red_count==0)",
+      "closure claim without a citation: \"The three inherited defects from cycle-1432 are all genuinely closed, including\" — a report may not assert a prior cycle's defect is closed without naming the per-",
+      "closure claim without a citation: \"RED in cycle-1432 — is now PASS. Inherited H1 closed.\" — a report may not assert a prior cycle's defect is closed without naming the per-defect record on the sam"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1434",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
