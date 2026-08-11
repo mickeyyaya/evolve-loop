@@ -1,6 +1,0 @@
-{
-  "name": "defect-disposition-ledger",
-  "role": "defect-disposition-ledger",
-  "cli": "claude-tmux",
-  "model_tier_default": "balanced"
-}

@@ -54,6 +54,8 @@ node_modules/
 .evolve/profiles/ship-stage-hygiene-check.json
 .evolve/profiles/regression-predicate-precheck.json
 .evolve/profiles/ci-parity-preflight.json
+.evolve/profiles/defect-disposition-ledger.json
+.evolve/profiles/pre-audit-evidence-check.json
 # ... and except the directory marker for failure-lessons. Generated lesson
 # YAMLs (inst-L*.yaml) are per-project runtime state and remain ignored, but
 # the .keep marker ships so the directory exists in fresh installs.
