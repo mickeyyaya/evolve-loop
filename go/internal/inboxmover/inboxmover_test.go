@@ -302,11 +302,11 @@ func TestPromote_InboxFallback(t *testing.T) {
 	if res.NoOp {
 		t.Error("NoOp = true, want false (inbox/ fallback)")
 	}
-	// Ledger should record from with srcRel="inbox" (bash format preserves
-	// the leading `.evolve/inbox/<srcRel>/` even when that double-nests for
-	// the inbox fallback path — preserved here for byte-parity with bash).
+	// Ledger should record the from-path with srcRel="inbox" (the historical
+	// format preserves the leading `.evolve/inbox/<srcRel>/` even when that
+	// double-nests for the inbox fallback path — now folded into message).
 	body, _ := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
-	if !strings.Contains(string(body), `"from":".evolve/inbox/inbox/task-1.json"`) {
+	if !strings.Contains(string(body), `.evolve/inbox/inbox/task-1.json`) {
 		t.Errorf("ledger missing inbox-fallback entry: %s", body)
 	}
 }
@@ -381,7 +381,11 @@ func TestLedgerEntry_Schema(t *testing.T) {
 	if err := json.Unmarshal(body[:len(body)-1], &entry); err != nil {
 		t.Fatalf("ledger not valid JSON: %v\n%s", err, body)
 	}
-	for _, field := range []string{"ts", "class", "action", "task_id", "from", "to", "cycle", "git_sha", "reason"} {
+	// The CHAINED shape (core.LedgerEntry): kind carries the old class value,
+	// from/to/reason fold into message, and the line is a chain participant
+	// (prev_hash + entry_seq present — the raw-append shape was the
+	// fleet-concurrency chain-break generator).
+	for _, field := range []string{"ts", "kind", "action", "task_id", "cycle", "message", "prev_hash", "entry_seq"} {
 		if _, ok := entry[field]; !ok {
 			t.Errorf("ledger entry missing field %q: %v", field, entry)
 		}
@@ -389,15 +393,18 @@ func TestLedgerEntry_Schema(t *testing.T) {
 	if entry["ts"] != "2026-05-24T12:00:00Z" {
 		t.Errorf("ts = %v, want fixed time", entry["ts"])
 	}
-	if entry["class"] != "inbox-lifecycle" {
-		t.Errorf("class = %v", entry["class"])
+	if entry["kind"] != "inbox-lifecycle" {
+		t.Errorf("kind = %v", entry["kind"])
 	}
-	// cycle should be numeric 7, git_sha should be null.
+	if entry["action"] != "claim" || entry["task_id"] != "task-1" {
+		t.Errorf("action/task_id = %v/%v, want claim/task-1", entry["action"], entry["task_id"])
+	}
 	if entry["cycle"] != float64(7) {
 		t.Errorf("cycle = %v (type %T), want 7", entry["cycle"], entry["cycle"])
 	}
-	if entry["git_sha"] != nil {
-		t.Errorf("git_sha = %v, want nil", entry["git_sha"])
+	msg, _ := entry["message"].(string)
+	if !strings.Contains(msg, ".evolve/inbox/task-1.json") || !strings.Contains(msg, "triage-claim") {
+		t.Errorf("message lost the from/to/reason detail: %q", msg)
 	}
 }
 

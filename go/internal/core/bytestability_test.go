@@ -37,7 +37,8 @@ var legacyLedgerEntryKeys = []string{
 }
 
 var additiveLedgerEntryKeys = []string{
-	"run_id", // CA.2
+	"run_id",  // CA.2
+	"task_id", // inbox-lifecycle records routed through the chain (ledger-fleet-concurrency-chain)
 }
 
 // legacyCycleStateKeys is the pre-Track-C cycle-state.json surface.

@@ -49,7 +49,7 @@ func TestReleaseCycleProcessingWithReason_ExplicitReason(t *testing.T) {
 		t.Fatalf("Recovered = %d, want 1", res.Recovered)
 	}
 	ledger := readLedger(t, root)
-	if !strings.Contains(ledger, `"reason":"cycle-release-unlanded-ship-retry"`) {
+	if !strings.Contains(ledger, `: cycle-release-unlanded-ship-retry"`) {
 		t.Errorf("ledger missing explicit reason; got: %s", ledger)
 	}
 }
@@ -62,7 +62,7 @@ func TestReleaseCycleProcessingWithReason_EmptyReasonKeepsGenericDefault(t *test
 		t.Fatalf("ReleaseCycleProcessingWithReason: %v", err)
 	}
 	ledger := readLedger(t, root)
-	if !strings.Contains(ledger, `"reason":"cycle-release"`) {
+	if !strings.Contains(ledger, `: cycle-release"`) {
 		t.Errorf("empty reason must default to generic cycle-release; got: %s", ledger)
 	}
 	if strings.Contains(ledger, "unlanded") {

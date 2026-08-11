@@ -125,7 +125,16 @@ func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) erro
 		seq = prevSeq + 1
 	}
 
-	line, err := hooks.marshal(fill(seq, prevHash))
+	return l.appendLineAndReplaceTip(fill(seq, prevHash), seq)
+}
+
+// appendLineAndReplaceTip is the shared write half of the two chain writers
+// (appendChained, appendChainedFromTail): marshal → append → atomic tip
+// replace. Callers hold mu+flock and pass an entry whose seq/prev_hash are
+// already derived — keeping ONE write path so the two writers can never
+// diverge in the file whose job is chain integrity.
+func (l *FileLedger) appendLineAndReplaceTip(entry any, seq int) error {
+	line, err := hooks.marshal(entry)
 	if err != nil {
 		return fmt.Errorf("ledger marshal: %w", err)
 	}
@@ -159,6 +168,71 @@ func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) erro
 		return fmt.Errorf("tip rename: %w", err)
 	}
 	return nil
+}
+
+// LifecycleRecord is one inbox-lifecycle event (claim/promote/recover…) to
+// append as a CHAINED ledger entry. It exists so inboxmover can record
+// lifecycle provenance without importing core (core's own tests exercise the
+// real inboxmover, so a core import from inboxmover would be a test-package
+// import cycle).
+type LifecycleRecord struct {
+	TS      string
+	Action  string
+	TaskID  string
+	Message string
+	GitHead string
+	Cycle   int
+}
+
+// AppendLifecycle appends one inbox-lifecycle record through the normal
+// chained path (flock, prev_hash/entry_seq, atomic tip replace). The old raw
+// O_APPEND write in inboxmover was the per-cycle chain-break generator under
+// fleet concurrency (item ledger-fleet-concurrency-chain).
+func (l *FileLedger) AppendLifecycle(ctx context.Context, r LifecycleRecord) error {
+	return l.Append(ctx, core.LedgerEntry{
+		TS:      r.TS,
+		Role:    "orchestrator",
+		Kind:    "inbox-lifecycle",
+		Action:  r.Action,
+		TaskID:  r.TaskID,
+		Message: r.Message,
+		GitHEAD: r.GitHead,
+		Cycle:   r.Cycle,
+	})
+}
+
+// appendChainedFromTail is the REPAIR-path variant of appendChained: it
+// chains the new entry from the PHYSICAL last line of the file, not from
+// ledger.tip. The tip tracks the last line written through the chained path,
+// but walkChain validates physical predecessors — so when a foreign writer
+// has raw-appended lines past the tip (the fleet-concurrency damage class),
+// a tip-chained seal binds the wrong predecessor and is rejected by
+// sealChainsFromPrev (console-plane live failure 2026-08-11). Full-file read
+// per call: acceptable for operator repair, wrong for the hot append path —
+// which is why appendChained stays tip-based.
+func (l *FileLedger) appendChainedFromTail(fill func(seq int, prevHash string) any) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	release, err := flock.Lock(l.lockPath)
+	if err != nil {
+		return fmt.Errorf("ledger: %w", err)
+	}
+	defer release()
+
+	raw, err := os.ReadFile(l.ledgerPath)
+	if err != nil {
+		return fmt.Errorf("ledger read: %w", err)
+	}
+	lines := splitLines(raw)
+	if len(lines) == 0 {
+		return fmt.Errorf("ledger: appendChainedFromTail on an empty chain")
+	}
+	prevHash := sha256Hex(lines[len(lines)-1])
+	prevSeq, _, err := l.readTip()
+	if err != nil {
+		return err
+	}
+	return l.appendLineAndReplaceTip(fill(prevSeq+1, prevHash), prevSeq+1)
 }
 
 // Verify walks every line, recomputes prev_hash, checks first entry's

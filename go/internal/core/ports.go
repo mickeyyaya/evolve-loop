@@ -111,8 +111,15 @@ type LedgerEntry struct {
 	WorkerCount     int      `json:"worker_count,omitempty"`
 	Workers         []string `json:"workers,omitempty"`
 	// Action carries the decision verb for self-heal events (e.g. "extend" or
-	// "pause" for stop_review entries). Empty for all other entry kinds.
+	// "pause" for stop_review entries) and for inbox-lifecycle entries (e.g.
+	// "claim", "promote"). Empty for all other entry kinds.
 	Action string `json:"action,omitempty"`
+	// TaskID names the inbox item an inbox-lifecycle entry moved. These
+	// records previously bypassed the chained append entirely (raw O_APPEND,
+	// no prev_hash — the per-cycle chain-break generator under fleet
+	// concurrency); routing them through the chain is what this field exists
+	// for. Empty for all other entry kinds.
+	TaskID string `json:"task_id,omitempty"`
 	// Message carries a human-readable detail string for self-heal events
 	// (e.g. the stop-reviewer's justification text). Empty for other kinds.
 	Message string `json:"message,omitempty"`
@@ -149,6 +156,7 @@ type ledgerEntryWire struct {
 	WorkerCount     int             `json:"worker_count,omitempty"`
 	Workers         []string        `json:"workers,omitempty"`
 	Action          string          `json:"action,omitempty"`
+	TaskID          string          `json:"task_id,omitempty"`
 	Message         string          `json:"message,omitempty"`
 	Source          string          `json:"source,omitempty"`
 	RunID           string          `json:"run_id,omitempty"`
@@ -179,6 +187,7 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.WorkerCount = wire.WorkerCount
 	e.Workers = wire.Workers
 	e.Action = wire.Action
+	e.TaskID = wire.TaskID
 	e.Message = wire.Message
 	e.Source = wire.Source
 	e.RunID = wire.RunID
