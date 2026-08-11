@@ -151,12 +151,15 @@ mutation testing — its waste is contention flakes, a different problem).
 
 Each portfolio item that lands must append its issue/gap/solution and measured
 before/after here or in `docs/operations/batch-integrity-review-2026-08-04.md`.
-Baselines to measure against, captured today: `bad_verdict` = 0 since the
-contract tail (batch-19+); contract-gate CIRCUIT OPEN firings = 3 (all
-weak-CLI adversarial-review); recoverable-malformed rate on our CLIs = not yet
-instrumented (the salvage layer's first deliverable is the *measurement*);
-whole-cycle losses to deliverable failures this week = documented per-cycle in
-the batch integrity review.
+Baselines to measure against: `bad_verdict` = 0 since the contract tail
+(batch-19+); contract-gate CIRCUIT OPEN firings = 3 (all weak-CLI
+adversarial-review); recoverable-malformed rate on our CLIs = **measured** —
+15 of 167 `bad_verdict` blocks are classifier-recoverable (9.0%), the salvage
+layer's first deliverable, landed in cycle-1389 and recorded in full in §7
+(source of record; re-derivable from the preserved sidecar
+`.evolve/runs/cycle-1389/bad-verdict-baseline.jsonl`); whole-cycle losses to
+deliverable failures this week = documented per-cycle in the batch integrity
+review.
 
 ### 6.1 Landed — fingerprint-gated CLI escalation (cycle-1289, item rank 1)
 
@@ -241,6 +244,29 @@ ledger records `salvage_attempted`; WARN distinguishes attempt from no-remedy.
 CIRCUIT-OPEN counts still measure against the §6 baseline (3 firings, all
 weak-CLI adversarial-review). With this rung landed, the rank-1 portfolio item was
 consumed in cycle-1304 (`.evolve/inbox/consumed/2026-08-04T07-15-00Z-contract-block-cli-escalation.json`).
+
+### 6.3 Measured — recoverable-malformed baseline (cycle-1389, item rank 2 input)
+
+**Issue.** The baseline line above could not be closed by argument: the rank-2
+portfolio item `schema-aligned-salvage-layer` is only worth building if a
+meaningful share of `bad_verdict` blocks are *shape* failures rather than
+genuinely missing verdicts, and that share had never been counted.
+
+**Gap.** `deliverable.Verify` emitted `bad_verdict` as one undifferentiated
+code, so the salvage layer's addressable population was not merely unknown but
+unknowable from the existing logs — no artifact distinguished a readable
+verdict rejected on shape from no verdict at all.
+
+**Solution.** A log-only classifier,
+`go/internal/deliverable/salvage_instrument.go`, records one JSONL baseline
+record per `bad_verdict` strictly after the gate's decision, changing no
+block/approve outcome. Driving it over the full historical corpus produced the
+audited table in **§7**, which is this entry's measured before/after and the
+source of record for the figures quoted in §6's baseline line above. The
+finding narrowed the portfolio rather than confirming it: one shape dominates
+the recoverable set and the extraction pass stays deferred on evidence — see
+**§7** for the counts, the caveat about the counterfactual sweep, and the
+consequence for the rank-2 item.
 
 ## 7. Baseline — the recoverable-malformed `bad_verdict` rate, measured (cycle-1389)
 
