@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — persona-strip lobotomy campaign (#434–#447, 2026-08-10 → 2026-08-11)
+
+The 15/30-FAIL streak (cycles 1390–1429, continuations 0/11) traced to ONE defect: `CompactPrompts` stripped every dispatched audit prompt at the mid-file `## Reference Index` marker, deleting the Verdict Rules, STOP criterion, and the continuation-disposition mandate from what the auditor actually received. Incident: [docs/incidents/2026-08-10-persona-strip-lobotomy.md](docs/incidents/2026-08-10-persona-strip-lobotomy.md). Campaign landings, all console-first with TDD + adversarial review:
+
+- #434 marker→EOF for the auditor + fleet-wide sentinel keep-guard (`phasecoherence/persona_strip_operational_test.go`); #437 the same curation for builder/scout/tdd-engineer/triage + inverted burial-era test pins.
+- #435 iteration-0 escalation swallow (zero-value stamp); #436 bookkeeping-FAIL regrade micro-cycle (ADR-0086; retro→audit edge, once-bound grant consumed on BOTH record and resume surfaces); #438–#442 disposition preseed, carryover retirement + P0 dedupe + stable failure identity, continuation base-advance, FailReasons backfill (the evidence plumbing that later made the cycle-1431/1434 halts self-diagnosing).
+- #443 spec clamp + sandboxed-profile predicate at both admission seams; #444 postship lane-scope fallback; #445 routing-overlay family rung; #446 ship-journal provenance + `evolve ship --push-only` strand recovery (first live validation 2026-08-11: 24 attested commits); #447 `Roots.DispatchedArtifact` one-source verify seam.
+
+---
+
 ## Fixed — ledger chain-safety: lifecycle appends chained + physical-tail rebaseline seal (#450, 2026-08-11)
 
 Two defects behind the per-cycle ledger chain breaks (item `ledger-fleet-concurrency-chain`, ~180 dense console breaks since mid-July): `inboxmover.writeLedger` raw-`O_APPEND`ed unchained NDJSON into the hash-chained `ledger.jsonl` on essentially every cycle's ship.postship, and `Rebaseline` sealed from `ledger.tip` while chain verification walks physical predecessors — so the repair command failed on exactly the damage class it was built for.
