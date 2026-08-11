@@ -90,6 +90,17 @@ neither block the gate (RED) nor fake a pass (GREEN). `total` includes skips, so
 the accounting identity is `green_count + red_count + skip_count == total`. The
 gate decision is unchanged: `red_count == 0 ⇒ verdict PASS ⇒ ship_eligible`.
 
+**Provenance stamps (cycle-1434, #449).** Every minted verdict additionally
+carries `"suite_root"` and `"project_root"` — the roots it was minted under.
+They exist because a verdict minted with the WRONG state root (the linked-
+worktree plane resolved to the console checkout) red'd 3 predicates the
+correct-root run showed green, and nothing in the artifact said so. Absence
+means *unstamped* (every pre-stamp verdict; operator/CI pre-stage), never a
+mismatch. The audit phase regenerates a pre-staged verdict whose stamped
+`project_root` differs from its own (symlink-normalized compare), preserving
+the original as `acs-verdict.foreign.json` — its reds are the evidence of what
+the wrong root saw.
+
 ## ship-gate integration
 
 `legacy/scripts/lifecycle/ship.sh` (cycle-class commits only) gates on `acs-verdict.json`:
