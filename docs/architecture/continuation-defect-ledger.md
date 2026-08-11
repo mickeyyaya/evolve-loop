@@ -234,6 +234,18 @@ name `defect-dispositions.json` or `defect-ledger.json` on that same line.
 Whole-document citation is deliberately not accepted: one incidental mention
 would vouch for twenty unevidenced claims.
 
+**Matcher posture (cycle-1431, #448).** The original unbounded substring match
+force-FAILed four narrative-PASS audits ("closed" inside *disclosed* on lines
+literally ending "still open" — cycles 1339/1371/1428/1431, the last an
+ADR-0072 batch halt). The matchers are now word-bounded and two-rung: the
+STRONG rung ("verified closed") is **never** guard-suppressed — an appended
+"…still open" clause must not become a one-token bypass of the citation demand
+— while the WEAK rung (a bare "closed" plus a cycle reference) accepts
+negation/openness guards ("not/never/isn't … closed", "still/remains open"),
+a posture revision bought by the four false-RED halts and backstopped by the
+per-id dispositions gate. Full design record in `closure_claim.go`; pins in
+`closure_claim_boundary_test.go` including the compound-line bypass attempt.
+
 **Disposition.** Clause (iii) is FIXED, per the record in
 `defect-dispositions.json` for this lineage; the gate is exercised by
 `TestC1287_DocsPassClosureCitationGate` and its anti-neutering twin

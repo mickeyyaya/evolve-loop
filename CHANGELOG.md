@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — ledger chain-safety: lifecycle appends chained + physical-tail rebaseline seal (#450, 2026-08-11)
+
+Two defects behind the per-cycle ledger chain breaks (item `ledger-fleet-concurrency-chain`, ~180 dense console breaks since mid-July): `inboxmover.writeLedger` raw-`O_APPEND`ed unchained NDJSON into the hash-chained `ledger.jsonl` on essentially every cycle's ship.postship, and `Rebaseline` sealed from `ledger.tip` while chain verification walks physical predecessors — so the repair command failed on exactly the damage class it was built for.
+
+- Lifecycle records go through `FileLedger.AppendLifecycle` (chained, flocked, atomic tip replace); `core.LedgerEntry` gains additive `task_id`; from/to/reason fold into `message`.
+- `Rebaseline` seals via `appendChainedFromTail` (prev_hash = sha256 of the physical last line); both writers share one `appendLineAndReplaceTip` write-half.
+- Live proof: console-plane ledger rebaselined GREEN — first intact chain since the 2026-07-22 break@78729. Incident: [docs/incidents/2026-08-11-verify-wave-halts-and-ledger-forensics.md](docs/incidents/2026-08-11-verify-wave-halts-and-ledger-forensics.md).
+
+---
+
+## Fixed — ACS suite plane-anchored project root + verdict provenance + foreign-root regeneration (#449, 2026-08-11)
+
+Cycle-1434's ADR-0072 halt: `evolve acs suite` derived `EVOLVE_PROJECT_ROOT` via `git --git-common-dir`'s parent (the OWNING repo) — wrong since the runtime plane became a linked worktree — and the wrong-root verdict suppressed the audit phase's correct-root run.
+
+- `suiteProjectRoot` anchors on the kernel-owned `runs/cycle-N/cycle-state.json` under `--evolve-dir`; git walk is the no-plane fallback only.
+- Verdicts stamp `suite_root`/`project_root` (absence = unstamped); audit regenerates on stamped-root mismatch, preserving the foreign artifact as `acs-verdict.foreign.json`. See [docs/architecture/egps-v10.md](docs/architecture/egps-v10.md).
+
+---
+
+## Fixed — closure-claim gate word-boundary + negation-aware weak rung (#448, 2026-08-11)
+
+Cycle-1431's ADR-0072 halt (prior firings 1339/1371/1428): the closure-citation gate's unbounded substring match fired on "closed" inside **"disclosed"** on a line ending "still open", force-FAILing a narrative-PASS audit. Matchers are now word-bounded and two-rung: `verified closed` is never guard-suppressed (no one-token bypass of the citation demand); bare `closed`+cycle-ref accepts negation/openness guards. Design record in `closure_claim.go`; posture note in [docs/architecture/continuation-defect-ledger.md](docs/architecture/continuation-defect-ledger.md).
+
+---
+
 ## Documented — `evolve loop --reset --fingerprint` operator flag (cycle-1333, 2026-08-05)
 
 The blocker-breaker fingerprint-ack mechanism (`--reset --fingerprint <fp>`, ADR-0072 extension, implemented cycle-1332) had zero mention in the operator-facing runtime reference — an operator hitting a recurring identical-fingerprint halt had no documented way to unblock it short of reading the Go source. Docs-only; no production code changed.
