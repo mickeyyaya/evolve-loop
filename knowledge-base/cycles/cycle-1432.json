@@ -1,0 +1,48 @@
+{
+  "cycle": 1432,
+  "run_id": "01KZQB4KDH8AWAZVJTNKX7QYQQ",
+  "goal": "Work the highest-priority open items in .evolve/inbox end-to-end: real implementation, real tests, honest gates, ship each landing so main stays green. Prefer live product and hardening items; consume each shipped item per the normal lifecycle.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|807d1cafa637",
+    "pre_class": "gate-block",
+    "reasons": [
+      "EGPS: red_count=1 (cycle ships only when red_count==0)",
+      "closure claim without a citation: \"| D-1/D-1b delimiter-noise ambiguity bypass closed | PASS | `go test -count=1 -tags acs -v ./acs/cycle1432/` → `TestC1432_001` PASS; `TestC1432_002` PASS over `{ba"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1432",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
