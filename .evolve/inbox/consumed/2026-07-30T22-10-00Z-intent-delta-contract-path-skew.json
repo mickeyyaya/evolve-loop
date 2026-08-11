@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "RED: a test proving Verify judges the DISPATCHED artifact for intent in DELTA mode, not the registry path",
+    "The dispatched filename and the contract filename derive from ONE source, the way every other BaseRunner phase already does",
+    "classifiedArtifact's path-skew fallback either becomes unreachable (and says so) or is removed",
+    "go test -race ./internal/phases/{intent,runner}/ ./internal/deliverable/ PASS; apicover clean"
+  ],
+  "campaign": "loop-reliability-2026-07",
+  "connects_to": [
+    "deliverable-verified-bytes-single-read"
+  ],
+  "created_at": "2026-07-30T22:10:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/intent/",
+    "go/internal/phasecontract/contract_registry.go",
+    "go/internal/phases/runner/runner.go"
+  ],
+  "id": "intent-delta-contract-path-skew",
+  "kind": "defect",
+  "priority": "medium",
+  "resolution": "RESOLVED-CONSOLE-FIRST 2026-08-11 (runner seam): PR #447 \u2014 Roots.DispatchedArtifact threads the hooks-derived dispatched path into deliverable.Verify at both runner call sites (one source); checkStray hunts the dispatched basename; the classifiedArtifact skew fallback is structurally unreachable via the real verify. Gate-seam residual (host gate/phase-verify under EVOLVE_INTENT_DELTA, latent) re-filed as intent-delta-gate-seam-threading (0.55).",
+  "source": "console-2026-07-30 wave-2 B implementation + opus adversarial review",
+  "summary": "Surfaced while landing deliverable-verified-bytes-single-read (PR #389). The runner's single-read fix had to add a fallback keyed on `res.ArtifactPath == artifactPath` because those two are NOT always the same path: internal/phases/intent in DELTA mode dispatches intent-delta.md, while the intent entry in the phasecontract registry names intent.md. So deliverable.Verify judges a DIFFERENT FILE than the one the phase was asked to produce. A naive 'classify the bytes we verified' FAILed every intent-delta cycle, which is how it was found (phases/intent.TestRun_DeltaMode_IntentUnchanged_SKIPPED went red). The single-read fix routes around the skew and pins it with TestRun_DispatchedArtifactDiffersFromContractPath_*; it deliberately does NOT paper over the underlying defect. Reachable only with EVOLVE_INTENT_DELTA set (no in-repo caller), so this is an operator-mode path, not the default one \u2014 which is why it survived this long.",
+  "title": "The contract gate verifies a file the phase was never asked to write \u2014 intent in DELTA mode dispatches intent-delta.md while its phasecontract names intent.md",
+  "weight": 0.88
+}

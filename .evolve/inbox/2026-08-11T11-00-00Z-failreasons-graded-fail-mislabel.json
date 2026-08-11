@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    ".evolve/runs/cycle-1436",
+    "go/internal/core/failreasons_backfill.go"
+  ],
+  "created_at": "2026-08-11T11:0000Z",
+  "fix": "In failreasons_backfill.go: before synthesizing the phase-infra label, look for the phase's graded artifact (audit-report.md verdict + first defect table headline; retro likewise) and stamp 'graded narrative FAIL: <headline>' instead. Keep the phase-infra label ONLY when no graded artifact exists (true abort). Regression test: graded-FAIL workspace fixture -> backfill emits the defect headline, never 'phase-infra class'; artifact-less abort keeps the current label.",
+  "id": "failreasons-graded-fail-mislabel",
+  "kind": "pipeline-repair",
+  "priority": "medium",
+  "summary": "Cycle-1436 (verify wave 2026-08-11): auditor issued an honest graded FAIL (C1 CRITICAL: untested headline output path; acs red_count=0). The #442 backfill stamped 'phase audit: verdict FAIL with no recorded abort reason (phase-infra class)' + same for retro \u2014 factually wrong classification (nothing aborted; the verdict is graded and fully reasoned in audit-report.md). This mislabel caused a live operator misdiagnosis on 2026-08-11 (initially read as a WARN-recovery contract defect; retracted after workspace forensics \u2014 see the corrected reading in the session record). Contrast cycle-1437 same wave: WARN + GIT_FLEET_REBASE_NEEDED -> ship-recovery converged and landed (1b78da95) -> FinalVerdict PASS, proving the recovery seam healthy.",
+  "title": "FailReasons backfill labels a GRADED narrative audit FAIL as 'verdict FAIL with no recorded abort reason (phase-infra class)' \u2014 misleading; extract the report's defect headline instead",
+  "weight": 0.6
+}

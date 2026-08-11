@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A preserved/continuation worktree is re-based onto current plane main (merge or rebase of the lane branch; conflicts -> honest FAIL with a named conflict, never silent) BEFORE the build phase runs \u2014 or at minimum before atomic-ship staging \u2014 so a lane never ships against a tree missing already-landed pipeline fixes.",
+    "Regression test: a preserved worktree based at HEAD~N with a .gitignore fix landed at HEAD stages a new .evolve/evals file successfully after adoption (the live cycle-1365 shape: base d323284e predating #418/42e37af2 -> GIT_STAGE_FAILED on .evolve/evals with the carve-out absent from the worktree's ladder).",
+    "The transient-retry-ship recovery detects a DETERMINISTIC stage refusal (same refused pathspec twice) and stops retrying in place \u2014 route to continuation instead of burning the retry budget on an unwinnable add.",
+    "Wiring proof over the continuation adoption seam; go vet ./..., -race green."
+  ],
+  "connects_to": [
+    "LIVE instance 2026-08-06 ~04:15Z cycle-1365 (audit-warn-prescriptions-unenforced chain): 2x GIT_STAGE_FAILED on .evolve/evals in a worktree whose base d323284e predates the #418 carve-out \u2014 verified: worktree .gitignore contains only the OLD issue-#11 NOTE text, no carve-out lines; fresh worktrees (cycle-1362/1366) have the fix and stage cleanly",
+    "boot binary self-heal (#411) + auto-refresh-binary-at-boundary (the SAME deploy-lag disease for the binary; this is the worktree-base instance of the class)",
+    "cycle-1348 batch HALT + #418 (the fix these stale-based worktrees are missing)",
+    "worktree-normalize soft-reset (orchestrator) \u2014 resets builder commits to the worktree's ORIGINAL base, never advances it"
+  ],
+  "created_at": "2026-08-06T04:30:00Z",
+  "files": [
+    "go/internal/core/ (continuation adoption / worktree-normalize \u2014 base advance)",
+    "go/internal/phases/ship/ (deterministic-refusal detection in the retry router, if kept)"
+  ],
+  "fix": "Treat worktree base like the binary: staleness is measured against plane HEAD and healed at a boundary (continuation adoption = the worktree's boot). Rebase/merge the preserved lane branch onto current main during adoption; a conflict is an honest continuation FAIL naming the conflicting paths (the ancestor work then salvages normally). Keep preserved worktrees for their DIFF value, not their stale base.",
+  "id": "continuation-worktree-base-refresh",
+  "priority": 0.92,
+  "problem": "Preserved continuation worktrees keep their original checkout base forever (worktree-normalize soft-resets TO that base), so a chain that predates a landed pipeline fix ships against a tree without it \u2014 deterministically re-failing on defects the repo already fixed, re-arming the identical-fingerprint breaker the fix was meant to disarm. Live: cycle-1365 hit GIT_STAGE_FAILED on .evolve/evals twice IN the retry loop because its base predates #418; its retries are unwinnable in place. Same disease as binary lag (boot self-heal, #411) \u2014 this is the worktree-base limb of that class.",
+  "resolution": "RESOLVED-CONSOLE-FIRST 2026-08-11 (pending final re-land PR): advanceContinuationBase merges plane main into the adopted lane at adoption (Clean-screen-guaranteed; conflicts degrade loudly to stale base); healed base supersedes manifest BaseSHA. Acceptance item 3 (deterministic stage-refusal router) re-filed as deterministic-stage-refusal-router (0.7).",
+  "source": "console-session monitor triage of the relaunched batch, 2026-08-06",
+  "title": "Continuation worktrees must re-base onto current main at adoption \u2014 stale bases re-fail already-fixed defects"
+}

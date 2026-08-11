@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A PASS cycle whose committed id matches a carryover entry removes it; a FAIL on a triage-less continuation increments a durable failure_count visible to the quarantine check; 124-entry generic flood collapses to <=1 entry per fingerprint.",
+    "Router window regains memo/product slots: a fixture with 20 generic P0s + 1 memo carryover surfaces the memo entry post-dedupe."
+  ],
+  "connects_to": [
+    "three-perspective investigation 2026-08-10 agent C",
+    "lesson_to_action_gap meta-defect"
+  ],
+  "created_at": "2026-08-10T16:02:00Z",
+  "files": [
+    "go/internal/inboxmover/outcome.go",
+    "go/internal/core/failure_learning.go",
+    "go/internal/core/phase_advisor.go",
+    "go/internal/cycleoutcome/cycleoutcome.go"
+  ],
+  "fix": "(a) On PASS with a committed carryover id, delete the matching state entry (anchor: inboxmover/outcome.go PASS path + a state hook beside mergeCarryoverTodos); (b) fingerprint-dedupe the per-FAIL generic P0 records; (c) key FAIL accounting to the continuation-registry scope id when triage-decision.json is absent (escalationScopeIDs in retry_tier_escalation.go:76-92 already resolves it; wire at the closeout seam cycleoutcome.go:88), mirroring the count into the durable item so quarantine/escalation see repeated failure.",
+  "id": "carryover-retirement-and-failure-identity",
+  "kind": "pipeline-repair",
+  "priority": 0.88,
+  "problem": "(1) carryoverTodos is a write-only log: 254 entries, no removal-on-pick/ship path (TTL-only drain, failurelog/prune_carryover.go:23); 124 are near-identical generic 'cycle N failed' P0s (failure_learning.go:315/:786) that saturate the 20-slot router window (phase_advisor.go:809,856), permanently shadowing memo/product carryovers. (2) All 81 inbox items sit at failure_count:0 after 15 FAILs because ApplyCycleOutcome bumps only triage-decision top_n ids resolvable as inbox FILES (inboxmover/outcome.go:100-118) while continuation retries mint new slugs and skip triage \u2014 so TaskRetryCeiling=2 quarantine, BuildDeepEscalateAtFailures, and split pressure NEVER fire.",
+  "resolution": "PARTIALLY RESOLVED 2026-08-11: PR #439 landed parts (b) fingerprint dedupe (+TTL-refresh-on-suppress) and (c) lane-scope failure-identity fallback (file-absent trigger). Part (a) retirement-on-PASS re-filed smaller as carryover-pass-retirement (0.72).",
+  "title": "carryoverTodos retirement path + P0 flood dedupe + stable failure_count identity (three dead governors, one root)"
+}

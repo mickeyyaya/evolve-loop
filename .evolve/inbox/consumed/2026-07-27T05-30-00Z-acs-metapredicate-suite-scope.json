@@ -1,0 +1,24 @@
+{
+  "campaign": "convergence-2026-07",
+  "connects_to": [
+    "acs-evidence-tail-capture",
+    "audit-probe-tree-isolation",
+    "core-suite-shared-tmp-p-hermeticity",
+    "gitstage-deterministic-classification",
+    "wave-planner-pass-scope-prune"
+  ],
+  "files": [
+    "agents/evolve-tdd-engineer.md",
+    "go/internal/evalqualitycheck/",
+    "go/internal/acssuite/"
+  ],
+  "id": "acs-metapredicate-suite-scope",
+  "injected_by": "console-batch12-halt-forensics",
+  "kind": "pipeline-integrity",
+  "notes": "Root cause CORRECTED 2026-07-27 (console forensics). Two DISTINCT triggers, not one: cycles 1115/1117 = auditor-authored TestZZAudit* probes written into the package under test (see audit-probe-tree-isolation); cycles 1107/1116 = the machine-global /tmp/p project root shared by every concurrent lane (see core-suite-shared-tmp-p-hermeticity, 19521 entries live). The earlier 'width-2 CPU contention' framing was wrong AND the disproof was too: three concurrent `go test ./internal/core/` runs on an idle host cannot reproduce shared-fixed-path contention across lanes. Stronger repo-backed evidence that this is not a simple flake: acssuite.retryFlakyReds (acssuite.go:388-403) already re-runs a red scope once and cycle-1116 lost BOTH rolls. THIS ITEM REMAINS THE STRUCTURAL FIX for both triggers: cycles 1107/1115/1116/1117 each red-flagged ONE whole-suite meta-predicate (ShippedGateSuitesStillGreen / BridgeAndRecoveryStayGreen / CoreAndTopngateSuitesStayGreen) shelling broad `go test ./internal/...`; scoping predicates to the cycle's TOUCHED packages makes them immune to anything a sibling phase or lane does elsewhere in the tree. Note f09ecfc4 scoped the RUNNER's tier; TDD-authored predicates that spawn their own whole-suite subprocesses bypass it. Fix in preference order: (a) eval-quality pre-flight / acssuite lint REJECTS a predicate whose `go test` package args exceed the cycle's touched packages \u2014 whole-repo staleness is already covered by the 195-predicate regression suite, so meta-predicates are pure duplication; (b) tdd persona instruction (weakest, drifts). Do NOT raise timeouts \u2014 that hides it. | LIVE RECURRENCE 2026-07-29 cycle-1173 (batch-18, P1 verifylock ACTIVE): TestC1173_002_core_package_stays_green red (8 core tests: SealCycle/LoadResumeState/PersonaStopCriterion, 43.2s whole-package run) while the FULL core suite passes clean in the SAME preserved worktree (.evolve/worktrees/cycle-42824668-1173) on a quiet host \u2014 console-verified. Sharpened root cause: the verify lock serializes EGPS-vs-EGPS, but sibling lanes' BUILD-phase self-verification go-test runs are NOT under the lock, so whole-package predicates stay load-sensitive even with P1. Touched-package scoping alone is insufficient here (core WAS the touched package): the fix must also bound predicate granularity to change-relevant tests, or give red meta-predicates one serialized re-run before declaring red (flake-rerun-scan exists as a phase; predicates have no rerun). Auditor narrative was PASS \u2014 the work itself was sound; the gate red was pure predicate-authorship flake. | [FRESH INSTANCES 2026-08-03] cycles 1222 (3 suite-wide guard predicates red) and 1237 (repo-wide apicover/redteam metapredicates red) \u2014 2 of the 4 honest EGPS rejections since relaunch are this class. The other half of the forward failure budget after the infra classes closed (#398 graduation + worktree-provisioning-retry).",
+  "priority": "high",
+  "resolution": "STALE-VERIFIED 2026-08-11: PR #388 (b21b7010, 2026-07-30 \u2014 after the last recurrence cycle-1173 on 07-29) landed the preference-(a) structural fix: acssuite scopelint.go LintPredicateScope + demoteOutOfScope WIRED into acssuite.Run:212 \u2014 out-of-scope meta-predicates demote to SKIP (never red a cycle) with loud EvidenceNote + verdict warning; conservative-direction limitation documented (concatenated patterns invisible = stays un-demoted, safe). Both trigger siblings also landed: probe quarantine #365, tmp-p hermeticity (#388 hermetic guards HOME).",
+  "route": "console-manual",
+  "title": "TDD keeps authoring whole-suite 'X stays green' ACS meta-predicates that flake red under fleet contention",
+  "weight": 0.95
+}

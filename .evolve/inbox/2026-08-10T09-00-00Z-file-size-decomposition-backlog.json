@@ -1,0 +1,9 @@
+{
+  "id": "file-size-decomposition-backlog",
+  "created_at": "2026-08-10T09:00:00Z",
+  "weight": 0.5,
+  "title": "refactor: 20 first-party Go files exceed the 800-line design target — gradual decomposition backlog (operator file-size policy 2026-08-10; hard trigger 2000, none currently over it)",
+  "kind": "refactor",
+  "priority": "medium",
+  "summary": "Operator policy (research-calibrated against Google Go Style Guide / Uber guide / stdlib norms): ~300-500 lines healthy, <800 aspiration for new code, 2000 = hard refactor trigger. Census 2026-08-10: zero first-party files over 2000 (only vendored yaml.v3); 20 non-test files over 800 (enumerate via: find go -name '*.go' -not -name '*_test.go' -not -path '*/vendor/*' | xargs wc -l | awk '$1>=800'). Work the backlog GRADUALLY: one file per cycle max, behavior-preserving split by responsibility (discrete refactor commits per Rule 11 — never mixed into feature diffs), each split keeps the package suite green and apicover graduation intact. Reviews should flag any diff that grows an already->800 file without a split plan. Do NOT bulk-refactor: prioritize files that are also hot in recent diffs (e.g. core/orchestrator.go, phases/audit/audit.go if over threshold)."
+}

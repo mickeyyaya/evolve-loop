@@ -1,0 +1,6 @@
+{
+  "name": "pre-audit-evidence-check",
+  "role": "pre-audit-evidence-check",
+  "cli": "claude-tmux",
+  "model_tier_default": "balanced"
+}

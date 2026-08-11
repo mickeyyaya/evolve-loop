@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A continuation cycle's builder prompt/contract EXPLICITLY carries: (a) the inherited defect ids + one-line summaries from the ancestor's defect-ledger, (b) the duty to write defect-dispositions.json covering EVERY id with FIXED(+bare evidence cite: path or path:N or path:N-M, prose OUTSIDE the cite)/DEFERRED(+reason)/OPEN, (c) the file's exact workspace location. Wiring proof: a test over the continuation adoption seam asserts the rendered prompt contains the ids.",
+    "TDD/auditor guidance (agents/*.md continuation sections) mirrors the duty \u2014 the 70977097 prescriptions precedent shape (producer + gate teach the same vocabulary).",
+    "Live validation: a continuation cycle with inherited defects passes disposition-preflight on its FIRST attempt (no MISSING round), observed in a soak batch.",
+    "go vet ./..., -race green on touched packages."
+  ],
+  "connects_to": [
+    "Recurrence evidence 2026-08-06 relaunched batch: crosspoll continuation 0/4 MISSING; auto-refresh chain 1/5 INCOMPLETE (converged 5->2 only via repeated FAIL feedback); chain-boundary pair cycle-1359 0/2 MISSING on a fresh continuation \u2014 every new continuation starts blind",
+    "evidence-cite-annotation-tolerance (sibling item: the cite FORMAT half; this is the duty-awareness half)",
+    "70977097 prescriptions producer+gate landing (the pattern to copy)",
+    "continuation-defect-ledger gate (16a2cbc6 + ancestors) \u2014 the gate half is done and honest; only the producer half is missing"
+  ],
+  "created_at": "2026-08-06T03:40:00Z",
+  "files": [
+    "go/internal/phases/ (continuation adoption seam \u2014 prompt injection of inherited ids + duty)",
+    "agents/evolve-builder.md, agents/evolve-tdd-engineer.md, agents/evolve-auditor.md (continuation-ledger duty sections)"
+  ],
+  "fix": "Push the disposition duty to the producer: the continuation adoption seam already copies the manifest into the workspace \u2014 extend it (or the phase prompt renderer) to inject the inherited defect ids and the disposition contract into the builder's prompt, so the ledger deliverable is authored proactively instead of learned through FAIL rounds. Gate stays unchanged.",
+  "id": "continuation-disposition-producer-duty",
+  "priority": 0.88,
+  "problem": "The continuation defect-ledger gate (deterministic, honest) demands per-id dispositions, but nothing TELLS a continuation builder about the inherited ids or the deliverable \u2014 so every fresh continuation ships without defect-dispositions.json, eats a FAIL round, and only converges through repeated per-id FailReason feedback (5->2 over two cycles on one chain; two other chains started at MISSING). Cost: ~1-2 wasted cycles per continuation chain, systematically.",
+  "resolution": "RESOLVED 2026-08-11 by the combination: #434 (auditor persona mandate restored to dispatched prompts), #438 (continuation audit prompts carry inherited OPEN ids + texts + duty), #440 (skeleton preseeded at adoption \u2014 the ledger deliverable is authored proactively). The builder-prompt half is covered by the preseed making the deliverable already-present; if builder-side authoring gaps recur, re-file scoped to the builder prompt renderer.",
+  "source": "console-session monitor triage, recurrence threshold (3 chains) reached 2026-08-06",
+  "title": "Continuations must be TOLD their inherited defects \u2014 inject disposition duty into the builder prompt"
+}

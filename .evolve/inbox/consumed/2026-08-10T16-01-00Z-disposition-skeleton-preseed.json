@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A continuation adoption with N inherited OPEN ids yields a workspace skeleton with exactly N entries; auditor upgrading all entries passes the gate first-attempt in a live soak.",
+    "Skeleton write is atomic and flock-consistent with the registry read (no TOCTOU vs DeleteRegistryEntryIfCycle).",
+    "Evidence with '; prose' annotation fragments resolves when the path fragment resolves; pure-prose evidence still rejected."
+  ],
+  "connects_to": [
+    "2026-08-06T03-40-00Z-continuation-disposition-producer-duty.json (builder-prompt half of the same duty)",
+    "2026-08-06T03-10-00Z-evidence-cite-annotation-tolerance.json"
+  ],
+  "created_at": "2026-08-10T16:01:00Z",
+  "files": [
+    "go/internal/core/continuation_stamp.go",
+    "go/internal/phases/audit/defect_ledger.go"
+  ],
+  "fix": "At continuation adoption (adoptContinuationAfterTriage, internal/core/continuation_stamp.go:216-263 / the releaseDeclinedBinding area from ADR-0085), write a pre-filled defect-dispositions.json skeleton into the workspace: one entry per inherited OPEN id with status OPEN placeholder the auditor must upgrade to FIXED(+evidence)/DEFERRED(+reason). The gate keeps failing on un-upgraded OPEN entries (no weakening) but MISSING/unparseable-shape classes disappear. Also give evidenceResolves tolerance for annotation fragments after ';' (defect_ledger.go:317-344 splitEvidence ANDs every fragment \u2014 real cites like 'a.go:1-2; verified live: go test PASS' are rejected whole-claim); the existing inbox item evidence-cite-annotation-tolerance covers the format half \u2014 land together.",
+  "id": "disposition-skeleton-preseed",
+  "kind": "pipeline-repair",
+  "priority": 0.9,
+  "problem": "Even with the persona-strip fix (#434) the disposition duty rides on LLM compliance. The orchestrator already KNOWS the inherited defect ids at lane provision (it prints them into the fail reason); making the auditor hand-author the file from scratch is an avoidable failure surface (15/30 FAILs cycles 1390-1429; 0/11 continuation passes).",
+  "resolution": "RESOLVED-CONSOLE-FIRST 2026-08-11: PR #440 (merge 485d9500) \u2014 SeedDispositionSkeleton at continuation adoption writes one status-OPEN entry per inherited OPEN id; gate unweakened (per-id block on untouched seeds, never MISSING); cross-package singlesource pin; atomicwrite. Evidence-tolerance half landed in #438.",
+  "title": "Pre-seed defect-dispositions.json skeleton at continuation adoption \u2014 MISSING becomes structurally impossible"
+}

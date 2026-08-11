@@ -1,0 +1,15 @@
+{
+  "id": "persona-tail-curation-fleet",
+  "title": "Curate builder/scout/tdd-engineer/triage persona tails: operational content above the strip marker; shrink the persona_strip_operational_test exception list to empty",
+  "kind": "pipeline-repair",
+  "priority": 0.86,
+  "created_at": "2026-08-10T16:03:00Z",
+  "problem": "Post-#434 the auditor persona is restored, but builder still loses its STOP CRITERION, Completion Gates, pre-handoff regression slice, git-tracking attestation and POSTHOC (28% of persona) to CompactPrompts stripping; scout loses its STOP CRITERION + six gates (23%); tdd loses REQUIRED predicate-quality reading + assertion templates (25%) — a plausible feeder of the grep-only-predicate -> audit-CRITICAL chain (8/30 FAILs); triage loses inbox ingestion + idempotency skip-list (25%) — sentinel-INVISIBLE (no keyword), so the keep-guard cannot see it.",
+  "fix": "Per persona: relocate operational sections above the ## Reference Index marker; keep (or move down) genuinely on-demand reference to satisfy the savings floors (realdoc_strip_test.go builder>=4096 scout>=2048 tdd>=1500; compact_marker_gate_test.go tdd>=1500 triage>=1200) OR recalibrate a floor with an incident-citing comment where the honest tail is smaller (the #434 precedent: auditor 4096->256). Respect the <751 combined scout/builder/auditor line budget (currently exactly 750). Delete each persona from pendingCuration in phasecoherence/persona_strip_operational_test.go as it lands — the list is self-pruning and fails on stale entries. CONSOLE-FIRST preferred (prompt-side, judgment-heavy); loop lane acceptable with adversarial review.",
+  "acceptance": [
+    "pendingCuration is empty; sentinel guard green for all 10 dispatched personas; all floor tests green (possibly recalibrated with justification); combined line budget respected.",
+    "For triage: a dispatched-prompt-level assertion pins that inbox-ingestion instructions survive stripping (sentinel regex extension or a named-anchor test like the auditor's)."
+  ],
+  "files": ["agents/evolve-builder.md", "agents/evolve-scout.md", "agents/evolve-tdd-engineer.md", "agents/evolve-triage.md", "go/internal/phasecoherence/persona_strip_operational_test.go", "go/internal/prompts/realdoc_strip_test.go"],
+  "connects_to": ["docs/incidents/2026-08-10-persona-strip-lobotomy.md", "PR #434"]
+}

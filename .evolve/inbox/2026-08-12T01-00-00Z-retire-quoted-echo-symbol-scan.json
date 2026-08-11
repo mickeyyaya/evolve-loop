@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    "go/internal/deliverable/salvage_instrument_test.go",
+    "go/acs/cycle1438/predicates_test.go"
+  ],
+  "created_at": "2026-08-12T01:00:00Z",
+  "fix": "Remove the symbol-scan halves of TestNoQuotedEchoRegression (go/internal/deliverable/salvage_instrument_test.go:~256) AND the auxiliary copy in go/acs/cycle1438/predicates_test.go:~238 in ONE landing (removing one alone trips the survivor). Keep every behavioral assertion. Diff-review lens: confirm no third copy.",
+  "id": "retire-quoted-echo-symbol-scan",
+  "kind": "cleanup",
+  "priority": "low",
+  "summary": "The name-ban's only real firing red'd main against CORRECT containment logic reusing the natural name (cycles 1438/1439 cross-lane merge), while an adjacency heuristic under any other name sails past it but fails the behavioral pins (F1 repro, QuotedEchoStillSuppressed, boundary). Whole-content substring scan incl. comments = ADR-0084 5a false-RED class.",
+  "title": "Retire the isQuotedEcho SYMBOL scan (both copies atomically); keep the behavioral tripwires",
+  "weight": 0.55
+}

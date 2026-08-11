@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A fixture cycle whose only audit-fail reasons are meta-class and whose narrative is PASS routes to the micro-cycle and ships after the artifact is authored; a cycle with ANY non-meta CRITICAL/HIGH still FAILs to continuation.",
+    "Micro-cycle is breaker-neutral (does not count toward consecutive-failures ceiling) and stamps its provenance into the run dir.",
+    "Regression test binds the reason-classifier to the two production prefix constants (single-sourced, ADR-0084 I2)."
+  ],
+  "connects_to": [
+    "docs/incidents/2026-08-10-persona-strip-lobotomy.md",
+    "three-perspective investigation 2026-08-10 (agents A+B, ~5/11 convertible)"
+  ],
+  "created_at": "2026-08-10T16:00:00Z",
+  "files": [
+    "go/internal/phases/audit/",
+    "go/internal/core/decision_branch.go",
+    "docs/architecture/"
+  ],
+  "fix": "audit-fail-reason.json reasons are machine-classifiable ('defect ledger:' / 'closure claim' prefixes minted at internal/phases/audit/defect_ledger.go:694 and closure_claim.go:146). When ALL blocking reasons are meta-class AND the agent narrative verdict was PASS/WARN (audit.go:374 already computes the verdict-conflict), dispatch a single-step artifact-authoring remediation in the SAME cycle on the SAME snapshot (no new slug, no new eval, no TDD phase) that authors/corrects ONLY the bookkeeping artifact, then re-runs the deterministic gate. Config-driven phase insertion (phases-are-config), not a Go-literal branch.",
+  "id": "bookkeeping-fail-regrade-microcycle",
+  "kind": "pipeline-repair",
+  "priority": 0.92,
+  "problem": "Cycles 1390-1429: in 6 FAILed cycles (1390/1393/1394/1397/1418/1423) the auditor graded the work PASS or WARN-good and the cycle died ONLY on machine-classifiable meta-contracts (disposition-preflight MISSING/INCOMPLETE, closure-claim citation grammar). Each such FAIL spawned a full continuation re-drive (fresh triage-less lane, growing inherited-defect ledger, full pipeline cost ~2M tokens) with a measured 0/11 continuation pass rate \u2014 an absorbing state. Investigation verdict: ~5 of 11 examined failures would have shipped under a bookkeeping repair.",
+  "resolution": "RESOLVED-CONSOLE-FIRST 2026-08-11: PR #436 (merge 052607d8) ADR-0086 \u2014 retro->audit micro-cycle, once-per-cycle bound on both branch surfaces, router-non-overridable, producer<->classifier singlesource pin.",
+  "title": "Meta-class FAIL with PASS/WARN narrative must route to a same-cycle bookkeeping-repair micro-cycle, not a full continuation re-drive"
+}

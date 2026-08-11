@@ -1,0 +1,12 @@
+{
+  "id": "fingerprint-normalizer-path-variance",
+  "title": "Failure-fingerprint normalizer: strip per-cycle path/attempt variance from abort-reason strings",
+  "kind": "pipeline-repair",
+  "priority": 0.6,
+  "created_at": "2026-08-11T03:01:00Z",
+  "problem": "PR #442 routes phase abort reasons into FailReasons (feeding failure fingerprints). normalizeReasonForFingerprint strips only narrative=<verdict> tokens and go-test decimal durations; path-bearing abort strings (per-cycle workspace/worktree paths in driver/artifact errors) and the ship-recovery 'attempt %d/%d' (denominator shifts with fleet width) split fingerprints for the same defect class, blinding the identical-fingerprint breaker.",
+  "fix": "Extend normalizeReasonForFingerprint (core/failure_digest.go): normalize .evolve/runs/cycle-N and worktree lane paths to stable tokens; normalize 'attempt N/M' to 'attempt N/M'-invariant form. Table-driven tests with the real abort shapes (launch refusal, artifact timeout, all-families-exhausted).",
+  "acceptance": ["Two abort reasons differing only by cycle-numbered paths or attempt denominators fingerprint identically; distinct classes stay distinct; existing normalization pins untouched."],
+  "files": ["go/internal/core/failure_digest.go"],
+  "connects_to": ["PR #442 diff-review LOW", "blocker_breaker identical-fingerprint rule"]
+}

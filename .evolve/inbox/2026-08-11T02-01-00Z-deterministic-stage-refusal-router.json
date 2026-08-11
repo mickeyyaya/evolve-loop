@@ -1,0 +1,12 @@
+{
+  "id": "deterministic-stage-refusal-router",
+  "title": "Ship retry router: a DETERMINISTIC stage refusal (same refused pathspec twice) stops retrying in place and routes to continuation",
+  "kind": "pipeline-repair",
+  "priority": 0.7,
+  "created_at": "2026-08-11T02:01:00Z",
+  "problem": "Residual of continuation-worktree-base-refresh (the base-advance heal landed console-side; this is its acceptance item 3). GIT_STAGE_FAILED is always classified transient, so a deterministic pathspec refusal (cycle-1365: same .evolve/evals path refused twice) burns the whole retry budget on an unwinnable add. The base-advance removes the dominant cause; this closes the class for any OTHER deterministic refusal.",
+  "fix": "In the ship retry router, fingerprint the refused pathspec set; identical refusal on consecutive attempts => stop in-place retries, classify deterministic, route to the normal failure path (continuation/salvage). Connects to gitstage-deterministic-classification (0.74) — land together.",
+  "acceptance": ["A fixture ship whose add refuses the same pathspec twice stops retrying and classifies deterministic; a transient refusal (different error) still retries; wiring proof over the retry seam."],
+  "files": ["go/internal/phases/ship/"],
+  "connects_to": ["2026-07-26T17-30-00Z-gitstage-deterministic-classification.json", "continuation base-advance landing"]
+}

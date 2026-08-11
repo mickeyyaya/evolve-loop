@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "evidenceResolves accepts a citation of the form 'path:N-M (annotation)' by stripping ONE trailing parenthesized annotation group (space + balanced parens at end-of-string) BEFORE the existing :line/:col suffix stripping \u2014 TWO live fixtures: cycle-1356 'go/internal/phases/triage/triage.go:114-129 (carryforwardCandidatesTimestamp...)' and cycle-1360-era 'go/internal/core/runlease_hook.go:56-73 (st...)' \u2014 the shape recurs across independent chains.",
+    "Anti-gaming preserved: an annotation-only cite ('(see the fix)'), an empty path after stripping, and a parenthesized path escape ('../x (y)') all still REJECT with the existing reasons; the ledger/disposition self-vouch blocklist still applies to the stripped path.",
+    "Regression test table includes the live fixture verbatim plus the adversarial rows above; existing defect_ledger_worktree_evidence_test.go rows stay green.",
+    "The auditor/builder agent guidance (agents/*.md continuation-ledger section) states the canonical cite form 'path' or 'path:N' or 'path:N-M' and that prose belongs OUTSIDE the cite \u2014 producer-side half, so agents stop generating decorated cites even before the parser tolerates them.",
+    "go vet ./..., -race green on internal/phases/audit."
+  ],
+  "connects_to": [
+    "16a2cbc6 defect-ledger worktree-evidence fallback (added :N-M range acceptance; this is the next citation-shape long-tail)",
+    "auto-refresh-binary-at-boundary chain (cycles 1350/1356 ground on exactly this rejection while converging 5->2 unaccounted)",
+    "70977097 prescriptions producer+gate landing (the sibling pattern: gate vocabulary must be taught to producers)"
+  ],
+  "created_at": "2026-08-06T03:10:00Z",
+  "files": [
+    "go/internal/phases/audit/defect_ledger.go (evidenceResolves citation parsing)",
+    "go/internal/phases/audit/defect_ledger_worktree_evidence_test.go (+ new table rows)",
+    "agents/evolve-auditor.md + agents/evolve-builder.md (cite-format guidance)"
+  ],
+  "fix": "Two halves, both small: (1) parser tolerance for ONE trailing parenthetical annotation on an otherwise-valid cite \u2014 same spirit as the range acceptance already landed, and the annotation is DROPPED (never resolved); (2) producer guidance pinning the canonical bare-cite form. The gate's honesty is unchanged \u2014 it still requires a real, repo-relative, non-self-vouching file.",
+  "id": "evidence-cite-annotation-tolerance",
+  "priority": 0.89,
+  "problem": "A continuation's FIXED disposition is rejected as 'resolves to no file' when the agent decorates a VALID path:range cite with a trailing parenthetical annotation \u2014 evidenceResolves strips only numeric :suffixes, so 'triage.go:114-129 (carryforwardCandidatesTimestamp...)' stats as a nonexistent path. Live instance: the auto-refresh-binary-at-boundary chain (top queued item 0.94) burned cycles 1350+1356 on this exact rejection while otherwise converging (5->2 unaccounted). Decoration is reasonable agent output, not gaming; the current failure mode invites repeated grind because the agent believes the cite is correct. SECOND instance cycle-~1360 (runlease_hook.go:56-73 decorated cite) confirms the shape is systematic agent output, not one-off. Note the accretion dynamic: each FAIL round ADDS audit findings to the chain ledger (2->7 inherited on the chain-boundary chain), so cite rejections make chains diverge, not converge \u2014 priority pressure is real.",
+  "resolution": "RESOLVED-CONSOLE-FIRST 2026-08-11: PR #438 \u2014 ';'-joined prose fragments are annotations (ignored), cite-SHAPED fragments must all resolve, >=1 cite mandatory; parenthetical tolerance was already landed (#419-era); typoed paths never demote to prose. Plus continuation audit prompts now carry inherited OPEN ids (the auditor half of continuation-disposition-producer-duty).",
+  "source": "console-session monitor triage of the relaunched batch, 2026-08-06",
+  "title": "Defect-ledger evidence cites: tolerate a trailing parenthetical annotation (path:N-M (note) shape)"
+}

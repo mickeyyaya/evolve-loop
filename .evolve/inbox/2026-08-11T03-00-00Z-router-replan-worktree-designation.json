@@ -1,0 +1,12 @@
+{
+  "id": "router-replan-worktree-designation",
+  "title": "Router REPLAN dispatch under fleet mode must designate a worktree (or sanctioned scratch cwd)",
+  "kind": "pipeline-repair",
+  "priority": 0.68,
+  "created_at": "2026-08-11T03:00:00Z",
+  "problem": "Half 2 of null-failreasons-capture (half 1 — seal-time FailReasons backfill — landed in PR #442). The one diagnosed null-reason mechanism: advisor/router REPLAN dispatch under fleet mode launched without a designated worktree and was correctly refused (cycle-1358 router-launch-error.txt). The refusal is now at least VISIBLE in FailReasons via the backfill; the dispatch itself remains broken.",
+  "fix": "Designate the worktree on the replan dispatch path (the lane's own worktree when one exists) or fall back to a sanctioned scratch cwd for the router agent under fleet mode.",
+  "acceptance": ["A fleet-mode REPLAN dispatch launches with a designated cwd (no refusal); regression test over the router dispatch seam; wiring proof."],
+  "files": ["go/internal/core/phase_advisor.go", "go/internal/bridge/ (router dispatch path)"],
+  "connects_to": ["PR #442", "2026-08-06T06-20-00Z-null-failreasons-capture.json"]
+}

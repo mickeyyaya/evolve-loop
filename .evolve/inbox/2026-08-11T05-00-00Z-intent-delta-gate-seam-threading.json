@@ -1,0 +1,12 @@
+{
+  "id": "intent-delta-gate-seam-threading",
+  "title": "Thread the dispatched artifact path through the host contract gate + evolve phase verify (delta-mode residual of the runner-seam fix)",
+  "kind": "pipeline-repair",
+  "priority": 0.55,
+  "created_at": "2026-08-11T05:00:00Z",
+  "problem": "PR #447 made the dispatched path the one source at the RUNNER verify seam (Roots.DispatchedArtifact). The no-override seams — host contract gate (deliverable/verifier.go rootsFor via Reviewer.Review), salvage-rung re-check, and evolve phase verify — still judge the contract path; under EVOLVE_INTENT_DELTA (operator mode, no in-repo caller) they would block a phase that wrote its dispatched intent-delta.md correctly. Latent, review-MEDIUM scoped out of #447.",
+  "fix": "Thread the dispatched path through core.ReviewInput at the runner->gate handoff and through phase_verify's request derivation, reusing Roots.DispatchedArtifact; or single-source the delta filename into the contract resolver mode-aware.",
+  "acceptance": ["Under EVOLVE_INTENT_DELTA a delta cycle passes the host gate + phase verify judging intent-delta.md; non-delta byte-identical; wiring proof at the gate seam."],
+  "files": ["go/internal/deliverable/verifier.go", "go/internal/core/ (ReviewInput)", "go/internal/cli/phasecmd/phase_verify.go"],
+  "connects_to": ["PR #447", "2026-07-30T22-10-00Z-intent-delta-contract-path-skew.json"]
+}
