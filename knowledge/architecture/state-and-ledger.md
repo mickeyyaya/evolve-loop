@@ -109,6 +109,35 @@ The ledger is an append-only, tamper-evident log. Each `core.LedgerEntry`
   preceding line. A single edited or removed entry breaks the chain *at that point
   and every entry after it* (`core.ErrLedgerChainBroken`).
 
+### The tip is a witness, not the source of truth
+
+`ledger.tip` is written by `Append` but is **never read as the expected end state by
+`Verify`**. Verify re-derives its own answer and then uses the sidecar only to
+cross-check it:
+
+- `Verify` calls `walkChain(lines, effectiveAnchorSHA(lines, l.loadAnchorSHA()))`
+  (`ledger.go:187`; `VerifyDeep` does the same over decompressed segments plus the
+  live tail at `seal.go:286`, so the two can never diverge on what "intact" means).
+- `effectiveAnchorSHA` (`anchor.go:112`) resolves where strict validation *starts*:
+  the LAST of the out-of-band `ledger-anchor.json` line and any self-valid in-band
+  operator `reset-seal-*` entry at or after it. `""` means full-strict from line 0.
+  A sidecar anchor SHA that matches no line is returned unchanged on purpose, so the
+  walk fails loudly with "anchor not found" instead of silently degrading to
+  "no anchor, verify everything".
+- `walkChain` (`ledger.go:217`) then walks forward from that anchor and returns
+  `lastSeq` / `lastSha` — computed from the file's actual bytes.
+- Only then does `checkTip` (`ledger.go:304-313`) compare `ledger.tip` against the
+  re-derived `fmt.Sprintf("%d:%s", lastSeq, lastSha)`. A mismatch is itself a
+  `core.ErrLedgerChainBroken`.
+
+**Why this ordering matters:** the expected tip is a *conclusion drawn from the
+chain*, not an input taken from a sidecar. If Verify trusted `ledger.tip` as the
+expected end state, anyone who could rewrite a past entry could also rewrite the tip
+file to match, and the chain would report green — the exact attack §4's hash chain
+exists to prevent. It also means the tip file cannot repair a chain: a rebaseline
+seal greens the ledger because it moves `effectiveAnchorSHA` forward, not because it
+rewrote the tip.
+
 **Why a hash chain:** the ledger *is* the evidence the ship-gate reads. Ship's
 audit-binding (see [trust-kernel-and-egps.md](trust-kernel-and-egps.md) §4) walks
 this file backwards for the auditor's binding entry; if an attacker could silently
