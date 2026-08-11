@@ -458,18 +458,18 @@ func acsFloorRescues(phase, workspace, report string) bool {
 // classified content — verdict and content come from ONE read, so a writer racing
 // the just-finished launch cannot slip bytes past the gate that judged them.
 //
-// The fallback covers a phase whose dispatched artifact filename differs from its
-// contract's, where Verify judged a DIFFERENT file and so holds no bytes for this
-// one (nor any verified-vs-classified claim to make). The known case is intent in
-// DELTA mode — it dispatches intent-delta.md while the intent contract names
-// intent.md — reachable only with EVOLVE_INTENT_DELTA set, which no in-repo caller
-// does, so this is an operator-mode path rather than the default one. It is a
-// PRE-EXISTING skew this fix deliberately does not paper over (the contract gate
-// verifies a file that phase was never asked to write). Every other BaseRunner phase
-// derives its filename from the same registry the contract does, so the paths agree
-// and the fast path applies. Also lands here: an errored/path-less Result, and a
-// NoArtifact contract (ArtifactPath "") were one ever routed through BaseRunner —
-// ship's is not.
+// The path-skew half of the fallback is now STRUCTURALLY CLOSED at THIS seam
+// (intent-delta-contract-path-skew): the runner threads the dispatched path
+// through Roots.DispatchedArtifact, so Verify always judges the file this run
+// dispatched — intent in DELTA mode included — and res.ArtifactPath ==
+// artifactPath for every contracted phase driven by the REAL verify. The
+// no-override seams (host contract gate's rootsFor, `evolve phase verify`)
+// still judge the contract path — correct for their callers, but in delta
+// mode the gate seam remains open (queued: gate-seam dispatched-path
+// threading). The fallback remains for what it still covers: an
+// errored/path-less Result, a NoArtifact contract (ArtifactPath "") were one
+// ever routed through BaseRunner (ship's is not), and test fakes that verify
+// other paths.
 //
 // The fallback reads the dispatched artifact exactly as the pre-single-read code
 // did, including the "absent + !OK ⇒ empty artifact" rule that makes an unwritten
@@ -904,7 +904,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// its verdict (via Classify) instead of synthesizing FAIL. Reconciliation
 		// can only UPGRADE toward the agent's real verdict, never downgrade a real one.
 		if core.IsInfraTeardownError(bridgeErr) {
-			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
+			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath}
 			if req.ProjectRoot != "" {
 				// EvolveDir completes the roots (orchestrator-target
 				// deliverables) AND locates the merged catalog for the
@@ -1074,7 +1074,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if reconciled {
 		artifact = classifiedArtifact(reconciledRes, artifactPath, artifact)
 	} else {
-		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree}
+		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath}
 		if req.ProjectRoot != "" {
 			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 		}

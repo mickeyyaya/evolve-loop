@@ -77,6 +77,11 @@ type Options struct {
 	// variables are intentionally not consulted.
 	BypassCommitGate bool
 	BypassPrefixGate bool
+	// PushOnly pushes an already-committed, provenance-verified ahead set and
+	// does nothing else — the sanctioned completion for a GIT_PUSH_REJECTED →
+	// sync-main strand (see pushonly.go). Mutually exclusive with new work:
+	// staged changes refuse.
+	PushOnly bool
 
 	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
@@ -206,12 +211,12 @@ type RunResult struct {
 func Run(ctx context.Context, opts Options) (RunResult, error) {
 	res := RunResult{ClassUsed: opts.Class}
 
-	// 0. Validate inputs.
-	if opts.CommitMessage == "" {
+	// 0. Validate inputs. Push-only commits nothing, so it carries no message.
+	if opts.CommitMessage == "" && !opts.PushOnly {
 		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
 			"ship: commit message required")
 	}
-	if !opts.Class.IsValid() {
+	if !opts.Class.IsValid() && !opts.PushOnly { // push-only mints no commit; class is ignored
 		return res, shipErr(core.CodeInvalidClass, core.ShipClassConfig, core.StageArgs,
 			"ship: invalid --class "+string(opts.Class)+" (must be: cycle|manual|release|trivial)",
 			"class", string(opts.Class))
@@ -251,6 +256,13 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		return verifySelfSHA(ctx, &opts, &res)
 	}); err != nil {
 		return finalize(ctx, &opts, &res, err, "verify-self-sha")
+	}
+
+	// 1.2 Push-only recovery: after self-SHA integrity, before any class
+	// machinery — there is no new work to verify, only an attested strand to
+	// complete (pushonly.go owns the provenance refusals).
+	if opts.PushOnly {
+		return finalize(ctx, &opts, &res, runPushOnly(ctx, &opts, &res), "push-only")
 	}
 
 	// 1.5 Check post-push idempotency.
@@ -313,6 +325,16 @@ func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exi
 	if err == nil {
 		res.ExitCode = ExitOK
 		writeDryRunJournal(ctx, opts, res, exitReason)
+		// Durable per-commit ship provenance (pushonly.go): every minted
+		// commit is journaled so a later GIT_PUSH_REJECTED strand can be
+		// completed by `evolve ship --push-only` with verified provenance.
+		// Push-only itself is exempt (review MEDIUM): it mints nothing, and
+		// journaling its HEAD would record commits this plane never shipped
+		// (e.g. a console-merged commit after a nothing-to-push clean exit)
+		// into the very trust anchor future pushes consult.
+		if !opts.DryRun && !opts.PushOnly {
+			appendShipJournal(opts.ProjectRoot, res.CommitSHA, opts.Class)
+		}
 		return *res, err
 	}
 	// The exit code is keyed off the structured error's Class, not the Go

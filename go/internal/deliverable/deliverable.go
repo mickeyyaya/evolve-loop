@@ -121,6 +121,12 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 		return Result{Phase: phase, OK: true}, nil
 	}
 	path := c.ArtifactPath(roots)
+	// The runner-threaded dispatched path is the ONE source when present
+	// (Roots.DispatchedArtifact) — the contract keeps owning the SHAPE checks
+	// while the runner owns WHICH file the phase was actually asked to write.
+	if roots.DispatchedArtifact != "" {
+		path = roots.DispatchedArtifact
+	}
 	res := Result{Phase: phase, ArtifactPath: path}
 
 	content, exists, err := readDeliverableWithGrace(path)
@@ -288,9 +294,16 @@ func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots
 	if roots.Worktree == "" || roots.Worktree == roots.Workspace {
 		return
 	}
-	strayPath := joinWorktree(roots.Worktree, c.ArtifactName)
+	// Hunt by the DISPATCHED basename when the runner threaded one — the
+	// stray hint must name the file this run actually asked for (delta-mode
+	// intent leaks intent-delta.md, not intent.md).
+	name := c.ArtifactName
+	if roots.DispatchedArtifact != "" {
+		name = filepath.Base(roots.DispatchedArtifact)
+	}
+	strayPath := joinWorktree(roots.Worktree, name)
 	if fileExists(strayPath) {
-		res.add(CodeStrayInWorktree, fmt.Sprintf("a stray %s exists in the worktree (%s); the deliverable must live in the workspace", c.ArtifactName, strayPath))
+		res.add(CodeStrayInWorktree, fmt.Sprintf("a stray %s exists in the worktree (%s); the deliverable must live in the workspace", name, strayPath))
 	}
 }
 
