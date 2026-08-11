@@ -17,8 +17,21 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
+
+// RealInboxForTest bridges to the REAL inboxmover functions, injected by the
+// external test package (continuation_adopt_inbox_test.go, package core_test).
+// A direct inboxmover import here became a test import cycle when inboxmover's
+// lifecycle records started going through adapters/ledger → core (the chained
+// ledger fix); core_test → inboxmover → core is acyclic, and init runs before
+// any test, so the byte-for-byte "real inboxmover" property is preserved.
+// Test-binary-only: declared in a _test.go file, never part of the package API.
+var RealInboxForTest struct {
+	Resolve      func(root string, cycle int) *continuation.Continuation
+	ResolveScope func(root string, cycle int, scopeIDs []string) *continuation.Continuation
+	Release      func(root string, cycle int, reason string) error
+	Claim        func(root, taskID, cycle string) error
+}
 
 // stampedContinuation runs the produce side for real over a repo fixture:
 // dirty worktree for oldCycle → snapshot + manifest → returns the manifest.
@@ -165,7 +178,7 @@ func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
 func productionResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, _ []string) *continuation.Continuation {
-		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)
+		return RealInboxForTest.Resolve(root, cycle)
 	}
 }
 
@@ -181,7 +194,7 @@ func seedStampedInboxItem(t *testing.T, root string, failedCycle int, taskID str
 	if err := os.WriteFile(filepath.Join(procDir, taskID+".json"), []byte(`{"id":"`+taskID+`"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := inboxmover.ReleaseCycleProcessingWithReason(inboxmover.Options{ProjectRoot: root}, failedCycle, "cycle-failure-release"); err != nil {
+	if err := RealInboxForTest.Release(root, failedCycle, "cycle-failure-release"); err != nil {
 		t.Fatalf("release: %v", err)
 	}
 }
@@ -210,7 +223,7 @@ type claimingTriageRunner struct {
 }
 
 func (r *claimingTriageRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
-	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: r.root}, r.taskID, itoa(req.Cycle)); err != nil {
+	if err := RealInboxForTest.Claim(r.root, r.taskID, itoa(req.Cycle)); err != nil {
 		return PhaseResponse{}, err
 	}
 	return r.fakeRunner.Run(ctx, req)
