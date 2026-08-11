@@ -141,6 +141,129 @@ func TestRecordBadVerdictBaseline_OnlyOnBadVerdict(t *testing.T) {
 	}
 }
 
+// strayBacktickPreamble is the historical poison: a lone, never-closed backtick
+// sitting in prose ahead of the report's own verdict shape. The cycle-1406/1407
+// defect (`isQuotedEcho`, since removed) read backtick *adjacency* as proof of a
+// quoted echo without requiring the backtick run to close, so this preamble
+// alone flipped a recoverable verdict to "genuinely absent, not recoverable" —
+// poisoning the very baseline this layer exists to measure honestly.
+const strayBacktickPreamble = "The auditor noted a stray ` tick in the transcript and moved on.\n\n"
+
+// TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify pins the fixed
+// behaviour by PAIRED CONTROL: every classifier shape is run twice, once as
+// written and once with the stray-backtick preamble prepended, and the two
+// classifications must be identical. "Same as the backtick-free twin" is
+// strictly stronger evidence than asserting today's literal output — it shows
+// the backtick made no difference at all, which is the property that regressed.
+func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name        string
+		content     string
+		recoverable bool
+		want        SalvagePattern
+	}{
+		{
+			// The crux shape: the malformed sentinel the old bug misread.
+			name:        "sentinel with trailing comma",
+			content:     "# Audit Report\n\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",} -->\n",
+			recoverable: true,
+			want:        SalvagePatternTrailingComma,
+		},
+		{
+			name:        "fenced json",
+			content:     "# Audit Report\n\n```json\n{\"verdict\":\"PASS\"}\n```\n",
+			recoverable: true,
+			want:        SalvagePatternFencedJSON,
+		},
+		{
+			name:        "displaced line",
+			content:     "# Audit Report\n\nThe verdict object is {\"verdict\":\"PASS\"} inline in prose.\n",
+			recoverable: true,
+			want:        SalvagePatternDisplaced,
+		},
+		{
+			// Negative axis: a classifier that blanket-claims recoverability
+			// fails here, so the paired control cannot be satisfied vacuously.
+			name:        "genuinely absent",
+			content:     "# Audit Report\n\nProse only. No verdict payload of any kind was emitted.\n",
+			recoverable: false,
+			want:        SalvagePatternNone,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			control := ClassifyBadVerdict(tc.content)
+			if control.Recoverable != tc.recoverable || control.Pattern != tc.want {
+				t.Fatalf("control classification drifted: got{recoverable=%v pattern=%q}, want{recoverable=%v pattern=%q}",
+					control.Recoverable, control.Pattern, tc.recoverable, tc.want)
+			}
+			poisoned := ClassifyBadVerdict(strayBacktickPreamble + tc.content)
+			if poisoned.Recoverable != control.Recoverable || poisoned.Pattern != control.Pattern {
+				t.Errorf("a stray unmatched backtick perturbed classification — control{recoverable=%v pattern=%q} vs poisoned{recoverable=%v pattern=%q}",
+					control.Recoverable, control.Pattern, poisoned.Recoverable, poisoned.Pattern)
+			}
+			if poisoned.Reason == "" {
+				t.Error("Reason must never be empty — a silent classification is not observability")
+			}
+		})
+	}
+
+	// Edge axis: a backtick with no report body, and an empty deliverable.
+	// Neither carries a verdict object, so neither may be claimed recoverable.
+	for _, content := range []string{"", "`", "```", strayBacktickPreamble} {
+		if got := ClassifyBadVerdict(content); got.Recoverable || got.Pattern != SalvagePatternNone {
+			t.Errorf("content %q classified {recoverable=%v pattern=%q} — a verdict-free deliverable is not recoverable",
+				content, got.Recoverable, got.Pattern)
+		}
+	}
+}
+
+// TestNoQuotedEchoRegression is the tripwire for the removed heuristic itself.
+// The behavioural assertion comes first — it is what actually matters — and the
+// source scan backs it up, because the defect class is broader than the one
+// input above: any future adjacency-as-proof helper anywhere in the package
+// would reintroduce it. Test files are excluded from the scan; this very file
+// names both symbols in prose.
+func TestNoQuotedEchoRegression(t *testing.T) {
+	t.Parallel()
+
+	// Behavioural tripwire: the exact historical failure, asserted directly.
+	const poisoned = strayBacktickPreamble + "<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",} -->\n"
+	got := ClassifyBadVerdict(poisoned)
+	if !got.Recoverable || got.Pattern != SalvagePatternTrailingComma {
+		t.Errorf("the cycle-1406/1407 defect is back: a recoverable trailing-comma sentinel behind a stray backtick "+
+			"classified {recoverable=%v pattern=%q}, want {true %q}", got.Recoverable, got.Pattern, SalvagePatternTrailingComma)
+	}
+
+	// Symbol tripwire over the package's production sources.
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read package dir: %v", err)
+	}
+	scanned := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		scanned++
+		for _, sym := range []string{"isQuotedEcho", "insideStringLiteral"} {
+			if strings.Contains(string(src), sym) {
+				t.Errorf("%s: %s reintroduced — that is the cycle-1406/1407 backtick-adjacency defect returning", name, sym)
+			}
+		}
+	}
+	if scanned == 0 {
+		t.Fatal("scanned no production sources — the tripwire would pass vacuously")
+	}
+}
+
 // TestRecordBadVerdictBaseline_RecordShape asserts the JSONL record carries the
 // fields §7's counts are tallied from, so the doc's aggregation can never drift
 // from what the writer emits.
