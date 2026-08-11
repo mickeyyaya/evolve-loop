@@ -25,6 +25,19 @@ import (
 // closureCycleRef matches a cycle reference in prose ("cycle-1272", "cycle 1255").
 var closureCycleRef = regexp.MustCompile(`cycle[- ]?\d+`)
 
+// The closure-claim token matchers (cycle-1431 lesson — see
+// closureClaimOffenders and the stripQuotedSpans design record): word-bounded
+// so "disclosed"/"foreclosed" never match; the negation/openness guards apply
+// to the WEAK rung only. The negation vocabulary is deliberately small
+// ("hasn't/won't/cannot be closed" still flag) — grow it from firings, not
+// speculation.
+var (
+	closureClaimRE       = regexp.MustCompile(`\bverified closed\b`)
+	closureClosedTokenRE = regexp.MustCompile(`\bclosed\b`)
+	closureNegationRE    = regexp.MustCompile(`\b(?:not|never|isn['’]?t|wasn['’]?t|aren['’]?t)\s+(?:\w+\s+){0,2}closed\b`)
+	closureOpenAssertRE  = regexp.MustCompile(`\b(?:still|remains?|left|stays?)\s+open\b|\bre-?opened\b`)
+)
+
 // closureCitationArtifacts are the per-defect disposition records. A closure
 // claim must name one of them ON THE SAME LINE.
 var closureCitationArtifacts = []string{defectDispositionFile, defectLedgerFile}
@@ -43,9 +56,16 @@ func closureClaimOffenders(text string) []string {
 	var offenders []string
 	for _, line := range strings.Split(text, "\n") {
 		lower := stripQuotedSpans(strings.ToLower(line))
-		claim := strings.Contains(lower, "verified closed") ||
-			(strings.Contains(lower, "closed") && closureCycleRef.MatchString(lower))
-		if !claim {
+		// Two rungs (cycle-1431 lesson — see the matcher var block): the
+		// STRONG rung ("verified closed") is never guard-suppressed — an
+		// appended "…still open" clause must not become a one-token bypass of
+		// the citation demand; only the WEAK rung (bare "closed" + cycle-ref)
+		// accepts the negation/openness guards, whose whole job is the
+		// disclosed/"still open" false-RED class.
+		strong := closureClaimRE.MatchString(lower)
+		weak := closureClosedTokenRE.MatchString(lower) && closureCycleRef.MatchString(lower) &&
+			!closureNegationRE.MatchString(lower) && !closureOpenAssertRE.MatchString(lower)
+		if !strong && !weak {
 			continue
 		}
 		cited := false
@@ -78,10 +98,17 @@ func closureClaimOffenders(text string) []string {
 // Quoting is the signal because it is what the honest report actually does:
 // quoting someone else's closure claim is reporting, asserting one unquoted is
 // claiming. Explicit negation markers ("still open", "not closed") were
-// considered as a second signal and DELIBERATELY REJECTED — they would hand
-// the gate a bypass strictly cheaper than the citation it demands, since
-// appending "not closed" is one token and evidences nothing. Quoting cannot be
-// used the same way: a claim wrapped in quotes reads as someone else's.
+// originally REJECTED as a second signal — they would hand the gate a bypass
+// strictly cheaper than the citation it demands, since appending "not closed"
+// is one token and evidences nothing. Cycle-1431 (with prior firings
+// 1339/1371/1428) revised that posture for the WEAK rung only: four P0
+// false-RED batch halts on honest refutations outweigh a one-rung leak that
+// the per-id dispositions gate still backstops, so bare-"closed"+cycle-ref
+// lines accept the negation/openness guards. The STRONG rung ("verified
+// closed") keeps the original rejection in full — no guard suppresses it —
+// so the one-token bypass remains closed where the claim is unambiguous.
+// Quoting cannot be used the same way: a claim wrapped in quotes reads as
+// someone else's.
 //
 // Backticks are NOT delimiters. In markdown a code span is how a real citation
 // is written (`defect-dispositions.json`), so stripping them would erase the
