@@ -1,6 +1,10 @@
 package llmroute
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+import (
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+)
 
 // Overlay is the cycle-440 MR4 SOFT dispatch adjustment: unlike a policy.Pin
 // (ABSOLUTE — can collapse the chain to a single candidate), an Overlay only
@@ -19,13 +23,21 @@ type Overlay struct {
 // ApplySoftOverlay returns a NEW Plan with ov applied over in; in is never
 // mutated.
 //
-// ov.CLI resolves in two steps, and the order matters. If the plan's chain
-// ALREADY contains ov.CLI, that exact entry is promoted — the chain was
-// resolved for this phase and its entries are concrete drivers the phase can
-// actually run. Only a CLI the chain does not name is normalized like a pin
-// primary (defaultDriverForFamily), so a bare family ("codex") promotes to its
-// registered driver ("codex-tmux"); an already driver-qualified or unregistered
-// name passes through unchanged.
+// ov.CLI resolves in three rungs, and the order matters — the DECIDED
+// semantics of the family/driver name ambiguity (overlay-family-name-
+// transport-ambiguity): a BARE name (no hyphen) is a FAMILY selector, a
+// hyphen-QUALIFIED name is a DRIVER selector, and an exact chain entry
+// outranks both. (1) If the plan's chain ALREADY contains ov.CLI, that exact
+// entry is promoted — the chain was resolved for this phase and its entries
+// are concrete drivers the phase can actually run. (2) Otherwise a bare
+// FAMILY name is satisfied by promoting the chain's existing same-family
+// entry, whatever its transport — chain [claude-p …] + overlay "claude"
+// stays on claude-p, never rewritten onto claude-tmux. (3) Only then is the
+// name normalized like a pin primary (defaultDriverForFamily): a bare family
+// the chain does not hold promotes to its default driver; a driver-qualified
+// name passes through unchanged — an EXPLICIT "claude-tmux" against a chain
+// of [claude-p] wins as written, because an explicit transport request must
+// never be satisfied by promoting its opposite.
 //
 // Promoting-in-place is what keeps an overlay from crossing TRANSPORT. Found on
 // CI macOS (PR #390): a headless phase with chain [claude-p codex] escalated its
@@ -40,10 +52,23 @@ func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
 	out.Candidates = append([]string(nil), in.Candidates...)
 	if ov.CLI != "" {
 		primary := defaultDriverForFamily(ov.CLI)
+		matched := false
 		for _, c := range out.Candidates {
 			if c == ov.CLI {
 				primary = c
+				matched = true
 				break
+			}
+		}
+		// Family rung (rung 2 of the header's decided semantics): a bare
+		// family name the chain holds under ANY driver promotes that entry,
+		// preserving the phase's resolved transport.
+		if !matched && !strings.Contains(ov.CLI, "-") {
+			for _, c := range out.Candidates {
+				if strings.HasPrefix(c, ov.CLI+"-") {
+					primary = c
+					break
+				}
 			}
 		}
 		candidates := make([]string, 0, len(out.Candidates)+1)
