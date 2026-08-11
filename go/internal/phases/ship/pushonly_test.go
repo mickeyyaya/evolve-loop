@@ -36,7 +36,11 @@ func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) st
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	run(base, "init", "--bare", remote)
+	// -b main matters on CI: without it the bare's HEAD points at the host
+	// default (master when init.defaultBranch is unset), so a later clone
+	// checks out an unborn branch and `push origin main` finds no ref —
+	// locally masked by any global init.defaultBranch=main.
+	run(base, "init", "--bare", "-b", "main", remote)
 	run(base, "init", "-b", "main", root)
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
