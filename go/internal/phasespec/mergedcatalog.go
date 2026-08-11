@@ -62,6 +62,12 @@ func MergedCatalog(projectRoot string) (Catalog, map[string]string, []string, er
 		return Catalog{}, nil, nil, err
 	}
 	user, sources, warns := DiscoverUserSpecsFromRoots(Roots(projectRoot))
+	// Registrar-parity clamp (ADR-0073 — see clamp.go): EVERY admission seam
+	// applies it, so listing/lint consumers report the same writes_source the
+	// dispatch path enforces (they may never disagree about eligibility).
+	user, clampWarns := ClampDiscoveredSpecs(user,
+		SandboxedProfilePredicate(filepath.Join(projectRoot, ".evolve", "profiles")))
+	warns = append(warns, clampWarns...)
 	merged, mWarns := builtin.Merge(user)
 	return merged, sources, append(warns, mWarns...), nil
 }
