@@ -351,6 +351,15 @@ type Orchestrator struct {
 	// Set via WithRegistrar; the composition root adapts phaseregistrar.Registrar.
 	registrar PhaseMinter
 
+	// catalogPublisher is notified with the LIVE catalog every time a mid-cycle
+	// mint changes it, so consumers that bound a resolver over the cycle-START
+	// catalog value (the bridge's deliverable-contract resolver, cmd_cycle.go)
+	// can re-bind. Without it the orchestrator knows the minted phase while the
+	// resolver keeps reading the pre-mint map for the rest of the cycle — the
+	// cycle-1424 naked-dispatch halt. Nil (default) ⇒ no-op, byte-identical
+	// legacy behavior. Set via WithCatalogPublisher.
+	catalogPublisher func(phasespec.Catalog)
+
 	// kb is the knowledge-base recall port (WS2): at plan time the orchestrator
 	// looks up prior lessons matching the most recent failure and threads them
 	// into the advisor's prompt (recall memory). Nil (default) ⇒ no recall is
@@ -483,6 +492,25 @@ func WithRegistrar(m PhaseMinter) Option {
 		}
 	}
 }
+
+// WithCatalogPublisher injects the sink notified with the orchestrator's LIVE
+// catalog whenever a mid-cycle mint changes it (see registerMintedPhases). The
+// composition root wires it to re-bind the bridge's contract resolver, closing
+// the same-cycle CatalogResolver.Resolve miss for a freshly-minted phase. Nil is
+// ignored, leaving the no-publish default (byte-identical legacy behavior).
+func WithCatalogPublisher(fn func(phasespec.Catalog)) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.catalogPublisher = fn
+		}
+	}
+}
+
+// CatalogPublisherWired reports whether the composition root bound a catalog
+// publisher — the reachability predicate cmd/evolve asserts against the real
+// wireOrchestratorDeps (same idiom as CompositionFastPathWired). Without it a
+// mid-cycle mint never reaches the live contract resolver.
+func (o *Orchestrator) CatalogPublisherWired() bool { return o.catalogPublisher != nil }
 
 // WithKB injects the knowledge-base recall port (WS2). Nil is ignored, leaving
 // the no-recall default (byte-identical legacy behavior). The composition root

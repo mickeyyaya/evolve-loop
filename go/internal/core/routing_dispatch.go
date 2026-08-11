@@ -164,6 +164,16 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q routing: %s\n", spec.Name, w)
 		}
 		o.runners[p] = runner
+		// Publish the LIVE catalog so consumers holding a resolver bound over the
+		// cycle-START catalog value re-bind (the bridge's deliverable-contract
+		// resolver, cmd_cycle.go). Catalog.Merge returns a NEW value over a NEW
+		// map, so without this the minted phase is invisible to contract injection
+		// for the rest of the cycle — cycle-1424's naked dispatch and its 600s
+		// artifact timeout. Fired only AFTER a mint fully succeeds: a rejected or
+		// colliding mint continues above and publishes nothing (no routable ghost).
+		if o.catalogPublisher != nil {
+			o.catalogPublisher(o.catalog)
+		}
 	}
 }
 

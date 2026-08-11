@@ -480,6 +480,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// Make the bridge catalog-aware so user/minted phases get their spec-derived
 	// Deliverable Contract block + exact-path footer injected (WS-A, ADR-0034).
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
+	// …and keep it aware: `catalog.Get` above is a method value bound to THIS
+	// catalog VALUE, whose byName map is the pre-mint one. A phase minted
+	// mid-cycle is spliced into a NEW catalog value (Catalog.Merge allocates a
+	// fresh map), so without the publisher below the resolver misses the minted
+	// phase for the rest of the cycle and dispatch falls back to the
+	// unresolved-agent path — the cycle-1424 600s artifact-timeout halt. The
+	// orchestrator option is appended beside core.WithRegistrar (see below).
 	// ADR-0050 §3.8b: at EVOLVE_PHASE_IO>=advisory the injected contract block
 	// instructs build/scout/triage to self-report failure via a structured
 	// sentinel; default (off) leaves the dispatched prompt byte-identical.
@@ -567,6 +574,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// tree-diff guard reads mintregistry.Path(ProjectRoot) — the guard only
 		// sees writes under the project tree, so write and read must agree
 		// there (cycle-967 Variant A2).
+		// Re-bind the bridge's deliverable-contract resolver on every mid-cycle
+		// mint, so a phase minted at Step 11/12 resolves its spec-derived contract
+		// in the SAME cycle (cycle-1429; the miss #429 only made safe).
+		core.WithCatalogPublisher(catalogPublisher(br)),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
 			Bridge:       br,
 			Prompts:      prm,
