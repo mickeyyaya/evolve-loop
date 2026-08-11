@@ -18,6 +18,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// TestLedgerAppender_SatisfiedByFileLedger names inboxmover.LedgerAppender
+// (apicover) and pins the seam's one production implementation: the chained
+// *ledger.FileLedger. A signature drift between the interface and
+// FileLedger.AppendLifecycle breaks here at compile time.
+func TestLedgerAppender_SatisfiedByFileLedger(t *testing.T) {
+	var _ LedgerAppender = ledger.New(t.TempDir())
+}
+
 // TestLedgerWrites_AreChainValid is the keystone: after a lifecycle event on
 // a ledger that already has chained history, the WHOLE chain still verifies —
 // the inbox record is a chain participant, not a foreign interleaved line.
