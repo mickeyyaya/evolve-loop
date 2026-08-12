@@ -432,6 +432,366 @@ first-sentinel-wins defect the cycle-1298 corpus exists to document, and the
 `TestClassifyBadVerdict_QuotedDecoyCorpus` against that corpus in both
 directions. Any rate recorded before cycle-1407 is a floor, not a measurement.
 
+## 8. Landed — the salvage stage itself (cycle-1392, corrected cycle-1397)
+
+The extraction/coercion pass §7 deferred is now built. `SalvageVerdict`
+(`go/internal/deliverable/salvage_extract.go`) reformats and reparses a
+bad_verdict, and it acts only when **all four** of these hold:
+
+1. the bad_verdict is the **SOLE** violation — the guard is
+   `Result.onlyViolation(CodeBadVerdict)`, not a membership test;
+2. `ClassifyBadVerdict` classifies the content as recoverable;
+3. exactly one verdict-bearing candidate exists anywhere in the content; and
+4. the **repaired bytes re-verify clean** against the phase contract
+   (`repairVerdict` → `verifyMarkdown`), rather than `OK` being hand-set.
+
+Any other outcome is a refusal (`applied=false`, `Result` unchanged — neither
+`Result.Content` nor the artifact on disk is touched), and a field value is
+never invented on any path.
+
+On the APPROVED path the repaired bytes are the ones that survive: salvage
+returns them as `Result.Content`, and the gate (`Reviewer.Review`) writes them
+back over `ArtifactPath` before it approves. If that write fails the salvage is
+**refused** and the phase blocks — the one place the gate deliberately fails
+closed rather than open.
+
+> **Correction (cycle-1441, audit H1 HIGH).** The first cut of the paragraph
+> above read "the stored `Result.Content` bytes are never mutated" and the code
+> matched it: `salvageVerdictWith` re-verified `repaired`, then returned a
+> struct-copy of the ORIGINAL with only `OK`/`Violations` flipped, and
+> `Reviewer.Review` discarded the salvaged `Result` outright. The gate therefore
+> reported `OK: true` over a byte stream that was never the byte stream it
+> verified, and the artifact a downstream phase re-read was still malformed —
+> so `ParseVerdictSentinelFull` failed on it and `releasepreflight.extractVerdict`
+> fell through to a prose scan that could resolve a FAIL-sentinel deliverable to
+> PASS. "Never mutates" was the right invariant for the REFUSAL path and the
+> wrong one for the approval path; the two are now stated separately, and pinned
+> by `go/acs/cycle1442/predicates_test.go` (001 in-memory, 002 on-disk through
+> the real gate, 003 the refusal invariant).
+
+> **Correction (cycle-1397).** The first cut of this section, and of cycle
+> 1392's build report, claimed a multi-violation failure could never be
+> salvaged. That was **false of the code as shipped**: the guard was a
+> membership test, so a bad_verdict co-occurring with `missing_section` or
+> `missing_challenge_token` WAS salvaged wholesale — every violation erased,
+> including the cycle-269 anti-forgery proof-of-read check. The cycle-1392
+> audit disproved the claim with an executed probe (CRITICAL-1), and the same
+> audit's MEDIUM-3 flagged that flipping `OK=true` from classification alone
+> skipped `RequireFailureContext`, laundering a malformed FAIL sentinel into
+> an approval. Both are fixed above. The multi-violation claim now rests on an
+> executed assertion, not on narration: `go/acs/cycle1397/predicates_test.go`,
+> `TestC1397_001_SalvageVerdict_MultiViolationNeverSalvaged` (unit seam) and
+> `TestC1397_002_ReviewerWiring_MultiViolation_BlocksAndLogsNoSalvage`
+> (production `Reviewer.Review` seam); the re-verify obligation is pinned by
+> `TestC1397_005_ReviewerWiring_RepairedFailWithoutContext_NotApproved`.
+
+Wired at the same seam
+`recordBadVerdictBaseline` uses in `Reviewer.Review` (reviewer.go), strictly
+after the unconditional baseline record and before the block decision: a
+successful salvage approves the phase and resets the contract-gate breaker,
+same as a clean pass.
+
+**Every coercion logged + surfaced (inbox `fix` text).** A successful salvage
+appends one record to a NEW `salvage-applied.jsonl` sidecar under `.evolve`
+(parallel to, and in addition to, `bad-verdict-baseline.jsonl` — the
+instrumentation stays unconditional, salvage is additive, never a
+replacement). `SalvageSummaryLine(evolveDir)` renders "Salvaged verdicts: N
+(pattern breakdown)" from that same sidecar — single source of truth, no
+second counter — and is silent (`""`) at zero records, so a cycle that salvages
+nothing adds no noise.
+
+> **Correction (cycle-1399).** Through cycle 1397 that renderer had **no
+> production caller** at all: it was declared, documented here as "surfaced",
+> and called only from tests (cycle-1392 audit LOW
+> `dd17d798e155571ecd91be63e14050ab6`). "Surfaced" was therefore false of the
+> code as shipped — the same overclaim class as the HIGH above, one severity
+> down. It is now wired at the salvage seam itself: `Reviewer.Review` emits the
+> line through the gate's own `logf` immediately after the sidecar append
+> (`go/internal/deliverable/reviewer.go:149`), so the operator-visible surface
+> is the `[contract-gate]` log stream, **not** a section of `audit-report.md` —
+> composing it into the report body is still unbuilt (queued as
+> `surface-salvage-in-audit-report`). Reachability is pinned by an executed
+> assertion, not narration:
+> `go/acs/cycle1399/predicates_test.go`,
+> `TestC1399_001_SalvageSummaryLine_HasProductionCaller` (AST call-site scan
+> over every non-test file under `go/`) and
+> `go/internal/deliverable/reviewer_salvage_surface_test.go`,
+> `TestReviewerReview_SalvageSurfacesSummaryLine` — which drives a salvageable
+> deliverable through the real `Reviewer.Review` seam and asserts the gate's own
+> log stream carried `Salvaged verdicts: 1 (fenced-json=1)`.
+
+**Measured before/after.** §7's counterfactual sweep found 15/167 (≈9.0%)
+recoverable-malformed `bad_verdict` blocks, 13 of them `fenced-json`. Cycle
+1392's own eval suite (`go/acs/cycle1392/predicates_test.go`,
+`TestC1392_001`–`TestC1392_007`) drives all three shapes plus the ambiguity
+and absence negative controls through the real `Reviewer.Review` production
+seam — `TestC1392_007_ReviewerWiring_SalvageApplied_ApprovesAndLogsSidecar`
+is the reachability proof: a trailing-comma bad_verdict flips `Approve` from
+false to true and writes both sidecars. The applied-count these tests exercise
+is the mechanical proof the wiring works; the live-traffic *before/after rate*
+delta (post-salvage unrecoverable share vs. §7's 91%) is future work once
+`PhaseIO=enforce` is promoted and salvage runs against real production
+`bad_verdict` blocks — §7's own caveat about counterfactual-sweep vs. observed
+traffic still applies, and the 91% legacy-prose share is unaffected by this
+stage (it targets JSON-shape recovery only, per §7 finding 2).
+
+## 9. Landed — trusting the layer's own two untrusted inputs (cycle-1406)
+
+Both deliverables above read inputs an attacker (or a merely buggy phase) can
+write: the `salvage-applied.jsonl` sidecar, and the deliverable report bytes
+themselves. Cycle 1406 closed one hole in each. Neither changes when salvage
+fires; both change what the layer is willing to *claim*.
+
+**9.1 Operator-log pattern allowlist (carryover
+`todo-salvage-summary-line-rejects-untrusted-sidecar-text`, HIGH).**
+
+- *Issue.* `salvage-applied.jsonl` is a repo-level, never-rotated file under
+  `.evolve` that any phase can append to. `SalvageSummaryLine` rendered its
+  `pattern` field into the single-line `[contract-gate]` operator stream.
+- *Gap.* Cycle-1399 (`dae44191…`) closed only the control-character half, with
+  a character class `^[A-Za-z0-9_.-]+$`. A forged value that is merely
+  alphanumeric — `circuit-open-notice`, shaped to read as the gate's own
+  breaker notice — passed untouched and rendered as a breakdown entry
+  indistinguishable from a real one: fabricated gate state in the one stream an
+  operator judges gate health from.
+- *Solution.* Membership in the closed `SalvagePattern` set, not a character
+  class (`go/internal/deliverable/salvage_extract.go`, `operatorPatternLabel`).
+  The renderer mints those strings itself, so anything else is by definition not
+  ours and folds into a single `unknown` bucket. Known constants still render
+  bare (`fenced-json=1`) — the breakdown stays legible — and the headline still
+  counts every parsed record, so a bogus pattern surfaces as evidence rather
+  than vanishing. Bounded cardinality subsumes the old character-class guard:
+  no control character can survive a closed allowlist.
+
+**9.2 Quoted-decoy classification (carryover
+`todo-schema-aligned-salvage-layer-decoy-fixture`).**
+
+- *Issue.* `ClassifyBadVerdict` ran `sentinelPayloadRE` and `verdictObjRE`
+  directly over raw report bytes.
+- *Gap.* A report that *pastes a log line verbatim* —
+  `{"msg":"<!-- evolve-verdict: {\"verdict\":\"PASS\",} -->"}` — carries a
+  sentinel-shaped, verdict-shaped span whose structural quotes are all
+  backslash-escaped, because the span is string DATA. `verdictObjRE` sees
+  `"verdict"` inside `\"verdict\"` and matched it, so every such report was
+  counted `recoverable` — inflating the §7 baseline the instrumentation exists
+  to measure honestly.
+- *Solution.* The tell is the **escaping, not the malformation**. A new
+  `insideStringLiteral` reuses the exact `inStr`/`esc` tracking
+  `verdictCandidates` already scans braces with, so the layer has one notion of
+  "quoted" rather than two that can disagree, and the classifier judges the
+  **object's opening brace** rather than the key — in
+  `{"phase":"audit","verdict":"PASS"}` the key is itself a string token, but the
+  brace opening it is not inside one, so genuine cases are untouched. It fails
+  closed: an unbalanced quote upstream can only *demote* a span to
+  non-recoverable, and under-claiming costs a salvage while over-claiming
+  corrupts the baseline.
+
+Both are pinned through the production seam by
+`go/acs/cycle1406/predicates_test.go` (`TestC1406_001`–`TestC1406_004`), each
+carrying an anti-over-correction control: a known pattern must still render
+bare, and a genuine unescaped trailing-comma sentinel must stay recoverable.
+
+## 10. Landed — the classifier→repairer span handoff (cycle-1424)
+
+§9.2 taught the *classifier* to tell markup from quoted string DATA. It did not
+teach the *repairer* anything, and the repairer was still finding its own
+bytes. Cycle 1424 closed the gap between them — not by adding a second check,
+but by removing the repairer's ability to search at all.
+
+**10.1 A repairer that re-derives its own span can disagree with the classifier
+(cycle-1406 audit CRITICAL-1, probe-confirmed through `Reviewer.Review`).**
+
+- *Issue.* `ClassifyBadVerdict` qualified a span and returned only a *verdict*
+  about it (`Recoverable`, `Pattern`). `repairVerdict` then re-found the bytes
+  to rewrite by itself — the trailing-comma branch took
+  `sentinelPayloadRE.FindStringSubmatch(content)`, the FIRST match, with none
+  of the string-literal awareness §9.2 had just added to the classifier.
+- *Gap.* §9.2 is a *classifier-side* fix, so it could not reach this: the two
+  sides simply asked different questions of the same bytes. A report quoting a
+  decoy `PASS` sentinel in prose was CLASSIFIED on its own genuine, malformed
+  `FAIL` (the classifier skipped the quoted decoy) and REPAIRED on the decoy
+  (the repairer did not). Because `ParseVerdictSentinelFull` takes the LAST
+  parseable sentinel, the phase's own `FAIL` — left malformed and therefore
+  unparseable — lost to the freshly repaired `PASS`, and the gate approved. One
+  stray `"` turned a phase's failure into an approval.
+- *Solution.* Structural, not another guard. `BadVerdictClassification` now
+  carries the QUALIFIED BYTE OFFSETS it admitted — `span` (the range to replace
+  with a canonical sentinel line) and `payload` (the JSON object's own bytes
+  inside it) — in `go/internal/deliverable/salvage_instrument.go`, and
+  `repairVerdict` (`go/internal/deliverable/salvage_extract.go`) performs one
+  branch-free replacement of exactly that span. Its own extraction primitive
+  was deleted rather than fixed. Adding a second quoting check inside the
+  repairer would have closed the one reproduced instance and left two
+  independently-drifting notions of an admissible span — the drift the
+  cycle-1406 audit explicitly warned about; taking the offsets instead means
+  "repair a span the classifier rejected" has no expressible form.
+
+Pinned through the production seam by `go/acs/cycle1424/predicates_test.go`:
+`TestC1424_001_Review_DeniesApproval_WhenRepairedSpanDivergesFromQualifiedSpan`
+is the reproduction, `TestC1424_002_Review_DeniesApproval_AcrossSpanDivergenceShapes`
+re-runs it with the stray quote hosted by a fence so the criterion is the CLASS
+rather than one fixture, and
+`TestC1424_003_Review_StillSalvages_EveryGenuineShape` plus
+`TestC1424_004_Review_KeepsAmbiguityRefusal_ForUnquotedTwinSentinels` are the
+anti-over-correction controls — all three recoverable shapes must still
+salvage, and the audit's own unquoted control must still block.
+
+## 11. Landed — an ambiguity guard that could be silenced by quoting (cycle-1428)
+
+Cycle 1424's own audit found the sequel to §10 in the code §10 left standing:
+the *counter* the ambiguity guard reads was still the string-aware scan, and
+§10 had just proved that prose quoting is attacker-controlled.
+
+**11.1 One unpaired quote made the `> 1` ambiguity guard vacuous (cycle-1424
+audit `d4982b388c4982275303ee68529b9313d`, CRITICAL).**
+
+- *Issue.* `candidateCount` counted verdict-bearing objects with a single
+  string-aware scan, so a `{` or `}` inside a JSON string never moved the depth.
+- *Gap.* Balanced quoting is a JSON property, not a markdown one. A single
+  unpaired `"` anywhere in prose leaves the scan believing every later byte is
+  inside a string literal, so **both** candidates of a two-candidate report
+  vanish and `candidateCount(res.Content) > 1` reads a genuinely ambiguous
+  report as unambiguous. Classification does not vanish with it: step 2 computes
+  parity FENCE-LOCALLY (`verdictObjSpan` runs over the fence body alone), so it
+  still qualified a stray fenced `PASS` beside the phase's own malformed `FAIL`
+  — the §10 laundering, reached by a different door. Neither §9.2 (classifier
+  quoting) nor §10 (span handoff) covers it, because the defect is in the guard
+  that decides whether to salvage *at all*.
+- *Solution.* `candidateCount` (`go/internal/deliverable/salvage_extract.go`)
+  now runs BOTH readings of the bytes — string-aware, and brace-only, where
+  quotes are not structure — and takes the LARGER. A counter that can only
+  undercount implements "refuse when the attacker permits"; ambiguity is what
+  EITHER reading can see. Neither reading dominates the other, which is why both
+  are kept: the brace-only reading cannot be silenced by quoting, and the
+  string-aware reading still catches the mirror case where a string CONTAINS a
+  stray brace and a brace-only scan would merge two objects into one. The
+  asymmetry is the one `insideStringLiteral` is already built on — over-counting
+  costs a salvage that would have been logged, under-counting costs the gate.
+
+Pinned at the production seam in
+`go/internal/deliverable/salvage_extract_test.go`
+(`TestReview_RefusesSalvage_WhenAnUnpairedQuoteHidesASecondCandidate`, RED
+before this change and GREEN after, with
+`TestReview_StillSalvages_TheGenuineSoleCandidate` as the anti-over-correction
+control), and every prior pin — `go/acs/cycle1392`, `go/acs/cycle1397`,
+`go/acs/cycle1399`, `go/acs/cycle1404`, `go/acs/cycle1406`, `go/acs/cycle1424`
+— re-run green on the change, which is what shows the new pessimism did not buy
+its refusal by breaking salvage.
+
+## 12. Landed — the same guard, silenced by a brace instead of a quote (cycle-1432)
+
+§11's fix was defeated by one different character. Cycle 1428's audit recorded
+the inherited CRITICAL as *not closed* (`d5bc991f500c121b0a173752a05ffccef`),
+and cycle 1432 re-probed it at the production seam.
+
+**12.1 A stateful counter has one silencer per reading (cycle-1428 audit
+`d5bc991f500c121b0a173752a05ffccef` / inherited
+`d4982b388c4982275303ee68529b9313d`, CRITICAL).**
+
+- *Issue.* §11 answered the unpaired-quote silencer with `max(string-aware,
+  brace-only)`. Both readings are stateful scans, and each carries its own
+  one-character silencer in ordinary prose.
+- *Gap.* The unpaired `"` still zeroes the string-aware reading (`aware=0`), and
+  a single unmatched `{` opens a depth the brace-only reading never closes, so
+  every later object is absorbed into it and only the truncation fallback span
+  is emitted (`raw=1`). `max(0, 1) == 1` is not `> 1`, the refusal never fires,
+  and the fence-local classifier still qualifies a decoy `PASS` beside the
+  phase's own displaced `FAIL`. The probe found the class is **wider than the
+  ledger recorded**: the unmatched brace defeats the guard *on its own*, with no
+  quote noise present — the class is one character wide, not two.
+- *Solution.* `candidateCount`
+  (`go/internal/deliverable/salvage_extract.go:181-201`) now takes the max of
+  **three** readings, the third being stateless: `verdictKeyCount` counts the
+  `"verdict":` keys themselves, carrying no scan state at all, so no earlier
+  byte can change what a later one means and no unbalanced delimiter can
+  desynchronise it. It is consulted only through the max, so it can add
+  refusals and never remove one — a stray `"verdict":` in prose costs a salvage,
+  which is the side of the asymmetry this gate is built on. Both structural
+  readings are kept: they are what produce spans; the stateless one only counts.
+
+Pinned as a **class**, not a fixture — the shipped §11 pin was a fixture pin
+(`df8ed646d2c48edcd558afb056a08d28d`), which is why the sibling shape shipped
+through it. `go/acs/cycle1432/predicates_test.go` drives `Reviewer.Review` over
+{balanced, unpaired-quote, unmatched-brace, quote-and-brace} at 2 candidates
+asserting refusal
+(`TestC1432_002_Review_AmbiguityRefusal_HoldsAcrossProseNoiseShapes`) and over
+the same four shapes at 1 candidate asserting salvage still happens
+(`TestC1432_003_Review_StillSalvages_SoleFencedJSONCandidate`), so the stricter
+counter cannot be satisfied by refusing more broadly.
+`TestC1432_001_Review_RefusesSalvage_WhenQuoteAndBraceNoiseHideASecondCandidate`
+is the direct reproduction, RED before this change and GREEN after; every prior
+pin — `go/acs/cycle1392`, `go/acs/cycle1397`, `go/acs/cycle1399`,
+`go/acs/cycle1404`, `go/acs/cycle1406`, `go/acs/cycle1424`, `go/acs/cycle1428`
+— re-runs green.
+
+The same cycle removed a cycle SCHEDULE from a permanent regression floor
+(`.evolve/evals/schema-aligned-salvage-layer-guard.md`, cycle-1428 audit
+`dd245084ac28b86b9f21d3a882240e327`): a floor that says "cycle 1428 is
+documentation-only" expires silently the moment that cycle passes, so it now
+states the invariant (sole-violation exclusivity, never a membership test over
+the violation-code set) instead.
+
+## 13. Landed — the stage itself, salvaged out of ten stranded worktrees (cycle-1441, 2026-08-12)
+
+### 13.1 The salvage-before-requeue landing (cycle-1441)
+
+Sections 8–12 above describe a stage that, until this cycle, existed on **no
+branch that ever merged**. The extraction half of `schema-aligned-salvage-layer`
+was built, corrected five times against its own audits, and left in place: ten+
+near-identical `cycle-42824668-{1397,1399,1404,1406,1422,1424,1427,1428,1432,1434}`
+worktrees each carry the same auto-committed
+`"salvage snapshot (ADR-0076 continuation-on-fail)"` commit, and `gh pr list`
+shows no PR ever touched `salvage_extract.go`.
+
+**What landed.** The most advanced snapshot — worktree `cycle-42824668-1434`,
+commit `a2d65920` — ported onto `main` at `d20efc51`:
+`go/internal/deliverable/salvage_extract.go` (the stage), its
+`salvage_extract_test.go` / `reviewer_salvage_surface_test.go` /
+`salvage_keycase_test.go` suites, the `reviewer.go` wiring, and the
+`BadVerdictClassification` span/payload offsets §10's handoff needs.
+
+**Wiring proof.** `salvageVerdictWith(res, r.resolver, roots, r.phaseIO)` is
+called from `go/internal/deliverable/reviewer.go:138` — strictly after the
+`res.OK` early return and strictly before the block decision is computed, so the
+seam's only caller is the production gate, not a test.
+`go/acs/cycle1441/predicates_test.go` reaches it through `Reviewer.Review`
+rather than calling it directly.
+
+**One deliberate divergence from the snapshot.** The snapshot's own
+`ClassifyBadVerdict` rewrite was NOT taken. `main` advanced past it at
+cycle-1407: the classifier there is quote-aware (a sentinel contained in a
+closed inline-code span is prose *discussing* a verdict) and tail-anchored, and
+`salvage_instrument_test.go` carries a symbol tripwire that fails the build if
+either historical helper name reappears in a production source. Taking the
+snapshot wholesale would have re-red'd `main` on that tripwire and dropped the
+1407 defence. What was ported instead is the part §10 actually requires — the
+qualified byte offsets — computed inside `main`'s classifier by BLANKING the
+echoed-sentinel and fence ranges rather than deleting them, so every offset into
+the working copy is still an offset into the original content. The snapshot's
+string-literal-escaping reading of "quoted" is deferred, not adopted: it is a
+second notion of quoting alongside 1407's, and reconciling the two is its own
+cycle.
+
+**Why it stranded, recorded so it does not recur (scout B1).** Nothing technical
+blocked it — every snapshot builds and tests green in place. The stage was
+always a *continuation artifact* of a cycle whose selected task was something
+else, so no cycle ever carried it to ship, and each failure produced one more
+snapshot of the same work. The lesson generalises past this item: in a
+continuation-worktree repo, "not on `main`" and "not built" are different facts,
+and a scout should `find .evolve/worktrees -name '<expected-new-file>'` before
+treating an inbox `feature` item as greenfield.
+
+### 13.2 Operator surface — measured potential vs. actual saves
+
+`evolve salvage report` now reports `saved` — coercions the gate actually
+performed, folded from `.evolve/salvage-applied.jsonl` by
+`deliverable.CountSalvageApplied` — beside `recoverable`, the measured potential
+from `bad-verdict-baseline.jsonl`. They are different numbers by construction: a
+stage that refuses on ambiguity or fails the re-verify pass makes potential
+exceed practice, and collapsing them would tell an operator the gate salvaged
+reports it in fact blocked. The key is always emitted, so a consumer never
+special-cases the fresh-project-root state.
+
 ## Sources (online track)
 
 Anthropic structured outputs (platform.claude.com, Nov 2025) · OpenAI

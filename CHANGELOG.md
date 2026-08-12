@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — reasoning-model: chain-of-reasoning audit verdicts + scope-delta adjudication (2026-08-12)
+
+Two design changes that replace a class of mechanical gate with a reasoning step, plus the root-cause record for why that class kept failing.
+
+- **ADR-0088** — the audit verdict is the **conclusion of a chain**, not an assertion. Seven cross-phase coherence links (intent → selection → specification → implementation → narrative → delivery → evidence), each with a status, a finding and a citation; the verdict is computed from the statuses and never reads the prose, so an auditor *cannot assert PASS over an incoherent link*. `unverifiable` is the honest middle (a link nobody could check must not launder into "fine"), and a **missing** link fails harder than a negative finding. Evidence entitlement applies to every judging phase — audit, adversarial-review, coverage-gate, plan-review, inherited-defect-reconcile, retro — with a downgrade that stops a *narrated* chain passing as a walked one. Live in **shadow**: the per-cycle record (`audit-chain-shadow.json`) carries narrative vs chain verdict, agreement, diagnoses, missing evidence, and what actually shipped.
+- **ADR-0087** — scope-delta adjudication: six classes by meaning, `CARVE` as the missing middle (preserve the work, ship clean), and an accounting invariant that makes silent disposal inexpressible. Its discriminators are now *evidence inside links* rather than a decision procedure of their own.
+- **Findings ledger** — [docs/incidents/2026-08-12-proxy-as-verdict-findings.md](docs/incidents/2026-08-12-proxy-as-verdict-findings.md): 15 findings from four adversarial review passes, each with symptom, root cause, why it happened and how it was resolved — unified by one recurring defect, **a proxy used as a verdict**. Includes the four-attempt failure of `schema-aligned-salvage-layer` (the work was never broken, it was *stranded*), the anti-gaming hinge that was bypassable by one string field, and the evidence table that would have pinned the soak's headline datum to a constant.
+
+---
+
 ## Fixed — persona-strip lobotomy campaign (#434–#447, 2026-08-10 → 2026-08-11)
 
 The 15/30-FAIL streak (cycles 1390–1429, continuations 0/11) traced to ONE defect: `CompactPrompts` stripped every dispatched audit prompt at the mid-file `## Reference Index` marker, deleting the Verdict Rules, STOP criterion, and the continuation-disposition mandate from what the auditor actually received. Incident: [docs/incidents/2026-08-10-persona-strip-lobotomy.md](docs/incidents/2026-08-10-persona-strip-lobotomy.md). Campaign landings, all console-first with TDD + adversarial review:

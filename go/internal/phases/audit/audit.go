@@ -36,6 +36,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -461,6 +463,18 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			})
 		}
 	}
+	// ADR-0088 chain-of-reasoning, SHADOW stage. Deliberately LAST: the record
+	// has to carry the verdict that actually shipped and the gates that forced
+	// it, or "the chain agreed with a PASS a gate then force-FAILed" is
+	// indistinguishable from "the chain agreed with a PASS that shipped" — the
+	// exact question a promotion decision turns on (review MEDIUM). Running it
+	// here also means acs-verdict.json has already been generated, so the
+	// evidence set is what the auditor could really have read rather than a
+	// snapshot taken 40 lines too early (review HIGH).
+	//
+	// Records only: every value above is computed and returned unchanged.
+	recordChainShadow(artifact, req, narrative, string(verdict), overrodeBy)
+
 	return verdict, diags, string(core.PhaseShip)
 }
 
@@ -841,4 +855,29 @@ func init() {
 	registry.Register(string(core.PhaseAudit), func(req core.PhaseRequest) core.PhaseRunner {
 		return NewDefault(bridge.NewDefault(req.ProjectRoot), prompts.NewForProject(req.ProjectRoot))
 	})
+}
+
+// recordChainShadow writes the ADR-0088 chain-versus-narrative comparison into
+// the phase workspace. Best-effort and silent on failure by design: a shadow
+// measurement must never influence, delay, or brick the decision it is
+// measuring — the same posture the bad_verdict instrumentation ships with.
+//
+// The evidence set is what is actually ON DISK in the workspace, not what the
+// prompt claimed: the question the record answers is whether the judge COULD
+// have walked the chain, and a file the dispatch mentioned but never produced
+// would make that answer a lie.
+func recordChainShadow(artifact string, req core.PhaseRequest, narrative, shipped string, overrodeBy []string) {
+	if req.Workspace == "" {
+		return
+	}
+	var given []string
+	for _, a := range auditchain.RequiredEvidence(string(core.PhaseAudit)) {
+		if _, err := os.Stat(filepath.Join(req.Workspace, a)); err == nil {
+			given = append(given, a)
+		}
+	}
+	rec := auditchain.Shadow(req.Cycle, string(core.PhaseAudit), artifact, narrative, given)
+	rec.ShippedVerdict = shipped
+	rec.OverrodeBy = overrodeBy
+	_ = atomicwrite.JSON(filepath.Join(req.Workspace, auditchain.ShadowRecordFile), rec)
 }
