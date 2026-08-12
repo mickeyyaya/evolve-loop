@@ -14,16 +14,57 @@ import (
 	"path/filepath"
 )
 
-// Verdict is the schema written to acs-verdict.json. SkipCount mirrors the
-// acssuite SKIP convention (a SKIP-action test counts neither red nor green) so
-// both verdict producers stay in schema lockstep.
+// Verdict is the schema written to acs-verdict.json.
+//
+// LOCKSTEP WITH acssuite.Verdict, and now asserted rather than asserted-about:
+// this comment used to claim the two producers stayed in step while this type
+// omitted `ship_eligible`, `verdict`, `green_count`, `red_ids` and
+// `schema_version`. The audit's EGPS reader takes ship_eligible as a POINTER so
+// that pre-stamp verdicts stay back-compatible — absent means "no opinion", and
+// the gate honours that by NOT blocking. A verdict written through this path
+// therefore SILENTLY DISABLED the ship-eligibility gate.
+//
+// The fields below are a PROJECTION of the same facts the counters already
+// carry (verdict and ship-eligibility are both functions of RedCount), computed
+// once at construction so a reader can never see a set of counters and a
+// disagreeing headline. schema_lockstep_test.go decodes this type through the
+// gate's own view and fails if any of them goes missing again.
 type Verdict struct {
-	Cycle      int         `json:"cycle"`
-	Total      int         `json:"total"`
-	RedCount   int         `json:"red_count"`
-	SkipCount  int         `json:"skip_count"`
-	Predicates []Predicate `json:"predicates"`
+	SchemaVersion string   `json:"schema_version"`
+	Cycle         int      `json:"cycle"`
+	Total         int      `json:"total"`
+	GreenCount    int      `json:"green_count"`
+	RedCount      int      `json:"red_count"`
+	SkipCount     int      `json:"skip_count"`
+	RedIDs        []string `json:"red_ids,omitempty"`
+	// IncompleteCount counts predicates whose stream never reported an
+	// outcome — the shape a SIGKILLed, timed-out or panic-aborted run leaves
+	// behind. Counted separately from red because it is a different fact
+	// (nothing was learned about them), and surfaced because a suite that did
+	// not finish must never read as one that passed.
+	IncompleteCount int      `json:"incomplete_count,omitempty"`
+	IncompleteIDs   []string `json:"incomplete_ids,omitempty"`
+	Verdict         string   `json:"verdict"`
+	ShipEligible    bool     `json:"ship_eligible"`
+	// PredicateSuite mirrors acssuite's nested shape. The ship gate reads
+	// predicate_suite.total for the message it prints while an operator is
+	// holding a block; acsrunner wrote only the flat `total`, so that message
+	// said "total=0" on every verdict this producer wrote (review MEDIUM).
+	PredicateSuite PredicateSuiteCounts `json:"predicate_suite"`
+	Predicates     []Predicate          `json:"predicates"`
 }
+
+// PredicateSuiteCounts is the nested counter block acssuite emits and the ship
+// gate reads. Projected from the same totals as the flat fields, so the two
+// views cannot disagree.
+type PredicateSuiteCounts struct {
+	Total int `json:"total"`
+}
+
+// verdictSchemaVersion matches acssuite's, because the two files are read by
+// the same consumers and a version that differed per producer would tell a
+// reader nothing.
+const verdictSchemaVersion = "1.0"
 
 // Predicate captures one test's outcome.
 type Predicate struct {
@@ -85,18 +126,41 @@ func ParseTestJSON(r io.Reader, cycle int) (Verdict, error) {
 	if err := scanner.Err(); err != nil {
 		return Verdict{}, fmt.Errorf("acsrunner scan: %w", err)
 	}
-	v := Verdict{Cycle: cycle}
+	v := Verdict{SchemaVersion: verdictSchemaVersion, Cycle: cycle}
 	for _, name := range order {
 		p := preds[name]
 		v.Total++
 		switch p.Verdict {
+		case "PASS":
+			v.GreenCount++
 		case "FAIL":
 			v.RedCount++
+			v.RedIDs = append(v.RedIDs, p.Name)
 		case "SKIP":
 			v.SkipCount++
+		default:
+			// Empty verdict = the stream ended before this predicate reported.
+			// The default arm used to fall through to GREEN, so a killed suite
+			// aggregated to red_count=0 and then claimed ship-eligibility
+			// (review BLOCK). Nothing was learned about this predicate; the
+			// honest counter is its own.
+			v.IncompleteCount++
+			v.IncompleteIDs = append(v.IncompleteIDs, p.Name)
 		}
 		v.Predicates = append(v.Predicates, *p)
 	}
+	// Derived once, here, from the counters above — never by a caller, so the
+	// headline and the counts cannot disagree. Same rule as acssuite: a cycle
+	// ships only when nothing is red, and a SKIP is neither red nor green.
+	// A run ships only when nothing failed AND nothing was left unfinished. A
+	// SKIP is a declared non-result and stays neutral; an INCOMPLETE is an
+	// undeclared one and must not be read as consent.
+	v.ShipEligible = v.RedCount == 0 && v.IncompleteCount == 0
+	v.Verdict = "FAIL"
+	if v.ShipEligible {
+		v.Verdict = "PASS"
+	}
+	v.PredicateSuite.Total = v.Total
 	return v, nil
 }
 

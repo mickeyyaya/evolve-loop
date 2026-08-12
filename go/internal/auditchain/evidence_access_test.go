@@ -82,11 +82,20 @@ func TestMissingEvidence_NamesWhatTheJudgeWasNotGiven(t *testing.T) {
 	given := []string{"build-report.md", "acs-verdict.json"}
 	missing := MissingEvidence("audit", given)
 	if len(missing) == 0 {
-		t.Fatal("a judging phase dispatched without the intent or the tests reported no gap")
+		t.Fatal("a judging phase dispatched without the tests or the triage decision reported no gap")
 	}
 	joined := strings.Join(missing, ",")
-	if !strings.Contains(joined, "intent") {
-		t.Errorf("the intent is what derailment is measured against; its absence must be named. got %v", missing)
+	// A REQUIRED artifact that was withheld must be named.
+	if !strings.Contains(joined, "covering-tests.md") {
+		t.Errorf("a withheld required artifact must be named; got %v", missing)
+	}
+	// UPDATED, declared: intent.md is CONDITIONAL — written only when the
+	// intent phase runs. The first live cycles (1444/1445) had
+	// `intent_required:false`, so naming its absence reported a gap for a file
+	// nobody was supposed to produce. "Not applicable" is not "withheld", and
+	// conflating them is how a measurement becomes a constant.
+	if strings.Contains(joined, "intent.md") {
+		t.Errorf("a conditionally-produced artifact must not be reported as a withholding; got %v", missing)
 	}
 	// Fully supplied: nothing missing.
 	if m := MissingEvidence("audit", RequiredEvidence("audit")); len(m) != 0 {
@@ -141,5 +150,45 @@ func TestChainShape_NamesEveryLinkAndItsConclusionType(t *testing.T) {
 	}
 	if got.Diagnoses != nil {
 		t.Errorf("a coherent chain diagnoses nothing, got %v", got.Diagnoses)
+	}
+}
+
+// TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded — found by
+// the FIRST live cycles (1444/1445), which is the point of a shadow stage.
+//
+// Both recorded `missing_evidence: [intent.md]` on cycles whose run.json says
+// `intent_required: false` — the intent phase never ran, so the artifact is
+// legitimately ABSENT rather than withheld. The downgrade fired on "any listed
+// source missing", so every such cycle reported an evidence gap for a file
+// nobody was supposed to produce.
+//
+// The rule that matches how the links are actually written: the sources of a
+// link are ALTERNATIVES. intent-fidelity can be answered from intent.md OR the
+// scout report. A link is only unverifiable when NOTHING it could be read from
+// was supplied.
+func TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded(t *testing.T) {
+	t.Parallel()
+	// Everything the audit is entitled to EXCEPT intent.md — the live shape.
+	var given []string
+	for _, a := range RequiredEvidence("audit") {
+		if a != "intent.md" {
+			given = append(given, a)
+		}
+	}
+	got := ConcludeWithEvidence(fullChain(), "audit", given)
+	if got.Verdict != VerdictPASS {
+		t.Errorf("a coherent chain was downgraded to %s because one of a link's ALTERNATIVE sources was absent: %s", got.Verdict, got.Rationale)
+	}
+
+	// The teeth must survive: a link whose sources are ALL absent is still
+	// unverifiable, because nobody was in a position to check it.
+	var blind []string
+	for _, a := range RequiredEvidence("audit") {
+		if a != "acs-verdict.json" && a != "coverage-gate-report.md" {
+			blind = append(blind, a)
+		}
+	}
+	if got := ConcludeWithEvidence(fullChain(), "audit", blind); got.Verdict == VerdictPASS {
+		t.Error("evidence-fidelity passed with NEITHER of its sources supplied — the entitlement has no teeth left")
 	}
 }

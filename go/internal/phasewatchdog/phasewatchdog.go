@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 )
 
 // Config is the runtime configuration for the watchdog. All durations are
@@ -286,11 +288,15 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 	if now == nil {
 		now = time.Now
 	}
+	// Vocabulary shared with the dispatcher, the other writer of this file:
+	// the severity enum is WARN|ERROR (a bare "HIGH" parsed into the field and
+	// was then dropped by every severity filter), and the event type is
+	// declared in dispatchevents so a typed consumer can switch on it.
 	entry := map[string]any{
-		"event_type":       "stall-detected",
+		"event_type":       string(dispatchevents.EventStallDetected),
 		"timestamp":        now().UTC().Format("2006-01-02T15:04:05Z"),
 		"source_phase":     "phase-watchdog",
-		"severity":         "HIGH",
+		"severity":         string(dispatchevents.SeverityError),
 		"details":          details,
 		"remediation_hint": "Check agent turn count; reduce scope or increase observer.stall_s in policy.json",
 	}
