@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	evolvelog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -93,10 +92,29 @@ const (
 // deliverable. Reason is always non-empty for a recoverable classification:
 // a silent classification is not observability — the baseline record has to
 // say WHY a future salvage stage would have recovered this report.
+//
+// span and payload carry the QUALIFIED BYTE OFFSETS into the exact content this
+// classification was computed from, and are meaningful only when Recoverable.
+// They exist because the repairer used to re-derive its own span from the same
+// content with a bare first-match regex and no quoting check, so classifier and
+// repairer could qualify DIFFERENT spans: a report quoting a decoy `PASS`
+// sentinel in prose was classified on its own genuine malformed `FAIL` but
+// REPAIRED on the decoy, and since ParseVerdictSentinelFull takes the LAST
+// parseable sentinel, a phase turned its own FAIL into an APPROVAL with one
+// stray `"` (cycle-1406 audit CRITICAL-1). Handing the offsets to repairVerdict
+// makes the divergence structurally impossible rather than guarded by a second
+// quoting check that can drift out of step with this one.
+//
+//	span    — the half-open range to REPLACE with a canonical sentinel line
+//	          (the whole sentinel comment / the whole fence / the bare object).
+//	payload — the half-open range of the JSON object's own bytes inside it.
 type BadVerdictClassification struct {
 	Recoverable bool
 	Pattern     SalvagePattern
 	Reason      string
+
+	span    verdictSpan
+	payload verdictSpan
 }
 
 var (
@@ -139,24 +157,44 @@ var (
 // pairing backtick runs (below). Upgrade path if a blockquoted (`> `) echo is
 // ever observed: extend inlineCodeSpans' notion of a delimiter — not a new
 // parser.
-func ownSentinelPayload(content string) (body, payload string, ok bool) {
+//
+// Echoed spans are BLANKED rather than deleted so every offset into body is
+// also an offset into content: the repairer acts on the span this classifier
+// qualified (BadVerdictClassification.span), and a body rebuilt by deletion
+// would silently shift every one of those offsets.
+func ownSentinelPayload(content string) (body string, span, payload verdictSpan, ok bool) {
 	spans := sentinelPayloadRE.FindAllStringSubmatchIndex(content, -1)
 	if len(spans) == 0 {
-		return content, "", false
+		return content, verdictSpan{}, verdictSpan{}, false
 	}
 	quoted := inlineCodeSpans(content)
-	var kept strings.Builder
-	prev := 0
+	var echoed [][2]int
 	for _, m := range spans {
 		if !sentinelInClosedSpan(quoted, m[0], m[1]) {
-			payload, ok = content[m[2]:m[3]], true
+			span, payload, ok = verdictSpan{start: m[0], end: m[1]}, verdictSpan{start: m[2], end: m[3]}, true
 			continue
 		}
-		kept.WriteString(content[prev:m[0]])
-		prev = m[1]
+		echoed = append(echoed, [2]int{m[0], m[1]})
 	}
-	kept.WriteString(content[prev:])
-	return kept.String(), payload, ok
+	return blankSpans(content, echoed), span, payload, ok
+}
+
+// blankSpans returns content with each half-open range replaced by an
+// equal-length run of spaces — neutralising the bytes for a later regex pass
+// while holding every other byte at its original offset. Spaces (not deletion)
+// also mean two fragments either side of a removal can never be joined into a
+// match that was not in the source.
+func blankSpans(content string, spans [][2]int) string {
+	if len(spans) == 0 {
+		return content
+	}
+	b := []byte(content)
+	for _, s := range spans {
+		for i := s[0]; i < s[1] && i < len(b); i++ {
+			b[i] = ' '
+		}
+	}
+	return string(b)
 }
 
 // sentinelInClosedSpan reports whether the sentinel span [start,end) lies
@@ -204,16 +242,21 @@ func inlineCodeSpans(content string) [][2]int {
 		runs = append(runs, run{start: i, length: j - i})
 		i = j
 	}
+	// Pair by length through an open-run index rather than an inner scan: the
+	// nested form was O(runs²) when no lengths match, and `content` is
+	// LLM-authored and unbounded (go-reviewer MEDIUM, measured ~4x per 2x
+	// input). Byte cost bounds the adversary — R distinct lengths need Θ(R²)
+	// backticks — so this was a foot-gun rather than a live DoS, but the linear
+	// form removes the coupling that made it one and reads no worse.
 	var spans [][2]int
-	for i := 0; i < len(runs); i++ {
-		for j := i + 1; j < len(runs); j++ {
-			if runs[j].length != runs[i].length {
-				continue
-			}
-			spans = append(spans, [2]int{runs[i].start, runs[j].start + runs[j].length})
-			i = j
-			break
+	open := make(map[int]int, len(runs)) // run length → index of its pending opener
+	for i, r := range runs {
+		if o, ok := open[r.length]; ok {
+			spans = append(spans, [2]int{runs[o].start, r.start + r.length})
+			delete(open, r.length)
+			continue
 		}
+		open[r.length] = i
 	}
 	return spans
 }
@@ -228,7 +271,7 @@ func inlineCodeSpans(content string) [][2]int {
 // is not displaced. Anything with no recoverable JSON verdict object at all —
 // prose musings, an empty report — is SalvagePatternNone, Recoverable=false.
 func ClassifyBadVerdict(content string) BadVerdictClassification {
-	body, payload, hasSentinel := ownSentinelPayload(content)
+	body, sentinelSpan, payloadSpan, hasSentinel := ownSentinelPayload(content)
 
 	// 1. The sentinel comment shape matched but the payload did not parse. The
 	//    only shape we claim as recoverable here is a trailing comma: everything
@@ -236,11 +279,14 @@ func ClassifyBadVerdict(content string) BadVerdictClassification {
 	//    corruption, and claiming recoverability we cannot justify would inflate
 	//    the very baseline this instrumentation exists to measure honestly.
 	if hasSentinel {
+		payload := content[payloadSpan.start:payloadSpan.end]
 		if !json.Valid([]byte(payload)) && trailingCommaRE.MatchString(payload) {
 			return BadVerdictClassification{
 				Recoverable: true,
 				Pattern:     SalvagePatternTrailingComma,
 				Reason:      "evolve-verdict sentinel payload is JSON with a trailing comma before a closing brace/bracket; a lenient reader recovers it",
+				span:        sentinelSpan,
+				payload:     payloadSpan,
 			}
 		}
 		return BadVerdictClassification{Reason: "evolve-verdict sentinel present but its payload is not recoverably malformed"}
@@ -250,26 +296,33 @@ func ClassifyBadVerdict(content string) BadVerdictClassification {
 	//    the payload as displayable JSON instead of the sentinel comment.
 	//    Searched over `body` (quoted sentinel echoes already excised) so an
 	//    echoed sentinel's payload cannot be re-read here as the report's own.
-	rest := body
-	for _, fb := range fencedBlockRE.FindAllStringSubmatch(body, -1) {
-		if verdictObjRE.MatchString(fb[1]) {
+	//    Fence ranges are BLANKED rather than deleted for the same offset-holding
+	//    reason as the echoed sentinels above.
+	var fences [][2]int
+	for _, fb := range fencedBlockRE.FindAllStringSubmatchIndex(body, -1) {
+		if loc := verdictObjRE.FindStringIndex(body[fb[2]:fb[3]]); loc != nil {
 			return BadVerdictClassification{
 				Recoverable: true,
 				Pattern:     SalvagePatternFencedJSON,
 				Reason:      "a JSON object carrying a \"verdict\" key is wrapped in a markdown code fence instead of the evolve-verdict sentinel comment",
+				span:        verdictSpan{start: fb[0], end: fb[1]},
+				payload:     verdictSpan{start: fb[2] + loc[0], end: fb[2] + loc[1]},
 			}
 		}
-		rest = strings.Replace(rest, fb[0], "", 1)
+		fences = append(fences, [2]int{fb[0], fb[1]})
 	}
+	rest := blankSpans(body, fences)
 
 	// 3. A bare, uncommented, unfenced verdict object sitting in prose — the
 	//    displaced sentinel. Searched over `rest` (fenced blocks removed) so a
 	//    fence whose body has no verdict key cannot masquerade as displaced.
-	if verdictObjRE.MatchString(rest) {
+	if loc := verdictObjRE.FindStringIndex(rest); loc != nil {
 		return BadVerdictClassification{
 			Recoverable: true,
 			Pattern:     SalvagePatternDisplaced,
 			Reason:      "a bare JSON object carrying a \"verdict\" key sits in prose with no evolve-verdict comment markers (displaced sentinel)",
+			span:        verdictSpan{start: loc[0], end: loc[1]},
+			payload:     verdictSpan{start: loc[0], end: loc[1]},
 		}
 	}
 
