@@ -1,0 +1,47 @@
+{
+  "cycle": 1443,
+  "run_id": "01KZSXS5S4ASJNRFV79M6D9MTT",
+  "goal": "Work the highest-priority open items in .evolve/inbox end-to-end: real implementation, real tests, honest gates, ship each landing so main stays green. Prefer live product and hardening items; consume each shipped item per the normal lifecycle.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|infra-error|23de5a6b79bd",
+    "pre_class": "infra-error",
+    "reasons": [
+      "the integration tier (`go test -tags integration`) reported 13 offender(s) — CI's integration-tier test step would FAIL (e.g. TestFleetSoak). Offenders: tmux_repl_interactive_test.go:181: exit = 80,"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1443",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
