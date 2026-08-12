@@ -48,6 +48,13 @@ const (
 	// are skipped silently by exactly the queries an operator runs when a phase
 	// went missing.
 	EventStallDetected EventType = "stall-detected"
+	// EventPhaseOutputsSurveyed is the loop's per-cycle phase-output
+	// accounting (internal/phaseoutputs): did every completed phase leave the
+	// data a reviewer needs, and what is the cycle's chain status. Emitted
+	// every cycle — INFO when complete, WARN on any gap or chain anomaly — so
+	// the unified stream carries the answer instead of only whoever runs
+	// `evolve cycle outputs` seeing it.
+	EventPhaseOutputsSurveyed EventType = "phase-outputs-surveyed"
 )
 
 // knownEventTypes is the closed vocabulary. Membership is exported because the
@@ -59,6 +66,7 @@ var knownEventTypes = map[EventType]bool{
 	EventClassification:        true,
 	EventGoalStallEscalated:    true,
 	EventStallDetected:         true,
+	EventPhaseOutputsSurveyed:  true,
 }
 
 // IsKnownEventType reports whether t is a declared abnormal-event type.
@@ -215,4 +223,24 @@ func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash, 
 		Details:         fmt.Sprintf("goal %s produced %d consecutive %s cycles (threshold=%d) — nothing shipped; escalated instead of re-dispatching", goalHash, streak, outcomes, threshold),
 		RemediationHint: "See the auto-filed stall inbox todo: re-scope or split the goal, or address the recurring block/fail reason before re-running it",
 	})
+}
+
+// EmitPhaseOutputsSurveyed records the loop's per-cycle phase-output
+// accounting. The caller (the phaseoutputs pure layer) has already decided
+// abnormality; this maps it onto the stream's severity vocabulary — INFO is
+// the healthy every-cycle heartbeat a dashboard baselines on, WARN is the
+// review-data-went-missing signal an operator acts on.
+func (w *Writer) EmitPhaseOutputsSurveyed(cycle int, details string, abnormal bool) error {
+	e := Event{
+		EventType:   EventPhaseOutputsSurveyed,
+		SourcePhase: "phase-outputs",
+		Severity:    SeverityInfo,
+		Cycle:       cycle,
+		Details:     details,
+	}
+	if abnormal {
+		e.Severity = SeverityWarn
+		e.RemediationHint = fmt.Sprintf("run `evolve cycle outputs %d` for the per-phase rows; a missing/empty artifact means that phase's work cannot be reviewed", cycle)
+	}
+	return w.Emit(e)
 }
