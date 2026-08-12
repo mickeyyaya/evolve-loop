@@ -32,7 +32,6 @@
 //
 // Pure: no I/O, no clock, no globals. Every decision here is a function of its
 // arguments, which is what lets the gate test its own contract exhaustively.
-
 package scopedelta
 
 import (
