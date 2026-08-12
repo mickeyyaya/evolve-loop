@@ -60,6 +60,18 @@ var linkEvidence = map[LinkID][]string{
 	LinkEvidence:       {"acs-verdict.json", "coverage-gate-report.md"},
 }
 
+// conditionalEvidence names artifacts a cycle produces only under a condition,
+// so their absence is "not applicable" rather than "withheld". Deliberately
+// tiny and deliberately explicit: every entry here is a downgrade that can
+// never fire on that artifact, so the list is a liability register, not a
+// convenience.
+//
+//	intent.md — written only when the intent phase runs (run.json
+//	            `intent_required`), which is false on most cycles.
+var conditionalEvidence = map[string]bool{
+	"intent.md": true,
+}
+
 // EvidenceFor returns the artifacts a link is read from.
 func EvidenceFor(id LinkID) ([]string, bool) {
 	srcs, ok := linkEvidence[id]
@@ -104,7 +116,7 @@ func MissingEvidence(phase string, given []string) []string {
 	}
 	var missing []string
 	for _, r := range req {
-		if !have[r] {
+		if !have[r] && !conditionalEvidence[r] {
 			missing = append(missing, r)
 		}
 	}
@@ -134,14 +146,37 @@ func ConcludeWithEvidence(c Chain, phase string, given []string) Conclusion {
 	copy(downgraded, c)
 	var affected []string
 	for i, l := range downgraded {
-		for _, src := range linkEvidence[l.ID] {
-			if absent[src] && l.Status == StatusCoherent {
-				downgraded[i].Status = StatusUnverifiable
-				downgraded[i].Finding = fmt.Sprintf("reported coherent, but %s was not supplied to this phase — downgraded: %s", src, l.Finding)
-				affected = append(affected, string(l.ID))
-				break
-			}
+		if l.Status != StatusCoherent {
+			continue
 		}
+		// Downgrade on any absent REQUIRED source; a CONDITIONAL one that the
+		// cycle never produced is not a withholding.
+		//
+		// The first live cycles (1444/1445) both reported an evidence gap for
+		// intent.md on runs whose `intent_required:false` — the phase never
+		// ran, so the artifact legitimately does not exist. The first cure was
+		// to treat every source list as alternatives, and review showed that
+		// disarmed four of seven downgrades to fix one false positive: a link
+		// keeps its teeth only while SOME source can actually go missing.
+		// Conditioning the one artifact that is conditionally produced targets
+		// the real cause and leaves the rest armed.
+		for _, src := range linkEvidence[l.ID] {
+			if !absent[src] || conditionalEvidence[src] {
+				continue
+			}
+			downgraded[i].Status = StatusUnverifiable
+			downgraded[i].Finding = fmt.Sprintf("reported coherent, but %s was not supplied to this phase — downgraded: %s", src, l.Finding)
+			affected = append(affected, string(l.ID))
+			break
+		}
+	}
+	// Nothing lost a source it actually needed: the absences were alternatives,
+	// so the conclusion stands on its own terms and the gap is still reported.
+	if len(affected) == 0 {
+		out := Conclude(c)
+		out.Rationale = fmt.Sprintf("evidence not supplied to %s: %s (no link lost every source; conclusion stands). %s",
+			phase, strings.Join(missing, ", "), out.Rationale)
+		return out
 	}
 	out := Conclude(downgraded)
 	out.Rationale = fmt.Sprintf("evidence not supplied to %s: %s (links downgraded: %s). %s",

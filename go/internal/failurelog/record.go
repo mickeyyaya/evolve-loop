@@ -99,6 +99,15 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 		if report != "" {
 			summary = extractSummary(report)
 		}
+		// Fall back to the reports that actually exist. orchestrator-report.md
+		// has no production writer — 0 of 241 live workspaces carry one — so
+		// this extraction has silently returned "" on every recorded failure,
+		// leaving an operator with a failure log that says nothing about the
+		// failure. The read tolerating absence is correct (a diagnostic must
+		// never brick the log); having no second source was the defect.
+		if strings.TrimSpace(summary) == "" && report != "" {
+			summary = extractSummaryForCycle(filepath.Dir(report))
+		}
 	}
 
 	entry := Recorded{
@@ -134,9 +143,29 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	return entry, nil
 }
 
+var summaryFallbacks = []string{"orchestrator-report.md", "audit-report.md", "build-report.md"}
+
+// extractSummaryForCycle returns the first non-empty summary among the reports
+// present in a cycle workspace. Invents nothing: an empty workspace stays
+// empty, because a fabricated summary is worse than an absent one.
+func extractSummaryForCycle(workspace string) string {
+	if workspace == "" {
+		return ""
+	}
+	for _, name := range summaryFallbacks {
+		if s := extractSummary(filepath.Join(workspace, name)); strings.TrimSpace(s) != "" {
+			return s
+		}
+	}
+	return ""
+}
+
 // extractSummary pulls the first ~8 lines of the Failure / Verdict /
 // Phase Outcomes section from orchestrator-report.md, joined into one
 // line, capped at 400 chars. Ports the bash awk extractor.
+// summaryFallbacks are the verdict-bearing reports a cycle workspace really
+// has, in the order an operator would read them: the graded verdict first, then
+// what the builder claimed.
 func extractSummary(reportPath string) string {
 	data, err := os.ReadFile(reportPath)
 	if err != nil {
