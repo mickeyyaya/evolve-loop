@@ -45,12 +45,87 @@ const badVerdictEventType = "bad_verdict_classified"
 // recovery costs, so a single headline rate cannot size the extraction stage.
 // Only patterns that actually occurred appear — a non-recoverable record
 // carries the empty pattern and must not manufacture a phantom bucket.
+//
+// Saved is the number of coercions the extraction stage ACTUALLY performed,
+// folded from a different sidecar (salvage-applied.jsonl) by
+// CountSalvageApplied. It is deliberately not derivable from Recoverable:
+// Recoverable is measured POTENTIAL — what a lenient reader could have
+// recovered — while Saved is what the gate did, and a stage that refuses on
+// ambiguity or fails the re-verify pass makes the two diverge. Reporting one
+// as the other would tell operators the gate is salvaging reports it in fact
+// blocked. Always emitted (never omitempty) so a consumer needs no special
+// case for the fresh-project-root state.
 type BaselineSummary struct {
-	Total       int                    `json:"total"`
-	Recoverable int                    `json:"recoverable"`
-	Rate        float64                `json:"rate"`
-	ByPattern   map[SalvagePattern]int `json:"by_pattern"`
+	Total       int `json:"total"`
+	Recoverable int `json:"recoverable"`
+	Saved       int `json:"saved"`
+	// Malformed is how many sidecar records were unreadable and therefore
+	// skipped. Emitted in the envelope because the JSON consumer is exactly
+	// the one that cannot see the prose WARN — tolerance that is honest only
+	// in prose is silent where it is machine-read (diff-review MEDIUM).
+	Malformed int                    `json:"malformed"`
+	Rate      float64                `json:"rate"`
+	ByPattern map[SalvagePattern]int `json:"by_pattern"`
 }
+
+// CountSalvageApplied folds the salvage-applied JSONL into the number of
+// coercions the extraction stage actually performed — every run, not just this
+// process's (run-scoping is SalvageSummaryLine's job, which answers the
+// different question "what did THIS cycle salvage"). Pure: no filesystem
+// access, no mutation of its input.
+//
+// Records of a foreign event_type are skipped: the sidecar is a repo-level file
+// any emitter may append to, and counting a foreign line would inflate the one
+// number an operator reads as "the gate coerced this many verdicts". Blank
+// lines are not records.
+//
+// TRUST POSTURE (cycle-1442 audit M1/M2). This sidecar is append-only and
+// UNAUTHENTICATED, so both of its failure directions are handled explicitly and
+// neither is silent:
+//
+//   - Unreadable line. Returned as the second value (malformed), never fatal.
+//     A torn line is an ordinary crash artifact — the in-process summary has
+//     always tolerated one — and hard-erroring here discarded the entire
+//     already-computed operator report (exit 1, no output) over one bad byte.
+//     Reporting the skip count is what keeps tolerance honest: silently
+//     dropping lines would make a deliberately torn record a way to HIDE
+//     salvages.
+//   - Inflated count. Foreign event types do not count, and the number this
+//     returns is advisory telemetry, never a gate input — nothing in the
+//     decision path reads it.
+func CountSalvageApplied(r io.Reader) (saved int, malformed int, err error) {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			EventType string `json:"event_type"`
+		}
+		if jsonErr := json.Unmarshal([]byte(line), &rec); jsonErr != nil {
+			malformed++
+			continue
+		}
+		if rec.EventType == salvageAppliedEventType {
+			saved++
+		}
+	}
+	// A scanner error is the one genuinely fatal case: it means the read
+	// itself failed (or a single line exceeded the cap), so the remainder of
+	// the file was never seen and any count would be an undercount presented
+	// as a total.
+	if scErr := sc.Err(); scErr != nil {
+		return 0, malformed, fmt.Errorf("read %s: %w", salvageAppliedFile, scErr)
+	}
+	return saved, malformed, nil
+}
+
+// SalvageAppliedFile is the applied-coercions sidecar's basename under .evolve/.
+// Exported for the same one-name-two-callers reason as BadVerdictBaselineFile:
+// the CLI must open the file recordSalvageApplied appends to.
+const SalvageAppliedFile = salvageAppliedFile
 
 // SummarizeBadVerdictBaseline folds the bad-verdict baseline JSONL into a
 // BaselineSummary. Pure: no filesystem access, no mutation of its input.

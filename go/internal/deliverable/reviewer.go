@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -128,6 +129,72 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	// recovered from this bad_verdict. Never reads a decision, never writes one.
 	recordBadVerdictBaseline(roots, in.Phase, res, r.logf)
 
+	// Extraction/coercion stage (schema-aligned salvage layer, second
+	// deliverable): when the bad_verdict is the SOLE violation, is genuinely
+	// recoverable and unambiguous, AND the repaired bytes re-verify clean,
+	// approve via the salvaged Result instead of falling through to block —
+	// same fail-safe posture as the instrumentation above (never invents a
+	// value, refuses on ambiguity). Logged separately from the unconditional
+	// baseline record, additive not a replacement.
+	if salvaged, applied := salvageVerdictWith(res, r.resolver, roots, r.phaseIO); applied {
+		// EFFECTS live below the dial; the DECISION above it (cycle-1442 audit
+		// H3). Computing "would this have salvaged" is precisely what a shadow
+		// soak is for, but the block inherited its position from the
+		// unconditional observability record above and so also rewrote the
+		// judged artifact, appended the telemetry sidecar and touched the
+		// breaker while the gate reported itself disabled — a soak run then
+		// measures a system its own "disabled" gate already mutated.
+		if r.stage != config.StageEnforce {
+			// Carries the contract reason too: the ordinary shadow path below
+			// logs summarize(), and an operator tailing the gate at advisory
+			// must not lose the rejection reason for exactly the subset of
+			// reports salvage happens to touch (diff-review LOW).
+			r.logf("[contract-gate] %s: %s (stage=%s, would-block; would salvage the verdict — artifact, telemetry and breaker left untouched)",
+				in.Phase, summarize(in.Phase, res), r.stage)
+			return core.ReviewResult{Approve: true}
+		}
+		// Write back the bytes the salvage re-verify actually approved. This
+		// Reviewer is salvage's only production caller and it consumes the
+		// salvaged Result and nothing else, so the artifact on disk is the ONLY
+		// channel by which the NEXT phase to read ArtifactPath can observe what
+		// the gate approved; leaving the malformed original there let a FAIL
+		// sentinel the strict parse could not read be re-resolved to PASS by a
+		// downstream prose scan (cycle-1441 audit H1, HIGH).
+		//
+		// Fail CLOSED. If the approved bytes cannot be persisted we do not
+		// approve on them — control falls through to the ordinary block path,
+		// which is exactly the behaviour that predated the salvage stage. This
+		// is the one place the gate must not fail open: failing open here
+		// reinstates the defect (approval over bytes nobody downstream will
+		// ever see) instead of merely declining a recovery.
+		if err := persistSalvagedArtifact(res.ArtifactPath, res.Content, salvaged.Content); err != nil {
+			r.logf("[contract-gate] %s: salvage recovered the verdict but the repaired artifact could not be persisted; refusing the salvage: %v", in.Phase, err)
+		} else {
+			recordSalvageApplied(roots, in.Phase, ClassifyBadVerdict(res.Content).Pattern, r.logf)
+			// Surfaced, not just logged to a sidecar nobody reads: README §8 promises
+			// operators that every coercion is "logged + surfaced", and a salvage
+			// silently approving a phase is exactly the false-confidence failure the
+			// research memo (§3.3) is written against. Rendered AFTER the sidecar
+			// append so the running total includes this salvage, and read back FROM
+			// that sidecar so the count is single-sourced, never a second counter
+			// (cycle-1392 audit LOW dd17d798e155571ecd91be63e14050ab6). Empty at zero
+			// records or an unreadable/absent sidecar — no zero-noise, and the gate's
+			// decision never depends on it.
+			if line := SalvageSummaryLine(roots.EvolveDir); line != "" {
+				r.logf("[contract-gate] %s: %s", in.Phase, line)
+			}
+			// Breaker-NEUTRAL, not breaker-clearing (cycle-1441 audit M2b; the
+			// repo rule for every salvage rung). Resetting here pinned the
+			// consecutive-block counter at zero for any phase that kept
+			// emitting recoverable-malformed reports, so neither the
+			// second-block escalation ladder nor the third-block breaker could
+			// ever fire on a persistently malformed producer. Leave the count
+			// exactly as the gate found it: a salvage is neither a block nor a
+			// clean pass.
+			return core.ReviewResult{Approve: true}
+		}
+	}
+
 	reason := summarize(in.Phase, res)
 
 	// Report-size handoff-budget is warn-only below its own enforce dial
@@ -223,4 +290,46 @@ func resetBreaker(path string) {
 	if readBreaker(path) != 0 {
 		writeBreaker(path, 0)
 	}
+}
+
+// persistSalvagedArtifact writes the salvage-approved bytes over the artifact
+// the gate judged, so the file a downstream phase re-reads is the file the gate
+// actually approved. Before this existed the gate approved `content` while
+// leaving the malformed original on disk — the two diverged silently and a FAIL
+// sentinel could be re-resolved to PASS by a prose scan downstream (cycle-1441
+// audit H1, HIGH).
+//
+// An empty path is the contract's "declares no file" discriminator
+// (deliverable.go:55, ship/NoArtifact): there is no artifact to reconcile, so
+// this is a no-op success rather than an error. The write goes through
+// internal/atomicwrite so a reader concurrent with the gate can never observe a
+// half-written report — the repo's single implementation of that, not a local
+// copy.
+func persistSalvagedArtifact(path, judged, content string) error {
+	if path == "" {
+		return nil
+	}
+	// Re-read and compare against the bytes the decision was computed over.
+	// atomicwrite is an unconditional rename, so without this a still-live
+	// agent that rewrote its report after the gate's read would have its
+	// CORRECTED verdict silently replaced by the repaired STALE bytes — with
+	// Approve=true (cycle-1442 adversarial F1).
+	//
+	// STATED GUARANTEE, deliberately narrower than compare-and-swap
+	// (go-reviewer HIGH): this refuses when the file changed BEFORE this read.
+	// It is not atomic with the rename below, so a write landing inside that
+	// microsecond window is still clobbered. Closing that would need a lock the
+	// agent side does not take, which buys a far smaller window than it costs;
+	// what matters is that the comment does not claim a guarantee the code does
+	// not provide. Refusing is free: the caller fails closed and the ordinary
+	// block path runs, which is what
+	// happened before salvage existed.
+	current, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("re-read before write-back: %w", err)
+	}
+	if string(current) != judged {
+		return fmt.Errorf("artifact changed under the gate between verify and write-back (judged %d bytes, on disk %d) — refusing to overwrite a newer report with a repair of the older one", len(judged), len(current))
+	}
+	return atomicwrite.Bytes(path, []byte(content))
 }
