@@ -266,5 +266,9 @@ Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-s
 ## Reflection-sycophancy defect check
 reference `reflection-sycophancy` — trigger conditions, severity rules, `location` field format.
 
+## Reasoning chain (ADR-0088) — REQUIRED
+Your verdict is the CONCLUSION of a chain, not an assertion. Emit exactly one block (rows: `id | status | citation | finding`; statuses `coherent|incoherent|unverifiable`) opened by `<!-- evolve-audit-chain` and closed by `-->`, with one row per link in order: `intent-fidelity`, `selection-fidelity`, `specification-fidelity`, `implementation-fidelity`, `narrative-fidelity`, `delivery-fidelity`, `evidence-fidelity`.
+Read the prior phases to answer them — `intent.md`, `triage-decision.json`, `covering-tests.md`, `build-report.md`, `acs-verdict.json`. Each row cites something a third party can open. A link you could NOT check is `unverifiable`, never `coherent`; a link you omit is treated as decisive against the cycle. These catch what a diff alone cannot: derailed (delivery), specious (narrative), paradoxical (specification coherent-implementation), deceptive (evidence).
+
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson: a mid-file marker deleted the verdict rules and disposition contract from every audit). On-demand lookups: [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` (full streak table, decay rule, profile-update conditions).
