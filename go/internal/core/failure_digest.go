@@ -167,6 +167,25 @@ var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIP
 // here so it is not rediscovered as a bug.
 var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
 
+// cycleNumberToken matches the cycle-numbered tokens that per-cycle ARTIFACT
+// PATHS bake into reason text — ".evolve/runs/cycle-1365/audit-report.md",
+// ".evolve/worktrees/cycle-42824668-1440/go", and the bare "cycle 1365" of
+// prose reasons. The trailing `(?:-\d+)*` is load-bearing for the worktree
+// shape, whose name carries BOTH a lane hash and a cycle number. Same shape as
+// failure_learning.go's carryoverCycleTokenRE, extended for multi-segment ids.
+// Only the NUMBER folds: the path around it (which dir, which artifact FILE)
+// is untouched, so two different artifacts in one cycle dir stay two defects.
+var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)
+
+// attemptDenominatorToken matches a retry loop's attempt index — "(attempt
+// 1/3)", "retry 3 of 4". One unwinnable defect retried N times is ONE defect,
+// but each attempt index minted its own fingerprint, so the identical-
+// fingerprint breaker (IdenticalFingerprintCeiling=3) could never reach its
+// ceiling on exactly the retry storms it exists to halt. The keyword is
+// preserved via ${1} so an "attempt" reason and a "retry" reason — different
+// writers, different failures — cannot collapse into each other.
+var attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
+
 // normalizeReasonForFingerprint projects a reason onto its DEFECT IDENTITY,
 // dropping tokens that are load-bearing for a human reader but pure noise for
 // identity. Display and identity are two projections of the one reason string:
@@ -189,6 +208,8 @@ var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
 // collapse into one fingerprint.
 func normalizeReasonForFingerprint(reason string) string {
 	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
+	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
+	reason = attemptDenominatorToken.ReplaceAllString(reason, "${1} <n>/<n>")
 	return goTestDurationToken.ReplaceAllString(reason, "<dur>")
 }
 

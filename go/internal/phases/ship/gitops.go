@@ -777,10 +777,21 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		if len(tail) > 300 {
 			tail = "…" + tail[len(tail)-300:]
 		}
-		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+		// Two-strikes-same-pathspec (deterministic-stage-refusal-router): the
+		// FIRST refusal keeps its retry (a genuinely flaky add must), but the
+		// SAME pathspec refused twice in a row cannot win in place — cycle-1365
+		// burned its whole retry budget re-adding one .evolve/evals path whose
+		// worktree base predated the .gitignore carve-out. Precondition routes
+		// it to continuation/salvage instead of another doomed attempt.
+		class := core.ShipClassTransient
+		if recordStageRefusal(opts.WorkspacePath, paths) {
+			class = core.ShipClassPrecondition
+		}
+		return shipErr(core.CodeGitStageFailed, class, core.StageAtomicShip,
 			fmt.Sprintf("ship: git add failed (rc=%d): %v: %s", exit, runErr, tail),
 			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(runErr), "git_stderr", tail, "worktree", dir)
 	}
+	clearStageRefusal(opts.WorkspacePath)
 	res.Logs = append(res.Logs, fmt.Sprintf(
 		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",
 		len(paths), len(manifest), len(changed)))
@@ -807,6 +818,47 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 // unquoteGitPath on every probe line. A broken probe fails OPEN with the full
 // set and a loud log: the probe must never block ship — if the refusal
 // survives, the add's own stderr now travels in the ship error.
+// stageRefusalMemoFile is where a lane remembers the pathspec its last `git
+// add` refused. Workspace-scoped on purpose: fleet lanes run concurrently, so
+// one lane's strike must never deterministically block a peer's first attempt.
+const stageRefusalMemoFile = "ship-stage-refusal.txt"
+
+// stageRefusalKey is the identity of a staging attempt: the sorted path set,
+// so "the SAME pathspec" is order-independent but a different refused path is
+// a different failure.
+func stageRefusalKey(paths []string) string {
+	sorted := append([]string(nil), paths...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, "\n")
+}
+
+// recordStageRefusal remembers that pathspec was refused and reports whether
+// this is the SECOND CONSECUTIVE refusal of that same pathspec — the signal
+// that no retry can win in place. With no workspace there is nowhere to record
+// a strike, so it degrades to the pre-existing transient behavior rather than
+// guessing deterministic.
+func recordStageRefusal(workspace string, paths []string) bool {
+	if workspace == "" {
+		return false
+	}
+	memo := filepath.Join(workspace, stageRefusalMemoFile)
+	key := stageRefusalKey(paths)
+	prev, err := os.ReadFile(memo)
+	// Best-effort memory: an unwritable workspace only costs the escalation,
+	// never the ship error itself.
+	_ = os.WriteFile(memo, []byte(key), 0o644)
+	return err == nil && string(prev) == key
+}
+
+// clearStageRefusal drops the strike memory after a staging call succeeds, so
+// "consecutive" means consecutive.
+func clearStageRefusal(workspace string) {
+	if workspace == "" {
+		return
+	}
+	_ = os.Remove(filepath.Join(workspace, stageRefusalMemoFile))
+}
+
 func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root string, paths []string) []string {
 	if len(paths) == 0 {
 		return paths

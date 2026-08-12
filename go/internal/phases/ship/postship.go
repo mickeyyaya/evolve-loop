@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
@@ -39,6 +40,70 @@ func postShip(ctx context.Context, opts *Options, res *RunResult) error {
 
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] DONE: shipped %s at %s", res.ClassUsed, res.CommitSHA))
 	return nil
+}
+
+// retireCommittedCarryover deletes the state.json carryover todos this cycle
+// actually committed (and their cross-cycle class twins) — the PASS-closeout
+// half of the carryover lifecycle. mergeCarryoverTodos only ever unions, so
+// without this an entry whose work shipped persisted forever and saturated the
+// router prompt's 20-slot carryover window with already-done work.
+//
+// Bookkeeping only: every failure path is a WARN, never a ship error. Callers
+// gate it on the landing check, exactly as inbox promotion is gated.
+//
+// Rewrites the RAW entries rather than round-tripping them through the typed
+// struct, so a field this binary does not model survives the retirement.
+func retireCommittedCarryover(opts *Options, res *RunResult, cid int, committedIDs []string) {
+	if len(committedIDs) == 0 {
+		return
+	}
+	stPath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
+	if _, err := os.Stat(stPath); err != nil {
+		// No state.json (fresh checkout, or a lane whose state lives elsewhere)
+		// is not an error — the PASS closeout must not fail over bookkeeping.
+		return
+	}
+	var retiredCount int
+	// Same shared lock every other state.json RMW takes (ADR-0049 S2 / G2), so
+	// a concurrent allocator write can neither lose nor be lost to this one.
+	if err := withStateLock(stPath, func() error {
+		stMap, err := readStateMap(stPath)
+		if err != nil {
+			return err
+		}
+		raw, ok := stMap["carryoverTodos"].([]any)
+		if !ok || len(raw) == 0 {
+			return nil
+		}
+		todos := make([]core.CarryoverTodo, len(raw))
+		for i, e := range raw {
+			em, _ := e.(map[string]any)
+			todos[i] = core.CarryoverTodo{ID: stateString(em, "id"), Action: stateString(em, "action")}
+		}
+		kept := core.RetireCarryoverTodos(todos, committedIDs)
+		if len(kept) == len(todos) {
+			return nil
+		}
+		keep := make(map[string]bool, len(kept))
+		for _, t := range kept {
+			keep[t.ID] = true
+		}
+		out := make([]any, 0, len(kept))
+		for i, e := range raw {
+			if keep[todos[i].ID] {
+				out = append(out, e)
+			}
+		}
+		retiredCount = len(raw) - len(out)
+		stMap["carryoverTodos"] = out
+		return writeStateMap(stPath, stMap)
+	}); err != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: carryover retirement for cycle %d: %v", cid, err))
+		return
+	}
+	if retiredCount > 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d carryover todo(s) for cycle %d: %v", retiredCount, cid, committedIDs))
+	}
 }
 
 // advanceLastCycleNumber reads cycle-state.json:cycle_id and writes it
@@ -175,6 +240,12 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			} else if len(retired) > 0 {
 				res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
 			}
+			// PASS-closeout carryover retirement (carryover-pass-retirement):
+			// the inbox item is now in processed/, so its state.json carryover
+			// twin is done work too. Rides the SAME landing gate as promotion —
+			// retiring on an unlanded ship would erase the only record of work
+			// that never shipped.
+			retireCommittedCarryover(opts, res, cid, committedIDs)
 		}
 	}
 

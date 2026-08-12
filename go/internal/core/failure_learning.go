@@ -798,6 +798,51 @@ func carryoverFingerprintExists(todos []CarryoverTodo, action string) bool {
 	return carryoverFingerprintIndex(todos, action) >= 0
 }
 
+// RetireCarryoverTodos is the PASS-closeout half of the carryover lifecycle:
+// mergeCarryoverTodos only ever UNIONS, so an entry whose work actually shipped
+// persisted forever and the router prompt's 20-slot window filled with done
+// work (124 of 254 live entries were stale on 2026-08-10).
+//
+// An entry retires when its ID is in committedIDs, OR when it shares a retired
+// entry's cross-cycle Action fingerprint — the per-cycle re-mints of the SAME
+// class that the ID-keyed dedupe never collapsed. Everything else survives in
+// order; the input slice is never mutated (callers re-read state under a lock,
+// and a mutated input would corrupt a concurrent peer's merge).
+func RetireCarryoverTodos(todos []CarryoverTodo, committedIDs []string) []CarryoverTodo {
+	committed := make(map[string]bool, len(committedIDs))
+	for _, id := range committedIDs {
+		// A blank committed id is malformed input, not a claim about the
+		// equally-malformed blank-ID entry — never let one retire the other.
+		if id = strings.TrimSpace(id); id != "" {
+			committed[id] = true
+		}
+	}
+	if len(committed) == 0 || len(todos) == 0 {
+		return append([]CarryoverTodo(nil), todos...)
+	}
+
+	// Pass 1: the fingerprints of the directly-committed entries. An empty
+	// Action has no class identity, so it never seeds a fingerprint match.
+	retiredFP := map[string]bool{}
+	for _, t := range todos {
+		if committed[t.ID] {
+			if fp := carryoverActionFingerprint(t.Action); fp != "" {
+				retiredFP[fp] = true
+			}
+		}
+	}
+
+	// Pass 2: drop committed ids and their same-class variants, order intact.
+	out := make([]CarryoverTodo, 0, len(todos))
+	for _, t := range todos {
+		if committed[t.ID] || retiredFP[carryoverActionFingerprint(t.Action)] {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 // refreshCarryoverExpiry keeps a suppressed re-mint's freshness: a class that
 // keeps failing must not ride its FIRST occurrence's TTL into the boot prune
 // while its duplicates are being deduped away (diff-review MEDIUM). The later
