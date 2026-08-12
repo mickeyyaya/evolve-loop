@@ -41,7 +41,28 @@ const (
 	EventVerifyFailed          EventType = "verify-failed"
 	EventClassification        EventType = "classification"
 	EventGoalStallEscalated    EventType = "goal-stall-escalated"
+	// EventStallDetected is the phase watchdog's kill-sequence record. It lives
+	// HERE, with its siblings, because abnormal-events.jsonl has two writers
+	// and a value declared in only one of them is invisible to every typed
+	// reader of the other — records that parse but fall outside the vocabulary
+	// are skipped silently by exactly the queries an operator runs when a phase
+	// went missing.
+	EventStallDetected EventType = "stall-detected"
 )
+
+// knownEventTypes is the closed vocabulary. Membership is exported because the
+// second writer must be able to assert it rather than reproduce the list.
+var knownEventTypes = map[EventType]bool{
+	EventCounterNonAdvance:     true,
+	EventCircuitBreakerTripped: true,
+	EventVerifyFailed:          true,
+	EventClassification:        true,
+	EventGoalStallEscalated:    true,
+	EventStallDetected:         true,
+}
+
+// IsKnownEventType reports whether t is a declared abnormal-event type.
+func IsKnownEventType(t EventType) bool { return knownEventTypes[t] }
 
 // Event is one line in abnormal-events.jsonl.
 //
