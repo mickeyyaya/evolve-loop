@@ -56,6 +56,40 @@ Triage Step 0 ──► list .evolve/inbox/*.json
 
 Injections during an active cycle are deferred to the next cycle by design — Triage reads inbox once at phase start.
 
+## Consumption rides the landing (`Closes-Inbox:`)
+
+An item is consumed by the ship that closes it, not by a later bookkeeping act.
+Two sources feed the committed set that `promoteInbox` moves to `processed/`:
+
+1. **Triage** — `top_n[]` + `skip_shipped[]` (or the `lane-scope.json` pin on a
+   continuation/lane cycle that carries no triage decision).
+2. **The Builder's marker** — a line-anchored `Closes-Inbox: <id>` (comma lists
+   allowed, ids deduped) in `build-report.md`. Parsed by
+   `inboxmover.ClosesInboxIDs`; wired in `internal/phases/ship/postship.go`.
+
+The two are **unioned**, so an item nobody named at dispatch is still consumed by
+its own landing. Before this, consumption was a separate act from landing and
+forgetting was always possible: #453 landed `schema-aligned-salvage-layer` without
+consuming its item, and wave cycle-1448 re-picked already-shipped work as live
+scope. Overnight, ~3-4 of ~20 cycles were bookkeeping-shaped — a full
+scout→triage→tdd→build→audit→ship to move one JSON file.
+
+Both over- and under-consumption are bounded:
+
+- **One gate, not two.** Marker ids ride the EXACT pre-existing cycle-598 landing
+  check (`isLanded`). An unlanded ship consumes nothing and its residuals drain
+  back to the inbox root with the `unlanded` release reason.
+- **Closure is never inferred.** `connects_to` is a hint, not an acceptance
+  predicate, so a diff that merely brushes past an item's files closes nothing.
+  Only an explicit, line-anchored marker consumes; prose mentioning the marker
+  mid-sentence does not, and ids are validated (`[A-Za-z0-9._-]+`) so a
+  documented `<id>` placeholder can never match a real item.
+- **The marker must NOT appear on a partial landing.** It asserts the item is
+  fully closed by this diff; marking half-done work erases the only record that
+  the rest is outstanding. Omit the line and note the deferral instead.
+- An absent `build-report.md` (build-skipped cycles) is not an error — it reads
+  as "no closure claim" and leaves the triage-sourced promotion untouched.
+
 ## Directory structure
 
 ```

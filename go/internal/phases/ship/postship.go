@@ -199,7 +199,19 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: no triage decision for cycle %d — committed set from lane-scope pin: %v", cid, laneFallbackIDs))
 		}
 	}
-	if body != nil || len(laneFallbackIDs) > 0 {
+	// Consumption rides the landing (consumption-rides-landing-ship): the ids the
+	// Builder line-anchored as closed by THIS diff. Before this, consuming an item
+	// was a separate act from the ship that closed it, so forgetting was always
+	// possible — #453 landed schema-aligned-salvage-layer with its item left open
+	// and wave cycle-1448 re-picked already-shipped work as live scope. The marker
+	// is additive to the triage/lane sources and rides the SAME landing gate
+	// below; an absent build-report.md (build-skipped cycles) reads as no claim,
+	// never an error.
+	markerIDs := inboxmover.ClosesInboxIDs(readBuildReport(cycleDir))
+	if len(markerIDs) > 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: build-report Closes-Inbox marker for cycle %d: %v", cid, markerIDs))
+	}
+	if body != nil || len(laneFallbackIDs) > 0 || len(markerIDs) > 0 {
 		// Landing gate (cycle-598 regression, inbox-promotion-requires-landed-ship):
 		// promote to processed/ ONLY when the ship commit actually reached durable
 		// history (ancestor of HEAD or origin/<branch>). Cycle 598's push was
@@ -225,6 +237,10 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			} else {
 				committedIDs = laneFallbackIDs
 			}
+			// Union, not replace: a marker closes items ALONGSIDE whatever triage
+			// named, which is the whole point — the id nobody named at dispatch is
+			// exactly the one that used to survive its own landing.
+			committedIDs = unionIDs(committedIDs, markerIDs)
 			// Reconcile superseded[] — inbox items whose work shipped under a
 			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
 			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
@@ -324,6 +340,34 @@ func isLanded(ctx context.Context, opts *Options, sha string) bool {
 //     cycle committed to);
 //  3. nil when neither exists — promotion is skipped, the residual drain (the
 //     caller's safety net) still releases claims.
+//
+// readBuildReport returns the cycle's build-report.md, or nil when there is
+// none. Absence is the ordinary shape for a build-skipped cycle and must not
+// disturb the triage-sourced promotion, so every read error degrades to "no
+// closure claim" rather than failing the closeout.
+func readBuildReport(cycleDir string) []byte {
+	body, err := os.ReadFile(filepath.Join(cycleDir, "build-report.md"))
+	if err != nil {
+		return nil
+	}
+	return body
+}
+
+// unionIDs appends the ids of b not already in a, preserving first-seen order.
+func unionIDs(a, b []string) []string {
+	seen := make(map[string]bool, len(a))
+	for _, id := range a {
+		seen[id] = true
+	}
+	for _, id := range b {
+		if !seen[id] {
+			seen[id] = true
+			a = append(a, id)
+		}
+	}
+	return a
+}
+
 func triageDecisionBytes(cycleDir string, cid int) ([]byte, string) {
 	companion := filepath.Join(cycleDir, "triage-decision.json")
 	body, err := os.ReadFile(companion)

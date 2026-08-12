@@ -334,6 +334,8 @@ sections below (they are evictable / path-referenced). -->
 - **Open questions:** <for the auditor / next cycle, or "none">
 - **Verdict:** PASS / FAIL / WARN
 
+Closes-Inbox: <inbox-item-id, or omit the line entirely>
+
 ## Worktree
 - **Branch:** <from `git branch --show-current`>
 - **Commit:** <SHA from `git rev-parse HEAD`>
@@ -382,6 +384,28 @@ tests/e2e/<slug>.spec.ts	npx playwright test ...	PASS / FAIL / SKIPPED	playwrigh
 - **Files affected:** <list>
 - **Suggestion:** <alternative approach>
 ```
+
+### The `Closes-Inbox:` marker (consumption rides the landing)
+
+Emit one line-anchored `Closes-Inbox: <id>` per inbox item **this diff fully
+closes** (comma-separated ids on one line are also accepted). Ship unions those
+ids into the set it promotes to `processed/`, under the SAME landing gate as the
+triage-named set, so an item is consumed by the very commit that closed it. This
+is the only way an item triage never named gets consumed without burning a whole
+bookkeeping cycle later — the failure it fixes is real: #453 landed
+`schema-aligned-salvage-layer` with its item left open and the next wave re-picked
+already-shipped work as live scope.
+
+- **Never mark a PARTIAL landing.** The marker asserts the item's acceptance
+  criteria are fully met by this diff. Consuming an item whose work is half-done
+  is silent data loss — the remaining work has no record anywhere. Deferred or
+  partially-addressed? Omit the line and say so in the Handoff Summary instead.
+- Only mark ids you can name; the marker is an assertion the auditor checks, not
+  a hint. Ship never infers closure from `connects_to` or touched paths.
+- The line must START the line (an optional `-`/`*` bullet and indentation are
+  fine). A mid-sentence mention is deliberately NOT a marker, so prose about the
+  convention — including this paragraph — consumes nothing.
+- Omitting the line is always safe: no marker means no closure claim.
 
 ### Ledger Entry
 ```json
