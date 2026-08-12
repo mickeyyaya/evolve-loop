@@ -45,6 +45,7 @@ docs/
 | **Reviewing the architecture as an engineer/security reviewer** | [concepts/trust-architecture.md](concepts/trust-architecture.md) → [architecture/egps-v10.md](architecture/egps-v10.md) → [architecture/phase-architecture.md](architecture/phase-architecture.md) |
 | **Mixing LLMs across phases for cost/quality** | [concepts/pluggability.md](concepts/pluggability.md) |
 | **Recovering from a failed cycle** | [concepts/error-recovery.md](concepts/error-recovery.md) → [architecture/checkpoint-resume.md](architecture/checkpoint-resume.md) |
+| **Why a gate keeps false-FAILing honest work** | [incidents/2026-08-12-proxy-as-verdict-findings.md](incidents/2026-08-12-proxy-as-verdict-findings.md) — the recurring proxy-as-verdict defect, 15 findings with root causes, and the two ADRs that replace it |
 | **Understanding what changed in v10.7** | [incidents/cycle-61.md](incidents/cycle-61.md) (B0-B7 fixes) + [CHANGELOG.md](../CHANGELOG.md) |
 
 ## Distinguishing principle

@@ -6,6 +6,8 @@
 
 ## Problem
 
+> Full root-cause record for this design and the 15 review findings that shaped it: [docs/incidents/2026-08-12-proxy-as-verdict-findings.md](../../incidents/2026-08-12-proxy-as-verdict-findings.md).
+
 A phase agent that produces valuable work outside its declared scope has it destroyed on a technicality — and destroyed *silently*.
 
 Scope is a **proxy** for "how much unreviewed surface is entering the tree", and the pipeline has been treating the proxy as a verdict: in-scope passes, out-of-scope dies. That is wrong in both directions. An in-scope change can be terrible. An out-of-scope change is frequently the thing that makes the in-scope change *correct* — the call site whose signature it broke, the covering test its new export requires, the doc it falsified.

@@ -6,6 +6,8 @@
 
 ## Problem
 
+> Full root-cause record for this design and the 15 review findings that shaped it: [docs/incidents/2026-08-12-proxy-as-verdict-findings.md](../../incidents/2026-08-12-proxy-as-verdict-findings.md).
+
 An auditor that reads the diff and declares `PASS` has produced a judgement whose support is invisible. Everything downstream must either trust it or re-derive it — and the failures that matter most are precisely the ones a diff-only reading **cannot** see.
 
 A human reviewer catches those instantly, and not by being cleverer. They hold the whole chain at once: what was asked, what was planned, what the tests demanded, what the builder claimed, what the bytes do, what the gates actually ran. Reading only the last of those, nobody could catch them either.
