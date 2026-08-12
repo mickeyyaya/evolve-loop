@@ -64,10 +64,16 @@ type Window struct {
 // tier could observe the launch's usage (Source == SourceNone) — the signal
 // that distinguishes "unmeasured" from "measured zero" so uncovered drivers
 // never masquerade as free (the 2026-07-13 all-zeros baseline defect).
+// FillPct is the derived context-fill reading for the launch (percent of the
+// driver family's effective window occupied by prompt-side tokens), stamped by
+// DefaultResolver off the usage that same resolve recovered. It carries
+// FillPctUnmeasured when the fill could not be derived — an uncovered launch
+// or an unmapped driver family — so "unmeasured" never reads as "0% full".
 type Result struct {
-	Usage  cyclestate.TokenUsage
-	Source Source
-	Warn   string
+	Usage   cyclestate.TokenUsage
+	Source  Source
+	Warn    string
+	FillPct float64
 }
 
 // transcriptLine is the subset of a Claude Code transcript JSONL record the

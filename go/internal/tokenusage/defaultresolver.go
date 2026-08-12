@@ -28,7 +28,14 @@ func DefaultResolver(configRoot string) func(Window) (Result, error) {
 		r := Chain(driverChain(configRoot, w)...)
 		if r.Source == SourceNone {
 			r.Warn = fmt.Sprintf("token usage uncovered for driver %q — no transcript/events/scrollback data (fail-open, recorded as unmeasured not zero-cost)", driverLabel(w.Driver))
+			// An uncovered launch has zero prompt tokens because nothing
+			// observed it, not because its context was empty (cycle-1444).
+			r.FillPct = FillPctUnmeasured
+			return r, nil
 		}
+		// Context fill is DERIVED here, off the usage this same resolve just
+		// recovered — single-sourced, never a second scan.
+		r.FillPct = FillPct(PromptTokens(r.Usage), EffectiveWindow(w.Driver))
 		return r, nil
 	}
 }

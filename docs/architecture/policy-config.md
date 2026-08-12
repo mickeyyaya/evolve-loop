@@ -24,9 +24,33 @@ policy).
   // "model", or both. An empty field means "no pin for that dimension".
   "pins": {
     "audit": { "cli": "claude-tmux", "model": "claude-opus-4-8" }
-  }
+  },
+
+  // Context-fill telemetry: warn when a launch's prompt-side tokens occupy more
+  // than this percentage of its driver family's effective context window.
+  // Absent / empty / out-of-range (<=0 or >100) ⇒ 60.
+  "context_fill": { "warn_threshold_pct": 60 }
 }
 ```
+
+## Context-fill telemetry (`context_fill`)
+
+Every launch's token telemetry carries a derived **fill reading**: the prompt-side
+tokens the resolver already recovered (`Input + CacheRead + CacheWrite` — generated
+output does not sit in the prompt) divided by the driver family's effective context
+window, on a 0–100 scale.
+
+| Aspect | Behaviour |
+|---|---|
+| Effective window | claude family (`""`, `claude`, `claude-*`) → 200 000. Any family whose window has not been measured → 0. |
+| Unmeasurable reading | An unconfigured window, or a launch no telemetry tier observed, yields the negative sentinel `tokenusage.FillPctUnmeasured` — never `0`, never `Inf`/`NaN`. "Unmeasured" and "0% full" must not read alike. |
+| WARN | Emitted at the dispatch seam (`internal/bridge.Engine.recordTokenUsage`) **strictly above** the threshold, carrying the `CONTEXT-FILL` marker and naming the phase. The sentinel never warns. |
+| Persistence | Each `llm-calls.ndjson` record carries `fill_pct`, so the reading is durable rather than only printed. |
+
+The 200 000 claude window is deliberately conservative — below any advertised
+maximum — because the operationally useful signal is proximity to *degradation*,
+not to the hard ceiling. Windows for unmeasured families are left at 0 on purpose:
+guessing one would publish a fabricated fill reading.
 
 ## Pin semantics (dispatch)
 

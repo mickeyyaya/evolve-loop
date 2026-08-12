@@ -89,6 +89,11 @@ type Adapter struct {
 	// bridgeConfig carries the timing overrides loaded from policy.json at
 	// construction time. Zero values mean "use bridge built-in defaults".
 	bridgeConfig policy.BridgePolicy
+	// contextFillWarnPct is the policy-resolved context-fill WARN threshold
+	// (cycle-1444), loaded alongside bridgeConfig at NewDefault. Zero (bare
+	// New(), or an unreadable policy.json) leaves the engine to apply its own
+	// built-in default, so the fail-open path matches the configured one.
+	contextFillWarnPct int
 	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
 	bootTimeoutStore *clihealth.Store
 }
@@ -111,6 +116,9 @@ func NewDefault(projectRoot string) *Adapter {
 	a := New()
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
+		// Resolve through policy's validating resolver, never off the raw
+		// field: an out-of-range operator value must arrive as the built-in.
+		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
@@ -138,6 +146,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
+		ContextFillWarnPct:    a.contextFillWarnPct,
 	}
 }
 

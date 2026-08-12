@@ -67,6 +67,11 @@ type Deps struct {
 	// injected by the orchestrator from the policy-resolved cfg.PhaseRecovery.
 	// Empty ⇒ channel.ResolveStage returns "shadow" (behavior-neutral default).
 	RecoveryStage string
+	// ContextFillWarnPct is the policy-resolved context-fill WARN threshold
+	// (percent of the driver family's effective context window), injected by
+	// the composition root from Policy.ContextFillConfig(). Zero = not
+	// configured ⇒ the bridge built-in default, matching policy's own.
+	ContextFillWarnPct int
 	// Typed timing fields (from BridgePolicy). Zero = use bridge built-in default.
 	ScrollbackLines    int
 	BootTimeoutS       int
@@ -609,7 +614,19 @@ type llmCallLog struct {
 	// success that warrants a per-CLI collector (cycle-1005). Not omitempty: the
 	// false case must stay queryable for the future tokens-report CLI.
 	Tripwire bool `json:"tripwire"`
+	// FillPct is the launch's context-fill reading (percent of the effective
+	// window), or tokenusage.FillPctUnmeasured when it could not be derived.
+	// Not omitempty: the deferred fill%-vs-verdict correlation report has no
+	// corpus unless every record carries the field, measured or not.
+	FillPct float64 `json:"fill_pct"`
 }
+
+// defaultContextFillWarnPct is the bridge-side built-in context-fill WARN
+// threshold for an unconfigured Deps.ContextFillWarnPct. It intentionally
+// matches policy's own built-in: internal/bridge cannot import internal/policy
+// (the adapter is what wires them), so the zero-value path here must resolve to
+// the same number the operator would get from an absent policy block.
+const defaultContextFillWarnPct = 60
 
 // tripwireSuccessThreshold is the wall-clock floor separating a genuine
 // unmeasured success from a quiet quota-abort: only launches that ran longer
@@ -672,6 +689,13 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		// as unmeasured, never left to read as zero-cost.
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: %s (agent %s)\n", result.Warn, req.Agent)
 	}
+	// Context-fill WARN (cycle-1444): the reading rides out of the resolve
+	// above, so this costs no second measurement. Keyed on a distinct
+	// CONTEXT-FILL marker because the coverage WARN above already names the
+	// agent — an agent-name-only grep could not tell the two lines apart.
+	if w := tokenusage.FillWarn(req.Agent, result.FillPct, defaultIfZero(e.deps.ContextFillWarnPct, defaultContextFillWarnPct)); w != "" {
+		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: CONTEXT-FILL %s\n", w)
+	}
 	// Telemetry tripwire (cycle-1005): the generic coverage WARN above fires on
 	// every uncovered launch, so a quiet quota-abort (exit 85, seconds long) and
 	// a genuine unmeasured success read identically. Escalate only the latter — a
@@ -709,6 +733,7 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		DurationMS: end.Sub(start).Milliseconds(),
 		ExitCode:   code,
 		Tripwire:   tripwire,
+		FillPct:    result.FillPct,
 	}
 	line, err := json.Marshal(rec)
 	if err != nil {

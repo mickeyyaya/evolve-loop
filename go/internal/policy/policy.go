@@ -163,6 +163,9 @@ type Policy struct {
 	// Absent ⇒ built-in defaults apply (stage="off" — dispatcher dormant,
 	// byte-identical to pre-T1 baseline; concurrency=3, the soak sweet spot).
 	ParallelEvaluate *ParallelEvaluatePolicy `json:"parallel_evaluate,omitempty"`
+	// ContextFill configures the context-fill WARN threshold. Absent ⇒
+	// built-in default applies (warn_threshold_pct=60).
+	ContextFill *ContextFillPolicy `json:"context_fill,omitempty"`
 	// RegressionTIA configures test-impact selection over the EGPS Go
 	// regression corpus. Absent ⇒ built-in default applies (stage="off" —
 	// nothing computed, no artifact, byte-identical audit path).
