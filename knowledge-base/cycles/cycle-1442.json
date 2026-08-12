@@ -1,0 +1,47 @@
+{
+  "cycle": 1442,
+  "run_id": "01KZSXS5RQS3A1SX9XYNY0WFED",
+  "goal": "Work the highest-priority open items in .evolve/inbox end-to-end: real implementation, real tests, honest gates, ship each landing so main stays green. Prefer live product and hardening items; consume each shipped item per the normal lifecycle.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|f8d9e99493b3",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "phase audit verdict FAIL routed to retro (agent-graded; see the audit report artifact) defect=H1 HIGH: the fail-CLOSED persist branch at go/internal/deliverable/reviewer.go:154-156 — the invariant b"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1442",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
