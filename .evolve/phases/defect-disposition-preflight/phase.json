@@ -1,0 +1,9 @@
+{
+  "name": "defect-disposition-preflight",
+  "optional": true,
+  "description": "Authors this workspace's defect-dispositions.json in full for every inherited defect (FIXED with resolvable path:line evidence, or DEFERRED with a reason) and scrubs every uncited closure claim from all cycle reports before audit.",
+  "when_to_use": "Select whenever a lane inherits defects from an ancestor cycle, or when the previous cycle's audit FAILed on 'disposition-preflight: MISSING', 'defect(s) inherited ... unaccounted for', or 'closure claim without a citation'.",
+  "inputs": {},
+  "outputs": {},
+  "gates": {}
+}

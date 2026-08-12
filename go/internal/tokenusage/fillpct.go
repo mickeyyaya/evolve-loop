@@ -13,6 +13,7 @@ package tokenusage
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
@@ -29,12 +30,35 @@ const FillPctUnmeasured = -1.0
 // hard ceiling.
 const claudeEffectiveWindow = 200_000
 
+// promptTokensUnmeasured is the prompt-side total for a launch whose counters
+// cannot be summed honestly — a negative counter, or a sum that would overflow
+// int. Negative on purpose, in the same vocabulary as FillPctUnmeasured, so
+// FillPct's negative guard turns it into the documented sentinel instead of a
+// fabricated reading. Unexported: no caller needs to distinguish "unmeasurable
+// prompt total" from "unmeasurable fill".
+const promptTokensUnmeasured = -1
+
 // PromptTokens returns the input-side token count that occupies the context
 // window: fresh input plus both cache halves. Generated Output is excluded —
 // it does not sit in the prompt, and counting it would make the fill WARN fire
 // on long answers instead of on big prompts.
+//
+// The three counters are driver-controlled (they arrive as JSON off a CLI's own
+// usage report), so the sum is guarded rather than trusted: any negative
+// counter, or an addition that would wrap, returns a negative total. Wrapping
+// silently is the worse failure — it publishes a fabricated percentage that
+// FillWarn's "any negative is unmeasured" rule then swallows, so the launch
+// whose telemetry is bogus is exactly the one that raises no warning
+// (cycle-1444 audit M1).
 func PromptTokens(u cyclestate.TokenUsage) int {
-	return u.Input + u.CacheRead + u.CacheWrite
+	total := 0
+	for _, n := range [...]int{u.Input, u.CacheRead, u.CacheWrite} {
+		if n < 0 || total > math.MaxInt-n {
+			return promptTokensUnmeasured
+		}
+		total += n
+	}
+	return total
 }
 
 // EffectiveWindow returns the effective context window for a driver family, or
@@ -55,8 +79,13 @@ func EffectiveWindow(driver string) int {
 // zero or negative window is unmeasurable and yields FillPctUnmeasured — the
 // divide-by-zero guard that keeps Inf/NaN out of every downstream comparison.
 // Over-full readings are not clamped: a launch at 120% is a real signal.
+//
+// A negative prompt-side total is likewise unmeasurable — it is either the
+// guard value PromptTokens returns for a wrapped/negative sum or a nonsense
+// count from elsewhere — and degrades to the sentinel rather than to a
+// fabricated negative percentage.
 func FillPct(promptTokens, window int) float64 {
-	if window <= 0 {
+	if window <= 0 || promptTokens < 0 {
 		return FillPctUnmeasured
 	}
 	return float64(promptTokens) / float64(window) * 100

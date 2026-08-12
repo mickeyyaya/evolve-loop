@@ -8,7 +8,10 @@ score_cap:
     evidence: "cd go && go test -count=1 -run TestContextFillWarn ./internal/bridge"
   - criterion: "The operator's policy.json threshold reaches the production engine deps through the composition root (config is not dead)"
     max_if_missing: 8
-    evidence: "cd go && go test -count=1 -run TestProductionDepsContextFill ./internal/adapters/bridge"
+    evidence: "cd go && go test -count=1 -run TestProductionDeps.*ContextFill ./internal/adapters/bridge"
+  - criterion: "A wrapped or negative prompt-side token total degrades to the FillPctUnmeasured sentinel — never to a fabricated negative percentage that is persisted to llm-calls.ndjson and silently suppresses the WARN"
+    max_if_missing: 7
+    evidence: "cd go && go test -count=1 -run TestFillTelemetry ./internal/tokenusage"
 ---
 
 # Eval: Context-fill WARN threshold (policy-configured, wired at dispatch)
@@ -34,4 +37,13 @@ score_cap:
 |---|---|---|---|
 | threshold-resolution | absent/empty/out-of-range ⇒ 60; valid override respected | 7/10 | `go test -run TestContextFillConfig ./internal/policy` |
 | warn-at-dispatch-seam | phase-named WARN, strictly-above boundary, sentinel silent, persisted | 8/10 | `go test -run TestContextFillWarn ./internal/bridge` |
-| policy-reaches-deps | composition root carries the resolved threshold into engine Deps | 8/10 | `go test -run TestProductionDepsContextFill ./internal/adapters/bridge` |
+| policy-reaches-deps | composition root carries the resolved threshold into engine Deps | 8/10 | `go test -run TestProductionDeps.*ContextFill ./internal/adapters/bridge` |
+| overflow-degrades-to-sentinel | wrapped/negative prompt total ⇒ sentinel, not a fabricated percentage | 7/10 | `go test -run TestFillTelemetry ./internal/tokenusage` |
+
+> Cycle-1446 addendum: the overflow cap closes finding M1 of cycle 1444's WARN
+> verdict — `PromptTokens` summed three driver-controlled counters with no
+> saturation, so a wrapped sum reached `FillPct` and published a negative that
+> was neither a real reading nor the documented sentinel, while `FillWarn`'s
+> "any negative is unmeasured" rule silently swallowed the warning on exactly
+> that launch. Source incident: cycle 1444 audit M1 (re-verified live in
+> cycle 1446).

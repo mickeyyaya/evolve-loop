@@ -157,7 +157,7 @@ func TestC1444_005_WarnReachableFromDispatchSeam(t *testing.T) {
 // production composition root into the engine Deps, or the config is dead.
 func TestC1444_006_PolicyThresholdReachesProductionDeps(t *testing.T) {
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"go", "-C", goDir(t), "test", "-count=1", "-run", "TestProductionDepsContextFill", "./internal/adapters/bridge")
+		"go", "-C", goDir(t), "test", "-count=1", "-run", "TestProductionDeps.*ContextFill", "./internal/adapters/bridge")
 	if err != nil || code != 0 {
 		t.Errorf("policy context_fill never reaches the production engine deps (exit=%d err=%v)\n%s\n%s", code, err, stdout, stderr)
 	}

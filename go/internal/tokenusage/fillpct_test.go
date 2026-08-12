@@ -184,3 +184,71 @@ func TestFillWarn_FiresOnlyStrictlyAboveThreshold(t *testing.T) {
 		})
 	}
 }
+
+// TestFillTelemetry_PromptTokenOverflowIsUnmeasured is the RED contract for
+// cycle-1446 task `contextfill-promptTokens-overflow-guard` (cycle-1444 audit
+// finding M1). The three counters are driver-controlled: each value below is
+// individually a valid `int` that encoding/json will happily land in the
+// TokenUsage fields, but the SUM wraps negative. Today PromptTokens is plain
+// unguarded addition, so FillPct returns a fabricated negative percentage that
+// is neither a real reading nor the documented sentinel — FillWarn then treats
+// it as unmeasured and stays silent on exactly the launch whose telemetry is
+// bogus, while the bogus number is still persisted to llm-calls.ndjson.
+//
+// The contract is behavioural and implementation-agnostic: whatever the guard
+// looks like, the full PromptTokens→FillPct path must yield FillPctUnmeasured
+// for a wrapped or otherwise negative prompt-side total.
+func TestFillTelemetry_PromptTokenOverflowIsUnmeasured(t *testing.T) {
+	cases := []struct {
+		name  string
+		usage cyclestate.TokenUsage
+	}{
+		{"input+cacheRead wraps past MaxInt", cyclestate.TokenUsage{Input: math.MaxInt, CacheRead: 1}},
+		{"three halves wrap", cyclestate.TokenUsage{
+			Input: math.MaxInt/2 + 1, CacheRead: math.MaxInt/2 + 1, CacheWrite: 2,
+		}},
+		{"cacheWrite alone tips the sum over", cyclestate.TokenUsage{
+			Input: math.MaxInt - 10, CacheRead: 5, CacheWrite: 100,
+		}},
+		{"a negative counter cannot fabricate an empty context", cyclestate.TokenUsage{
+			Input: -500_000, CacheRead: 1_000,
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pct := FillPct(PromptTokens(c.usage), claudeWindow)
+			if pct != FillPctUnmeasured {
+				t.Fatalf("FillPct(PromptTokens(%+v), %d) = %v, want FillPctUnmeasured (%v): a wrapped/negative prompt total must degrade to the sentinel, never to a fabricated percentage",
+					c.usage, claudeWindow, pct, FillPctUnmeasured)
+			}
+			if got := FillWarn("build", pct, 60); got != "" {
+				t.Errorf("FillWarn on the unmeasured sentinel = %q, want silence", got)
+			}
+		})
+	}
+}
+
+// TestFillTelemetry_OverflowGuardKeepsHonestReadings is the anti-overfit half:
+// the guard must not be a blanket "big or unusual ⇒ unmeasured" clamp. Honest
+// large readings — including the deliberately-unclamped over-full case the
+// file's invariant promises — must survive untouched.
+func TestFillTelemetry_OverflowGuardKeepsHonestReadings(t *testing.T) {
+	cases := []struct {
+		name  string
+		usage cyclestate.TokenUsage
+		want  float64
+	}{
+		{"ordinary launch", cyclestate.TokenUsage{Input: 100_000, CacheRead: 20_000, Output: 9_999_999}, 60},
+		{"empty prompt is a measured zero", cyclestate.TokenUsage{Output: 1_000}, 0},
+		{"over-full is still not clamped", cyclestate.TokenUsage{Input: 200_000, CacheWrite: 40_000}, 120},
+		{"large but non-wrapping total stays a real reading", cyclestate.TokenUsage{Input: 1_000_000_000}, 500_000},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := FillPct(PromptTokens(c.usage), claudeWindow)
+			if math.Abs(got-c.want) > 0.001 {
+				t.Errorf("FillPct(PromptTokens(%+v), %d) = %v, want %v — the overflow guard must not swallow honest readings", c.usage, claudeWindow, got, c.want)
+			}
+		})
+	}
+}
