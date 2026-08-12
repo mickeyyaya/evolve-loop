@@ -13,6 +13,7 @@ func TestIsKnownEventType_IsTheClosedVocabulary(t *testing.T) {
 	for _, et := range []EventType{
 		EventCounterNonAdvance, EventCircuitBreakerTripped, EventVerifyFailed,
 		EventClassification, EventGoalStallEscalated, EventStallDetected,
+		EventPhaseOutputsSurveyed,
 	} {
 		if !IsKnownEventType(et) {
 			t.Errorf("%q is declared but not in the vocabulary — the sibling writer cannot assert its own records are readable", et)
