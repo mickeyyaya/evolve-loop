@@ -149,7 +149,30 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// Continuations are TOLD their inherited OPEN defect ids (2026-08-10
 	// investigation: auditors were graded against ids they were never shown).
 	b.WriteString(inheritedDefectsPromptBlock(req))
+	b.WriteString(chainExamplePromptBlock())
 	return b.String()
+}
+
+// chainExamplePromptBlock SHOWS the auditor the reasoning-chain shape
+// (ADR-0088) instead of only describing it.
+//
+// Measured, not assumed: the first shadow wave dispatched three audits with
+// byte-identical prompts that all carried the persona's chain instruction —
+// delivery worked, compaction stripped nothing — and one of the three emitted a
+// chain. The persona describes the format in prose and cannot show it, because
+// the combined line budget has five lines of headroom and the example is nine.
+//
+// Injecting it here costs no budget and closes the drift hole a review raised
+// as a BLOCK: auditchain.ChainBlockExample is now the persona's illustration,
+// the parser's own round-trip fixture, and the dispatched text — one constant,
+// three legs (ADR-0084 I2). The parser is tail-anchored, so an auditor that
+// echoes this block above its real one has the echo ignored.
+func chainExamplePromptBlock() string {
+	return "\n## Reasoning chain — emit exactly this shape (ADR-0088)\n\n" +
+		"Your verdict is the CONCLUSION of this chain. Replace every status and finding with your own;\n" +
+		"cite something a third party can open. A link you could not check is `unverifiable`, never\n" +
+		"`coherent`. A link you omit is treated as decisive against the cycle.\n\n" +
+		auditchain.ChainBlockExample + "\n"
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
