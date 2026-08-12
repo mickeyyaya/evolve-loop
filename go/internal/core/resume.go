@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
@@ -207,6 +208,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	// printing/telemetry only (audited then).
 	var phaseTimings []phaseTimingEntry
 	defer func() {
+		// Survey emission is unconditional (a resumed cycle that dispatched
+		// nothing still has pre-crash outputs to account); the timings write
+		// keeps its emptiness guard. cs.CompletedPhases carries the pre-crash
+		// completions plus everything this resume appended.
+		emitPhaseOutputsSignal(cs.WorkspacePath, cycle, cs.CompletedPhases,
+			phasecontract.NewCatalogResolver(o.catalog.Get))
 		if len(phaseTimings) == 0 {
 			return
 		}
