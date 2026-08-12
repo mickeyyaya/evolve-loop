@@ -124,6 +124,7 @@ var commands = []subcommand{
 	{Name: "tokens", Summary: "Token-usage telemetry: report [--last N] (ranked per-phase consumers)", Run: runTokens},
 	{Name: "lessons", Summary: "Lesson analytics: recurrence (deterministic recurrence ledger, patterns by count + fix status)", Run: runLessons},
 	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
+	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 
 // lookupCommand returns the subcommand matching name or any of its

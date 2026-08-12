@@ -537,3 +537,10 @@
 # Named+exercised by digest_test.go and apicover_named_test.go. Consumer:
 # go/internal/systemprompt.Resolve prefers profile.digest_file when present.
 ./internal/digest
+
+# fill-vs-verdict correlation (cycle-1402, new-package graduation): part (3) of
+# the context-fill-telemetry inbox item — the pure join/bucket over
+# contextfill.HotThreshold plus the real-corpus Load, consumed by
+# `evolve context-fill correlate` (cmd/evolve/cmd_contextfillcorrelate.go).
+# Named+exercised by apicover_named_test.go and contextfillcorrelate_test.go.
+./internal/contextfillcorrelate

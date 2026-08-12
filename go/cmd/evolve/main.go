@@ -130,6 +130,11 @@ v12.1 utilities + composition:
   compose                   Ad-hoc phase composition bypassing the
                               state machine ( compose --phases <p1,p2,...>
                               [--ship-anyway] [--dry-run] )
+  context-fill              Context-window fill telemetry; correlates each
+                              cycle's peak per-phase fill ratio against its
+                              dossier final verdict (read-only)
+                              ( context-fill correlate [--project-root DIR]
+                                [--json] [--out PATH] )
 `
 
 // dispatch is the top-level subcommand router. Extracted so tests can

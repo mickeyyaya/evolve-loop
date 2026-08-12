@@ -210,11 +210,81 @@ Two contracts hold the wiring honest:
 Both packages import `contextfill`; **nothing else may** — it stays a leaf, and a
 cycle-1271 ACS predicate re-checks the real build graph each run.
 
+### Fill vs verdict — `internal/contextfillcorrelate` (cycle-1402)
+
+Deriving and persisting the ratio does not answer the question the ratio exists
+to answer: *do cycles that ran hot fail more often?* Part (3) of the
+`context-fill-telemetry-and-cap` item is the join that asks it.
+
+`go/internal/contextfillcorrelate` is a second leaf — stdlib plus `contextfill`
+(the one definition of the hot boundary) and `phasetiming` (the one reader of the
+timing log). It reimplements neither.
+
+- `Correlate([]CycleFill) Report` is pure: it buckets each cycle by its **peak**
+  per-phase ratio into ascending bands `[0,0.50) [0.50,0.70) [0.70,0.85)` and an
+  open-ended top band whose lower bound **is** `contextfill.HotThreshold`, then
+  tallies FAIL/PASS/WARN per band plus a coarse hot/cold split via
+  `contextfill.IsHot`.
+- `Load(projectRoot)` reads the real corpus: `knowledge-base/cycles/cycle-*.json`
+  for `final_verdict`, joined by cycle id to
+  `.evolve/runs/cycle-<n>/phase-timing.json` for the recorded ratios.
+- `evolve context-fill correlate [--project-root DIR] [--json] [--out PATH]`
+  (`go/cmd/evolve/cmd_contextfillcorrelate.go`, registered in `registry.go`) is the
+  production caller.
+
+Two invariants keep the evidence honest, both ACS-pinned:
+
+- **Conservation.** `CyclesJoined + len(NoData)` equals the number of dossiers on
+  disk. A cycle with no usable ratio or no verdict is reported in `NoData`; it is
+  never bucketed as a fabricated `0.0`, which would manufacture the very
+  correlation being measured. Bucket counts sum to `CyclesJoined`.
+- **An empty corpus is an error, not a zero.** A project root with no dossiers
+  exits non-zero rather than printing an all-zero report.
+
+Bucket `Max` is `+Inf` for the open-ended top band; JSON cannot represent
+infinity, so `Bucket.MarshalJSON` emits `"max": null` and `UnmarshalJSON` restores
+it — the `--json` projection round-trips.
+
+**Three identity/write invariants (cycle-1447).** The join landed with the
+continuation; these were hardened before it did, and each is a named regression
+test rather than a comment:
+
+- **The verdict vocabulary is a closed set** (`FAIL`/`PASS`/`WARN` —
+  `recognisedVerdicts`). Membership is checked *before* a row is counted. An
+  unrecognised verdict (schema drift, a future `BLOCKED`) previously incremented
+  `Bucket.Cycles` while being unable to increment `Fail`, raising the FailRate
+  denominator only — a silent dilution of the measured correlation. Such a row
+  is now `NoData`, the same treatment a missing ratio gets. The current corpus is
+  100 % inside the set (408 FAIL / 356 PASS / 5 WARN of 769), so this costs
+  nothing today and cannot mislead tomorrow.
+- **The filename is the cycle's identity**, not the dossier body's `cycle`
+  field. The glob makes filenames unique by construction; the body is free text
+  no writer validates, so two dossiers claiming one id used to tally that cycle
+  twice *while row-based conservation still passed*. The body id is now only a
+  fallback for an unparseable filename, and only for an id not already claimed.
+- **`--out` writes temp-then-rename behind an `Lstat` guard**, matching the
+  repo's atomic-write convention. The bare `os.WriteFile` followed symlinks with
+  `O_TRUNC`, so a pre-planted `report.md -> <victim>` link truncated the victim.
+
+**First real-corpus run is not yet a usable signal — and says so.** Over 769
+dossiers: 129 joined, 640 no-data, and *all 129 joined cycles land in the hot
+band* (FAIL rate 0.760). The band is saturated because
+the upstream derivation sums a phase's **cumulative** token usage across every API
+call against a single window — observed ratios reach ~75×, not ≤1. The join is
+correct; its input is not yet an occupancy fraction. Fixing that (per-call peak
+rather than a running sum) is a prerequisite for reading the correlation, and is
+queued as `context-fill-ratio-cumulative-overcount` — see § deferred below.
+
 ### Still deliberately deferred
 
-Measurement and telemetry are wired; *behaviour* is not. Two follow-ups remain, in
-dependency order:
+Measurement, telemetry and the verdict join are wired; *behaviour* is not. Three
+follow-ups remain, in dependency order:
 
+0. `context-fill-ratio-cumulative-overcount` — the ratio currently divides a
+   phase's summed-across-calls `TokenUsage` by one window, so it saturates above
+   1.0 (observed up to ~75×) and every joined cycle classifies hot. Until this is
+   a real occupancy fraction, the cycle-1402 correlation report has no usable
+   contrast and neither (1) nor (2) can be threshold-tuned from it.
 1. `context-fill-stage-dial` — the `Off`/`Advisory`/`Enforce` dial from
    `.evolve/policy.json` (the `internal/cyclebudget` Stage precedent). Default-off,
    byte-identical to today when the policy key is absent.
