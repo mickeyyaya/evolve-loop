@@ -8,13 +8,15 @@ package phaseoutputs
 import (
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 func TestSignal_CompleteCycleWithHealthyChainIsNotAbnormal(t *testing.T) {
 	t.Parallel()
 	res := Survey([]string{"build"}, files(
 		"build-report.md", "build-prompt.txt", "build-events.ndjson", "build-usage.json",
-	))
+	), phasecontract.BuiltinResolver{})
 	details, abnormal := Signal(res, ChainPresent)
 	if abnormal {
 		t.Error("a fully-instrumented cycle with a present chain is the healthy case — flagging it abnormal drowns the stream")
@@ -28,7 +30,7 @@ func TestSignal_AuditNotRunAloneIsNotAbnormal(t *testing.T) {
 	t.Parallel()
 	res := Survey([]string{"scout"}, files(
 		"scout-report.md", "scout-prompt.txt", "scout-events.ndjson", "scout-usage.json",
-	))
+	), phasecontract.BuiltinResolver{})
 	if _, abnormal := Signal(res, ChainAuditNotRun); abnormal {
 		t.Error("a cycle whose audit never ran has nothing to comply with — not a chain abnormality")
 	}
@@ -36,13 +38,13 @@ func TestSignal_AuditNotRunAloneIsNotAbnormal(t *testing.T) {
 
 func TestSignal_GapsAndChainAnomaliesAreAbnormal(t *testing.T) {
 	t.Parallel()
-	gapped := Survey([]string{"build"}, files("build-report.md"))
+	gapped := Survey([]string{"build"}, files("build-report.md"), phasecontract.BuiltinResolver{})
 	if _, abnormal := Signal(gapped, ChainPresent); !abnormal {
 		t.Error("a cycle with missing review data must signal WARN — that silence is the defect this tool exists to end")
 	}
 	clean := Survey([]string{"build"}, files(
 		"build-report.md", "build-prompt.txt", "build-events.ndjson", "build-usage.json",
-	))
+	), phasecontract.BuiltinResolver{})
 	for _, chain := range []ChainStatus{ChainAbsent, ChainRecordMissing, ChainRecordCorrupt, ChainInconsistent} {
 		if details, abnormal := Signal(clean, chain); !abnormal {
 			t.Errorf("chain state %s demands operator attention; details=%q", chain, details)

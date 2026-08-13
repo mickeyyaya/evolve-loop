@@ -31,6 +31,11 @@ type Artifact struct {
 	// so presence alone is not data.
 	Empty bool  `json:"empty,omitempty"`
 	Bytes int64 `json:"bytes"`
+	// NotOwed marks an artifact this phase legitimately does not produce (a
+	// native phase's prompt, a NoArtifact contract's report). Marked ON the
+	// row rather than only skipped in Gaps() so a consumer reading rows
+	// cannot re-derive the absence as a gap the summary disagrees with.
+	NotOwed bool `json:"not_owed,omitempty"`
 }
 
 // Row is one completed phase's accounting.
@@ -41,10 +46,6 @@ type Row struct {
 	Prompt Artifact `json:"prompt"`
 	Events Artifact `json:"events"`
 	Usage  Artifact `json:"usage"`
-	// Exempt marks a bookkeeping phase that dispatches no agent and so owes no
-	// report — exempted explicitly, or every such phase would spam the gap
-	// list until the signal drowned.
-	Exempt bool `json:"exempt,omitempty"`
 }
 
 // Result is Survey's output: one Row per completed phase.
@@ -52,51 +53,79 @@ type Result struct {
 	Rows []Row `json:"rows"`
 }
 
-// noDispatchPhases is the exemption register: a phase listed here owes no
-// review outputs, so its gaps can never fire. It is EMPTY by evidence: the two
-// candidates guessed during development (inherited-defect-reconcile,
-// coverage-gate) both turn out to be fully-dispatched phases with complete
-// outputs in live workspaces (cycles 1432/1442) — the guess was refuted by
-// exactly the kind of look this package institutionalises. An entry added here
-// must cite the live cycle that shows the phase legitimately producing
-// nothing.
-var noDispatchPhases = map[string]bool{}
-
-// agentFor resolves the artifact/stream basename stem for a phase from the
-// registry — the SSOT — falling back to the phase name for minted phases the
-// registry does not know.
-func agentFor(phase string) string {
-	if c, ok := phasecontract.For(phase); ok && c.AgentName != "" {
-		return c.AgentName
-	}
-	return phase
-}
+// nativePhases lists phases that complete natively in Go with no agent
+// dispatch: they owe no prompt and no events (nothing was dispatched to
+// stream), and their no-report fact comes from the registry's NoArtifact
+// contract. They ALWAYS owe usage — the C1 chokepoint writes a sidecar for
+// every recorded phase, native included, so a missing one is a real recording
+// failure. Admission requires a cited live cycle: ship enters on cycles
+// 1452/1453 (in completed_phases with ship-usage.json and nothing else; the
+// earlier whole-row exemption guesses — inherited-defect-reconcile,
+// coverage-gate — were refuted by cycles 1432/1442 and stay OUT).
+var nativePhases = map[string]bool{"ship": true}
 
 // Survey accounts for every completed phase against the workspace listing
-// (name → size in bytes).
-func Survey(completedPhases []string, listing map[string]int64) Result {
+// (name → size in bytes). Duplicate completed_phases entries (a re-dispatched
+// phase records once per completion — cycle-1452 carried audit twice) collapse
+// to one row, or the completeness denominator counts the same files twice.
+//
+// resolver is the SAME contract-resolution vocabulary the contract gate and
+// bridge use — callers pass a catalog-aware phasecontract.CatalogResolver so
+// spec-derived phases (memo, minted phases) resolve their real report names.
+// Cycle-1452's false `memo-report.md missing` gap came from resolving through
+// the compiled map alone; the tempting alternative — adding a builtin memo
+// entry — was caught in review as WORSE: builtins shadow spec-derived
+// contracts, so it would have silently dropped memo's required sections from
+// the live gate. A nil resolver degrades to builtin-only.
+func Survey(completedPhases []string, listing map[string]int64, resolver phasecontract.Resolver) Result {
+	if resolver == nil {
+		resolver = phasecontract.BuiltinResolver{}
+	}
 	res := Result{}
+	seen := map[string]bool{}
 	for _, phase := range completedPhases {
-		agent := agentFor(phase)
+		if seen[phase] {
+			continue
+		}
+		seen[phase] = true
+		c, known := resolver.Resolve(phase)
+		agent := phase
+		if known && c.AgentName != "" {
+			agent = c.AgentName
+		}
+		report := phase + "-report.md"
+		if known && c.ArtifactName != "" {
+			report = c.ArtifactName
+		}
 		row := Row{
-			Phase:  phase,
-			Agent:  agent,
-			Exempt: noDispatchPhases[phase],
-			// Live naming truth (cycles 1432/1441/1442, corrected by review):
-			// the REPORT follows the registry (retrospective-report.md,
-			// test-report.md). Usage is PHASE-named everywhere — the C1
-			// chokepoint writes %s-usage.json from the phase. Prompt and
-			// events are PHASE-named for runner-dispatched phases (the runner
-			// sets Agent = phase), but retro dispatches outside that path and
-			// its prompt is AGENT-named (retrospective-prompt.txt) — the
-			// fallback candidate's one live consumer. Retro has NO events
-			// stream under either name live (retro-observer-events.ndjson is
-			// the observer's, a different mechanism): that gap is REAL and
+			Phase: phase,
+			Agent: agent,
+			// Live naming truth (cycles 1432/1441/1442/1452, corrected by
+			// review + first monitored wave): the REPORT follows the resolved
+			// contract (retrospective-report.md, test-report.md, memo.md).
+			// Usage is PHASE-named everywhere — the C1 chokepoint writes
+			// %s-usage.json from the phase. Prompt and events are PHASE-named
+			// for runner-dispatched phases (the runner sets Agent = phase),
+			// but retro dispatches outside that path and its prompt is
+			// AGENT-named (retrospective-prompt.txt) — the fallback
+			// candidate's one live consumer. Retro has NO events stream under
+			// either name live (retro-observer-events.ndjson is the
+			// observer's, a different mechanism): that gap is REAL and
 			// intentionally reported — fix queued as retro-events-stream item.
-			Report: observe(listing, phasecontract.ArtifactFilename(phase)),
+			Report: observe(listing, report),
 			Prompt: observe(listing, phase+"-prompt.txt", agent+"-prompt.txt"),
 			Events: observe(listing, phase+"-events.ndjson", agent+"-events.ndjson"),
 			Usage:  observe(listing, phase+"-usage.json", agent+"-usage.json"),
+		}
+		// Owed-ness. The no-report fact is the resolved contract's (NoArtifact
+		// — ship's result is the pushed commit, not a file); no-prompt/
+		// no-events is the native register's. Usage is never trimmed.
+		if known && c.NoArtifact {
+			row.Report.NotOwed = true
+		}
+		if nativePhases[phase] {
+			row.Prompt.NotOwed = true
+			row.Events.NotOwed = true
 		}
 		res.Rows = append(res.Rows, row)
 	}
@@ -115,20 +144,18 @@ func observe(listing map[string]int64, candidates ...string) Artifact {
 	return Artifact{Name: candidates[0]}
 }
 
-// reviewable reports whether an artifact carries data a reviewer can read.
-func (a Artifact) reviewable() bool { return a.Present && !a.Empty }
+// satisfied reports whether this artifact's obligation is met: either the
+// phase does not owe it, or it is present with actual content.
+func (a Artifact) satisfied() bool { return a.NotOwed || (a.Present && !a.Empty) }
 
-// Gaps names every completed phase whose review data is missing or empty —
-// the phase and the artifact, because an operator holding a gap list needs to
-// know which file to go looking for, not that "something" was lost.
+// Gaps names every completed phase whose OWED review data is missing or empty
+// — the phase and the artifact, because an operator holding a gap list needs
+// to know which file to go looking for, not that "something" was lost.
 func (r Result) Gaps() []string {
 	var out []string
 	for _, row := range r.Rows {
-		if row.Exempt {
-			continue
-		}
 		for _, a := range []Artifact{row.Report, row.Prompt, row.Events, row.Usage} {
-			if !a.reviewable() {
+			if !a.satisfied() {
 				state := "missing"
 				if a.Present {
 					state = "empty"
@@ -145,11 +172,8 @@ func (r Result) Gaps() []string {
 func (r Result) SummaryLine() string {
 	surveyed, complete := 0, 0
 	for _, row := range r.Rows {
-		if row.Exempt {
-			continue
-		}
 		surveyed++
-		if row.Report.reviewable() && row.Prompt.reviewable() && row.Events.reviewable() && row.Usage.reviewable() {
+		if row.Report.satisfied() && row.Prompt.satisfied() && row.Events.satisfied() && row.Usage.satisfied() {
 			complete++
 		}
 	}

@@ -821,15 +821,6 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		ranCycle := result.Cycle
 		workspace := cycleWorkspace(cfg.ProjectRoot, ranCycle)
 
-		// Per-cycle phase-output accounting → unified signal stream
-		// (abnormal-events.jsonl). Emitted BEFORE the halt/quota/breaker
-		// early-returns below so every cycle that produced a workspace gets its
-		// survey recorded — halted cycles most of all: the survey names exactly
-		// which review data a diagnosis will and won't find.
-		if dirExists(workspace) {
-			emitPhaseOutputsSurvey(workspace, ranCycle, stderr)
-		}
-
 		// ADR-0072: a SYSTEM-level failure (the pipeline forged a verdict, not a
 		// task-code failure) HALTS the loop for diagnosis instead of retrying the
 		// same inbox task — which would only reproduce the fault (the cycle

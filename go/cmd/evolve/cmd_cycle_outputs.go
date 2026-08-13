@@ -21,7 +21,9 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseoutputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
 func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
@@ -38,9 +40,8 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve cycle outputs: WARN: %s\n", m)
-	})
+	warn := func(m string) { fmt.Fprintf(stderr, "evolve cycle outputs: WARN: %s\n", m) }
+	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, warn)
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
@@ -63,7 +64,7 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	survey := phaseoutputs.Survey(completed, listing)
+	survey := phaseoutputs.Survey(completed, listing, catalogAwareResolver(projectRoot, warn))
 	reading := phaseoutputs.LoadShadowReading(workspace, auditchain.ShadowRecordFile)
 	chain := phaseoutputs.CycleChainStatus(slices.Contains(completed, "audit"), reading)
 
@@ -85,4 +86,23 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "cycle %s — %s\n", cycleLabel, survey.SummaryLine())
 	fmt.Fprintf(stdout, "chain: %s\n", chain)
 	return 0
+}
+
+// catalogAwareResolver assembles the same builtin+user-spec catalog cmd_cycle
+// builds, so the survey resolves report names through the SAME vocabulary the
+// contract gate and bridge use (a builtin-only lookup produced cycle-1452's
+// false memo-report.md gap). Degrades loudly to builtin-only when the registry
+// cannot load.
+func catalogAwareResolver(projectRoot string, warn func(string)) phasecontract.Resolver {
+	builtinCat, err := phasespec.Load(filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json"))
+	if err != nil {
+		warn(fmt.Sprintf("builtin registry load failed (%v); resolving builtin-only", err))
+		return phasecontract.BuiltinResolver{}
+	}
+	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot)
+	catalog, mergeWarns := builtinCat.Merge(userSpecs)
+	for _, w := range append(discWarns, mergeWarns...) {
+		warn(w)
+	}
+	return phasecontract.NewCatalogResolver(catalog.Get)
 }
