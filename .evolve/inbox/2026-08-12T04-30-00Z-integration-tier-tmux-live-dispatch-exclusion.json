@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    ".evolve/runs/cycle-1443/integration-tier.log",
+    "go/internal/bridge/tmux_repl_integration_test.go",
+    "go/internal/acssuite/acssuite.go",
+    "docs/incidents/2026-08-11-verify-wave-halts-and-ledger-forensics.md"
+  ],
+  "created_at": "2026-08-12T04:30:00Z",
+  "fix": "Make host tmux exclusivity explicit for boot-sensitive tests. Options in preference order: (a) have the integration tier acquire the SAME host-wide single-flight lock the LLM dispatch respects (bounded wait + loud degrade, mirroring acssuite's verifylock.Acquire posture) so the tier waits for a dispatch gap instead of racing it; (b) tag real-tmux tests as host-exclusive and have the per-cycle tier skip them when a live lane is dispatching, relying on CI (clean host, every PR) for that coverage \u2014 with the skip LOGGED as a named coverage gap, never silent; (c) scale boot deadlines by observed load (weakest \u2014 hides the race). Regression test: with a simulated live-dispatch holder, the tier must either wait or skip-with-log, never run the real-tmux set concurrently.",
+  "id": "integration-tier-tmux-live-dispatch-exclusion",
+  "kind": "pipeline-repair",
+  "priority": "high",
+  "summary": "Cycle-1443 ADR-0072 halt (2026-08-12): 13 real-tmux tests failed exit=80 (ExitREPLBootTimeout) in the lane while the sibling lane ran LLM phases in tmux. Console reproduction under the gate's exact flags is GREEN in 30s vs the lane's 145s (~5x contention slowdown); isolation and EVOLVE_SANDBOX=1 also green. Both gate attempts failed because attempt 2's 'serialized retake' holds the cross-lane gate lock only \u2014 live phase dispatch is not a participant, so real-tmux boot deadlines keep getting missed at width>=2. Recurrence class: same family as integration_tier_scope_flake (scoping fix landed; this is the CONCURRENCY limb).",
+  "title": "Integration tier's real-tmux tests race LIVE LANE tmux dispatch \u2014 'serialized retake' locks only against other GATES, not against phase dispatch on the same tmux server",
+  "weight": 0.85
+}

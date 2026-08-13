@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    "go/internal/contextfill/",
+    "go/internal/core/failure_learning.go"
+  ],
+  "created_at": "2026-08-12T15:10:00Z",
+  "id": "contextfill-ratio-over-100pct",
+  "kind": "pipeline-repair",
+  "fix": "Root-cause why contextfill.FillRatio exceeds 1.0 by up to 5.7x: either WindowSizeForTier resolves the wrong window for the resolved model (unknown model falling to a tiny default), or the token numerator is cumulative across attempts/sessions rather than the live context. A ratio is a proxy — >100% proves the denominator or numerator is not what the name claims (proxy-as-verdict class). Fix the computation, then add a table-driven test pinning that a known model+token pair yields the documented ratio, and a guard: ratio > 1.0 must surface as a computation-suspect WARN (naming both operands), never as a legitimate fill reading. Verify the 60% warn threshold and any compaction/escalation consumer never acted on the bogus readings.",
+  "notes": "Observed live during the 2026-08-12 monitored wave (cycles 1452/1453, post-#457): scout fill 566.9%, triage fill 114.3% — both phases WARN 'close to compaction'. Two occurrences in one wave = class per the CI-failure standing rule.",
+  "summary": "CONTEXT-FILL warns report fill ratios of 566.9% (scout) and 114.3% (triage) — a fill fraction above 100% is arithmetically impossible for a live context, so the metric's denominator (window size for the resolved model) or numerator (token count) is wrong. The reading is recorded into phase-timing.json (ContextFillRatio/ContextWindowHot) so the corrupted figure also poisons the timing dataset any correlation report consumes.",
+  "title": "Context-fill ratio exceeds 100% (up to 5.7x) — window-size or token-count operand is wrong, and the bogus figure lands in phase-timing.json",
+  "weight": 0.75
+}
