@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
@@ -868,6 +869,11 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		if werr := interaction.WriteRollup(cr.cs.WorkspacePath); werr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
 		}
+		// Per-cycle phase-output survey → unified signal stream (rationale:
+		// phaseoutputs_signal.go header). o.catalog is read at defer-exec
+		// time, so mid-cycle mints are visible to the resolver.
+		emitPhaseOutputsSignal(cr.cs.WorkspacePath, cr.cycle, cr.cs.CompletedPhases,
+			phasecontract.NewCatalogResolver(cr.o.catalog.Get))
 	}()
 	// ADR-0048 Slice B (SHADOW): content-addressed audit-reuse probe. If this
 	// cycle's worktree content already matches a prior audited verdict, the
