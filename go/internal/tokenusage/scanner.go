@@ -69,11 +69,20 @@ type Window struct {
 // DefaultResolver off the usage that same resolve recovered. It carries
 // FillPctUnmeasured when the fill could not be derived — an uncovered launch
 // or an unmapped driver family — so "unmeasured" never reads as "0% full".
+// PeakPromptTokens is the fullest any SINGLE observed turn's prompt side got —
+// the numerator the fill reading is measured against, and deliberately not the
+// summed Usage: each turn's cache_read already carries that turn's whole prior
+// context, so summing turns re-counts the same context once per turn (a 12-turn
+// phase then reports several hundred percent — cycle-1455). Zero means the tier
+// observed no per-turn breakdown (events/scrollback report one whole-launch
+// envelope, which is already a single reading); negative means turns were
+// expected but none was observed, which degrades the fill to the sentinel.
 type Result struct {
-	Usage   cyclestate.TokenUsage
-	Source  Source
-	Warn    string
-	FillPct float64
+	Usage            cyclestate.TokenUsage
+	Source           Source
+	Warn             string
+	FillPct          float64
+	PeakPromptTokens int
 }
 
 // transcriptLine is the subset of a Claude Code transcript JSONL record the
@@ -144,14 +153,26 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	if !matched {
 		return Result{Source: SourceNone}, nil
 	}
+	// Two readings off the same turns, answering different questions: the SUM is
+	// what the launch cost, the PEAK single turn is how full its window got. The
+	// peak is taken (rather than the last turn) because perMsg is keyed by
+	// message id across every attributed transcript — there is no reliable
+	// ordering to call "terminal" — and because the operational question the
+	// fill WARN answers is how close this launch came to compaction at all, not
+	// where it happened to land on its final turn. Within a phase, context only
+	// accumulates, so the two coincide on real transcripts.
 	var total cyclestate.TokenUsage
+	peak := promptTokensUnmeasured
 	for _, u := range perMsg {
 		total.Input += u.Input
 		total.Output += u.Output
 		total.CacheRead += u.CacheRead
 		total.CacheWrite += u.CacheWrite
+		if p := PromptTokens(u); p > peak {
+			peak = p
+		}
 	}
-	return Result{Usage: total, Source: SourceTranscript}, nil
+	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak}, nil
 }
 
 // readLines parses a transcript file into its records, silently skipping

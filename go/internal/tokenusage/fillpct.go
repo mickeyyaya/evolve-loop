@@ -61,6 +61,25 @@ func PromptTokens(u cyclestate.TokenUsage) int {
 	return total
 }
 
+// windowOccupancy returns the prompt-side token count to measure a Result
+// against its window: the fullest single observed turn when the tier broke the
+// launch down per turn (transcript), otherwise that tier's whole-launch
+// prompt-side total. The distinction is the cycle-1455 defect: a per-turn tier's
+// summed Usage counts the same accumulated context once per turn and reads as
+// multiples of 100% (566.9% observed live), while the events/scrollback tiers
+// report ONE result envelope, whose total already is a single reading.
+//
+// A negative peak (turns were expected, none was observed) is passed through
+// rather than repaired, so FillPct's negative guard turns it into the documented
+// sentinel — nothing observed the context is not the same as the context being
+// empty.
+func windowOccupancy(r Result) int {
+	if r.PeakPromptTokens != 0 {
+		return r.PeakPromptTokens
+	}
+	return PromptTokens(r.Usage)
+}
+
 // EffectiveWindow returns the effective context window for a driver family, or
 // 0 when the family has no measured window. Empty means claude, matching
 // isClaudeDriver — the window table must not disagree with the collector

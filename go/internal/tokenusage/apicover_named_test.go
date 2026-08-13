@@ -24,6 +24,23 @@ func TestResultAndSourceNamed(t *testing.T) {
 	}
 }
 
+// TestResultPeakPromptTokensNamed pins Result.PeakPromptTokens (cycle-1455) and
+// the rule that separates it from Usage: it is ONE turn's prompt-side
+// occupancy, so it must not move when a second turn adds to the summed spend.
+func TestResultPeakPromptTokensNamed(t *testing.T) {
+	r := Result{
+		Usage:            cyclestate.TokenUsage{Input: 10, CacheRead: 90},
+		Source:           SourceTranscript,
+		PeakPromptTokens: 60,
+	}
+	if got := windowOccupancy(r); got != 60 {
+		t.Fatalf("windowOccupancy = %d, want 60 (Result.PeakPromptTokens, not the summed Usage's 100)", got)
+	}
+	if got := windowOccupancy(Result{Usage: r.Usage, Source: SourceEventsResult}); got != 100 {
+		t.Fatalf("windowOccupancy = %d, want 100 — a tier with no per-turn breakdown falls back to its whole-launch total", got)
+	}
+}
+
 // TestCollectorTypeNamed pins the exported Collector type (apicover requires
 // every exported type be named in a test). It also asserts a bare func literal
 // satisfies Collector and the chain runs it — the load-bearing property is that

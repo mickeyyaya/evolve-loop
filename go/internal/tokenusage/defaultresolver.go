@@ -34,8 +34,9 @@ func DefaultResolver(configRoot string) func(Window) (Result, error) {
 			return r, nil
 		}
 		// Context fill is DERIVED here, off the usage this same resolve just
-		// recovered — single-sourced, never a second scan.
-		r.FillPct = FillPct(PromptTokens(r.Usage), EffectiveWindow(w.Driver))
+		// recovered — single-sourced, never a second scan. The numerator is one
+		// turn's occupancy, not the launch's summed spend: see windowOccupancy.
+		r.FillPct = FillPct(windowOccupancy(r), EffectiveWindow(w.Driver))
 		return r, nil
 	}
 }
