@@ -48,12 +48,14 @@ const (
 	// are skipped silently by exactly the queries an operator runs when a phase
 	// went missing.
 	EventStallDetected EventType = "stall-detected"
-	// EventPhaseOutputsSurveyed is the loop's per-cycle phase-output
-	// accounting (internal/phaseoutputs): did every completed phase leave the
-	// data a reviewer needs, and what is the cycle's chain status. Emitted
-	// every cycle — INFO when complete, WARN on any gap or chain anomaly — so
+	// EventPhaseOutputsSurveyed is the per-cycle phase-output accounting
+	// (internal/phaseoutputs): did every completed phase leave the data a
+	// reviewer needs, and what is the cycle's chain status. Emitted at cycle
+	// finalize — INFO when complete, WARN on any gap or chain anomaly — so
 	// the unified stream carries the answer instead of only whoever runs
-	// `evolve cycle outputs` seeing it.
+	// `evolve cycle outputs` seeing it. A cycle that aborts and later
+	// resumes finalizes twice and so appears twice; consumers must take the
+	// LAST event per cycle (each snapshot was true at its moment).
 	EventPhaseOutputsSurveyed EventType = "phase-outputs-surveyed"
 )
 
