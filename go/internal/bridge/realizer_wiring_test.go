@@ -95,7 +95,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// undefined -m short flag stays in `absent` (space-delimited so the
 			// substring can't match inside --model) — the cycle-154 regression
 			// lock. Model "sonnet" → legacy ladder → balanced → offline default.
-			want:   "agy --model 'Gemini 3.5 Flash (High)' --dangerously-skip-permissions",
+			want:   "agy --model 'Gemini Flash 3.7 (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 		{
@@ -111,13 +111,12 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// --help 0.134 omits --yolo from its option list, but clap parses
 			// it; verified empirically.)
 			// Cycle-142: this launch runs with no OPENAI_API_KEY → codexAuthMode
-			// == "chatgpt", so the driver clamps the realized gpt-5.4 (which a
-			// ChatGPT account 400-rejects) to the ChatGPT-safe default —
-			// gpt-5.5 since the 2026-06-07 safe-set refresh (plan tier now
-			// accepts gpt-5.5; gpt-5.2 left the picker). The leak-absent
-			// assertions below are what this case actually guards; the model
-			// value rides along.
-			want:   "codex --yolo -m gpt-5.5",
+			// == "chatgpt"; the clamp seam stays armed but no longer fires —
+			// the whole gpt-5.6 family (2026-08-14 operator-confirmed refresh)
+			// is in chatgpt_safe_models, so the realized balanced tier
+			// (gpt-5.6-terra) passes through. The leak-absent assertions below
+			// are what this case actually guards; the model value rides along.
+			want:   "codex --yolo -m gpt-5.6-terra",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

@@ -241,7 +241,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		return modelcatalog.Catalog{}, fmt.Errorf("liveRefresh: scratch workspace: %w", err)
 	}
 	defer func() {
-		salvageProbeDiagnostics(scratch, evolveDir, time.Now, log)
+		salvageProbeDiagnostics(scratch, evolveDir, "", time.Now, log)
 		_ = os.RemoveAll(scratch)
 	}()
 
@@ -287,7 +287,13 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 // Deliberately allowlist-shaped: artifacts/prompts/pane logs are probe
 // plumbing and stay disposable. Best-effort throughout — salvage must never
 // fail the refresh — and fully quiet when a clean probe left nothing behind.
-func salvageProbeDiagnostics(scratch, evolveDir string, now func() time.Time, log io.Writer) {
+// tag disambiguates destinations when multiple probes salvage CONCURRENTLY
+// into the shared durable home (`evolve setup latest` runs one salvage per
+// family in parallel): the second-granularity stamp alone collided in exactly
+// this shape before (tmux resolveSession, ADR-0049 N15), and the un-stamped
+// launch-error name collides outright since every family's capturer is
+// Agent "models". Empty tag keeps the historical names (single-probe callers).
+func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Time, log io.Writer) {
 	entries, err := os.ReadDir(scratch)
 	if err != nil {
 		return
@@ -311,16 +317,24 @@ func salvageProbeDiagnostics(scratch, evolveDir string, now func() time.Time, lo
 		src := filepath.Join(scratch, name)
 		switch {
 		case name == "escalation-report.json":
-			dst := fmt.Sprintf("escalation-report-%s.json", now().UTC().Format("20060102T150405Z"))
+			stamp := now().UTC().Format("20060102T150405Z")
+			if tag != "" {
+				stamp += "-" + tag
+			}
+			dst := fmt.Sprintf("escalation-report-%s.json", stamp)
 			if raw, rerr := os.ReadFile(src); rerr == nil && ensure() {
 				if werr := os.WriteFile(filepath.Join(durable, dst), raw, 0o644); werr == nil {
 					fmt.Fprintf(log, "[models] WARN probe escalation salvaged to %s — a live /model probe needed operator attention\n", filepath.Join(durable, dst))
 				}
 			}
 		case strings.HasSuffix(name, "-launch-error.txt"):
+			dstName := name
+			if tag != "" {
+				dstName = tag + "-" + name
+			}
 			if raw, rerr := os.ReadFile(src); rerr == nil && ensure() {
-				if werr := os.WriteFile(filepath.Join(durable, name), raw, 0o644); werr == nil {
-					fmt.Fprintf(log, "[models] WARN probe launch-error salvaged to %s\n", filepath.Join(durable, name))
+				if werr := os.WriteFile(filepath.Join(durable, dstName), raw, 0o644); werr == nil {
+					fmt.Fprintf(log, "[models] WARN probe launch-error salvaged to %s\n", filepath.Join(durable, dstName))
 				}
 			}
 		case name == "llm-calls.ndjson":

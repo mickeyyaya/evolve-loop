@@ -41,7 +41,7 @@ func TestSalvageProbeDiagnostics_DurableBeforeTeardown(t *testing.T) {
 	writeFile(durable, "llm-calls.ndjson", `{"call":1}`+"\n")
 
 	var log bytes.Buffer
-	salvageProbeDiagnostics(scratch, evolveDir, salvageNow, &log)
+	salvageProbeDiagnostics(scratch, evolveDir, "", salvageNow, &log)
 
 	esc, err := os.ReadFile(filepath.Join(durable, "escalation-report-20260805T230000Z.json"))
 	if err != nil || string(esc) != `{"reason":"quota wall"}` {
@@ -70,11 +70,43 @@ func TestSalvageProbeDiagnostics_QuietWhenNothingToSalvage(t *testing.T) {
 	t.Parallel()
 	scratch, evolveDir := t.TempDir(), t.TempDir()
 	var log bytes.Buffer
-	salvageProbeDiagnostics(scratch, evolveDir, salvageNow, &log)
+	salvageProbeDiagnostics(scratch, evolveDir, "", salvageNow, &log)
 	if _, err := os.Stat(filepath.Join(evolveDir, "models-probe")); !os.IsNotExist(err) {
 		t.Error("durable dir created with nothing to salvage")
 	}
 	if log.Len() != 0 {
 		t.Errorf("unexpected log output: %s", log.String())
+	}
+}
+
+// The tag path IS the collision fix (parallel per-family salvage into the
+// shared durable home): two same-second probes with different tags must land
+// as two distinct durable files for BOTH the stamped escalation report and
+// the un-stamped launch-error name. An implementation that ignores the tag
+// passes every other test while last-write-wins destroys a sibling family's
+// diagnostics — the exact class ADR-0049 N15 closed for tmux session names.
+func TestSalvageProbeDiagnostics_TagsKeepConcurrentFamiliesDistinct(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	durable := filepath.Join(evolveDir, "models-probe")
+	for _, tag := range []string{"codex", "claude"} {
+		scratch := t.TempDir()
+		if err := os.WriteFile(filepath.Join(scratch, "escalation-report.json"), []byte(`{"family":"`+tag+`"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(scratch, "models-launch-error.txt"), []byte(tag+" boom"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var log bytes.Buffer
+		salvageProbeDiagnostics(scratch, evolveDir, tag, salvageNow, &log)
+	}
+	for _, tag := range []string{"codex", "claude"} {
+		esc, err := os.ReadFile(filepath.Join(durable, "escalation-report-20260805T230000Z-"+tag+".json"))
+		if err != nil || string(esc) != `{"family":"`+tag+`"}` {
+			t.Errorf("%s escalation lost to a same-second sibling: %v %q", tag, err, esc)
+		}
+		if _, err := os.Stat(filepath.Join(durable, tag+"-models-launch-error.txt")); err != nil {
+			t.Errorf("%s launch-error lost to the shared Agent-models name: %v", tag, err)
+		}
 	}
 }

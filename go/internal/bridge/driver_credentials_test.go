@@ -124,9 +124,9 @@ func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 	cases := []struct {
 		tier, codexModel string
 	}{
-		{"haiku", "gpt-5.4-mini"},
-		{"sonnet", "gpt-5.4"},
-		{"opus", "gpt-5.5"},
+		{"haiku", "gpt-5.6-luna"},
+		{"sonnet", "gpt-5.6-terra"},
+		{"opus", "gpt-5.6-sol"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.tier, func(t *testing.T) {

@@ -39,7 +39,7 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 		// balanced → the manifest's offline display-name default. The scalar
 		// order (model before permission) is part of the pin; settings_scope
 		// stays a no-op for agy.
-		want := []string{"--model", "Gemini 3.5 Flash (High)", "--dangerously-skip-permissions"}
+		want := []string{"--model", "Gemini Flash 3.7 (High)", "--dangerously-skip-permissions"}
 		if !reflect.DeepEqual(r.LaunchFlags, want) {
 			t.Fatalf("agy-tmux = %v, want %v", r.LaunchFlags, want)
 		}
@@ -47,15 +47,15 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 
 	t.Run("codex-tmux", func(t *testing.T) {
 		r := RealizeFor("codex-tmux", intent)
-		// codex resolves the tier via its manifest tier_aliases (sonnet→gpt-5.4)
+		// codex resolves the tier via its manifest tier map (sonnet→balanced→gpt-5.6-terra)
 		// and emits it as the -m launch flag (flags-first); no permission flag.
 		// Cycle-124 G1a: --yolo from manifest.default_args lands FIRST (defuses
 		// the per-edit-approval modal that hung cycle-123 tdd by setting
 		// approval=never + sandbox=danger-full-access at boot — undocumented in
 		// codex --help 0.134 but parsed by clap; verified empirically). The
 		// order is load-bearing: default_args before per-param scalars.
-		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-m", "gpt-5.4"}) {
-			t.Fatalf("codex-tmux = %v, want [--yolo -m gpt-5.4]", r.LaunchFlags)
+		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-m", "gpt-5.6-terra"}) {
+			t.Fatalf("codex-tmux = %v, want [--yolo -m gpt-5.6-terra]", r.LaunchFlags)
 		}
 		if containsToken(r.LaunchFlags, "--dangerously-skip-permissions") {
 			t.Fatalf("codex must NOT emit claude's permission flag; trust is handled by --yolo + auto-responder; got %v", r.LaunchFlags)

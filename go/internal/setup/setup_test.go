@@ -105,8 +105,8 @@ func TestTierModelsFor(t *testing.T) {
 	// cross-family coverage lives in cli_fallback, never a CLI's own tier map).
 	agy := tierModelsFor("agy")
 	wantAgy := map[string]string{
-		"fast":     "Gemini 3.5 Flash (Low)",
-		"balanced": "Gemini 3.5 Flash (High)",
+		"fast":     "Gemini Flash 3.7 (Low)",
+		"balanced": "Gemini Flash 3.7 (High)",
 		"deep":     "Gemini 3.1 Pro (High)",
 	}
 	for tier, m := range wantAgy {
@@ -116,7 +116,7 @@ func TestTierModelsFor(t *testing.T) {
 	}
 	// codex maps to its native GPT tiers.
 	codex := tierModelsFor("codex")
-	want := map[string]string{"fast": "gpt-5.4-mini", "balanced": "gpt-5.4", "deep": "gpt-5.5"}
+	want := map[string]string{"fast": "gpt-5.6-luna", "balanced": "gpt-5.6-terra", "deep": "gpt-5.6-sol"}
 	for tier, m := range want {
 		if codex[tier] != m {
 			t.Errorf("codex[%s] = %q, want %q", tier, codex[tier], m)
