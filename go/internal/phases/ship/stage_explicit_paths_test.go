@@ -43,16 +43,45 @@ type porcelainCapture struct {
 	// 0 forces that exit code for the probe (broken-probe fail-open test).
 	ignored       []string
 	checkIgnoreRC int
+	// refuseAddPaths: pathspecs that make an `add` call refuse rc=1 with the
+	// real refusal stderr naming them — the layer-4 class where the
+	// check-ignore probe is BLIND to a path git add still refuses
+	// (directory-form rules; 2026-08-14 halt). A retry without them succeeds.
+	refuseAddPaths []string
+	// refuseAddAlways: when non-empty, EVERY add call refuses rc=1 naming this
+	// path in the refusal stderr — the foreign-offender/no-progress shape.
+	refuseAddAlways string
 }
 
 func (c *porcelainCapture) runner() CmdRunner {
 	return func(_ context.Context, name, _ string, args, _ []string,
-		_ io.Reader, stdout, _ io.Writer) (int, error) {
+		_ io.Reader, stdout, stderr io.Writer) (int, error) {
 		c.calls = append(c.calls, append([]string{name}, args...))
 		if name != "git" {
 			return 0, nil
 		}
 		switch {
+		case slices.Contains(args, "add") && c.refuseAddAlways != "":
+			if stderr != nil {
+				_, _ = io.WriteString(stderr, "The following paths are ignored by one of your .gitignore files:\n"+
+					c.refuseAddAlways+"\nhint: Use -f if you really want to add them.\n")
+			}
+			return 1, nil
+		case slices.Contains(args, "add") && len(c.refuseAddPaths) > 0:
+			var named []string
+			for _, p := range c.refuseAddPaths {
+				if slices.Contains(args, p) {
+					named = append(named, p)
+				}
+			}
+			if len(named) > 0 {
+				if stderr != nil {
+					_, _ = io.WriteString(stderr, "The following paths are ignored by one of your .gitignore files:\n"+
+						strings.Join(named, "\n")+"\nhint: Use -f if you really want to add them.\n")
+				}
+				return 1, nil
+			}
+			return 0, nil
 		case slices.Contains(args, "diff") && slices.Contains(args, "--cached") &&
 			slices.Contains(args, "--quiet"):
 			return 1, nil // staged changes exist
