@@ -20,10 +20,15 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 	//     schema_version-2 failure block, corrections exhausted, and the CYCLE
 	//     failed on the top-priority queue item's lane (batch-21 cycle-1215).
 	//     See TestTriageRoutesToClaudeForContractCompliance.
+	//   - retrospective, 2026-08-14: operator-directed model-strength reroute —
+	//     agy deep resolves Gemini 3.1 Pro, now the weakest deep-tier model in
+	//     the fleet (vs opus and gpt-5.6-sol); retro post-mortems are
+	//     reasoning-heavy and move to claude/deep (opus). See
+	//     TestRetrospectiveRoutesToClaudeDeep.
 	// Durable fix queued as contract-block-cli-escalation (0.95): escalate the
 	// re-dispatch that already failed the contract, so a phase-wide reroute
 	// stops being the only available remedy.
-	for _, name := range []string{"router", "retrospective"} {
+	for _, name := range []string{"router"} {
 		t.Run(name, func(t *testing.T) {
 			p, err := loader.Get(name)
 			if err != nil {
@@ -36,6 +41,30 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 				t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 			}
 		})
+	}
+}
+
+// TestRetrospectiveRoutesToClaudeDeep pins the 2026-08-14 operator-directed
+// reroute: Gemini 3.1 Pro (agy's deep tier) is the weakest deep-tier model in
+// the fleet, and retro post-mortems are reasoning-heavy — they run on
+// claude/deep (opus; gpt-5.6-sol is the alternative once codex returns from
+// quota bench). agy keeps memo (balanced → Gemini 3.7 Flash); its family-pure
+// tier map is untouched — this is a ROUTING change, never a cross-family map
+// entry (D7).
+func TestRetrospectiveRoutesToClaudeDeep(t *testing.T) {
+	loader := NewFromDir(realProfilesDir(t))
+	p, err := loader.Get("retrospective")
+	if err != nil {
+		t.Fatalf("load profile: %v", err)
+	}
+	if p.CLI != "claude-tmux" {
+		t.Fatalf("CLI=%q, want claude-tmux (operator model-strength directive)", p.CLI)
+	}
+	if len(p.CLIFallback) != 0 {
+		t.Fatalf("CLIFallback=%v, want [] — claude is the universal fallback; a self-fallback is a dead entry", p.CLIFallback)
+	}
+	if p.ModelTierEnvelope == nil || p.ModelTierEnvelope.Default != "deep" {
+		t.Fatalf("envelope default must stay deep (opus): %+v", p.ModelTierEnvelope)
 	}
 }
 

@@ -27,6 +27,11 @@ import (
 // returns the "outside envelope" error for fast-vs-balanced. GREEN once the
 // config drift is resolved.
 
+// shippedMemoPinAndProfile loads the shipped memo pin when one exists.
+// 2026-08-14: the checked-in policy no longer pins memo — `setup apply
+// --preset recommended` (operator-chosen) superseded the old agy/fast pin, so
+// memo rides its profile default (balanced). The envelope-coherence contract
+// below stays armed for ANY future pin; absence is legal and skips.
 func shippedMemoPinAndProfile(t *testing.T) (policy.Pin, *profiles.Profile) {
 	t.Helper()
 	pol, err := policy.Load(filepath.Join("..", "..", "..", ".evolve", "policy.json"))
@@ -35,7 +40,7 @@ func shippedMemoPinAndProfile(t *testing.T) (policy.Pin, *profiles.Profile) {
 	}
 	pin, ok := pol.PinFor("memo")
 	if !ok {
-		t.Fatalf("shipped policy.json has no pins.memo entry — Task 1 assumes memo is pinned")
+		t.Skip("no pins.memo in shipped policy (preset default in force) — the envelope contract applies only to an existing pin")
 	}
 	loader := profiles.NewFromDir(filepath.Join("..", "..", "..", ".evolve", "profiles"))
 	prof, err := loader.Get("memo")
