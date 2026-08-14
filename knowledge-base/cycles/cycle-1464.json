@@ -1,0 +1,48 @@
+{
+  "cycle": 1464,
+  "run_id": "01M00GR3067PEF40SVE7W46TR5",
+  "goal": "Work through the todo inbox by weight; pipeline-repair items first.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|infra-error|149b8b250b24",
+    "pre_class": "infra-error",
+    "reasons": [
+      "EGPS: red_count=2 (cycle ships only when red_count==0)",
+      "the integration tier (`go test -tags integration`) reported 7 offender(s) — CI's integration-tier test step would FAIL (e.g. TestFleetSoak). Offenders: --- FAIL: TestRun_RoleDigestExcludesForeignAnd"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1464",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
