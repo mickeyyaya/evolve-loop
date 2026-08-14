@@ -86,11 +86,11 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 func mapCodexModel(m string) string {
 	switch m {
 	case "fast", "haiku":
-		return "gpt-5.4-mini"
+		return "gpt-5.6-luna"
 	case "balanced", "sonnet":
-		return "gpt-5.4"
+		return "gpt-5.6-terra"
 	case "deep", "opus":
-		return "gpt-5.5"
+		return "gpt-5.6-sol"
 	}
 	return m
 }

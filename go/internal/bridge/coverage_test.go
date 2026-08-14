@@ -109,7 +109,7 @@ func TestParseExtendSecs(t *testing.T) {
 }
 
 func TestMapCodexModelAndName(t *testing.T) {
-	for in, want := range map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5", "gpt-x": "gpt-x", "weird": "weird"} {
+	for in, want := range map[string]string{"haiku": "gpt-5.6-luna", "sonnet": "gpt-5.6-terra", "opus": "gpt-5.6-sol", "gpt-x": "gpt-x", "weird": "weird"} {
 		if got := mapCodexModel(in); got != want {
 			t.Fatalf("mapCodexModel(%q) = %q, want %q", in, got, want)
 		}

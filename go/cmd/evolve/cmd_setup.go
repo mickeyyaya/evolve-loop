@@ -19,13 +19,15 @@ import (
 //
 //	detect    [--json]                      onboarding digest (CLIs + per-phase)
 //	recommend [--json]                      the configured presets (Recommended/Economy/Max-quality)
+//	latest    [--json]                      LIVE parallel probe: freshest model each ready CLI's
+//	                                        bridge offers vs today's dispatch map (read-only)
 //	apply     --preset <name> [--dry-run]   write the chosen preset's pins to policy.json
 //	complete                                stamp the first-run marker
 //
 // Exit codes: 0 OK, 10 bad args, 1 runtime error.
 func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|recommend|apply|complete)")
+		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|recommend|latest|apply|complete)")
 		return 10
 	}
 	switch args[0] {
@@ -33,6 +35,8 @@ func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runSetupDetect(args[1:], stdout, stderr)
 	case "recommend":
 		return runSetupRecommend(args[1:], stdout, stderr)
+	case "latest":
+		return runSetupLatest(args[1:], stdout, stderr)
 	case "apply":
 		return runSetupApply(args[1:], stdout, stderr)
 	case "complete":

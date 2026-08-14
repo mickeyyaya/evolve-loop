@@ -51,7 +51,7 @@ func writeReportAtomic(path, content string) error {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp) // best-effort cleanup; the rename error is the one that matters
 		return err
 	}
 	return nil

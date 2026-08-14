@@ -20,7 +20,9 @@
   },
   "prompt_marker": "\u203a",
   "default_model": "",
-  "default_args": ["--yolo"],
+  "default_args": [
+    "--yolo"
+  ],
   "params": {
     "model_tier": {
       "channel": "flag",
@@ -30,9 +32,18 @@
     "effort": {
       "channel": "flag",
       "values": {
-        "low": ["-c", "model_reasoning_effort=low"],
-        "medium": ["-c", "model_reasoning_effort=medium"],
-        "high": ["-c", "model_reasoning_effort=high"]
+        "low": [
+          "-c",
+          "model_reasoning_effort=low"
+        ],
+        "medium": [
+          "-c",
+          "model_reasoning_effort=medium"
+        ],
+        "high": [
+          "-c",
+          "model_reasoning_effort=high"
+        ]
       }
     },
     "permission": {
@@ -46,12 +57,28 @@
     }
   },
   "controls": {
-    "usage":     { "send": "/status", "await": "prompt_marker", "exhausted_regex": "(?i)(limit reached|\\b0%\\s*left|rate.?limit|too many requests)", "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))" },
-    "status":    { "send": "/status", "await": "prompt_marker" },
-    "clean_ctx": { "send": "/clear" },
-    "compact":   { "send": "/compact" },
-    "model":     { "send": "/model" },
-    "exit":      { "send": "/quit" }
+    "usage": {
+      "send": "/status",
+      "await": "prompt_marker",
+      "exhausted_regex": "(?i)(limit reached|\\b0%\\s*left|rate.?limit|too many requests)",
+      "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))"
+    },
+    "status": {
+      "send": "/status",
+      "await": "prompt_marker"
+    },
+    "clean_ctx": {
+      "send": "/clear"
+    },
+    "compact": {
+      "send": "/compact"
+    },
+    "model": {
+      "send": "/model"
+    },
+    "exit": {
+      "send": "/quit"
+    }
   },
   "interactive_prompts": [
     {
@@ -60,14 +87,14 @@
       "response_keys": "1,Enter",
       "policy": "auto_respond",
       "once": true,
-      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml. `once`: a one-time boot dialog — after a single auto-response it must not re-fire, since its dismissed text lingers in the bootScrollback=200 capture during the artifact-wait loop and would otherwise re-match every poll and trip the loop guard (the codex-tmux abandon observed 2026-06-03)."
+      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml. `once`: a one-time boot dialog \u2014 after a single auto-response it must not re-fire, since its dismissed text lingers in the bootScrollback=200 capture during the artifact-wait loop and would otherwise re-match every poll and trip the loop guard (the codex-tmux abandon observed 2026-06-03)."
     },
     {
       "name": "per_edit_approval",
       "regex": "Would you like to make the following edits|Press enter to confirm or esc to cancel|Yes, proceed",
       "response_keys": "1,Enter",
       "policy": "auto_respond",
-      "note": "Cycle-124 G1b (defense-in-depth for G1a's `--yolo`): codex per-edit-approval modal that hung cycle-123 tdd. The modal lists 3 numbered options ('1. Yes, proceed' / '2. Yes, and don't ask again' / '3. No, and tell Codex what to do differently'); response_keys '1,Enter' selects 'Yes, proceed' explicitly (the default highlight is option 1 so a bare 'Enter' would also work, but the explicit '1' is robust to future UX shifts in default selection). With G1a's `--yolo` in default_args, this modal should not fire — it's the regex backstop for the case where `--yolo` regresses (codex renames the flag, operator overrides default_args, OR the modal appears via a different code path codex's approval=never doesn't cover). Source: docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md."
+      "note": "Cycle-124 G1b (defense-in-depth for G1a's `--yolo`): codex per-edit-approval modal that hung cycle-123 tdd. The modal lists 3 numbered options ('1. Yes, proceed' / '2. Yes, and don't ask again' / '3. No, and tell Codex what to do differently'); response_keys '1,Enter' selects 'Yes, proceed' explicitly (the default highlight is option 1 so a bare 'Enter' would also work, but the explicit '1' is robust to future UX shifts in default selection). With G1a's `--yolo` in default_args, this modal should not fire \u2014 it's the regex backstop for the case where `--yolo` regresses (codex renames the flag, operator overrides default_args, OR the modal appears via a different code path codex's approval=never doesn't cover). Source: docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md."
     },
     {
       "name": "auth_recheck",
@@ -85,12 +112,16 @@
   ],
   "stub": false,
   "model_tier_map": {
-    "fast": "gpt-5.4-mini",
-    "balanced": "gpt-5.4",
-    "deep": "gpt-5.5",
-    "top": "gpt-5.5"
+    "fast": "gpt-5.6-luna",
+    "balanced": "gpt-5.6-terra",
+    "deep": "gpt-5.6-sol",
+    "top": "gpt-5.6-sol"
   },
-  "chatgpt_safe_models": ["gpt-5.5", "gpt-5.4-mini"],
-  "chatgpt_default_model": "gpt-5.5",
+  "chatgpt_safe_models": [
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna"
+  ],
+  "chatgpt_default_model": "gpt-5.6-sol",
   "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same model_tier_map as the codex-headless driver. chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism; set refreshed 2026-06-07 per operator): this ChatGPT plan accepts gpt-5.5 and gpt-5.4-mini; gpt-5.4 still 400-rejects on subscription auth (see OpenAI codex issues #14190/#19654) and gpt-5.2 is gone from the /model picker, so the balanced tier (gpt-5.4) clamps UP to gpt-5.5 when auth=chatgpt. API-key auth bypasses the clamp entirely."
 }
