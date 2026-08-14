@@ -1,0 +1,47 @@
+{
+  "cycle": 1461,
+  "run_id": "01M00AFH8JSB62M4BEDAMCD6CJ",
+  "goal": "Work through the todo inbox by weight; pipeline-repair items first.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|infra-error|9c328be6c85b",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase audit verdict FAIL routed to retro (agent-graded; see the audit report artifact) defect=H1 (HIGH): acceptance criterion 'healthy /status display vocabulary must NOT classify exhausted for ANY fa"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1461",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
