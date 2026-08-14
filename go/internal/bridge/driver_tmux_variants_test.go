@@ -75,13 +75,13 @@ func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
 	// undocumented but parsed flag that sets approval=never AND
 	// sandbox=danger-full-access at boot, defusing the per-edit-approval
 	// modal that hung cycle-123 tdd). It lands FIRST per realizer order
-	// (default_args before per-param scalars), then -m gpt-5.4-mini from
-	// params.model_tier (tier_alias haiku → gpt-5.4-mini).
+	// (default_args before per-param scalars), then -m gpt-5.6-luna from
+	// params.model_tier (tier_alias haiku → fast → gpt-5.6-luna).
 	fx := newFixture(t, "codex-tmux", "") // profile model=haiku
 	tmux := &fakeTmux{}                   // no marker → REPL boot times out, but launchCmd already sent
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
-	if !tmux.sentContains("codex --yolo -m gpt-5.4-mini") {
-		t.Fatalf("codex-tmux launch should map haiku→gpt-5.4-mini with --yolo prefix; sentKeys=%v", tmux.sentKeys)
+	if !tmux.sentContains("codex --yolo -m gpt-5.6-luna") {
+		t.Fatalf("codex-tmux launch should map haiku→gpt-5.6-luna with --yolo prefix; sentKeys=%v", tmux.sentKeys)
 	}
 }
 

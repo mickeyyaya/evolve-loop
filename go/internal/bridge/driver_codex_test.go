@@ -14,15 +14,15 @@ import "testing"
 func TestMapCodexModel_CanonicalTiers_Regression(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		// canonical tiers (the regression) — mirror the legacy aliases
-		{"fast", "gpt-5.4-mini"},
-		{"balanced", "gpt-5.4"},
-		{"deep", "gpt-5.5"},
+		{"fast", "gpt-5.6-luna"},
+		{"balanced", "gpt-5.6-terra"},
+		{"deep", "gpt-5.6-sol"},
 		// legacy aliases must still map (no regression)
-		{"haiku", "gpt-5.4-mini"},
-		{"sonnet", "gpt-5.4"},
-		{"opus", "gpt-5.5"},
+		{"haiku", "gpt-5.6-luna"},
+		{"sonnet", "gpt-5.6-terra"},
+		{"opus", "gpt-5.6-sol"},
 		// native ids + genuinely unknown values pass through unchanged
-		{"gpt-5.5", "gpt-5.5"},
+		{"gpt-5.6-sol", "gpt-5.6-sol"},
 		{"weird", "weird"},
 	} {
 		if got := mapCodexModel(tc.in); got != tc.want {
