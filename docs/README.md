@@ -46,6 +46,7 @@ docs/
 | **Mixing LLMs across phases for cost/quality** | [concepts/pluggability.md](concepts/pluggability.md) |
 | **Recovering from a failed cycle** | [concepts/error-recovery.md](concepts/error-recovery.md) → [architecture/checkpoint-resume.md](architecture/checkpoint-resume.md) |
 | **Why a gate keeps false-FAILing honest work** | [incidents/2026-08-12-proxy-as-verdict-findings.md](incidents/2026-08-12-proxy-as-verdict-findings.md) — the recurring proxy-as-verdict defect, 15 findings with root causes, and the two ADRs that replace it |
+| **Why a batch halted at ship with identical fingerprints** | [incidents/2026-08-14-wave4-staging-halt.md](incidents/2026-08-14-wave4-staging-halt.md) — the check-ignore blind spot (negated-parent dir rules), prose-scraped manifest re-injection, and staging-onion layer 4 (git-named refusal drop + single retry) |
 | **Understanding what changed in v10.7** | [incidents/cycle-61.md](incidents/cycle-61.md) (B0-B7 fixes) + [CHANGELOG.md](../CHANGELOG.md) |
 
 ## Distinguishing principle
