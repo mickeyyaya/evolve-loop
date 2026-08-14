@@ -772,6 +772,49 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		stderr = io.MultiWriter(opts.Stderr, &errTail)
 	}
 	exit, runErr := opts.run(ctx, "git", args, io.Discard, stderr)
+	if runErr == nil && exit != 0 {
+		// Layer 4 of the staging onion (2026-08-14 halt, ship|unknown|99c38818):
+		// a pathspec the check-ignore probe is blind to can still be refused
+		// by add. The live blind shape (probed on the runtime repo, git
+		// 2.50.1): a directory whose rule sits under a NEGATED parent
+		// (`!.evolve/inbox/` re-include above `.evolve/inbox/processed/`) —
+		// check-ignore returns not-ignored for BOTH slash forms there, while
+		// a minimal `dir/` rule without the negation IS flagged (review
+		// probe). The fix is deliberately mechanism-independent: rather than
+		// re-implement ignore semantics a third time, trust git's own
+		// refusal — it NAMES the offending pathspecs in stderr. Drop exactly
+		// those, retry ONCE.
+		if offenders := ignoredPathsFromAddRefusal(errTail.String()); len(offenders) > 0 {
+			offenderSet := make(map[string]bool, len(offenders))
+			for _, o := range offenders {
+				offenderSet[o] = true
+			}
+			retryPaths := make([]string, 0, len(paths))
+			for _, p := range paths {
+				if !offenderSet[p] {
+					retryPaths = append(retryPaths, p)
+				}
+			}
+			// Progress is mandatory, and so is having something left to stage:
+			// an offender list that filters nothing (form mismatch) falls
+			// through to the honest error below, and an ALL-ignored set stays
+			// on the two-strikes ladder (cycle-1365: refusal → strike →
+			// deterministic precondition → continuation/salvage) — a success
+			// that staged nothing would delete that routing.
+			if len(retryPaths) > 0 && len(retryPaths) < len(paths) {
+				res.Logs = append(res.Logs, fmt.Sprintf(
+					"[ship] git refused %d gitignored pathspec(s) the check-ignore probe cannot see (directory-form rules); dropped and retrying: %s",
+					len(paths)-len(retryPaths), strings.Join(offenders, " ")))
+				retryArgs := make([]string, 0, len(prefix)+3+len(retryPaths))
+				retryArgs = append(retryArgs, prefix...)
+				retryArgs = append(retryArgs, "add", "-A", "--")
+				retryArgs = append(retryArgs, retryPaths...)
+				errTail.Reset()
+				exit, runErr = opts.run(ctx, "git", retryArgs, io.Discard, stderr)
+				paths = retryPaths
+			}
+		}
+	}
 	if runErr != nil || exit != 0 {
 		tail := strings.TrimSpace(errTail.String())
 		if len(tail) > 300 {
@@ -1029,4 +1072,31 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 		}
 	}
 	return nil
+}
+
+// ignoredPathsFromAddRefusal extracts the pathspecs git names in an add
+// refusal ("The following paths are ignored by one of your .gitignore
+// files:") — the lines between that header and the first hint:. Strict by
+// design: no header means no offenders (a fuzzy parse of an unrelated failure
+// would silently under-stage the ship). Quoted lines decode through
+// unquoteGitPath (the cycle-1108 quotepath contract applies here too).
+func ignoredPathsFromAddRefusal(stderr string) []string {
+	const header = "The following paths are ignored by one of your .gitignore files:"
+	lines := strings.Split(stderr, "\n")
+	var out []string
+	in := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.Contains(trimmed, header):
+			in = true
+		case in && strings.HasPrefix(trimmed, "hint:"):
+			return out
+		case in && trimmed != "":
+			if p := unquoteGitPath(trimmed); p != "" {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
