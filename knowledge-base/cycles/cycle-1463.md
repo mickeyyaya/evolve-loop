@@ -1,11 +1,28 @@
 # Cycle 1463 Dossier
 
-**Goal:** 427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164
-**Final verdict:** PASS
-**Run ID:** 01M00FTP3GBWKV6N5G53WE9FRX
+**Goal:** Work through the todo inbox by weight; pipeline-repair items first.
+**Final verdict:** FAIL
+**Run ID:** 01M00GR2ZXV7YAR7R2941MP2Z7
 
 ## Phases
 
 | Phase | Archetype | Verdict | Duration | Key Findings |
 |-------|-----------|---------|----------|--------------|
-| cycle-recorded |  | PASS |  | cycle completed; ledger walk deferred to future slice |
+| cycle-recorded |  | FAIL |  | cycle completed; ledger walk deferred to future slice |
+
+## Defects
+
+- **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Failure
+
+**Fingerprint:** `audit|gate-block|9595a6e9719a` · **Class:** gate-block
+
+- EGPS: red_count=2 (cycle ships only when red_count==0)
+
+
+## Carryover
+
+- **address-audit-findings** (high): resolve the audit findings that failed cycle 1463
+

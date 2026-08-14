@@ -1,12 +1,12 @@
 {
   "cycle": 1463,
-  "run_id": "01M00FTP3GBWKV6N5G53WE9FRX",
-  "goal": "427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164",
-  "final_verdict": "PASS",
+  "run_id": "01M00GR2ZXV7YAR7R2941MP2Z7",
+  "goal": "Work through the todo inbox by weight; pipeline-repair items first.",
+  "final_verdict": "FAIL",
   "phases": [
     {
       "name": "cycle-recorded",
-      "verdict": "PASS",
+      "verdict": "FAIL",
       "key_findings": "cycle completed; ledger walk deferred to future slice",
       "tokens": {
         "input": 0,
@@ -14,6 +14,34 @@
         "cache_read": 0,
         "cache_write": 0
       }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|9595a6e9719a",
+    "pre_class": "gate-block",
+    "reasons": [
+      "EGPS: red_count=2 (cycle ships only when red_count==0)"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1463",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
     }
   ]
 }
