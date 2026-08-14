@@ -1,7 +1,7 @@
 {
   "name": "build-planner",
   "role": "build-planner",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",

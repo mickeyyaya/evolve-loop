@@ -1,9 +1,9 @@
 {
-  "_deprecated": "ARCHIVED / non-LLM. The orchestrator is the deterministic Go kernel (core.Orchestrator), not an LLM agent — this bash-era profile is never loaded at runtime. The LLM routing brain is the advisor (profiles/router.json + agents/evolve-router.md). Kept for historical reference only.",
+  "_deprecated": "ARCHIVED / non-LLM. The orchestrator is the deterministic Go kernel (core.Orchestrator), not an LLM agent \u2014 this bash-era profile is never loaded at runtime. The LLM routing brain is the advisor (profiles/router.json + agents/evolve-router.md). Kept for historical reference only.",
   "name": "orchestrator",
   "role": "orchestrator",
   "context_mode": "digest",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "model_tier_default": "balanced",
   "_model_tier_overrides_note": "cycle-974: removed inert 'cycle_4_plus_mature'=fast (zero production consumers; below floor). clamped 'cycle_1_or_low_goal' deep->balanced: orchestration is lightweight coordination bounded by envelope max=balanced.",
   "model_tier_overrides": {
@@ -262,5 +262,7 @@
   ],
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": []
+  "cli_fallback": [
+    "claude-tmux"
+  ]
 }

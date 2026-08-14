@@ -1,7 +1,7 @@
 {
   "name": "tester",
   "role": "builder",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "model_tier_default": "balanced",
   "_model_tier_overrides_note": "cycle-974: removed inert 's_complex_with_cache'=fast (zero production consumers; below floor). widened envelope max balanced->deep so complex/adversarial test-authoring strategies (ultrathink/m_complex/audit_retry=deep) sit within bounds, matching sibling profiles builder+tdd-engineer (max=deep, identical override intent).",
   "model_tier_overrides": {
@@ -110,8 +110,10 @@
   "allowed_clis": [
     "claude"
   ],
-  "_note": "Restricted to claude — same safety reasoning as builder.",
+  "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": []
+  "cli_fallback": [
+    "claude-tmux"
+  ]
 }
