@@ -539,6 +539,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// Its OWN gate (not shared with the fast-poll's) — the two loops observe at
 	// different cadences and must each confirm on their own consecutive frames.
 	checkpointExhaustGate := newExhaustionGate()
+	checkpointWall := &checkpointWallState{}
 	// Persistence guard for the ADR-0044 C2 fatal-pane fast-fail
 	// (fatalpane_persistence.go) — same shape, same reason: the detector matches
 	// substrings against the RAW pane, so a working agent quoting a fatal
@@ -730,9 +731,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// agent's pane clears by the next checkpoint — the raw-pane false-FAIL
 			// class the go-review of the per-model regex fix surfaced.
 			walled := livenessCenter.ExhaustedOf(strippedForExhaustionScan(curPane, ar.injectedPrompt), paneProfile)
-			if checkpointExhaustGate.observe(walled) {
-				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall (persisted %d checkpoints) — failing over to fallback CLI (exit %d)\n", pfx, exhaustionPersistObservations, ExitUnknownPrompt)
+			// Corroboration contract shared with the fast-poll site, one
+			// probe per phase, latched (wallcorroborate.go checkpointWallState).
+			if escalate, suppressNow := checkpointWall.decide(ctx, deps.CorroborateWall, lp.name, checkpointExhaustGate.observe(walled)); escalate {
+				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall (persisted %d checkpoints, corroborated by live probe) — failing over to fallback CLI (exit %d)\n", pfx, exhaustionPersistObservations, ExitUnknownPrompt)
 				return ExitUnknownPrompt, nil
+			} else if suppressNow {
+				fmt.Fprintf(deps.Stderr, "%s EXHAUSTION-SUPPRESSED: pane matched wall vocabulary but a live probe (cheapest tier) answered — treating as content-induced; a tier-scoped wall would surface via artifact-timeout fallback instead\n", pfx)
 			}
 			// Progressed is sourced from the center's Changed(session)
 			// projection (S4) — a consecutive-observation comparison, not the

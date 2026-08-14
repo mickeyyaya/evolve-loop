@@ -116,7 +116,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// is in chatgpt_safe_models, so the realized balanced tier
 			// (gpt-5.6-terra) passes through. The leak-absent assertions below
 			// are what this case actually guards; the model value rides along.
-			want:   "codex --yolo -m gpt-5.6-terra",
+			want:   "codex --yolo -m gpt-5.6-terra -c 'model_reasoning_effort=high'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

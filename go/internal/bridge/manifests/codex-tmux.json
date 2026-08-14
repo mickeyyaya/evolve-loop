@@ -44,7 +44,8 @@
           "-c",
           "model_reasoning_effort=high"
         ]
-      }
+      },
+      "default": "high"
     },
     "permission": {
       "channel": "controller"
@@ -60,7 +61,7 @@
     "usage": {
       "send": "/status",
       "await": "prompt_marker",
-      "exhausted_regex": "(?i)(limit reached|\\b0%\\s*left|rate.?limit|too many requests)",
+      "exhausted_regex": "(?i)(usage limit reached|hit your (usage|weekly) limit|\\b0%\\s*left|out of (usage|credits))",
       "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))"
     },
     "status": {

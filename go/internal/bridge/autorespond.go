@@ -232,11 +232,20 @@ type autoResponder struct {
 	// e.g. an echoed "...reached your usage limit..." Deliverable-Contract
 	// line — never escalates rc 85. Empty strips nothing (fail-open).
 	injectedPrompt string
-	workspace      string
-	cli            string
-	counts         map[string]int
-	deps           Deps
-	human          bool // when true, deliver keys with human-input cadence
+	// wallScanSuppressed disables the exhaustion scan for the rest of this
+	// phase after a corroborated-healthy suppression (wallcorroborate.go) —
+	// the content that tripped it persists on-pane by nature.
+	wallScanSuppressed bool
+	// wallProbed/wallConfirmed latch the ONE corroboration this responder is
+	// allowed: rc-discarding tick callers + the latching gate would otherwise
+	// re-probe a confirmed wall every tick (review HIGH-1).
+	wallProbed    bool
+	wallConfirmed bool
+	workspace     string
+	cli           string
+	counts        map[string]int
+	deps          Deps
+	human         bool // when true, deliver keys with human-input cadence
 	// scrollback is the capture-pane depth: 0 for visible-pane CLIs (claude),
 	// >0 for alt-screen CLIs (codex/agy) whose bare visible pane is blank.
 	scrollback int
@@ -380,13 +389,32 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// the diff-stripped pane too (scanPane already has prompt-echo removed), and
 	// (2) it is persistence-gated (exhaustion_persistence.go) — a single transient frame
 	// never crosses; a real wall, present every frame, crosses in a couple ticks.
-	if rc != 85 && ar.exhaustedRegex != "" {
+	if rc != 85 && ar.exhaustedRegex != "" && !ar.wallScanSuppressed {
 		if ar.exhaustGate == nil { // bulletproof against a direct struct construction
 			ar.exhaustGate = newExhaustionGate()
 		}
 		walled := ar.deps.LivenessCenter.ExhaustedOf(strippedForExhaustionScan(pane, ar.injectedPrompt), panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex})
 		if ar.exhaustGate.observe(walled) {
-			action, rc = "escalate:exhausted", 85
+			// Corroborate before the verdict (2026-08-15 false-wall class):
+			// a lane whose WORK CONTENT is wall vocabulary persists it
+			// on-pane exactly like a real wall. EXACTLY ONE probe per
+			// responder, whatever it answers: healthy disables the scan
+			// (the fixture stays on screen), and a CONFIRMED wall latches
+			// too — the gate itself latches, and several tick callers
+			// discard rc (boot loop, recipe adapter), so an unlatched
+			// verdict would re-fire a bounded-60s quota-consuming probe on
+			// every subsequent tick of an already-confirmed wall.
+			if !ar.wallProbed {
+				ar.wallProbed = true
+				ar.wallConfirmed = wallCorroborated(ctx, ar.deps.CorroborateWall, ar.cli)
+				if !ar.wallConfirmed {
+					ar.wallScanSuppressed = true
+					fmt.Fprintf(ar.deps.Stderr, "[%s] EXHAUSTION-SUPPRESSED: pane matched wall vocabulary but a live probe (cheapest tier) answered — treating as content-induced; a tier-scoped wall would surface via artifact-timeout fallback instead\n", ar.cli)
+				}
+			}
+			if ar.wallConfirmed {
+				action, rc = "escalate:exhausted", 85
+			}
 		}
 	}
 	switch rc {

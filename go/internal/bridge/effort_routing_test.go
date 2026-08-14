@@ -48,7 +48,21 @@ func TestEffortRealize_Matrix(t *testing.T) {
 			}
 			base := Realize(m, LaunchIntent{ModelTier: "deep"})
 			hi := Realize(m, LaunchIntent{ModelTier: "deep", Effort: "high"})
-			if emitCount(hi) <= emitCount(base) {
+			lo := Realize(m, LaunchIntent{ModelTier: "deep", Effort: "low"})
+			// The dial must be effective in BOTH directions: explicit high and
+			// low realize differently (an all-noop wiring fails here), and a
+			// manifest that declares a DEFAULT (codex: high, 2026-08-15
+			// operator directive — the CLI's second model layer must never run
+			// at the CLI's own default) already carries it in the base.
+			if reflect.DeepEqual(hi, lo) {
+				t.Errorf("%s effort dial ineffective: high and low realize identically: %+v", cli, hi)
+			}
+			if def := m.Params["effort"].Default; def != "" {
+				want := Realize(m, LaunchIntent{ModelTier: "deep", Effort: def})
+				if !reflect.DeepEqual(base, want) {
+					t.Errorf("%s declares effort default=%q but an unset intent does not realize it: base=%+v want=%+v", cli, def, base, want)
+				}
+			} else if emitCount(hi) <= emitCount(base) {
 				t.Errorf("%s does not translate abstract effort=high through any effective channel (flag/repl): base=%+v high=%+v", cli, base, hi)
 			}
 		})
@@ -99,7 +113,17 @@ func TestEffortRealize_AbsentByteIdentical(t *testing.T) {
 			}
 			preEffort := Realize(m2, intent)
 
-			if !reflect.DeepEqual(withEffortParam, preEffort) {
+			// Contract split (2026-08-15): a manifest WITHOUT a declared effort
+			// default keeps the purely-additive guarantee (unset ⇒ identical
+			// to a pre-effort manifest). A manifest WITH one (codex: high)
+			// deliberately breaks it — unset now realizes the default, so the
+			// equivalence is asserted against the explicit-default form.
+			if def := m.Params["effort"].Default; def != "" {
+				explicit := Realize(m, LaunchIntent{ModelTier: "deep", Permission: "bypass", Effort: def})
+				if !reflect.DeepEqual(withEffortParam, explicit) {
+					t.Errorf("%s: unset Effort must realize the manifest default %q: got=%+v want=%+v", cli, def, withEffortParam, explicit)
+				}
+			} else if !reflect.DeepEqual(withEffortParam, preEffort) {
 				t.Errorf("%s: unset Effort must be byte-identical to a pre-effort manifest: with=%+v pre-effort=%+v", cli, withEffortParam, preEffort)
 			}
 		})

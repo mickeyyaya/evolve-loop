@@ -27,6 +27,11 @@ type ParamSpec struct {
 	From     string              `json:"from,omitempty"`     // "model_tier_map" (canonical) | "tier_alias" (deprecated) → resolve via Manifest.ModelTierMap
 	Template string              `json:"template,omitempty"` // repl: "/model {alias}"
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
+	// Default is the value realized when the intent leaves this param empty —
+	// data-driven, per CLI (2026-08-15: codex's two-layer model config runs at
+	// the CLI's own reasoning-effort default unless the second layer is set;
+	// the manifest now pins effort=high by default, operator directive).
+	Default string `json:"default,omitempty"`
 }
 
 // unresolvedModelTokens is the closed vocabulary that never names a model on
@@ -195,7 +200,13 @@ func legacyTierAlias(value string) string {
 // emits nothing.
 func realizeScalar(r *Realization, m Manifest, param, value string) {
 	spec, ok := m.Params[param]
-	if !ok || value == "" {
+	if !ok {
+		return
+	}
+	if value == "" {
+		value = spec.Default // manifest-declared default; still may be empty
+	}
+	if value == "" {
 		return
 	}
 	// Enum-mapped: the intent value selects concrete flag tokens.
