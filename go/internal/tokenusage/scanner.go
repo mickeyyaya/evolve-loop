@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Source identifies how a Result's usage was obtained.
@@ -197,16 +198,49 @@ func readLines(path string) []transcriptLine {
 	return out
 }
 
+// artifactMarker is the label the subagent assemblers stamp ahead of the
+// deliverable path: subagent.go's composePrompt ("Artifact path: %s\n") and
+// run.go's assembleV2Prompt ("- Artifact path: %s\n"), whose leading list bullet
+// sits outside the key.
+const artifactMarker = "Artifact path: "
+
+// artifactAnchors are every literal label a dispatched prompt puts immediately
+// ahead of the launch's deliverable path. Attribution keys on anchor+path rather
+// than on a bare path substring so that a transcript which merely CITES another
+// launch's artifact in prose — e.g. the retrospective profile's "Read
+// .evolve/runs/cycle-{cycle}/build-report.md" — is not billed to that launch's
+// Window.
+//
+// All three disclosure forms must stay listed: the subagent assemblers stamp
+// artifactMarker, while the bridge dispatch path every loop phase takes stamps
+// the contract footer (phasecontract.FooterMarker, see render.go:86) and the
+// contract tail's <artifact-path> element (render.go:117) — a real cycle-1457
+// build prompt carries the footer form and no artifactMarker at all. Dropping a
+// form here does not narrow attribution loudly; it silently degrades those
+// launches to the scrollback tier (input:0, cache_read:0), the cycle-867 defect
+// this scanner exists to close.
+var artifactAnchors = []string{
+	artifactMarker,
+	phasecontract.FooterMarker + " ",
+	"<artifact-path>",
+}
+
 // attributes reports whether a transcript belongs to the launch. When
 // w.ArtifactPath is set (all production launches) it alone attributes: the
-// deliverable path is stamped verbatim into this launch's first user message
-// (the subagent assembler's "Artifact path: <path>" line) and is cycle+phase
-// unique. Cwd is unreliable across the exec boundary (see the package doc), so
-// it is only a fallback for ArtifactPath-less Windows (legacy launches, unit
-// fixtures), which require an exact cwd == w.Worktree match.
+// deliverable path is stamped into this launch's first user message behind one
+// of the artifactAnchors and is cycle+phase unique. Cwd is unreliable across the
+// exec boundary (see the package doc), so it is only a fallback for
+// ArtifactPath-less Windows (legacy launches, unit fixtures), which require an
+// exact cwd == w.Worktree match.
 func attributes(lines []transcriptLine, w Window) bool {
 	if w.ArtifactPath != "" {
-		return strings.Contains(firstUserText(lines), w.ArtifactPath)
+		text := firstUserText(lines)
+		for _, anchor := range artifactAnchors {
+			if strings.Contains(text, anchor+w.ArtifactPath) {
+				return true
+			}
+		}
+		return false
 	}
 	for _, ln := range lines {
 		if ln.Cwd == w.Worktree {

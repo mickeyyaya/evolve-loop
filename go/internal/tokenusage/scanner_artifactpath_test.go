@@ -32,7 +32,7 @@ func TestTranscriptScan_AttributesByArtifactPath_WhenCwdMispropagated(t *testing
 
 	root := t.TempDir()
 	sessionDir := filepath.Join(root, "projects", "-repo--evolve-worktrees-cycle-867")
-	body := `{"type":"user","cwd":"` + transcriptCwd + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":[{"type":"text","text":"write your report to ` + artifact + `"}]}}
+	body := `{"type":"user","cwd":"` + transcriptCwd + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":[{"type":"text","text":"Artifact path: ` + artifact + `"}]}}
 {"type":"assistant","cwd":"` + transcriptCwd + `/go","timestamp":"2026-07-07T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":12,"output_tokens":7506,"cache_read_input_tokens":173121,"cache_creation_input_tokens":40}}}
 `
 	writeTranscript(t, sessionDir, "sess1.jsonl", body)
@@ -97,7 +97,7 @@ func TestTranscriptScan_AttributesByArtifactPath_StringContent(t *testing.T) {
 	root := t.TempDir()
 	sessionDir := filepath.Join(root, "projects", "-repo--evolve-worktrees-cycle-500")
 	// content is a JSON STRING (not an array of blocks), as real transcripts emit:
-	body := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":"## Deliverable Contract\n\nWrite it to the EXACT path: ` + artifact + `"}}
+	body := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":"## Deliverable Contract\n\nArtifact path: ` + artifact + `"}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":9,"output_tokens":100,"cache_read_input_tokens":88000,"cache_creation_input_tokens":12}}}
 `
 	writeTranscript(t, sessionDir, "sess1.jsonl", body)

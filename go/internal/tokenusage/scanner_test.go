@@ -122,9 +122,10 @@ func TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted(t *
 	root := t.TempDir()
 	sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-997")
 
-	// Session A: the real launch — first user message cites the unique
-	// artifact path the orchestrator stamped for this launch.
-	bodyA := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uA","content":[{"type":"text","text":"working in .evolve/runs/cycle-997/launch-token-abc123"}]}}
+	// Session A: the real launch — first user message carries the assembler's
+	// "Artifact path: " marker ahead of the unique artifact path the
+	// orchestrator stamped for this launch (the attribution key's real shape).
+	bodyA := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uA","content":[{"type":"text","text":"Artifact path: .evolve/runs/cycle-997/launch-token-abc123"}]}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:02Z","message":{"id":"mA","usage":{"input_tokens":40,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `
 	// Session B: a concurrent swarm reader sharing the same sanitized dir and
