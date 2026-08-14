@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/digest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
@@ -559,6 +560,16 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		if b.compactPrompts {
 			body = prompts.StripOnDemandSections(body)
 		}
+	}
+
+	materialized := digest.Materialize([]byte(body), phase)
+	shadow := digest.NewShadowRecord([]byte(body), materialized)
+	b.diag.Infof("%s\n", FormatDigestShadowLog(phase, shadow))
+	if materialized.Outcome == digest.OutcomeMalformed {
+		return core.PhaseResponse{}, fmt.Errorf("%s: materialize digest: %w", phase, materialized.Err)
+	}
+	if shadow.Parity {
+		body = string(materialized.Digest)
 	}
 
 	prompt := b.hooks.ComposePrompt(body, req)
@@ -1221,6 +1232,12 @@ func StaticPrefix(prompt string) string {
 		return prompt[:i]
 	}
 	return prompt
+}
+
+// FormatDigestShadowLog renders the role projection's dispatch-time evidence.
+func FormatDigestShadowLog(phase string, record digest.ShadowRecord) string {
+	return fmt.Sprintf("[runner] phase=%s digest-shadow outcome=%s full_bytes=%d digest_bytes=%d parity=%t",
+		phase, record.Outcome, record.FullBytes, record.DigestBytes, record.Parity)
 }
 
 // ComposePrompt exposes the phase's prompt assembly (Hooks.ComposePrompt) as a

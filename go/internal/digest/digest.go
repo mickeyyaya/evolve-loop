@@ -30,6 +30,53 @@ const (
 	markerEnd    = "<!-- /digest -->"
 )
 
+// Outcome classifies a role projection without falling back to the source.
+type Outcome string
+
+const (
+	OutcomeMatched   Outcome = "matched"
+	OutcomeNoMatch   Outcome = "no_match"
+	OutcomeMalformed Outcome = "malformed"
+)
+
+// Result is the classified output of Materialize.
+type Result struct {
+	Outcome Outcome
+	Digest  []byte
+	Err     error
+}
+
+// Materialize projects source for role and classifies the result.
+func Materialize(source []byte, role string) Result {
+	projected, err := ProjectDigest(source, role)
+	if err != nil {
+		return Result{Outcome: OutcomeMalformed, Err: err}
+	}
+	if len(strings.TrimSpace(string(projected))) == 0 {
+		return Result{Outcome: OutcomeNoMatch, Digest: projected}
+	}
+	return Result{Outcome: OutcomeMatched, Digest: projected}
+}
+
+// ShadowRecord records whether a projection is safe to substitute.
+type ShadowRecord struct {
+	FullBytes   int
+	DigestBytes int
+	Parity      bool
+	Outcome     Outcome
+}
+
+// NewShadowRecord derives size and safety facts without changing live input.
+func NewShadowRecord(full []byte, result Result) ShadowRecord {
+	return ShadowRecord{
+		FullBytes:   len(full),
+		DigestBytes: len(result.Digest),
+		Parity: result.Outcome == OutcomeMatched && result.Err == nil &&
+			len(strings.TrimSpace(string(result.Digest))) > 0 && len(result.Digest) < len(full),
+		Outcome: result.Outcome,
+	}
+}
+
 // ProjectDigest scans source for "<!-- digest:role=ROLE[,ROLE2,...] -->
 // ... <!-- /digest -->" marker pairs and returns the concatenated content of
 // every block whose role list contains role. Blocks tagged for other roles,

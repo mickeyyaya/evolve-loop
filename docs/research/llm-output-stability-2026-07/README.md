@@ -72,6 +72,12 @@ window. Distraction is the likeliest explanation for a real pattern we observe â
 late-phase agents (audit, retro) reasoning from accumulated history rather than
 re-deriving from the diff.
 
+Cycle 1460 therefore keeps role-scoped digests evidence-gated: [LLMLingua](https://aclanthology.org/2023.emnlp-main.825/)
+targets semantic integrity during compression, while a [large-scale prompt-compression
+study](https://arxiv.org/abs/2604.02985) finds that benefits depend on measured
+quality and operating conditions. The runner records size/parity in shadow mode
+and preserves the full prompt for unsafe projections before any default flip.
+
 Missing entirely: **fill-percentage telemetry and an effective-window cap.** We
 measure tokens spent; we do not measure how *full* each phase's window was when
 it produced its deliverable. Without that we cannot correlate quality with fill,

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/digest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -159,6 +162,47 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	}
 	if !strings.Contains(hooks.gotArtifact, "Files Modified") {
 		t.Errorf("Classify did not receive artifact contents; got %q", hooks.gotArtifact)
+	}
+}
+
+func TestRun_RoleScopedDigestMaterializesBeforeCompose(t *testing.T) {
+	const source = `UNTAGGED
+<!-- digest:role=scout -->
+SCOUT ONLY
+<!-- /digest -->
+<!-- digest:role=build -->
+BUILD ONLY
+<!-- /digest -->`
+	hooks := &fakeHooks{
+		phase:   "scout",
+		agent:   "evolve-scout",
+		model:   "sonnet",
+		prompt:  "composed body",
+		verdict: core.VerdictPASS,
+	}
+	var diagnostics bytes.Buffer
+	r := New(Options{
+		Hooks:   hooks,
+		Bridge:  &fakeBridge{writeArtifact: "# scout artifact\n"},
+		Prompts: fakePromptsFS("evolve-scout", source),
+		Diag:    log.Console{Out: &diagnostics, Err: &diagnostics},
+	})
+
+	if _, err := r.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1460, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got, want := strings.TrimSpace(hooks.gotComposeBody), "SCOUT ONLY"; got != want {
+		t.Errorf("ComposePrompt body = %q, want role-scoped %q", got, want)
+	}
+	if !strings.Contains(diagnostics.String(), "digest-shadow outcome=matched") {
+		t.Errorf("runner diagnostics = %q, want matched digest shadow record", diagnostics.String())
+	}
+	if got := FormatDigestShadowLog("scout", digest.ShadowRecord{
+		FullBytes: 10, DigestBytes: 5, Parity: true, Outcome: digest.OutcomeMatched,
+	}); got != "[runner] phase=scout digest-shadow outcome=matched full_bytes=10 digest_bytes=5 parity=true" {
+		t.Errorf("FormatDigestShadowLog = %q", got)
 	}
 }
 

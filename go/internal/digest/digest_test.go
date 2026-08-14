@@ -96,3 +96,34 @@ func TestProjectDigest(t *testing.T) {
 		}
 	})
 }
+
+func TestMaterializeAndShadowRecord(t *testing.T) {
+	matchedSource := []byte("<!-- digest:role=scout -->\nscout\n<!-- /digest -->\nexcluded")
+	matched := Materialize(matchedSource, "scout")
+	if got, want := matched.Outcome, OutcomeMatched; got != want {
+		t.Fatalf("Materialize matched outcome = %q, want %q", got, want)
+	}
+	if matched.Err != nil || string(matched.Digest) != "\nscout\n" {
+		t.Errorf("Materialize matched result = %+v, want scout digest without error", matched)
+	}
+	var record ShadowRecord = NewShadowRecord(matchedSource, matched)
+	if record.FullBytes != len(matchedSource) || record.DigestBytes != len(matched.Digest) || !record.Parity || record.Outcome != OutcomeMatched {
+		t.Errorf("NewShadowRecord matched = %+v, want exact byte counts and parity", record)
+	}
+
+	noMatch := Materialize(matchedSource, "audit")
+	if noMatch.Outcome != OutcomeNoMatch || len(noMatch.Digest) != 0 || noMatch.Err != nil {
+		t.Errorf("Materialize no-match = %+v, want empty OutcomeNoMatch", noMatch)
+	}
+	if got := NewShadowRecord(matchedSource, noMatch); got.Parity {
+		t.Errorf("NewShadowRecord no-match = %+v, want parity=false", got)
+	}
+
+	malformed := Materialize([]byte("<!-- digest:role=scout -->\nbroken"), "scout")
+	if malformed.Outcome != OutcomeMalformed || malformed.Err == nil || malformed.Digest != nil {
+		t.Errorf("Materialize malformed = %+v, want nil digest and classified error", malformed)
+	}
+	if got := NewShadowRecord([]byte("broken"), Result{Outcome: OutcomeMatched, Digest: []byte("not smaller")}); got.Parity {
+		t.Errorf("NewShadowRecord non-reducing = %+v, want parity=false", got)
+	}
+}
