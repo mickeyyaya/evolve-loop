@@ -1,6 +1,37 @@
 {
-  "version": 1,
+  "acs": {
+    "go_timeout_s": 600
+  },
+  "catalog": {
+    "auto_refresh": false,
+    "refresh_stage": "shadow",
+    "allowed_families": {
+      "agy": [
+        "gemini"
+      ],
+      "claude": [
+        "claude"
+      ],
+      "codex": [
+        "gpt"
+      ]
+    }
+  },
+  "cli_health": {
+    "proactive_probe": true
+  },
   "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout, parallel-evaluate rollout, per-phase CLI/model pins).",
+  "disposition": {
+    "stage": "enforce"
+  },
+  "failure_disposition": {
+    "stage": "enforce"
+  },
+  "fleet": {
+    "count": 2,
+    "plan_source": "triage",
+    "min_lanes": 2
+  },
   "floor": [
     {
       "id": "dossier-closeout",
@@ -8,35 +39,9 @@
       "enforced_since_cycle": 2
     }
   ],
-  "cli_health": {
-    "proactive_probe": true
-  },
-  "catalog": {
-    "auto_refresh": false,
-    "refresh_stage": "shadow"
-  },
-  "acs": {
-    "go_timeout_s": 600
-  },
   "parallel_evaluate": {
     "stage": "shadow",
     "concurrency": 3
   },
-  "pins": {
-    "memo": {
-      "cli": "agy",
-      "model": "fast"
-    }
-  },
-  "fleet": {
-    "count": 2,
-    "plan_source": "triage",
-    "min_lanes": 2
-  },
-  "disposition": {
-    "stage": "enforce"
-  },
-  "failure_disposition": {
-    "stage": "enforce"
-  }
+  "version": 1
 }

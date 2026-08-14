@@ -1,0 +1,14 @@
+{
+  "connects_to": [
+    "go/internal/bridge/driver_codex.go",
+    "go/internal/bridge/manifests/codex-tmux.json"
+  ],
+  "created_at": "2026-08-14T09:30:00Z",
+  "id": "codex-tier-map-single-source",
+  "kind": "pipeline-repair",
+  "fix": "mapCodexModel (driver_codex.go) hardcodes the tier→model table that the codex-tmux manifest's model_tier_map already owns — two declarations of the same vocabulary (the campaign_retrospective_215_231 disease). Derive the driver's mapping from the loaded Manifest.ModelTierMap (the driver has manifest access at realize/launch time) and delete the switch; add a coherence test asserting the driver resolves exactly what the manifest declares, so the next model-family cutover is ONE edit not three. Wiring proof: change the manifest map in a fixture and assert the driver follows without a code edit.",
+  "notes": "Found during the 2026-08-14 gpt-5.6 cutover: the manifest-only edit red'd CI because this duplicate (plus chatgpt_safe_models and 7 integration-tagged test pins) also carried the old family. Values are aligned as of PR #460; this item removes the class.",
+  "summary": "codex tier→model mapping is declared TWICE: manifests/codex-tmux.json model_tier_map (SSOT) and a hardcoded switch in driver_codex.go mapCodexModel. Every model-family refresh must edit both or dispatch and realization disagree.",
+  "title": "mapCodexModel duplicates the manifest tier map — single-source via Manifest.ModelTierMap",
+  "weight": 0.7
+}
