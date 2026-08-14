@@ -1,0 +1,19 @@
+{
+  "cycle": 1460,
+  "run_id": "01M00AFH8A0XF5S1TRF5XT791M",
+  "goal": "Work through the todo inbox by weight; pipeline-repair items first.",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "PASS",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ]
+}
