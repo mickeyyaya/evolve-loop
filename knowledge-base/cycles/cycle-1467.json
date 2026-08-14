@@ -1,0 +1,163 @@
+{
+  "cycle": 1467,
+  "run_id": "01M00VC1V9V8SSSR3FF6G5757B",
+  "goal": "Work through the todo inbox by weight; pipeline-repair items first.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 647623,
+      "started_at": "2026-08-14T19:19:45Z",
+      "ended_at": "2026-08-14T19:30:33Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 8573,
+        "cache_read": 595463,
+        "cache_write": 47688
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 57979,
+      "started_at": "2026-08-14T19:30:33Z",
+      "ended_at": "2026-08-14T19:31:31Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2895,
+        "cache_read": 251901,
+        "cache_write": 39211
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 245728,
+      "started_at": "2026-08-14T19:31:31Z",
+      "ended_at": "2026-08-14T19:35:37Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 52,
+        "output": 20912,
+        "cache_read": 2137319,
+        "cache_write": 107128
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 988766,
+      "started_at": "2026-08-14T19:35:37Z",
+      "ended_at": "2026-08-14T20:07:53Z",
+      "archetype": "build",
+      "tokens": {
+        "input": 36,
+        "output": 8168,
+        "cache_read": 1194222,
+        "cache_write": 61776
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 85040,
+      "started_at": "2026-08-14T20:07:53Z",
+      "ended_at": "2026-08-14T20:09:18Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 14,
+        "output": 4491,
+        "cache_read": 392037,
+        "cache_write": 49652
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|infra-error|e4100926f46e",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase build: core: all CLI families quota-exhausted (exit=85): every family in the fallback chain returned exit=85 across 2 attempts; checkpoint written — resume with `evolve loop --resume` after qu"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1467",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2025136,
+    "phase_count": 5,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 988766,
+    "by_archetype_ms": {
+      "build": 988766,
+      "control": 85040,
+      "plan": 951330
+    },
+    "total_tokens": {
+      "input": 134,
+      "output": 45039,
+      "cache_read": 4570942,
+      "cache_write": 305455
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 36,
+        "output": 8168,
+        "cache_read": 1194222,
+        "cache_write": 61776
+      },
+      "control": {
+        "input": 14,
+        "output": 4491,
+        "cache_read": 392037,
+        "cache_write": 49652
+      },
+      "plan": {
+        "input": 84,
+        "output": 32380,
+        "cache_read": 2984683,
+        "cache_write": 194027
+      }
+    },
+    "wasted_tokens": {
+      "input": 50,
+      "output": 12659,
+      "cache_read": 1586259,
+      "cache_write": 111428
+    },
+    "cache_hit_ratio": 0.999970685239099,
+    "hot_phase_count": 3,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd"
+    ]
+  }
+}
