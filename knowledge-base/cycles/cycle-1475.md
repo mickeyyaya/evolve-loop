@@ -1,8 +1,8 @@
 # Cycle 1475 Dossier
 
-**Goal:** 427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164
+**Goal:** Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.
 **Final verdict:** PASS
-**Run ID:** 01M01QTEY1AXG9PKPS3BGZ52BP
+**Run ID:** 01M02EQAEQ8NPQTEBJEV4ZJFFZ
 
 ## Phases
 
