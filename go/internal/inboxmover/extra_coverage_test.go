@@ -43,7 +43,7 @@ func TestReadTaskIDOrUnknown_Fallbacks(t *testing.T) {
 
 func TestFindFileByTaskID_ReadDirError(t *testing.T) {
 	t.Parallel()
-	if _, err := findFileByTaskID(filepath.Join(t.TempDir(), "nope"), "x"); err == nil {
+	if _, err := FindFileByTaskID(filepath.Join(t.TempDir(), "nope"), "x"); err == nil {
 		t.Error("expected ReadDir error for missing dir")
 	}
 }
@@ -70,7 +70,7 @@ func TestFindFileByTaskID_SkipsUnreadableAndMalformed(t *testing.T) {
 	if err := os.WriteFile(good, []byte(`{"id":"target"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := findFileByTaskID(dir, "target")
+	got, err := FindFileByTaskID(dir, "target")
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}

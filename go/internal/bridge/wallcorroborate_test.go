@@ -99,7 +99,10 @@ func TestDefaultWallCorroborator_UnknownFamilyStaysConservative(t *testing.T) {
 // The probe is deadline-bounded: a hung probe must return walled=true (the
 // provider not answering IS the wall signature) rather than hang the poll.
 func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
-	t.Parallel()
+	// NOT parallel — this test WRITES the package-level wallProbeTimeout var;
+	// Go runs serial tests to completion before any t.Parallel test resumes,
+	// which is the only ordering that makes the write race-free (the -race
+	// CI run on PR #466 caught the parallel variant racing every reader).
 	hang := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
 		<-ctx.Done()
 		return 1, ctx.Err()
