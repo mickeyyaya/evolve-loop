@@ -1,0 +1,21 @@
+{
+  "connects_to": [
+    "go/internal/bridge/autorespond.go",
+    "go/internal/bridge/driver_tmux_repl.go",
+    "go/internal/bridge/exhaustion_persistence.go",
+    "go/internal/bridge/panestream/liveness.go",
+    "go/internal/usageprobe/"
+  ],
+  "created_at": "2026-08-15T02:30:00Z",
+  "id": "exhaustion-scan-needs-corroboration",
+  "kind": "pipeline-repair",
+  "fix": "Make the pane exhaustion match a HINT, never a verdict. On a persistence-gate cross, CORROBORATE out-of-band before emitting rc=85: (a) preferred \u2014 a one-shot headless probe call for the family (codex exec / claude -p, one token); success \u21d2 suppress with a loud '[bridge] content-induced exhaustion match suppressed (probe OK)' log + keep the pane evidence; provider error \u21d2 real wall, proceed. (b) additionally anchor the scan to the CLI's error-surface region (after the last prompt marker / status box), never full scrollback where file content lives. (c) split the taxonomy: 'too many requests' (burst 429) maps to short backoff + in-place retry, NEVER family bench or all-families checkpoint. Regression tests: a pane rendering wall-phrase FIXTURES with a succeeding probe must not 85 (the 2026-08-15 class); a pane with wall text AND a failing probe must 85 (real-wall preserved); the corroboration probe itself must be quota-cheap and timeout-bounded. NOTE: regex tightening is proven insufficient \u2014 the false-positive content contains the TRUE wall phrases verbatim.",
+  "notes": "Third proxy-as-verdict instance in the quota domain in 24h (usage-probe display vocabulary; now dispatch subject-matter vocabulary). Cycle-314/641's two guards (echo-strip, persistence gate) are structurally defeated by file content: fixtures persist on-pane exactly like a real wall. Evidence: escalation-report.json for cycles 1460-1467 \u2014 pane tails show WORKING agents (rg through usageclassify_test.go, persona text, report content); operator dashboards + live probes (CODEX-ALIVE/CLAUDE-ALIVE) confirm zero real walls while 'all CLI families quota-exhausted' checkpointed both wave-5 lanes.",
+  "summary": "Wave-5 false quota walls: the dispatch-layer exhaustion pane-scan matched wall phrases inside the lanes' OWN WORK CONTENT (they were fixing the exhaustion-regex bug; their fixtures contain the true wall phrases), defeating both existing guards, cascading through every fallback family into a false all-families quota checkpoint while both plans had headroom.",
+  "title": "Exhaustion pane-scan needs out-of-band corroboration \u2014 subject-matter wall vocabulary forges quota walls (3rd proxy-as-verdict in quota domain)",
+  "weight": 0.95,
+  "consumed": {
+    "at": "2026-08-15T07:55:00Z",
+    "by": "PR #465 (merge 53b293e5) \u2014 WallCorroborator Strategy on Deps, one-probe latches at both scan sites, checkpointWallState extraction, 429/display vocabulary retired from codex+agy wall regexes, ParamSpec.Default + codex effort=high. Two adversarial rounds (BLOCK->APPROVE). Consumed LATE: cycle-1471 re-picked the landed item first \u2014 live instance #3 of consumption-rides-landing (0.92)."
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "campaign": "exhaustion-2026-07",
+  "connects_to": [
+    "exhaustion-regex-drift-failloud",
+    "exhaustion-checkpoint-raw-pane-stripping"
+  ],
+  "continuation": {
+    "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1468",
+    "branch": "cycle-42824668-1468",
+    "snapshot_sha": "acc8faa174ba1c6b8ef203c716cada8868309153",
+    "base_sha": "1a98d0c70a38038bdf13b6228eefe3339b903816",
+    "findings_path": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1468/audit-fail-reason.json",
+    "cycle": 1468
+  },
+  "files": [
+    "go/internal/bridge/manifests/claude-tmux.json",
+    "go/internal/bridge/manifests/codex-tmux.json",
+    "go/internal/bridge/manifests/agy-tmux.json",
+    "go/internal/bridge/manifest_exhaustion_wording_test.go"
+  ],
+  "id": "exhaustion-regex-anchor-hardening",
+  "injected_by": "console-2026-07-26-quota-drift-fix",
+  "kind": "pipeline-integrity",
+  "notes": "Follow-ups from the adversarial review of the 2026-07-26 'hit your weekly limit' drift fix (5th-gen wording; cycles 1077-1096 exit-81 livelock). (1) MEDIUM: claude-tmux's legacy branch `(?:reached|hit) your (usage|weekly) limit` carries no second-person anchor and no companion requirement \u2014 unlike the hardened per-model branch \u2014 so third-person prose like 'a cache hit your usage limit and fell back' false-matches (parity-preserving with the old 'reached' risk envelope, but now two verbs wide). Consider requiring the second-person chrome OR a companion (`/usage-credits` next-line tolerant, or the `\u00b7 resets` suffix) and pin both verbs' prose guards in notWalls. (2) codex-tmux and agy-tmux exhausted_regex only match 'limit reached'/'quota (exceeded|reached)' era wordings \u2014 if either CLI drifts to a 'hit your ... limit' form they inherit the identical exit-81-instead-of-85 blind spot; add real-pane-derived fixtures + wording-drift regression locks per manifest (the claude-tmux test file is the template). Remember the self-trigger guard: fixtures must be concatenation-split so Read-tool cat-n renderings of the test source cannot match the live regex. PARKED 2026-08-15: console-first landing only \u2014 lane work on this item renders wall vocabulary on-pane and forges exhaustion walls (see exhaustion-scan-needs-corroboration 0.95, which SUPERSEDES the anchor approach with corroboration).",
+  "priority": "medium",
+  "route": "lane",
+  "title": "Exhaustion regex: harden the legacy (usage|weekly) branch anchoring + close the codex/agy verb-drift blind spot",
+  "weight": 0.72,
+  "consumed": {
+    "at": "2026-08-15T09:40:00Z",
+    "via": "operator-boundary-sweep",
+    "note": "Landed via PR #465 (merge 53b293e5): wall-regex retirement + corroboration supersede the parked approach."
+  }
+}
