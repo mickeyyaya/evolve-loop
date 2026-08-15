@@ -416,7 +416,7 @@ func TestFindFileByTaskID_IgnoresNonJSON(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(d, "bad.json"), []byte("{not json"), 0o644)
 	_ = os.WriteFile(filepath.Join(d, "good.json"), []byte(`{"id":"target"}`), 0o644)
 
-	got, err := findFileByTaskID(d, "target")
+	got, err := FindFileByTaskID(d, "target")
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}

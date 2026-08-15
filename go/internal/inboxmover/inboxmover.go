@@ -195,7 +195,7 @@ func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
 		opts.logf("ERROR: ", "usage: claim <task_id> <cycle>")
 		return res, fmt.Errorf("%w: claim requires task_id and cycle", ErrBadArgs)
 	}
-	src, err := findFileByTaskID(opts.InboxDir, taskID)
+	src, err := FindFileByTaskID(opts.InboxDir, taskID)
 	if err != nil {
 		opts.logf("WARN: ", "claim: task '%s' not found in %s", taskID, opts.InboxDir)
 		return res, fmt.Errorf("%w: %s", ErrNotFound, taskID)
@@ -289,14 +289,14 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 				continue
 			}
 			d := filepath.Join(procDir, e.Name())
-			if found, err := findFileByTaskID(d, taskID); err == nil {
+			if found, err := FindFileByTaskID(d, taskID); err == nil {
 				src, srcRel = found, "processing"
 				break
 			}
 		}
 	}
 	if src == "" {
-		if found, err := findFileByTaskID(opts.InboxDir, taskID); err == nil {
+		if found, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
 			src, srcRel = found, "inbox"
 		}
 	}
@@ -451,7 +451,7 @@ func ReleaseFromQuarantine(opts Options, taskID string) (PromoteResult, error) {
 		return res, fmt.Errorf("%w: release-from-quarantine requires task_id", ErrBadArgs)
 	}
 	qDir := filepath.Join(opts.InboxDir, "quarantine")
-	src, err := findFileByTaskID(qDir, taskID)
+	src, err := FindFileByTaskID(qDir, taskID)
 	if err != nil {
 		return res, fmt.Errorf("%w: %s (not in quarantine)", ErrNotFound, taskID)
 	}
@@ -844,7 +844,12 @@ func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) erro
 
 // findFileByTaskID scans <dir>/*.json and returns the path of the first
 // file whose JSON .id equals taskID.
-func findFileByTaskID(dir, taskID string) (string, error) {
+// FindFileByTaskID resolves a task id to its file within one inbox directory
+// (ids live INSIDE the JSON; filenames carry timestamps). Exported for the
+// ship-side transactional consumption (consumption-rides-landing-ship): the
+// ship needs the same id→file resolution against the WORKTREE's tracked
+// inbox copy that this package uses against the runtime root.
+func FindFileByTaskID(dir, taskID string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err
@@ -972,7 +977,7 @@ func ReadFailureCount(opts Options, taskID string) (int, bool) {
 		dirs = append(dirs, procs...)
 	}
 	for _, d := range dirs {
-		path, err := findFileByTaskID(d, taskID)
+		path, err := FindFileByTaskID(d, taskID)
 		if err != nil {
 			continue
 		}

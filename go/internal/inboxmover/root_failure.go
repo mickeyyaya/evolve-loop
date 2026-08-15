@@ -47,7 +47,7 @@ func RecordRootTaskFailure(opts Options, taskID string, cycle int, reason string
 	defer release()
 	// Resolve INSIDE the lock: a concurrent lane may have just bumped or
 	// quarantined this id — a stale pre-lock path must never be written back.
-	path, err := findFileByTaskID(opts.InboxDir, taskID)
+	path, err := FindFileByTaskID(opts.InboxDir, taskID)
 	if err != nil || path == "" {
 		return 0, false, nil // not root-resident (unknown, or already quarantined)
 	}
