@@ -78,7 +78,7 @@ func TestDriftProbeArmedPerCLI(t *testing.T) {
 	}{
 		{
 			cli:         "codex-tmux",
-			driftedPane: "You've hit your usage limit for this week.",
+			driftedPane: "Too many requests — please retry in a moment.",
 			matchedWall: "Usage limit reached for this account.",
 			benignPane:  "Applying patch to usageclassify.go; 2 hunks staged.",
 		},

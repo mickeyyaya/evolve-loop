@@ -55,6 +55,13 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	default:
 		fmt.Fprintf(deps.Stderr, "[codex] WARN: unrecognized model '%s' — omitting -m\n", resolved)
 	}
+	// Codex's SECOND model layer (2026-08-15 operator directive): pin the
+	// reasoning effort so the headless path never runs the CLI's own default —
+	// mirrors the tmux manifest's params.effort default=high. Skipped when the
+	// caller already set one (raw flags / extra flags own the override).
+	if !argsContainEffort(cfg.Realization.LaunchFlags) && !argsContainEffort(cfg.ExtraFlags) {
+		args = append(args, "-c", "model_reasoning_effort=high")
+	}
 	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["codex"])
 	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
 
@@ -107,3 +114,15 @@ func isCodexModelName(m string) bool {
 }
 
 func init() { Register(codexDriver{}) }
+
+// argsContainEffort reports whether an arg vector already carries a
+// model_reasoning_effort override — the headless default must never duplicate
+// or fight an explicit caller choice.
+func argsContainEffort(args []string) bool {
+	for _, a := range args {
+		if strings.Contains(a, "model_reasoning_effort=") {
+			return true
+		}
+	}
+	return false
+}
