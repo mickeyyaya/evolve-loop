@@ -219,7 +219,7 @@ hint: Use -f if you really want to add them.
 | Item | Why separate |
 |---|---|
 | **Prose-scraping manifest extractor** (§3.2) — scope `extractReportPaths` to declared-files sections, or teach reports to fence failure-discussion paths | Changes what EVERY cycle stages; needs its own TDD + blast-radius review. Until then layer 4 makes scraped runtime paths harmless (dropped + logged, ship proceeds). |
-| `usage-probe-display-vocab-false-bench` 0.9 | Distinct same-batch defect (probe regex matched the usage display's own vocabulary; benched a healthy codex every wave). State-level override live; embedded fix + fixture test queued. |
+| `usage-probe-display-vocab-false-bench` 0.9 | LANDED via PR #465 (2026-08-15): wall regexes retired burst/display vocabulary + WallCorroborator live-probe corroboration — see [2026-08-15-false-walls-and-repick-class.md](2026-08-15-false-walls-and-repick-class.md). |
 | `verdict-cache-fresh-base-collision` 0.88 | Shadow-only measurement contamination found during the same batch. |
 | BenchWall evidence persistence | The cli-health bench entry stored no evidence line; false benches need a live re-probe to diagnose. |
 
