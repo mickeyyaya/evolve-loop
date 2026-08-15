@@ -78,28 +78,25 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 	incomingFiles := make(map[string]bool)
 
 	// 1. Files modified in commits branch..cycleBranch
-	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, "diff", "--name-only", branch, cycleBranch)
+	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("diff", "--name-only", branch, cycleBranch)...)
 	if err == nil {
 		for _, line := range strings.Split(diffOut, "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {
-				incomingFiles[line] = true
+				incomingFiles[unquoteGitPath(line)] = true
 			}
 		}
 	}
 
 	// 2. Files in worktree status (modified, added, untracked, staged)
-	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain")
+	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("status", "--porcelain")...)
 	if err == nil {
 		for _, line := range strings.Split(statusOut, "\n") {
 			line = strings.TrimSpace(line)
 			if len(line) > 3 {
 				status := line[:2]
 				if !strings.Contains(status, "D") { // Skip deleted files
-					path := line[3:]
-					if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
-						path = path[1 : len(path)-1]
-					}
+					path := unquoteGitPath(line[3:])
 					incomingFiles[path] = true
 				}
 			}

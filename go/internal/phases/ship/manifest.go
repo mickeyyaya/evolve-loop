@@ -232,6 +232,27 @@ func unquoteGitPath(tok string) string {
 	return tok
 }
 
+func splitPorcelainRename(path string) []string {
+	for i := 0; i < len(path); i++ {
+		if path[i] == '"' {
+			for i++; i < len(path); i++ {
+				if path[i] == '\\' {
+					i++
+					continue
+				}
+				if path[i] == '"' {
+					break
+				}
+			}
+			continue
+		}
+		if strings.HasPrefix(path[i:], " -> ") {
+			return []string{path[:i], path[i+4:]}
+		}
+	}
+	return []string{path}
+}
+
 // porcelainChangedPaths parses `git status --porcelain` output into the sorted
 // set of repo-relative paths it names. A rename entry ("R  old -> new") yields
 // BOTH sides, so an explicit staging pathspec records the deletion as well as
@@ -243,7 +264,7 @@ func porcelainChangedPaths(out string) []string {
 		if len(line) <= 3 {
 			continue
 		}
-		for _, part := range strings.Split(line[3:], " -> ") {
+		for _, part := range splitPorcelainRename(line[3:]) {
 			if p := unquoteGitPath(strings.TrimSpace(part)); p != "" {
 				seen[p] = true
 			}
@@ -288,8 +309,8 @@ func stagedGonePaths(porcelain string) map[string]bool {
 		case strings.HasPrefix(line, "D "):
 			gone[unquoteGitPath(strings.TrimSpace(line[3:]))] = true
 		case line[0] == 'R':
-			if src, _, ok := strings.Cut(line[3:], " -> "); ok {
-				gone[unquoteGitPath(strings.TrimSpace(src))] = true
+			if parts := splitPorcelainRename(line[3:]); len(parts) == 2 {
+				gone[unquoteGitPath(strings.TrimSpace(parts[0]))] = true
 			}
 		}
 	}
