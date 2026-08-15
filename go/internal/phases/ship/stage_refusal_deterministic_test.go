@@ -28,7 +28,17 @@ import (
 )
 
 // stagingRefusalRunner scripts `git status --porcelain` to report the given
-// changed paths and makes `git add` refuse (rc=1, the ignored-path shape).
+// changed paths and makes `git add` refuse with an UNRECOGNISED stderr shape.
+//
+// Cycle-1473 re-base: this file's fixture was git's rc=1 gitignore-advice
+// refusal, which the `gitstage-deterministic-classification` contract now
+// classifies non-transient on the FIRST failure from captured git_stderr (see
+// stage_classify_stderr_test.go). Keeping that fixture here would assert two
+// contradictory classes for one stderr. The two-strikes rule these tests exist
+// to pin is orthogonal to the stderr shape, so they now run on a stderr the
+// classifier cannot place — which is exactly where the strike memo is still the
+// only signal, and their original intent (a first, possibly-flaky refusal keeps
+// its retry; the same pathspec twice does not) is preserved unchanged.
 func stagingRefusalRunner(porcelain string) *scriptedRunner {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -47,7 +57,7 @@ func stagingRefusalRunner(porcelain string) *scriptedRunner {
 		stderr string
 		exit   int
 		err    error
-	}{stderr: "The following paths are ignored by one of your .gitignore files:\n.evolve/evals/foo.md\n", exit: 1}
+	}{stderr: "error: an add failure shape the stderr classifier cannot place\n", exit: 128}
 	return r
 }
 

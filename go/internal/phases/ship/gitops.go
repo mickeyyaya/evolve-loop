@@ -815,7 +815,8 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		}
 	}
 	if runErr != nil || exit != 0 {
-		tail := strings.TrimSpace(errTail.String())
+		gitStderr := errTail.String()
+		tail := strings.TrimSpace(gitStderr)
 		if len(tail) > 300 {
 			tail = "…" + tail[len(tail)-300:]
 		}
@@ -826,7 +827,11 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		// worktree base predated the .gitignore carve-out. Precondition routes
 		// it to continuation/salvage instead of another doomed attempt.
 		class := core.ShipClassTransient
-		if recordStageRefusal(opts.WorkspacePath, paths) {
+		deterministic := exit == 128 && (strings.Contains(gitStderr, "fatal: Invalid path ") ||
+			strings.Contains(gitStderr, " is outside repository at ") ||
+			strings.Contains(gitStderr, "fatal: pathspec ") && strings.Contains(gitStderr, " did not match any files")) ||
+			exit == 1 && strings.Contains(gitStderr, "The following paths are ignored by one of your .gitignore files:")
+		if deterministic || recordStageRefusal(opts.WorkspacePath, paths) {
 			class = core.ShipClassPrecondition
 		}
 		return shipErr(core.CodeGitStageFailed, class, core.StageAtomicShip,
