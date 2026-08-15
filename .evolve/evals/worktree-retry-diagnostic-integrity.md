@@ -10,6 +10,7 @@
 - `[code]` `cd go && go test -count=1 -race ./internal/gitexec -run 'TestAddWorktreeWithRetry_(PreservesFirstFailure|AnnouncesBeforeBackoff)$'`
 - `[code]` `cd go && go test -count=1 ./internal/gitexec -run 'TestAddWorktreeWithRetry_PermanentFailureSkipsBackoff$' # negative: permanent failure should_fail retry`
 - `[code]` `cd go && go test -count=1 ./internal/gitexec -run 'TestAddWorktreeWithRetry_PreservesFirstFailure$' # edge: empty stderr boundary`
+- `[code]` `cd go && go test -tags acs -count=1 ./acs/cycle1477 -run 'TestC1477_005_ProductionProvisionerSurfacesGitStderrWithoutFabricatedHistory$' # wiring: the production provisioner (swarm.NewGitWorkerProvisioner) surfaces git's own stderr and adds no retry history to a single-attempt permanent failure`
 - `[model]` Rubric: "The terminal diagnostic retains both the first retryable failure and final failure, OnRetry executes before Sleep, and comments do not assert that every rc=255 is a repository-lock failure." — threshold: >= 80
 
 ## Adversarial Cases
