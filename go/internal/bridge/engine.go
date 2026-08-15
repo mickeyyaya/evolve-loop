@@ -85,6 +85,12 @@ type Deps struct {
 	// or a non-positive entry all fail open to Config.ArtifactTimeoutS=0 →
 	// Deps.ArtifactTimeoutS → the 300s builtin.
 	PhaseArtifactTimeoutS map[string]int
+	// CorroborateWall is the out-of-band truth check behind the exhaustion
+	// fast-fail (wallcorroborate.go): on a persistence-gate cross, only a
+	// corroborated wall escalates rc 85. nil = legacy behavior (pane match
+	// IS the verdict) — the production composition root wires
+	// DefaultWallCorroborator explicitly.
+	CorroborateWall WallCorroborator
 	// Stdout/Stderr are the bridge's own diagnostic streams (NOT the
 	// inner CLI's stdout/stderr — a driver redirects those to the log
 	// files named in Config). Drivers write their `[driver] ...` notes

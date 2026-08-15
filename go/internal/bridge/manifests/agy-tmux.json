@@ -49,7 +49,7 @@
     "usage": {
       "send": "/usage",
       "await": "prompt_marker",
-      "exhausted_regex": "(?i)(limit reached|quota (exceeded|reached)|\\b0%\\s*(left|remaining)|rate.?limit)",
+      "exhausted_regex": "(?i)(usage limit reached|quota (exceeded|reached)|\\b0%\\s*(left|remaining))",
       "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))"
     },
     "status": {

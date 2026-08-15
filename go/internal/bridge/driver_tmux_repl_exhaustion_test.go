@@ -79,3 +79,29 @@ func TestTmuxREPL_HealthyIdle_NotExhausted(t *testing.T) {
 		t.Fatalf("healthy idle exit = %d, want %d (ExitArtifactTimeout) — exhaustion must not fire without a wall", code, ExitArtifactTimeout)
 	}
 }
+
+// End-to-end wiring proof for the corroboration seam (2026-08-15 false-wall
+// incident): the SAME walled pane that fast-fails above must NOT fail over
+// when a live probe answers — the driver plumbs Deps.CorroborateWall through
+// to the scan sites, suppresses loudly, and concludes with the ordinary
+// artifact timeout instead of forging a quota wall.
+func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
+	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
+	healthy := func(context.Context, string) bool { return false } // probe answered ⇒ not walled
+	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CorroborateWall: healthy})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
+	if code == ExitUnknownPrompt {
+		t.Fatalf("corroborated-healthy pane must NOT fail over as a wall (the false all-families class); stderr=%q", stderr.String())
+	}
+	if code != ExitArtifactTimeout {
+		t.Fatalf("suppressed wall concludes via the ordinary artifact timeout, got %d; stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "EXHAUSTION-SUPPRESSED") {
+		t.Errorf("the suppression must be loud in driver stderr; stderr=%q", stderr.String())
+	}
+}

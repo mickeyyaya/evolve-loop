@@ -54,8 +54,8 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 		// approval=never + sandbox=danger-full-access at boot — undocumented in
 		// codex --help 0.134 but parsed by clap; verified empirically). The
 		// order is load-bearing: default_args before per-param scalars.
-		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-m", "gpt-5.6-terra"}) {
-			t.Fatalf("codex-tmux = %v, want [--yolo -m gpt-5.6-terra]", r.LaunchFlags)
+		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-m", "gpt-5.6-terra", "-c", "model_reasoning_effort=high"}) {
+			t.Fatalf("codex-tmux = %v, want [--yolo -m gpt-5.6-terra -c model_reasoning_effort=high] (manifest effort default, 2026-08-15 operator directive)", r.LaunchFlags)
 		}
 		if containsToken(r.LaunchFlags, "--dangerously-skip-permissions") {
 			t.Fatalf("codex must NOT emit claude's permission flag; trust is handled by --yolo + auto-responder; got %v", r.LaunchFlags)

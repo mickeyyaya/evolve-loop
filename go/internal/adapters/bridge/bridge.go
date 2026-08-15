@@ -147,6 +147,12 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
+		// Wall corroboration (2026-08-15 false-wall incident): a pane
+		// exhaustion match escalates rc 85 only after a live one-token probe
+		// corroborates it — subject-matter wall vocabulary (a lane editing
+		// the exhaustion fixtures) can no longer forge a quota wall. Wired
+		// HERE, the production root, so tests keep the legacy nil seam.
+		CorroborateWall: gobridge.DefaultWallCorroborator(nil, os.Stderr),
 	}
 }
 

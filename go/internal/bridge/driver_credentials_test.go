@@ -139,6 +139,25 @@ func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 			if !fr.argvContainsPair("-m", tc.codexModel) {
 				t.Fatalf("codex argv should map %s → -m %s; calls=%+v", tc.tier, tc.codexModel, fr.calls)
 			}
+			// Codex's SECOND model layer (2026-08-15 operator directive): the
+			// headless path must pin the reasoning effort too, or the model
+			// runs at the CLI's own default.
+			if !fr.argvContainsPair("-c", "model_reasoning_effort=high") {
+				t.Fatalf("codex argv must carry -c model_reasoning_effort=high; calls=%+v", fr.calls)
+			}
+			// Exactly once: the headless default and any realized/extra flag
+			// must never stack two effort overrides (argsContainEffort guard).
+			var effortTokens int
+			for _, call := range fr.calls {
+				for _, a := range call.args {
+					if strings.Contains(a, "model_reasoning_effort=") {
+						effortTokens++
+					}
+				}
+			}
+			if effortTokens != 1 {
+				t.Fatalf("exactly ONE effort override expected in argv, got %d; calls=%+v", effortTokens, fr.calls)
+			}
 		})
 	}
 }
