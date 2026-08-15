@@ -223,6 +223,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 			}
 		} else {
 			_ = discardBinaryChurn(ctx, opts, opts.ProjectRoot)
+			consumeCommittedItems(ctx, opts, res, "")
 			if err := stageExplicitPaths(ctx, opts, res, ""); err != nil {
 				return err
 			}
@@ -366,6 +367,7 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 
 	if !opts.DryRun {
 		_ = discardBinaryChurn(ctx, opts, worktree)
+		consumeCommittedItems(ctx, opts, res, worktree)
 		if err := stageExplicitPaths(ctx, opts, res, worktree); err != nil {
 			return err
 		}

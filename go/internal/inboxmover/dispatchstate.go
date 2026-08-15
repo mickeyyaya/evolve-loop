@@ -46,17 +46,17 @@ type DispatchState struct {
 // inbox can only ever fail OPEN at the dispatch gate.
 func ResolveDispatchState(opts Options, taskID string) DispatchState {
 	opts.resolveOpts()
-	if path, err := findFileByTaskID(opts.InboxDir, taskID); err == nil {
+	if path, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
 		return DispatchState{State: StatePending, Deps: readTaskDeps(path)}
 	}
 	cycles, _ := filepath.Glob(filepath.Join(opts.InboxDir, "processing", "cycle-*"))
 	for _, dir := range cycles {
-		if _, err := findFileByTaskID(dir, taskID); err == nil {
+		if _, err := FindFileByTaskID(dir, taskID); err == nil {
 			return DispatchState{State: StateProcessing, Detail: filepath.Base(dir)}
 		}
 	}
 	for _, state := range []string{StateProcessed, StateRejected, StateRetry, StateQuarantine} {
-		if _, err := findFileByTaskID(filepath.Join(opts.InboxDir, state), taskID); err == nil {
+		if _, err := FindFileByTaskID(filepath.Join(opts.InboxDir, state), taskID); err == nil {
 			return DispatchState{State: state}
 		}
 	}
