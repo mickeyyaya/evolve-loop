@@ -259,8 +259,8 @@ A report may contain **several** strings matching the sentinel shape. Only the l
 producer's actual verdict; the earlier ones are prose — contract examples the agent was shown, review
 commentary quoting a verdict it is discussing, scrollback echoes. `ParseVerdictSentinelFull`
 (`go/internal/phasecontract/sentinel.go`) therefore walks candidates from the **END** of the document
-and returns the **last** one that unmarshals, carries a non-empty verdict, and is not a placeholder
-echo. Invalid candidates are **skipped, never fatal**. Documents with a single sentinel — the
+and returns the **last** one whose leading complete JSON value decodes, carries a non-empty verdict,
+and is not a placeholder echo. Invalid candidates are **skipped, never fatal**. Documents with a single sentinel — the
 overwhelmingly common case — are unaffected.
 
 First-match selection was the original rule and it was wrong in two directions:
@@ -286,6 +286,23 @@ inherits the rule.
 
 **Producer-side rule:** emit your verdict sentinel **once, at the tail** of the report. If you must
 quote sentinel syntax in prose, quoting it earlier in the document is safe by construction.
+
+### Trailing bytes inside the comment are tolerated (cycle-1478)
+
+The captured payload is parsed as its **leading complete JSON value** (`json.Decoder`), not a
+whole-string `Unmarshal`. In cycle-1478 an audit agent emitted a valid 2.8KB WARN sentinel followed
+by **one stray `}`** before the `-->`. The whole-string parse rejected that byte; at contract-gate
+enforce the prose fallback is off (ADR-0050 §3.10 Slice 5), so the gate reported "no parseable
+verdict" three times against unchanged bytes, burned two corrections plus a salvage retry, opened
+the contract-gate circuit, and the orchestrator coherence floor halted the batch as
+verdict-incoherence — while prose, sentinel, and `acs-verdict.json` all agreed on WARN. Tolerance
+is bounded by the comment capture; a leading value that is not a verdict-bearing object is still
+rejected, and the vocabulary/placeholder/tail-anchor guards are unchanged. The live artifact is the
+regression fixture `go/internal/phasecontract/testdata/cycle1478-trailing-brace.md`; coverage in
+`sentinel_trailingdata_test.go` and `internal/deliverable/verdict_trailingdata_test.go` (the
+enforce-stage gate-level pin). The correction-loop staleness half of that incident (re-validating
+an artifact the re-dispatched agent never rewrote) is tracked separately — inbox item
+`contract-correction-stale-artifact-freshness`.
 
 ## Rollout / rollback
 

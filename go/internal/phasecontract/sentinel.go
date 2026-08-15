@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // The machine-readable verdict sentinel (ADR-0034, Layer 5). Producers emit one
@@ -105,13 +106,28 @@ func ParseVerdictSentinelFull(content string) (VerdictSentinel, bool) {
 }
 
 // parseSentinelPayload validates ONE candidate payload. A candidate counts only
-// when it unmarshals, carries a verdict, and is not a prompt-echoed contract
-// example: a sentinel whose failure block still holds literal placeholder
-// tokens can only be the Deliverable Contract's own printed example captured
-// from scrollback, never a real agent verdict (cycle-603).
+// when its LEADING complete JSON value decodes, carries a verdict, and is not a
+// prompt-echoed contract example: a sentinel whose failure block still holds
+// literal placeholder tokens can only be the Deliverable Contract's own printed
+// example captured from scrollback, never a real agent verdict (cycle-603).
+//
+// Leading-value decode, not whole-string Unmarshal: sentinelRE's non-greedy
+// capture ends at the first '}' directly followed by '-->' — for real payloads
+// that is the closing brace of the outermost object plus any stray bytes before
+// it — so an agent that emits one stray trailing brace hands us "valid JSON +
+// '}'". Whole-string Unmarshal rejected that one byte, and at contract-gate
+// enforce (prose fallback off, ADR-0050 §3.10) the miss blocked three times
+// against unchanged bytes (two correction re-dispatches, the second a salvage
+// retry), opened the gate circuit, and halted the batch as
+// verdict-incoherence while prose, sentinel, and acs-verdict.json all agreed
+// (cycle-1478). Tolerance is bounded by the comment capture itself; a leading
+// value that is not a verdict-bearing object is still rejected. The guard CODE
+// is unchanged, though the candidate SET widens: a comment whose payload was
+// previously rejected for trailing bytes can now win tail-anchored selection —
+// acceptable because the artifact author already controls the verdict outright.
 func parseSentinelPayload(payload string) (VerdictSentinel, bool) {
 	var s VerdictSentinel
-	if err := json.Unmarshal([]byte(payload), &s); err != nil {
+	if err := json.NewDecoder(strings.NewReader(payload)).Decode(&s); err != nil {
 		return VerdictSentinel{}, false
 	}
 	if s.Verdict == "" || isPlaceholderEcho(s.Failure) {
