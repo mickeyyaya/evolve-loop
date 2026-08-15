@@ -461,6 +461,11 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// PASS work to this prune; cycle 12 survived only via operator snapshot.
 	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
+		if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN create workspace for provisioning failure: %v\n", err)
+		} else {
+			o.ensureFailureDigest(cycle, req.ProjectRoot, cs.WorkspacePath, "worktree", fmt.Sprintf("worktree provisioning failed: %v", werr))
+		}
 	} else {
 		cs.ActiveWorktree = wtPath
 		if base, _, berr := gitCapture(ctx, wtPath, "rev-parse", "HEAD"); berr == nil {

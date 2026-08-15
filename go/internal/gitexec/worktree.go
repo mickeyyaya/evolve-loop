@@ -2,6 +2,7 @@ package gitexec
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -81,8 +82,8 @@ func RetryableWorktreeAddFailure(code int, stderr string) bool {
 // backoff'd retry proven by PR #401 (a497ffe1).
 //
 // Why it exists: N lanes of one repo provision concurrently and `git worktree
-// add` takes repo-level locks in the SHARED .git, so a collision returns rc=255
-// with nothing on stderr beyond "Preparing worktree". One transient collision
+// add` takes repo-level locks in the SHARED .git; the observed collision returned
+// rc=255 with nothing on stderr beyond "Preparing worktree". One transient collision
 // used to cost a lane its whole cycle (ActiveWorktree stayed empty, CB.2
 // fail-fasted every dispatch, three identical fingerprints halted the batch).
 // The fix landed at exactly one call site; this is that loop lifted to the
@@ -104,6 +105,7 @@ func (g Git) AddWorktreeWithRetry(ctx context.Context, r WorktreeAddRetry, args 
 		sleep = time.Sleep
 	}
 	argv := append([]string{"worktree", "add"}, args...)
+	var firstFailure string
 	for attempt := 0; attempt < DefaultWorktreeAddAttempts; attempt++ {
 		stdout, stderr, exitCode, err = g.Capture(ctx, argv...)
 		if err == nil && exitCode == 0 {
@@ -118,10 +120,16 @@ func (g Git) AddWorktreeWithRetry(ctx context.Context, r WorktreeAddRetry, args 
 		if r.Retryable != nil && !r.Retryable(exitCode, stderr) {
 			break
 		}
-		sleep(time.Duration(attempt+1) * 2 * time.Second)
+		if firstFailure == "" {
+			firstFailure = fmt.Sprintf("initial worktree add failure (rc=%d): %s", exitCode, stderr)
+		}
 		if r.OnRetry != nil {
 			r.OnRetry(attempt+1, DefaultWorktreeAddAttempts, exitCode, stderr)
 		}
+		sleep(time.Duration(attempt+1) * 2 * time.Second)
+	}
+	if firstFailure != "" {
+		stderr = firstFailure + "\nfinal worktree add failure: " + stderr
 	}
 	return stdout, stderr, exitCode, err
 }

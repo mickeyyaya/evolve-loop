@@ -98,9 +98,16 @@ func resetFloorFailReason(cs *CycleState, phase Phase) {
 	if phase == PhaseShip {
 		cs.ShipFailReasons = nil
 	}
-	if cs.WorkspacePath != "" {
-		_ = os.Remove(floorFailReasonPath(cs.WorkspacePath, phase))
+	if cs.WorkspacePath == "" {
+		return
 	}
+	if phase == PhaseAudit {
+		recordedPhase, _ := readAuditFailReason(cs.WorkspacePath)
+		if recordedPhase != "" && recordedPhase != string(phase) {
+			return // another phase owns the shared failure-reason evidence
+		}
+	}
+	_ = os.Remove(floorFailReasonPath(cs.WorkspacePath, phase))
 }
 
 // readFloorFailReasons reads the FORENSIC reason file (retro/operator/test
