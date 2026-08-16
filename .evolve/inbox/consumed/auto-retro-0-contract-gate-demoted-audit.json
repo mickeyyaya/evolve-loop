@@ -1,0 +1,17 @@
+{
+  "action": "recurring failure contract gate demoted enforce->advisory on phase audit (cli=claude-tmux) (3 occurrences)",
+  "evidence_pointer": "[orchestrator] WARN CONTRACT GATE DEMOTED: phase audit on cli=claude-tmux tripped the contract-gate circuit breaker \u2014 the gate is now advisory (enforce\u2192advisory) for the rest of this run, so later phases ship UNGATED. no other CLI family was available to escalate to, so a structured re-prompt salvage retry attempted the repair on the same CLI \u2014 and that CLI failed the contract too. Last violation: audit deliverable failed contract: [bad_verdict] no parseable verdict; expected one of [PASS FAIL WARN SKIPPED]",
+  "files": null,
+  "id": "contract-gate-demoted-audit",
+  "injected_at": "2026-08-16T02:07:45Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "priority": "HIGH",
+  "recurrence": 3,
+  "weight": 0.75,
+  "consumed": {
+    "at": "2026-08-16T10:15:00Z",
+    "via": "console-merge",
+    "merged_into": "contract-correction-stale-artifact-freshness",
+    "note": "recurrence-ledger re-filing of the cycle-1478 audit demotion (resolved by PR #468); folded like its 3 sibling markers"
+  }
+}
