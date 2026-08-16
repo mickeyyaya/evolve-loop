@@ -377,7 +377,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	// raised. Unaccounted ⇒ FAIL, named by id. A no-op for the ordinary
 	// non-continuation cycle (no manifest ⇒ nothing inherited), so the green
 	// path is unperturbed.
-	ledgerDiags, ledgerBlocked := reconcileContinuationDefects(req)
+	ledgerDiags, ledgerBlocked, lineageCycles := reconcileContinuationDefects(req)
 	diags = append(diags, ledgerDiags...)
 	if ledgerBlocked {
 		overrode("continuation defect-ledger")
@@ -389,9 +389,55 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	// a prior cycle's defect is closed must name the per-defect disposition
 	// record on the same line. Invisible to the overwhelming majority of reports,
 	// which make no closure claim at all.
+	//
+	// Demotion, cycle-1502: when the reconcile above RAN against a real lineage
+	// and verified every inherited defect against its per-id disposition record,
+	// the filing cabinet has provably been opened — a summary line restating
+	// those closures without re-citing is a formatting note, not laundering, and
+	// forcing FAIL over it produced a verdict-incoherence halt on a 165-green/
+	// 0-red cycle. Scoped PER LINE: only claims whose prose cycle refs all fall
+	// within the verified lineage (ancestor, its ledger's origin, this cycle)
+	// demote — the machine records vouch for exactly those cycles. A claim
+	// naming any OTHER cycle, a blocked reconcile, or no lineage at all (the
+	// original 1255 shape) forces exactly as before.
 	if closureDiags := closureClaimDiagnostics(artifact); len(closureDiags) > 0 {
+		vouched := map[int]bool{req.Cycle: true}
+		for _, c := range lineageCycles {
+			vouched[c] = true
+		}
+		// closureClaimDiagnostics renders one diagnostic per offender, in
+		// order — the offender lines are re-derived here so cycle refs come
+		// from the CLAIM text, not the diagnostic boilerplate around it.
+		offenders := closureClaimOffenders(artifact)
+		forced := false
+		for i := range closureDiags {
+			// A claim must NAME at least one lineage cycle to demote: an empty
+			// ref set means the machine record vouches for nothing on that line
+			// — a ref-less "verified closed" is the strong rung's canonical
+			// laundering sentence, and demoting it would guard-suppress the one
+			// rung the design record forbids suppressing (review BLOCK-1).
+			inLineage := false
+			if len(lineageCycles) > 0 && i < len(offenders) {
+				refs := closureLineCycleRefs(offenders[i])
+				inLineage = len(refs) > 0
+				for _, ref := range refs {
+					if !vouched[ref] {
+						inLineage = false
+						break
+					}
+				}
+			}
+			if inLineage {
+				closureDiags[i].Severity = "warning"
+				closureDiags[i].Message += " [demoted to advisory: this cycle's defect-ledger reconcile verified every inherited defect of the referenced lineage against its per-id disposition record — cite on the claim line anyway next time]"
+			} else {
+				forced = true
+			}
+		}
 		diags = append(diags, closureDiags...)
-		overrode("closure-claim citation")
+		if forced {
+			overrode("closure-claim citation")
+		}
 	}
 
 	// Auditor-vs-gate coherence record — ONE per Classify call, emitted here so

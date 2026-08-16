@@ -2,6 +2,7 @@ package audit
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -22,8 +23,25 @@ import (
 // is the loophole, not the feature: one incidental mention would vouch for
 // twenty unevidenced claims.
 
-// closureCycleRef matches a cycle reference in prose ("cycle-1272", "cycle 1255").
-var closureCycleRef = regexp.MustCompile(`cycle[- ]?\d+`)
+// closureCycleRef matches a cycle reference in prose ("cycle-1272", "cycle
+// 1255"), with the number captured. Serves two callers: the weak rung below
+// (MatchString — does this line reference ANY cycle) and closureLineCycleRefs
+// (the captured numbers themselves, for the lineage-scoped demotion in
+// audit.go) — one pattern, so a future tune to what counts as a cycle
+// reference cannot update one caller's notion of it and not the other's.
+var closureCycleRef = regexp.MustCompile(`cycle[- ]?(\d+)`)
+
+// closureLineCycleRefs returns the cycle numbers a line references in PROSE
+// (path tokens dropped, same rule as the weak rung's ref check).
+func closureLineCycleRefs(line string) []int {
+	var out []int
+	for _, m := range closureCycleRef.FindAllStringSubmatch(stripPathTokens(strings.ToLower(line)), -1) {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
 
 // The closure-claim token matchers (cycle-1431 lesson — see
 // closureClaimOffenders and the stripQuotedSpans design record): word-bounded
