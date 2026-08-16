@@ -37,3 +37,11 @@ August 2026 focused on deliverable alignment, robust parser hardening, and elimi
 *   **Symptom:** Audit prompt execution failed on missing/truncated verdict rules and output-path contracts.
 *   **Root Cause:** Relocation of reference markers within prompt templates caused `CompactPrompts` to aggressively strip constitutional guidelines and mandatory contracts.
 *   **Resolution:** Moved reference index markers strictly to EOF and added a fleet-wide keep-guard test suite to prevent truncation regression.
+
+### 2.4 Verdict-Cache Fresh-Base Collisions (Cycles 1485–1495, console-salvaged)
+
+*   **Symptom:** Sibling cycles launched from the same main tip matched each other's verdict cache, suggesting they could skip the `tdd/build/audit` pipeline based on a stale/sibling verdict.
+*   **Root Cause:** The content-addressed verdict-cache lookup (ADR-0048 Slice B) ran pre-loop on the fresh worktree. At start, a fresh/untouched worktree has a clean content tree SHA that is identical to the base HEAD commit's tree SHA. If a cycle completed with no changes (or a previous cycle cached its pre-build tree SHA), any future sibling cycle starting on the same commit SHA immediately matched, leading to a collision.
+*   **Resolution:** Modified `recordAuditBinding` to only record in the cache if the audited worktree tree SHA differs from the base commit's tree SHA — where "base" is the worktree's OWN base (`CycleState.WorktreeBaseSHA`), never projectRoot HEAD at audit time, and the write side fails CLOSED when no base identity resolves (salvage-review HIGH-1: a sibling ship advancing main mid-cycle otherwise diverges the operands and re-admits the fresh-base write). Similarly, updated the pre-loop probe in `RunCycle` to skip lookup if the current worktree content tree SHA equals the base commit's tree SHA. Added `TestVerdictCacheCollisionRegression` + `TestAuditBindingPut_*` integration tests.
+*   **Lesson:** **(1) CONTENT-ADDRESSING DEMANDS DELTA DIFFERENTIATION.** When caching outcomes of a mutation/test pipeline, never cache or match on the untouched baseline state (clean checkout) under the bare tree hash. The baseline hash is a shared property of the branch, not a signature of the cycle's unique changes.
+
