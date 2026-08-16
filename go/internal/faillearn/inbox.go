@@ -52,6 +52,10 @@ type Option func(*writeConfig)
 type writeConfig struct {
 	inboxDir   string
 	inboxItems []InboxItem
+	// noveltyThreshold is the near-duplicate similarity bound (novelty.go).
+	// Zero/out-of-range ⇒ the built-in default, so the three option-free call
+	// sites get the gate at its safe setting.
+	noveltyThreshold float64
 }
 
 // WithInbox routes the retrospective's remediation items into dir as one

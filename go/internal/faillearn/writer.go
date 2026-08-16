@@ -56,6 +56,14 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 			return fmt.Errorf("faillearn: write retrospective: %w", err)
 		}
 	}
+	// Novelty gate (novelty.go): writeIfAbsent only dedupes by exact path, and
+	// the lesson id carries the cycle number, so the same observation recurring
+	// on a later cycle would land as a second file. A suppressed near-duplicate
+	// is NOT an error — the evidence is already on disk, and the retrospective
+	// above (the caller's actual failure record) was written either way.
+	if isNearDuplicate(lessonsDir, lesson, cfg.resolvedNoveltyThreshold()) {
+		return nil
+	}
 	if _, err := writeIfAbsent(filepath.Join(lessonsDir, id+".yaml"), lesson); err != nil {
 		return fmt.Errorf("faillearn: write lesson %s: %w", id, err)
 	}

@@ -29,9 +29,56 @@ policy).
   // Context-fill telemetry: warn when a launch's prompt-side tokens occupy more
   // than this percentage of its driver family's effective context window.
   // Absent / empty / out-of-range (<=0 or >100) ⇒ 60.
-  "context_fill": { "warn_threshold_pct": 60 }
+  "context_fill": { "warn_threshold_pct": 60 },
+
+  // KB recall bound + failure-lesson novelty gate. Absent / empty /
+  // out-of-range ⇒ recall_k=5 (today's compiled bound), novelty_threshold=0.9.
+  "research": { "recall_k": 5, "novelty_threshold": 0.9 }
 }
 ```
+
+## KB recall and lesson novelty (`research`)
+
+Two knobs over the lessons corpus (`.evolve/instincts/lessons`), both resolved by
+`policy.Policy.ResearchConfig()` (`go/internal/policy/research_config.go`).
+
+| Key | Range | Default | Effect |
+|---|---|---|---|
+| `recall_k` | 1–50 | **5** | How many lessons one KB lookup returns — the top-k **prefix** of the existing deterministic ranking, not a resample. Resolved at the composition root (`go/cmd/evolve/cmd_cycle.go`, `kbRecallK` → `research.NewFileKBWithRecall`) and consumed by the advisor's recall memory (`Orchestrator.recallForPlan`). |
+| `novelty_threshold` | (0, 1] | **0.9** | Similarity at or above which an incoming deterministic failure lesson counts as a near-duplicate of one already on disk and is skipped (`faillearn.WithNoveltyThreshold` → `go/internal/faillearn/novelty.go`). |
+
+Out-of-range values fall back to the built-in rather than being honoured: `recall_k: 0`
+would silently disable advisor recall memory and `novelty_threshold: 0` would suppress
+every lesson write, and neither is an intent an operator can express by accident.
+
+**The recall default is held at 5 on purpose.** It is the value the compiled
+`research.maxResults` has always carried, so introducing the knob changes no
+install's behaviour; lowering it narrows the advisor's failure recall, which is a
+phase-integrity regression, not a token optimisation.
+
+### Why the novelty gate sits in the writer
+
+A lesson id is `cycle-N-<scope>-<slug>`, so the same observation recurring on a later
+cycle lands under a *different* filename — `writeIfAbsent`'s exact-path dedupe cannot
+see it, and a corpus that repeats one failure for twenty cycles crowds recall with
+twenty copies of it. The gate therefore intercepts `faillearn.WriteArtifacts` itself
+(the one Go lesson-write seam, reached from `cmd_loop_outcome.go`,
+`core/failure_learning.go` and `core/reset.go`) rather than living in a helper the
+write path never calls.
+
+Similarity is Jaccard overlap over the *observation-bearing* fields only —
+`pattern`, `description`, `defects` and `failureContext`. `id`, `source` and
+`preventiveAction` all embed the cycle number, so including them would make every
+recurrence look novel and the gate would never fire. Pure-digit tokens are dropped for
+the same reason. Two hard rules bound the gate, both pinned by tests:
+
+- a materially different failure is **never** suppressed (suppressing evidence is
+  irreversible, so anything short of an almost token-identical match is written);
+- corpus rot is **inert** — an unparseable neighbour is skipped, never treated as a
+  reason to drop the incoming lesson, and never rewritten or deleted.
+
+A suppressed lesson is not an error, and the failing cycle's own
+`retrospective-report.md` is written either way.
 
 ## Context-fill telemetry (`context_fill`)
 

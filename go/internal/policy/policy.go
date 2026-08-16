@@ -166,6 +166,10 @@ type Policy struct {
 	// ContextFill configures the context-fill WARN threshold. Absent ⇒
 	// built-in default applies (warn_threshold_pct=60).
 	ContextFill *ContextFillPolicy `json:"context_fill,omitempty"`
+	// Research configures the KB recall bound and the failure-lesson novelty
+	// gate. Absent ⇒ built-in defaults apply (recall_k=5, the value
+	// research.maxResults has always carried; novelty_threshold=0.9).
+	Research *ResearchPolicy `json:"research,omitempty"`
 	// RegressionTIA configures test-impact selection over the EGPS Go
 	// regression corpus. Absent ⇒ built-in default applies (stage="off" —
 	// nothing computed, no artifact, byte-identical audit path).

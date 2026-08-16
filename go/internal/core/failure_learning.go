@@ -468,7 +468,15 @@ func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, sum
 	// block whenever Class != "", and ev.Defects is overwritten only when the
 	// block carries defects, so a classed-but-defectless block left the summary
 	// echo in place and filed it as a priority-H bug.
-	var opts []faillearn.Option
+	// The near-duplicate bound is operator config, not a Go literal: resolved
+	// here (the composition point that already holds projectRoot) and passed as
+	// an Option so faillearn stays a policy-free leaf. A load failure resolves
+	// to the compiled default, never to a disarmed or suppress-everything gate.
+	pol, polErr := policy.Load(filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "policy.json"))
+	if polErr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: policy load for novelty threshold: %v (using compiled default)\n", polErr)
+	}
+	opts := []faillearn.Option{faillearn.WithNoveltyThreshold(pol.ResearchConfig().NoveltyThreshold)}
 	if defects := faillearn.StructuredDefects(ev); len(defects) > 0 {
 		if items := retroRemediationItems(fl.CycleRequest.ProjectRoot, fl.Cycle, defects); len(items) > 0 {
 			opts = append(opts, faillearn.WithInbox(filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "inbox"), items))

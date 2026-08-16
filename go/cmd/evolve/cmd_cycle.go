@@ -687,7 +687,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// WS2 knowledge-base recall: wire the lessons corpus so the advisor plans
 	// with recall memory (prior failures + lessons). Lookup is best-effort and
 	// only consulted at plan time; an absent corpus is a no-op.
-	opts = append(opts, core.WithKB(research.NewFileKB(kbRootsAbs(projectRoot))))
+	// The recall bound is RESOLVED from policy.json (research.recall_k), never a
+	// compiled literal: a knob whose value never reaches this construction is
+	// dead config. Default holds at 5 — see policy.ResearchConfig.
+	opts = append(opts, core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))))
 
 	// WS4 configurable integrity floor: pass the user-resolved ship_floor (nil ⇒
 	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
@@ -737,6 +740,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 // kbRootsAbs resolves the KB search roots (relative by default,
 // e.g. ".evolve/instincts/lessons/") against the project root so the KB reads
 // the right corpus regardless of the process cwd. Absolute roots pass through.
+// kbRecallK resolves the KB recall bound from .evolve/policy.json. A load
+// failure resolves to the built-in default (policy.Load returns a zero Policy),
+// which is today's behaviour — an unreadable policy file must not disable
+// recall memory.
+func kbRecallK(projectRoot string) int {
+	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	return pol.ResearchConfig().RecallK
+}
+
 func kbRootsAbs(projectRoot string) []string {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	raw := research.SearchPathsFromEnv(pol.PathsConfig())

@@ -9,15 +9,31 @@ import (
 // and ranks matches deterministically. No caching (the corpus is small and a
 // lookup happens at most once per cycle); no LLM (ranking is pure arithmetic).
 type FileKB struct {
-	roots []string
+	roots  []string
+	recall int
 }
 
 // NewFileKB builds a FileKB over the given lesson-directory roots (e.g. from
-// SearchPathsFromEnv). Roots that don't exist are simply skipped at lookup time.
-func NewFileKB(roots []string) *FileKB { return &FileKB{roots: roots} }
+// SearchPathsFromEnv) at the built-in recall bound. Roots that don't exist are
+// simply skipped at lookup time.
+func NewFileKB(roots []string) *FileKB { return NewFileKBWithRecall(roots, maxResults) }
 
-// maxResults bounds how many lessons a Lookup returns — enough for the advisor's
-// recall section without flooding the prompt.
+// NewFileKBWithRecall builds a FileKB whose Lookup returns at most recallK
+// lessons — the top-k PREFIX of the same deterministic ranking, never a
+// resample. recallK ≤ 0 falls back to the built-in maxResults: a zero-recall KB
+// would silently disable the advisor's recall memory, which is a degradation an
+// operator typo must not be able to cause. The caller (the composition root)
+// resolves recallK from policy.ResearchConfig().RecallK.
+func NewFileKBWithRecall(roots []string, recallK int) *FileKB {
+	if recallK <= 0 {
+		recallK = maxResults
+	}
+	return &FileKB{roots: roots, recall: recallK}
+}
+
+// maxResults is the built-in recall bound — enough for the advisor's
+// recall section without flooding the prompt. Operator-overridable via the
+// policy.json "research" block; see NewFileKBWithRecall.
 const maxResults = 5
 
 // scored pairs a lesson with its relevance score for ranking.
@@ -63,8 +79,14 @@ func (k *FileKB) Lookup(_ context.Context, q Query) ([]Lesson, error) {
 		}
 		return ranked[i].lesson.ID < ranked[j].lesson.ID
 	})
-	out := make([]Lesson, 0, min(len(ranked), maxResults))
-	for i := 0; i < len(ranked) && i < maxResults; i++ {
+	// A zero-value FileKB (struct literal rather than a constructor) must still
+	// recall: an unset bound means "built-in", never "none".
+	recall := k.recall
+	if recall <= 0 {
+		recall = maxResults
+	}
+	out := make([]Lesson, 0, min(len(ranked), recall))
+	for i := 0; i < len(ranked) && i < recall; i++ {
 		out = append(out, ranked[i].lesson)
 	}
 	return out, nil
