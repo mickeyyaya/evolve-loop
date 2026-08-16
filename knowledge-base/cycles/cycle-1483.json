@@ -1,0 +1,164 @@
+{
+  "cycle": 1483,
+  "run_id": "01M0456TAGRTKEWYK659RGZXCQ",
+  "goal": "Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 664578,
+      "started_at": "2026-08-16T02:09:06Z",
+      "ended_at": "2026-08-16T02:20:12Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 58543,
+      "started_at": "2026-08-16T02:20:12Z",
+      "ended_at": "2026-08-16T02:21:11Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 3072,
+        "cache_read": 113131,
+        "cache_write": 59350
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 590766,
+      "started_at": "2026-08-16T02:21:13Z",
+      "ended_at": "2026-08-16T02:31:04Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 114,
+        "output": 45060,
+        "cache_read": 6324693,
+        "cache_write": 164644
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 13102,
+      "started_at": "2026-08-16T02:31:04Z",
+      "ended_at": "2026-08-16T02:51:47Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 383669,
+      "started_at": "2026-08-16T02:51:47Z",
+      "ended_at": "2026-08-16T02:58:10Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 28,
+        "output": 28019,
+        "cache_read": 1093677,
+        "cache_write": 89583
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|27c685ff12f5",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: enforced package tests FAIL (coverage"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1483",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1710658,
+    "phase_count": 5,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 664578,
+    "by_archetype_ms": {
+      "build": 13102,
+      "control": 383669,
+      "plan": 1313887
+    },
+    "total_tokens": {
+      "input": 148,
+      "output": 76151,
+      "cache_read": 7531501,
+      "cache_write": 313577
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 28,
+        "output": 28019,
+        "cache_read": 1093677,
+        "cache_write": 89583
+      },
+      "plan": {
+        "input": 120,
+        "output": 48132,
+        "cache_read": 6437824,
+        "cache_write": 223994
+      }
+    },
+    "wasted_tokens": {
+      "input": 28,
+      "output": 28019,
+      "cache_read": 1093677,
+      "cache_write": 89583
+    },
+    "cache_hit_ratio": 0.9999803495887819,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "triage",
+      "tdd"
+    ]
+  }
+}
