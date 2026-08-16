@@ -32,8 +32,19 @@ var closureCycleRef = regexp.MustCompile(`cycle[- ]?\d+`)
 // ("hasn't/won't/cannot be closed" still flag) — grow it from firings, not
 // speculation.
 var (
-	closureClaimRE       = regexp.MustCompile(`\bverified closed\b`)
-	closureClosedTokenRE = regexp.MustCompile(`\bclosed\b`)
+	// `[ -]`: the hyphen-compound carve-out on the WEAK rung (below) must not
+	// turn "verified-closed" — a one-character mutation of the canonical
+	// laundering phrase — into a both-rungs miss; the strong rung accepts the
+	// hyphenated spelling directly. "verified fail-closed" still cannot match
+	// (the compound's own hyphen sits between "fail" and "closed").
+	closureClaimRE = regexp.MustCompile(`\bverified[ -]closed\b`)
+	// `(?:^|[^-\w])` instead of `\b`: a hyphen IS a word boundary, so plain
+	// \bclosed\b matched inside "fail-closed" — a state adjective, not a
+	// closure claim (cycle-1493 infra-systemic halt; the same compound in
+	// cycle-1486's "fail-closed by construction" prose fired twice more).
+	// Letter-prefixed compounds ("disclosed") stay excluded because a letter
+	// is rejected by [^-\w] just as it was by \b.
+	closureClosedTokenRE = regexp.MustCompile(`(?:^|[^-\w])closed\b`)
 	closureNegationRE    = regexp.MustCompile(`\b(?:not|never|isn['’]?t|wasn['’]?t|aren['’]?t)\s+(?:\w+\s+){0,2}closed\b`)
 	closureOpenAssertRE  = regexp.MustCompile(`\b(?:still|remains?|left|stays?)\s+open\b|\bre-?opened\b`)
 )
@@ -63,7 +74,13 @@ func closureClaimOffenders(text string) []string {
 		// accepts the negation/openness guards, whose whole job is the
 		// disclosed/"still open" false-RED class.
 		strong := closureClaimRE.MatchString(lower)
-		weak := closureClosedTokenRE.MatchString(lower) && closureCycleRef.MatchString(lower) &&
+		// The weak rung's cycle reference must come from PROSE, not from a
+		// path: `.evolve/runs/cycle-1493/…` is a citation locator, and it was
+		// the ONLY cycle token on the line that force-FAILed cycle-1493's
+		// narrative-green audit. Tokens containing '/' are dropped for this
+		// one check; the closed-token, negation, and citation checks keep the
+		// full line (a real prose claim next to a path still flags — pinned).
+		weak := closureClosedTokenRE.MatchString(lower) && closureCycleRef.MatchString(stripPathTokens(lower)) &&
 			!closureNegationRE.MatchString(lower) && !closureOpenAssertRE.MatchString(lower)
 		if !strong && !weak {
 			continue
@@ -139,6 +156,25 @@ func stripQuotedSpans(line string) string {
 		i = close // drop the delimiters and everything between them
 	}
 	return string(out)
+}
+
+// stripPathTokens drops whitespace-delimited tokens containing '/' — file
+// paths and locators. Used ONLY for the weak rung's cycle-reference check: a
+// cycle number inside an evidence path is where a citation points, not a
+// prose claim about that cycle (cycle-1493). Accepted misses, documented in
+// the compound test: a markdown-link ref ("[cycle-1272](docs/x.md)") and a
+// dual-ref token ("cycle-1272/cycle-1273") also strip — both are weak-rung
+// shapes an author could already evade by omitting the ref outright, and the
+// strong rung + citation demand still stand on such lines.
+func stripPathTokens(line string) string {
+	fields := strings.Fields(line)
+	kept := fields[:0]
+	for _, f := range fields {
+		if !strings.Contains(f, "/") {
+			kept = append(kept, f)
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // isQuoteDelim reports whether r[i] opens or closes a quotation. Double quotes
