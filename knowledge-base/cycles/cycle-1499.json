@@ -1,0 +1,188 @@
+{
+  "cycle": 1499,
+  "run_id": "01M055FBFMS8Z84Z90T4GKJGTW",
+  "goal": "Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 576046,
+      "started_at": "2026-08-16T11:33:09Z",
+      "ended_at": "2026-08-16T11:42:46Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 42505,
+      "started_at": "2026-08-16T11:42:46Z",
+      "ended_at": "2026-08-16T11:43:29Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1705,
+        "cache_read": 112303,
+        "cache_write": 58941
+      }
+    },
+    {
+      "name": "premise-challenge",
+      "verdict": "PASS",
+      "duration_ms": 368796,
+      "started_at": "2026-08-16T11:43:29Z",
+      "ended_at": "2026-08-16T11:49:38Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 30,
+        "output": 22616,
+        "cache_read": 1643350,
+        "cache_write": 115833
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 554244,
+      "started_at": "2026-08-16T11:49:38Z",
+      "ended_at": "2026-08-16T11:58:53Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 78,
+        "output": 43902,
+        "cache_read": 4199433,
+        "cache_write": 149257
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 13097,
+      "started_at": "2026-08-16T11:58:53Z",
+      "ended_at": "2026-08-16T12:40:57Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 755371,
+      "started_at": "2026-08-16T12:40:57Z",
+      "ended_at": "2026-08-16T12:53:32Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 76,
+        "output": 32374,
+        "cache_read": 3199515,
+        "cache_write": 90262
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|285030383db3",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 3 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: enforced package tests FAIL (coverage"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1499",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2310059,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "retro",
+    "longest_ms": 755371,
+    "by_archetype_ms": {
+      "build": 13097,
+      "control": 755371,
+      "evaluate": 368796,
+      "plan": 1172795
+    },
+    "total_tokens": {
+      "input": 190,
+      "output": 100597,
+      "cache_read": 9154601,
+      "cache_write": 414293
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 76,
+        "output": 32374,
+        "cache_read": 3199515,
+        "cache_write": 90262
+      },
+      "evaluate": {
+        "input": 30,
+        "output": 22616,
+        "cache_read": 1643350,
+        "cache_write": 115833
+      },
+      "plan": {
+        "input": 84,
+        "output": 45607,
+        "cache_read": 4311736,
+        "cache_write": 208198
+      }
+    },
+    "wasted_tokens": {
+      "input": 76,
+      "output": 32374,
+      "cache_read": 3199515,
+      "cache_write": 90262
+    },
+    "cache_hit_ratio": 0.999979245839692,
+    "hot_phase_count": 3,
+    "hot_phases": [
+      "triage",
+      "premise-challenge",
+      "tdd"
+    ]
+  }
+}
