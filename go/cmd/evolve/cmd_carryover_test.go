@@ -271,3 +271,30 @@ func TestCarryoverApplyDecisions_PreservesStateSymlink(t *testing.T) {
 		t.Fatalf("canonical not updated through link: %v", got["carryoverTodos"])
 	}
 }
+
+func TestCarryoverApplyDecisions_DropsConsumedFleetAlias(t *testing.T) {
+	const (
+		consumedAlias = "pipeline-defect-pipeline-blocker"
+		liveID        = "todo-still-live"
+	)
+	statePath := writeFixtureState(t, consumedAlias, liveID)
+	doc := carryoverDecisionsDoc{
+		SourceCount: 2,
+		Decisions: []carryoverDecisionRow{
+			{ID: consumedAlias, Decision: "drop", Reason: "consumed fleet alias"},
+			{ID: liveID, Decision: "keep", Reason: "still actionable"},
+		},
+	}
+
+	res, err := applyCarryoverDecisions(statePath, doc)
+	if err != nil {
+		t.Fatalf("applyCarryoverDecisions: %v", err)
+	}
+	if res.Before != 2 || res.After != 1 || res.Dropped != 1 || res.Clustered != 0 {
+		t.Fatalf("result = %+v, want Before=2 After=1 Dropped=1 Clustered=0", res)
+	}
+	surviving := readCarryoverIDs(t, statePath)
+	if surviving[consumedAlias] || !surviving[liveID] || len(surviving) != 1 {
+		t.Fatalf("surviving ids = %v, want only %q", surviving, liveID)
+	}
+}
