@@ -20,5 +20,11 @@
   ],
   "source": "go-reviewer MEDIUM finding on branch fix/deliverable-authority-ctxcancel-859 (2026-07-16)",
   "created_at": "2026-07-16T15:50:00Z",
-  "notes": " [REBAND 2026-07-23] 0.87->0.55: priority=low telemetry-accuracy defect (exit-code parse), no pipeline-blocking failure mode; band-reserved weights belong to integrity classes."
+  "notes": " [REBAND 2026-07-23] 0.87->0.55: priority=low telemetry-accuracy defect (exit-code parse), no pipeline-blocking failure mode; band-reserved weights belong to integrity classes.",
+  "consumed": {
+    "at": "2026-08-15T17:10:00Z",
+    "via": "console-merge",
+    "merged_into": "minor-hardening-sweep",
+    "note": "folded as nit (8) \u2014 same exit-code accuracy family as nit (1)"
+  }
 }

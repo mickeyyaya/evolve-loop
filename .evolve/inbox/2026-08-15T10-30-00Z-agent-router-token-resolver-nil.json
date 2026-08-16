@@ -1,0 +1,28 @@
+{
+  "id": "agent-router-token-resolver-nil",
+  "kind": "bug",
+  "title": "Agent-router composition root dispatches with nil Deps.TokenResolver — token telemetry silently unmeasured on router-dispatched phases",
+  "summary": "Every lane in batch-20260815c (and 6 hits in 20260815b, 3 in wave-5) logs the WARN pair: 'token usage uncovered for driver agy-tmux — no transcript/events/scrollback data (agent router)' followed by 'Deps.TokenResolver is nil — token telemetry disabled (fail-open); wire tokenusage.DefaultResolver at the composition root'. The production engine root DOES wire it (go/internal/adapters/bridge/bridge.go:148 — tokenusage.DefaultResolver(configRoot(env))), so the nil comes from a SECOND composition root: the agent-router dispatch path constructs bridge Deps without TokenResolver.",
+  "root_cause": "Second-composition-root wiring gap — the same class as PR #459's finalize-defer emission fix (component wired at one root, absent at the sibling root). Router-dispatched phase work is recorded as 'unmeasured' (honest fail-open, not zero-cost), but this blinds the token-usage goal's telemetry on exactly the phases the standing goal wants to optimize.",
+  "fix": "TWO confirmed sub-defects (batch-20260815c log lines 61-83): (1) agent-router root dispatches with nil TokenResolver — the WARN pair fires on every router dispatch; wire tokenusage.DefaultResolver via the same configRoot(env) recipe as bridge.go:148, plus a coherence test enumerating ALL Deps composition roots asserting TokenResolver non-nil (class-kill: fails when a third root appears unwired). (2) Driver-source gap, PROVEN distinct: '(agent scout)' codex-tmux emits 'token usage uncovered' WITHOUT the nil-resolver WARN (log line 83) — resolver wired, but codex-tmux has no transcript/events/scrollback usage adapter; agy-tmux same. Since codex now carries scout/tester/build-planner/orchestrator (roster #461), unmeasured codex usage blinds the token goal on 4 phase families — add a codex usage source (session jsonl or scrollback parse) and an agy one if feasible.",
+  "files": [
+    "go/internal/adapters/bridge/bridge.go (reference wiring, line ~148)",
+    "go/internal/bridge/ (engine WARN emit sites; router Deps construction)",
+    "go/internal/tokenusage/ (DefaultResolver)"
+  ],
+  "acceptance": [
+    "Batch log shows ZERO 'Deps.TokenResolver is nil' WARNs across a full wave.",
+    "Router-dispatched phases report measured token usage (not 'unmeasured') for claude/codex drivers.",
+    "Coherence/wiring test red-first: fails on current tree (nil at router root), green after wiring; covers every Deps composition root by enumeration not hardcoded list where feasible.",
+    "go vet ./... green; touched-package tests + -race green."
+  ],
+  "connects_to": [
+    "token_telemetry_campaign S1-S7 (this is a missed root, not a new subsystem)",
+    "PR #459 finalize-defer emission (same wiring-in-two-roots disease)",
+    "standing goal: per-agent token usage optimization (unmeasured phases are invisible to it)"
+  ],
+  "priority": "medium",
+  "weight": 0.65,
+  "created_at": "2026-08-15T10:30:00Z",
+  "notes": "Filed mid-batch 20260815c from console monitoring; preexisting class (present in 20260815b + wave5 logs), NOT a regression from v22.18.0. Fail-open is honest so not batch-blocking; weight below the 0.85+ pipeline-integrity band by design."
+}

@@ -22,5 +22,11 @@
   "source": "console-2026-08-02 pre-launch cleanup, reproduced live",
   "summary": "Reproduced live 2026-08-02 on the runtime plane. Sequence: (1) evolve ship creates commit 16c8f8bc (commit-gate attested d4799eb2) but origin/main had moved (#396) -> GIT_PUSH_REJECTED, 'local commit preserved... reconcile with evolve sync-main'; (2) sync-main merges origin in (merge ff09b899), tree now CLEAN and 2 attested commits ahead; (3) re-running ship: 'no staged changes; nothing to ship' \u2014 and bare git push is (correctly) guard-denied. The recovery the ship error prescribes cannot complete through any sanctioned command. Workaround that resolved it: file the next legitimate inbox change and let that ship carry the stranded commits \u2014 works at a batch boundary but is a coincidence of having pending bookkeeping, not a path. Fix shape: ship detects clean-tree-but-ahead-of-origin where every local commit is either commit-gate attested, a cycle ship, or a sync-main merge of such \u2014 and completes the push under the same atomic-ship verifications (prefix gate, SELF_SHA, ledger), refusing if ANY unattested commit is in the ahead set. NOT a bypass: it extends attestation checking to the push-only case.",
   "title": "ship has no sanctioned path to push attested-but-stranded commits \u2014 GIT_PUSH_REJECTED recovery dead-ends at 'no staged changes; nothing to ship'",
-  "weight": 0.8
+  "weight": 0.8,
+  "consumed": {
+    "at": "2026-08-15T17:10:00Z",
+    "via": "console-merge",
+    "merged_into": "ship-addall-staging-surface",
+    "note": "push-recovery defect folded as part (c)"
+  }
 }

@@ -1,0 +1,26 @@
+{
+  "id": "posthoc-diff-anchor-no-op-cycle",
+  "kind": "bug",
+  "title": "build-report 'Files changed' POSTHOC anchors to HEAD^..HEAD \u2014 a no-op cycle inherits the PRIOR commit's diff stats (false disclosure in an audit-bound artifact)",
+  "summary": "Cycle-1479 authored zero commits, but its build-report.md POSTHOC block claimed '2 files / 238 insertions' \u2014 the stats of cycle-1477's ship commit (1d6ee809), because the anchor is HEAD^..HEAD on a base that already contains the prior cycle's landed work. Audit verdict WARN M2 (batch-20260815c). A no-op cycle thus presents another cycle's productivity in a ship-gate-bound artifact \u2014 the proxy-as-evidence family. SECOND VARIANT same batch: cycle-1480 audit L1 \u2014 POSTHOC metrics/files-changed left as literal 'pending' placeholder, never substituted. The writer has two failure shapes: wrong anchor (1479) and unsubstituted template (1480); fix both at the same site with the same base-SHA-sourced ground truth.",
+  "root_cause": "The POSTHOC diff summarizer keys on relative revision syntax (HEAD^..HEAD) instead of the cycle's own base ref. Correct on cycles that commit; wrong on cycles that don't (inherits whatever the tip commit was) and wrong on multi-commit cycles (undercounts).",
+  "fix": "Audit prescription verbatim (cycle-1479 audit-report.md): anchor the POSTHOC to the cycle base (git diff --numstat <cycle_base_sha>..HEAD, base recorded at worktree provisioning) and emit 0 files when the cycle authored no commit. The base SHA already exists in run state (worktree provisioning records it); thread it to the report writer instead of the relative anchor. Regression tests: (a) no-commit cycle => 0 files, never the parent's stats; (b) one-commit cycle => that commit's stats; (c) two-commit cycle => cumulative stats.",
+  "files": [
+    "go/internal/phases/build/ (POSTHOC Files-changed writer \u2014 locate via grep 'Files changed' / 'POSTHOC')",
+    ".evolve/runs/cycle-1479/build-report.md (live false-disclosure evidence, line ~20)"
+  ],
+  "acceptance": [
+    "Table-driven regression: no-commit / one-commit / multi-commit worktree fixtures produce 0 / exact / cumulative stats; the HEAD^ inheritance shape is pinned red-first.",
+    "Cycle base SHA sourced from run state, not recomputed via relative revs.",
+    "go vet + touched-package suites green.",
+    "Placeholder shape pinned: a report writer that fails to substitute POSTHOC emits 0/absent with a loud log line, never the literal 'pending' template text (red-first on the cycle-1480 shape)."
+  ],
+  "connects_to": [
+    "carryover-lane-retirement-verifiableby (same cycle's M1; retirement removes most no-op cycles, this fixes honest disclosure for the rest)",
+    "proxy-as-verdict findings ledger docs/incidents/2026-08-12-proxy-as-verdict-findings.md (same disease: derived signal presented as direct evidence)"
+  ],
+  "priority": "medium",
+  "weight": 0.8,
+  "created_at": "2026-08-15T13:31:00Z",
+  "notes": "Filed from console monitoring of batch-20260815c (cycle-1479 audit WARN M2). Evidence-integrity adjacent: the false stat rode INTO an audit artifact and the auditor caught it by re-deriving \u2014 the fix makes the artifact honest at the source. THIRD occurrence same batch: cycle-1478 audit M1 posthoc-unresolved \u2014 build-report.md:192-193 both POSTHOC markers literal 'pending' while ground truth was 43 files/+3699/-133. Three cycles, two shapes, one writer: this is now the batch's most recurrent defect; consider raising priority at triage."
+}

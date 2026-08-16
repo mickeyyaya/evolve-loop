@@ -1,0 +1,28 @@
+{
+  "id": "multi-slug-lane-scope-reconciliation",
+  "kind": "bug",
+  "title": "Multi-slug lanes: TDD predicate scope and Builder contract scope are never reconciled — the second slug is silently undelivered and the cycle deterministically FAILs",
+  "summary": "Cycle-1480 (batch-20260815c wave-2) dispatched a 2-slug bundle 'minted-phase-verdict-contract-unsatisfiable+dead-api-sweep'. TDD minted a cycle-wide ACS predicate suite covering BOTH slugs; the Builder's contract bound only the FIRST. Slug 2 (dead-api-sweep) was entirely undelivered (go/internal/core/phase_judge.go unchanged, no regenerated reachability evidence), predicates 006/007/008 red. Audit FAIL H1 verbatim: 'TDD minted a cycle-wide predicate suite covering both slugs while the Builder contract bound only the first slug; nothing reconciles the two scopes.'",
+  "root_cause": "Two phase agents derive scope from the same lane independently: TDD reads the full lane-scope (all slugs) to author predicates; the Builder's deliverable contract binds a single slug. No coherence check asserts predicate-suite scope == builder contract scope, so any multi-slug lane FAILs by construction after burning the full spine (~12 phases).",
+  "fix": "Single-source the lane scope projection (never-duplicate rule): both the TDD predicate-minting input and the Builder contract binding must derive from the same lane-scope.json slug set. Then add a deterministic pre-build coherence gate: if the minted predicate suite references slugs absent from the builder contract (or vice versa), block at the TDD->Build transition with a named defect — before ~2M tokens are spent proving the mismatch. Alternatives to weigh at build time: (a) bind the builder contract to ALL lane slugs, or (b) split multi-slug bundles into per-slug lanes at mint (batching menus are exact-file-overlap only, so a split may be the simpler class-kill).",
+  "files": [
+    ".evolve/runs/cycle-1480/{audit-report.md,lane-scope.json,routing-plan.json} (evidence)",
+    "go/internal/phases/ (TDD predicate minting input; builder contract binding site)",
+    "go/internal/core/ (lane-scope projection; TDD->Build transition gate)"
+  ],
+  "acceptance": [
+    "A 2-slug fixture lane either delivers both slugs or blocks at the TDD->Build boundary with a scope-mismatch defect — it can no longer run the full spine and FAIL at audit.",
+    "Predicate-suite slug set == builder contract slug set enforced by a deterministic check with a red-first test pinning the cycle-1480 shape.",
+    "Single projection source: one function yields the slug set for both consumers (grep-proof: no second parser of lane-scope slugs).",
+    "go vet + touched suites + -race green."
+  ],
+  "connects_to": [
+    "cycle-1480 audit FAIL H1 (live evidence, batch-20260815c)",
+    "batching_partition_menus (menus are exact-file-overlap only — relevant if fix (b) per-slug split is chosen)",
+    "never_duplicate_centralize_via_design_patterns (two scope derivations = replicated belief, the canonical disease)"
+  ],
+  "priority": "high",
+  "weight": 0.85,
+  "created_at": "2026-08-15T14:05:00Z",
+  "notes": "Filed from console monitoring. Deterministic FAIL burn on every multi-slug lane makes this pipeline-efficiency-critical; 0.85 places it at the pipeline band floor. Cycle-1480's preserved worktree (branch cycle-42824668-1480, snapshot 2516f29bff6b) holds slug-1 work — salvage assessment due at batch boundary BEFORE any requeue of the bundle."
+}

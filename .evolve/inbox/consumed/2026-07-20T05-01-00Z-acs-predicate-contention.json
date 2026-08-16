@@ -13,5 +13,10 @@
   "title": "ACS predicates that subprocess whole-package `go test -race` flake under fleet contention \u2014 same class PR #340 fixed for the tier gate, unfixed at the predicate layer",
   "weight": 0.6,
   "weight_hint": 0.93,
-  "why": "Cycle-944 no-shipped on EGPS red_count=1: the sole red was TestC944_005_core_race_clean, a predicate that re-runs `go test -race internal/core` as a SUBPROCESS (37s) inside the ACS lane. Under 2-wide fleet contention this is the exact false-RED family PR #340 (3c5ed711) fixed for the integration-tier gate via env-scrub + flock-serialized retake \u2014 but the ACS predicate lane got neither. Such predicates ALSO duplicate the CI-parity tier gate (never_duplicate violation): the tier gate already proves core -race green; a predicate re-proving it adds only flake surface."
+  "why": "Cycle-944 no-shipped on EGPS red_count=1: the sole red was TestC944_005_core_race_clean, a predicate that re-runs `go test -race internal/core` as a SUBPROCESS (37s) inside the ACS lane. Under 2-wide fleet contention this is the exact false-RED family PR #340 (3c5ed711) fixed for the integration-tier gate via env-scrub + flock-serialized retake \u2014 but the ACS predicate lane got neither. Such predicates ALSO duplicate the CI-parity tier gate (never_duplicate violation): the tier gate already proves core -race green; a predicate re-proving it adds only flake surface.",
+  "consumed": {
+    "at": "2026-08-15T17:10:00Z",
+    "via": "console-retire",
+    "reason": "superseded per its own notes: largely addressed by P1 verifylock (v22.10.0 c13603df); residual folded into acs-metapredicate-suite-scope (already out of the pending pool); flake SURFACE remains tracked by suite-family-flake-deflake 0.55"
+  }
 }

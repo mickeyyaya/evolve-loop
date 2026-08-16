@@ -1,6 +1,6 @@
 {
   "id": "ship-staging-rename-pathspec",
-  "title": "ship's changed-path staging fails on a staged RENAME — git add of the old half errors 'did not match any files'",
+  "title": "ship's changed-path staging fails on a staged RENAME \u2014 git add of the old half errors 'did not match any files'",
   "kind": "pipeline-integrity",
   "priority": "medium",
   "weight": 0.8,
@@ -13,11 +13,17 @@
   "route": "lane",
   "injected_by": "console-2026-07-28-release-prep",
   "evidence": "Live 2026-07-27 (hotfix ship c21dcb0b prep): with a rename staged (.evolve/inbox/X.json -> .evolve/inbox/consumed/X.json, porcelain status 'R'), evolve ship --class manual FAILed [GIT_STAGE_FAILED/transient @atomic-ship]: ship re-derives changed paths from porcelain and runs git add per path, but the R line's OLD path no longer exists on disk and its deletion is already fully staged, so git add rejects the pathspec (rc=128). Worked around by setting status.renames=false for the ship (porcelain then reports plain D + A, both addable) and unsetting after.",
-  "notes": "Fix in ship's porcelain parsing: an R-status line carries 'old -> new'; stage the deletion of old via git rm --cached semantics or simply split R into (D old, A new) before the per-path git add — or pass --no-renames to the status invocation ship already owns (one flag, no parse change; gitexec.PorcelainPath is the SSOT for the path extraction and R lines embed TWO paths, which is also a latent PorcelainPath hazard worth a test). Same class as the 1098 staging onion (absolute pathspec rc=128, ignored-path rc=1): ship staging must be total over every porcelain status code.",
+  "notes": "Fix in ship's porcelain parsing: an R-status line carries 'old -> new'; stage the deletion of old via git rm --cached semantics or simply split R into (D old, A new) before the per-path git add \u2014 or pass --no-renames to the status invocation ship already owns (one flag, no parse change; gitexec.PorcelainPath is the SSOT for the path extraction and R lines embed TWO paths, which is also a latent PorcelainPath hazard worth a test). Same class as the 1098 staging onion (absolute pathspec rc=128, ignored-path rc=1): ship staging must be total over every porcelain status code.",
   "acceptance": [
     "RED first: a staged rename in the tree; evolve ship --class manual (dry-run path or test harness) stages and commits it without GIT_STAGE_FAILED.",
     "PorcelainPath (or ship's caller) handles the 'R old -> new' two-path shape explicitly, with a test.",
     "No behavior change for plain A/M/D paths.",
     "cd go && go test -race ./internal/ship/... N/N PASS."
-  ]
+  ],
+  "consumed": {
+    "at": "2026-08-15T17:10:00Z",
+    "via": "console-merge",
+    "merged_into": "ship-addall-staging-surface",
+    "note": "rename-pathspec defect folded as part (b)"
+  }
 }

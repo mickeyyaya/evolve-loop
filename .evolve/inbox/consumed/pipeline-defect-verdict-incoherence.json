@@ -1,0 +1,23 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1478"
+  ],
+  "created_at": "2026-08-15T13:47:50Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-verdict-incoherence",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-08-15T13:47:50Z. Evidence: orchestrator-classified verdict-incoherence: audit-report.md:15-17 reads '## Verdict' then '**WARN**', and its tail sentinel (audit-report.md:109) carries {\"verdict\":\"WARN\"}; acs-verdict.json reports red_count=0, ship_eligible=true over 226 predicates; audit-fail-reason.json nevertheless records 'declares no parseable verdict \u2014 treating as FAIL'. Replaying sentinel.go's regex plus json.Unmarshal against those bytes reproduces it: capture=2815 bytes, first complete JSON value ends at 2814, remainder '}' \u2192 'invalid character '}' after top-level value'. No substantive phase error exists: build/tdd/security-scan/telemetry-coverage-check all completed and the whole-module suite was green.",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1478. The pipeline forged a verdict (category=verdict-incoherence): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure \u2014 retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (verdict-incoherence): the loop halted \u2014 orchestrator-classified verdict-incoherence: audit-report.md:15-17 reads '## Verdict' then '**WARN**', and its tail sentinel (audit-report.md:109) carries {\"verdict\":\"WARN\"}; acs-verdict.json reports red_count=0, ship_eligible=true over 226 predicates; audit-fail-reason.json nevertheless records 'declares no parseable verdict \u2014 treating as FAIL'. Replaying sentinel.go's regex plus json.Unmarshal against those bytes reproduces it: capture=2815 bytes, first complete JSON value ends at 2814, remainder '}' \u2192 'invalid character '}' after top-level value'. No substantive phase error exists: build/tdd/security-scan/telemetry-coverage-check all completed and the whole-module suite was green.",
+  "weight": 0.99,
+  "consumed": {
+    "at": "2026-08-15T16:20:00Z",
+    "via": "console-manual",
+    "cycle": "1478",
+    "resolution": "PR #468 merged 4a805658 \u2014 leading-value sentinel decode (phasecontract) + gate-level enforce pin (deliverable); real artifact pinned as regression fixture; correction-staleness half queued as contract-correction-stale-artifact-freshness (0.87)"
+  }
+}

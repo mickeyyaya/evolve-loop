@@ -1,0 +1,17 @@
+{
+  "action": "recurring failure contract gate demoted enforce->advisory on phase adversarial-review (cli=claude-tmux) (3 occurrences)",
+  "evidence_pointer": "[orchestrator] WARN CONTRACT GATE DEMOTED: phase adversarial-review on cli=claude-tmux tripped the contract-gate circuit breaker \u2014 the gate is now advisory (enforce\u2192advisory) for the rest of this run, so later phases ship UNGATED. CLI escalation did NOT run for this phase (no other CLI family available in its chain, or the block count opened the circuit first). Last violation: adversarial-review deliverable failed contract: [bad_verdict] no parseable verdict; expected one of [PASS FAIL WARN SKIPPED]",
+  "files": null,
+  "id": "contract-gate-demoted-adversarial-review",
+  "injected_at": "2026-08-11T04:03:54Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "priority": "HIGH",
+  "recurrence": 3,
+  "weight": 0.75,
+  "consumed": {
+    "at": "2026-08-15T17:10:00Z",
+    "via": "console-merge",
+    "merged_into": "contract-correction-stale-artifact-freshness",
+    "note": "bad_verdict x3, no alternate family"
+  }
+}
