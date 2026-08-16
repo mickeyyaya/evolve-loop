@@ -1,0 +1,205 @@
+{
+  "cycle": 1487,
+  "run_id": "01M048CHZAZ28DGHJN8TEW99ZR",
+  "goal": "Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 751164,
+      "started_at": "2026-08-16T03:04:54Z",
+      "ended_at": "2026-08-16T03:17:26Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 44696,
+      "started_at": "2026-08-16T03:18:34Z",
+      "ended_at": "2026-08-16T03:19:19Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 2069,
+        "cache_read": 193033,
+        "cache_write": 38443
+      }
+    },
+    {
+      "name": "premise-challenge",
+      "verdict": "PASS",
+      "duration_ms": 500354,
+      "started_at": "2026-08-16T03:19:20Z",
+      "ended_at": "2026-08-16T03:27:41Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 44,
+        "output": 27970,
+        "cache_read": 2607774,
+        "cache_write": 131280
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 427996,
+      "started_at": "2026-08-16T03:27:41Z",
+      "ended_at": "2026-08-16T03:34:50Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 62,
+        "output": 31858,
+        "cache_read": 2703096,
+        "cache_write": 97310
+      }
+    },
+    {
+      "name": "behavior-baseline",
+      "verdict": "PASS",
+      "duration_ms": 270301,
+      "started_at": "2026-08-16T03:34:50Z",
+      "ended_at": "2026-08-16T03:39:20Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 15365,
+        "cache_read": 738218,
+        "cache_write": 101949
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 13105,
+      "started_at": "2026-08-16T03:39:20Z",
+      "ended_at": "2026-08-16T04:25:49Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 589006,
+      "started_at": "2026-08-16T04:25:49Z",
+      "ended_at": "2026-08-16T04:35:38Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 58,
+        "output": 28424,
+        "cache_read": 2307626,
+        "cache_write": 106390
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|infra-error|110fceab4c02",
+    "pre_class": "infra-error",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 3 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: enforced package tests FAIL (coverage"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1487",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2596622,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 751164,
+    "by_archetype_ms": {
+      "build": 13105,
+      "control": 589006,
+      "evaluate": 770655,
+      "plan": 1223856
+    },
+    "total_tokens": {
+      "input": 188,
+      "output": 105686,
+      "cache_read": 8549747,
+      "cache_write": 475372
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 58,
+        "output": 28424,
+        "cache_read": 2307626,
+        "cache_write": 106390
+      },
+      "evaluate": {
+        "input": 60,
+        "output": 43335,
+        "cache_read": 3345992,
+        "cache_write": 233229
+      },
+      "plan": {
+        "input": 70,
+        "output": 33927,
+        "cache_read": 2896129,
+        "cache_write": 135753
+      }
+    },
+    "wasted_tokens": {
+      "input": 58,
+      "output": 28424,
+      "cache_read": 2307626,
+      "cache_write": 106390
+    },
+    "cache_hit_ratio": 0.9999780115287427,
+    "hot_phase_count": 4,
+    "hot_phases": [
+      "triage",
+      "premise-challenge",
+      "tdd",
+      "behavior-baseline"
+    ]
+  }
+}
