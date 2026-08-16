@@ -48,7 +48,7 @@ func TestDispositionSeed_BindsGateSemantics(t *testing.T) {
 	core.SeedDispositionSkeleton(ws, root, 1425)
 
 	req := core.PhaseRequest{ProjectRoot: root, Workspace: ws}
-	diags, blocking := reconcileContinuationDefects(req)
+	diags, blocking, _ := reconcileContinuationDefects(req)
 	if !blocking {
 		t.Fatal("an untouched skeleton PASSED the gate — the seed laundered the inherited defects")
 	}
