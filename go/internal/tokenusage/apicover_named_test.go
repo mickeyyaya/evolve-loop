@@ -41,6 +41,16 @@ func TestResultPeakPromptTokensNamed(t *testing.T) {
 	}
 }
 
+// TestResultPeakUsageNamed pins Result.PeakUsage as the component-level
+// companion to PeakPromptTokens: both describe the same fullest observed turn.
+func TestResultPeakUsageNamed(t *testing.T) {
+	peak := cyclestate.TokenUsage{Input: 200, CacheRead: 6_800}
+	r := Result{Usage: cyclestate.TokenUsage{Input: 1_200, CacheRead: 7_800}, PeakUsage: peak}
+	if r.PeakUsage != peak {
+		t.Fatalf("PeakUsage = %+v, want %+v", r.PeakUsage, peak)
+	}
+}
+
 // TestCollectorTypeNamed pins the exported Collector type (apicover requires
 // every exported type be named in a test). It also asserts a bare func literal
 // satisfies Collector and the chain runs it — the load-bearing property is that

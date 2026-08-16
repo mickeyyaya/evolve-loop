@@ -699,7 +699,11 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 	// above, so this costs no second measurement. Keyed on a distinct
 	// CONTEXT-FILL marker because the coverage WARN above already names the
 	// agent — an agent-name-only grep could not tell the two lines apart.
-	if w := tokenusage.FillWarn(req.Agent, result.FillPct, defaultIfZero(e.deps.ContextFillWarnPct, defaultContextFillWarnPct)); w != "" {
+	contributors := result.Usage
+	if result.PeakPromptTokens != 0 {
+		contributors = result.PeakUsage
+	}
+	if w := tokenusage.FillWarnWithContributors(req.Agent, result.FillPct, defaultIfZero(e.deps.ContextFillWarnPct, defaultContextFillWarnPct), contributors); w != "" {
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: CONTEXT-FILL %s\n", w)
 	}
 	// Telemetry tripwire (cycle-1005): the generic coverage WARN above fires on

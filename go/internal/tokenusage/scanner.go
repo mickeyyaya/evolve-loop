@@ -78,12 +78,15 @@ type Window struct {
 // observed no per-turn breakdown (events/scrollback report one whole-launch
 // envelope, which is already a single reading); negative means turns were
 // expected but none was observed, which degrades the fill to the sentinel.
+// PeakUsage carries that same turn's component counters so a fill warning can
+// name contributors without mixing a single-turn percentage with launch totals.
 type Result struct {
 	Usage            cyclestate.TokenUsage
 	Source           Source
 	Warn             string
 	FillPct          float64
 	PeakPromptTokens int
+	PeakUsage        cyclestate.TokenUsage
 }
 
 // transcriptLine is the subset of a Claude Code transcript JSONL record the
@@ -164,6 +167,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	// accumulates, so the two coincide on real transcripts.
 	var total cyclestate.TokenUsage
 	peak := promptTokensUnmeasured
+	var peakUsage cyclestate.TokenUsage
 	for _, u := range perMsg {
 		total.Input += u.Input
 		total.Output += u.Output
@@ -171,9 +175,10 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 		total.CacheWrite += u.CacheWrite
 		if p := PromptTokens(u); p > peak {
 			peak = p
+			peakUsage = u
 		}
 	}
-	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak}, nil
+	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage}, nil
 }
 
 // readLines parses a transcript file into its records, silently skipping

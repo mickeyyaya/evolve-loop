@@ -14,6 +14,9 @@ package tokenusage
 import (
 	"fmt"
 	"math"
+	"sort"
+	"strings"
+	"unicode"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
@@ -83,11 +86,17 @@ func windowOccupancy(r Result) int {
 // EffectiveWindow returns the effective context window for a driver family, or
 // 0 when the family has no measured window. Empty means claude, matching
 // isClaudeDriver — the window table must not disagree with the collector
-// dispatch about who is a claude launch. Families whose real window nobody has
-// measured (codex, agy, ollama, anything unknown) return 0 on purpose, which
+// dispatch about who is a claude launch. Codex and agy have documented
+// advertised windows, so their exact production identities use the same
+// conservative 200K effective window as Claude. Families whose real window
+// nobody has measured (ollama, anything unknown) return 0 on purpose, which
 // degrades FillPct to the sentinel rather than to a guess.
 func EffectiveWindow(driver string) int {
 	if isClaudeDriver(driver) {
+		return claudeEffectiveWindow
+	}
+	switch driver {
+	case "codex", "codex-tmux", "agy", "agy-tmux":
 		return claudeEffectiveWindow
 	}
 	return 0
@@ -123,4 +132,48 @@ func FillWarn(phase string, pct float64, thresholdPct int) string {
 		return ""
 	}
 	return fmt.Sprintf("context fill %.1f%% for phase %s exceeds the %d%% warn threshold — this launch is close to compaction", pct, phase, thresholdPct)
+}
+
+// FillWarnWithContributors adds an ordered prompt-side breakdown to a fill
+// warning. Missing or invalid contributor data leaves the base warning intact;
+// output tokens are excluded because they do not occupy the prompt window.
+func FillWarnWithContributors(phase string, pct float64, thresholdPct int, usage cyclestate.TokenUsage) string {
+	phase = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, phase)
+	base := FillWarn(phase, pct, thresholdPct)
+	if base == "" {
+		return ""
+	}
+
+	contributors := []struct {
+		name  string
+		value int
+	}{
+		{"input", usage.Input},
+		{"cache_read", usage.CacheRead},
+		{"cache_write", usage.CacheWrite},
+	}
+	for _, contributor := range contributors {
+		if contributor.value < 0 {
+			return base
+		}
+	}
+	sort.SliceStable(contributors, func(i, j int) bool {
+		return contributors[i].value > contributors[j].value
+	})
+
+	parts := make([]string, 0, len(contributors))
+	for _, contributor := range contributors {
+		if contributor.value > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d", contributor.name, contributor.value))
+		}
+	}
+	if len(parts) == 0 {
+		return base
+	}
+	return base + "; contributors (largest first): " + strings.Join(parts, ", ")
 }
