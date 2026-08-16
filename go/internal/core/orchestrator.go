@@ -441,6 +441,11 @@ type Orchestrator struct {
 	// no-op. Set via WithThroughputRecorder.
 	throughputRecorder ThroughputRecorder
 
+	// verdictCacheLookupHook, if non-nil, is invoked during the verdict-cache lookup
+	// phase of RunCycle, letting tests verify whether the cache was queried, skipped,
+	// or matched.
+	verdictCacheLookupHook func(sha string, skipped bool, matched bool, entry verdictcache.Entry)
+
 	// currentRunID holds the in-flight run's ULID (CA.5) as a string; the
 	// construction-time stampingLedger reads it atomically on every Append.
 	// Empty ⇒ no run in flight ⇒ entries are not stamped.
@@ -710,6 +715,13 @@ func WithGitDirtyPaths(fn func(ctx context.Context, repoRoot string) ([]string, 
 	}
 }
 
+// WithVerdictCacheLookupHook registers a hook that is called when the verdict cache is checked.
+func WithVerdictCacheLookupHook(fn func(sha string, skipped bool, matched bool, entry verdictcache.Entry)) Option {
+	return func(o *Orchestrator) {
+		o.verdictCacheLookupHook = fn
+	}
+}
+
 // NewOrchestrator wires the orchestrator with its dependencies. Routing stays
 // off unless a WithRouting option supplies an enabled-stage config.
 // HasRunner reports whether a PhaseRunner is registered for p. It is the
@@ -891,8 +903,22 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// is an enforce-stage decision, deliberately out of the shadow increment.
 	if cr.cs.ActiveWorktree != "" {
 		if sha := worktreeContentSHA(ctx, cr.cs.ActiveWorktree); sha != "" {
-			if e, ok := verdictcache.NewStore(req.ProjectRoot, o.now).Lookup(sha); ok {
-				fmt.Fprintf(os.Stderr, "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
+			baseTree := worktreeBaseTreeSHA(ctx, cr.cs.ActiveWorktree, cr.cs.WorktreeBaseSHA)
+			if !verdictcache.ProbeEligible(baseTree, sha) {
+				// Untouched/fresh worktree (no changes compared to the base commit),
+				// skip verdict-cache lookup to prevent fresh-base collisions. The
+				// decision is the shared predicate's, never a local copy of it.
+				if o.verdictCacheLookupHook != nil {
+					o.verdictCacheLookupHook(sha, true, false, verdictcache.Entry{})
+				}
+			} else {
+				e, ok := verdictcache.NewStore(req.ProjectRoot, o.now).Lookup(sha)
+				if o.verdictCacheLookupHook != nil {
+					o.verdictCacheLookupHook(sha, false, ok, e)
+				}
+				if ok {
+					fmt.Fprintf(os.Stderr, "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
+				}
 			}
 		}
 	}

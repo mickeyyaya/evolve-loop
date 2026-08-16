@@ -86,6 +86,29 @@ so a lost/corrupt cache only costs time, never correctness (same degradation con
 > where actually *skipping* phases on a match warrants the stronger key; enforce also adds the
 > `EVOLVE_VERDICT_CACHE` (`off`/`shadow`/`enforce`, default `shadow`) dial per ADR-0046 discipline.
 
+> **Fresh-base collision guard (2026-08-16, cycle 1488 — `verdictcache.ProbeEligible`):** keying
+> on `worktree_tree_sha` alone has a degenerate case the shadow probe hit in production. A cycle's
+> worktree starts as a clean checkout of its base commit, so its `write-tree` identity is *not
+> unique to the cycle* — every sibling fleet lane cut from the same base computes the SAME tree
+> SHA before any work runs. The pre-loop probe therefore matched verdicts audited by unrelated
+> lanes and logged "would skip tdd/build/audit" (four contaminated shadow matches, inbox item
+> `verdict-cache-fresh-base-collision`). Under the enforce stage those matches would skip real
+> work on unaudited content — a correctness break, not a lost-time one — so the guard is a
+> precondition for enforce, not a shadow-stage nicety.
+>
+> The rule: a candidate tree identity is cache-eligible only when it is non-empty **and** differs
+> from a *resolved* base tree identity; an unresolvable base leaves the candidate eligible
+> (absence of a base identity is not evidence of freshness, and that pre-guard behaviour is
+> deliberately frozen). It is exported as the single deterministic predicate
+> **`verdictcache.ProbeEligible(baseTreeSHA, candidateTreeSHA)`**, and BOTH production call sites
+> derive their decision from it rather than carrying a private copy of the comparison: the
+> pre-loop shadow probe in `RunCycle` (`internal/core/orchestrator.go`) gates its `Lookup`, and
+> the audit-binding projection in `recordAuditBinding` (`internal/core/phase_bindings.go`) gates
+> its `Put` — so a fresh base is never *written* either, and the two sites cannot drift. The
+> enforce-stage lookup inherits one predicate to reuse. `inputs_digest` (above) remains the
+> deferred refinement; `ProbeEligible` is the part of that stronger key the existing identity can
+> express today.
+
 ### Slice C — Resilient ship (all-or-nothing)
 
 Make the commit→verify→push sequence transactional. Two options; **recommend C1**:
