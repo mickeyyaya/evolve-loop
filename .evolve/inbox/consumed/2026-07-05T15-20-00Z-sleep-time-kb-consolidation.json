@@ -32,5 +32,17 @@
     "cycle": "1494",
     "verdict": "WARN",
     "resolution": "Deliverable LANDED in cycle ship 4f133efe (14 files: faillearn novelty + policy + eval + predicates) with acs WARN red_count=0; #466 consumption skipped by its PASS-only gate (see warn-ship-consumption-gap 0.82). Consumed console-side so main stops offering landed work. Patch backup of the worktree residuals: ~/ai/claude/backups/cycle-1494-sleep-time-kb-consolidation-20260816.patch."
-  }
+  },
+  "released_continuations": [
+    {
+      "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1497",
+      "branch": "cycle-42824668-1497",
+      "snapshot_sha": "f41e33739ef1eb88434c2d86252340e98e6f1cab",
+      "base_sha": "e83baa31af4dd6d9f00bc06819e4c75d2bc3ed70",
+      "findings_path": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1497/audit-fail-reason.json",
+      "cycle": 1497,
+      "released_at": "2026-08-16T21:20:00Z",
+      "released_because": "CONSUMED scope re-dispatched by registry (cycle-1497 burn, batch-20260816d) \u2014 my boundary consumption released parked-item bindings but missed this one; the 0.86 item adoption-guard leg is exactly this. Binding released post-close under flock."
+    }
+  ]
 }

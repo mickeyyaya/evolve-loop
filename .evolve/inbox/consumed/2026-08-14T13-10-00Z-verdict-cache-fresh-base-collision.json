@@ -18,5 +18,27 @@
   "notes": "Live evidence 2026-08-14 batch (cycles 1457-1460+): shadow lines matched cycle=1457 PASS then cycle=1459 WARN for FOUR different lanes including one whose inbox item was created minutes earlier \u2014 impossible as genuine re-land. Would-skip under enforce = skipping tdd/build/audit on fresh unbuilt cycles with a stale verdict. | LIVE DOUBLE EVIDENCE batch-20260815c wave-1: BOTH sibling fresh worktrees (worktree-retry-diagnostic-integrity + context-fill-telemetry-and-cap) logged [verdict-cache SHADOW] tree_sha=6c73f03e6500... matched cycle=1477 verdict=PASS \"would skip tdd/build/audit\" \u2014 two unbuilt fresh bases matching a prior PASS in one wave. Confirms enforce (ADR-0048 Slice B) MUST NOT flip until the probe excludes pre-build base trees (e.g. only match post-build tree_sha, or key on base_sha+diff_sha). | 2026-08-16 cycle-1492 retry: product predicates C1492_* ALL GREEN \u2014 sole red is the INHERITED C1488_003 (inverted oracle, unsatisfiable on any tree). NEXT ADOPTION: fix that one predicate FIRST (plain Go negation: read file, assert !strings.Contains \u2014 no new primitive needed), then the cycle ships on existing work.",
   "summary": "verdict-cache shadow matches are fresh-base collisions: pre-build probe on an untouched worktree matches every sibling cycle from the same main tip. The shadow soak's would-reuse data is contaminated; enforce would skip the pipeline spine on fresh cycles.",
   "title": "ADR-0048 verdict-cache: pre-build probe collides on the unchanged base tree \u2014 enforce would reuse stale verdicts for unbuilt cycles",
-  "weight": 0.88
+  "weight": 0.88,
+  "parked": {
+    "at": "2026-08-16T22:30:00Z",
+    "via": "console-salvage-pending",
+    "reason": "THREE deterministic burns (1488, 1492, 1495) on the same inherited defect: TestC1488_003 inverted oracle (FileContains used for an absence assertion) \u2014 attempt 3 had ALL FIVE of its own predicates green plus a second cascading red (TestC1492_003 meta-predicate asserting suite-green, unsatisfiable while its sibling is red). Each retry builds new work and never repairs the anchor. SALVAGE RECIPE: adopt worktree from cycle-1495 snapshot; (1) fix go/acs/cycle1488/predicates_test.go:113 \u2014 invert the oracle (read file, assert NOT contains); (2) re-check TestC1492_003 goes green by cascade; (3) run lane suite + full bar; ship. The product work is done and green \u2014 this is a ten-line test repair away from landing."
+  },
+  "released_continuations": [
+    {
+      "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1495",
+      "branch": "cycle-42824668-1495",
+      "snapshot_sha": "893a8e909c0d53ba207045079ad5f4be795ed38f",
+      "base_sha": "e83baa31af4dd6d9f00bc06819e4c75d2bc3ed70",
+      "findings_path": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1495/audit-fail-reason.json",
+      "cycle": 1495,
+      "released_at": "2026-08-16T22:30:00Z",
+      "released_because": "parked for console salvage; planner must not re-mint"
+    }
+  ],
+  "consumed": {
+    "at": "2026-08-17T00:30:00Z",
+    "via": "console-salvage",
+    "resolution": "LANDED as PR #470 (e36604e7): ProbeEligible shared predicate at both call sites; three-burn oracle anchor repaired (FileNotContains); salvage-review HIGH-1 Put-site base-operand fix (CycleState.WorktreeBaseSHA threaded, write-side fail-closed) with red-first TestAuditBindingPut_* trio. Four lane attempts (1485/1488/1492/1495) salvaged into one landing."
+  }
 }
