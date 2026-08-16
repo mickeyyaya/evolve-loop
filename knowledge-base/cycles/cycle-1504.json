@@ -1,0 +1,105 @@
+{
+  "cycle": 1504,
+  "run_id": "01M05P5A0NGBFDG6VDRZ1PBMXZ",
+  "goal": "Optimize per-agent token usage across all phase agents (Scout, Builder, Auditor, orchestrator, and supporting agents): trim verbose agent prompts, cut redundant context/artifact injection, and tighten report sizes so the pipeline is more stable (fewer context-limit and quota failures) and faster per cycle. Preserve every phase-integrity guarantee and gate behavior.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 13101,
+      "started_at": "2026-08-16T16:24:47Z",
+      "ended_at": "2026-08-16T16:37:42Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 305493,
+      "started_at": "2026-08-16T16:37:42Z",
+      "ended_at": "2026-08-16T16:42:47Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 42,
+        "output": 21771,
+        "cache_read": 1589311,
+        "cache_write": 80086
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "scout|gate-block|7cee1f4bb446",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"scout\" deliverable rejected after 2 correction(s): scout did not materialize evals for selected slug(s): tokenopt-bounded-build-plan-digest, tokenopt-phase-edge-handoff-policy"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1504",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 318594,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "retro",
+    "longest_ms": 305493,
+    "by_archetype_ms": {
+      "control": 305493,
+      "plan": 13101
+    },
+    "total_tokens": {
+      "input": 42,
+      "output": 21771,
+      "cache_read": 1589311,
+      "cache_write": 80086
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 42,
+        "output": 21771,
+        "cache_read": 1589311,
+        "cache_write": 80086
+      },
+      "plan": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 42,
+      "output": 21771,
+      "cache_read": 1589311,
+      "cache_write": 80086
+    },
+    "cache_hit_ratio": 0.9999735741525011,
+    "hot_phase_count": 0
+  }
+}
