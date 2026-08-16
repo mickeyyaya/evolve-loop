@@ -1,0 +1,30 @@
+{
+  "id": "park-consume-releases-continuation-binding",
+  "kind": "bug",
+  "title": "Quarantining an inbox item does NOT release its continuation-registry binding \u2014 adopted continuations re-dispatch parked/consumed scopes forever; plus no operator command exists for registry lifecycle",
+  "summary": "Live burn (batch-20260816b cycle-1487): context-fill-telemetry-and-cap was parked out of .evolve/inbox (tracked deletion shipped d3c69cd2) after 2 lane burns \u2014 yet the next wave dispatched it ANYWAY as an ADOPTED continuation from continuation-registry.json (cycle-1484's binding), burned a 3rd full lane on the same deterministic test collision, and RE-REGISTERED itself (9813bc621fe4) for a 4th. The dispatch pool is TWO stores \u2014 inbox items and scope-keyed continuation bindings \u2014 and quarantine only touched one. Console had to hand-edit the registry under its flock sidecar because no evolve command manages it. CORRECTED third observation: during the cycle-1493 halt, sibling lane cycle-1494 initially LOOKED unpreserved (no binding, uncommitted worktree) but in fact DRAINED to PASS and shipped 4f133efe \u2014 the halt stops new dispatch, live lanes drain. No halt-path preservation defect demonstrated; the transient console misread is recorded so the drain semantics are known: mid-drain state inspection is unreliable evidence of orphaning.",
+  "root_cause": "Registry lifecycle is one-sided: WriteRegistryEntry runs at every abnormal cycle end, DeleteRegistryEntry exists (added for the 2026-08-10 immortal-entries stall) but nothing invokes it when an item leaves the pending pool (consumed, parked, superseded). The adopted-continuation path checks only the registry, not whether the scope id still has a live inbox item \u2014 so any scope whose item is retired keeps re-spawning lanes from its preserved snapshot.",
+  "fix": "(1) Transactional retire: wherever an item leaves the pending pool (ship-time consumption in phases/ship/consume.go, inbox-mover promote/park paths), call continuation.DeleteRegistryEntry for the item id \u2014 preserving the binding VALUE into the item file (released_continuations[] annotation, as done manually 2026-08-16) so salvage pointers survive. (2) Adoption guard (belt): before adopting a continuation, verify the scope id resolves to a live pending item; a miss logs and releases the binding instead of dispatching. (3) Operator surface: `evolve continuation list` + `evolve continuation release <scope-id>` using the existing package functions (registry.go) under the flock convention \u2014 console should never flock-edit JSON by hand. Red-first: fixture where a scope is parked then a wave plans \u2014 adopted-continuation dispatch must NOT occur; binding is released with the annotation.",
+  "files": [
+    "go/internal/continuation/registry.go (Delete exists, uncalled from lifecycle paths)",
+    "go/internal/phases/ship/consume.go (consumption must also release the binding)",
+    "go/internal/inboxmover/ (park/promote paths)",
+    "go/cmd/evolve/ (new continuation subcommand)"
+  ],
+  "acceptance": [
+    "Parking or consuming an item releases its registry binding in the same operation, with the binding value preserved into the item file (no pointer loss).",
+    "Adoption path refuses a binding whose scope id has no live pending item (logged, binding released) \u2014 red-first on the cycle-1487 shape.",
+    "evolve continuation list/release work under the flock sidecar; release annotates the item file.",
+    "go vet + touched suites + -race green; wiring proof at all lifecycle call sites."
+  ],
+  "connects_to": [
+    "PR #466 transactional inbox consumption (same disease one store over: lifecycle acts must be transactional with ALL dispatch-relevant state)",
+    "2026-08-10 immortal-registry-entries stall (DeleteRegistryEntry's origin; this closes its remaining unreachable half)",
+    "carryover-lane-retirement-verifiableby 0.88 (third sibling: three independent dispatch sources \u2014 inbox, carryovers, continuations \u2014 each needs a retirement check)",
+    "batch-20260816b log cycle-1487 (live evidence, burn #3)"
+  ],
+  "priority": "high",
+  "weight": 0.86,
+  "created_at": "2026-08-16T15:10:00Z",
+  "notes": "Filed after console-side manual remediation: bindings for context-fill-telemetry-and-cap (cycle-1487), minted-phase-verdict-contract-unsatisfiable (1483), dead-api-sweep (1483) released under the registry flock, pointers preserved in the item files. The pattern to generalize: the pending pool has THREE dispatch sources and every retirement path must retire from all of them."
+}

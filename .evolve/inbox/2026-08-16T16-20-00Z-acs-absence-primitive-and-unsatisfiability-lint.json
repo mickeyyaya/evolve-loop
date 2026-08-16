@@ -1,0 +1,28 @@
+{
+  "id": "acs-absence-primitive-and-unsatisfiability-lint",
+  "kind": "bug",
+  "title": "ACS predicate DSL: no absence primitive, and the eval-quality lint cannot flag unsatisfiable-by-construction predicates (positive primitive asserting an absence)",
+  "summary": "Cycle-1488 (batch-20260816b) FAILed on its own TDD-authored predicate TestC1488_003: FileContains(phase_bindings.go, 'worktreeTree == headTree') written to assert the string is ABSENT \u2014 a positive primitive for an absence claim, red in every possible tree state. The lane burned a full spine proving an unsatisfiable acceptance. SECOND instance of the self-authored-unsatisfiable-contract family (first: cycle-1480/1483 minted KindJSON contract demanding pure-JSON AND a sentinel tail \u2014 see minted-phase-verdict-contract-unsatisfiable, parked). SECOND burn: cycle-1492 (the retry) inherited the same unrepaired predicate and red-counted on it despite all-new-work-green \u2014 one unsatisfiable predicate has now cost two full lanes.",
+  "root_cause": "The predicate DSL offers positive primitives (FileContains) with no first-class negation, so absence assertions get mis-encoded; and the eval-quality/flaky-shape pre-flight has no unsatisfiability check \u2014 a predicate that cannot green under ANY tree state passes authoring review and is only discovered by burning the cycle.",
+  "fix": "(1) Add the absence primitive (FileNotContains or a Negate combinator) to the ACS predicate vocabulary \u2014 smallest change that lets authors say what they mean. (2) Extend the eval-quality pre-flight with an unsatisfiability lint: for each authored predicate, detect the positive-primitive-with-absence-intent shape (e.g. the failure detail text or expectation naming 'missing'/'absent'/'not contain' while using a Contains-family primitive) and WARN/BLOCK at authoring time, before dispatch. (3) Regression: the exact TestC1488_003 shape red-first through the lint.",
+  "files": [
+    "go/internal/acssuite/ (predicate primitives)",
+    "go/internal/evalquality/ (pre-flight lint)",
+    ".evolve/runs/cycle-1488/acs-verdict.json (live evidence: red predicate detail names the class verbatim)"
+  ],
+  "acceptance": [
+    "An absence assertion is expressible directly (FileNotContains/Negate) with table-driven tests.",
+    "The eval-quality pre-flight flags the cycle-1488 shape (positive primitive + absence wording) before dispatch \u2014 red-first on the live predicate bytes.",
+    "Existing predicate corpus sweeps clean or violations enumerated (no silent caps).",
+    "go vet + touched suites + -race green."
+  ],
+  "connects_to": [
+    "minted-phase-verdict-contract-unsatisfiable (parked): the sibling unsatisfiable-contract instance \u2014 one family, two authoring surfaces (deliverable contracts, ACS predicates)",
+    "eval-quality pre-flight (guardrail 7): this is its missing check",
+    "cycle-1488 breaker halt (batch-20260816b): the burn that named the class"
+  ],
+  "priority": "high",
+  "weight": 0.8,
+  "created_at": "2026-08-16T16:20:00Z",
+  "notes": "Filed during the mandated 3-consecutive-FAIL deep-dive. The verdict-cache item itself (0.88) remains pending with its cycle-1488 continuation \u2014 its product code may be fine; the red was the predicate's encoding, so the retry should re-author the predicate with the correct primitive once available (or with inverted logic meanwhile)."
+}

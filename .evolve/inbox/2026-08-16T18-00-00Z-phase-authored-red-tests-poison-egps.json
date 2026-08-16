@@ -1,0 +1,30 @@
+{
+  "id": "phase-authored-red-tests-poison-egps",
+  "kind": "bug",
+  "title": "A pipeline phase's self-FAILed test artifact left in go/acs/cycle-N red-counts an innocent green cycle — EGPS has no authorship/retraction model for phase-authored ship-blocking evidence",
+  "summary": "Cycle-1493 (batch-20260816c): audit marked every acceptance criterion PASS with executed evidence; acs green_count=11. The SOLE red was TestAmplified_Cycle1493PredicatesAreDiscovered — authored by the test-amplification PHASE (not the builder) into go/acs/cycle1493/, with a $-anchored -run regex that cannot match this repo's suffixed predicate names (guaranteed '[no tests to run]' -> guaranteed red). The phase self-verdicted FAIL at 14:11; nothing between it and audit at 14:44 could repair or retract the artifact; EGPS red_count=1 FAILed the cycle; orchestrator classified infra-systemic and halted the batch. Prompt-side mitigations landed same-day (persona: never write into go/acs/cycle*/, never $-anchor -run, retract self-broken tests) but prompt guidance is not a guarantee.",
+  "root_cause": "EGPS treats every red under go/acs/cycle-N as ship-blocking evidence regardless of author. There is no deterministic retraction path when the authoring phase itself verdicts FAIL on its own artifact, and no attribution distinguishing 'amplified test caught an implementation defect' (legitimate red) from 'amplified test is itself broken' (manufactured red).",
+  "fix": "DESIGN TASK — ultrathink + strong review required (architecture change touching the ship-eligibility floor; per ultrathink_architecture_strong_review). Candidate designs to weigh, each with an anti-gaming analysis: (a) deterministic quarantine: when a phase whose contract declares test-authoring self-verdicts FAIL, the orchestrator moves that phase's written test files aside (logged, preserved) before the acs run — narrow, but requires reliable authorship tracking (the phase's written-file set from its Write audit trail, not its self-report); (b) authorship partition: phase-authored tests live in a separate build-tagged package counted by a WARN-level gate instead of the EGPS red floor — preserves signal without ship-blocking power; (c) status quo + orchestrator floor (current): the infra-systemic classifier catches it POST-burn — works, but costs a full lane + batch halt per occurrence. CRITICAL anti-gaming constraint: any weakening of 'red under go/acs blocks ship' must not create a laundering path where builder-influenced work routes its red tests through phase-authored channels — the adversarial-audit separation (different agent, different CLI) is the existing mitigation to preserve.",
+  "files": [
+    "go/internal/acssuite/ (red-count floor)",
+    "go/internal/core/ (phase finalize — where a quarantine hook would live; Write-audit authorship trail)",
+    ".evolve/runs/cycle-1493/{test-amplification-report.md,acs-verdict.json,audit-report.md} + pipeline-escalation archived evidence (live incident)",
+    "agents/evolve-test-amplification.md (prompt-side mitigations already landed — the belt, not the fix)"
+  ],
+  "acceptance": [
+    "A phase that self-verdicts FAIL on its own authored test cannot red an otherwise-green cycle (whichever design wins) — red-first fixture reproducing the cycle-1493 shape.",
+    "A phase-authored test that legitimately catches an implementation defect STILL blocks ship (the signal is preserved) — twin fixture.",
+    "Anti-gaming: builder-authored reds cannot be laundered through the phase-authored path — adversarial test or design argument recorded in the ADR.",
+    "ADR written (architecture change); go vet + suites + -race green; wiring proof."
+  ],
+  "connects_to": [
+    "cycle-1493 infra-systemic halt (live evidence, batch-20260816c)",
+    "acs-absence-primitive-and-unsatisfiability-lint 0.8 (sibling authoring-quality fix: lint unsatisfiable predicates at authoring time)",
+    "proxy-as-verdict findings ledger (family: derived signals acquiring verdict power without provenance)",
+    "ADR-0088 chain-of-reasoning + adversarial-audit separation (the anti-gaming property any design must preserve)"
+  ],
+  "priority": "high",
+  "weight": 0.87,
+  "created_at": "2026-08-16T18:00:00Z",
+  "notes": "Filed during the cycle-1493 console-first response. The closure-claim matcher false-positive from the same halt is FIXED (hyphen-compound + path-ref carve-outs, red-first on the live line 36 bytes); this item is the remaining structural half. Do NOT rush this through a lane — the ship-floor is the one surface where a wrong 'fix' weakens the whole anti-gaming stack."
+}

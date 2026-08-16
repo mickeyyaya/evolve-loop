@@ -35,5 +35,17 @@
   "root_cause": "Features landed dormant or were superseded without a removal pass; the apicover gate then forces name-tests for exports nobody calls, compounding maintenance cost.",
   "summary": "golang.org/x/tools deadcode from the ./cmd/evolve entrypoint reports 186 unreachable funcs; ~168 after excluding legitimate test seams (Fake*, withHooks, ForTesting). Clusters: bridge/channel/supervisor.go (whole Supervisor: Ask/awaitReply/collectSpan...), core/phase_judge.go (PlanJudge \u2014 known unwired), deliverable NewReviewer*/NewVerifier* constructor variants, checkpoint ComposeChecked/ApplyToStateFile/RecordPhaseIntegrity, adapters/sandbox GenerateBwrapArgv/New/Exec, core WithMaxPhaseIterations/WithWorktreeProvisioner/ApplyDefectsAsCarryoverTodos, cyclecost.ParseEventsLog (superseded by sidecar-preferred S7), changedpkgs.FromGit, verdict helpers. Full list preserved in the scan session; regenerate with: ~/go/bin/deadcode ./cmd/evolve (run in go/).",
   "title": "deadcode analysis: ~168 non-test-seam functions unreachable from cmd/evolve \u2014 including whole dormant subsystems (bridge/channel Supervisor, core PlanJudge, deliverable constructor family, checkpoint appliers, sandbox bwrap) each carrying permanent apicover test tax",
-  "weight": 0.68
+  "weight": 0.68,
+  "released_continuations": [
+    {
+      "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1483",
+      "branch": "cycle-42824668-1483",
+      "snapshot_sha": "2638093383c1c9759783e231425ca66cc35deb92",
+      "base_sha": "d7ec21c70c9bc07f96d500704f6a0522924dc05d",
+      "findings_path": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1483/audit-fail-reason.json",
+      "cycle": 1483,
+      "released_at": "2026-08-16T15:05:00Z",
+      "released_because": "binding removed from continuation-registry so the adopted-continuation path stops re-dispatching this scope (parked items kept burning via registry despite inbox removal \u2014 see batch-20260816b cycle-1487 burn #3)"
+    }
+  ]
 }
