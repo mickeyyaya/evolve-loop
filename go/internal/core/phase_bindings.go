@@ -18,11 +18,12 @@ import (
 
 func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, projectRoot string, cs CycleState, phase Phase, verdict string) {
 	in := bindingInputs{
-		cycle:       cycle,
-		projectRoot: projectRoot,
-		workspace:   cs.WorkspacePath,
-		worktree:    cs.ActiveWorktree,
-		verdict:     verdict,
+		cycle:        cycle,
+		projectRoot:  projectRoot,
+		workspace:    cs.WorkspacePath,
+		worktree:     cs.ActiveWorktree,
+		worktreeBase: cs.WorktreeBaseSHA,
+		verdict:      verdict,
 	}
 	switch {
 	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN):
@@ -65,6 +66,13 @@ type bindingInputs struct {
 	projectRoot string
 	workspace   string
 	worktree    string
+	// worktreeBase is the worktree's own base commit (CycleState.WorktreeBaseSHA)
+	// — the ONLY correct operand for the Put-site fresh-base guard. projectRoot
+	// HEAD at audit time diverges under fleet concurrency (a sibling ship
+	// advances main mid-cycle to a commit the lane worktree may not contain),
+	// which either mismatches the operands or fails the resolution open and
+	// re-admits the shared fresh-base cache write ADR-0048 exists to prevent.
+	worktreeBase string
 	// verdict is consumed only by the audit recorder (verdict→exit_code: WARN→1);
 	// build and generic bindings always record exit_code 0.
 	verdict string
@@ -82,7 +90,7 @@ type bindingInputs struct {
 func (o *Orchestrator) recordPhaseBinding(ctx context.Context, phase Phase, in bindingInputs) {
 	switch phase {
 	case PhaseAudit:
-		o.recordAuditBinding(ctx, in.cycle, in.projectRoot, in.workspace, in.worktree, in.verdict)
+		o.recordAuditBinding(ctx, in.cycle, in.projectRoot, in.workspace, in.worktree, in.worktreeBase, in.verdict)
 	case PhaseBuild:
 		o.recordBuildBinding(ctx, in.cycle, in.projectRoot, in.workspace)
 	default:
@@ -100,7 +108,7 @@ func (o *Orchestrator) recordPhaseBinding(ctx context.Context, phase Phase, in b
 // ship's computeTreeStateSHA so the bind matches. Best-effort: a failure WARNs
 // and is swallowed; ship then fails loudly on the missing/stale binding rather
 // than shipping unbound.
-func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, verdict string) {
+func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, worktreeBase, verdict string) {
 	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
@@ -157,14 +165,38 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// Best-effort + advisory: an empty key (no worktree content identity) or a
 	// write failure never blocks the cycle — a future lookup miss just costs a
 	// full re-run.
-	if err := verdictcache.NewStore(projectRoot, o.now).Put(verdictcache.Entry{
-		TreeSHA:        worktreeTree,
-		Cycle:          cycle,
-		Verdict:        verdict,
-		ArtifactSHA256: hex.EncodeToString(artSum[:]),
-		ArtifactPath:   artPath,
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put: %v\n", err)
+	//
+	// The fresh-base guard is the SAME predicate the pre-loop shadow probe reads
+	// (verdictcache.ProbeEligible), fed the SAME base operand: the worktree's
+	// own base commit, never projectRoot HEAD at audit time (salvage-review
+	// HIGH-1 — a sibling ship advancing main mid-cycle diverged the operands
+	// and re-admitted the shared fresh-base write). An untouched worktree's
+	// tree identity is shared by every sibling lane at that base, so recording
+	// under it would contaminate their lookups.
+	//
+	// Write-side fail-CLOSED, deliberately asymmetric with the read side's
+	// fail-open: a skipped Lookup costs one shadow log line, but a poisoned
+	// Put sits in the shared store for every future consumer. No base
+	// identity ⇒ no cache write.
+	if worktreeBase == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put skipped (cycle %d): no worktree base identity\n", cycle)
+		return
+	}
+	baseTree := worktreeBaseTreeSHA(ctx, worktree, worktreeBase)
+	if baseTree == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put skipped (cycle %d): worktree base %s did not resolve to a tree\n", cycle, worktreeBase)
+		return
+	}
+	if verdictcache.ProbeEligible(baseTree, worktreeTree) {
+		if err := verdictcache.NewStore(projectRoot, o.now).Put(verdictcache.Entry{
+			TreeSHA:        worktreeTree,
+			Cycle:          cycle,
+			Verdict:        verdict,
+			ArtifactSHA256: hex.EncodeToString(artSum[:]),
+			ArtifactPath:   artPath,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put: %v\n", err)
+		}
 	}
 }
 
@@ -186,6 +218,25 @@ func worktreeContentSHA(ctx context.Context, worktree string) string {
 	wt, code, werr := gitCapture(ctx, worktree, "write-tree")
 	if werr != nil || code != 0 {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git write-tree failed (rc=%d): %v\n", code, werr)
+		return ""
+	}
+	return strings.TrimSpace(wt)
+}
+
+// worktreeBaseTreeSHA resolves the tree SHA of the base commit for the worktree.
+// If baseCommit is empty, it falls back to resolving HEAD^{tree}.
+// Returns "" on error.
+func worktreeBaseTreeSHA(ctx context.Context, worktree, baseCommit string) string {
+	if worktree == "" {
+		return ""
+	}
+	ref := "HEAD"
+	if baseCommit != "" {
+		ref = strings.TrimSpace(baseCommit)
+	}
+	wt, code, err := gitCapture(ctx, worktree, "rev-parse", ref+"^{tree}")
+	if err != nil || code != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree base tree SHA: git rev-parse failed (rc=%d): %v\n", code, err)
 		return ""
 	}
 	return strings.TrimSpace(wt)

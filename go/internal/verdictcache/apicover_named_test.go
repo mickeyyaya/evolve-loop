@@ -2,6 +2,31 @@ package verdictcache
 
 import "testing"
 
+// TestProbeEligible_FreshBaseGuard names verdictcache.ProbeEligible and pins the
+// shared fresh-base guard both production call sites (the ADR-0048 shadow probe
+// and the audit-binding Put) route through: only a candidate that carries a
+// content identity distinct from a RESOLVED base is cache-eligible, while an
+// unresolvable base leaves the candidate eligible (frozen pre-guard behaviour).
+func TestProbeEligible_FreshBaseGuard(t *testing.T) {
+	cases := []struct {
+		name      string
+		base      string
+		candidate string
+		want      bool
+	}{
+		{name: "fresh worktree equals base", base: "tree-aaa", candidate: "tree-aaa", want: false},
+		{name: "empty candidate has no identity", base: "tree-aaa", candidate: "", want: false},
+		{name: "both identities empty", base: "", candidate: "", want: false},
+		{name: "changed worktree", base: "tree-aaa", candidate: "tree-bbb", want: true},
+		{name: "unresolvable base stays eligible", base: "", candidate: "tree-bbb", want: true},
+	}
+	for _, tc := range cases {
+		if got := ProbeEligible(tc.base, tc.candidate); got != tc.want {
+			t.Errorf("%s: ProbeEligible(%q, %q) = %t, want %t", tc.name, tc.base, tc.candidate, got, tc.want)
+		}
+	}
+}
+
 // TestStore_PutLookupRoundTrip names the verdictcache.Store type (NewStore
 // returns *Store but the bare type is never named in a test) and pins the core
 // contract: a Put'd verdict is retrievable by its tree SHA, and Put on an empty

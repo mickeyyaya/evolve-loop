@@ -84,6 +84,27 @@ func (s *Store) Load() (map[string]Entry, error) {
 	return f.Verdicts, nil
 }
 
+// ProbeEligible reports whether candidateTreeSHA may be used as a verdict-cache
+// key given the worktree's base tree identity. It is the SINGLE source of the
+// fresh-base collision guard, shared by the ADR-0048 Slice B pre-loop shadow
+// probe (Lookup) and the audit-binding projection (Put), so the two sites can
+// never drift apart and a future enforce-stage lookup has one predicate to
+// reuse.
+//
+// A candidate with no content identity is never eligible — there is nothing to
+// content-address, matching Lookup/Put's empty-SHA no-ops. A candidate equal to
+// a RESOLVED base tree is a fresh/untouched worktree: every sibling lane cut
+// from the same base carries that identity, so a verdict stored or matched
+// under it collides across unrelated cycles. An unresolvable base ("") leaves
+// the candidate eligible — absence of a base identity is not evidence of
+// freshness, and the pre-guard behaviour there is deliberately frozen.
+func ProbeEligible(baseTreeSHA, candidateTreeSHA string) bool {
+	if candidateTreeSHA == "" {
+		return false
+	}
+	return baseTreeSHA == "" || candidateTreeSHA != baseTreeSHA
+}
+
 // Put upserts e keyed by e.TreeSHA (read-modify-write + temp+rename). An empty
 // TreeSHA is a no-op (a verdict with no content identity cannot be
 // content-addressed) — never an error, so a best-effort caller need not branch.
