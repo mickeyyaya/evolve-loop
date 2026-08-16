@@ -551,9 +551,9 @@ func isAllDigits(s string) bool {
 // vanish: an unaccounted OPEN entry, an unevidenced closure claim, an
 // unreadable ancestor ledger, or a write-back failure (a disposition that did
 // not reach disk is not visible, which is the whole point of the mechanism).
-func reconcileContinuationDefects(req core.PhaseRequest) ([]core.Diagnostic, bool) {
+func reconcileContinuationDefects(req core.PhaseRequest) (diags []core.Diagnostic, blocked bool, lineageCycles []int) {
 	if req.Workspace == "" || req.ProjectRoot == "" {
-		return nil, false
+		return nil, false, nil
 	}
 	cont, isContinuation, err := continuation.ReadManifest(req.Workspace)
 	if err != nil {
@@ -568,7 +568,7 @@ func reconcileContinuationDefects(req core.PhaseRequest) ([]core.Diagnostic, boo
 		// repaired before the cycle can PASS, which is the correct direction to
 		// fail in for a mechanism whose entire job is to make defects visible.
 		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: continuation manifest is unreadable (%s) — a continuation cannot be graded against a lineage it cannot read, and degrading open here is the gate's cheapest bypass", err.Error())}}, true
+			Message: fmt.Sprintf("defect ledger: continuation manifest is unreadable (%s) — a continuation cannot be graded against a lineage it cannot read, and degrading open here is the gate's cheapest bypass", err.Error())}}, true, nil
 	}
 	// cycle-1285 F2, the deletion half. Arming may not depend SOLELY on a file
 	// inside the workspace the graded agent writes: `rm continuation-manifest.json`
@@ -579,23 +579,53 @@ func reconcileContinuationDefects(req core.PhaseRequest) ([]core.Diagnostic, boo
 	registryCont, hasRegistry := laneRegistryBinding(req)
 	switch {
 	case !isContinuation && !hasRegistry:
-		return nil, false
+		return nil, false, nil
 	case !isContinuation && hasRegistry:
 		graded, _ := reconcileAgainstAncestor(req, registryCont)
 		return append([]core.Diagnostic{{Severity: "error",
 			Message: fmt.Sprintf("defect ledger: this workspace holds no continuation manifest, but the root-owned %s binds this lane's scope to cycle-%d — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding.",
 				continuation.RegistryPath(req.ProjectRoot), registryCont.Cycle)}},
-			graded...), true
+			graded...), true, nil
 	case hasRegistry && registryCont.Cycle != cont.Cycle:
 		// Both records exist and disagree about the ancestor. The workspace copy
 		// is the rewritable one, so it is the suspect; refusing to pick is the
 		// only honest move.
 		return []core.Diagnostic{{Severity: "error",
 			Message: fmt.Sprintf("defect ledger: the workspace continuation manifest names cycle-%d but the root-owned registry binds this lane to cycle-%d — a rewritten manifest would re-point the gate at an ancestor with no open defects; resolve the disagreement before this cycle can PASS",
-				cont.Cycle, registryCont.Cycle)}}, true
+				cont.Cycle, registryCont.Cycle)}}, true, nil
 	}
 
-	return reconcileAgainstAncestor(req, cont)
+	// A graded, unblocked reconcile is the one path where the lineage's every
+	// inherited defect has been verified against its per-id disposition record
+	// — the condition under which the closure-citation gate's prose-formatting
+	// demand demotes to advisory for claims WITHIN this lineage (cycle-1502: a
+	// WARN summary line restating closures the machine record had already
+	// proven forced a false FAIL). The returned cycle set scopes that demotion:
+	// the immediate ancestor plus the ledger's origin cycle — a prose claim
+	// about any OTHER cycle has no record here vouching for it and keeps the
+	// full gate. The extra readDefectLedger is a duplicated READ (the grade
+	// already loaded it), accepted to keep reconcileAgainstAncestor's signature
+	// stable; the arming/grading logic stays single-sourced above.
+	d, b := reconcileAgainstAncestor(req, cont)
+	if b {
+		return d, b, nil
+	}
+	// Vouch ONLY when the ancestor ledger exists with entries: the unblocked
+	// missing/empty-ledger branch verified NOTHING (its own warning says so),
+	// and a deleted ancestor ledger must not convert the closure gate's
+	// backstop into a demotion (review BLOCK-2). The read duplicates one I/O
+	// the grade already did; lerr is unreachable here (the grade blocks on the
+	// same read erroring) and narrows toward less vouching if it ever fires.
+	ancestorWS := filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cont.Cycle))
+	ledger, ok, lerr := readDefectLedger(ancestorWS)
+	if lerr != nil || !ok || len(ledger.Entries) == 0 {
+		return d, b, nil
+	}
+	cycles := []int{cont.Cycle}
+	if ledger.OriginCycle > 0 && ledger.OriginCycle != cont.Cycle {
+		cycles = append(cycles, ledger.OriginCycle)
+	}
+	return d, b, cycles
 }
 
 // laneRegistryBinding returns this lane's continuation binding from the
