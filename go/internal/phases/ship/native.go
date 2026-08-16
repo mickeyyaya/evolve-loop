@@ -158,6 +158,16 @@ type Options struct {
 	// site in this package. Not part of the public API.
 	internalAuditBoundTreeSHA string
 
+	// internalConsumedPaths is the exact set of repo-relative paths the ship's
+	// OWN in-commit inbox consumption staged (consume.go — the one mutation
+	// the ship performs by design AFTER the audit bound the tree). The two
+	// tree-drift integrity checks accept a bound-vs-actual mismatch IFF the
+	// tree delta is a subset of these paths (cycle-1506: consumption made
+	// every PASS ship of an inbox-claimed item refuse at the pre-commit
+	// check). Written ONLY by consumeCommittedItems; any other writer
+	// re-opens a smuggling channel through the drift tolerance.
+	internalConsumedPaths []string
+
 	// repairAttempted is the repair ladder's once-per-code-per-Run guard
 	// (repair.go). Lazily initialized by attemptRepair/repairPushRace.
 	repairAttempted map[core.ShipErrorCode]bool
