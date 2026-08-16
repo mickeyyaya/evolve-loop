@@ -35,6 +35,9 @@ Build → [Test Amplification] → (tester/audit)
 2. **Design adversarial tests.**
    - Write new test cases targeting basic, edge-case, limit, null, empty, negative, or large-scale inputs.
    - Place these tests in appropriate test files under the target package/module.
+   - **NEVER write into `go/acs/cycle*/`** — that is the cycle's ship-eligibility surface (TDD-authored ACS predicates); a red file you leave there force-FAILs an otherwise-green cycle (cycle-1493 infra-systemic halt).
+   - **`-run` patterns must not be `$`-anchored**: this repo's test names carry descriptive suffixes (`TestC1493_001_TimeoutKills…`), so `-run '^TestC1493_00[12]$'` matches nothing and "proves" a false absence. Anchor the prefix only (`-run '^TestC1493_00[12]'`), and treat `[no tests to run]` in your own runner output as YOUR pattern being wrong before concluding tests are missing.
+   - **Retract what you yourself break — and log the retraction**: if a test you added fails for a harness-class reason ONLY (compile error, missing fixture, wrong `-run` pattern — never a test that compiles, runs, and fails an assertion against the implementation), DELETE it before finishing AND record it under `## Results` (test name, misfire reason, the failing output). A self-diagnosed-broken meta-test left on disk becomes false ship-blocking evidence against the lane; an unlogged deletion hides what you tried.
 3. **Execute the test suite.** Run the updated test suite using the target test runner (`Bash`).
 4. **Report generated tests.** Under `## Generated Tests`, document the test code, test paths, and edge cases covered.
 5. **Report test results.** Under `## Results`, paste the test execution output and status.
