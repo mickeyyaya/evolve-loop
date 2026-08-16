@@ -48,6 +48,7 @@ docs/
 | **Why a gate keeps false-FAILing honest work** | [incidents/2026-08-12-proxy-as-verdict-findings.md](incidents/2026-08-12-proxy-as-verdict-findings.md) — the recurring proxy-as-verdict defect, 15 findings with root causes, and the two ADRs that replace it |
 | **Why a batch halted at ship with identical fingerprints** | [incidents/2026-08-14-wave4-staging-halt.md](incidents/2026-08-14-wave4-staging-halt.md) — the check-ignore blind spot (negated-parent dir rules), prose-scraped manifest re-injection, and staging-onion layer 4 (git-named refusal drop + single retry) |
 | **Why healthy CLIs read as quota-walled / why lanes redo landed work** | [incidents/2026-08-15-false-walls-and-repick-class.md](incidents/2026-08-15-false-walls-and-repick-class.md) — content-forged exhaustion walls (corroboration fix), the 429 taxonomy, the re-pick class (transactional in-commit consumption), and the audit chain's first live anti-gaming catches |
+| **What the post-v22.18.0 fail rate actually was, and the ranked plan to reduce it** | [incidents/2026-08-17-failure-rate-review-1481-1503.md](incidents/2026-08-17-failure-rate-review-1481-1503.md) — 17-FAIL ledger across 8 classes (manufactured false-REDs vs re-dispatch waste vs authoring defects vs honest floors), the 4 console PRs that killed class A, and the ranked improvement plan with 2026 literature |
 | **Understanding what changed in v10.7** | [incidents/cycle-61.md](incidents/cycle-61.md) (B0-B7 fixes) + [CHANGELOG.md](../CHANGELOG.md) |
 
 ## Distinguishing principle
