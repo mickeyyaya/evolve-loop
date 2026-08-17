@@ -1,0 +1,25 @@
+{
+  "id": "same-subsystem-wave-scheduling",
+  "kind": "feature",
+  "title": "Wave planner: items touching the same subsystem must share a lane or sequence across waves \u2014 a sibling ship mid-batch changed a contract under a running lane",
+  "summary": "Cycle-1484 (batch-20260816a): the context-fill CAP lane assumed a default 200K window for agy while its SIBLING context-fill telemetry lane shipped mid-batch the contract 'unmeasured families stay unmeasured' (fillpct_driverwindow_test.go) \u2014 the fresh test deterministically red'd the running lane. Partition menus key on exact-file overlap only; semantic coupling (same subsystem, disjoint files) is invisible to them.",
+  "root_cause": "Menu partitioning is file-overlap-scoped; two items in one subsystem with disjoint file sets dispatch concurrently and one lane's landing changes semantics under the other.",
+  "fix": "Cheap heuristic at wave planning: items sharing a subsystem prefix (id prefix family like context-fill-*/tokenopt-*, or files under one internal/<pkg>) either co-lane (multi-slug \u2014 AFTER multi-slug-lane-scope-reconciliation 0.87 lands) or defer the later one a wave. Log the deferral (no silent caps).",
+  "files": [
+    "go/cmd/evolve/cmd_loop_wave.go (wave planning/partition)",
+    "docs/incidents/2026-08-17-failure-rate-review-1481-1503.md \u00a74.7"
+  ],
+  "acceptance": [
+    "Fixture: two same-prefix items plan into one lane or consecutive waves, logged.",
+    "Disjoint-subsystem items unaffected.",
+    "go vet + suites green."
+  ],
+  "connects_to": [
+    "batching_partition_menus (exact-file-overlap design \u2014 this extends, not replaces)",
+    "Self-Healing Orchestrators arXiv:2606.01416 (stale-context/contradictory-intermediates class)"
+  ],
+  "priority": "medium",
+  "weight": 0.68,
+  "created_at": "2026-08-17T07:05:00Z",
+  "notes": "Filed from the 2026-08-17 failure-rate review \u00a74.7."
+}

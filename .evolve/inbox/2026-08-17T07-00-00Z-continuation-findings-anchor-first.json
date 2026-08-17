@@ -1,0 +1,27 @@
+{
+  "id": "continuation-findings-anchor-first",
+  "kind": "bug",
+  "title": "Continuation findings must LEAD with 'repair or retract these RED artifacts first' \u2014 retries build new work while the prior attempt's broken test sits untouched",
+  "summary": "Cycles 1492 and 1495 (verdict-cache retries) each produced all-green NEW predicates while the inherited cycle-1488 unsatisfiable predicate \u2014 the sole red, whose correct one-line fix was even written in a sibling predicate's COMMENT \u2014 went untouched through two full retries. The findings injection (continuation_stamp.go readContinuationFindings) serves the prior audit-fail-reason as context, but nothing instructs the builder to prioritize repairing/retracting the failing artifacts before new work.",
+  "root_cause": "The findings block is descriptive, not prescriptive: it reports why the prior attempt failed but does not order the retry's first action. Builders optimize for the item's acceptance criteria and treat prior-cycle test files as not-theirs-to-touch.",
+  "fix": "(1) In the continuation findings rendering (core/continuation_stamp.go readContinuationFindings / the build prompt injection seam), when the prior failure includes EGPS red predicates or named failing artifacts, PREPEND a mandatory header: 'FIRST ACTION: the following artifacts are RED on your base \u2014 repair or retract each BEFORE any new work: <paths+one-line reasons>'. (2) Builder persona: prior-cycle ACS predicate files in the lane's own go/acs/cycle*/ ARE yours to repair on a continuation. Deterministic Go for (1), persona line for (2). Red-first: fixture continuation with a red inherited predicate \u2014 the rendered findings block must lead with the repair directive naming the file.",
+  "files": [
+    "go/internal/core/continuation_stamp.go (findings rendering)",
+    "agents/evolve-builder.md (persona line)",
+    ".evolve/runs/cycle-1492 + cycle-1495 acs-verdict.json (live evidence)"
+  ],
+  "acceptance": [
+    "Findings block on a red-predicate continuation leads with the FIRST-ACTION repair directive naming exact files \u2014 red-first fixture.",
+    "No change when the prior failure carries no named red artifacts (descriptive block unchanged).",
+    "go vet + touched suites green."
+  ],
+  "connects_to": [
+    "docs/incidents/2026-08-17-failure-rate-review-1481-1503.md \u00a74.4 (this plan item)",
+    "DARC arXiv:2608.11772 (diagnosis-guided selective self-correction: typed signals ordered before recovery)",
+    "acs-absence-primitive-and-unsatisfiability-lint 0.85 (prevents the anchor being authored; this makes retries fix it when it slips through)"
+  ],
+  "priority": "high",
+  "weight": 0.86,
+  "created_at": "2026-08-17T07:00:00Z",
+  "notes": "Filed from the 2026-08-17 failure-rate review. Two full lanes (~4M tokens) were spent re-deriving green work around a ten-line repair. | REPRIORITIZED 2026-08-17 0.78->0.86 per docs/incidents/2026-08-17-failure-rate-review-1481-1503.md ranked plan (operator directive: prioritize pipeline/fail-rate improvements)."
+}

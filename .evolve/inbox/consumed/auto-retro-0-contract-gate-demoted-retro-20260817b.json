@@ -1,0 +1,16 @@
+{
+  "action": "recurring failure contract gate demoted enforce->advisory on phase retro (cli=claude-tmux) (3 occurrences)",
+  "evidence_pointer": "[orchestrator] WARN CONTRACT GATE DEMOTED: phase retro on cli=claude-tmux tripped the contract-gate circuit breaker \u2014 the gate is now advisory (enforce\u2192advisory) for the rest of this run, so later phases ship UNGATED. no other CLI family was available to escalate to, so a structured re-prompt salvage retry attempted the repair on the same CLI \u2014 and that CLI failed the contract too. Last violation: retro deliverable failed contract: [missing_artifact] deliverable not found \u2014 write it to exactly: /Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1505/retrospective-report.md",
+  "files": null,
+  "id": "contract-gate-demoted-retro",
+  "injected_at": "2026-08-16T19:18:07Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "priority": "HIGH",
+  "recurrence": 3,
+  "weight": 0.75,
+  "consumed": {
+    "at": "2026-08-17T10:40:00Z",
+    "via": "console-manual",
+    "resolution": "Stale auto-filed halt record consumed at the 20260817b boundary: its constituent failures are individually root-caused in docs/incidents/2026-08-17-failure-rate-review-1481-1503.md and the campaign doc; the retirement work it seeded (cycle-1505, burn 6) is PARKED for console salvage \u2014 leaving this pending re-seeds lanes on a parked scope (fourth-source re-derivation, noted in the parked item)."
+  }
+}

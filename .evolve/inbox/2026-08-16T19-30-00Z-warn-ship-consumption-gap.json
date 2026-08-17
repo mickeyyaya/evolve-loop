@@ -1,17 +1,17 @@
 {
   "id": "warn-ship-consumption-gap",
   "kind": "bug",
-  "title": "A WARN-verdict cycle that nonetheless SHIPS leaves its inbox item unconsumed on main — landed work stays pickable (the #466 PASS-only gate's uncovered quadrant)",
-  "summary": "Cycle-1494 (batch-20260816c): acs verdict WARN with red_count=0; the cycle shipped 4f133efe (14 files incl. the faillearn novelty feature) and FinalVerdict PASS — but consumeCommittedItems gates on acs PASS only (by #466 design: 'WARN ships stay pickable'), so the tracked item 2026-07-05T15-20-00Z-sleep-time-kb-consolidation.json stayed on main while the plane-local promotion moved its runtime copy to gitignored processed/. Every fresh worktree now offers an item whose deliverable is already landed — the exact re-pick burn #466 closed for the PASS quadrant. Console-consumed manually at this boundary; the class needs the decision.",
-  "root_cause": "#466's gate condition conflated 'verdict WARN' with 'nothing landed'. The ship-eligibility floor is red_count==0 — a WARN verdict with zero reds can ship a real commit. The consumption rule keys on the verdict when it should key on the LANDING: if the cycle pushed a commit that delivers the item's work, the item must be consumed in that commit regardless of PASS-vs-WARN.",
-  "fix": "Change consumeCommittedItems' gate from (ClassCycle && acs PASS) to (ClassCycle && ship-commit-created && red_count==0), recording the verdict in the consumed annotation ({verdict: WARN}) so triage/audit history keeps the distinction. Preserve the true no-ship WARN behavior (no commit => no consumption => item stays pickable — correct). Red-first: fixture WARN-with-zero-reds shipping cycle must consume in-commit (pins the cycle-1494 shape); fixture WARN-that-does-not-ship must not consume (preserves the original design's intent).",
+  "title": "A WARN-verdict cycle that nonetheless SHIPS leaves its inbox item unconsumed on main \u2014 landed work stays pickable (the #466 PASS-only gate's uncovered quadrant)",
+  "summary": "Cycle-1494 (batch-20260816c): acs verdict WARN with red_count=0; the cycle shipped 4f133efe (14 files incl. the faillearn novelty feature) and FinalVerdict PASS \u2014 but consumeCommittedItems gates on acs PASS only (by #466 design: 'WARN ships stay pickable'), so the tracked item 2026-07-05T15-20-00Z-sleep-time-kb-consolidation.json stayed on main while the plane-local promotion moved its runtime copy to gitignored processed/. Every fresh worktree now offers an item whose deliverable is already landed \u2014 the exact re-pick burn #466 closed for the PASS quadrant. Console-consumed manually at this boundary; the class needs the decision.",
+  "root_cause": "#466's gate condition conflated 'verdict WARN' with 'nothing landed'. The ship-eligibility floor is red_count==0 \u2014 a WARN verdict with zero reds can ship a real commit. The consumption rule keys on the verdict when it should key on the LANDING: if the cycle pushed a commit that delivers the item's work, the item must be consumed in that commit regardless of PASS-vs-WARN.",
+  "fix": "Change consumeCommittedItems' gate from (ClassCycle && acs PASS) to (ClassCycle && ship-commit-created && red_count==0), recording the verdict in the consumed annotation ({verdict: WARN}) so triage/audit history keeps the distinction. Preserve the true no-ship WARN behavior (no commit => no consumption => item stays pickable \u2014 correct). Red-first: fixture WARN-with-zero-reds shipping cycle must consume in-commit (pins the cycle-1494 shape); fixture WARN-that-does-not-ship must not consume (preserves the original design's intent).",
   "files": [
     "go/internal/phases/ship/consume.go (gate condition, both ship paths)",
-    "go/internal/phases/ship/consume_integration_test.go (WARN fixture currently pins the OLD behavior — TestShipFromWorktree_WarnVerdictDoesNotConsume must evolve to distinguish ships-vs-doesn't)",
+    "go/internal/phases/ship/consume_integration_test.go (WARN fixture currently pins the OLD behavior \u2014 TestShipFromWorktree_WarnVerdictDoesNotConsume must evolve to distinguish ships-vs-doesn't)",
     ".evolve/runs/cycle-1494/{acs-verdict.json,triage-decision.json} + commit 4f133efe (live evidence)"
   ],
   "acceptance": [
-    "WARN cycle that creates a ship commit consumes its items in that commit with the verdict recorded — red-first on the cycle-1494 shape.",
+    "WARN cycle that creates a ship commit consumes its items in that commit with the verdict recorded \u2014 red-first on the cycle-1494 shape.",
     "WARN cycle with no ship commit leaves items pickable (existing test evolved, not deleted).",
     "go vet + ship package suites + -race green."
   ],
@@ -21,7 +21,7 @@
     "cycle-1494 ship 4f133efe (live evidence, batch-20260816c)"
   ],
   "priority": "high",
-  "weight": 0.82,
+  "weight": 0.84,
   "created_at": "2026-08-16T19:30:00Z",
-  "notes": "Found during batch-20260816c close-out because the old processed/ promotion log line fired where #466's in-commit consumption should have. The manual console consumption of the sleep-time item rides the same boundary landing that carries this filing."
+  "notes": "Found during batch-20260816c close-out because the old processed/ promotion log line fired where #466's in-commit consumption should have. The manual console consumption of the sleep-time item rides the same boundary landing that carries this filing. | REPRIORITIZED 2026-08-17 0.82->0.84 per docs/incidents/2026-08-17-failure-rate-review-1481-1503.md ranked plan (operator directive: prioritize pipeline/fail-rate improvements)."
 }
