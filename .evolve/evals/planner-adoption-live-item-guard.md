@@ -2,10 +2,10 @@
 score_cap:
   - criterion: "ResolveContinuationForScope refuses a binding whose scope id is retired with no live pending item, logs the refusal naming the scope, and releases the ghost binding"
     max_if_missing: 8
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_003' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_003'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_003' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_003'"
   - criterion: "The guard still resolves a binding whose scope id names a LIVE pending item — refusal is on positive retirement evidence, never on mere absence"
     max_if_missing: 9
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_003' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_003'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_003' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_003'"
 ---
 
 # Eval: planner / adoption live-item guard on the scope-keyed registry read

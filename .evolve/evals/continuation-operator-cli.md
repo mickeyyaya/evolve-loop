@@ -2,19 +2,19 @@
 score_cap:
   - criterion: "`evolve continuation list` is registered and reports every registry binding with its scope id, snapshot SHA and ancestor cycle"
     max_if_missing: 7
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_004' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_004'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_004' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_004'"
   - criterion: "`evolve continuation list` on a project with no registry is a clean exit-0 report, not an error and not a phantom scope"
     max_if_missing: 5
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_005' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_005'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_005' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_005'"
   - criterion: "`evolve continuation release <scope-id>` releases exactly that binding and preserves the released value into the item file's released_continuations[]"
     max_if_missing: 8
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_006' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_006'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_006' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_006'"
   - criterion: "`evolve continuation release <unknown-scope>` fails loudly, names the scope, and leaves other bindings intact"
     max_if_missing: 7
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_007' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_007'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_007' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_007'"
   - criterion: "Malformed invocations (bare `continuation`, unknown subcommand, `release` with no scope) fail loudly and never mutate the registry"
     max_if_missing: 6
-    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_008' ./acs/cycle1515 | grep -q -- '--- PASS: TestC1515_008'"
+    evidence: "cd go && go test -tags acs -count=1 -v -run '^TestC1515_008' ./acs/regression/cycle1515 | grep -q -- '--- PASS: TestC1515_008'"
 ---
 
 # Eval: `evolve continuation list` / `release <scope-id>` operator surface

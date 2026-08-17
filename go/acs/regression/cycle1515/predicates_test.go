@@ -100,7 +100,7 @@ func TestMain(m *testing.M) {
 // moduleRoot returns <worktree>/go by walking up from the predicate package
 // dir, so no predicate depends on process cwd.
 func moduleRoot() (string, error) {
-	wd, err := os.Getwd() // go test runs in the package dir: <root>/go/acs/cycle1515
+	wd, err := os.Getwd() // go test runs in the package dir: <root>/go/acs/regression/cycle1515
 	if err != nil {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
