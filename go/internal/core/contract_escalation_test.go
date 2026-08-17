@@ -779,3 +779,104 @@ func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
 			probe.dispatched[2], uncoded)
 	}
 }
+
+// TestContractArtifactDetermined_Table is the RED contract for cycle-1510 task
+// `contract-correction-hash-freshness-classification` (carryover from the
+// cycle-1508 audit FAIL, defects H1/L1).
+//
+// What it pins. contractArtifactDetermined(code) answers exactly one question:
+// "does repairing this violation NECESSARILY change the bytes of the watched
+// deliverable artifact?" — the only precondition under which an unchanged
+// artifact hash is sound evidence of "no new work was done". Six codes qualify,
+// because their repair IS an edit to the artifact. deliverable.CodeStrayInWorktree
+// is the canonical counter-example the cycle-1508 audit was built around: it is
+// repaired by DELETING a stray worktree copy, which leaves the watched artifact
+// byte-identical — so a hash-equality short-circuit that does not consult this
+// classifier converts a repairable contract block into a deterministic ladder
+// abort (inst-L1508a).
+//
+// NEGATIVE + fail-closed axis. Unknown codes must return false. The classifier
+// is an ALLOWLIST, not a denylist: a code this function has never heard of is,
+// by construction, one whose repair mechanics are unknown, and the only safe
+// answer for an unknown repair mechanic is "do not let anyone skip re-verify".
+// A denylist implementation (`return code != "stray_in_worktree"`) passes the
+// six positive rows and the stray row and is still wrong — the unknown-code
+// rows below are what separate it from a correct allowlist.
+func TestContractArtifactDetermined_Table(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		code string
+		want bool
+	}{
+		// The six artifact-determined codes: repair edits the watched bytes.
+		{"missing_artifact", "missing_artifact", true},
+		{"empty_artifact", "empty_artifact", true},
+		{"missing_section", "missing_section", true},
+		{"bad_verdict", "bad_verdict", true},
+		{"missing_key", "missing_key", true},
+		{"missing_challenge_token", "missing_challenge_token", true},
+
+		// The location-class code the whole classifier exists for: repaired by
+		// deleting a file OUTSIDE the watched artifact, so the hash cannot move.
+		{"stray_in_worktree", "stray_in_worktree", false},
+
+		// Other real deliverable codes that are not on the allowlist.
+		{"invalid_json", "invalid_json", false},
+		{"failure_context_missing", "failure_context_missing", false},
+
+		// Fail-closed rows — these are what a denylist implementation fails.
+		{"unknown_code", "totally_unknown_future_code", false},
+		{"empty_string", "", false},
+		{"case_variant_is_not_the_code", "Missing_Section", false},
+		{"bracketed_rendering_is_not_a_code", "[missing_section]", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := contractArtifactDetermined(tc.code); got != tc.want {
+				t.Errorf("contractArtifactDetermined(%q) = %v, want %v", tc.code, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestContractArtifactDetermined_StrayInWorktreeIsFalse is the crux assertion
+// stated on its own so a regression names itself in the failure output: the
+// exact pair that made cycle-1508's proposed hash short-circuit unsound.
+func TestContractArtifactDetermined_StrayInWorktreeIsFalse(t *testing.T) {
+	t.Parallel()
+	if contractArtifactDetermined("stray_in_worktree") {
+		t.Error("contractArtifactDetermined(\"stray_in_worktree\") = true, want false — stray_in_worktree is repaired by deleting a worktree copy, which leaves the watched artifact byte-identical; treating it as artifact-determined lets an unchanged hash abort a repairable ladder (inst-L1508a)")
+	}
+	if !contractArtifactDetermined("missing_section") {
+		t.Error("contractArtifactDetermined(\"missing_section\") = false, want true — repairing a missing section edits the artifact, so hash equality IS sound evidence there")
+	}
+}
+
+// TestContractArtifactDetermined_CodesMatchDeliverableVocabulary pins the
+// allowlist to the SOURCE vocabulary rather than to string literals invented
+// here: every allowlisted code must be a code deliverable actually emits. The
+// codes reach core as plain strings (deliverable imports core, so core cannot
+// import deliverable.Violation — see the identity comment above), which is
+// exactly why drift between the two vocabularies is invisible to the compiler
+// and has to be asserted.
+func TestContractArtifactDetermined_CodesMatchDeliverableVocabulary(t *testing.T) {
+	t.Parallel()
+	// Mirrors internal/deliverable's exported code constants (deliverable.go:69-85).
+	// Kept as data, not an import, because of the documented import-cycle constraint.
+	allDeliverableCodes := []string{
+		"missing_artifact", "empty_artifact", "missing_section",
+		"missing_challenge_token", "bad_verdict", "stray_in_worktree",
+		"invalid_json", "missing_key", "failure_context_missing",
+	}
+	determined := 0
+	for _, code := range allDeliverableCodes {
+		if contractArtifactDetermined(code) {
+			determined++
+		}
+	}
+	if determined != 6 {
+		t.Errorf("contractArtifactDetermined accepts %d of the %d real deliverable codes, want exactly 6 — the allowlist must be neither widened past the artifact-determined six nor narrowed below them", determined, len(allDeliverableCodes))
+	}
+}

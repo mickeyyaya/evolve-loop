@@ -279,6 +279,58 @@ type contractBlockIdentity struct {
 // fabricate an intersection between two unrelated defects.
 var contractViolationCodeRE = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
 
+// contractArtifactDetermined reports whether repairing the deliverable
+// violation named by code NECESSARILY rewrites the bytes of the watched
+// artifact. It is the precondition a hash-equality check needs before it may
+// read "the artifact hash did not move" as "the agent did no new work": that
+// inference is sound only for violations whose ONLY repair is an edit to the
+// artifact itself.
+//
+// The counter-example the classifier exists for is deliverable.CodeStrayInWorktree
+// (deliverable.go:306), which is repaired by DELETING a stray copy elsewhere in
+// the worktree — the watched artifact is left byte-identical, so an unchanged
+// hash there is not evidence of inaction and a short-circuit reading it that way
+// would turn a repairable contract block into a deterministic ladder abort
+// (inst-L1508a).
+//
+// ALLOWLIST, not denylist, and therefore fail-closed: a code this function has
+// never heard of is one whose repair mechanics are unknown, and the only safe
+// answer for an unknown repair mechanic is false — "do not skip the re-verify".
+// False negatives cost one redundant verification; a false positive silently
+// drops a real repair.
+//
+// Deliberately NARROWER than the criterion in one respect, stated here so the
+// comment is true as written: deliverable.CodeInvalidJSON and
+// deliverable.CodeFailureContextMissing also repair by editing the artifact, and
+// this cycle's contract (triage top_n; the cycle-1510 eval's vocabulary-drift
+// grader) pins the allowlist to six. Widening to those two is queued as
+// follow-up work rather than taken here — the omission errs in the fail-closed
+// direction, so it cannot cause the unsound inference above. See the Amendments
+// section of the cycle-1510 build report.
+//
+// The codes arrive as plain strings, never deliverable.Violation values:
+// internal/deliverable imports internal/core (reviewer.go, verifier.go), so the
+// reverse import would be a cycle — the same constraint documented for
+// contractViolationCodeRE above. That makes drift between the two vocabularies
+// invisible to the compiler, which is why it is asserted in a test instead
+// (TestContractArtifactDetermined_CodesMatchDeliverableVocabulary).
+//
+// NO PRODUCTION CALLER YET, by design: the hash short-circuit this classifies
+// for is not scheduled, and building the short-circuit alongside it would be
+// scope creep (Core Rule 2). The exercised caller is the test above.
+func contractArtifactDetermined(code string) bool {
+	switch code {
+	case "missing_artifact", // the artifact does not exist; repair writes it
+		"empty_artifact",          // zero bytes; repair fills it
+		"missing_section",         // a required heading is absent; repair adds it
+		"missing_challenge_token", // the token is not echoed; repair echoes it
+		"bad_verdict",             // the verdict sentinel is wrong; repair rewrites it
+		"missing_key":             // a required JSON key is absent; repair adds it
+		return true
+	}
+	return false
+}
+
 // newContractBlockIdentity projects one block's rejection reason onto its defect
 // identity. Both projections are computed eagerly: which one the comparison uses
 // depends on the OTHER block, so neither can be deferred.
