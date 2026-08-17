@@ -347,6 +347,13 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 	}
 	headTree = strings.TrimSpace(headTree)
 	if headTree != bound {
+		// Recorded decision (cycle-1506 review M5): a consumed-item PASS ship's
+		// HEAD tree legitimately differs from the bound tree by the sanctioned
+		// consumption delta — but this rung runs in a FRESH process after a
+		// died-between-commit-and-push crash, where internalConsumedPaths no
+		// longer exists, so the explained-by-consumption test cannot run here.
+		// Interrupted consumed-item ships therefore decline this fast heal and
+		// route to the slower re-audit path — fail-safe, deliberately.
 		return repairNone // HEAD is not the audited work
 	}
 	auditedHead := se.Debug["audited"]

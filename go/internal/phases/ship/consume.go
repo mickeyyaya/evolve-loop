@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
@@ -113,6 +114,26 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 		}
 		srcRel := ".evolve/inbox/" + base
 		dstRel := consumedRel + "/" + base
+		// Review HIGH (cycle-1506 fix hardening): when an audit binding is set,
+		// the drift tolerance downstream will SANCTION these paths — so the
+		// consumed bytes must be exactly what the AUDITED tree carried. A file
+		// planted or tampered in the post-binding window (the one window the
+		// binding floor exists to close) rolls back loudly and stays pickable;
+		// it does not ship unaudited. shipDirect (no binding, no drift checks)
+		// is untouched — plane-side failure-count write-backs keep consuming.
+		if opts.internalAuditBoundTreeSHA != "" {
+			boundArgs := append(append([]string{}, prefix...), "show", opts.internalAuditBoundTreeSHA+":"+srcRel)
+			var boundOut strings.Builder
+			exit, runErr := opts.run(ctx, "git", boundArgs, &boundOut, io.Discard)
+			if runErr != nil || exit != 0 || boundOut.String() != string(raw) {
+				_ = os.Remove(dstAbs)
+				if werr := os.WriteFile(src, raw, 0o644); werr != nil {
+					res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume provenance rollback write %q: %v", id, werr))
+				}
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q REFUSED sanctioning: item bytes are not what the audit-bound tree carries (absent or tampered post-binding) — move rolled back, item stays pickable", id))
+				continue
+			}
+		}
 		args := append(append([]string{}, prefix...), "add", "-A", "--", srcRel, dstRel)
 		if exit, runErr := opts.run(ctx, "git", args, io.Discard, io.Discard); runErr != nil || exit != 0 {
 			// Roll the fs move BACK (review): on the shipDirect path this tree
@@ -125,8 +146,60 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume stage %q rc=%d err=%v — move rolled back, item stays pickable", id, exit, runErr))
 			continue
 		}
+		opts.internalConsumedPaths = append(opts.internalConsumedPaths, srcRel, dstRel)
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: consumed inbox item %q into %s (rides this ship commit)", id, dstRel))
 	}
+}
+
+// treeDriftExplainedByConsumption reports whether every path differing between
+// the audit-bound tree and the actual tree is one of the ship's own sanctioned
+// consumption moves (opts.internalConsumedPaths). gitDir=="" runs in the
+// process cwd (the direct/plane path); otherwise `git -C gitDir`. Fail-CLOSED:
+// no consumed paths, or a diff-tree that cannot run, explains nothing — the
+// caller then refuses exactly as before. The second return is a rendered
+// offender suffix for the refusal message ("" when nothing to add), so the
+// operator sees WHICH unsanctioned paths drifted.
+func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir, boundTree, actualTree string) (bool, string) {
+	if len(opts.internalConsumedPaths) == 0 {
+		return false, ""
+	}
+	sanctioned := make(map[string]bool, len(opts.internalConsumedPaths))
+	for _, p := range opts.internalConsumedPaths {
+		sanctioned[p] = true
+	}
+	args := []string{}
+	if gitDir != "" {
+		args = append(args, "-C", gitDir)
+	}
+	// rawPathRead/unquoteGitPath (cycle-1108): without them a non-ASCII byte in
+	// an item filename comes back C-quoted, never matches the sanctioned set,
+	// and false-refuses a legitimate consumption ship (review M4).
+	args = append(args, rawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)
+	var out strings.Builder
+	if exit, err := opts.run(ctx, "git", args, &out, io.Discard); err != nil || exit != 0 {
+		return false, ""
+	}
+	var offenders []string
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		p := unquoteGitPath(strings.TrimSpace(line))
+		if p == "" {
+			continue
+		}
+		if !sanctioned[p] {
+			offenders = append(offenders, p)
+		}
+	}
+	if len(offenders) == 0 {
+		return true, ""
+	}
+	// Bounded suffix (review LOW): the refusal travels into digests/escalations.
+	const maxNamed = 8
+	extra := ""
+	if len(offenders) > maxNamed {
+		extra = fmt.Sprintf(" and %d more", len(offenders)-maxNamed)
+		offenders = offenders[:maxNamed]
+	}
+	return false, " (unsanctioned drift path(s): " + strings.Join(offenders, ", ") + extra + ")"
 }
 
 // workspaceACSVerdict reads the deterministic verdict the gate stamped, or ""
