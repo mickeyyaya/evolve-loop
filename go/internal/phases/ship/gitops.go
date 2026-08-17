@@ -433,12 +433,23 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 					"worktree", worktree)
 			}
 			if opts.internalAuditBoundTreeSHA != stagedTreeSHA {
-				return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
-					fmt.Sprintf("INTEGRITY BREACH (pre-commit): audit-bound tree SHA %s != staged tree SHA %s — refused to commit; worktree changes preserved (staged) for operator triage",
-						opts.internalAuditBoundTreeSHA, stagedTreeSHA),
-					"audit_bound_tree", opts.internalAuditBoundTreeSHA, "worktree_tree", stagedTreeSHA, "phase", "pre-commit")
+				// cycle-1506: the ship's OWN in-commit inbox consumption
+				// (consume.go) legitimately mutates the tree after audit
+				// binding. A drift whose delta is exactly the sanctioned
+				// consumption moves is accepted LOUDLY; any other path in the
+				// delta refuses as before — the tolerance is the consumption
+				// set, never wider.
+				if ok, offending := treeDriftExplainedByConsumption(ctx, opts, worktree, opts.internalAuditBoundTreeSHA, stagedTreeSHA); ok {
+					res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-commit tree drift (audit=%s staged=%s) fully explained by sanctioned inbox consumption (%d path(s)) — accepted", opts.internalAuditBoundTreeSHA, stagedTreeSHA, len(opts.internalConsumedPaths)))
+				} else {
+					return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
+						fmt.Sprintf("INTEGRITY BREACH (pre-commit): audit-bound tree SHA %s != staged tree SHA %s — refused to commit; worktree changes preserved (staged) for operator triage%s",
+							opts.internalAuditBoundTreeSHA, stagedTreeSHA, offending),
+						"audit_bound_tree", opts.internalAuditBoundTreeSHA, "worktree_tree", stagedTreeSHA, "phase", "pre-commit")
+				}
+			} else {
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-commit tree-SHA binding verified (audit=%s staged=%s)", opts.internalAuditBoundTreeSHA, stagedTreeSHA))
 			}
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-commit tree-SHA binding verified (audit=%s staged=%s)", opts.internalAuditBoundTreeSHA, stagedTreeSHA))
 		}
 
 		if opts.DryRun {
@@ -519,11 +530,18 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 	committedTree = strings.TrimSpace(committedTree)
 	if opts.internalAuditBoundTreeSHA != "" && committedTree != "" {
 		if opts.internalAuditBoundTreeSHA != committedTree {
-			return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
-				fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected", opts.internalAuditBoundTreeSHA, committedTree),
-				"audit_bound_tree", opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
+			// Same cycle-1506 tolerance as the pre-commit check: sanctioned
+			// consumption is the one designed post-audit mutation.
+			if ok, offending := treeDriftExplainedByConsumption(ctx, opts, "", opts.internalAuditBoundTreeSHA, committedTree); ok {
+				res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: post-push tree drift (audit=%s committed=%s) fully explained by sanctioned inbox consumption — accepted", opts.internalAuditBoundTreeSHA, committedTree))
+			} else {
+				return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
+					fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected%s", opts.internalAuditBoundTreeSHA, committedTree, offending),
+					"audit_bound_tree", opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
+			}
+		} else {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", opts.internalAuditBoundTreeSHA, committedTree))
 		}
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", opts.internalAuditBoundTreeSHA, committedTree))
 	}
 
 	// ship-binding.json sidecar.
