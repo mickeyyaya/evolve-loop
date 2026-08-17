@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
@@ -189,4 +190,39 @@ func ReadRegistryEntry(projectRoot, scopeID string) (Continuation, bool, error) 
 		return Continuation{}, false, nil
 	}
 	return c, true, nil
+}
+
+// ListRegistryEntries returns every scope→binding pair the registry holds, so
+// an operator surface (`evolve continuation list`) reads the same map the
+// resolver does instead of hand-parsing the file under its flock sidecar. An
+// absent registry is an empty map, not an error — no binding is the normal
+// state; a corrupt one is loud, exactly as readRegistry decides for every other
+// caller.
+func ListRegistryEntries(projectRoot string) (map[string]Continuation, error) {
+	return readRegistry(projectRoot)
+}
+
+// RedactHostPaths returns c with the operator's home directory collapsed to
+// "~". The preserved-pointer annotations written by the retire/consume paths
+// ride the ship commit into TRACKED .evolve/inbox items on a public remote, and
+// Worktree/FindingsPath are absolute host paths that carry the account name
+// (audit cycle-1507 M1). The tilde form stays operator-usable and stays a
+// stable salvage pointer; SnapshotSHA/BaseSHA/Branch — the fields salvage
+// actually resolves work from — are untouched. An unresolvable home is a
+// no-op rather than a failure: redaction must never block a release.
+func RedactHostPaths(c Continuation) Continuation {
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return c
+	}
+	prefix := strings.TrimSuffix(home, string(filepath.Separator)) + string(filepath.Separator)
+	tilde := func(p string) string {
+		if strings.HasPrefix(p, prefix) {
+			return "~" + string(filepath.Separator) + strings.TrimPrefix(p, prefix)
+		}
+		return p
+	}
+	c.Worktree = tilde(c.Worktree)
+	c.FindingsPath = tilde(c.FindingsPath)
+	return c
 }

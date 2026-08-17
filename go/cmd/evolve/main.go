@@ -30,6 +30,9 @@ Commands:
               ( dossier verify [--project-root P] )
   salvage    Report the recoverable-malformed bad_verdict rate (read-only)
               ( salvage report [-json] [-project-root P] )
+  continuation Inspect/release scope-keyed continuation bindings; release
+                preserves the salvage pointer into the scope's inbox item first
+              ( continuation list | continuation release <scope-id> ) [-project-root P]
   acs        Run ACS predicates    ( acs run --cycle N <pkg> | acs suite --cycle N )
   names      Guard naming after a rename; scans tracked files for dead tokens
               from .evolve/naming.json ( names check [--project-root P] | names fix )

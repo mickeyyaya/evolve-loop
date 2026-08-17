@@ -708,7 +708,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// resolve from the processing claims; a lane whose scope came from the wave
 	// planner instead resolves from its pinned lane-scope todo ids (G2).
 	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
-		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, cycle, scopeIDs)
+		// Stderr is wired (was the io.Discard default): the live-scope guard's
+		// refusal line — "this scope has no live pending item, binding released"
+		// — is the operator's only signal that a ghost binding was caught, and a
+		// discarded warning is how cycles 1487/1497 stayed invisible for three
+		// waves.
+		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
 	}))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))

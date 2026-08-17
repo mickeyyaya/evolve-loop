@@ -370,9 +370,18 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 	res.DestPath = dest
 	opts.logf("", "promoted: %s → %s/", base, newState)
 	reason := "ship-promote-" + newState
+	// Transactional retire (park-consume-releases-continuation-binding): every
+	// Promote destination — processed/rejected/retry/quarantine — is OUT of the
+	// batch loader's reach, so the item's registry binding must go with it in
+	// this same operation or the parked scope is re-dispatched as an adopted
+	// continuation forever (cycle-1487).
+	// The reason override lands BEFORE the release so the preserved pointer and
+	// the ledger entry below describe the same transaction with the same word
+	// (audit cycle-1507 L1: they used to disagree on the rerouted-unlanded path).
 	if reroutedUnlanded {
 		reason = "ship-promote-retry-unlanded-sha"
 	}
+	releaseContinuationOnRetire(opts, dest, taskID, reason)
 	writeLedger(opts, LedgerEntry{
 		Action: "promote",
 		TaskID: taskID,

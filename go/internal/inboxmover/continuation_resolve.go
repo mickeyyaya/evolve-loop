@@ -75,6 +75,43 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 			return nil
 		}
 		if ok && c.SnapshotSHA != "" {
+			// Live-scope guard (planner-and-adoption-live-scope-guard). This is
+			// the ONE seam both the wave planner's lane-scope minting and the
+			// post-triage adoption path go through, and it used to trust a
+			// registry hit without asking whether the scope id still names a
+			// live pending item — so a parked/consumed scope re-armed on every
+			// wave with no adoption event and no carryover entry (cycles 1487,
+			// 1497). The belt holds even if a release call is ever missed at a
+			// pool-exit path; releasing the ghost here stops it re-arming.
+			//
+			// Two conditions the audit of cycle-1507 (H1/H2) made mandatory
+			// before this read path is allowed to DELETE a root-owned binding:
+			//
+			//  1. RECENCY. A retired copy older than the binding is not evidence
+			//     of a ghost — the item was re-filed and rebound AFTER that
+			//     retirement, and its archived copy sits in consumed/ forever.
+			//     Releasing on that evidence destroys live preserved work
+			//     (measured: 7 of 91 real bindings on the runtime plane).
+			//     Unknown (0) is not stale — the ordinary quarantine copy
+			//     carries no cycle stamp, and refusing to act on the common case
+			//     would disarm the belt entirely.
+			//  2. PRESERVE FIRST. The release goes through the ONE shared
+			//     transaction (ReleaseContinuationBinding), so the salvage
+			//     pointer lands in the item file before the delete instead of
+			//     on stderr only.
+			retiredPath, retiredIn := scopeRetiredAt(opts, id)
+			if retiredIn != "" && !scopeHasLiveItem(opts, id) {
+				if rc := retiredAtCycle(retiredPath); rc > 0 && rc < c.Cycle {
+					fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d scope %q has a retired copy in inbox/%s/ from cycle %d, but its binding is NEWER (cycle %d) — the item was re-filed and rebound after that retirement, so the copy is stale evidence: adopting the binding, not releasing it\n", cycle, id, retiredIn, rc, c.Cycle)
+					resolved := c
+					return &resolved
+				}
+				fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d refusing continuation binding for scope %q: its item is retired in inbox/%s/ with no live pending copy (not in the inbox root, not claimed in processing/) — releasing the dead binding (snapshot %s, cycle %d)\n", cycle, id, retiredIn, c.SnapshotSHA, c.Cycle)
+				if _, _, derr := ReleaseContinuationBinding(opts, id, fmt.Sprintf("scope-read-guard-cycle-%d", cycle)); derr != nil {
+					fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d could not release dead binding for scope %q: %v\n", cycle, id, derr)
+				}
+				continue
+			}
 			resolved := c
 			return &resolved
 		}

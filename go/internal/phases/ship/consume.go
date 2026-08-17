@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -92,6 +93,17 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 			"via":   "ship",
 			"cycle": cid,
 		}
+		// Transactional retire, registry half (park-consume-releases-continuation-
+		// binding): consumption takes the item out of the batch loader's reach, so
+		// its scope-keyed continuation binding must go too — otherwise the next
+		// wave mints a lane straight off the immortal binding (cycles 1487, 1497).
+		// The pointer is PRESERVED into the consumed item here; the registry delete
+		// happens only after the move is staged, so a rollback below leaves both
+		// stores exactly as they were.
+		bound, boundOK := readBindingForConsume(opts, res, id)
+		if boundOK {
+			doc["released_continuations"] = appendReleasedForConsume(doc, bound, cid)
+		}
 		out, err := json.MarshalIndent(doc, "", "  ")
 		if err != nil {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume marshal %q: %v", id, err))
@@ -148,6 +160,65 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 		}
 		opts.internalConsumedPaths = append(opts.internalConsumedPaths, srcRel, dstRel)
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: consumed inbox item %q into %s (rides this ship commit)", id, dstRel))
+		if boundOK {
+			releaseBindingForConsume(opts, res, id, bound)
+		}
+	}
+}
+
+// readBindingForConsume reads id's continuation binding from the ROOT-owned
+// registry (always opts.ProjectRoot — the registry is root-owned even when the
+// consumption itself happens in a ship worktree). Best-effort and LOUD: an
+// unreadable registry leaves the binding in place, where the read-side live-
+// scope guard refuses it, rather than blocking a ship that earned its verdict.
+func readBindingForConsume(opts *Options, res *RunResult, id string) (continuation.Continuation, bool) {
+	c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
+	if err != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation registry unreadable (%v) — binding NOT released", id, err))
+		return continuation.Continuation{}, false
+	}
+	return c, ok
+}
+
+// appendReleasedForConsume returns doc's released_continuations[] with the
+// released binding appended, preserving any entries an earlier retirement left
+// (a non-array value is replaced — the entry being written now is the one that
+// carries the live salvage pointer).
+// The consumed item is TRACKED and rides the ship commit to the public remote,
+// so the absolute host paths are collapsed to "~" first (audit cycle-1507 M1):
+// worktree/findings_path carry the operator account name, while the snapshot,
+// base and branch refs salvage resumes from are unaffected.
+func appendReleasedForConsume(doc map[string]any, c continuation.Continuation, cycleID string) []any {
+	c = continuation.RedactHostPaths(c)
+	var list []any
+	if prev, ok := doc["released_continuations"].([]any); ok {
+		list = prev
+	}
+	return append(list, map[string]any{
+		"worktree":      c.Worktree,
+		"branch":        c.Branch,
+		"snapshot_sha":  c.SnapshotSHA,
+		"base_sha":      c.BaseSHA,
+		"findings_path": c.FindingsPath,
+		"cycle":         c.Cycle,
+		"released_at":   time.Now().UTC().Format(time.RFC3339),
+		"reason":        "ship-consume-" + cycleID,
+	})
+}
+
+// releaseBindingForConsume deletes the binding once the consumption move is
+// staged. DeleteRegistryEntryIfCycle (not the unconditional delete) so a
+// sibling lane that rebound the scope between the read and here keeps its
+// fresh binding — the TOCTOU lost-update the registry's own doc calls out.
+func releaseBindingForConsume(opts *Options, res *RunResult, id string, c continuation.Continuation) {
+	released, err := continuation.DeleteRegistryEntryIfCycle(opts.ProjectRoot, id, c.Cycle)
+	switch {
+	case err != nil:
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation binding release failed: %v", id, err))
+	case !released:
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation binding was rebound by another lane (cycle %d no longer owns it) — left intact", id, c.Cycle))
+	default:
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: released continuation binding for %q (snapshot %s, cycle %d) — pointer preserved in the consumed item", id, c.SnapshotSHA, c.Cycle))
 	}
 }
 
