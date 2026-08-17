@@ -26,5 +26,11 @@
   "priority": "high",
   "weight": 0.89,
   "created_at": "2026-08-16T15:10:00Z",
-  "notes": "Filed after console-side manual remediation: bindings for context-fill-telemetry-and-cap (cycle-1487), minted-phase-verdict-contract-unsatisfiable (1483), dead-api-sweep (1483) released under the registry flock, pointers preserved in the item files. The pattern to generalize: the pending pool has THREE dispatch sources and every retirement path must retire from all of them. | REPRIORITIZED 2026-08-17 0.86->0.89 per docs/incidents/2026-08-17-failure-rate-review-1481-1503.md ranked plan (operator directive: prioritize pipeline/fail-rate improvements)."
+  "notes": "Filed after console-side manual remediation: bindings for context-fill-telemetry-and-cap (cycle-1487), minted-phase-verdict-contract-unsatisfiable (1483), dead-api-sweep (1483) released under the registry flock, pointers preserved in the item files. The pattern to generalize: the pending pool has THREE dispatch sources and every retirement path must retire from all of them. | REPRIORITIZED 2026-08-17 0.86->0.89 per docs/incidents/2026-08-17-failure-rate-review-1481-1503.md ranked plan (operator directive: prioritize pipeline/fail-rate improvements).",
+  "consumed": {
+    "at": "2026-08-18T08:00:00Z",
+    "via": "console-manual",
+    "cycle": "1515",
+    "resolution": "LANDED as cycle ship 868b8cf8 (23 files/+2462): ADR-0089 continuation-retirement + live-scope guard, evolve continuation CLI (cmd_continuation.go), planner/adoption live-item guards, registry release-on-park/consume (inboxmover continuation_release/retire), ship-side consume_registry_release. In-commit self-consumption did NOT fire on this ship (see acs verdict) \u2014 recorded as further warn-ship-consumption-gap evidence."
+  }
 }
