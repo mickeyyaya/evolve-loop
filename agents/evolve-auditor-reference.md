@@ -102,6 +102,15 @@ Loaded when the auditor writes `workspace/audit-report.md` and the `Ledger Entry
 
 ### Workspace File: `workspace/audit-report.md`
 
+**Whole-file size budget: 32KB (32768 bytes).** The gate checks it
+(`auditReportMaxBytes`, `go/internal/phases/audit/audit.go`) and emits a
+warning-only diagnostic on overflow — it never fails the cycle and never
+truncates the file (ship SHA-binds these exact bytes). Stay inside the budget at
+the source: the `## Issues` table is the section that grows without bound, so
+cap it at the top findings by severity (HIGH first, then MEDIUM; drop LOW rows
+rather than the evidence for a HIGH one) and keep long evidence in the evictable
+sections below the Handoff Summary.
+
 ```markdown
 <!-- challenge-token: {token} -->
 # Cycle {N} Audit Report

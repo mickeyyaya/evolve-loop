@@ -51,6 +51,26 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
+// auditReportMaxBytes bounds the SIZE of audit-report.md, the same way
+// defect_ledger.go's defectLedgerMaxEntries/defectTextMaxRunes bound the
+// ledger: bound it, RECORD the overflow, never silently drop. The report is
+// re-read in full at ship time and SHA-bound there
+// (internal/phases/ship/audit.go), and the next cycle's handoff carries the
+// prior audit forward, so an unbounded ## Issues table compounds token cost on
+// every downstream read.
+//
+// Two properties are load-bearing. The overflow diagnostic is severity
+// "warning", NEVER "error": core's errorSeverityMessages keys off
+// Severity=="error" to build AuditFailReasons, so an error here would convert a
+// merely verbose report into a dossier-visible failure. And the check never
+// touches the file on disk — ship SHA-binds those exact bytes, so a truncating
+// cap would break the integrity check it was meant to protect.
+//
+// 32KiB is ~1.5x the largest audit-report.md observed across 256 recorded runs
+// (max 22,035 bytes, p90 15,777): high enough that a normal report never trips
+// it, low enough to catch a runaway table.
+const auditReportMaxBytes = 32 * 1024
+
 // verdictCanonicalRE matches the canonical two-line heading
 // "## Verdict\n**PASS**" — bold optional, intervening blank lines tolerated.
 var verdictCanonicalRE = regexp.MustCompile(`(?m)^##[^\S\n]*Verdict[^\S\n]*\n\s*\*{0,2}(PASS|FAIL|WARN|SKIPPED)\*{0,2}`)
@@ -187,6 +207,16 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		verdict = core.VerdictFAIL
 	}
 	var diags []core.Diagnostic
+	// Size budget: warn once when the report overruns auditReportMaxBytes.
+	// Diagnostic-only by construction — the verdict is untouched and the
+	// artifact on disk is never rewritten (ship SHA-binds it).
+	if len(artifact) > auditReportMaxBytes {
+		diags = append(diags, core.Diagnostic{
+			Severity: "warning",
+			Message: fmt.Sprintf("audit-report.md size %d bytes exceeds the %d-byte budget — trim ## Issues to the top findings by severity and keep evidence in the evictable sections (advisory: the verdict and the artifact are unchanged)",
+				len(artifact), auditReportMaxBytes),
+		})
+	}
 	// overrodeBy names each gate that ACTUALLY forced verdict=FAIL this call —
 	// the single source of truth for "was the narrative overridden?". Keying the
 	// conflict record off this list (not off "a gate diagnostic exists") is what

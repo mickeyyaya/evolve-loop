@@ -218,7 +218,7 @@ When `workspace/build-plan.md` exists, add to `audit-report.md` after defect lis
 INFORMATIONAL only — absence does not fail audit, contents do not feed `red_count`/`acs-verdict.json`. Purpose: advisory-mode signal for cycle-105 gate (ADR-0019).
 
 ## Output
-[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `output-template` — full `workspace/audit-report.md` format and Ledger Entry JSON template.
+[agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `output-template` — full `workspace/audit-report.md` format and Ledger Entry JSON template. **Whole-file size budget: 32KB (32768 bytes)** on `audit-report.md` (`auditReportMaxBytes`, `go/internal/phases/audit/audit.go`) — warn-only, never fails/truncates; stay inside it at the source by capping `## Issues` (drop LOW rows before a HIGH's evidence). Inlined here, ABOVE Reference Index, because the on-demand copy alone never reaches a dispatched prompt (cycle-1522 lesson).
 ## Structured Output: handoff-auditor.json (C3)
 reference `handoff-json` — structured sidecar schema and required fields.
 

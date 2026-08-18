@@ -93,6 +93,31 @@ bash legacy/scripts/verification/audit-constitution-check.sh .evolve/runs/cycle-
 # Exit 2 = missing citations; defect emitted
 ```
 
+## Report size budget (cycle-1522)
+
+`audit-report.md` has a whole-file budget of **32KB (32768 bytes)**, the constant
+`auditReportMaxBytes` in [go/internal/phases/audit/audit.go](../../go/internal/phases/audit/audit.go).
+Over-budget emits exactly one `warning`-severity diagnostic naming the actual
+size and the cap; it never flips the verdict and never rewrites the file.
+
+Both properties are load-bearing, not stylistic:
+
+- **Severity is wiring.** `core.errorSeverityMessages` keys off
+  `Severity == "error"` to build `AuditFailReasons`, so an error-severity size
+  diagnostic would turn a merely verbose report into a dossier-visible failure.
+- **No on-disk mutation.** The ship phase re-reads this artifact and SHA-binds
+  those exact bytes (`go/internal/phases/ship/audit.go`), so a truncating cap
+  would break the integrity check it was meant to protect.
+
+The idiom is the one `defect_ledger.go` already uses for the defect ledger
+(`defectLedgerMaxEntries` / `defectTextMaxRunes`, cycle-1282 DEF-6): bound it,
+RECORD the overflow, never silently drop. The budget is set ~1.5x above the
+largest report observed across 256 recorded runs (max 22,035 bytes, p90 15,777)
+— high enough that a normal report never trips it, low enough to catch a runaway
+`## Issues` table. The auditor persona carries the same number
+([agents/evolve-auditor-reference.md](../../agents/evolve-auditor-reference.md)
+§ output-template), and `go/acs/cycle1522` fails on drift between the two.
+
 ## References
 
 - ADR-0012 (parent): [adr/0012-commit-claim-coherence.md](adr/0012-commit-claim-coherence.md)
