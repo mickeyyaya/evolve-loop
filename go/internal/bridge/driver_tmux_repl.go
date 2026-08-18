@@ -560,6 +560,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			return ExitREPLBootTimeout, nil
 		}
 	}
+	// Submit-verify the prompt delivery (driver_tmux_submitverify.go). Read off
+	// the SAME already-captured baseline the spill check just used — no extra
+	// capture, no fixture-frame drift — and ordered after it so a pane that
+	// spilled into a dead shell fails fast rather than collecting Enters. The
+	// paste is submitted with a blind Enter (or the human-cadence review path);
+	// if the prompt is still sitting at the input line, re-send it, bounded.
+	if !lp.bootOnly {
+		verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
+			firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		waitedS = elapsed
@@ -806,6 +816,15 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				if lastVerdict.Action == ReviewPause && isDeterministic && !livenessCenter.Busy(lp.session) && !nudgeSent {
 					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
+					// The recorded stall (cycles 1505/1510/1517): this nudge was
+					// still parked at the `❯` input line in the final capture and
+					// every interaction record read result=no_effect. Verify it
+					// was submitted; re-send Enter, bounded, if it was not.
+					// A fresh capture is unavoidable here: the nudge was sent
+					// microseconds ago, so every earlier pane predates it.
+					deps.Sleep(submitVerifySettle)
+					nudgePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
