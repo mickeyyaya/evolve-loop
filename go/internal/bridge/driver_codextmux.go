@@ -65,18 +65,20 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	launchCmd := launchCmdLine(resolveBinary(deps, "codex"), flags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:           "codex-tmux",
-		session:        session,
-		named:          named,
-		launchCmd:      launchCmd,
-		promptMarker:   "›", // U+203A
-		bootScrollback: 200, // alt-screen: bare capture-pane is blank
-		bootIntervalS:  2,
-		tickDuringBoot: true, // codex shows a trust prompt during boot
-		bootMenuSkip:   "2",  // codex update menu: Skip before prompt injection
-		exitSeq:        []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
-		bootOnly:       cfg.BootOnly,
-		guardDeadShell: true,
+		name:         "codex-tmux",
+		session:      session,
+		named:        named,
+		launchCmd:    launchCmd,
+		promptMarker: "›", // U+203A
+		// Same glyph: codex's boot-ready marker IS its input-line prompt.
+		inputLineMarker: "›",
+		bootScrollback:  200, // alt-screen: bare capture-pane is blank
+		bootIntervalS:   2,
+		tickDuringBoot:  true, // codex shows a trust prompt during boot
+		bootMenuSkip:    "2",  // codex update menu: Skip before prompt injection
+		exitSeq:         []tmuxKey{{keys: "/quit", enter: true, pauseS: 2}},
+		bootOnly:        cfg.BootOnly,
+		guardDeadShell:  true,
 	})
 }
 
