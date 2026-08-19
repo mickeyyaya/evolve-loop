@@ -62,17 +62,26 @@ type tmuxKey struct {
 // driver-specific that the state machine needs is captured here; the
 // driver computes it after its own preflight.
 type tmuxLaunch struct {
-	name           string    // log prefix, e.g. "claude-tmux"
-	session        string    // resolved tmux session name
-	named          bool      // resume-eligible: skip kill + skip exit seq
-	launchCmd      string    // REPL launch command line
-	promptMarker   string    // boot-ready marker to grep the pane for
-	bootScrollback int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
-	bootIntervalS  int       // seconds per boot poll iteration
-	tickDuringBoot bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
-	bootMenuSkip   string    // non-empty: keypress sent when an interstitial update menu is detected
-	exitSeq        []tmuxKey // keystrokes to close the REPL cleanly
-	bootOnly       bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
+	name         string // log prefix, e.g. "claude-tmux"
+	session      string // resolved tmux session name
+	named        bool   // resume-eligible: skip kill + skip exit seq
+	launchCmd    string // REPL launch command line
+	promptMarker string // boot-ready marker to grep the pane for
+	// inputLineMarker locates the LIVE INPUT LINE: text after its LAST
+	// occurrence is what has been typed but not yet submitted. Deliberately
+	// DISTINCT from promptMarker, which only answers "has the REPL booted" —
+	// for agy that is the footer hint "? for shortcuts", which says nothing
+	// about where input begins (cycle-1526 audit). Empty means this family
+	// declares NO input-line marker: submit-verify then refuses to guess and
+	// says so on stderr, rather than anchoring a re-send on a footer and
+	// submitting whatever the agent typed.
+	inputLineMarker string
+	bootScrollback  int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
+	bootIntervalS   int       // seconds per boot poll iteration
+	tickDuringBoot  bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
+	bootMenuSkip    string    // non-empty: keypress sent when an interstitial update menu is detected
+	exitSeq         []tmuxKey // keystrokes to close the REPL cleanly
+	bootOnly        bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
 	// guardDeadShell arms the cycle-274 dead-shell checks (boot rejection +
 	// post-paste spill fast-fail). Set by the REAL CLI drivers — their
 	// foreground process is never a shell, so a shell pane means the CLI is
@@ -375,6 +384,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		deps.Sleep(time.Second)
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "", true) // Enter
 	}
+	// Let the REPL redraw before ANY pane is read as evidence that this Enter
+	// landed. The interval baseline below is submit-verify's first observation
+	// (verifySubmitted, driver_tmux_submitverify.go); captured pre-redraw it
+	// still shows the prompt at the input line and arms a spurious re-send —
+	// the double-submit the guard exists to prevent. The nudge site already
+	// settles on the same constant; this makes the two sites symmetric.
+	deps.Sleep(submitVerifySettle)
 	fmt.Fprintf(deps.Stderr, "%s prompt delivered\n", pfx)
 
 	// --- Live-injection inbox cursor. Seek to EOF so a resumed named session
@@ -528,7 +544,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// a busy→idle pair is seen) — never a false-early bracket.
 	openCorrID := ""
 	sawBusy := false
-	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	intervalBaselinePane, baselineErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	if baselineErr != nil {
+		// This pane is submit-verify's ONLY observation on the clean path. A
+		// failed capture makes the guard entirely blind, and an empty pane reads
+		// as "input line clear" — indistinguishable from a verified submission
+		// unless we say so. Silence here reproduced the pre-fix cycle-1505 log.
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: prompt NOT verified — baseline capture failed, input-line state unknown: %v\n", pfx, baselineErr)
+	}
 	recordTokens(intervalBaselinePane)
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
@@ -568,7 +591,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
 		verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -822,10 +845,15 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					// was submitted; re-send Enter, bounded, if it was not.
 					// A fresh capture is unavoidable here: the nudge was sent
 					// microseconds ago, so every earlier pane predates it.
-					deps.Sleep(submitVerifySettle)
-					nudgePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
-					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
+					// Announce the nudge BEFORE verifying it, so an operator never reads
+					// "re-sending Enter" above any line saying a nudge exists.
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
+					deps.Sleep(submitVerifySettle)
+					nudgePane, nudgeCapErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+					if nudgeCapErr != nil {
+						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
+					}
+					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
 						Kind:    interaction.KindNudge,

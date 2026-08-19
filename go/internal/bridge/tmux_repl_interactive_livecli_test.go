@@ -84,7 +84,7 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 	deps := Deps{Tmux: execTmux{}, Sleep: time.Sleep, Now: time.Now}.withDefaults()
 	lp := tmuxLaunch{
 		name: sp.name, session: sess, launchCmd: sp.launchCmd,
-		promptMarker: sp.marker, bootScrollback: sp.bootScrollback,
+		promptMarker: sp.marker, inputLineMarker: sp.marker, bootScrollback: sp.bootScrollback,
 		bootIntervalS: sp.bootIntervalS, tickDuringBoot: sp.tickDuringBoot,
 		exitSeq: sp.exitSeq,
 	}
