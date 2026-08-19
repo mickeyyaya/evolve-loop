@@ -544,7 +544,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// a busy→idle pair is seen) — never a false-early bracket.
 	openCorrID := ""
 	sawBusy := false
-	intervalBaselinePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	intervalBaselinePane, baselineErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	if baselineErr != nil {
+		// This pane is submit-verify's ONLY observation on the clean path. A
+		// failed capture makes the guard entirely blind, and an empty pane reads
+		// as "input line clear" — indistinguishable from a verified submission
+		// unless we say so. Silence here reproduced the pre-fix cycle-1505 log.
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: prompt NOT verified — baseline capture failed, input-line state unknown: %v\n", pfx, baselineErr)
+	}
 	recordTokens(intervalBaselinePane)
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
@@ -584,7 +591,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
 		verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			promptSubmitEcho(resolvedPrompt), tmuxPastePlaceholderEcho)
+			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -838,10 +845,15 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					// was submitted; re-send Enter, bounded, if it was not.
 					// A fresh capture is unavoidable here: the nudge was sent
 					// microseconds ago, so every earlier pane predates it.
-					deps.Sleep(submitVerifySettle)
-					nudgePane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
-					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
+					// Announce the nudge BEFORE verifying it, so an operator never reads
+					// "re-sending Enter" above any line saying a nudge exists.
 					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
+					deps.Sleep(submitVerifySettle)
+					nudgePane, nudgeCapErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+					if nudgeCapErr != nil {
+						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
+					}
+					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
 						Kind:    interaction.KindNudge,

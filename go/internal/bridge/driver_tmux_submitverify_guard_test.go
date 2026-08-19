@@ -22,11 +22,22 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
+)
+
+// Matchers for the keep-guard below. Whitespace-tolerant so gofmt realignment
+// can never turn a green guard red.
+var (
+	emptyMarkerRe    = regexp.MustCompile(`inputLineMarker:\s*""`)
+	declaredMarkerRe = regexp.MustCompile(`inputLineMarker:\s*\S`)
 )
 
 // captureErrTmux fails CapturePane from the errAfter'th call onward, so a test
@@ -168,16 +179,46 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	// empty; it must still NAME the field so the choice is visible in review.
 	noInputLine := map[string]bool{"driver_agytmux.go": true}
 
-	matches, err := filepath.Glob("driver_*tmux.go")
+	// The guard is textual and cannot see a marker emptied at its DEFINITION.
+	// claude/codex point inputLineMarker at shared constants, so pin the shared
+	// one here for free rather than leaving that hole entirely open.
+	if tmuxPromptMarkerDefault == "" {
+		t.Fatal("tmuxPromptMarkerDefault is empty — every driver pointing inputLineMarker at it goes inert while this guard stays green")
+	}
+
+	// Bind git-TRACKED state, not whatever sits on disk (ADR-0084 lens 5a): an
+	// untracked scratch driver_*tmux.go would otherwise become a subject of this
+	// guard and produce a false RED — the cd49274beab2 class.
+	root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		t.Fatalf("glob: %v", err)
+		t.Fatalf("git rev-parse --show-toplevel: %v", err)
+	}
+	repoRoot := strings.TrimSpace(string(root))
+	tracked, err := repostate.TrackedFiles(repoRoot, "go/internal/bridge")
+	if err != nil {
+		t.Fatalf("tracked files: %v", err)
 	}
 	var drivers []string
-	for _, m := range matches {
-		if !strings.Contains(readFileT(t, m), "tmuxLaunch{") {
+	for _, rel := range tracked {
+		base := filepath.Base(rel)
+		// Select by CONTENT, not filename: a driver named gemini_tmux_driver.go
+		// would escape a `driver_*tmux.go` pattern and inherit exactly the silent
+		// inertness this guard exists to prevent. Test harnesses are excluded —
+		// they are not dispatch surfaces.
+		if strings.HasSuffix(base, "_test.go") {
 			continue
 		}
-		drivers = append(drivers, m)
+		src, err := os.ReadFile(base)
+		if err != nil {
+			// Tracked but not on disk (staged deletion, mid-rebase): not this
+			// guard's failure to report.
+			t.Logf("skipping %s: %v", base, err)
+			continue
+		}
+		if !strings.Contains(string(src), "tmuxLaunch{") {
+			continue
+		}
+		drivers = append(drivers, base)
 	}
 	if len(drivers) < 4 {
 		t.Fatalf("found %d driver(s) constructing tmuxLaunch %v — the guard has lost its subjects", len(drivers), drivers)
@@ -189,7 +230,10 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 				"silently inert for this family (cycle-1526 audit: agy's footer marker)", d)
 			continue
 		}
-		declaresEmpty := strings.Contains(src, "inputLineMarker: \"\"") || !strings.Contains(src, "inputLineMarker:")
+		// Whitespace-tolerant on purpose: gofmt re-pads struct-literal keys when a
+		// sibling field name grows, so a single-space literal match would FALSE-RED
+		// on a file nobody edited.
+		declaresEmpty := emptyMarkerRe.MatchString(src) || !declaredMarkerRe.MatchString(src)
 		if noInputLine[d] && !declaresEmpty {
 			t.Errorf("%s is listed as having no input-line marker but now declares one — "+
 				"delist it from noInputLine (self-pruning exception list)", d)

@@ -136,7 +136,13 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 		}
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
 			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
-		_ = deps.Tmux.SendKeys(ctx, lp.session, "", true)
+		if err := deps.Tmux.SendKeys(ctx, lp.session, "", true); err != nil {
+			// Without this the loop runs to exhaustion and reports "pane looks
+			// wedged" — a confident WRONG diagnosis that points an operator (and
+			// any log-scraping classifier) at the REPL when tmux is what died.
+			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s re-send %d/%d never reached tmux — the session is unreachable, not wedged: %v\n", pfx, site, resends+1, submitVerifyMaxResends, err)
+			return resends
+		}
 		resends++
 		deps.Sleep(submitVerifySettle)
 		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
@@ -154,21 +160,36 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 	return resends
 }
 
-// promptSubmitEcho is what a verbatim-echo REPL shows at its input line after a
-// paste: the head of the prompt, whitespace-normalized so a wrapped render
-// compares equal.
+// promptSubmitEcho is the FORWARD-direction echo for a pasted prompt: the head
+// of the whole prompt, whitespace-normalized so a wrapped render compares equal.
 //
-// It deliberately does NOT use firstNonEmptyLine alone. That line is the only
-// prompt-derived echo the prompt site has, and a prompt whose first non-empty
+// Why the whole prompt and not just its first line: the first line is the only
+// prompt-derived echo the prompt site had, and a prompt whose first non-empty
 // line is short (YAML frontmatter `---`, a stub header) falls under
-// submitVerifyMinEchoRunes — the echo would then never match and the guard
-// would silently miss the cycles 1505/1510/1517 stall it exists to catch.
-// Taking the head of the WHOLE prompt keeps the echo above the floor
-// regardless of how the prompt is laid out, and is byte-identical to the old
-// behavior whenever the first line already exceeds echoChunk's window.
+// submitVerifyMinEchoRunes — that echo would never match and the guard would
+// silently miss the cycles 1505/1510/1517 stall it exists to catch.
 //
-// Bounded on purpose: echoChunk caps at submitVerifyEchoRunes, so the reverse
-// match direction (Contains(full, tail)) compares against a short head, never
-// the whole prompt — passing the whole prompt would let any ≥floor phrase the
-// agent happens to type that also appears anywhere in the prompt arm a re-send.
+// It is BOUNDED (echoChunk caps at submitVerifyEchoRunes) and is therefore NOT
+// a drop-in replacement for the first line in BOTH match directions: the
+// reverse direction reads the passed value directly, so a head-only echo would
+// narrow it from "any fragment of the first line" to "any fragment of its first
+// 40 runes" — a silent detection loss on a REPL that horizontally scrolls its
+// input line (ollama readline) rather than wrapping. The prompt site therefore
+// passes this AND firstNonEmptyLine: this one keeps the forward direction above
+// the floor, the first line preserves the reverse direction's original reach.
+// Passing the WHOLE prompt as an echo would be wrong in the other direction —
+// reverse would then match any ≥floor phrase the agent typed that appears
+// anywhere in the prompt body.
 func promptSubmitEcho(prompt string) string { return echoChunk(prompt) }
+
+// firstNonEmptyLine returns the first line of s with content — the line a REPL
+// that echoes a paste verbatim shows at its input line, and the reverse
+// direction's echo at the prompt site (see promptSubmitEcho).
+func firstNonEmptyLine(s string) string {
+	for _, ln := range strings.Split(s, "\n") {
+		if strings.TrimSpace(ln) != "" {
+			return ln
+		}
+	}
+	return ""
+}
