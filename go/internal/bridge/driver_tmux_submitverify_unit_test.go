@@ -24,6 +24,17 @@ func TestPendingAtInputLine(t *testing.T) {
 		{"paste chip parked", "❯ [Pasted text #1 +812 lines]", []string{"# Evolve Builder", tmuxPastePlaceholderEcho}, true},
 		{"no marker on screen at all", "zsh: command not found", []string{nudge}, false},
 		{"empty echo never matches", "❯ something", []string{""}, false},
+		// cycle-1526 audit M1: the forward branch had no length floor while the
+		// reverse branch enforced one, so a SHORT echo matched almost any input
+		// line — arming up to submitVerifyMaxResends Enters into text the AGENT
+		// typed. That is the double-submit desync this guard exists to prevent.
+		// A prompt whose first non-empty line is short (frontmatter `---`, a
+		// stub header) is all it takes; today's 53-char first lines are a
+		// measurement, not an invariant.
+		{"short echo must not match agent typing", "❯ let me check --- the diff", []string{"---"}, false},
+		{"sub-floor echo below the rune floor", "❯ yes", []string{"y"}, false},
+		{"echo one rune below the floor", "❯ abcdefg and more", []string{"abcdefg"}, false},
+		{"echo exactly at the rune floor still matches", "❯ abcdefgh and more", []string{"abcdefgh"}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -32,4 +43,16 @@ func TestPendingAtInputLine(t *testing.T) {
 			}
 		})
 	}
+
+	// Second mechanism, pinned separately (review M1): a family that declares no
+	// input-line marker is refused HERE too, not only by verifySubmitted's early
+	// return. The two are deliberately redundant — that is why a mutation which
+	// deletes the early return alone is still safe — so the redundancy itself
+	// needs a test, or a later "simplification" could remove this check and
+	// leave the whole guard resting on one branch.
+	t.Run("empty marker is refused — no anchor, no match", func(t *testing.T) {
+		if pendingAtInputLine("● out\n? for shortcuts\n"+nudge, "", []string{nudge}) {
+			t.Error("pendingAtInputLine() = true for an empty marker; with nothing to anchor on it must never claim the input line is pending")
+		}
+	})
 }

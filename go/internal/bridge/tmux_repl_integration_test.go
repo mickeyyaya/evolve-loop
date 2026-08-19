@@ -137,14 +137,15 @@ func itDeps(perTick time.Duration) Deps {
 // an unexpected auto-response).
 func itLaunch(session, launchCmd, marker string, scrollback int, named bool) tmuxLaunch {
 	return tmuxLaunch{
-		name:           "itest-tmux",
-		session:        session,
-		named:          named,
-		launchCmd:      launchCmd,
-		promptMarker:   marker,
-		bootScrollback: scrollback,
-		bootIntervalS:  1,
-		exitSeq:        []tmuxKey{{keys: "/exit", enter: true, pauseS: 0}},
+		name:            "itest-tmux",
+		session:         session,
+		named:           named,
+		launchCmd:       launchCmd,
+		promptMarker:    marker,
+		inputLineMarker: marker,
+		bootScrollback:  scrollback,
+		bootIntervalS:   1,
+		exitSeq:         []tmuxKey{{keys: "/exit", enter: true, pauseS: 0}},
 	}
 }
 

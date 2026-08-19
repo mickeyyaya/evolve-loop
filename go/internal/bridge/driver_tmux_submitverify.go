@@ -33,6 +33,13 @@ const (
 	// at the input line to call it unsubmitted. Long enough that unrelated
 	// agent typing cannot collide with it.
 	submitVerifyEchoRunes = 40
+	// submitVerifyMinEchoRunes is the floor BOTH match directions honour: below
+	// it a fragment is too generic to identify what this driver sent, and a
+	// match would arm re-sends into whatever the agent typed — the double-submit
+	// this guard exists to prevent (cycle-1526 audit M1: the forward direction
+	// had no floor, so a short first line like `---` matched almost any input
+	// line). Single-sourced: the reverse direction used to hardcode this.
+	submitVerifyMinEchoRunes = 8
 	// submitVerifySettle is the pause between a re-sent Enter and the capture
 	// that judges it — the REPL needs a frame to redraw.
 	submitVerifySettle = 500 * time.Millisecond
@@ -85,10 +92,12 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 		}
 		// Either direction: the pane shows the head of what we sent (normal),
 		// or the pane truncated it to a shorter fragment of the same text.
-		if strings.Contains(tail, echoChunk(full)) {
+		// Both are floored at submitVerifyMinEchoRunes — a fragment shorter than
+		// that identifies nothing, and matching on it re-sends the agent's text.
+		if chunk := echoChunk(full); len([]rune(chunk)) >= submitVerifyMinEchoRunes && strings.Contains(tail, chunk) {
 			return true
 		}
-		if len([]rune(tail)) >= 8 && strings.Contains(full, tail) {
+		if len([]rune(tail)) >= submitVerifyMinEchoRunes && strings.Contains(full, tail) {
 			return true
 		}
 	}
@@ -109,20 +118,35 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 // site names the submission ("prompt", "nudge") in the log line; echoes are
 // candidate renderings of what was sent.
 func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) int {
+	// No input-line marker ⇒ nothing to anchor a match to. Refuse LOUDLY: the
+	// alternative is matching against whatever follows a boot/footer marker,
+	// which re-sends the agent's own text (cycle-1526 audit — agy's marker is
+	// the footer "? for shortcuts").
+	if lp.inputLineMarker == "" {
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — %s declares no input-line marker, "+
+			"so a stalled submission here will not be detected or re-sent\n", pfx, site, lp.name)
+		return 0
+	}
 	resends := 0
-	for pendingAtInputLine(pane, lp.promptMarker, echoes) {
+	for pendingAtInputLine(pane, lp.inputLineMarker, echoes) {
 		if resends >= submitVerifyMaxResends {
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s STILL unsubmitted after %d re-send(s) — giving up; pane looks wedged\n",
 				pfx, site, resends)
 			return resends
 		}
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
-			pfx, site, lp.promptMarker, resends+1, submitVerifyMaxResends)
+			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "", true)
 		resends++
 		deps.Sleep(submitVerifySettle)
 		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 		if err != nil {
+			// Never silent: without this line an operator sees a re-send start
+			// and nothing after it, and cannot tell a cleared input line from a
+			// dead tmux server.
+			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
+				"stopping verification, input-line state unknown: %v\n",
+				pfx, site, resends, submitVerifyMaxResends, err)
 			return resends
 		}
 		pane = next
@@ -130,13 +154,21 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 	return resends
 }
 
-// firstNonEmptyLine returns the first line of s with content — the line a REPL
-// that echoes a paste verbatim shows at its input line.
-func firstNonEmptyLine(s string) string {
-	for _, ln := range strings.Split(s, "\n") {
-		if strings.TrimSpace(ln) != "" {
-			return ln
-		}
-	}
-	return ""
-}
+// promptSubmitEcho is what a verbatim-echo REPL shows at its input line after a
+// paste: the head of the prompt, whitespace-normalized so a wrapped render
+// compares equal.
+//
+// It deliberately does NOT use firstNonEmptyLine alone. That line is the only
+// prompt-derived echo the prompt site has, and a prompt whose first non-empty
+// line is short (YAML frontmatter `---`, a stub header) falls under
+// submitVerifyMinEchoRunes — the echo would then never match and the guard
+// would silently miss the cycles 1505/1510/1517 stall it exists to catch.
+// Taking the head of the WHOLE prompt keeps the echo above the floor
+// regardless of how the prompt is laid out, and is byte-identical to the old
+// behavior whenever the first line already exceeds echoChunk's window.
+//
+// Bounded on purpose: echoChunk caps at submitVerifyEchoRunes, so the reverse
+// match direction (Contains(full, tail)) compares against a short head, never
+// the whole prompt — passing the whole prompt would let any ≥floor phrase the
+// agent happens to type that also appears anywhere in the prompt arm a re-send.
+func promptSubmitEcho(prompt string) string { return echoChunk(prompt) }

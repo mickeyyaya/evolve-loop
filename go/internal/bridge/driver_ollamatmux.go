@@ -111,17 +111,19 @@ func (ollamaTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 	launchCmd := ollamaComposeLaunchCmd(resolveBinary(deps, "ollama"), model, cfg.Realization.LaunchFlags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:           "ollama-tmux",
-		session:        session,
-		named:          named,
-		launchCmd:      launchCmd,
-		promptMarker:   ">>> ", // REPL prompt marker per docs.ollama.com/cli
-		bootScrollback: 200,    // first-use `ollama run` prints a model-download progress bar that scrolls the >>> prompt off an 80-row pane; scan scrollback to be safe (operator may also pre-pull via `ollama pull <model>`)
-		bootIntervalS:  1,
-		tickDuringBoot: false, // no boot-time interactive prompts on the happy path
-		exitSeq:        []tmuxKey{{keys: "/bye", enter: true, pauseS: 1}},
-		bootOnly:       cfg.BootOnly,
-		guardDeadShell: true,
+		name:         "ollama-tmux",
+		session:      session,
+		named:        named,
+		launchCmd:    launchCmd,
+		promptMarker: ">>> ", // REPL prompt marker per docs.ollama.com/cli
+		// Same string: ollama's boot-ready marker IS its input-line prompt.
+		inputLineMarker: ">>> ",
+		bootScrollback:  200, // first-use `ollama run` prints a model-download progress bar that scrolls the >>> prompt off an 80-row pane; scan scrollback to be safe (operator may also pre-pull via `ollama pull <model>`)
+		bootIntervalS:   1,
+		tickDuringBoot:  false, // no boot-time interactive prompts on the happy path
+		exitSeq:         []tmuxKey{{keys: "/bye", enter: true, pauseS: 1}},
+		bootOnly:        cfg.BootOnly,
+		guardDeadShell:  true,
 	})
 }
 
