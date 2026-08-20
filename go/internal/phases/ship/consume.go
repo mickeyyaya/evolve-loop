@@ -63,7 +63,17 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	if body == nil && note != "" {
 		res.Logs = append(res.Logs, note) // corrupt/absent decision stays visible
 	}
-	ids := extractIDs(body)
+	// Same resolver the post-ship promotion uses — precedence and rationale live
+	// once, at committedInboxIDs (postship.go). Reading triage alone here is what
+	// kept consumption at zero for eight cycles on carryover-driven lanes.
+	//
+	// Blast radius worth knowing: this id set also drives the continuation-binding
+	// release below (readBindingForConsume / released_continuations / the registry
+	// delete), so lane-scope and Closes-Inbox ids now reach it too. That is
+	// consistent with shipped behavior — postship's retireCommittedCarryover
+	// already retires the carryover twins for the identical set — but it is a
+	// wider set than the triage-only one this path used to see.
+	ids := committedInboxIDs(opts.WorkspacePath, body)
 	if len(ids) == 0 {
 		return
 	}
