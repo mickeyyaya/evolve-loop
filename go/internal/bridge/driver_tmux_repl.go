@@ -590,8 +590,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// paste is submitted with a blind Enter (or the human-cadence review path);
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
-		verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt",
+			verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
+				promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho))
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -853,7 +854,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					if nudgeCapErr != nil {
 						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
 					}
-					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
+					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge",
+						verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg))
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
 						Kind:    interaction.KindNudge,

@@ -242,3 +242,40 @@ func TestInteractionRule_BoundViaLoadRules(t *testing.T) {
 		t.Errorf("PromoteRule must have written %s.yaml: %v", id, statErr)
 	}
 }
+
+// TestSubmitVerifyConsts_FlowThroughRollup pins the submit-verify vocabulary the
+// tmux driver emits (internal/bridge/driver_tmux_submitverify.go), through the
+// same producer→Rollup path every other const in this file uses. The driver
+// records one outcome per driver-initiated submission; Rollup buckets them, so a
+// renamed const — or a driver that stopped emitting one — fails here.
+func TestSubmitVerifyConsts_FlowThroughRollup(t *testing.T) {
+	ev := func(result string) interaction.Outcome {
+		return interaction.Outcome{
+			Event:  interaction.Event{Kind: interaction.KindSubmitVerify, Phase: "build", Cycle: 1526, Trigger: "driver_submission"},
+			Result: result,
+		}
+	}
+	s := recordAndRollup(t, []interaction.Outcome{
+		ev(interaction.ResultSubmitVerified),
+		ev(interaction.ResultSubmittedAfterResend),
+		ev(interaction.ResultSubmitWedged),
+		ev(interaction.ResultNotVerified),
+	})
+	if got := s.ByKind[interaction.KindSubmitVerify]; got != 4 {
+		t.Errorf("ByKind[%q] = %d, want 4", interaction.KindSubmitVerify, got)
+	}
+	for _, r := range []string{
+		interaction.ResultSubmitVerified,
+		interaction.ResultSubmittedAfterResend,
+		interaction.ResultSubmitWedged,
+		interaction.ResultNotVerified,
+	} {
+		if got := s.ByResult[r]; got != 1 {
+			t.Errorf("ByResult[%q] = %d, want 1 — the const must be the exact key that flows through", r, got)
+		}
+	}
+	// The clean case must NOT land in the auto-respond bucket.
+	if got := s.ByResult[interaction.ResultPromptCleared]; got != 0 {
+		t.Errorf("ByResult[%q] = %d, want 0 — submit-verify no-ops must not dilute injection-success", interaction.ResultPromptCleared, got)
+	}
+}
