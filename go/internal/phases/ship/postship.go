@@ -232,15 +232,9 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			if body != nil {
-				committedIDs = inboxmover.CommittedIDs(body)
-			} else {
-				committedIDs = laneFallbackIDs
-			}
-			// Union, not replace: a marker closes items ALONGSIDE whatever triage
-			// named, which is the whole point — the id nobody named at dispatch is
-			// exactly the one that used to survive its own landing.
-			committedIDs = unionIDs(committedIDs, markerIDs)
+			// Precedence + marker union live in committedInboxIDs, shared with the
+			// in-commit consumption so the two resolutions cannot drift apart.
+			committedIDs = committedInboxIDs(cycleDir, body)
 			// Reconcile superseded[] — inbox items whose work shipped under a
 			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
 			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
@@ -402,6 +396,33 @@ func triageDecisionBytes(cycleDir string, cid int) ([]byte, string) {
 // (never_duplicate_centralize).
 func extractIDs(body []byte) []string {
 	return inboxmover.CommittedIDs(body)
+}
+
+// committedInboxIDs is the SINGLE resolver for "which inbox ids did this cycle
+// close". Both consumption sites use it: the in-commit consumption
+// (consume.go, so the retirement rides the landing) and the post-ship promotion
+// below. They diverged for eight cycles — consume.go read triage top_n alone
+// while this file already resolved three sources — and that asymmetry is why a
+// carryover-driven lane could land a PASS ship that closed an item and leave it
+// pickable, because its triage ids never match the inbox file's own id.
+//
+// Precedence is postship's, preserved verbatim:
+//   - triage decision PRESENT  -> its committed set, and lane-scope is IGNORED.
+//     A present decision that committed zero ids must keep the declined menu
+//     unpromoted; a naive union would retire work triage deliberately declined.
+//   - triage decision ABSENT   -> the lane-scope pin (continuation/lane cycles
+//     carry no decision at all).
+//   - ALWAYS union the build-report Closes-Inbox marker: a marker closes items
+//     ALONGSIDE whatever triage named, which is the whole point — the id nobody
+//     named at dispatch is exactly the one that used to survive its own landing.
+func committedInboxIDs(cycleDir string, body []byte) []string {
+	var ids []string
+	if body != nil {
+		ids = inboxmover.CommittedIDs(body)
+	} else {
+		ids = cycleoutcome.LaneScopeIDs(cycleDir)
+	}
+	return unionIDs(ids, inboxmover.ClosesInboxIDs(readBuildReport(cycleDir)))
 }
 
 // repinPostCycle handles the case where the just-shipped commit

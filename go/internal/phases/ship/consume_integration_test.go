@@ -162,3 +162,108 @@ func TestShipDirect_ConsumesCommittedItemFromHead(t *testing.T) {
 		t.Error("root item must be gone — main stops offering it")
 	}
 }
+
+// consumeScenarioWith builds the consume harness and lets the caller replace the
+// workspace's id-source files, so a test can express "no triage decision" or
+// "triage named something else" without duplicating the fixture.
+func consumeScenarioWith(t *testing.T, mutate func(ws string)) (repo, wt, ws, itemRel string) {
+	t.Helper()
+	repo, wt, ws, itemRel = consumeScenario(t, "PASS")
+	mutate(ws)
+	return repo, wt, ws, itemRel
+}
+
+// TestConsume_ResolvesIDsLikePostShip pins that IN-COMMIT consumption resolves the
+// committed-id set from the same sources the POST-ship promotion already does.
+//
+// consume.go read triage top_n alone, while postship.go (:190-250) resolves from
+// three and even documents the gap ("extractIDs only walks top_n/skip_shipped, so
+// these orphans were never retired"). The asymmetry is why consumption never fired
+// in 8 cycles: a carryover-driven lane carries no triage id matching its inbox
+// file, so the item stayed pickable even on a PASS ship that closed it.
+func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
+	consumedRel := ".evolve/inbox/consumed/2026-08-15T03-00-00Z-fix-the-widget.json"
+
+	t.Run("no triage decision: the lane-scope pin is the committed set", func(t *testing.T) {
+		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+			// A continuation/lane cycle carries NO triage decision at all.
+			mustRemove(t, filepath.Join(ws, "triage-decision.json"))
+			mustWrite(t, filepath.Join(ws, "lane-scope.json"),
+				`{"todo_ids":["fix-the-widget"],"goal_hash":"abc"}`)
+		})
+		shipConsumeAndAssert(t, repo, wt, ws, itemRel, consumedRel,
+			"a lane cycle with no triage decision must consume its lane-scope item in-commit")
+	})
+
+	t.Run("triage decided nothing: a lane-scope pin must NOT retire the declined menu", func(t *testing.T) {
+		// Precedence guard at the CONSUME site. postship has its own pin
+		// (TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen) but the blast
+		// radius here is worse: a wrong consume lands a tracked deletion on main,
+		// where postship would only have made a recoverable processed/ move.
+		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
+				`{"schema_version":1,"top_n":[],"deferred":[],"dropped":[]}`)
+			mustWrite(t, filepath.Join(ws, "lane-scope.json"),
+				`{"todo_ids":["fix-the-widget"],"goal_hash":"abc"}`)
+		})
+		opts := &Options{
+			Class: ClassCycle, CommitMessage: "feat: nothing committed",
+			ProjectRoot: repo, PluginRoot: repo,
+			WorkspacePath: ws, Stdout: io.Discard, Stderr: io.Discard,
+		}
+		if err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt); err != nil {
+			t.Fatalf("shipFromWorktree: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(itemRel))); err != nil {
+			t.Error("a PRESENT triage decision that committed zero ids must keep the declined menu open — lane-scope must not override it")
+		}
+	})
+
+	t.Run("triage named a different id: the Closes-Inbox marker still closes it", func(t *testing.T) {
+		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+			// The decomposition shape: triage renames the work, so top_n never
+			// matches the inbox file's own id.
+			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
+				`{"schema_version":1,"top_n":[{"id":"some-decomposed-subtask"}],"deferred":[],"dropped":[]}`)
+			mustWrite(t, filepath.Join(ws, "build-report.md"),
+				"# Build Report\n\n## Files Changed\n\n- `wt-change.txt`\n\nCloses-Inbox: fix-the-widget\n")
+		})
+		shipConsumeAndAssert(t, repo, wt, ws, itemRel, consumedRel,
+			"a builder that declares Closes-Inbox must have the item consumed in-commit even when triage renamed the work")
+	})
+}
+
+func mustRemove(t *testing.T, path string) {
+	t.Helper()
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("remove %s: %v", path, err)
+	}
+}
+
+// shipConsumeAndAssert runs a cycle ship over wt and asserts the item was
+// consumed INTO the commit: root deletion + tracked consumed/ record + a loud log.
+func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why string) {
+	t.Helper()
+	opts := &Options{
+		Class:         ClassCycle,
+		CommitMessage: "feat: widget fixed",
+		ProjectRoot:   repo, PluginRoot: repo,
+		WorkspacePath: ws, Stdout: io.Discard, Stderr: io.Discard,
+	}
+	res := &RunResult{}
+	if err := shipFromWorktree(context.Background(), opts, res, "main", wt); err != nil {
+		t.Fatalf("shipFromWorktree: %v", err)
+	}
+	// Full path, not the basename: the commit also carries the tracked ROOT
+	// DELETION under the identical basename, so a basename match is satisfied by
+	// an implementation that deletes the item and never writes the record.
+	if files := commitFileList(t, wt, "cycle-1"); !strings.Contains(files, "consumed/"+filepath.Base(consumedRel)) {
+		t.Fatalf("%s\nthe ship commit must carry the tracked consumed/ record; files=%q", why, files)
+	}
+	if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(itemRel))); !os.IsNotExist(err) {
+		t.Errorf("%s\nroot item must be gone from the tree", why)
+	}
+	if !strings.Contains(strings.Join(res.Logs, "\n"), "consumed") {
+		t.Errorf("%s\nconsumption must be LOUD in ship logs: %v", why, res.Logs)
+	}
+}
