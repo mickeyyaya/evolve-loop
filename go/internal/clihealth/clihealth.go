@@ -65,8 +65,26 @@ func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == 80 }
 // walled resource is guaranteed waste, while most escalations (trust prompts,
 // auth rechecks) are situational. auth_recheck is the documented next candidate.
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit" || pattern == BootTimeoutPattern
+	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == BootTimeoutPattern
 }
+
+// ExhaustedPattern is the OTHER vocabulary a classified quota wall arrives in.
+// codex reports "rate_limit"; agy reports "exhausted" ("Individual quota
+// reached. Please upgrade your subscription… Resets in 6h12m56s"). Same wall,
+// and for four lanes across two waves only one of the two was admitted here, so
+// cli-health never learned agy was walled and the bench-aware chain reorder had
+// no row to act on — every agy-primary phase paid a dead-CLI round-trip.
+const ExhaustedPattern = "exhausted"
+
+// NOTE, deliberate: agy's wall text is "Resets in 6h12m56s", which ParseResetHint
+// does NOT recognize (it keys on "try again at H:MM" / "try again in N hours").
+// So an exhausted bench falls back to CooldownForStrikes — 30 minutes on the
+// first strike — and that is the behavior we want, not an oversight to fix.
+// Teaching the parser this format would newly honor a six-hour hint on ONE
+// refusal, and the evidence says that is wrong: agy claimed "Resets in 6h12m56s"
+// at 17:02Z and then served three successful dispatches at ~19:00Z, inside its
+// own claimed window. Doubling per re-bench (CooldownForStrikes) reaches a long
+// bench only once the wall has actually repeated.
 
 // CooldownForStrikes returns DefaultCooldown doubled per re-bench beyond the
 // first, capped at MaxCooldown. Strikes <=1 → DefaultCooldown.
