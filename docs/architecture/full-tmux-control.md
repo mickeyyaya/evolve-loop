@@ -282,7 +282,7 @@ stuck, the layer model gives a deterministic checklist:
 
 ### 7a. Exit 81: read the artifact-timeout marker line first
 
-An artifact-timeout death emits ONE self-describing summary line on stderr,
+An artifact-timeout death emits ONE self-describing marker line on stderr,
 which `Engine.Launch` lifts verbatim as the recorded cause:
 
 ```
@@ -307,7 +307,9 @@ Read `transient=` before anything else:
 
 The exit code is unchanged either way: 81 stays non-transient by contract
 (eval `transient-bridge-retry` AC-1), so the discrimination rides the cause as
-data rather than reclassifying the death.
+data rather than reclassifying the death. Rationale and rejected alternatives:
+[ADR-0090](adr/0090-transient-disclosure-as-cause-data.md). Driving incident:
+[2026-08-18-transient-529-inside-artifact-timeout.md](../incidents/2026-08-18-transient-529-inside-artifact-timeout.md).
 
 **Per-CLI configuration.** The recognized wording is declared per family as the
 top-level `transient_regex` key in `go/internal/bridge/manifests/<cli>.json`, and
