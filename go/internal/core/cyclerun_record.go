@@ -114,6 +114,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// self-defeating task (the skills-drift storm, cycles 836/838/841/843/849)
 	// re-derived the same doomed fix forever. Retro still runs via the normal
 	// FAIL→retro transition, so this records only — it does not run retro.
+	// A JUDGMENT phase's FAIL is not authoritative and carries no dispatch
+	// error, so it reaches neither learning path — its objection was lost and
+	// Scout re-derived the falsified premise. Teaches via a carryover todo only,
+	// never a FailedRecord (see judgment_lesson.go). No-op for other phases.
+	if dr.resp.Verdict == VerdictFAIL {
+		cr.o.recordJudgmentLesson(cr.ctx, cr.cycle, next, &cr.state, dr.resp.Diagnostics)
+	}
 	if dr.resp.Verdict == VerdictFAIL && cr.o.isAuthoritativePhase(next) {
 		cr.o.recordFloorVerdictFailure(cr.ctx, cr.req, cr.cycle, next, &cr.state, &cr.cs, dr.resp.Diagnostics)
 		// Surface the override explanation in the RESULT too (cycle-1022: the
