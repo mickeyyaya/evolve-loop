@@ -1,0 +1,40 @@
+  without audit. Omit "mint" for existing phases. Minted phases default to writes_source:true; set "writes_source":false only for phases that never edit source.
+  ALSO supply "description" (one line: what the phase produces) and "when_to_use" (the signal that should trigger SELECTing it) — this is the SELECT metadata a later cycle reads to reuse your phase instead of minting a
+  duplicate.
+
+  You MAY also propose a dispatch "cli" and abstract "tier" (fast|balanced|deep — never a raw model name) for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the
+  phase's profile-pinned default unchanged.
+
+  ## Operator model-tier policy (apply when proposing a tier)
+  - deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.
+  - balanced: review/scan/triage-class phases — the safe default for anything not covered below.
+  - fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.
+  - Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.
+
+  ## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):
+  [{"phase":"<phase>","run":true,"justification":"<one
+  sentence>","cli":"<cli>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it
+  produces>","when_to_use":"<when to select it>"}}]
+
+  Now write your whole-cycle plan as a strict JSON array to /Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1523/routing-plan.json (no prose, no fence).
+
+
+  DELIVERABLE PATH: /Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1523/routing-plan.json
+
+  <deliverable-contract phase="router">
+    <artifact-path>/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1523/routing-plan.json</artifact-path>
+    <format>a single valid JSON object — write nothing else to this file</format>
+    <self-check>evolve phase verify router --workspace <your workspace dir></self-check>
+  </deliverable-contract>
+
+
+
+⏺ API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com.
+
+✻ Sautéed for 3m 28s
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Please write the deliverable to /Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1523/routing-plan.json to complete the phase.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

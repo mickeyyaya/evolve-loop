@@ -19,6 +19,7 @@
     ]
   },
   "prompt_marker": "? for shortcuts",
+  "transient_regex": "(?i)(\\b5\\d{2}\\b\\s*(unavailable|internal)|model is overloaded)",
   "default_model": "gemini-3.5-flash",
   "default_args": [],
   "params": {

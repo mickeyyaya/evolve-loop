@@ -50,3 +50,17 @@ func matchExhausted(pattern, pane string) bool {
 	}
 	return re.MatchString(pane)
 }
+
+// classifyTransientPane reports whether pane shows a recognized TEMPORARY
+// upstream error for the tmux driver named driver (e.g. "claude-tmux"). pane
+// MUST already be agent-stripped: a raw-pane scan fires on error text the agent
+// merely quoted or echoed, which is the same false-positive class the
+// exhaustion detector strips for. Fail-open — an unloadable manifest or an
+// unset transient_regex reports false (the driver must never invent a cause).
+func classifyTransientPane(driver, pane string) bool {
+	m, err := LoadManifest(driver)
+	if err != nil {
+		return false
+	}
+	return matchExhausted(m.TransientRegex, pane)
+}

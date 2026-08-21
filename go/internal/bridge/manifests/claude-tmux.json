@@ -19,6 +19,7 @@
     ]
   },
   "prompt_marker": "\u276f",
+  "transient_regex": "(?i)(api error:\\s*5\\d{2}\\b|server-side issue,? usually temporary)",
   "default_model": "haiku",
   "default_args": [],
   "model_tier_map": {
