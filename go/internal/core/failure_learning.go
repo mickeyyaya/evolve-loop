@@ -312,22 +312,10 @@ func (o *Orchestrator) recordFailedApproachState(fl failureLearningRequest) (sum
 	// the record's stamp rather than re-deriving it (single-sourced TTL logic).
 	record.ExpiresAt = failurelog.ComputeExpiresAt(
 		failurelog.NormalizeLegacy(record.Classification), now)
-	if idx := carryoverFingerprintIndex(fl.State.CarryoverTodos, summary); idx >= 0 {
-		refreshCarryoverExpiry(&fl.State.CarryoverTodos[idx], record.ExpiresAt)
-	} else if !carryoverTodoExists(fl.State.CarryoverTodos, todoID) {
-		fl.State.CarryoverTodos = append(fl.State.CarryoverTodos, CarryoverTodo{
-			ID: todoID,
-			// The router prompt's own "## Carryover todos" section header already
-			// says these are prior-cycle failures to consider before retrying, so
-			// the summary (which carries cycle/phase/error-class) stands alone —
-			// no fixed boilerplate prefix repeated per todo.
-			Action:         summary,
-			Priority:       "P0",
-			FirstSeenCycle: fl.Cycle,
-			CyclesUnpicked: 0,
-			ExpiresAt:      record.ExpiresAt,
-		})
-	}
+	appendCarryoverTodoDeduped(fl.State, CarryoverTodo{
+		ID: todoID, Action: summary, Priority: carryoverPriorityBlocking,
+		FirstSeenCycle: fl.Cycle, ExpiresAt: record.ExpiresAt,
+	})
 	fl.State.FailedAt = append(fl.State.FailedAt, record)
 	fl.State.LastCycleNumber = fl.Cycle
 	return summary, todoID, structured
@@ -862,6 +850,36 @@ func refreshCarryoverExpiry(t *CarryoverTodo, expiresAt string) {
 }
 
 const maxFailureLearningSummaryChars = 500
+
+// carryoverPriorityBlocking is the priority for a todo recording a failure that
+// BLOCKED a cycle (a floor phase, or an errored dispatch). It outranks everything
+// else in the next planner pass, which is correct for blocking work and wrong for
+// advice — see carryoverPriorityLesson.
+const carryoverPriorityBlocking = "P0"
+
+// appendCarryoverTodoDeduped appends one carryover todo to state, or refreshes an
+// existing one's TTL. Single-sourced (never_duplicate) between the failure path
+// (recordFailedApproachState) and the judgment-lesson path (recordJudgmentLesson):
+// both dedupe the same two ways — by content fingerprint first (the same failure
+// re-summarized), then by todo id (the same phase failing twice in one cycle) —
+// and a second copy of that logic would drift the two apart.
+//
+// The router prompt's own "## Carryover todos" section header already says these
+// are prior-cycle items to consider before retrying, so the summary (which carries
+// cycle/phase/error-class) stands alone — no boilerplate prefix repeated per todo.
+func appendCarryoverTodoDeduped(state *State, todo CarryoverTodo) {
+	if state == nil {
+		return
+	}
+	if idx := carryoverFingerprintIndex(state.CarryoverTodos, todo.Action); idx >= 0 {
+		refreshCarryoverExpiry(&state.CarryoverTodos[idx], todo.ExpiresAt)
+		return
+	}
+	if carryoverTodoExists(state.CarryoverTodos, todo.ID) {
+		return
+	}
+	state.CarryoverTodos = append(state.CarryoverTodos, todo)
+}
 
 func failureLearningSummary(cycle int, failed Phase, err error) string {
 	msg := err.Error()
