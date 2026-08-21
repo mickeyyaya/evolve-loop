@@ -7,7 +7,7 @@ import (
 
 func TestComposeCorrection(t *testing.T) {
 	t.Parallel()
-	got := composeCorrection("audit deliverable failed contract: [missing_section] required section 'Verdict' not found")
+	got := composeCorrection("audit deliverable failed contract: [missing_section] required section 'Verdict' not found", "")
 	if !strings.Contains(got, "REJECTED") {
 		t.Errorf("missing rejection framing: %q", got)
 	}

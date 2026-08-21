@@ -233,9 +233,9 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 					CostUSD:   dr.resp.CostUSD,
 				})
 			}
-			directive := composeCorrection(rr.Reason)
+			directive := composeCorrection(rr.Reason, rr.Remediation)
 			if salvageRetry {
-				directive = composeContractSalvageRetry(rr.Reason)
+				directive = composeContractSalvageRetry(rr.Reason, rr.Remediation)
 			}
 			if cr.o.cfg.PhaseRecovery == config.StageEnforce {
 				// Evidence-enriched re-dispatch (I2 rung 3): kernel-verified

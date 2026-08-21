@@ -70,6 +70,19 @@ type ReviewResult struct {
 	// whenever a prior cycle left the breaker hot or the salvage rung consumed a
 	// block without a re-dispatch.
 	Blocks int
+	// Remediation is an OPTIONAL, gate-authored instruction describing how to
+	// SATISFY this specific violation. Empty for every gate that does not know
+	// how to fix its own rejection — and empty means the correction directive is
+	// byte-identical to what it has always been.
+	//
+	// It exists because one generic directive cannot serve two different failure
+	// classes. The default text is written for "the contracted artifact exists
+	// but is malformed" and ends with "Do not change unrelated files"; for a
+	// violation whose remedy is to CREATE a missing sidecar artifact that clause
+	// forbids the fix. Gate A (evals-materialized) is that case, and it recovered
+	// 0 of 4 times in production (cycles 1471/1476/1504/1531, each "rejected
+	// after 2 correction(s)").
+	Remediation string
 }
 
 // DeliverableReviewer adjudicates a finished phase's deliverable. Implementations

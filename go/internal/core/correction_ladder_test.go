@@ -240,7 +240,7 @@ func TestLadder_ShadowLogsOnly_ByteIdenticalLegacy(t *testing.T) {
 		t.Errorf("shadow must NOT relocate anything: %v", err)
 	}
 	cd := buildR.requests[1].CorrectionDirective
-	if cd != composeCorrection("deliverable missing required header") {
+	if cd != composeCorrection("deliverable missing required header", "") {
 		t.Errorf("shadow directive must be byte-identical to today's composeCorrection; got %q", cd)
 	}
 	outs := readLadderOutcomes(t, cycleWorkspaceDir(root, res.Cycle))

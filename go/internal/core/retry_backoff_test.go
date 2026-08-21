@@ -64,7 +64,7 @@ func TestComposeCorrection_CarriesReasonVerbatim(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := composeCorrection(tc.reason)
+			got := composeCorrection(tc.reason, "")
 			if !strings.Contains(got, tc.reason) {
 				t.Errorf("composeCorrection dropped or transformed the reason.\n reason (%d bytes): %q\n output (%d bytes): %q\nthe rejection reason MUST appear byte-for-byte: downstream code re-parses its [code] tokens and the re-dispatched agent reads its literal text",
 					len(tc.reason), tc.reason, len(got), got)
@@ -87,7 +87,7 @@ func TestComposeCorrection_CarriesReasonVerbatim(t *testing.T) {
 func TestComposeCorrection_FramingSurroundsTheReason(t *testing.T) {
 	t.Parallel()
 	const reason = "[missing_artifact] no file at the contracted path"
-	got := composeCorrection(reason)
+	got := composeCorrection(reason, "")
 
 	idx := strings.Index(got, reason)
 	if idx < 0 {
@@ -112,7 +112,7 @@ func TestComposeCorrection_FramingSurroundsTheReason(t *testing.T) {
 // quotable to say.
 func TestComposeCorrection_EmptyReasonStillProducesADirective(t *testing.T) {
 	t.Parallel()
-	got := composeCorrection("")
+	got := composeCorrection("", "")
 	if !strings.Contains(got, "REJECTED") || !strings.Contains(got, "contracted path") {
 		t.Errorf("empty reason produced a directive missing its framing: %q", got)
 	}

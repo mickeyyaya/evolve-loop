@@ -22,6 +22,14 @@ import (
 // simplification of Review that keys rejection off `reason != ""` would
 // therefore fail every tdd phase — including cycles with no Go predicate package
 // (review MEDIUM). Key on block, always.
+// remediator is the OPTIONAL half of the gate contract: implement it when the
+// gate can state, concretely, what would satisfy it. Optional by design — most
+// violations are "the artifact is malformed", for which the default correction
+// directive is already correct.
+type remediator interface {
+	remediation(in core.ReviewInput) string
+}
+
 type gate interface {
 	name() string
 	appliesTo(phase string) bool
@@ -62,7 +70,17 @@ func (r *reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		}
 		r.logf("[evalgate] %s: %s (stage=%s, blocking=%v)", g.name(), reason, r.stage, block && r.stage == config.StageEnforce)
 		if block && r.stage == config.StageEnforce {
-			return core.ReviewResult{Approve: false, Reason: reason}
+			res := core.ReviewResult{Approve: false, Reason: reason}
+			// OPTIONAL capability: a gate that knows how to satisfy its own
+			// violation says so, and the correction directive relays it instead
+			// of emitting the generic "fix the deliverable / do not change
+			// unrelated files" text — which forbids the fix when the remedy is
+			// to CREATE a missing artifact. Gates that do not implement this are
+			// untouched and their corrections stay byte-identical.
+			if rm, ok := g.(remediator); ok {
+				res.Remediation = rm.remediation(in)
+			}
+			return res
 		}
 	}
 	return core.ReviewResult{Approve: true}
