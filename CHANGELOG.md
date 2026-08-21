@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a transient upstream error inside an artifact timeout is no longer invisible (#478, 2026-08-21)
+
+3 of 4 observed router stalls (cycles 1523/1524/1526) burned the full 600s silence budget on a pane that stated its own cause verbatim — `API Error: 529 Overloaded. This is a server-side issue, usually temporary` — then degraded routing to the static spine. cycle-1526 paid it twice in one cycle. Three recognition paths existed and a transient server error fell between all of them: it is not a quota wall (`exhausted_regex` correctly ignores it), not a transient exit code (80/85/86), and exit 81 is contractually non-retryable — correctly so. The distinguishing evidence was already captured in the pane and simply never consulted.
+
+- **ADR-0090** — the discrimination rides the cause as **data**, never as a reclassification. The one self-describing `artifact-timeout:` marker line now carries a driver-authored `transient=true|false` field; exit 81 stays non-transient by exit code, so `transient-bridge-retry` AC-1 is preserved by construction rather than by careful re-reading. The field EXTENDS that line rather than competing with it, which makes the cause-displacement regression class (the drift alarm's "quota", the workspace file listing) structurally unreachable.
+- **LLM-agnostic by construction** — the pattern is resolved from the LAUNCHED cli's manifest, and all four tmux families declare their own provider's signature; no vocabulary is hard-coded in Go. `transient_regex` is a **top-level** manifest key, not a sibling of `controls.usage.exhausted_regex`: the two read different surfaces (the `/usage` control's output vs the working pane), and `ollama-tmux` has no usage control at all — the sibling placement the design proposed left one family structurally unable to declare recognition.
+- **Two designs were killed by looking rather than by review** — a stderr-buffer classifier would have passed acceptance 3/3 GREEN while never firing on a real API error (the exit-81 stderr path is entirely bridge-authored; provider text renders in the PANE, a different sink), and the `controls.usage` placement was falsified by ollama during implementation. Both are recorded in [docs/incidents/2026-08-18-transient-529-inside-artifact-timeout.md](docs/incidents/2026-08-18-transient-529-inside-artifact-timeout.md) with the regression-coverage map.
+- **Scope, stated** — this delivers the diagnostic data, not the control flow. The 600s is still burned; it is now diagnosable. And only `claude-tmux`'s pattern is grounded in a live captured pane — codex/agy/ollama come from documented error shapes, so the next non-Claude occurrence is the evidence that confirms or corrects them.
+
+---
+
 ## Added — reasoning-model: chain-of-reasoning audit verdicts + scope-delta adjudication (2026-08-12)
 
 Two design changes that replace a class of mechanical gate with a reasoning step, plus the root-cause record for why that class kept failing.

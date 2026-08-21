@@ -19,6 +19,7 @@
     ]
   },
   "prompt_marker": ">>> ",
+  "transient_regex": "(?i)(\\b5\\d{2}\\b\\s*internal server error|runner process has terminated|connection refused)",
   "default_model": "llama3.1:8b",
   "default_args": ["--experimental-yolo"],
   "params": {

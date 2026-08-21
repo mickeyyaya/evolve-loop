@@ -280,6 +280,49 @@ stuck, the layer model gives a deterministic checklist:
    classified per ADR-0029 (cross-CLI fallback chain) and either retried
    or surfaced.
 
+### 7a. Exit 81: read the artifact-timeout marker line first
+
+An artifact-timeout death emits ONE self-describing marker line on stderr,
+which `Engine.Launch` lifts verbatim as the recorded cause:
+
+```
+[bridge] artifact-timeout: phase=router waited=600s interval=300s extends_used=1 \
+  max_extends=4 last_review=pause liveness=idle progressed=false busy=false \
+  transient=true reason="agent produced no output"
+```
+
+Read `transient=` before anything else:
+
+- `transient=true` — the pane carried a recognized TEMPORARY upstream failure
+  (an overloaded/unavailable/erroring server). The agent did not wedge; the
+  provider did. Re-dispatch is reasonable and the phase budget is not the
+  problem. Live precedent: cycles 1523/1524/1526, where the router burned the
+  full silence budget three times on `API Error: 529 Overloaded` with nothing in
+  the record to say so.
+- `transient=false` with `busy=true` and `extends_used == max_extends` — the
+  agent was working and ran out of budget. Raise
+  `bridge.phase_artifact_timeout_s` for the phase named in `phase=`.
+- `transient=false` with `liveness=idle` and `progressed=false` — a genuine
+  wedge. Work the steps above.
+
+The exit code is unchanged either way: 81 stays non-transient by contract
+(eval `transient-bridge-retry` AC-1), so the discrimination rides the cause as
+data rather than reclassifying the death. Rationale and rejected alternatives:
+[ADR-0090](adr/0090-transient-disclosure-as-cause-data.md). Driving incident:
+[2026-08-18-transient-529-inside-artifact-timeout.md](../incidents/2026-08-18-transient-529-inside-artifact-timeout.md).
+
+**Per-CLI configuration.** The recognized wording is declared per family as the
+top-level `transient_regex` key in `go/internal/bridge/manifests/<cli>.json`, and
+resolved from whichever CLI the launch named — so recognition works identically
+on claude, codex, agy and ollama, and no provider vocabulary is hard-coded in Go.
+It sits at the top level rather than under `controls.usage` because the two read
+different surfaces: `controls.usage.exhausted_regex` classifies the output of the
+`/usage` control, while `transient_regex` classifies the working pane (and
+`ollama-tmux` has no usage control at all). A family that declares no pattern is
+fail-open — `transient=false`, never a fabricated cause. The pattern is matched
+against the AGENT-STRIPPED pane, so a cycle whose own task text mentions a
+provider error cannot mislabel its own timeouts.
+
 ## 8. Known gaps + future work
 
 | Gap | Tracked as | Plan |
