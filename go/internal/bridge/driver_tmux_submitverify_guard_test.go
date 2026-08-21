@@ -86,11 +86,11 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 		promptMarker: "? for shortcuts", // a FOOTER — not where input begins
 		// inputLineMarker deliberately unset: agy declares none.
 	}
-	resends := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
+	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
 		"[agy-tmux]", "prompt", parkedPane(guardNudge), guardNudge)
 
-	if resends != 0 {
-		t.Errorf("resends = %d, want 0 — with no input-line marker there is nothing to anchor a match to", resends)
+	if got.Resends != 0 {
+		t.Errorf("outcome = %+v, want 0 — with no input-line marker there is nothing to anchor a match to", got)
 	}
 	if n := len(tm.sentSeq); n != 0 {
 		t.Errorf("sent %d key(s) %v, want 0 — an unanchored re-send submits whatever the agent typed", n, tm.sentSeq)
@@ -108,8 +108,8 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 	tm2 := &fakeTmux{paneSeq: []string{footerPane}}
 	var stderr2 bytes.Buffer
 	if n := verifySubmitted(context.Background(), submitVerifyDeps(tm2, &stderr2), lp,
-		"[agy-tmux]", "prompt", footerPane, guardNudge); n != 0 {
-		t.Errorf("resends = %d, want 0 — a footer rendered mid-pane must not be treated as an input line", n)
+		"[agy-tmux]", "prompt", footerPane, guardNudge); n.Resends != 0 {
+		t.Errorf("outcome = %+v, want 0 — a footer rendered mid-pane must not be treated as an input line", n)
 	}
 	if n := len(tm2.sentSeq); n != 0 {
 		t.Errorf("sent %d key(s) %v into a footer-anchored match, want 0", n, tm2.sentSeq)
@@ -130,11 +130,11 @@ func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
 		promptMarker:    "boot-ready-banner", // deliberately NOT the input line
 		inputLineMarker: tmuxPromptMarkerDefault,
 	}
-	resends := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
+	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
 		"[claude-tmux]", "nudge", parkedPane(guardNudge), guardNudge)
 
-	if resends != 1 {
-		t.Errorf("resends = %d, want 1 — the parked input line must be re-sent once and then read clear", resends)
+	if got.Resends != 1 {
+		t.Errorf("outcome = %+v, want 1 — the parked input line must be re-sent once and then read clear", got)
 	}
 	if !strings.Contains(stderr.String(), "submit-verify") {
 		t.Errorf("re-send must be loud; stderr:\n%s", stderr.String())
@@ -153,11 +153,11 @@ func TestVerifySubmitted_CaptureErrorIsLogged(t *testing.T) {
 		promptMarker:    tmuxPromptMarkerDefault,
 		inputLineMarker: tmuxPromptMarkerDefault,
 	}
-	resends := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
+	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
 		"[claude-tmux]", "nudge", parkedPane(guardNudge), guardNudge)
 
-	if resends != 1 {
-		t.Errorf("resends = %d, want 1 — one Enter went out before the capture failed", resends)
+	if got.Resends != 1 {
+		t.Errorf("outcome = %+v, want 1 — one Enter went out before the capture failed", got)
 	}
 	out := stderr.String()
 	if !strings.Contains(out, "capture") {

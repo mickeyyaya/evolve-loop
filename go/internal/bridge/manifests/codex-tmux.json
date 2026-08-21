@@ -19,6 +19,7 @@
     ]
   },
   "prompt_marker": "\u203a",
+  "transient_regex": "(?i)(stream error|server_error|\\b5\\d{2}\\b\\s*(bad gateway|service unavailable|internal server error)|the server had an error)",
   "default_model": "",
   "default_args": [
     "--yolo"

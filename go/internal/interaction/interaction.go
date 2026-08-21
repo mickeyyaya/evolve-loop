@@ -42,6 +42,11 @@ const (
 	KindSalvage              = "salvage"
 	KindKernelAnswer         = "kernel_answer"
 	KindCorrectionRedispatch = "correction_redispatch"
+	// KindSubmitVerify is one driver-initiated submission checked for delivery
+	// (driver_tmux_submitverify.go). Recorded on EVERY outcome, including the
+	// clean one: stderr is discarded on the phase-success path, so this ledger
+	// is the only durable place a recovered stall can be observed.
+	KindSubmitVerify = "submit_verify"
 )
 
 // Outcome results: the deterministic resolution vocabulary. Resolution never
@@ -75,6 +80,33 @@ const (
 	// re-dispatch itself errored / returned an unevaluable verdict.
 	ResultDispatchFailed      = "dispatch_failed"
 	ResultNonCanonicalVerdict = "non_canonical_verdict"
+
+	// submit-verify outcomes.
+	//
+	// ResultSubmitVerified is the CLEAN case: the input line was already clear,
+	// so nothing needed doing. Deliberately NOT ResultPromptCleared — that const
+	// means "the prompt pattern that TRIGGERED an interaction stopped matching",
+	// i.e. our injection worked, and every other producer of it (autorespond,
+	// kernel-answer) means exactly that. submit_verify fires on every dispatch
+	// while auto-responds are occasional, so folding no-ops into that bucket
+	// would flip Summary.ByResult["prompt_cleared"] from "injections that
+	// succeeded" to mostly "nothing happened".
+	//
+	// NOTE for anyone diffing interaction-summary.json across this change:
+	// Summary.Total (and ByRung["none"]) grow by 1-2 per dispatch from here on.
+	// Volume is not comparable across this boundary; nothing regressed.
+	ResultSubmitVerified = "submit_verified"
+	//
+	// ResultSubmittedAfterResend is the one that makes the guard measurable:
+	// the input line was still parked and a bounded re-send cleared it, so the
+	// cycles 1505/1510/1517 stall class occurred AND was absorbed.
+	ResultSubmittedAfterResend = "submitted_after_resend"
+	// ResultSubmitWedged is the re-send budget exhausted — known ~20 minutes
+	// before the phase times out, and previously typed nowhere.
+	ResultSubmitWedged = "submit_wedged"
+	// ResultNotVerified is "could not check", which must never read as
+	// "checked and clean": no input-line marker, or the capture failed.
+	ResultNotVerified = "not_verified"
 )
 
 // Event is one injection fired at a phase agent (ADR-0045 I1).

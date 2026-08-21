@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
 // driver_tmux_submitverify.go — every driver-initiated submission verifies
@@ -117,7 +119,18 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 //
 // site names the submission ("prompt", "nudge") in the log line; echoes are
 // candidate renderings of what was sent.
-func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) int {
+// submitVerifyOutcome is what verifySubmitted learned. Returned rather than
+// logged-and-forgotten: stderr for a phase dispatch is discarded on the success
+// path (engine.go:531-534 returns before the :544 persistence), so the caller
+// must be able to put this somewhere durable.
+type submitVerifyOutcome struct {
+	// Resends is how many bare Enters this call issued (0 on the clean path).
+	Resends int
+	// Result is an interaction.Result* value; never empty.
+	Result string
+}
+
+func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) submitVerifyOutcome {
 	// No input-line marker ⇒ nothing to anchor a match to. Refuse LOUDLY: the
 	// alternative is matching against whatever follows a boot/footer marker,
 	// which re-sends the agent's own text (cycle-1526 audit — agy's marker is
@@ -125,14 +138,23 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 	if lp.inputLineMarker == "" {
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — %s declares no input-line marker, "+
 			"so a stalled submission here will not be detected or re-sent\n", pfx, site, lp.name)
-		return 0
+		return submitVerifyOutcome{Result: interaction.ResultNotVerified}
+	}
+	// An empty pane is NOT a clear input line: a failed CapturePane at either
+	// call site yields "", pendingAtInputLine returns false on the absent marker,
+	// and the fall-through would record "verified clean" for a state the code
+	// just logged as unknown — the precise lie this ledger exists to prevent.
+	if strings.TrimSpace(pane) == "" {
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — no pane observation, "+
+			"input-line state unknown\n", pfx, site)
+		return submitVerifyOutcome{Result: interaction.ResultNotVerified}
 	}
 	resends := 0
 	for pendingAtInputLine(pane, lp.inputLineMarker, echoes) {
 		if resends >= submitVerifyMaxResends {
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s STILL unsubmitted after %d re-send(s) — giving up; pane looks wedged\n",
 				pfx, site, resends)
-			return resends
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmitWedged}
 		}
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
 			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
@@ -141,7 +163,7 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 			// wedged" — a confident WRONG diagnosis that points an operator (and
 			// any log-scraping classifier) at the REPL when tmux is what died.
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s re-send %d/%d never reached tmux — the session is unreachable, not wedged: %v\n", pfx, site, resends+1, submitVerifyMaxResends, err)
-			return resends
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
 		}
 		resends++
 		deps.Sleep(submitVerifySettle)
@@ -153,11 +175,14 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
 				"stopping verification, input-line state unknown: %v\n",
 				pfx, site, resends, submitVerifyMaxResends, err)
-			return resends
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
 		}
 		pane = next
 	}
-	return resends
+	if resends > 0 {
+		return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmittedAfterResend}
+	}
+	return submitVerifyOutcome{Result: interaction.ResultSubmitVerified}
 }
 
 // promptSubmitEcho is the FORWARD-direction echo for a pasted prompt: the head
@@ -192,4 +217,27 @@ func firstNonEmptyLine(s string) string {
 		}
 	}
 	return ""
+}
+
+// recordSubmitVerify puts a submit-verify outcome somewhere durable. The
+// Recorder writes through to <workspace>/<phase>-interactions.ndjson on every
+// Record (appendLedgerLine), independent of how the phase ends — which is the
+// whole point: stderr from a phase dispatch survives only the FAILURE path
+// (engine.go:531-534 returns before the :544 persistence), so a guard that
+// recovers a stall and lets the phase succeed erased its own evidence.
+//
+// Recorded on the clean path too. Without the denominator a recovered stall is
+// an anecdote, not a rate, and the cycles 1505/1510/1517 class cannot be tracked.
+// Nil-recorder-safe by Recorder's own contract.
+func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site string, o submitVerifyOutcome) {
+	rec.Record(interaction.Outcome{
+		Event: interaction.Event{
+			Kind:    interaction.KindSubmitVerify,
+			Phase:   phase,
+			Cycle:   cycle,
+			Trigger: "driver_submission",
+			Payload: fmt.Sprintf("site=%s resends=%d", site, o.Resends),
+		},
+		Result: o.Result,
+	})
 }

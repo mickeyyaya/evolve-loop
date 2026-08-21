@@ -99,7 +99,22 @@ type Manifest struct {
 	DefaultModel       string              `json:"default_model"`
 	DefaultArgs        []string            `json:"default_args"`
 	InteractivePrompts []ManifestPrompt    `json:"interactive_prompts"`
-	Stub               bool                `json:"stub"`
+	// TransientRegex recognizes a TEMPORARY upstream failure in this CLI's PHASE
+	// pane — an overloaded, unavailable or erroring server — as distinct from the
+	// permanent quota wall controls.usage.exhausted_regex matches. Top-level, not
+	// under controls.usage, because the two read DIFFERENT surfaces: the wall
+	// pattern classifies the output of the /usage control, while this one
+	// classifies the working pane. Hanging it off that control would also make it
+	// undeclarable for a family that has no usage control at all (ollama-tmux,
+	// a local model with no quota concept but a server that still returns 500s).
+	//
+	// Consulted only on the artifact-timeout teardown path, where it labels the
+	// self-describing summary line so a silence budget burned by a server-side
+	// blip is distinguishable from a genuinely wedged pane. Diagnostic-only: it
+	// never changes the exit code, so exit 81 stays non-transient
+	// (transient-bridge-retry AC-1). Empty = recognition off (fail-open).
+	TransientRegex string `json:"transient_regex,omitempty"`
+	Stub           bool   `json:"stub"`
 	// ModelTierMap translates the abstract, provider-neutral model tier
 	// (fast|balanced|deep — the same vocabulary profiles' model_tier_default
 	// + model_tier_envelope already use) to this CLI's concrete model

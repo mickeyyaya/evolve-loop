@@ -590,8 +590,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// paste is submitted with a blind Enter (or the human-cadence review path);
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
-		verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt",
+			verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
+				promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho))
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -853,7 +854,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					if nudgeCapErr != nil {
 						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
 					}
-					verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
+					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge",
+						verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg))
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
 						Kind:    interaction.KindNudge,
@@ -894,7 +896,34 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// (strippedForExhaustionScan, line ~704): an alarm that scans the raw pane
 		// fires on wall-shaped text the agent merely wrote or echoed, which the real
 		// regex correctly ignored — an operator chasing a regex that is working.
-		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedForExhaustionScan(lastGoodPane, ar.injectedPrompt), paneProfile.ExhaustedRegex)
+		strippedPane := strippedForExhaustionScan(lastGoodPane, ar.injectedPrompt)
+		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedPane, paneProfile.ExhaustedRegex)
+		// Transient-upstream recognition (inbox item
+		// transient-api-error-invisible-inside-artifact-timeout): 3 of 4 observed
+		// router stalls (cycles 1523/1524/1526) spent the FULL silence budget on a
+		// pane reading "API Error: 529 Overloaded … usually temporary" — a failure
+		// no path recognizes. It is not a quota wall (exhausted_regex correctly
+		// ignores it) and not a transient exit code (80/85/86). The distinguishing
+		// evidence was already captured right here and simply never consulted.
+		//
+		// Family-agnostic by construction: the pattern is resolved from the
+		// LAUNCHED cli's manifest (lp.name), so every CLI family declares its own
+		// provider's transient signature and none of that vocabulary is hard-coded
+		// here. A family that declares none is fail-open, not misreported.
+		//
+		// Carried as ONE driver-authored field on the marker line below, NOT as a
+		// second cause candidate: extending that line means it can never displace
+		// artifactTimeoutSummary's selection, so the class of regression where the
+		// drift alarm or a workspace listing outranks the timeout summary stays
+		// structurally unreachable. The exit code is untouched — 81 remains
+		// non-transient (transient-bridge-retry AC-1) and the discrimination rides
+		// the cause as data. A bool, never pane text, also keeps agent-authored
+		// content out of the recorded cause (F1 indirect-prompt-injection).
+		//
+		// Scanned on the SAME agent-stripped pane as the drift alarm above: a raw
+		// scan fires on error text the agent merely quoted, flagging a working
+		// agent's own prose as an upstream outage.
+		transient := classifyTransientPane(lp.name, strippedPane)
 		// Self-describing death (inbox item deep-phase-artifact-budget-too-small):
 		// exit 81 alone says nothing, and the diagnostic file listing printed above
 		// used to become the recorded cause. This ONE marker line carries how long
@@ -906,10 +935,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
 		// is also the final stderr line, and lifted into the error by Engine.Launch.
 		fmt.Fprintf(deps.Stderr,
-			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v reason=%q\n",
+			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
 			artifactTimeoutMarker, phaseName, waitedS, interval, attempt, maxExtends,
 			reviewActionOrNone(lastVerdict.Action), livenessOrUnknown(lastEv.State),
-			lastEv.Progressed, lastEv.Busy, lastVerdict.Reason)
+			lastEv.Progressed, lastEv.Busy, transient, lastVerdict.Reason)
 		return ExitArtifactTimeout, nil
 	}
 
