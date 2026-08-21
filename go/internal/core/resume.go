@@ -349,6 +349,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// PASS to FAIL (dispatch err==nil) must feed failure-learning HERE too, or
 		// the storm class is silently reproduced for resumed cycles specifically.
 		// Same single-source *Orchestrator primitive as the live loop.
+		// Resume-path parity for the judgment-lesson recorder (judgment_lesson.go),
+		// mirroring the floor-verdict guard below: a resumed judgment phase's FAIL
+		// must leave the same lesson, or the objection is lost for resumed cycles
+		// specifically. Same single-source *Orchestrator primitive.
+		if resp.Verdict == VerdictFAIL {
+			o.recordJudgmentLesson(ctx, cycle, next, &state, resp.Diagnostics)
+		}
 		if resp.Verdict == VerdictFAIL && o.isAuthoritativePhase(next) {
 			o.recordFloorVerdictFailure(ctx, req, cycle, next, &state, &cs, resp.Diagnostics)
 		}
