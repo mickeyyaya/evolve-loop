@@ -1,0 +1,148 @@
+{
+  "cycle": 1537,
+  "run_id": "01M0M3KBTZXSZS3BNZA7R3ZEFW",
+  "goal": "Work the highest-weight pipeline-integrity items in the inbox: prefer defects where a produced signal has no consumer, and verify each fix fires on the real production path rather than only in unit tests.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 589511,
+      "started_at": "2026-08-22T06:51:48Z",
+      "ended_at": "2026-08-22T07:01:38Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 60572,
+      "started_at": "2026-08-22T07:09:29Z",
+      "ended_at": "2026-08-22T07:10:30Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 4137,
+        "cache_read": 188131,
+        "cache_write": 66535
+      }
+    },
+    {
+      "name": "premise-challenge",
+      "verdict": "PASS",
+      "duration_ms": 378391,
+      "started_at": "2026-08-22T07:10:31Z",
+      "ended_at": "2026-08-22T07:16:49Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 50,
+        "output": 21740,
+        "cache_read": 2969701,
+        "cache_write": 145550
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 475659,
+      "started_at": "2026-08-22T07:16:49Z",
+      "ended_at": "2026-08-22T07:24:45Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 62,
+        "output": 36006,
+        "cache_read": 3042313,
+        "cache_write": 140911
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "premise-challenge|infra-error|0a59c1d41a04",
+    "pre_class": "infra-error",
+    "reasons": [
+      "tree-diff guard: phase \"premise-challenge\" wrote to the main tree outside its worktree \"/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1537\" — leaked paths: [.evolve/"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1537",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1504133,
+    "phase_count": 4,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 589511,
+    "by_archetype_ms": {
+      "control": 475659,
+      "evaluate": 378391,
+      "plan": 650083
+    },
+    "total_tokens": {
+      "input": 120,
+      "output": 61883,
+      "cache_read": 6200145,
+      "cache_write": 352996
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 62,
+        "output": 36006,
+        "cache_read": 3042313,
+        "cache_write": 140911
+      },
+      "evaluate": {
+        "input": 50,
+        "output": 21740,
+        "cache_read": 2969701,
+        "cache_write": 145550
+      },
+      "plan": {
+        "input": 8,
+        "output": 4137,
+        "cache_read": 188131,
+        "cache_write": 66535
+      }
+    },
+    "wasted_tokens": {
+      "input": 62,
+      "output": 36006,
+      "cache_read": 3042313,
+      "cache_write": 140911
+    },
+    "cache_hit_ratio": 0.9999806459885182,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "triage",
+      "premise-challenge"
+    ]
+  }
+}
