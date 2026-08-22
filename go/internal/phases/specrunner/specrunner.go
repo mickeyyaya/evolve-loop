@@ -81,10 +81,23 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 // declared verdict_from_sentinel, so no phase pays for a measurement it did not
 // ask for and no phase name appears in Go.
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	verdict, diags := EvaluateClassify(artifact, h.spec.Classify)
-	rec, ok := ClassifyShadow(req.Cycle, h.spec.Name, artifact, h.spec.Classify)
-	writeVerdictShadow(req.Workspace, rec, ok)
-	return verdict, diags, h.spec.OnPass
+	o := evaluate(artifact, h.spec.Classify)
+	rec, ok := shadowRecord(req.Cycle, h.spec.Name, sentinelStageOf(h.spec.Classify), o)
+	if err := writeVerdictShadow(req.Workspace, rec, ok); err != nil {
+		o.diags = append(o.diags, core.Diagnostic{
+			Severity: "warn",
+			Message:  "verdict_from_sentinel: shadow record not written: " + err.Error(),
+		})
+	}
+	return o.effective, o.diags, h.spec.OnPass
+}
+
+// sentinelStageOf reads the declared stage off possibly-absent rules.
+func sentinelStageOf(rules *phasespec.ClassifyRules) string {
+	if rules == nil {
+		return SentinelStageOff
+	}
+	return rules.VerdictFromSentinel
 }
 
 // EvaluateClassify is the declarative verdict evaluator shared by specrunner and
@@ -121,12 +134,16 @@ func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 // precisely what a shadow stage cannot survive, since a record that disagrees
 // with the routing it claims to describe measures nothing.
 type classifyOutcome struct {
-	stage      string
 	structural string // what STRUCTURE alone concludes (the legacy verdict)
 	sentinel   string // the agent's own stated verdict; "" when absent/unusable
-	present    bool
-	effective  string // what the caller actually gets, per stage
-	diags      []core.Diagnostic
+	// consulted records that the sentinel stage actually ran the parse. A
+	// structural failure (or a typo'd stage word) returns before it, and
+	// without this bit "we looked and found nothing" is indistinguishable from
+	// "we never looked" — see VerdictShadowRecord.SentinelConsulted.
+	consulted bool
+	present   bool
+	effective string // what the caller actually gets, per stage
+	diags     []core.Diagnostic
 }
 
 // structuralOnly is the outcome for a decision reached before the sentinel stage
@@ -136,10 +153,9 @@ func structuralOnly(verdict string, diags []core.Diagnostic) classifyOutcome {
 	return classifyOutcome{structural: verdict, effective: verdict, diags: diags}
 }
 
-// evaluate runs the declarative rules once. The structural checks below are the
-// original EvaluateClassify body, unchanged in order and in message text; the
-// only addition is the trailing applySentinelStage, which is a no-op for every
-// phase that does not declare verdict_from_sentinel.
+// evaluate runs the declarative rules once — the single pass that both the
+// verdict view and the measurement view read from. applySentinelStage runs LAST
+// and is a no-op for every phase that does not declare verdict_from_sentinel.
 func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 	if strings.TrimSpace(artifact) == "" && (rules == nil || rules.FailIfEmpty) {
 		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{Severity: "error", Message: "phase produced an empty artifact"}})
@@ -178,7 +194,7 @@ func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 		}
 		verdict = rules.VerdictOnPass
 	}
-	return applySentinelStage(classifyOutcome{structural: verdict, effective: verdict}, artifact, rules)
+	return applySentinelStage(classifyOutcome{structural: verdict, effective: verdict}, artifact, rules.VerdictFromSentinel)
 }
 
 // hasSection reports whether section appears as a line-anchored markdown

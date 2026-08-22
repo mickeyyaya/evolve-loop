@@ -42,6 +42,10 @@ cycle and discarded its conclusion.
 Every one of those 225 classified PASS. This is a **wiring** defect, not a parsing
 problem.
 
+> **This ADR owns these counts.** The code deliberately does not repeat them — they move
+> every cycle, and a stale copy in a comment would mislead a promotion decision. Re-measure
+> before promoting; the shadow records make it mechanical.
+
 ## Decision
 
 1. **Reuse the existing sentinel parser.** `phasecontract.ParseVerdictSentinel` — the
@@ -69,6 +73,27 @@ problem.
    EveryPhaseThatCanStateItsOwnVerdict` binds any tracked phase declaring the key to
    membership in `judgmentTeachingPhases`. Bound at DECLARATION, not at enforce, so
    promoting a phase can never open the gap the recorder exists to close.
+
+8. **The shadow record is PHASE-SCOPED on disk** (`judgment-verdict-shadow-<phase>.json`).
+   The workspace is `core.RunWorkspacePath(root, cycle)` — one directory per CYCLE, shared
+   by every phase — and both judgment phases routinely run in the same cycle
+   (premise-challenge after triage, adversarial-review after build). A single shared
+   filename would let the later phase silently overwrite the earlier: **47 of 55**
+   premise-challenge cycles in the live tree also ran adversarial-review, so ~85% of
+   samples would be lost, for the phase whose promotion is most fraught — and lost with a
+   BIAS, since the dropped cycles are exactly the ones that also produced a build. The
+   `auditchain.ShadowRecordFile` precedent this otherwise mirrors is a bare constant only
+   because `audit` runs once per cycle; that uniqueness does not survive a per-phase key.
+9. **The record carries `sentinel_consulted` as a distinct bit from `sentinel_present`.**
+   The stage runs LAST, so a structural failure — or a typo'd stage word — short-circuits
+   before the parse. Without the bit, such a record was indistinguishable from a malformed
+   report, and read "no readable verdict sentinel" about artifacts that carried a perfectly
+   good one. That under-reports malformedness in exactly the cycles where the phase
+   misbehaved, which is the population an operator would promote on.
+10. **A failed shadow write emits a warn diagnostic** rather than being silent. The write
+    is best-effort — a measurement must never brick the decision it measures — but
+    diagnostics do not affect routing, so saying it out loud costs nothing, and a
+    permanently failing write would otherwise yield an empty soak that nothing reports.
 
 ## Alternatives considered
 

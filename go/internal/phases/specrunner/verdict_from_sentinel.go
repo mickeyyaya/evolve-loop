@@ -11,25 +11,24 @@ package specrunner
 // shipped as ADR-0090). The loop paid for a full agent dispatch every cycle and
 // discarded its conclusion.
 //
-// The signal was never missing. Measured across this repo's entire run history,
-// 225 of 225 premise-challenge/adversarial-review reports carry a well-formed
-// sentinel. Nothing read them. So this is a WIRING fix, and deliberately not a
-// new grammar: it reuses phasecontract's sentinel parser — the same one the
+// The signal was never missing — every judgment report on disk carries a
+// well-formed sentinel. So this is a WIRING fix, and deliberately not a new
+// grammar: it reuses phasecontract's sentinel parser — the same one the
 // contract gate and the verdict cache already read — rather than inventing a
 // second way to say "FAIL" that could drift from the first.
 //
-// Why a rollout stage and not a switch. The same measurement says the
-// population is uncalibrated: 100 of those 225 state FAIL, and
-// premise-challenge alone states FAIL on 52 of 55 reports — 20 of 20 since
-// cycle-1500. A verdict emitted for years into a void does not get corrected,
-// because nothing ever contradicted it; turning it authoritative in one step
-// would halt nearly every cycle at that phase. Shadow measures the population
-// first. That is this repo's most expensive recurring habit, and the one place
-// it is cheapest to break.
+// Why a rollout stage and not a switch: the population is UNCALIBRATED. A
+// verdict emitted for years into a void does not get corrected, because nothing
+// ever contradicted it, and turning it authoritative in one step would halt
+// nearly every cycle at that phase. Shadow measures the population first. The
+// measured counts live in ADR-0091 (docs/architecture/adr/0091-*) and are
+// deliberately NOT repeated here — they move every cycle, and a stale number in
+// a comment is worse than a pointer to the place that owns it.
 
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -50,16 +49,46 @@ const (
 	SentinelStageEnforce = "enforce"
 )
 
-// VerdictShadowRecordFile is the per-cycle measurement, written into the phase
-// workspace beside the report it is about — the same placement as
-// auditchain.ShadowRecordFile so one soak sweep can read both.
-const VerdictShadowRecordFile = "judgment-verdict-shadow.json"
+// verdictShadowRecordPrefix names the per-cycle measurement written into the
+// phase workspace, beside the report it is about.
+//
+// The filename is PHASE-SCOPED, and that is load-bearing rather than cosmetic.
+// The workspace is core.RunWorkspacePath(root, cycle) — one directory PER CYCLE,
+// shared by every phase — and both opted-in judgment phases routinely run in the
+// same cycle (premise-challenge after triage, adversarial-review after build:
+// 47 of 55 premise-challenge cycles in the live tree also ran adversarial-review).
+// A single shared filename would let the later phase silently overwrite the
+// earlier one, destroying ~85% of premise-challenge's samples — and destroying
+// them with a BIAS, since the lost cycles are exactly the ones that also
+// produced a build. The auditchain.ShadowRecordFile precedent this otherwise
+// mirrors is a bare constant only because `audit` runs once per cycle; that
+// uniqueness assumption does not survive a per-phase key.
+const verdictShadowRecordPrefix = "judgment-verdict-shadow"
+
+// VerdictShadowRecordFile is the record's filename for one phase.
+// Non-portable characters are folded to '_' so a phase name can never traverse
+// out of the workspace or collide with a sibling by accident.
+func VerdictShadowRecordFile(phase string) string {
+	safe := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+			return r
+		default:
+			return '_'
+		}
+	}, phase)
+	if safe == "" {
+		safe = "unnamed"
+	}
+	return verdictShadowRecordPrefix + "-" + safe + ".json"
+}
 
 // VerdictShadowRecord is one phase's stated-versus-routed comparison.
 //
 // Every field answers a question the promotion decision actually turns on: what
 // the phase said, what the cycle did, whether those differed, and — when they
-// did not — whether that was agreement or merely an unreadable sentinel.
+// did not — whether that was agreement, an unreadable sentinel, or a sentinel
+// nobody ever looked at.
 type VerdictShadowRecord struct {
 	Cycle int    `json:"cycle"`
 	Phase string `json:"phase"`
@@ -68,10 +97,16 @@ type VerdictShadowRecord struct {
 	// none of this wired. Kept explicitly so a record read after a promotion
 	// still shows what was being suppressed before it.
 	StructuralVerdict string `json:"structural_verdict"`
+	// SentinelConsulted distinguishes "we looked and found nothing readable"
+	// from "we never looked". The stage runs LAST, so a structurally broken
+	// artifact — or a typo'd stage word — short-circuits before the parse, and
+	// without this bit such a record was indistinguishable from a malformed
+	// report. That silently under-reports malformedness in exactly the cycles
+	// where the phase misbehaved, which is the population an operator would
+	// promote on.
+	SentinelConsulted bool `json:"sentinel_consulted"`
 	// SentinelPresent separates "the agent stated nothing readable" from "the
-	// agent stated PASS". Conflating them would let a population of malformed
-	// reports masquerade as a population of clean ones — and the flip rate
-	// computed from that is the number an operator would promote on.
+	// agent stated PASS". Meaningful only when SentinelConsulted is true.
 	SentinelPresent bool   `json:"sentinel_present"`
 	SentinelVerdict string `json:"sentinel_verdict,omitempty"`
 	// EffectiveVerdict is what the cycle actually carried out of this phase.
@@ -86,9 +121,8 @@ type VerdictShadowRecord struct {
 // applySentinelStage resolves the stated verdict against the configured stage.
 // It runs only after every structural check has passed, so a stated verdict can
 // never launder a malformed artifact past the section requirement.
-func applySentinelStage(o classifyOutcome, artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
-	o.stage = rules.VerdictFromSentinel
-	switch o.stage {
+func applySentinelStage(o classifyOutcome, artifact, stage string) classifyOutcome {
+	switch stage {
 	case SentinelStageOff:
 		return o
 	case SentinelStageShadow, SentinelStageEnforce:
@@ -97,12 +131,13 @@ func applySentinelStage(o classifyOutcome, artifact string, rules *phasespec.Cla
 		// fail LOUDLY — the cycle-241 declared-semantics rule this classifier
 		// already applies to fail_if_signal and verdict_on_pass. Failing here
 		// costs one cycle; passing silently costs however long nobody notices.
-		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{
+		return structuralOnly(core.VerdictFAIL, append(o.diags, core.Diagnostic{
 			Severity: "error",
 			Message: fmt.Sprintf("invalid verdict_from_sentinel %q: must be %q (off), %q or %q",
-				o.stage, SentinelStageOff, SentinelStageShadow, SentinelStageEnforce),
-		}})
+				stage, SentinelStageOff, SentinelStageShadow, SentinelStageEnforce),
+		}))
 	}
+	o.consulted = true
 
 	stated, ok := phasecontract.ParseVerdictSentinel(artifact)
 	switch {
@@ -118,6 +153,8 @@ func applySentinelStage(o classifyOutcome, artifact string, rules *phasespec.Cla
 	case !core.IsVerdict(stated):
 		// Readable but not a verdict this system has: same fail-open, said out
 		// loud, because a silently discarded conclusion is the whole defect.
+		// Note core.IsVerdict is case-SENSITIVE, so a lowercased "fail" lands
+		// here rather than being honored.
 		o.diags = append(o.diags, core.Diagnostic{
 			Severity: "warn",
 			Message: fmt.Sprintf("verdict_from_sentinel: stated verdict %q is not PASS/FAIL/WARN/SKIPPED — keeping the structural verdict (fail-open)",
@@ -127,7 +164,7 @@ func applySentinelStage(o classifyOutcome, artifact string, rules *phasespec.Cla
 	}
 
 	o.sentinel, o.present = stated, true
-	if o.stage == SentinelStageEnforce {
+	if stage == SentinelStageEnforce {
 		o.effective = stated
 		return o
 	}
@@ -141,21 +178,29 @@ func applySentinelStage(o classifyOutcome, artifact string, rules *phasespec.Cla
 	return o
 }
 
-// ClassifyShadow builds the measurement record for one phase's artifact.
-// ok is false when the phase never opted in, so a caller can write the record
+// classifyShadow builds the measurement record for one phase's artifact.
+// ok is false when the phase never opted in, so a caller can build the record
 // unconditionally without a phase-name literal anywhere in Go.
-//
-// Pure, like EvaluateClassify: it decides WHAT to record, never where it lands.
-func ClassifyShadow(cycle int, phase, artifact string, rules *phasespec.ClassifyRules) (VerdictShadowRecord, bool) {
-	if rules == nil || rules.VerdictFromSentinel == SentinelStageOff {
+func classifyShadow(cycle int, phase, artifact string, rules *phasespec.ClassifyRules) (VerdictShadowRecord, bool) {
+	if rules == nil {
 		return VerdictShadowRecord{}, false
 	}
-	o := evaluate(artifact, rules)
+	return shadowRecord(cycle, phase, rules.VerdictFromSentinel, evaluate(artifact, rules))
+}
+
+// shadowRecord projects an already-computed outcome into the record. Split from
+// classifyShadow so the live path (hooks.Classify) evaluates ONCE and reads both
+// views off that single pass, instead of classifying the same artifact twice.
+func shadowRecord(cycle int, phase, stage string, o classifyOutcome) (VerdictShadowRecord, bool) {
+	if stage == SentinelStageOff {
+		return VerdictShadowRecord{}, false
+	}
 	rec := VerdictShadowRecord{
 		Cycle:             cycle,
 		Phase:             phase,
-		Stage:             rules.VerdictFromSentinel,
+		Stage:             stage,
 		StructuralVerdict: o.structural,
+		SentinelConsulted: o.consulted,
 		SentinelPresent:   o.present,
 		SentinelVerdict:   o.sentinel,
 		EffectiveVerdict:  o.effective,
@@ -170,6 +215,10 @@ func ClassifyShadow(cycle int, phase, artifact string, rules *phasespec.Classify
 // one file understands it without this package open beside them.
 func shadowRationale(rec VerdictShadowRecord) string {
 	switch {
+	case !rec.SentinelConsulted && !knownSentinelStage(rec.Stage):
+		return fmt.Sprintf("invalid verdict_from_sentinel stage %q — the phase was failed on its own config, not on its artifact", rec.Stage)
+	case !rec.SentinelConsulted:
+		return fmt.Sprintf("structural verdict %s decided before the stated verdict was consulted; the report's own sentinel was never read", rec.StructuralVerdict)
 	case !rec.SentinelPresent:
 		return "no readable verdict sentinel; structural verdict kept (fail-open)"
 	case rec.WouldFlip:
@@ -182,13 +231,20 @@ func shadowRationale(rec VerdictShadowRecord) string {
 	}
 }
 
+func knownSentinelStage(s string) bool {
+	return s == SentinelStageOff || s == SentinelStageShadow || s == SentinelStageEnforce
+}
+
 // writeVerdictShadow persists the record beside the artifacts it describes.
-// Best-effort and silent on failure by design, the same posture as the
-// audit-chain shadow: a measurement must never influence, delay, or brick the
-// decision it is measuring.
-func writeVerdictShadow(workspace string, rec VerdictShadowRecord, ok bool) {
+// Best-effort: a measurement must never influence, delay, or brick the decision
+// it is measuring — the same posture as the audit-chain shadow. It is NOT
+// silent, though: a returned error becomes a warn diagnostic at the call site,
+// because a permanently failing write yields an empty soak with zero signal and
+// nothing else would ever say so. Diagnostics do not affect routing, so saying
+// it out loud cannot perturb the decision being measured.
+func writeVerdictShadow(workspace string, rec VerdictShadowRecord, ok bool) error {
 	if !ok || workspace == "" {
-		return
+		return nil
 	}
-	_ = atomicwrite.JSON(filepath.Join(workspace, VerdictShadowRecordFile), rec)
+	return atomicwrite.JSON(filepath.Join(workspace, VerdictShadowRecordFile(rec.Phase)), rec)
 }

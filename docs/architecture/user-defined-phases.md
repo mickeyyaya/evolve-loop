@@ -78,7 +78,7 @@ Set `classify.verdict_from_sentinel` to have the verdict your agent already emit
 | value | behavior |
 | --- | --- |
 | absent / `""` | off — structure decides, the stated verdict is discarded (legacy) |
-| `"shadow"` | routes exactly as off, and writes `judgment-verdict-shadow.json` recording what the stated verdict *would* have made it |
+| `"shadow"` | routes exactly as off, and writes `judgment-verdict-shadow-<phase>.json` recording what the stated verdict *would* have made it |
 | `"enforce"` | the stated verdict is authoritative |
 
 Rules worth knowing before you set it:
@@ -90,7 +90,9 @@ Rules worth knowing before you set it:
 - **A typo is a hard FAIL**, not a silent "off". `"shadwo"` fails the phase loudly.
 - **Start at `shadow`.** A verdict nothing has ever consumed is a verdict nobody has
   ever calibrated; measure the flip rate before you promote. Read
-  `judgment-verdict-shadow.json` from the run workspace — `would_flip` is the datum.
+  `judgment-verdict-shadow-<phase>.json` from the run workspace — `would_flip` is the datum,
+  and `sentinel_consulted` tells you whether the sentinel was read at all (a structural
+  failure decides before it is).
 - **If your phase can FAIL, it must also teach.** A phase declaring this key has to be
   listed in `judgmentTeachingPhases` (`go/internal/core/judgment_lesson.go`) so its
   objection becomes a carryover lesson instead of a silent halt. A test enforces this.

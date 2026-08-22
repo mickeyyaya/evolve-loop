@@ -11,17 +11,24 @@ package core
 // re-derives the same falsified premise — exactly the gap judgment_lesson.go was
 // written to close.
 //
-// Bound at DECLARATION, not at enforce, so promoting a phase from shadow to
-// enforce can never open the gap: by the time anyone flips the stage word, this
-// test has already required the teaching side to exist.
+// Bound at DECLARATION, not at enforce, so promoting a TRACKED catalog phase
+// from shadow to enforce can never open the gap: by the time anyone flips the
+// stage word, this test has already required the teaching side to exist.
+//
+// Scope limit, stated because docs/architecture/user-defined-phases.md now
+// documents the key for user phases: this binds git-TRACKED catalog phases only.
+// A runtime-minted, untracked phase that declares the key gets neither this
+// guard nor phasespec's stage-word guard, and judgmentTeachingPhases has no
+// runtime enforcement (recordJudgmentLesson simply no-ops). That is the residual
+// gap; the author docs carry the requirement in prose.
 
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
 func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *testing.T) {
@@ -75,25 +82,41 @@ func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *test
 		t.Skip("no phase.json files found — catalog layout moved?")
 	}
 	if declaring == 0 {
-		t.Errorf("no tracked phase declares classify.verdict_from_sentinel: the judgment-verdict wiring is inert, and a fix nothing exercises is the defect it was written to cure")
+		// Deliberately NOT an error. Setting both phases back to "" is the
+		// designed CONFIG rollback for this feature; failing the build on it
+		// would convert a config action into a code change, against
+		// phase_settings_from_config_not_code. Inertness still surfaces — the
+		// shadow records simply stop appearing in the run workspaces.
+		t.Log("no tracked phase declares classify.verdict_from_sentinel — the judgment-verdict wiring is currently inert (expected only if it was deliberately rolled back)")
 	}
 }
 
 // trackedPhaseDirsForTest returns the git-tracked phase dirs, or nil when there
 // is no usable git context (then the caller binds every dir — the stricter
-// fallback). Mirrors phasespec's TrackedPhaseDirs, which lives in that package's
-// test binary and so cannot be imported here.
+// fallback).
+//
+// Builds on repostate.TrackedFiles, the production primitive, rather than
+// shelling out to git again: a second hand-rolled implementation drifted from
+// phasespec.TrackedPhaseDirs on the definition of "tracked" (any file under the
+// dir, versus the phase.json itself), so a dir with a tracked agent.md and an
+// untracked phase.json bound in one guard and not the other. Same primitive,
+// same predicate, one meaning.
 func trackedPhaseDirsForTest(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	out, err := exec.Command("git", "-C", root, "ls-files", "--", ".evolve/phases").Output()
+	entries, err := os.ReadDir(filepath.Join(root, ".evolve", "phases"))
 	if err != nil {
 		return nil
 	}
 	tracked := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		parts := strings.Split(line, "/")
-		if len(parts) >= 3 && parts[0] == ".evolve" && parts[1] == "phases" {
-			tracked[parts[2]] = true
+	for _, e := range entries {
+		files, ferr := repostate.TrackedFiles(root, filepath.Join(".evolve", "phases", e.Name()))
+		if ferr != nil {
+			return nil
+		}
+		for _, f := range files {
+			if filepath.Base(f) == "phase.json" {
+				tracked[e.Name()] = true
+			}
 		}
 	}
 	if len(tracked) == 0 {

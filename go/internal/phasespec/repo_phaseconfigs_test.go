@@ -75,9 +75,20 @@ func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 	t.Parallel()
 	// Mirrors specrunner's stage words. Duplicated as literals rather than
 	// imported because phasespec is the LEAF here — specrunner imports it, so
-	// importing back would cycle. The catalog test above makes the same trade.
+	// importing back would cycle.
 	known := map[string]bool{"": true, "shadow": true, "enforce": true}
+	eachTrackedPhaseClassify(t, func(path string, c *ClassifyRules) {
+		if c != nil && !known[c.VerdictFromSentinel] {
+			t.Errorf("%s declares classify.verdict_from_sentinel=%q — EvaluateClassify FAILs this phase unconditionally at runtime. Use \"\" (off), \"shadow\" or \"enforce\".", path, c.VerdictFromSentinel)
+		}
+	})
+}
 
+// eachTrackedPhaseClassify calls fn for every git-TRACKED phase.json in the repo
+// catalog, skipping the run when the catalog is absent (layout moved) — the walk
+// the catalog guards share instead of copying.
+func eachTrackedPhaseClassify(t *testing.T, fn func(path string, c *ClassifyRules)) {
+	t.Helper()
 	root := filepath.Join("..", "..", "..")
 	dir := filepath.Join(root, ".evolve", "phases")
 	entries, err := os.ReadDir(dir)
@@ -99,12 +110,11 @@ func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 			Classify *ClassifyRules `json:"classify"`
 		}
 		if jerr := json.Unmarshal(data, &cfg); jerr != nil {
-			continue // the sibling test reports unparseable catalogs
+			t.Errorf("%s: unparseable phase.json: %v", path, jerr)
+			continue
 		}
 		checked++
-		if cfg.Classify != nil && !known[cfg.Classify.VerdictFromSentinel] {
-			t.Errorf("%s declares classify.verdict_from_sentinel=%q — EvaluateClassify FAILs this phase unconditionally at runtime. Use \"\" (off), \"shadow\" or \"enforce\".", path, cfg.Classify.VerdictFromSentinel)
-		}
+		fn(path, cfg.Classify)
 	}
 	if checked == 0 {
 		t.Skip("no phase.json files found — catalog layout moved?")

@@ -59,10 +59,11 @@ type ClassifyRules struct {
 	// cycle must not proceed as framed" and the cycle ran to completion.
 	//
 	// Stage word, not a bool, because the population this switches on is
-	// UNCALIBRATED: 100 of 225 live judgment reports state FAIL, and
-	// premise-challenge alone states FAIL on 52 of 55 (20 of 20 since
-	// cycle-1500). Enforcing that without a measured soak would halt nearly
-	// every cycle at that phase. "" = off (legacy, byte-identical),
+	// UNCALIBRATED — a verdict nothing ever consumed is a verdict nobody ever
+	// calibrated, so enforcing it without a measured soak would halt nearly
+	// every cycle at that phase. ADR-0091 owns the measured counts; they move
+	// every cycle, and a stale copy here would mislead a promotion decision.
+	// "" = off (legacy, byte-identical),
 	// "shadow" = record the disagreement and route as before, "enforce" = the
 	// stated verdict decides. Per-phase and not a global policy stage because
 	// the two phases are in very different states of calibration and must be
