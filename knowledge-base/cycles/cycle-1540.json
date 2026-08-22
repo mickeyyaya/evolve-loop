@@ -1,0 +1,105 @@
+{
+  "cycle": 1540,
+  "run_id": "01M0M969RQNQ1QS49YQEHQ27Y7",
+  "goal": "Work the highest-weight pipeline-integrity items in the inbox: prefer defects where a produced signal has no consumer, and verify each fix fires on the real production path rather than only in unit tests.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 13640,
+      "started_at": "2026-08-22T08:27:19Z",
+      "ended_at": "2026-08-22T08:36:39Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 322889,
+      "started_at": "2026-08-22T08:36:39Z",
+      "ended_at": "2026-08-22T08:42:02Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 46,
+        "output": 23257,
+        "cache_read": 1940789,
+        "cache_write": 113140
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "scout|gate-block|d0e4667f922d",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"scout\" deliverable rejected after 2 correction(s): scout did not materialize evals for selected slug(s): integration-tier-exclusion-observability, integration-tier-failure-digest-i"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1540",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 336529,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "retro",
+    "longest_ms": 322889,
+    "by_archetype_ms": {
+      "control": 322889,
+      "plan": 13640
+    },
+    "total_tokens": {
+      "input": 46,
+      "output": 23257,
+      "cache_read": 1940789,
+      "cache_write": 113140
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 46,
+        "output": 23257,
+        "cache_read": 1940789,
+        "cache_write": 113140
+      },
+      "plan": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 46,
+      "output": 23257,
+      "cache_read": 1940789,
+      "cache_write": 113140
+    },
+    "cache_hit_ratio": 0.9999762988610572,
+    "hot_phase_count": 0
+  }
+}
