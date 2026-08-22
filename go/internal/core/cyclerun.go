@@ -238,6 +238,22 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 		}
 	}
 
+	// A cycle can also lose its landing OUTRIGHT: ship ran, hit landing-queue
+	// contention, and the recovery correctly routed elsewhere — leaving a PASS
+	// verdict from the audit floor attached to a cycle that delivered nothing
+	// (wave-20260822a-verify: cycle-1535 rebased into a genuine conflict on a
+	// peer lane's file, went to the debugger, and closed out PASS). Runs AFTER
+	// the incoherence block so a self-healed PASS is checked too, and keyed on
+	// the cycle's OWN ship artifacts rather than a HEAD delta, which in fleet
+	// mode belongs to whichever sibling landed last. See lost_landing_floor.go.
+	if result.SystemFailure == nil {
+		if sig := detectLostLanding(cs.WorkspacePath, result.FinalVerdict); sig != nil {
+			result.SystemFailure = sig
+			result.FinalVerdict = lostLandingVerdict()
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d LANDING LOST: %s Recorded as %s (system-class, not halting — the recovery path behaved correctly and siblings are still working).\n", cycle, sig.Evidence, result.FinalVerdict)
+		}
+	}
+
 	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
 	// HEAD advancing and without an audit-advisory "would-have-blocked" record —
 	// i.e. work may have been produced and then discarded with the worktree
@@ -287,6 +303,15 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// a formal continuation of the ledger-holding cycle (reconcileAgainstAncestor's
 	// arming scope). Mirrors MergeWorkspaceCarryover immediately above.
 	MergeWorkspacePrescriptionCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
+
+	// Triage's DROPPED set retires here, AFTER both merges above and before the
+	// persist — otherwise a todo triage just declared stale is re-merged from the
+	// workspace and handed straight back to the next cycle's planner, which is
+	// the cycle-1538 reproduction: triage said "stale: existing bridge tests and
+	// ACS replay predicate are green" and the same id came back the next cycle.
+	// Ordering is load-bearing: retiring BEFORE the merges would let the merge
+	// resurrect the very id that was just dropped.
+	retireTriageDroppedCarryover(state, cs.WorkspacePath)
 
 	state.LastCycleNumber = cycle
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {
