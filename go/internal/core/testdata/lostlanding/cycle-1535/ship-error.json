@@ -1,0 +1,7 @@
+{
+  "class": "transient",
+  "code": "GIT_FLEET_REBASE_NEEDED",
+  "debug": "branch=main; cycle_branch=cycle-42824668-1535; git_err=; git_rc=128",
+  "message": "ship: fleet ff-merge cycle-42824668-1535 into main diverged (a peer cycle moved main mid-pipeline); rebase + re-verify the merged tree, then re-ship",
+  "stage": "atomic-ship"
+}
