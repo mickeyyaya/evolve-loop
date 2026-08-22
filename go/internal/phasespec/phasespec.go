@@ -49,6 +49,25 @@ type ClassifyRules struct {
 	// failure block (class/defects/evidence_paths) or the contract gate
 	// re-dispatches with a correction.
 	RequireFailureContext bool `json:"require_failure_context,omitempty"`
+	// VerdictFromSentinel opts a JUDGMENT phase into having its own stated
+	// verdict decide, instead of having it discarded.
+	//
+	// A judgment phase (premise-challenge, adversarial-review) renders a
+	// conclusion and emits the canonical machine sentinel carrying it. Without
+	// this key the classifier reads STRUCTURE ONLY, so a well-formed report is
+	// PASS no matter what it concluded — cycle-1528 stated "FAIL (BLOCK). The
+	// cycle must not proceed as framed" and the cycle ran to completion.
+	//
+	// Stage word, not a bool, because the population this switches on is
+	// UNCALIBRATED: 100 of 225 live judgment reports state FAIL, and
+	// premise-challenge alone states FAIL on 52 of 55 (20 of 20 since
+	// cycle-1500). Enforcing that without a measured soak would halt nearly
+	// every cycle at that phase. "" = off (legacy, byte-identical),
+	// "shadow" = record the disagreement and route as before, "enforce" = the
+	// stated verdict decides. Per-phase and not a global policy stage because
+	// the two phases are in very different states of calibration and must be
+	// promotable independently.
+	VerdictFromSentinel string `json:"verdict_from_sentinel,omitempty"`
 }
 
 // Gates names the inter-phase gate functions (declarative; resolved by the

@@ -74,8 +74,16 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 // Classify evaluates the spec's declarative ClassifyRules against the artifact.
 // The next-phase hint comes from spec.OnPass (empty lets the orchestrator's
 // state machine pick the successor — Stage 1 behavior).
-func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+//
+// The shadow record is written here rather than inside EvaluateClassify because
+// that function is pure and exhaustively unit-tested on that basis; this is the
+// I/O boundary. writeVerdictShadow is a no-op for every phase that has not
+// declared verdict_from_sentinel, so no phase pays for a measurement it did not
+// ask for and no phase name appears in Go.
+func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	verdict, diags := EvaluateClassify(artifact, h.spec.Classify)
+	rec, ok := ClassifyShadow(req.Cycle, h.spec.Name, artifact, h.spec.Classify)
+	writeVerdictShadow(req.Workspace, rec, ok)
 	return verdict, diags, h.spec.OnPass
 }
 
@@ -96,12 +104,48 @@ func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespo
 //     (cycle-263: 15 mis-authored catalog phases hit this in production).
 //   - rules.VerdictOnPass overrides the pass verdict, but must be a canonical
 //     verdict (guards against silent typos in user phase JSON); else FAIL
+//   - rules.VerdictFromSentinel lets a JUDGMENT phase's own stated verdict
+//     decide (verdict_from_sentinel.go). Absent = byte-identical legacy
+//     behavior; "shadow" records the disagreement without routing on it;
+//     "enforce" makes the stated verdict authoritative. Runs LAST, so a stated
+//     verdict can never launder a structurally broken artifact, and fails open
+//     on an unreadable sentinel. An unknown stage word is a hard FAIL.
 func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
+	o := evaluate(artifact, rules)
+	return o.effective, o.diags
+}
+
+// classifyOutcome is one evaluation's full result. It exists so the VERDICT view
+// (EvaluateClassify) and the MEASUREMENT view (ClassifyShadow) are two readings
+// of ONE pass rather than two evaluators that can drift — the drift being
+// precisely what a shadow stage cannot survive, since a record that disagrees
+// with the routing it claims to describe measures nothing.
+type classifyOutcome struct {
+	stage      string
+	structural string // what STRUCTURE alone concludes (the legacy verdict)
+	sentinel   string // the agent's own stated verdict; "" when absent/unusable
+	present    bool
+	effective  string // what the caller actually gets, per stage
+	diags      []core.Diagnostic
+}
+
+// structuralOnly is the outcome for a decision reached before the sentinel stage
+// is ever consulted (empty artifact, missing sections, an inert gate). Those are
+// defects in the ARTIFACT or the CONFIG, and no stated verdict may launder them.
+func structuralOnly(verdict string, diags []core.Diagnostic) classifyOutcome {
+	return classifyOutcome{structural: verdict, effective: verdict, diags: diags}
+}
+
+// evaluate runs the declarative rules once. The structural checks below are the
+// original EvaluateClassify body, unchanged in order and in message text; the
+// only addition is the trailing applySentinelStage, which is a no-op for every
+// phase that does not declare verdict_from_sentinel.
+func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 	if strings.TrimSpace(artifact) == "" && (rules == nil || rules.FailIfEmpty) {
-		return core.VerdictFAIL, []core.Diagnostic{{Severity: "error", Message: "phase produced an empty artifact"}}
+		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{Severity: "error", Message: "phase produced an empty artifact"}})
 	}
 	if rules == nil {
-		return core.VerdictPASS, nil
+		return structuralOnly(core.VerdictPASS, nil)
 	}
 
 	var missing []string
@@ -111,30 +155,30 @@ func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, 
 		}
 	}
 	if len(missing) > 0 {
-		return core.VerdictFAIL, []core.Diagnostic{{
+		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message:  "artifact missing required section(s): " + strings.Join(missing, ", "),
-		}}
+		}})
 	}
 
 	if len(rules.FailIfSignal) > 0 {
-		return core.VerdictFAIL, []core.Diagnostic{{
+		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message:  "fail_if_signal declared but Stage-3 signal bus not available — remove or defer this gate",
-		}}
+		}})
 	}
 
 	verdict := core.VerdictPASS
 	if rules.VerdictOnPass != "" {
 		if !core.IsVerdict(rules.VerdictOnPass) {
-			return core.VerdictFAIL, []core.Diagnostic{{
+			return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{
 				Severity: "error",
 				Message:  fmt.Sprintf("invalid verdict_on_pass %q: must be PASS/FAIL/WARN/SKIPPED", rules.VerdictOnPass),
-			}}
+			}})
 		}
 		verdict = rules.VerdictOnPass
 	}
-	return verdict, nil
+	return applySentinelStage(classifyOutcome{structural: verdict, effective: verdict}, artifact, rules)
 }
 
 // hasSection reports whether section appears as a line-anchored markdown

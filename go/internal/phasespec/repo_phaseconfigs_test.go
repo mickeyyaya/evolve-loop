@@ -62,3 +62,51 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 		t.Skip("no phase.json files found — catalog layout moved?")
 	}
 }
+
+// TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown catches a typo'd rollout
+// stage at AUTHORING time rather than mid-cycle.
+//
+// EvaluateClassify hard-FAILs an unknown verdict_from_sentinel word on purpose
+// (an inert gate must fail loudly, cycle-241) — but discovering that from a
+// dead cycle costs a dispatch and an operator's afternoon. This is the same
+// belt-and-braces pairing the fail_if_signal guard above already uses: the
+// runtime rejection is the floor, this is the tripwire.
+func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
+	t.Parallel()
+	// Mirrors specrunner's stage words. Duplicated as literals rather than
+	// imported because phasespec is the LEAF here — specrunner imports it, so
+	// importing back would cycle. The catalog test above makes the same trade.
+	known := map[string]bool{"": true, "shadow": true, "enforce": true}
+
+	root := filepath.Join("..", "..", "..")
+	dir := filepath.Join(root, ".evolve", "phases")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Skipf("phase catalog not present at %s: %v", dir, err)
+	}
+	tracked := TrackedPhaseDirs(t, root)
+	checked := 0
+	for _, e := range entries {
+		if !e.IsDir() || (tracked != nil && !tracked[e.Name()]) {
+			continue
+		}
+		path := filepath.Join(dir, e.Name(), "phase.json")
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			continue
+		}
+		var cfg struct {
+			Classify *ClassifyRules `json:"classify"`
+		}
+		if jerr := json.Unmarshal(data, &cfg); jerr != nil {
+			continue // the sibling test reports unparseable catalogs
+		}
+		checked++
+		if cfg.Classify != nil && !known[cfg.Classify.VerdictFromSentinel] {
+			t.Errorf("%s declares classify.verdict_from_sentinel=%q — EvaluateClassify FAILs this phase unconditionally at runtime. Use \"\" (off), \"shadow\" or \"enforce\".", path, cfg.Classify.VerdictFromSentinel)
+		}
+	}
+	if checked == 0 {
+		t.Skip("no phase.json files found — catalog layout moved?")
+	}
+}
