@@ -169,6 +169,19 @@ func transientFamilyCases() []transientFamilyCase {
 	}
 }
 
+func TestArtifactTimeoutTransient_LivePaneIsFamilyScopedNotHardCodedText(t *testing.T) {
+	pane := livePane529(t)
+	for _, tc := range transientFamilyCases() {
+		t.Run(tc.cli, func(t *testing.T) {
+			got := classifyTransientPane(tc.cli, pane)
+			want := tc.cli == "claude-tmux"
+			if got != want {
+				t.Errorf("classifyTransientPane(%q, live claude 529 pane) = %t, want %t; recognition must come from the launched family's manifest", tc.cli, got, want)
+			}
+		})
+	}
+}
+
 // bridgeAuthoredChatter is stderr the BRIDGE itself writes on the exit-81 path.
 // None of it may read as transient for ANY family: matching it would prove the
 // classifier is pointed at the stderr buffer rather than the pane (the
@@ -299,6 +312,21 @@ func TestClassifyTransientPane_IgnoresEchoedPromptText(t *testing.T) {
 	genuine := "⏺ API Error: 529 Overloaded. This is a server-side issue, usually temporary."
 	if !classifyTransientPane("claude-tmux", strippedForExhaustionScan(genuine, injected)) {
 		t.Errorf("a real provider error was stripped away as a prompt echo: %q", genuine)
+	}
+}
+
+func TestArtifactTimeoutTransient_EchoedProviderTextNeverClassifiesForAnyFamily(t *testing.T) {
+	for _, tc := range transientFamilyCases() {
+		t.Run(tc.cli, func(t *testing.T) {
+			for _, providerText := range tc.transient {
+				injected := "Task:\n" + providerText + "\nWrite the deliverable."
+				pane := "thinking...\n" + providerText + "\nstill working..."
+				stripped := strippedForExhaustionScan(pane, injected)
+				if classifyTransientPane(tc.cli, stripped) {
+					t.Errorf("%s classified provider text echoed from the injected prompt as a live upstream failure: %q", tc.cli, providerText)
+				}
+			}
+		})
 	}
 }
 
