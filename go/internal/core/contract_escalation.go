@@ -103,15 +103,38 @@ const contractSalvageRetryDirectiveHeading = "## Contract Salvage Retry — verb
 // last resort. The repair-economics rationale (arXiv:2306.09896, cited by the
 // inbox item) is to spend the harder round's budget on the DIAGNOSIS when buying
 // a different CLI family is not on the menu.
-func composeContractSalvageRetry(reason string) string {
-	return composeCorrection(reason) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
+// remediation, when the triggering gate supplied one, is threaded through
+// composeCorrection and changes the closing clause below (see salvageClosing).
+func composeContractSalvageRetry(reason, remediation string) string {
+	return composeCorrection(reason, remediation) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
 		"This is the second consecutive block reporting the SAME defect, and no other CLI family is " +
 		"available to escalate to — this is the last correction before the contract gate's circuit " +
 		"breaker opens and the gate stops enforcing for the rest of this run.\n\n" +
 		"The contract validator's output, verbatim:\n\n" + reason + "\n\n" +
 		"Do not re-summarize it. Take each bracketed [violation_code] above in turn, state the exact " +
 		"section heading or file path that code refers to, then re-emit the whole deliverable at the " +
-		"contracted path with that specific defect closed. Do not change unrelated files."
+		"contracted path with that specific defect closed. " + salvageClosing(remediation)
+}
+
+// salvageClosing picks the salvage rung's final clause. The default forbids
+// collateral edits; when the gate supplied a remedy that clause must not fire,
+// because a remediation exists only for violations whose fix is to CREATE
+// something.
+//
+// REACHABILITY, stated honestly: this branch is currently DEAD in production and
+// is forward-looking parity, not the fix. The salvage rung only fires at
+// rr.Blocks >= contractEscalateAtBlock, and Blocks is set solely by
+// internal/deliverable, while Remediation is set solely by internal/evalgate —
+// no gate can satisfy both today. The 0-for-4 Gate A failures were "rejected
+// after 2 correction(s)" via maxCorrections exhaustion in the ORDINARY
+// correction loop, which goes through composeCorrection — that is the call that
+// actually closes the gap. This exists so the two directive paths cannot drift
+// if a future gate ever sets both.
+func salvageClosing(remediation string) string {
+	if remediation != "" {
+		return "Change nothing else beyond what the remedy above requires."
+	}
+	return "Do not change unrelated files."
 }
 
 // ledgerKindContractGateDemoted is the ledger Kind recorded when the contract

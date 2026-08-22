@@ -30,7 +30,8 @@
       "Stated Premise",
       "Falsification Attempts",
       "Verdict"
-    ]
+    ],
+    "verdict_from_sentinel": "shadow"
   },
   "routing": {
     "insert_when": [

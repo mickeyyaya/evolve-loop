@@ -9,9 +9,23 @@ import (
 
 // composeCorrection turns a deliverable-reject reason into the correction
 // directive injected into the phase re-dispatch (## Correction prompt block).
-func composeCorrection(reason string) string {
-	return "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" +
-		reason +
+func composeCorrection(reason, remediation string) string {
+	head := "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" + reason
+	// Gate-authored remedy: the rejecting gate is the only component that knows
+	// what "fixed" looks like for its own violation, so when it says, we relay it
+	// verbatim instead of guessing. Critically this branch does NOT emit "Do not
+	// change unrelated files" — a remediation exists precisely for violations
+	// whose remedy is to CREATE an artifact the deliverable itself is not, and
+	// that clause forbade the fix (Gate A recovered 0 of 4 times in production).
+	// The no-collateral intent is preserved, scoped to the remedy.
+	if remediation != "" {
+		return head + "\n\n" + remediation +
+			"\n\nThen finish. Change nothing else beyond what this remedy requires."
+	}
+	// Default: the artifact exists at the contracted path but is malformed. This
+	// is the class the wording was written for and is byte-identical to before
+	// remediation existed.
+	return head +
 		"\n\nFix the deliverable so it satisfies the contract — write it at the EXACT contracted path " +
 		"with all required sections / valid structure — then finish. Do not change unrelated files."
 }

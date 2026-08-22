@@ -62,3 +62,61 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 		t.Skip("no phase.json files found — catalog layout moved?")
 	}
 }
+
+// TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown catches a typo'd rollout
+// stage at AUTHORING time rather than mid-cycle.
+//
+// EvaluateClassify hard-FAILs an unknown verdict_from_sentinel word on purpose
+// (an inert gate must fail loudly, cycle-241) — but discovering that from a
+// dead cycle costs a dispatch and an operator's afternoon. This is the same
+// belt-and-braces pairing the fail_if_signal guard above already uses: the
+// runtime rejection is the floor, this is the tripwire.
+func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
+	t.Parallel()
+	// Mirrors specrunner's stage words. Duplicated as literals rather than
+	// imported because phasespec is the LEAF here — specrunner imports it, so
+	// importing back would cycle.
+	known := map[string]bool{"": true, "shadow": true, "enforce": true}
+	eachTrackedPhaseClassify(t, func(path string, c *ClassifyRules) {
+		if c != nil && !known[c.VerdictFromSentinel] {
+			t.Errorf("%s declares classify.verdict_from_sentinel=%q — EvaluateClassify FAILs this phase unconditionally at runtime. Use \"\" (off), \"shadow\" or \"enforce\".", path, c.VerdictFromSentinel)
+		}
+	})
+}
+
+// eachTrackedPhaseClassify calls fn for every git-TRACKED phase.json in the repo
+// catalog, skipping the run when the catalog is absent (layout moved) — the walk
+// the catalog guards share instead of copying.
+func eachTrackedPhaseClassify(t *testing.T, fn func(path string, c *ClassifyRules)) {
+	t.Helper()
+	root := filepath.Join("..", "..", "..")
+	dir := filepath.Join(root, ".evolve", "phases")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Skipf("phase catalog not present at %s: %v", dir, err)
+	}
+	tracked := TrackedPhaseDirs(t, root)
+	checked := 0
+	for _, e := range entries {
+		if !e.IsDir() || (tracked != nil && !tracked[e.Name()]) {
+			continue
+		}
+		path := filepath.Join(dir, e.Name(), "phase.json")
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			continue
+		}
+		var cfg struct {
+			Classify *ClassifyRules `json:"classify"`
+		}
+		if jerr := json.Unmarshal(data, &cfg); jerr != nil {
+			t.Errorf("%s: unparseable phase.json: %v", path, jerr)
+			continue
+		}
+		checked++
+		fn(path, cfg.Classify)
+	}
+	if checked == 0 {
+		t.Skip("no phase.json files found — catalog layout moved?")
+	}
+}
