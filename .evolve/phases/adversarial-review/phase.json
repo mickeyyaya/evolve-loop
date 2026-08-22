@@ -25,7 +25,8 @@
       "Threat Model",
       "Findings",
       "Verdict"
-    ]
+    ],
+    "verdict_from_sentinel": "shadow"
   },
   "routing": {
     "insert_when": [
