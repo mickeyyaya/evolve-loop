@@ -32,11 +32,18 @@ package core
 //     consumed a block). That is still before the third strike, so the circuit
 //     stays the last resort.
 //
-//  3. ONLY A CONTRACT BLOCK ESCALATES. Blocks==0 means the rejecting reviewer in
-//     the chain keeps no contract-block counter (evalgate / topngate / triagecap /
-//     the build floor). Those are task-binding or capacity rejections, not
-//     format-compliance failures, so a different CLI is not the remedy and the
-//     ladder behaves exactly as before.
+//  3. A CONTRACT BLOCK ESCALATES — AND, since 2026-08-23, SO DOES A
+//     REMEDIATION-CARRYING REJECTION (ReviewResult.Remediation, set only by
+//     evalgate) at its second identical in-cycle round. The original constraint
+//     read "a different CLI is not the remedy" for every Blocks==0 rejection;
+//     the measured record disproved that for the CREATE-a-missing-artifact
+//     class: every eval-materialization failure since cycle-1450
+//     (1471/1476/1504/1531/1540/1545) was one CLI family, 0-for-all correction
+//     rounds on that family — including rounds whose directive named the exact
+//     writable paths (cycle-1545, verified) — while the other family never
+//     failed the gate once (0/26). Remediation-LESS Blocks==0 rejections
+//     (topngate / triagecap / the build floor) are capacity or task-binding
+//     failures and keep the original rule: they never escalate.
 //
 //  4. ONLY AN IDENTICAL BLOCK ESCALATES (cycle-1289). ReviewResult.Blocks counts
 //     blocks, not defects: two genuinely DIFFERENT contract violations on one
@@ -121,12 +128,15 @@ func composeContractSalvageRetry(reason, remediation string) string {
 // because a remediation exists only for violations whose fix is to CREATE
 // something.
 //
-// REACHABILITY, stated honestly: this branch is currently DEAD in production and
-// is forward-looking parity, not the fix. The salvage rung only fires at
-// rr.Blocks >= contractEscalateAtBlock, and Blocks is set solely by
-// internal/deliverable, while Remediation is set solely by internal/evalgate —
-// no gate can satisfy both today. The 0-for-4 Gate A failures were "rejected
-// after 2 correction(s)" via maxCorrections exhaustion in the ORDINARY
+// REACHABILITY, revised 2026-08-23: LIVE. The escalation trigger now admits
+// remediation-carrying rejections (the evalgate class) at their second
+// identical round, so a phase whose whole chain is one CLI family CAN reach
+// this arm with a remediation in hand — the forward-looking parity below is
+// now the production path for that shape. Historical context: before the
+// revision, Blocks was set solely by internal/deliverable and Remediation
+// solely by internal/evalgate, so no gate satisfied the trigger with a
+// remediation; the 0-for-4 Gate A failures were "rejected after 2
+// correction(s)" via maxCorrections exhaustion in the ORDINARY
 // correction loop, which goes through composeCorrection — that is the call that
 // actually closes the gap. This exists so the two directive paths cannot drift
 // if a future gate ever sets both.
