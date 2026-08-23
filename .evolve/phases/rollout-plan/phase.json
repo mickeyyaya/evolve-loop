@@ -1,5 +1,6 @@
 {
   "name": "rollout-plan",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-rollout-plan",
   "categories": [

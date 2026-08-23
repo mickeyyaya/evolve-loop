@@ -1,5 +1,6 @@
 {
   "name": "incident-postmortem",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "description": "Structured 4-section debrief to prevent incident recurrence when root causes go unrecorded.",

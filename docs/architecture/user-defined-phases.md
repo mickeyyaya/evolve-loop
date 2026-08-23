@@ -63,6 +63,7 @@ what does it do about it."*
 | `inputs/outputs.signals` | namespaced signals consumed/emitted (`<phase>.<key>`) | — |
 | `prompt_context` | `req.Context` keys appended to the prompt | — |
 | `classify` | declarative verdict: `require_sections`, `fail_if_empty`, `verdict_on_pass`, `verdict_from_sentinel` | PASS if non-empty |
+| `catalog` | `"on-demand"` keeps the phase installed but off the advisor's SELECT menu | on the menu |
 | `routing.insert_when` / `skip_when` | signal conditions that trigger the phase | — |
 
 ### Letting your phase's OWN verdict decide (`classify.verdict_from_sentinel`)
@@ -96,6 +97,45 @@ Rules worth knowing before you set it:
 - **If your phase can FAIL, it must also teach.** A phase declaring this key has to be
   listed in `judgmentTeachingPhases` (`go/internal/core/judgment_lesson.go`) so its
   objection becomes a carryover lesson instead of a silent halt. A test enforces this.
+
+### Staying installed without crowding the menu (`catalog`)
+
+Every non-control phase is offered to the planner as a SELECT card. That menu has
+only **12 enriched slots**; beyond that, cards render in a degraded form with no
+metadata. Measured on 2026-08-23 the repo projected **65 cards**, so 53 rendered
+degraded — and **47 of the 65 had never been selected in 120 cycles**. The best
+real estate was being allocated by registry order, not usefulness.
+
+Set `"catalog": "on-demand"` on a phase that should stay available but stop
+competing for a slot:
+
+```json
+{ "name": "migration-safety-check", "catalog": "on-demand", ... }
+```
+
+An on-demand phase is **hidden from the menu, not removed**. It is still
+installed, still routable, still dispatchable by naming it in a plan, and it is
+still listed by name in a single index line beneath the menu:
+
+```
+43 further phase(s) are installed and available ON REQUEST — name one in your plan to use it: …
+```
+
+Rules:
+
+- **Absent key = on the menu.** Byte-identical to before for any phase that says
+  nothing.
+- **Only the exact word `on-demand` declines.** `ondemand`, `On-Demand` and the
+  like are rejected by a catalog test rather than silently ignored — an
+  unrecognized value fails *open* onto the menu, the opposite of the author's
+  intent.
+- **Never used as a substitute for `enabled`.** `enabled` gates whether a phase
+  can run at all; `catalog` only gates whether the planner is offered it. Use
+  `enabled` to turn something off, `catalog` to keep it available but quiet.
+- Reach for it when a phase is genuinely rare rather than obsolete — a
+  migration-safety check is worth having on the day you need it, and deleting it
+  because it has not fired is deleting the fire extinguisher because there has
+  been no fire.
 
 ## How it runs
 

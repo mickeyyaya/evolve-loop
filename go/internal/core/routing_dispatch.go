@@ -318,6 +318,13 @@ func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 		if role == phasespec.RoleControl {
 			continue
 		}
+		// A phase may decline its SELECT slot (phasespec.CatalogOnDemand) while
+		// staying installed and dispatchable. It is still named in the prompt's
+		// on-demand index (onDemandCatalogNames), so declining costs
+		// discoverability of METADATA, never of existence.
+		if spec.IsOnDemand() {
+			continue
+		}
 		cards = append(cards, router.PhaseCard{
 			Name:              spec.Name,
 			Role:              string(role),
@@ -384,4 +391,22 @@ func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 // hand.
 func backfillArtifactPath(workspacePath, phase string) string {
 	return filepath.Join(workspacePath, phasecontract.ArtifactFilename(phase))
+}
+
+// onDemandCatalogNames lists the phases that declined a SELECT slot, in catalog
+// order. Rendered as ONE line beneath the menu: the point of declining is to
+// stop 53 cards crowding out 12 enriched slots, so re-listing them as cards
+// would undo the fix. Control phases are absent here for the same reason they
+// are absent from the menu — they are kernel-managed, never advisor-composed.
+func onDemandCatalogNames(cat phasespec.Catalog) []string {
+	var out []string
+	for _, spec := range cat.All() {
+		if spec.RoleOrDefault() == phasespec.RoleControl {
+			continue
+		}
+		if spec.IsOnDemand() {
+			out = append(out, spec.Name)
+		}
+	}
+	return out
 }

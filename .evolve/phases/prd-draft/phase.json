@@ -1,5 +1,6 @@
 {
   "name": "prd-draft",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-prd-draft",
   "inputs": {

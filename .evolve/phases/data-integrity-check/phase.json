@@ -1,5 +1,6 @@
 {
   "name": "data-integrity-check",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-data-integrity-check",

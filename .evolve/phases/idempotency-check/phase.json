@@ -1,5 +1,6 @@
 {
   "name": "idempotency-check",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-idempotency-check",

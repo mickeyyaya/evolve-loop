@@ -1,5 +1,6 @@
 {
   "name": "dependency-map",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-dependency-map",
   "inputs": {

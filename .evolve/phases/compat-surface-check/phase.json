@@ -1,5 +1,6 @@
 {
   "name": "compat-surface-check",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-compat-surface-check",

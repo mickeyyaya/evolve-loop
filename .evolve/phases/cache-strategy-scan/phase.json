@@ -1,5 +1,6 @@
 {
   "name": "cache-strategy-scan",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-cache-strategy-scan",
