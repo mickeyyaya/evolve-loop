@@ -39,7 +39,23 @@ import (
 // pickable). Every step is per-item fail-open and LOUD: a consumption problem
 // must never block a ship that already earned its verdict.
 func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, dir string) {
-	if opts.Class != ClassCycle {
+	switch opts.Class {
+	case ClassCycle:
+		// The lane path: workspace evidence is mandatory, and its absence is
+		// LOUD below — a lane ship always has a cycle behind it.
+	case ClassManual:
+		// consumption_must_ride_the_landing, the manual half (the lane half
+		// shipped as #466; cycle-1547's red-first reproduction pins this one):
+		// a reviewed console ship that closes an inbox item must retire that
+		// item IN THE LANDING COMMIT, or every later cycle rediscovers it —
+		// three recorded live burns. A manual ship WITHOUT cycle evidence
+		// (ordinary console commit, no WorkspacePath) has nothing to consume
+		// and returns silently: the loud missing-verdict warn below is for
+		// ships that CLAIM a workspace and can't prove a PASS.
+		if opts.WorkspacePath == "" {
+			return
+		}
+	default:
 		return
 	}
 	if v := workspaceACSVerdict(opts.WorkspacePath); v != "PASS" {
