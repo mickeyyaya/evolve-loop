@@ -75,6 +75,14 @@ type Result struct {
 	// (compile failure, timeout, signal) — a red must never be a
 	// content-free exit code.
 	EvidenceNote string `json:"evidence_note,omitempty"`
+	// PhantomBindings names bound tests this red predicate demanded that NEVER
+	// RAN — reported did-NOT-pass while absent from FailingTests, i.e. the
+	// bound name no longer resolves in its target package (renamed away, or
+	// never created). Distinct from a FAILING bound test on purpose: the cure
+	// for a phantom is repointing the binding, not fixing code, and a red that
+	// cannot say which of the two it is costs a forensic session
+	// (phantom_binding.go; the 1539-1546 absorbing streak).
+	PhantomBindings []string `json:"phantom_bindings,omitempty"`
 	// Flaky marks a predicate that was RED on the first run and GREEN on the
 	// single bounded retry (cycle-468): value "passed-on-retry". Visible in
 	// the wire JSON so a flake is never silently absorbed; the first-run
@@ -684,6 +692,7 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 			if len(r.FailingTests) == 0 && !strings.Contains(full, "--- FAIL: "+a.test) {
 				r.EvidenceNote = "no `--- FAIL:` marker in output — compile failure, timeout, or signal; see excerpt tail"
 			}
+			r.PhantomBindings = phantomBindings(full, r.FailingTests)
 		}
 		out = append(out, r)
 	}

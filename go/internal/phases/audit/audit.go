@@ -283,7 +283,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}
 	}
 
-	redCount, redIDs, shipEligible, acsErr := readACSVerdict(verdictPath)
+	redCount, redIDs, phantomBindings, shipEligible, acsErr := readACSVerdict(verdictPath)
 	// egpsOverride is the one-line reason of whichever EGPS branch forces FAIL —
 	// "" means no override happened. Selecting the reason first (instead of
 	// appending inside each branch) makes the override single-exit: exactly one
@@ -304,7 +304,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		egpsLabel = "EGPS acs-verdict.json unreadable"
 	case redCount > 0:
 		egpsBlocked = true
-		egpsOverride = egpsRedMessage(redCount, redIDs)
+		egpsOverride = egpsRedMessage(redCount, redIDs, phantomBindings)
 		egpsLabel = "EGPS red_count>0"
 	case shipEligible != nil && !*shipEligible:
 		// The authoritative acssuite SSOT (ship_eligible) can say do-not-ship even
@@ -658,28 +658,42 @@ func canonRootPath(p string) string {
 	return filepath.Clean(p)
 }
 
-func readACSVerdict(path string) (redCount int, redIDs []string, shipEligible *bool, err error) {
+func readACSVerdict(path string) (redCount int, redIDs, phantomBindings []string, shipEligible *bool, err error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return 0, nil, nil, fmt.Errorf("read: %w", err)
+		return 0, nil, nil, nil, fmt.Errorf("read: %w", err)
 	}
 	var v struct {
 		RedCount     int   `json:"red_count"`
 		ShipEligible *bool `json:"ship_eligible"`
 		Results      []struct {
-			ACID   string `json:"ac_id"`
-			Result string `json:"result"`
+			ACID            string   `json:"ac_id"`
+			Result          string   `json:"result"`
+			PhantomBindings []string `json:"phantom_bindings"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return 0, nil, nil, fmt.Errorf("parse: %w", err)
+		return 0, nil, nil, nil, fmt.Errorf("parse: %w", err)
 	}
+	seen := map[string]bool{}
 	for _, r := range v.Results {
-		if r.Result == "red" && r.ACID != "" {
+		if r.Result != "red" {
+			continue
+		}
+		if r.ACID != "" {
 			redIDs = append(redIDs, r.ACID)
 		}
+		// Phantom names are surfaced so the gate-block can carry the cure
+		// (phantom_binding.go in acssuite). Deduped across results: two
+		// predicates demanding the same renamed test is one repoint.
+		for _, pb := range r.PhantomBindings {
+			if pb != "" && !seen[pb] {
+				seen[pb] = true
+				phantomBindings = append(phantomBindings, pb)
+			}
+		}
 	}
-	return v.RedCount, redIDs, v.ShipEligible, nil
+	return v.RedCount, redIDs, phantomBindings, v.ShipEligible, nil
 }
 
 // egpsRedIDCycleTokens strips the cycle-numbered chrome from an ACS ac_id:
@@ -703,10 +717,10 @@ var egpsRedIDCycleTokens = regexp.MustCompile(`^(?:cycle\d+/)?(?:Test)?(?:C\d+_)
 // fingerprint — distinct per defect, while the same defect red again on a
 // retry cycle (new cycle-numbered ac_id, same semantic name) still collides
 // exactly, so the breaker keeps catching real recurrences.
-func egpsRedMessage(redCount int, redIDs []string) string {
+func egpsRedMessage(redCount int, redIDs, phantomBindings []string) string {
 	const maxNamedReds = 5
 	if len(redIDs) == 0 {
-		return fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount)
+		return fmt.Sprintf("EGPS: red_count=%d (cycle ships only when red_count==0)", redCount) + phantomBindingClause(phantomBindings)
 	}
 	shown := make([]string, 0, len(redIDs))
 	for _, id := range redIDs {
@@ -722,7 +736,25 @@ func egpsRedMessage(redCount int, redIDs []string) string {
 		shown = shown[:maxNamedReds]
 	}
 	return fmt.Sprintf("EGPS: red_count=%d [%s%s] (cycle ships only when red_count==0)",
-		redCount, strings.Join(shown, " "), suffix)
+		redCount, strings.Join(shown, " "), suffix) + phantomBindingClause(phantomBindings)
+}
+
+// phantomBindingClause renders the actionable half of a phantom-binding red, or
+// "" when there are none — the phantom-free message stays byte-identical
+// (pinned), so every existing fingerprint and log grep is untouched.
+//
+// The clause states diagnosis, cure, AND the anti-gaming boundary in the
+// directive itself: the reader of this line is usually an agent (retro, a
+// continuation builder, a correction round), and an agent told only "test
+// missing" reliably reaches for the cheapest green — deleting the predicate —
+// which is the exact gaming vector red-on-missing exists to block. The
+// 1539-1546 streak burned five cycles on a red this one line would have cured.
+func phantomBindingClause(phantomBindings []string) string {
+	if len(phantomBindings) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("; PHANTOM binding(s) [%s]: the bound test name does not resolve in its target package (renamed or never created) — repoint the predicate's binding to the real test name or restore the name; do NOT delete the predicate",
+		strings.Join(phantomBindings, " "))
 }
 
 type Config struct {
