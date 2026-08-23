@@ -474,11 +474,11 @@ func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, 
 	if len(scoped) == 0 && len(envExclusive) > 0 {
 		// Everything in scope is env-exclusive: surface a visible WARN (applyCIGate's
 		// could-not-run path) instead of a false FAIL. CI is the backstop.
-		return nil, fmt.Errorf("touched package(s) %s are env-exclusive under a live loop — their integration tests (full RunCycle orchestrators over real git, tmux fleets, real git worktrees) false-RED the tier under fleet contention while CI, isolated, stays green (cycles 930/931/932); CI's integration-tier step remains the backstop (ADR-0069)", strings.Join(envExclusive, ", "))
+		return nil, fmt.Errorf("touched package(s) %s are env-exclusive under a live loop — their integration tests false-RED the tier under fleet contention (cycles 930/931/932; the requireTmux boot-timeout class, cycles 1539/1543/1546). Backstop: %s (ADR-0069)", strings.Join(envExclusive, ", "), envExclusiveBackstopNote(envExclusive))
 	}
 	if len(envExclusive) > 0 {
 		// Mixed scope: run the runnable remainder; name the skips in the lane log.
-		fmt.Fprintf(os.Stderr, "[integration-tier] skipping env-exclusive package(s) under a live loop (CI covers them): %s\n", strings.Join(envExclusive, ", "))
+		fmt.Fprintf(os.Stderr, "[integration-tier] skipping env-exclusive package(s) under a live loop: %s. Backstop: %s\n", strings.Join(envExclusive, ", "), envExclusiveBackstopNote(envExclusive))
 	}
 	return scoped, nil // may be empty (cycle touched only acs/) → gate skips
 }
@@ -493,10 +493,62 @@ func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, 
 // the exact tier once, isolated, and stays green — per-cycle parity for these
 // packages is CI's job (the same ADR-0069 rationale that scoped the tier in the
 // first place).
+// Backstop honesty (2026-08-23): the first three entries are covered by CI's
+// own integration-tier step, isolated — "CI is the backstop" is TRUE for them.
+// internal/bridge joined for the same false-RED reason (its requireTmux tests
+// boot real tmux sessions; under a live wave those boots time out — 13
+// offenders on cycle-1543, all exit=80, the same tests 7/7 PASS in 17.2s on a
+// quiet host), but its requireTmux subset SKIPS in CI (GitHub runners have no
+// tmux — the #483 finding), so its real backstop is a quiet-host run, and the
+// skip message must say that instead of asserting coverage CI provably does
+// not provide. envExclusiveBackstopNote renders the per-package truth.
 var integrationTierEnvExclusive = []string{
 	"internal/core",
 	"cmd/evolve",
 	"internal/phases/ship",
+	"internal/bridge",
+}
+
+// envExclusiveQuietHostOnly names the env-exclusive packages whose integration
+// tier is NOT covered by CI either — their tests self-skip there — so the only
+// honest backstop is a run on a quiet host (loop-boot preflight or a console
+// `go test -tags integration` with no wave active).
+var envExclusiveQuietHostOnly = map[string]bool{
+	"internal/bridge": true,
+}
+
+// envExclusiveBackstopNote states, per skipped package, WHERE its integration
+// tests actually run instead. One dishonest word here recreates the defect
+// #483 removed: a gate message asserting coverage that cannot occur.
+func envExclusiveBackstopNote(pkgs []string) string {
+	var ci, quiet []string
+	for _, p := range pkgs {
+		n := strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/...")
+		n = strings.TrimSuffix(n, "/")
+		if envExclusiveQuietHostOnly[n] || quietHostSuffix(n) {
+			quiet = append(quiet, n)
+		} else {
+			ci = append(ci, n)
+		}
+	}
+	var parts []string
+	if len(ci) > 0 {
+		parts = append(parts, fmt.Sprintf("CI's isolated integration-tier step covers %s", strings.Join(ci, ", ")))
+	}
+	if len(quiet) > 0 {
+		parts = append(parts, fmt.Sprintf("%s's requireTmux tier is NOT covered by CI (no tmux on runners) — its backstop is a quiet-host run (loop-boot preflight, or `go test -tags integration` with no wave active)", strings.Join(quiet, ", ")))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// quietHostSuffix matches full import paths ending in a quiet-host-only pkg.
+func quietHostSuffix(n string) bool {
+	for q := range envExclusiveQuietHostOnly {
+		if strings.HasSuffix(n, "/"+q) {
+			return true
+		}
+	}
+	return false
 }
 
 // envExclusivePkg reports whether a package pattern ("./internal/core/...", a

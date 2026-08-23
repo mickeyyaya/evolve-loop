@@ -138,13 +138,16 @@ func TestIntegrationTierScope_EnvExclusiveSkipped(t *testing.T) {
 	if !strings.Contains(err.Error(), "env-exclusive") {
 		t.Errorf("the WARN must explain the skip; got %q", err.Error())
 	}
-	// Mixed → env-exclusive dropped, runnable remainder kept.
-	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/core/...", "./internal/bridge/..."})
+	// Mixed → env-exclusive dropped, runnable remainder kept. internal/bridge
+	// was this test's remainder example until 2026-08-23, when its requireTmux
+	// boot-timeout false-REDs (cycles 1539/1543/1546) put it ON the exclusive
+	// list; internal/prompts is a genuinely runnable stand-in.
+	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/core/...", "./internal/prompts/..."})
 	if err != nil {
 		t.Fatalf("mixed scope must run the remainder, got err %v", err)
 	}
-	if len(pkgs) != 1 || pkgs[0] != "./internal/bridge/..." {
-		t.Errorf("pkgs = %v, want only ./internal/bridge/...", pkgs)
+	if len(pkgs) != 1 || pkgs[0] != "./internal/prompts/..." {
+		t.Errorf("pkgs = %v, want only ./internal/prompts/...", pkgs)
 	}
 	// The other two evidence-named env-exclusive packages.
 	if _, err := integrationTierScope(ctx, nil, "", []string{"./cmd/evolve/..."}); err == nil {
