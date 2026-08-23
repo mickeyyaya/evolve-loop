@@ -493,15 +493,6 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		}
 	} else {
 		cs.ActiveWorktree = wtPath
-		if base, _, berr := gitCapture(ctx, wtPath, "rev-parse", "HEAD"); berr == nil {
-			cs.WorktreeBaseSHA = strings.TrimSpace(base)
-		} else {
-			// Fail loudly: an empty base disables the cycle-156 normalize, so a
-			// committing builder's work would again be discarded by the audit —
-			// the exact symptom Option C fixes. WARN rather than abort (the
-			// source phases still run; normalize just degrades to a no-op).
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD at worktree creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
-		}
 		stack = append(stack, func(preserve, completedNormally bool) {
 			if preserve || !completedNormally {
 				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
@@ -514,6 +505,22 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 			}
 			o.clearActiveWorktree(wtPath)
 		})
+		// NOT a bare `rev-parse HEAD`: a REUSED worktree's HEAD can be an
+		// ADR-0076 salvage snapshot, and recording that as the base makes
+		// normalizeWorktreeToBase soft-reset onto the preserved work itself
+		// (see worktree_base.go). Ordinary HEADs are returned verbatim.
+		base, berr := resolveWorktreeBaseSHA(ctx, wtPath)
+		if berr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: resolving the worktree base at creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
+			if errors.Is(berr, errUnresolvableSnapshotBase) {
+				// An empty base would discard the preserved snapshot from audit.
+				// Preserve the reused worktree and abort rather than degrading.
+				failClean()
+				return cycleInit{}, nil, fmt.Errorf("resolve worktree base: %w", berr)
+			}
+		} else {
+			cs.WorktreeBaseSHA = strings.TrimSpace(base)
+		}
 	}
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		failClean()
