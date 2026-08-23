@@ -1,0 +1,47 @@
+{
+  "cycle": 1549,
+  "run_id": "01M0QGTXR90SW3D5ZN5GHN67M0",
+  "goal": "Work ordinary high-value bug fixes from the inbox. EXCLUDE one item reserved for console work: transient-artifact-timeout-shortcircuit-the-silence-budget — do not select it. Prefer defects where a produced signal has no consumer, and prove each fix fires on the real production path, not only in unit tests.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|d48492c70190",
+    "pre_class": "gate-block",
+    "reasons": [
+      "EGPS: red_count=1 [objection_reaches_next_cycle_planner_context] (cycle ships only when red_count==0)"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1549",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
