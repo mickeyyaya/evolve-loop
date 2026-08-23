@@ -15,11 +15,14 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // gitRepoWithCommits initialises a repo and returns a helper that commits an
@@ -252,5 +255,42 @@ func TestWorktreeReuseBase_ProvisioningPathRecordsGuardedBaseInCycleState(t *tes
 	}
 	if got := st.cycleState.WorktreeBaseSHA; got != wantBase {
 		t.Fatalf("production provisioning recorded base %s, want guarded ancestor %s", got, wantBase)
+	}
+}
+
+// TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim — the fail-OPEN
+// branch: HEAD resolves but its ancestry cannot be read (here: HEAD is a
+// grafted/garbage ref the log walk rejects). The guard can only justify walking
+// when it can positively identify a salvage snapshot; unreadable subjects mean
+// "record verbatim, WARN", never "record empty" — an empty base disables
+// normalization, the outcome the pre-guard code itself called worse. This is
+// also the seam TestVerdictCacheCollisionRegression's missing-base scenario
+// constructs by stubbing rev-parse HEAD: capture must go through rev-parse and
+// survive a failed walk, or that regression's scenario silently stops existing
+// (which is exactly how PR #486's first CI run went red).
+func TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim(t *testing.T) {
+	wt, commit := gitRepoWithCommits(t)
+	commit("ordinary work")
+
+	orig := gitRunner
+	gitRunner = sysexec.RunFunc(func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if len(args) == 2 && args[0] == "rev-parse" && args[1] == "HEAD" {
+			_, _ = io.WriteString(stdout, "feedfacefeedfacefeedfacefeedfacefeedface\n")
+			return 0, nil
+		}
+		if len(args) > 0 && args[0] == "log" {
+			_, _ = io.WriteString(stderr, "fatal: bad object feedface\n")
+			return 128, nil
+		}
+		return orig(ctx, name, dir, args, env, stdin, stdout, stderr)
+	})
+	t.Cleanup(func() { gitRunner = orig })
+
+	got, err := resolveWorktreeBaseSHA(context.Background(), wt)
+	if err != nil {
+		t.Fatalf("unreadable ancestry must fail OPEN to the captured HEAD, not error: %v", err)
+	}
+	if got != "feedfacefeedfacefeedfacefeedfacefeedface" {
+		t.Fatalf("the captured HEAD must be recorded verbatim; got %q", got)
 	}
 }
