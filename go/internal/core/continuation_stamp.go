@@ -42,7 +42,7 @@ func snapshotPreservedWorktree(ctx context.Context, worktree string) (string, er
 			return "", fmt.Errorf("snapshot: add: rc=%d err=%v: %s", code, err, stderr)
 		}
 		args := append(append([]string{}, snapshotIdentity...),
-			"commit", "-m", "salvage snapshot (ADR-0076 continuation-on-fail)", "--no-verify")
+			"commit", "-m", salvageSnapshotSubject, "--no-verify")
 		if _, stderr, code, err := g.Capture(ctx, args...); err != nil || code != 0 {
 			return "", fmt.Errorf("snapshot: commit: rc=%d err=%v: %s", code, err, stderr)
 		}
