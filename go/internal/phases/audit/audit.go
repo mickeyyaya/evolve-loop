@@ -395,8 +395,13 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		"go vet ./... reported %d issue(s) — CI `vet + fmt` would FAIL (e.g. import cycle). Offenders: %s")
 	applyCIGate(h.acsDurableCheck, "acs-durable gate",
 		"acs-durable (-tags acs) FAILED %d check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: %s")
+	// The integration-tier finding is the one gate whose local run can diverge
+	// from CI's (the requireTmux-guarded tier runs here and skips there), so its
+	// template carries a derived parity caveat instead of asserting CI's outcome
+	// — see ciparity_caveat.go. Pre-formatting the caveat keeps applyCIGate's
+	// (count, offenders) contract unchanged for the other four gates.
 	applyCIGate(h.integrationTierCheck, "integration-tier gate",
-		"the integration tier (`go test -tags integration`) reported %d offender(s) — CI's integration-tier test step would FAIL (e.g. TestFleetSoak). Offenders: %s")
+		integrationTierTemplateWithCaveat(ciParityCaveatNow()))
 	applyCIGate(h.apicoverEnforceCheck, "apicover-enforce gate",
 		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
 	applyCIGate(h.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
