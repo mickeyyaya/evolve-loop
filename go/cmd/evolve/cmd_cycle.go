@@ -707,6 +707,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// one (validated in-orchestrator against live git state). Claimed scopes
 	// resolve from the processing claims; a lane whose scope came from the wave
 	// planner instead resolves from its pinned lane-scope todo ids (G2).
+	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
 		// Stderr is wired (was the io.Discard default): the live-scope guard's
 		// refusal line — "this scope has no live pending item, binding released"
@@ -946,4 +947,16 @@ func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseS
 		return phasespec.PhaseSpec{}, nil, err
 	}
 	return res.Spec, res.Runner, nil
+}
+
+// scopePathResolver maps a scoped task id to its LIVE inbox record's absolute
+// path, "" when the id is not pending (carryover ids, consumed namesakes).
+// Named (not an inline closure) so the composition-root wiring is testable —
+// the week's recurring survivor is a correct component the root never calls.
+func scopePathResolver(projectRoot, taskID string) string {
+	st := inboxmover.ResolveDispatchState(inboxmover.Options{ProjectRoot: projectRoot}, taskID)
+	if st.State != inboxmover.StatePending {
+		return ""
+	}
+	return st.Path
 }

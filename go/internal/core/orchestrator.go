@@ -388,6 +388,11 @@ type Orchestrator struct {
 	// ids handed in as scopeIDs. Nil (default) = continuations never adopt —
 	// byte-identical provisioning.
 	continuationFor func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation
+	// scopePathFor resolves a scoped task id to its LIVE inbox record's
+	// absolute path ("" = not inbox-backed / not pending). Injected from the
+	// composition root like continuationFor (core cannot import inboxmover).
+	// Nil (default) = no path disclosure — Context byte-identical.
+	scopePathFor func(projectRoot, taskID string) string
 
 	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
 	// once from policy.json at the composition root (chronicle S3).
@@ -554,6 +559,37 @@ func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []
 	return func(o *Orchestrator) {
 		if fn != nil {
 			o.continuationFor = fn
+		}
+	}
+}
+
+// WithScopePathResolver injects the live-record path lookup for scoped task
+// ids, so a lane's phases receive the ONE correct file instead of a bare name.
+//
+// Why a name is not enough (cycle-1548, soak-20260823a): auto-minted ids are
+// deliberately stable per category — the dedup identity — so inbox/consumed/
+// accumulates same-id namesakes forever (17 records for one id at the
+// incident). An agent handed only the name name-searches the tree and finds
+// whichever namesake matches first; every phase of cycle-1548 worked a record
+// from a halt cured two weeks earlier. Nil is ignored — disclosure stays off.
+// ScopePathProbe reports whether a scope-path resolver is wired and, when it
+// is, what it resolves taskID to. A WIRING probe, not a workflow API: the
+// composition root's registration of the resolver is exactly the layer unit
+// tests of the resolver function cannot see (this week's nine NOT-WIRED
+// mutation survivors are all this shape), and Orchestrator's fields are
+// unexported by design — this is the narrow window that lets cmd/evolve pin
+// its own wiring without widening anything else.
+func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool) {
+	if o.scopePathFor == nil {
+		return "", false
+	}
+	return o.scopePathFor(projectRoot, taskID), true
+}
+
+func WithScopePathResolver(fn func(projectRoot, taskID string) string) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.scopePathFor = fn
 		}
 	}
 }
