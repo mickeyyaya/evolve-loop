@@ -180,13 +180,35 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 			// (contractBlocksShareIdentity, scoping constraint 4) — two different
 			// violations are two honest defects, not an incapable CLI.
 			salvageRetry := false
-			if rr.Blocks >= contractEscalateAtBlock && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
+			// Escalation eligibility has two typed doors, one per rejection class:
+			//   - rr.Blocks: the deliverable contract gate's own breaker count.
+			//   - rr.Remediation + the local correction ordinal: a
+			//     remediation-carrying rejection (set ONLY by evalgate) whose
+			//     second identical round is starting. The evalgate keeps no
+			//     breaker, so the in-cycle ordinal is its only honest counter —
+			//     and constraint 2's desync warning is about the DELIVERABLE
+			//     breaker's cross-cycle file, which this class does not have.
+			//     Measured basis (2026-08-23): every eval-materialization
+			//     failure since cycle-1450 (1471/1476/1504/1531/1540/1545) was
+			//     one CLI family, 0-for-all correction rounds on that family,
+			//     including rounds whose directive named the exact writable
+			//     paths — for the CREATE-a-missing-artifact class, a different
+			//     CLI is demonstrably the remedy. Remediation-LESS Blocks==0
+			//     rejections (topngate/triagecap/build floor) keep constraint 3
+			//     exactly: they never enter here.
+			escalEligible := rr.Blocks >= contractEscalateAtBlock ||
+				(rr.Remediation != "" && corr >= contractEscalateAtBlock)
+			if escalEligible && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
 				failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
 				esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI)
 				switch {
 				case ok && esc != dr.phaseReq.ModelRoutingCLI:
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive contract blocks on cli=%s; correction %d re-dispatches on cli=%s (contract blocks never trigger cli_fallback, which is how a mis-formatting CLI used to demote the gate). The phase's primary routing is unchanged.\n",
-						next, rr.Blocks, failedCLI, corr, esc)
+					blocksForLog := rr.Blocks
+					if blocksForLog == 0 {
+						blocksForLog = corr // the evalgate door: its ordinal IS the count
+					}
+					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
+						next, blocksForLog, failedCLI, corr, esc)
 					dr.phaseReq.ModelRoutingCLI = esc
 					escalated = true
 				case !ok:
