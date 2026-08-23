@@ -23,6 +23,23 @@ import (
 // processing claims (deterministic filename order), or nil when none carries
 // one.
 func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
+	return resolveClaim(opts, cycle, nil)
+}
+
+// resolveClaim walks this cycle's claimed items in sorted order and returns the
+// first STAMPED one that inScope admits. inScope nil admits every claim — the
+// legacy, scope-blind reading.
+//
+// The scope filter exists because a cycle's processing dir can hold claims for
+// several ids, and a lane may legitimately be working only one of them. Without
+// the filter the walk returns whichever stamped claim it meets first, which
+// silently hands a lane a PEER LANE's continuation: cycle-1536, scoped to
+// "pipeline-defect-infra-systemic", adopted "pipeline-replay-contract-boundary"
+// (cycle-1535's task), shipped that lane's eval file, and left cycle-1535 unable
+// to rebase — a PASS cycle whose landing was destroyed. Unstamped claims are
+// skipped, so the lane's own claim not carrying a stamp is exactly the case that
+// let the peer's win.
+func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuation.Continuation {
 	opts.resolveOpts()
 	cycleDir := filepath.Join(opts.InboxDir, "processing", fmt.Sprintf("cycle-%d", cycle))
 	entries, err := os.ReadDir(cycleDir)
@@ -42,13 +59,39 @@ func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
 			continue
 		}
 		var it struct {
+			ID           string                     `json:"id"`
 			Continuation *continuation.Continuation `json:"continuation"`
 		}
-		if json.Unmarshal(body, &it) == nil && it.Continuation != nil && it.Continuation.SnapshotSHA != "" {
-			return it.Continuation
+		if json.Unmarshal(body, &it) != nil {
+			continue
 		}
+		if it.Continuation == nil || it.Continuation.SnapshotSHA == "" {
+			continue
+		}
+		if inScope != nil && !inScope[strings.TrimSpace(it.ID)] {
+			fmt.Fprintf(opts.Stderr, "[inbox] cycle %d skipping claim %q: it carries a continuation from cycle %d but is OUTSIDE this lane's declared scope — adopting it would make two lanes work one task\n",
+				cycle, it.ID, it.Continuation.Cycle)
+			continue
+		}
+		return it.Continuation
 	}
 	return nil
+}
+
+// scopeSet turns a lane's declared ids into a membership set, or nil when the
+// lane declares none. nil means "no lane identity to violate" — a sequential or
+// solo cycle — and preserves the legacy scope-blind reading exactly.
+func scopeSet(scopeIDs []string) map[string]bool {
+	set := map[string]bool{}
+	for _, id := range scopeIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			set[id] = true
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	return set
 }
 
 // ResolveContinuationForScope is the composition root's lookup once a cycle's
@@ -61,10 +104,13 @@ func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
 // is not a binding. A corrupt registry degrades to nil (fresh start) with a
 // loud line — the orchestrator must never crash mid-cycle over a salvage index.
 func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *continuation.Continuation {
-	if c := ResolveContinuation(opts, cycle); c != nil {
+	// Claim-first (G1) is unchanged — but a SCOPED lane only adopts claims
+	// belonging to its own scope. An unscoped cycle passes nil and reads exactly
+	// as before.
+	opts.resolveOpts()
+	if c := resolveClaim(opts, cycle, scopeSet(scopeIDs)); c != nil {
 		return c
 	}
-	opts.resolveOpts()
 	for _, id := range scopeIDs {
 		if strings.TrimSpace(id) == "" {
 			continue
