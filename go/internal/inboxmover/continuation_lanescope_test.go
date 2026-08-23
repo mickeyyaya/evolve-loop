@@ -77,10 +77,20 @@ func TestResolveContinuationForScope_FallsBackToLaneScopeRegistry(t *testing.T) 
 // TestResolveContinuationForScope_ClaimWinsOverRegistry — G1 is unaffected:
 // when a claim carries a stamp, that stamp is returned even though the lane
 // scope also has a registry binding. Ordering, not replacement.
+//
+// The claim is seeded under the lane's OWN id. It previously used a different
+// id ("task-a" against scope "scope-a"), which made the assertion pass only
+// because the claim path ignored lane scope entirely — the defect that let
+// cycle-1536 adopt cycle-1535's continuation, ship its eval file, and destroy
+// that lane's landing. Claim ids and lane scope ids are ONE namespace (both are
+// inbox item ids: seedClaim writes {"id": …}, lane-scope.json carries todo_ids),
+// so a claim outside the lane's scope is a PEER's work, and the out-of-scope
+// case is pinned by TestResolveContinuationForScope_DoesNotAdoptAPeerLanesClaim.
+// The ordering rule this test exists for is unchanged.
 func TestResolveContinuationForScope_ClaimWinsOverRegistry(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "6666666666666666666666666666666666666666", 1078)
-	seedClaim(t, root, 1102, "task-a", "7777777777777777777777777777777777777777")
+	seedClaim(t, root, 1102, "scope-a", "7777777777777777777777777777777777777777")
 
 	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a"})
 	if got == nil {
