@@ -1,5 +1,6 @@
 {
   "name": "capacity-plan",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-capacity-plan",
   "inputs": {

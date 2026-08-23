@@ -1,5 +1,6 @@
 {
   "name": "frontend-design-review",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-frontend-design-review",

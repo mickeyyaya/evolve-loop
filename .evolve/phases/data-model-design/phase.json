@@ -1,5 +1,6 @@
 {
   "name": "data-model-design",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-data-model-design",
   "categories": [

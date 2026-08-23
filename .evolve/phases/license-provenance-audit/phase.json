@@ -1,5 +1,6 @@
 {
   "name": "license-provenance-audit",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-license-provenance-audit",

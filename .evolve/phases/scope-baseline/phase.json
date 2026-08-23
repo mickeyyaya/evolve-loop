@@ -1,5 +1,6 @@
 {
   "name": "scope-baseline",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-scope-baseline",
   "inputs": {

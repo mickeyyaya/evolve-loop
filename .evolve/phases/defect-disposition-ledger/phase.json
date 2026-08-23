@@ -1,5 +1,6 @@
 {
   "name": "defect-disposition-ledger",
+  "catalog": "on-demand",
   "optional": true,
   "description": "Authors this cycle's defect-dispositions.json in full — one entry per inherited defect id, FIXED with single-string resolvable evidence or DEFERRED with a reason — plus a coverage report reconciled against the continuation manifest or registry binding.",
   "when_to_use": "Select whenever this lane inherits defects from an ancestor cycle (a continuation manifest or a continuation-registry lane-scope binding exists), especially after any audit that reported disposition-preflight MISSING or INCOMPLETE.",

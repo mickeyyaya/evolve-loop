@@ -1,5 +1,6 @@
 {
   "name": "contract-fuzz-probe",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-contract-fuzz-probe",

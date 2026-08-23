@@ -1,5 +1,6 @@
 {
   "name": "resilience-design",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-resilience-design",
   "categories": [
