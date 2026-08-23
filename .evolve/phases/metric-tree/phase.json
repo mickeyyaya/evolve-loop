@@ -1,5 +1,6 @@
 {
   "name": "metric-tree",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-metric-tree",
   "inputs": {

@@ -1,5 +1,6 @@
 {
   "name": "opportunity-map",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-opportunity-map",
   "inputs": {

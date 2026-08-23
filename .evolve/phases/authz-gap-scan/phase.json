@@ -1,5 +1,6 @@
 {
   "name": "authz-gap-scan",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-authz-gap-scan",

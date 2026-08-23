@@ -1,5 +1,6 @@
 {
   "name": "benchmark-gate",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-benchmark-gate",
   "inputs": {

@@ -1,5 +1,6 @@
 {
   "name": "variance-analysis",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-variance-analysis",
   "inputs": {

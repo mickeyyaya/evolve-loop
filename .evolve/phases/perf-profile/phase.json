@@ -1,5 +1,6 @@
 {
   "name": "perf-profile",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-perf-profile",
   "inputs": {

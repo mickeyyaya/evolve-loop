@@ -1,5 +1,6 @@
 {
   "name": "locale-format-check",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-locale-format-check",

@@ -81,6 +81,11 @@ type RouteInput struct {
 	// so determinism is preserved. Additive: nil until the advisor-prompt slice
 	// wires it.
 	Catalog []PhaseCard
+	// OnDemandPhases names the installed phases that declined a SELECT slot
+	// (phasespec.CatalogOnDemand). Carried beside Catalog deliberately: the menu
+	// and the index of what is off the menu are two halves of one statement, and
+	// splitting them is how one half goes stale.
+	OnDemandPhases []string
 
 	// LastReason + Lessons are the recall-memory context (WS2): the short "why"
 	// of the most recent failure and the prior lessons that match it, looked up

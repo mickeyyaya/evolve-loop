@@ -1,5 +1,6 @@
 {
   "name": "cicd-pipeline-audit",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "optional": true,
   "agent": "evolve-cicd-pipeline-audit",

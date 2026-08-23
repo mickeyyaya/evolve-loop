@@ -1,5 +1,6 @@
 {
   "name": "market-sizing",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "agent": "evolve-market-sizing",
   "inputs": {

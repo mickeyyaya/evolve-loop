@@ -1,5 +1,6 @@
 {
   "name": "okr-draft",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-okr-draft",
   "inputs": {

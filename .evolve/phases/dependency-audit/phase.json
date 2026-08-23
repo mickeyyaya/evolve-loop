@@ -1,5 +1,6 @@
 {
   "name": "dependency-audit",
+  "catalog": "on-demand",
   "archetype": "evaluate",
   "outputs": {
     "signals": [

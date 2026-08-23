@@ -1,5 +1,6 @@
 {
   "name": "caching-strategy-design",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-caching-strategy-design",
   "categories": [

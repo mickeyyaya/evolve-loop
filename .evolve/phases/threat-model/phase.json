@@ -1,5 +1,6 @@
 {
   "name": "threat-model",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-threat-model",
   "inputs": {

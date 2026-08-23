@@ -1,5 +1,6 @@
 {
   "name": "risk-register",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-risk-register",
   "inputs": {

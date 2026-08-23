@@ -101,14 +101,32 @@ type PhaseSpec struct {
 	// nil/empty in the common case (no per-phase guardrail configured).
 	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
 	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
-	Enabled           string                      `json:"enabled,omitempty"`
-	EnableVar         string                      `json:"enable_var,omitempty"`
-	Inputs            IO                          `json:"inputs,omitempty"`
-	Outputs           IO                          `json:"outputs,omitempty"`
-	PromptContext     []string                    `json:"prompt_context,omitempty"`
-	Classify          *ClassifyRules              `json:"classify,omitempty"`
-	Routing           *config.RoutingBlock        `json:"routing,omitempty"`
-	Gates             Gates                       `json:"gates,omitempty"`
+	// Catalog decides whether this phase occupies a slot on the ADVISOR'S
+	// SELECT MENU. It does not affect whether the phase is installed, routable,
+	// dispatchable by an explicit plan, or mintable — only whether the planner
+	// is offered it as a card.
+	//
+	// Measured 2026-08-23: 65 non-control phases were projected as SELECT cards
+	// against maxEnrichedCatalogCards=12, so 53 rendered in the degraded
+	// overflow form — and 47 of the 65 had never been selected in 120 cycles.
+	// The enriched slots were allocated by registry order, not usefulness, so
+	// phases the advisor actually uses lost their metadata to phases it has
+	// never once chosen. "If a human engineer can't definitively say which tool
+	// should be used, an AI agent can't be expected to do better."
+	//
+	// "" (absent) = CatalogSelect, today's behavior byte-for-byte.
+	// "on-demand" = keep it installed, take it off the menu. The declined set is
+	// still INDEXED by name in one line of the prompt, so nothing becomes
+	// undiscoverable — this hides phases from the menu, it does not remove them.
+	Catalog       string               `json:"catalog,omitempty"`
+	Enabled       string               `json:"enabled,omitempty"`
+	EnableVar     string               `json:"enable_var,omitempty"`
+	Inputs        IO                   `json:"inputs,omitempty"`
+	Outputs       IO                   `json:"outputs,omitempty"`
+	PromptContext []string             `json:"prompt_context,omitempty"`
+	Classify      *ClassifyRules       `json:"classify,omitempty"`
+	Routing       *config.RoutingBlock `json:"routing,omitempty"`
+	Gates         Gates                `json:"gates,omitempty"`
 	// After names the phase this one slots in right after, in the routing order
 	// (e.g. "build" → runs between build and audit). Empty defaults to running
 	// just before "audit" — the canonical post-build check slot.
@@ -273,6 +291,24 @@ func ApplyArchetypeDefaults(s *PhaseSpec) {
 
 // Catalog is the ordered, lookup-able set of phase specs. Registry order is
 // preserved (All) for pipeline sequencing; Names is a sorted snapshot.
+// Catalog membership words for PhaseSpec.Catalog.
+const (
+	// CatalogSelect is the absent/default value: the phase is offered to the
+	// advisor as a SELECT card.
+	CatalogSelect = ""
+	// CatalogOnDemand keeps the phase installed and dispatchable but off the
+	// advisor's menu.
+	CatalogOnDemand = "on-demand"
+)
+
+// IsOnDemand reports whether this phase has declined its advisor SELECT slot.
+func (s PhaseSpec) IsOnDemand() bool { return s.Catalog == CatalogOnDemand }
+
+// KnownCatalogWord reports whether c is a recognized catalog membership value.
+// An unknown word is a config typo that would silently leave the phase on the
+// menu, so the repo-catalog guard fails on it loudly rather than defaulting.
+func KnownCatalogWord(c string) bool { return c == CatalogSelect || c == CatalogOnDemand }
+
 type Catalog struct {
 	order     []string
 	byName    map[string]PhaseSpec

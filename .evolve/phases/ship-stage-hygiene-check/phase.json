@@ -1,5 +1,6 @@
 {
   "name": "ship-stage-hygiene-check",
+  "catalog": "on-demand",
   "optional": true,
   "description": "Reconcile the paths ship is about to stage against the cycle's declared manifest (build-report/test-report): flag out-of-manifest files, runtime-minted .evolve stubs, and cross-lane leaks BEFORE ship binds the whole worktree tree.",
   "when_to_use": "Insert before ship when the cycle touched .evolve config surfaces or when the ship manifest gate (shadow) has been reporting out-of-manifest paths — the whole-tree bind sweeps silent additions into tracking (the gate-wiring-proof and cycle-1262 stub incidents). Runtime-minted cycle-1262; config stub, no gates wired yet.",

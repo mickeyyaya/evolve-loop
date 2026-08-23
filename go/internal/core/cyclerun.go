@@ -609,6 +609,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		LastReason:     lastReason,
 		Lessons:        lessons,
 		Catalog:        phaseCardsFromCatalog(o.catalog),
+		OnDemandPhases: onDemandCatalogNames(o.catalog),
 		GoalText:       req.Context["goal"],
 		CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
 		BenchedCLIs:    benchedCLIs,

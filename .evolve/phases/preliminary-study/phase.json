@@ -1,5 +1,6 @@
 {
   "name": "preliminary-study",
+  "catalog": "on-demand",
   "archetype": "plan",
   "agent": "evolve-preliminary-study",
   "when_to_use": "Use before a multi-cycle campaign when the goal needs research-backed decomposition into dependency-ordered cycle tasks.",

@@ -1,5 +1,6 @@
 {
   "name": "scout-scan",
+  "catalog": "on-demand",
   "archetype": "plan",
   "kind": "llm",
   "optional": true,

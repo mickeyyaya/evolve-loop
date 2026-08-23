@@ -226,7 +226,7 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile stri
 	if in.Cfg.ReconDigest {
 		router.RenderReconDigest(&b, gatherPreplanRecon(in))
 	}
-	writeCatalog(&b, in.Catalog)
+	writeCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 	writePlanResponseSchema(&b)
 	// Instruct the ABSOLUTE artifact path — the same path advisorLaunch tells the
 	// bridge to watch (filepath.Join(in.Workspace, artifactFile)). A relative path
@@ -490,7 +490,7 @@ func buildPlanPrompt(in router.RouteInput) string {
 
 	writeRoutingContext(&b, in)
 
-	writeCatalog(&b, in.Catalog)
+	writeCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 
 	writePlanResponseSchema(&b)
 	return b.String()
@@ -547,6 +547,18 @@ const maxCardHintRunes = 140
 // order (catalog order, stable partition) ⇒ prompt-prefix-cache friendly.
 // Emits nothing when the catalog is empty (legacy built-in-only path).
 func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
+	writeCatalogWithOnDemand(b, cards, nil)
+}
+
+// writeCatalogWithOnDemand renders the SELECT menu, then names the phases that
+// declined a slot in a single line.
+//
+// The index is the difference between HIDING a phase and REMOVING it. Declining
+// exists so 53 never-selected cards stop crowding out 12 enriched slots; if the
+// declined set then vanished from the prompt entirely, the advisor could not
+// learn those phases exist and the fix would trade one invisibility defect for
+// another — the exact class this repo has spent the week removing.
+func writeCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDemand []string) {
 	if len(cards) == 0 {
 		return
 	}
@@ -581,6 +593,11 @@ func writeCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	if len(overflow) > 0 {
 		b.WriteString("- All remaining selectable phases are in the \"## Phase Catalog — Core Values\" table (this prompt) and .evolve/phase-inventory.json (same SELECT rules; type/domain details there).\n")
 	}
+	if len(onDemand) > 0 {
+		fmt.Fprintf(b, "\n%d further phase(s) are installed and available ON REQUEST — name one in your plan to use it: %s\n",
+			len(onDemand), strings.Join(onDemand, ", "))
+	}
+
 }
 
 // writeCard renders one enriched catalog line:
