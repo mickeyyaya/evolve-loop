@@ -1,0 +1,204 @@
+{
+  "cycle": 1555,
+  "run_id": "01M0SCTZ8XEMFE1MM0P2D4AK2V",
+  "goal": "Work ordinary high-value bug fixes from the inbox. EXCLUDE one item reserved for console work: transient-artifact-timeout-shortcircuit-the-silence-budget — do not select it. Prefer defects where a produced signal has no consumer, and prove each fix fires on the real production path, not only in unit tests. A bug-reproduction deliverable must land WITH its passing fix or carry t.Skip until fixed — a red test on main blocks every lane.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 692182,
+      "started_at": "2026-08-24T08:06:16Z",
+      "ended_at": "2026-08-24T08:17:48Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 39862,
+      "started_at": "2026-08-24T08:19:51Z",
+      "ended_at": "2026-08-24T08:20:31Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1493,
+        "cache_read": 128239,
+        "cache_write": 66662
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 65290,
+      "started_at": "2026-08-24T08:20:31Z",
+      "ended_at": "2026-08-24T08:21:37Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 3639,
+        "cache_read": 314634,
+        "cache_write": 47311
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 329698,
+      "started_at": "2026-08-24T08:21:37Z",
+      "ended_at": "2026-08-24T08:27:07Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 411596,
+      "started_at": "2026-08-24T08:27:07Z",
+      "ended_at": "2026-08-24T08:33:59Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 66,
+        "output": 32581,
+        "cache_read": 3310694,
+        "cache_write": 128438
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 13631,
+      "started_at": "2026-08-24T08:33:59Z",
+      "ended_at": "2026-08-24T08:50:35Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 379468,
+      "started_at": "2026-08-24T08:50:35Z",
+      "ended_at": "2026-08-24T08:56:54Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 42,
+        "output": 27617,
+        "cache_read": 1815205,
+        "cache_write": 123126
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|4275564463fa",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: enforced package tests FAIL (coverage"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1555",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1931727,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 692182,
+    "by_archetype_ms": {
+      "build": 13631,
+      "control": 379468,
+      "evaluate": 329698,
+      "plan": 1208930
+    },
+    "total_tokens": {
+      "input": 132,
+      "output": 65330,
+      "cache_read": 5568772,
+      "cache_write": 365537
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 42,
+        "output": 27617,
+        "cache_read": 1815205,
+        "cache_write": 123126
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 90,
+        "output": 37713,
+        "cache_read": 3753567,
+        "cache_write": 242411
+      }
+    },
+    "wasted_tokens": {
+      "input": 42,
+      "output": 27617,
+      "cache_read": 1815205,
+      "cache_write": 123126
+    },
+    "cache_hit_ratio": 0.999976296951788,
+    "hot_phase_count": 3,
+    "hot_phases": [
+      "triage",
+      "fault-localization",
+      "tdd"
+    ]
+  }
+}
