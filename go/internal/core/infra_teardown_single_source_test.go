@@ -108,24 +108,27 @@ func TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation(t *testing.T) {
 	}
 }
 
-// TestOptionalInfraSkip_InfraGateAgreesWithIsInfraTeardownError is the
-// EQUIVALENCE proof that justifies the replacement: for a phase that clears
-// every OTHER guard (optional, off-floor, non-mandatory), optionalInfraSkip's
-// verdict must equal IsInfraTeardownError's verdict for every error shape. If
-// these ever disagree, the site does NOT mean the same concept and must not
-// adopt the helper.
-func TestOptionalInfraSkip_InfraGateAgreesWithIsInfraTeardownError(t *testing.T) {
+// TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError pins the gate
+// to its single-source predicate: for a phase that clears every OTHER guard
+// (optional, off-floor, non-mandatory), optionalInfraSkip's verdict must equal
+// IsOptionalSkippableError's verdict for every error shape — infra teardown
+// AND the missing-persona class (cycle-1551) alike. If these ever disagree,
+// the site has grown a private error taxonomy and must be re-single-sourced
+// through core/errors.go before any consolidation touches it.
+func TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, nil, nil, optionalSpecFor("learn"))
 	for _, err := range []error{
 		ErrArtifactTimeout,
 		ErrTransientBridgeFailure,
+		ErrAgentDocMissing,
 		fmt.Errorf("wrapped: %w", ErrArtifactTimeout),
+		fmt.Errorf("phase learn: load agent: %w", ErrAgentDocMissing),
 		errors.New("plain logic error"),
 	} {
-		want := IsInfraTeardownError(err)
+		want := IsOptionalSkippableError(err)
 		if got := o.optionalInfraSkip(Phase("learn"), err); got != want {
-			t.Errorf("for err=%v: optionalInfraSkip=%v but IsInfraTeardownError=%v — the site's infra gate "+
-				"must be exactly the union predicate for the adoption to be sound", err, got, want)
+			t.Errorf("for err=%v: optionalInfraSkip=%v but IsOptionalSkippableError=%v — the site's error gate "+
+				"must be exactly the single-source predicate for the adoption to be sound", err, got, want)
 		}
 	}
 }

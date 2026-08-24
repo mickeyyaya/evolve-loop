@@ -83,7 +83,9 @@ func TestC1166_002_InfraTeardownUnionSpelledOnce(t *testing.T) {
 	const suite = "TestIsInfraTeardownError_UnionSemantics|" +
 		"TestIsTransientBridgeError_StaysTransientOnly|" +
 		"TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation|" +
-		"TestOptionalInfraSkip_InfraGateAgreesWithIsInfraTeardownError|" +
+		// (renamed 2026-08-24: gate now proves equivalence to the widened
+		// single-source IsOptionalSkippableError — cycle-1551)
+		"TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError|" +
 		"TestInfraTeardownUnion_SpelledExactlyOnce"
 	out, code := goTest(t, "./internal/core/", suite)
 	if code != 0 {

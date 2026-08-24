@@ -291,18 +291,19 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// the cycle advances toward audit/ship. The failed attempts stay
 				// in failure-learning and the ledger — recovered, never silent.
 				if retryHooks.optionalInfraSkip(next, err) {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: optional phase exhausted infra retries (%v); degrading to WARN and advancing (optional_infra_skip)\n", next, err)
+					kind, msg, diags := optionalSkipDetails(next, err)
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s (%s)\n", msg, kind)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 						TS:       cr.o.now().UTC().Format(time.RFC3339),
 						Cycle:    cr.cycle,
 						Role:     string(next),
-						Kind:     "optional_infra_skip",
+						Kind:     kind,
 						ExitCode: bridgeExitCode(err),
 					}); lerr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN optional_infra_skip ledger append: %v\n", lerr)
+						fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", kind, lerr)
 					}
-					resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
+					resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: diags}
 					break
 				}
 				// Ship-error recovery seam (Component #7): ship is a pure

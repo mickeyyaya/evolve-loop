@@ -21,7 +21,9 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -554,6 +556,14 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if !inline {
 		agent, err := b.prompts.Agent(b.hooks.AgentPromptName())
 		if err != nil {
+			// A nonexistent persona is a CONFIG defect with a distinct remedy
+			// (write the doc, or take the phase off the menu), so it carries
+			// its own sentinel: optionalInfraSkip degrades an OPTIONAL phase
+			// to a recorded skip instead of killing the lane (cycle-1551).
+			// Every other load failure (unreadable, permission) stays plain.
+			if errors.Is(err, fs.ErrNotExist) && !errors.Is(err, prompts.ErrNoSource) {
+				return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w: %w", phase, core.ErrAgentDocMissing, err)
+			}
 			return core.PhaseResponse{}, fmt.Errorf("%s: load agent: %w", phase, err)
 		}
 		body = agent.Body
