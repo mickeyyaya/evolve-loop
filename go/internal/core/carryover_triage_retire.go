@@ -25,6 +25,10 @@ package core
 // the one consumer can actually reach. triagecap owns the WRITE shape; this
 // owns the READ. Keep it that way — a third parser is how "committed" and
 // "dropped" drift apart on the same document.
+// (2026-08-24 amendment: inboxmover.DroppedIDs now reads the same dropped[]
+// field for SHIP CONSUMPTION — forced apart from this reader by the very
+// import cycle above. A schema change to dropped[] must land in BOTH readers
+// or consumption and carryover retirement diverge on the same document.)
 
 import (
 	"encoding/json"

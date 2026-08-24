@@ -219,6 +219,23 @@ func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 		}
 	})
 
+	t.Run("triage dropped the assigned id as already-shipped: the PASS ship still consumes it (cycle-1552)", func(t *testing.T) {
+		// soak-20260824a wave-2 burn: 1552's triage put the fleet-scope id in
+		// dropped[] with top_n:[], build shipped the item's implementation
+		// anyway (df322f6c), consumption resolved zero ids, and the stale item
+		// cost the next wave a full lane re-proving finished work. A dropped
+		// ASSIGNED id is an affirmative close and must retire in-commit.
+		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
+				`{"schema_version":1,"top_n":[],"deferred":[],"dropped":[{"id":"fix-the-widget","reason":"already-shipped"}]}`)
+			mustWrite(t, filepath.Join(ws, "lane-scope.json"),
+				`{"todo_ids":["fix-the-widget"],"goal_hash":"abc"}`)
+		})
+		shipConsumeAndAssert(t, repo, wt, ws, itemRel,
+			".evolve/inbox/consumed/2026-08-15T03-00-00Z-fix-the-widget.json",
+			"a triage-dropped assigned scope id must be consumed by the PASS landing (cycle-1552)")
+	})
+
 	t.Run("triage named a different id: the Closes-Inbox marker still closes it", func(t *testing.T) {
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
 			// The decomposition shape: triage renames the work, so top_n never
