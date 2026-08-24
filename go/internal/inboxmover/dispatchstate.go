@@ -31,6 +31,14 @@ type DispatchState struct {
 	State  string   // one of the State* constants
 	Detail string   // e.g. "cycle-748" when State==StateProcessing
 	Deps   []string // declared deps (populated only when State==StatePending)
+	// Path is the LIVE record's absolute path, populated only for
+	// StatePending. Auto-minted ids are deliberately stable per category (the
+	// dedup identity), so consumed/ accumulates same-id namesakes forever and
+	// a bare id is structurally unsafe to hand to an agent: cycle-1548 worked
+	// an already-cured two-week-old consumed record because its prompt carried
+	// only the name. The resolver had this path in hand all along; carrying it
+	// is what lets dispatch disclose the one correct file.
+	Path string
 }
 
 // ResolveDispatchState classifies taskID against the inbox lifecycle dirs:
@@ -47,7 +55,7 @@ type DispatchState struct {
 func ResolveDispatchState(opts Options, taskID string) DispatchState {
 	opts.resolveOpts()
 	if path, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
-		return DispatchState{State: StatePending, Deps: readTaskDeps(path)}
+		return DispatchState{State: StatePending, Deps: readTaskDeps(path), Path: path}
 	}
 	cycles, _ := filepath.Glob(filepath.Join(opts.InboxDir, "processing", "cycle-*"))
 	for _, dir := range cycles {

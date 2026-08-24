@@ -92,6 +92,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// gate (core/lanescope.go) can fire on a mismatch instead of failing open.
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; scout ONLY within this assigned todo-id set, ignore all other candidate work: %s\n", scope)
+		// The LIVE record per assigned id (cycle-1548: a bare id name-searched
+		// into a consumed namesake from a halt cured two weeks earlier — 17
+		// records shared the id). The path alone is not enough; the directive
+		// must forbid the name-search it replaces, or the agent still greps.
+		if paths := req.Context["fleet_scope_paths"]; paths != "" {
+			fmt.Fprintf(&b, "- fleet_scope_records: the LIVE inbox record for each assigned id — READ THESE EXACT FILES; same-named files under inbox/consumed|processed|rejected are STALE NAMESAKES of already-handled work, never your task: %s\n", paths)
+		}
 		b.WriteString("- lane_coherence: echo the pinned goal_hash verbatim under a \"goal_hash\" key in your report's Decision Trace JSON block\n")
 	}
 	// Chronicle S3 (digest stage=enforce): the orchestrator seeds

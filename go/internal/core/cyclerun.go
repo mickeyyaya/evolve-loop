@@ -702,6 +702,26 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		ctxSnap["fleet_scope"] = scope
 		materializeLaneScope(cs.WorkspacePath, scope, req.GoalHash)
 	}
+	// Disclose each scoped id's LIVE inbox record beside the id list
+	// (cycle-1548: a bare name resolved to a two-week-old consumed namesake —
+	// 17 records shared the id — and every phase worked the cured ghost). Only
+	// PENDING ids get an entry; carryover/non-inbox ids resolve to "" and are
+	// silently omitted (fail-open, same as before). Nil resolver = no key,
+	// Context byte-identical.
+	if scope := ctxSnap["fleet_scope"]; scope != "" && o.scopePathFor != nil {
+		var pairs []string
+		for _, id := range strings.Split(scope, ",") {
+			if id = strings.TrimSpace(id); id == "" {
+				continue
+			}
+			if p := o.scopePathFor(req.ProjectRoot, id); p != "" {
+				pairs = append(pairs, id+"="+p)
+			}
+		}
+		if len(pairs) > 0 {
+			ctxSnap["fleet_scope_paths"] = strings.Join(pairs, " ")
+		}
+	}
 
 	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
 	// ONCE per cycle, at orchestrator start, BEFORE any phase runs. Surface
