@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -99,7 +100,10 @@ func catalogAwareResolver(projectRoot string, warn func(string)) phasecontract.R
 		warn(fmt.Sprintf("builtin registry load failed (%v); resolving builtin-only", err))
 		return phasecontract.BuiltinResolver{}
 	}
-	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot)
+	// The demotion inside the composed path is a no-op for name resolution
+	// (Catalog only hides a spec from the SELECT menu; Get still resolves it),
+	// so sharing the one path keeps the vocabularies identical.
+	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, cmdutil.NewPromptsLoader(projectRoot))
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
 	for _, w := range append(discWarns, mergeWarns...) {
 		warn(w)

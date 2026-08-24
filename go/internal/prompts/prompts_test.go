@@ -478,3 +478,16 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// TestZeroLoader_CarriesBothSentinels — the zero loader keeps its documented
+// fs.ErrNotExist contract AND is discriminable as a wiring defect via
+// ErrNoSource, so a nil source can never masquerade as one missing doc.
+func TestZeroLoader_CarriesBothSentinels(t *testing.T) {
+	_, err := NewFromFS(nil).Agent("any")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("zero-loader contract broken: err=%v, want fs.ErrNotExist", err)
+	}
+	if !errors.Is(err, ErrNoSource) {
+		t.Errorf("err=%v, want ErrNoSource discriminator", err)
+	}
+}

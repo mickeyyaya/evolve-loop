@@ -16,6 +16,17 @@ score_cap:
 
 # Eval: user-phase-persona-resolution-core
 
+> **RE-SCOPE (2026-08-24, cycle-1551 fix):** the landed design resolves this
+> class differently — registration-seam demotion to catalog:"on-demand"
+> (`demotePersonalessSpecs` inside `discoverUserSpecsClamped`) + dispatch-time
+> fail-soft (`core.ErrAgentDocMissing` → `optionalInfraSkip`) + the tracked-menu
+> guard test. `agents/<name>.md` remains the ONLY persona source for disk specs;
+> the phase-local `agent.md` resolution mode (Loader.AgentForPhase) specified
+> below is NOT implemented and must not land without first retiring one of the
+> existing mechanisms (three-for-one-class ceiling). See
+> docs/incidents/2026-08-24-personaless-menu-phase-lane-kill.md.
+
+
 ## Summary
 Verifies that the four dispatch-safety sub-fixes land correctly:
 1. `AgentForPhase` tries `.evolve/phases/<name>/agent.md` before `agents/<name>.md`

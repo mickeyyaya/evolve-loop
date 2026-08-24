@@ -48,8 +48,10 @@ func wrapCycleLevelError(phase Phase, err error) error {
 // optionalInfraSkip reports whether a phase whose retries exhausted may
 // degrade to WARN+advance instead of aborting the cycle (the Workstream-D
 // intent documented on ErrArtifactTimeout; cycle-283). Four conditions, all
-// required: the error is INFRA-shaped (artifact timeout / transient bridge —
-// never integrity or logic failures), the phase is NOT configured-mandatory,
+// required: the error is skippable-shaped per IsOptionalSkippableError (infra
+// teardown — artifact timeout / transient bridge — OR a missing persona doc,
+// cycle-1551; never integrity or logic failures), the phase is NOT
+// configured-mandatory,
 // the phase is catalog-Optional, and the phase sits outside the resolved ship
 // floor — so the skip can never weaken `ship ⇒ build ∧ audit ∧ tdd`. The
 // mandatory guard is generic and config-driven (the orchestrator reads
@@ -57,8 +59,24 @@ func wrapCycleLevelError(phase Phase, err error) error {
 // special-case — ship is a mandatory anchor — while protecting any mandatory
 // phase mis-marked Optional (the floor loop alone would miss ship, which is
 // not in the floor set). Phase-agnostic flow per ADR-0035/0038.
+// optionalSkipDetails names the ledger kind, operator message, and structured
+// diagnostic for an ADMITTED optional-phase skip, split by error class so
+// forensics never files a config defect under an infra key: a missing persona
+// (cycle-1551) had zero retries and no infra event — calling it
+// "optional_infra_skip" at exit 0 would merge two failure classes the ledger
+// has already paid for merging once. The diagnostic rides the synthesized WARN
+// response so the cause reaches audit/retro, not only stderr + ledger.
+func optionalSkipDetails(p Phase, err error) (kind, msg string, diags []Diagnostic) {
+	if errors.Is(err, ErrAgentDocMissing) {
+		msg = fmt.Sprintf("optional phase %s: persona doc missing (%v) — degrading to WARN and advancing; write agents/<agent>.md or mark the phase catalog:\"on-demand\"", p, err)
+		return "optional_missing_persona_skip", msg, []Diagnostic{{Severity: "warn", Message: msg}}
+	}
+	msg = fmt.Sprintf("optional phase %s exhausted infra retries (%v) — degrading to WARN and advancing", p, err)
+	return "optional_infra_skip", msg, []Diagnostic{{Severity: "warn", Message: msg}}
+}
+
 func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
-	if !IsInfraTeardownError(err) {
+	if !IsOptionalSkippableError(err) {
 		return false
 	}
 	if isConfiguredMandatory(o.cfg, string(p)) {

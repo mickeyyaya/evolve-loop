@@ -13,6 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 func writeUserPhase(t *testing.T, root, name string, spec map[string]any) {
@@ -42,7 +45,7 @@ func TestDiscoverUserSpecsClamped_ComposedPathStripsSmuggledWriter(t *testing.T)
 		t.Fatal(err)
 	}
 
-	specs, warns := discoverUserSpecsClamped(root)
+	specs, warns := discoverUserSpecsClamped(root, prompts.NewFromFS(fstest.MapFS{}))
 	byName := map[string]bool{}
 	for _, s := range specs {
 		byName[s.Name] = s.WritesSource
