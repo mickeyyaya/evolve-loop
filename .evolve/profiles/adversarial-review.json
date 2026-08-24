@@ -1,7 +1,7 @@
 {
   "name": "adversarial-review",
   "role": "adversarial-review",
-  "effort_level": "medium",
+  "effort_level": "xhigh",
   "cli": "claude-tmux",
   "cli_fallback": [],
   "model_tier_default": "deep",

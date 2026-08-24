@@ -89,7 +89,7 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	// consistent with shipped behavior — postship's retireCommittedCarryover
 	// already retires the carryover twins for the identical set — but it is a
 	// wider set than the triage-only one this path used to see.
-	ids := committedInboxIDs(opts.WorkspacePath, body)
+	ids := committedInboxIDs(opts.WorkspacePath, body, true) // this site is PASS-gated above
 	if len(ids) == 0 {
 		return
 	}

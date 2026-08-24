@@ -44,6 +44,10 @@
         "high": [
           "-c",
           "model_reasoning_effort=high"
+        ],
+        "xhigh": [
+          "-c",
+          "model_reasoning_effort=xhigh"
         ]
       },
       "default": "high"
