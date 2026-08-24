@@ -1,0 +1,235 @@
+{
+  "cycle": 1551,
+  "run_id": "01M0RPYFVC7CD8HV9NX8PGJKPF",
+  "goal": "Work ordinary high-value bug fixes from the inbox. EXCLUDE one item reserved for console work: transient-artifact-timeout-shortcircuit-the-silence-budget — do not select it. Prefer defects where a produced signal has no consumer, and prove each fix fires on the real production path, not only in unit tests. A bug-reproduction deliverable must land WITH its passing fix or carry t.Skip until fixed — a red test on main blocks every lane.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 629912,
+      "started_at": "2026-08-24T01:45:09Z",
+      "ended_at": "2026-08-24T01:55:41Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 44047,
+      "started_at": "2026-08-24T01:58:21Z",
+      "ended_at": "2026-08-24T01:59:06Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1979,
+        "cache_read": 121986,
+        "cache_write": 62365
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 212456,
+      "started_at": "2026-08-24T01:59:06Z",
+      "ended_at": "2026-08-24T02:02:39Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 42,
+        "output": 13782,
+        "cache_read": 1088174,
+        "cache_write": 111404
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 413378,
+      "started_at": "2026-08-24T02:02:39Z",
+      "ended_at": "2026-08-24T02:09:33Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 50,
+        "output": 31326,
+        "cache_read": 2358447,
+        "cache_write": 125002
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 5604267,
+      "started_at": "2026-08-24T02:09:33Z",
+      "ended_at": "2026-08-24T03:43:57Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 80,
+        "output": 32473,
+        "cache_read": 4783406,
+        "cache_write": 155438
+      }
+    },
+    {
+      "name": "adversarial-review",
+      "verdict": "PASS",
+      "duration_ms": 447106,
+      "started_at": "2026-08-24T03:43:57Z",
+      "ended_at": "2026-08-24T03:51:25Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 56,
+        "output": 29681,
+        "cache_read": 2302087,
+        "cache_write": 115584
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 304349,
+      "started_at": "2026-08-24T03:51:25Z",
+      "ended_at": "2026-08-24T03:56:29Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "defect-disposition-preflight",
+      "verdict": "FAIL",
+      "started_at": "2026-08-24T03:56:29Z",
+      "ended_at": "2026-08-24T03:56:30Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 309208,
+      "started_at": "2026-08-24T03:56:30Z",
+      "ended_at": "2026-08-24T04:01:39Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 50,
+        "output": 22151,
+        "cache_read": 1919769,
+        "cache_write": 107591
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "defect-disposition-preflight|unknown|53a2761d8d3b",
+    "pre_class": "unknown",
+    "reasons": [
+      "phase defect-disposition-preflight: defect-disposition-preflight: load agent: prompts: read agents/evolve-defect-disposition-preflight.md: open agents/evolve-defect-disposition-preflight.md: no such f"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1551",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 7964723,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 5604267,
+    "by_archetype_ms": {
+      "build": 5604267,
+      "control": 309208,
+      "evaluate": 751455,
+      "plan": 1299793
+    },
+    "total_tokens": {
+      "input": 284,
+      "output": 131392,
+      "cache_read": 12573869,
+      "cache_write": 677384
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 80,
+        "output": 32473,
+        "cache_read": 4783406,
+        "cache_write": 155438
+      },
+      "control": {
+        "input": 50,
+        "output": 22151,
+        "cache_read": 1919769,
+        "cache_write": 107591
+      },
+      "evaluate": {
+        "input": 56,
+        "output": 29681,
+        "cache_read": 2302087,
+        "cache_write": 115584
+      },
+      "plan": {
+        "input": 98,
+        "output": 47087,
+        "cache_read": 3568607,
+        "cache_write": 298771
+      }
+    },
+    "wasted_tokens": {
+      "input": 50,
+      "output": 22151,
+      "cache_read": 1919769,
+      "cache_write": 107591
+    },
+    "cache_hit_ratio": 0.9999774139856578,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "triage",
+      "fault-localization",
+      "tdd",
+      "build",
+      "adversarial-review"
+    ]
+  }
+}
