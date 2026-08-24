@@ -1,5 +1,6 @@
 {
   "name": "pre-audit-evidence-check",
+  "catalog": "on-demand",
   "optional": true,
   "description": "A re-authored defect-dispositions.json for every inherited defect, a closure-claim citation sweep over this cycle's reports, and a classified EGPS red_count — the audit's admissibility inputs, verified before audit runs.",
   "when_to_use": "Select when the lane inherits defects from an ancestor cycle (continuation manifest or continuation-registry binding present), or when recent cycles FAILed audit on disposition-preflight, uncited closure claims, or EGPS red_count rather than on code quality.",

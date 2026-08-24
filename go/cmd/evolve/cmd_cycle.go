@@ -474,7 +474,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// surface the cause here rather than leave it undiagnosable.
 		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
 	}
-	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot)
+	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
 	for _, w := range append(discWarns, mergeWarns...) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)

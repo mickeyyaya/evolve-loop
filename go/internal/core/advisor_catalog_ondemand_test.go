@@ -320,3 +320,71 @@ func TestAdvisorPlanInput_PopulatesOnDemandFromTheOrchestratorCatalog(t *testing
 		}
 	}
 }
+
+// A tracked phase with NO resolvable persona is undispatchable by construction
+// — the runner's load-agent step fails before any work happens. It must not
+// hold a SELECT slot: cycle-1551 (soak-20260824a) had the advisor insert
+// defect-disposition-preflight, whose persona exists nowhere, and the load
+// failure killed the whole lane rc=4. Four catalog phases carried the defect;
+// two were on the menu. The fail-soft skip (optionalInfraSkip +
+// ErrAgentDocMissing) contains the blast radius when one is dispatched anyway;
+// this guard keeps them off the menu in the first place. The cure for a phase
+// caught here: write agents/evolve-<agent>.md, add a phase-local agent.md, or
+// mark it catalog:"on-demand" until someone does.
+func TestRepoPhaseCatalog_MenuPhasesResolveAPersona(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "..")
+	dir := filepath.Join(root, ".evolve", "phases")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Skipf("phase catalog not present: %v", err)
+	}
+	tracked := trackedPhaseDirsForTest(t, root)
+	checked := 0
+	for _, e := range entries {
+		if !e.IsDir() || (tracked != nil && !tracked[e.Name()]) {
+			continue
+		}
+		data, rerr := os.ReadFile(filepath.Join(dir, e.Name(), "phase.json"))
+		if rerr != nil {
+			continue
+		}
+		var cfg struct {
+			Name      string `json:"name"`
+			Agent     string `json:"agent"`
+			Archetype string `json:"archetype"`
+			Catalog   string `json:"catalog"`
+		}
+		if json.Unmarshal(data, &cfg) != nil {
+			continue
+		}
+		name := cfg.Name
+		if name == "" {
+			name = e.Name()
+		}
+		// Control-role detection uses the PRODUCTION inference (RoleOrDefault:
+		// explicit archetype, else the built-in name table) — never a private
+		// allowlist that drifts from phasespec.inferredRoles.
+		if (phasespec.PhaseSpec{Name: name, Role: cfg.Archetype}).RoleOrDefault() == phasespec.RoleControl ||
+			cfg.Catalog == phasespec.CatalogOnDemand {
+			continue
+		}
+		checked++
+		agent := cfg.Agent
+		if agent == "" {
+			agent = "evolve-" + name
+		}
+		// The ONLY persona source the dispatch path reads for a disk-loaded
+		// spec is agents/<agent>.md (prompts.Loader.Agent is single-rooted;
+		// specrunner's inline PromptBody is mint-only). A phase-local agent.md
+		// is a scaffold for humans and must NOT count — accepting it would
+		// bless exactly the phase shape `evolve phases add` produces while the
+		// runner still dies at load-agent.
+		if _, err := os.Stat(filepath.Join(root, "agents", agent+".md")); err != nil {
+			t.Errorf("menu phase %q resolves NO persona (agents/%s.md absent) — dispatching it kills a lane at load-agent (cycle-1551). Write agents/%s.md or mark the phase catalog:\"on-demand\".", name, agent, agent)
+		}
+	}
+	if checked == 0 {
+		t.Skip("no menu phases found")
+	}
+}

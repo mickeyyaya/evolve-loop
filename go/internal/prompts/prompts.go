@@ -128,9 +128,21 @@ func (l *Loader) Skills() ([]string, error) {
 }
 
 // load reads, parses, and packages a single prompt.
+// ErrNoSource marks a Loader with NO configured filesystem — a wiring defect
+// (empty/misresolved prompts root), categorically different from a single
+// missing doc even though the zero-loader contract also reports
+// fs.ErrNotExist. errors.Is(err, ErrNoSource) is the discriminator.
+var ErrNoSource = errors.New("prompts: no source configured")
+
 func (l *Loader) load(p, name string) (Prompt, error) {
 	if l.fs == nil {
-		return Prompt{}, fmt.Errorf("prompts: %w (no source configured)", fs.ErrNotExist)
+		// Both sentinels, deliberately: fs.ErrNotExist preserves the documented
+		// zero-loader contract (NewFromFS(nil): "every read returns
+		// fs.ErrNotExist"), while ErrNoSource lets callers distinguish a WIRING
+		// defect (misresolved prompts root — EVERY doc "missing") from one
+		// genuinely absent doc, so a nil loader can never masquerade as a
+		// skippable missing-persona (cycle-1551 class must stay narrow).
+		return Prompt{}, fmt.Errorf("prompts: %w (%w)", fs.ErrNotExist, ErrNoSource)
 	}
 	raw, err := fs.ReadFile(l.fs, p)
 	if err != nil {

@@ -42,6 +42,14 @@ var (
 	// exit-code-triggered family fallback.
 	ErrTransientBridgeFailure = errors.New("core: transient bridge failure")
 
+	// ErrAgentDocMissing marks a phase-dispatch failure whose cause is the
+	// agent persona doc not existing on disk (soak-20260824a cycle-1551: an
+	// optional menu phase with no persona anywhere killed its whole lane
+	// rc=4). Wrapped by the runner at the load-agent step; consumed by
+	// optionalInfraSkip so a genuinely OPTIONAL phase degrades to a recorded
+	// skip while mandatory/floor phases still fail loud.
+	ErrAgentDocMissing = errors.New("core: agent persona doc missing")
+
 	// ErrAllFamiliesExhausted marks the quota-terminal exhaustion case
 	// (cycle-656): every retry attempt for a phase returned exit=85, meaning
 	// every CLI family in the fallback chain is quota-drained. The dispatch
@@ -80,6 +88,17 @@ var (
 // their output is untrustworthy, so those hard-fail without consulting disk.
 func IsInfraTeardownError(err error) bool {
 	return errors.Is(err, ErrArtifactTimeout) || errors.Is(err, ErrTransientBridgeFailure)
+}
+
+// IsOptionalSkippableError is the FULL admission predicate for
+// optionalInfraSkip's error gate: infra teardown (IsInfraTeardownError — the
+// original Workstream-D class) OR a missing agent persona doc
+// (ErrAgentDocMissing, cycle-1551 — a config defect whose blast radius must
+// not exceed the phase carrying it). Single-sourced beside the sentinels so
+// the dispatch site and its invariant tests share one spelling; widen ONLY
+// alongside a paired incident + regression pin, never ad hoc at a call site.
+func IsOptionalSkippableError(err error) bool {
+	return IsInfraTeardownError(err) || errors.Is(err, ErrAgentDocMissing)
 }
 
 // ErrCycleLevelFailure wraps a phase failure that should escalate to cycle-level

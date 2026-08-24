@@ -277,7 +277,11 @@ func TestC1270_005_NarrowerPredicateSitesSurviveTheWidening(t *testing.T) {
 		"TestTimeoutOnlySites_NotWidenedToUnion",
 		"TestWritePhaseFailureDiag_TimeoutOnlyNotWidened",
 		"TestIsTransientBridgeError_StaysTransientOnly",
-		"TestOptionalInfraSkip_InfraGateAgreesWithIsInfraTeardownError",
+		// Renamed 2026-08-24 (cycle-1551 fix): the gate's single-source
+		// predicate widened to IsOptionalSkippableError (infra teardown OR
+		// missing persona doc) and the equivalence proof was retargeted with
+		// it — same pin, wider predicate, still exactly one spelling.
+		"TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError",
 	)
 }
 

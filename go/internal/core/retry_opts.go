@@ -181,7 +181,8 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 					}
 				}
 				if opts.optionalInfraSkip != nil && opts.optionalInfraSkip(phase, err) {
-					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, attempt, nil
+					_, _, diags := optionalSkipDetails(phase, err)
+					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: diags}, attempt, nil
 				}
 				if opts.postShipObserverSkip != nil && opts.postShipObserverSkip(phase) {
 					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, attempt, nil
