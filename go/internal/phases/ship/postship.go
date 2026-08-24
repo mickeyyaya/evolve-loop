@@ -234,7 +234,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
 			// Precedence + marker union live in committedInboxIDs, shared with the
 			// in-commit consumption so the two resolutions cannot drift apart.
-			committedIDs = committedInboxIDs(cycleDir, body)
+			committedIDs = committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS")
 			// Reconcile superseded[] — inbox items whose work shipped under a
 			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
 			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
@@ -406,22 +406,84 @@ func extractIDs(body []byte) []string {
 // carryover-driven lane could land a PASS ship that closed an item and leave it
 // pickable, because its triage ids never match the inbox file's own id.
 //
-// Precedence is postship's, preserved verbatim:
-//   - triage decision PRESENT  -> its committed set, and lane-scope is IGNORED.
-//     A present decision that committed zero ids must keep the declined menu
-//     unpromoted; a naive union would retire work triage deliberately declined.
-//   - triage decision ABSENT   -> the lane-scope pin (continuation/lane cycles
-//     carry no decision at all).
-//   - ALWAYS union the build-report Closes-Inbox marker: a marker closes items
-//     ALONGSIDE whatever triage named, which is the whole point — the id nobody
-//     named at dispatch is exactly the one that used to survive its own landing.
-func committedInboxIDs(cycleDir string, body []byte) []string {
-	var ids []string
-	if body != nil {
-		ids = inboxmover.CommittedIDs(body)
-	} else {
-		ids = cycleoutcome.LaneScopeIDs(cycleDir)
+// Precedence is the PER-ID rule documented inside the body (lane-scope-union,
+// cycle-1515/1552): triage's committed set always counts; the lane's ASSIGNED
+// scope ids join it unless triage deferred them or declined the whole menu;
+// and the build-report Closes-Inbox marker always unions in — the id nobody
+// named at dispatch is exactly the one that used to survive its own landing.
+// The declined-menu contract (present decision, zero committed, id
+// unmentioned -> stays open) is preserved verbatim and pinned at both sites.
+func committedInboxIDs(cycleDir string, body []byte, landedPASS bool) []string {
+	// consumption-id-linkage-lane-scope-union (0.86; burns: cycle-1515 triage
+	// DECOMPOSED the assigned id into sub-ids top_n named instead, cycle-1552
+	// triage DROPPED it as already-shipped with top_n:[] while build shipped
+	// the implementation anyway): triage's bookkeeping must not defeat the
+	// in-commit consumption of a PASS landing. The assigned lane-scope ids
+	// join the committed set under a per-id rule that keeps every prior pin:
+	//   - triage DEFERRED the id           -> stays pickable (postponed;
+	//     the remainder rides carryover)
+	//   - triage DROPPED the id            -> consumes (an affirmative close;
+	//     the carryover twin is already retired on the same signal)
+	//   - the decision committed ANY work  -> scope ids consume (fleet lanes
+	//     scout only their scope, so committed work is scope-derived — the
+	//     cycle-1515 decomposition shape)
+	//   - decision present, zero committed, id unmentioned -> stays open (the
+	//     declined-menu contract: lane-scope must not override an explicit
+	//     empty commitment; see TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen)
+	ids := inboxmover.CommittedIDs(body)
+	if !landedPASS {
+		// WARN ships under the fluent posture: partial work must stay pickable
+		// (consume.go's own contract), so the NEW scope/dropped widening is
+		// PASS-only. The long-standing nil-body fallback (continuation/lane
+		// cycles carry no decision at all) predates the verdict gate and is
+		// preserved verbatim — it was never verdict-conditioned.
+		if body == nil {
+			ids = cycleoutcome.LaneScopeIDs(cycleDir)
+		}
+		return unionIDs(ids, inboxmover.ClosesInboxIDs(readBuildReport(cycleDir)))
 	}
+	deferred := map[string]bool{}
+	for _, id := range inboxmover.DeferredIDs(body) {
+		deferred[id] = true
+	}
+	closedDrop := map[string]bool{}
+	for _, id := range inboxmover.ClosedDroppedIDs(body) {
+		closedDrop[id] = true
+	}
+	committed := map[string]bool{}
+	for _, id := range ids {
+		committed[id] = true
+	}
+	// This rule leans on lane-scope.json living in a FRESHLY-PROVISIONED
+	// per-cycle workspace (RunWorkspacePath) — a future workspace-reuse change
+	// (resume/recycling) that lets a stale lane-scope.json survive into another
+	// cycle's dir would make this union consume the wrong items; re-check here.
+	scopeIDs := cycleoutcome.LaneScopeIDs(cycleDir)
+	// Named-engagement discriminator: lane scopes are multi-item MENUS, and
+	// triage may commit a subset and leave menu mates pending as dispatchable
+	// backlog (triagecap lane_menu contract). If triage engaged the scope BY
+	// NAME (scope ∩ committed non-empty), only the named scope ids consume —
+	// an unmentioned menu mate stays pickable. Only when the committed set
+	// names NO scope id (the cycle-1515 rename/decomposition shape) does the
+	// whole non-deferred scope ride the landing.
+	engagedByName := false
+	for _, id := range scopeIDs {
+		if committed[id] {
+			engagedByName = true
+			break
+		}
+	}
+	scopeEligible := body == nil || len(ids) > 0
+	var scope []string
+	for _, id := range scopeIDs {
+		if deferred[id] {
+			continue
+		}
+		if closedDrop[id] || (scopeEligible && (!engagedByName || committed[id])) {
+			scope = append(scope, id)
+		}
+	}
+	ids = unionIDs(ids, scope)
 	return unionIDs(ids, inboxmover.ClosesInboxIDs(readBuildReport(cycleDir)))
 }
 

@@ -184,6 +184,69 @@ func CommittedIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
+// DeferredIDs returns the ids triage EXPLICITLY deferred — work postponed
+// wholesale to a later cycle. Consumption must never retire these: the item
+// stays pickable and the deferral's remainder rides carryover. Parses the
+// "id" key only — the same key core.triageDroppedIDs reads — so the sibling
+// readers cannot diverge on document shape.
+func DeferredIDs(body []byte) []string {
+	var d struct {
+		Deferred []struct {
+			ID string `json:"id"`
+		} `json:"deferred"`
+	}
+	if json.Unmarshal(body, &d) != nil {
+		return nil
+	}
+	out := []string{}
+	for _, e := range d.Deferred {
+		out = append(out, e.ID)
+	}
+	return dedupeIDs(out)
+}
+
+// closedDropReasons are the drop-reason tokens that mean "this item's work is
+// DONE or the item itself is dead" — the only drops consumption may retire.
+// The triage persona also routes VALID work into dropped[] (requires-split,
+// out-of-scope): those items must stay pickable, and so must any UNKNOWN
+// reason — "forgetting a live todo is worse than carrying a stale one"
+// (carryover_triage_retire.go's governing preference, applied to the durable
+// queue where the stakes are higher, not lower).
+var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "stale", "obsolete"}
+
+// ClosedDroppedIDs returns the ids triage dropped WITH a close-class reason —
+// an affirmative statement the work is landed or the item is dead. The
+// carryover twin is retired reason-blind (retireTriageDroppedCarryover, a
+// soft 20-slot advisory store); the durable tracked queue gets the stricter
+// reason gate. Parses the "id" key only, matching the core sibling reader.
+// SIBLING READER: core.triageDroppedIDs (internal/core/carryover_triage_retire.go)
+// parses the SAME dropped[] field for the carryover twin — kept apart only by
+// the inboxmover→adapters/ledger→core import cycle. A schema change to
+// dropped[] must land in BOTH readers or consumption and carryover retirement
+// drift apart on the same document.
+func ClosedDroppedIDs(body []byte) []string {
+	var d struct {
+		Dropped []struct {
+			ID     string `json:"id"`
+			Reason string `json:"reason"`
+		} `json:"dropped"`
+	}
+	if json.Unmarshal(body, &d) != nil {
+		return nil
+	}
+	out := []string{}
+	for _, e := range d.Dropped {
+		reason := strings.ToLower(e.Reason)
+		for _, tok := range closedDropReasons {
+			if strings.Contains(reason, tok) {
+				out = append(out, e.ID)
+				break
+			}
+		}
+	}
+	return dedupeIDs(out)
+}
+
 // dedupeIDs drops empties and duplicates, preserving first-seen order.
 func dedupeIDs(ids []string) []string {
 	if len(ids) == 0 {
