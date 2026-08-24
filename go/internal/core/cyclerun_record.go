@@ -119,7 +119,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// Scout re-derived the falsified premise. Teaches via a carryover todo only,
 	// never a FailedRecord (see judgment_lesson.go). No-op for other phases.
 	if dr.resp.Verdict == VerdictFAIL {
-		cr.o.recordJudgmentLesson(cr.ctx, cr.cycle, next, &cr.state, dr.resp.Diagnostics)
+		cr.o.recordJudgmentLesson(cr.ctx, cr.cycle, cr.cs.WorkspacePath, next, &cr.state, dr.resp.Diagnostics)
 	}
 	if dr.resp.Verdict == VerdictFAIL && cr.o.isAuthoritativePhase(next) {
 		cr.o.recordFloorVerdictFailure(cr.ctx, cr.req, cr.cycle, next, &cr.state, &cr.cs, dr.resp.Diagnostics)

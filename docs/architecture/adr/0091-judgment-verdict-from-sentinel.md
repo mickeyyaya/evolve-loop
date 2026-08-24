@@ -138,3 +138,11 @@ problem.
   outcome.
 - **Phases outside the catalog are untouched.** `EvaluateClassify` is byte-identical
   for every phase that does not declare the key, pinned by a no-regression test.
+
+## Failure-context carryover
+
+When an enforced judgment sentinel supplies a FAIL without runner diagnostics,
+the lesson recorder re-reads that phase's canonical structured failure block from
+the workspace before writing its carryover todo. This preserves the objection in
+the next cycle's planner context without promoting the lesson to `FailedAt` or
+changing routing. Explicit runner diagnostics remain authoritative.

@@ -354,7 +354,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// must leave the same lesson, or the objection is lost for resumed cycles
 		// specifically. Same single-source *Orchestrator primitive.
 		if resp.Verdict == VerdictFAIL {
-			o.recordJudgmentLesson(ctx, cycle, next, &state, resp.Diagnostics)
+			o.recordJudgmentLesson(ctx, cycle, cs.WorkspacePath, next, &state, resp.Diagnostics)
 		}
 		if resp.Verdict == VerdictFAIL && o.isAuthoritativePhase(next) {
 			o.recordFloorVerdictFailure(ctx, req, cycle, next, &state, &cs, resp.Diagnostics)

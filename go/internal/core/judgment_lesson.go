@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // carryoverPriorityLesson is the priority for a judgment lesson. Deliberately
@@ -61,7 +62,7 @@ var judgmentTeachingPhases = map[Phase]bool{
 // runs mid-loop, and several abort branches of both call sites return WITHOUT
 // reaching finalizeCycle's persist. An in-memory-only append would be lost
 // exactly when the cycle dies — which is the case this exists for.
-func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, failed Phase, state *State, diags []Diagnostic) {
+func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, workspace string, failed Phase, state *State, diags []Diagnostic) {
 	if state == nil || !judgmentTeachingPhases[failed] {
 		return
 	}
@@ -74,6 +75,13 @@ func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, fail
 	// summary, so the floor path's P0 todo would collapse into this P1 one.
 	if o.isAuthoritativePhase(failed) {
 		return
+	}
+	if len(errorSeverityMessages(diags)) == 0 {
+		if failure, ok := phasecontract.ReadFailureBlock(workspace, string(failed)); ok {
+			for _, defect := range failure.Defects {
+				diags = append(diags, Diagnostic{Severity: "error", Message: defect})
+			}
+		}
 	}
 	// Reuses the floor path's diagnostic synthesis so the todo names WHY the
 	// judgment went against the work, not merely THAT it did — a todo reading

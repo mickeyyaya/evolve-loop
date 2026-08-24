@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -59,6 +60,102 @@ func renderPersistedPlannerContext(t *testing.T, cr *cycleRun) (string, State) {
 	var b strings.Builder
 	writeRoutingContext(&b, in)
 	return b.String(), persisted
+}
+
+func TestJudgmentLessonFullPath_PremiseChallengeSentinelFAILTeachesWithoutHalting(t *testing.T) {
+	const objection = "the proposed premise contradicts the recorded evidence"
+	artifact := strings.Join([]string{
+		"## Stated Premise\nThe implementation is safe.",
+		"## Falsification Attempts\nThe evidence contradicts that premise.",
+		"## Verdict\nFAIL",
+		phasecontract.RenderVerdictSentinelWithFailure("premise-challenge", VerdictFAIL,
+			&phasecontract.FailureBlock{Class: "premise-rejected", Defects: []string{objection}}),
+	}, "\n\n")
+	parsed, ok := phasecontract.ParseVerdictSentinelFull(artifact)
+	if !ok {
+		t.Fatal("ParseVerdictSentinelFull rejected the rendered premise-challenge sentinel")
+	}
+	if parsed.Failure == nil || len(parsed.Failure.Defects) != 1 {
+		t.Fatalf("parsed failure = %+v, want one defect", parsed.Failure)
+	}
+
+	t.Run("real_sentinel_parse_produces_the_FAIL", func(t *testing.T) {
+		if parsed.Phase != "premise-challenge" || parsed.Verdict != VerdictFAIL {
+			t.Errorf("parsed sentinel = phase %q verdict %q, want premise-challenge FAIL", parsed.Phase, parsed.Verdict)
+		}
+		if parsed.Failure.Defects[0] != objection {
+			t.Errorf("parsed defect = %q, want %q", parsed.Failure.Defects[0], objection)
+		}
+	})
+
+	cr := retroGateHarness(t, phasespec.Catalog{})
+	if err := os.WriteFile(cr.cs.WorkspacePath+"/premise-challenge-report.md", []byte(artifact), 0o644); err != nil {
+		t.Fatalf("write premise-challenge report: %v", err)
+	}
+	failedBefore := append([]FailedRecord(nil), cr.state.FailedAt...)
+	// SentinelStageEnforce obtains its FAIL from this same parser but emits no
+	// diagnostic for a matched sentinel. The production recorder must therefore
+	// recover the structured objection from this phase report.
+	action, err := cr.recordAndBranch(Phase(parsed.Phase), dispatchResult{resp: PhaseResponse{
+		Verdict: parsed.Verdict,
+	}, attemptCount: 1})
+	prompt, persisted := renderPersistedPlannerContext(t, cr)
+
+	t.Run("objection_reaches_next_cycle_planner_context", func(t *testing.T) {
+		lessons := judgmentLessonTodos(cr, Phase(parsed.Phase))
+		if len(lessons) != 1 {
+			t.Fatalf("persisted premise-challenge lessons = %d, want 1: %+v", len(lessons), persisted.CarryoverTodos)
+		}
+		if got := strings.Count(lessons[0].Action, objection); got != 1 {
+			t.Errorf("persisted lesson contains objection %d times, want 1: %+v", got, lessons[0])
+		}
+		if got := strings.Count(prompt, objection); got != 1 {
+			t.Errorf("next-cycle planner context contains objection %d times, want 1\n%s", got, prompt)
+		}
+	})
+
+	t.Run("failed_at_unchanged_and_continuation_non_halting", func(t *testing.T) {
+		if err != nil {
+			t.Errorf("recordAndBranch returned error: %v", err)
+		}
+		if action == loopAbort {
+			t.Error("premise-challenge lesson aborted the loop")
+		}
+		if !reflect.DeepEqual(persisted.FailedAt, failedBefore) {
+			t.Errorf("FailedAt changed after judgment lesson: got %+v, want %+v", persisted.FailedAt, failedBefore)
+		}
+	})
+}
+
+func TestJudgmentLessonFullPath_NoLessonWithoutAWellFormedSentinelFAIL(t *testing.T) {
+	tests := []struct {
+		name     string
+		artifact string
+	}{
+		{name: "stated_PASS", artifact: phasecontract.RenderVerdictSentinelWithFailure("premise-challenge", VerdictPASS, nil)},
+		{name: "malformed_sentinel", artifact: `<!-- evolve-verdict: {"phase":"premise-challenge","verdict":} -->`},
+		{name: "absent_sentinel", artifact: "premise challenge completed without a verdict sentinel"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := retroGateHarness(t, phasespec.Catalog{})
+			verdict := VerdictPASS
+			parsed, ok := phasecontract.ParseVerdictSentinelFull(tt.artifact)
+			if ok {
+				verdict = parsed.Verdict
+			}
+			if _, err := cr.recordAndBranch(Phase("premise-challenge"), dispatchResult{
+				resp: PhaseResponse{Verdict: verdict}, attemptCount: 1,
+			}); err != nil {
+				t.Fatalf("recordAndBranch: %v", err)
+			}
+			_, persisted := renderPersistedPlannerContext(t, cr)
+			if got := judgmentLessonTodos(cr, Phase("premise-challenge")); len(got) != 0 {
+				t.Errorf("%s persisted %d premise-challenge lessons, want 0: %+v (all todos: %+v)",
+					tt.name, len(got), got, persisted.CarryoverTodos)
+			}
+		})
+	}
 }
 
 func TestJudgmentLessonEndToEnd_ReachesNextCyclePlannerPrompt(t *testing.T) {
@@ -427,7 +524,7 @@ func TestJudgmentLesson_AuthoritativePhaseYieldsToFloorRecorder(t *testing.T) {
 	if !cr.o.isAuthoritativePhase(Phase("premise-challenge")) {
 		t.Skip("ship_floor override did not take effect through this harness; guard is untestable here")
 	}
-	cr.o.recordJudgmentLesson(context.Background(), 5, Phase("premise-challenge"), &cr.state,
+	cr.o.recordJudgmentLesson(context.Background(), 5, cr.cs.WorkspacePath, Phase("premise-challenge"), &cr.state,
 		[]Diagnostic{{Severity: "error", Message: "premise falsified"}})
 
 	for _, td := range cr.state.CarryoverTodos {
