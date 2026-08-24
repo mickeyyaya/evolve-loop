@@ -128,7 +128,7 @@
   "max_budget_usd": 2.5,
   "max_turns": 40,
   "turn_budget_hint": 30,
-  "effort_level": "medium",
+  "effort_level": "xhigh",
   "output_artifact": ".evolve/runs/cycle-{cycle}/audit-report.md",
   "challenge_token_required": true,
   "extra_flags_by_cli": {
@@ -198,7 +198,7 @@
   "allowed_clis": [
     "all"
   ],
-  "_note": "Cross-family with builder (builder=codex/OpenAI, auditor=claude/Anthropic -> different families, adversarial-audit invariant satisfied). NO cli_fallback by design: the only non-claude option was codex, which would collide with the codex builder and breach the builder!=auditor floor; agy is banned from all fallback chains (operator 2026-06-07). allowed_clis=all. codex-tmux remains reachable only via consensus mode (consensus.cli_voters); there the claude-only raw flags (--plugin-dir, --strict-mcp-config, ...) do NOT apply — codex realizes only -m <model> and runs the verification scripts via its own shell; extra_flags_by_cli.codex-tmux is intentionally empty. The claude-tmux flag set is active now that the auditor runs on claude.",
+  "_note": "Cross-family with builder (builder=codex/OpenAI, auditor=claude/Anthropic -> different families, adversarial-audit invariant satisfied). NO cli_fallback by design: the only non-claude option was codex, which would collide with the codex builder and breach the builder!=auditor floor; agy is banned from all fallback chains (operator 2026-06-07). allowed_clis=all. codex-tmux remains reachable only via consensus mode (consensus.cli_voters); there the claude-only raw flags (--plugin-dir, --strict-mcp-config, ...) do NOT apply \u2014 codex realizes only -m <model> and runs the verification scripts via its own shell; extra_flags_by_cli.codex-tmux is intentionally empty. The claude-tmux flag set is active now that the auditor runs on claude.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,

@@ -38,13 +38,16 @@ func effortProfilesDir(t *testing.T) string {
 // basename each phase resolves to.
 func TestEffortDefaults_Matrix(t *testing.T) {
 	loader := NewFromDir(effortProfilesDir(t))
+	// 2026-08-24 operator directive: phases whose model_tier_default is
+	// deep/top run at xhigh effort (auditor, adversarial-review here); the
+	// fast/balanced rows keep the cycle-566 cost matrix.
 	want := map[string]string{
 		"scout":              "low",
 		"triage":             "low",
 		"tdd-engineer":       "medium",
-		"auditor":            "medium",
+		"auditor":            "xhigh",
 		"builder":            "medium",
-		"adversarial-review": "medium",
+		"adversarial-review": "xhigh",
 	}
 	for profile, effort := range want {
 		p, err := loader.Get(profile)

@@ -71,5 +71,6 @@
   ],
   "stream_output": true,
   "generated_from": "hand-authored (ADR-0044 Slice 5)",
-  "cli_fallback": []
+  "cli_fallback": [],
+  "effort_level": "xhigh"
 }

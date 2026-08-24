@@ -3,7 +3,7 @@
   "role": "intent",
   "cli": "claude-tmux",
   "model_tier_default": "deep",
-  "_model_tier_overrides_note": "cycle-974: raised 'clear_goal' balanced->deep — intent parsing is floored at deep (envelope min=default=max=deep); goal-clarity does not lower the reasoning floor.",
+  "_model_tier_overrides_note": "cycle-974: raised 'clear_goal' balanced->deep \u2014 intent parsing is floored at deep (envelope min=default=max=deep); goal-clarity does not lower the reasoning floor.",
   "model_tier_overrides": {
     "vague_goal": "deep",
     "clear_goal": "deep"
@@ -114,5 +114,6 @@
   },
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": []
+  "cli_fallback": [],
+  "effort_level": "xhigh"
 }
