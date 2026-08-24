@@ -1,0 +1,47 @@
+{
+  "cycle": 1553,
+  "run_id": "01M0SCTZ7SKB3BDFKYG16DAME4",
+  "goal": "Work ordinary high-value bug fixes from the inbox. EXCLUDE one item reserved for console work: transient-artifact-timeout-shortcircuit-the-silence-budget — do not select it. Prefer defects where a produced signal has no consumer, and prove each fix fires on the real production path, not only in unit tests. A bug-reproduction deliverable must land WITH its passing fix or carry t.Skip until fixed — a red test on main blocks every lane.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|850fdbc53188",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "phase audit verdict FAIL routed to retro (agent-graded; see the audit report artifact) defect=H1 CRITICAL: zero-delivery cycle reported PASS — premise-challenge returned FAIL(BLOCK) for an already-s"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1553",
+      "priority": "high"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ]
+}
