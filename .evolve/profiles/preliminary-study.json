@@ -45,5 +45,6 @@
     ],
     "allow_network": true
   },
-  "generated_from": "hand-authored"
+  "generated_from": "hand-authored",
+  "effort_level": "xhigh"
 }
