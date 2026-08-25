@@ -28,8 +28,8 @@ import (
 const (
 	// submitVerifyMaxResends bounds the re-send loop: a pane whose input line
 	// never clears is wedged, and hammering it is not a recovery strategy. On
-	// exhaustion the driver gives up loudly and the normal stop-review /
-	// artifact-timeout path runs.
+	// exhaustion the driver gives up loudly and the caller routes the classified
+	// outcome through the existing bounded artifact-timeout path.
 	submitVerifyMaxResends = 3
 	// submitVerifyEchoRunes is how much of the sent text must still be visible
 	// at the input line to call it unsubmitted. Long enough that unrelated

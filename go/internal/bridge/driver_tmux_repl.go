@@ -566,6 +566,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
 	lastGoodPane := intervalBaselinePane
+	writeArtifactTimeoutMarker := func(transient bool) {
+		fmt.Fprintf(deps.Stderr,
+			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
+			artifactTimeoutMarker, phaseName, waitedS, interval, attempt, maxExtends,
+			reviewActionOrNone(lastVerdict.Action), livenessOrUnknown(lastEv.State),
+			lastEv.Progressed, lastEv.Busy, transient, lastVerdict.Reason)
+	}
 	// Persistence guard for the checkpoint exhaustion fast-fail (exhaustion_persistence.go):
 	// the wall must be present across consecutive checkpoints before failing over,
 	// so wall-shaped text a working agent momentarily rendered does not kill it.
@@ -600,9 +607,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// paste is submitted with a blind Enter (or the human-cadence review path);
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
-		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt",
-			verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-				promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho))
+		outcome := verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
+			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt", outcome)
+		if outcome.Result == interaction.ResultSubmitWedged {
+			lastVerdict = ReviewVerdict{
+				Action: ReviewPause,
+				Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
+			}
+			writeArtifactTimeoutMarker(false)
+			return ExitArtifactTimeout, nil
+		}
 	}
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
@@ -864,8 +879,12 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 					if nudgeCapErr != nil {
 						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
 					}
-					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge",
-						verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg))
+					nudgeOutcome := verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
+					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge", nudgeOutcome)
+					if nudgeOutcome.Result == interaction.ResultSubmitWedged {
+						lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", nudgeOutcome.Result, nudgeOutcome.Resends)
+						break
+					}
 					nudgeSent = true
 					nudgeEv = &interaction.Event{
 						Kind:    interaction.KindNudge,
@@ -944,11 +963,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// cfg.Agent — the SAME key bridge.phase_artifact_timeout_s is indexed on —
 		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
 		// is also the final stderr line, and lifted into the error by Engine.Launch.
-		fmt.Fprintf(deps.Stderr,
-			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
-			artifactTimeoutMarker, phaseName, waitedS, interval, attempt, maxExtends,
-			reviewActionOrNone(lastVerdict.Action), livenessOrUnknown(lastEv.State),
-			lastEv.Progressed, lastEv.Busy, transient, lastVerdict.Reason)
+		writeArtifactTimeoutMarker(transient)
 		return ExitArtifactTimeout, nil
 	}
 

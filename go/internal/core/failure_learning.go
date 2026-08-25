@@ -224,12 +224,28 @@ func writePhaseTimings(workspace string, timings []phaseTimingEntry) {
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
 // when a mandatory phase aborts after exhausting all retry attempts.
 type phaseFailureDiag struct {
-	Phase        string `json:"phase"`
-	Cycle        int    `json:"cycle"`
-	ErrorMessage string `json:"error_message"`
-	ExitCode     int    `json:"exit_code"`
-	AttemptCount int    `json:"attempt_count"`
-	Timestamp    string `json:"timestamp"`
+	Phase           string `json:"phase"`
+	Cycle           int    `json:"cycle"`
+	ErrorMessage    string `json:"error_message"`
+	DeliveryFailure string `json:"delivery_failure"`
+	ExitCode        int    `json:"exit_code"`
+	AttemptCount    int    `json:"attempt_count"`
+	Timestamp       string `json:"timestamp"`
+}
+
+func deliveryFailureCause(err error) string {
+	if !errors.Is(err, ErrArtifactTimeout) {
+		return ""
+	}
+	_, reason, ok := strings.Cut(err.Error(), `reason="`)
+	if !ok {
+		return ""
+	}
+	reason, _, ok = strings.Cut(reason, `"`)
+	if !ok || !strings.Contains(reason, "submit_wedged") {
+		return ""
+	}
+	return reason
 }
 
 // writePhaseFailureDiag writes a structured diagnostic file to
@@ -244,12 +260,13 @@ func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, a
 		exitCode = exitErr.ExitCode()
 	}
 	diag := phaseFailureDiag{
-		Phase:        phase,
-		Cycle:        cycle,
-		ErrorMessage: phaseErr.Error(),
-		ExitCode:     exitCode,
-		AttemptCount: attempts,
-		Timestamp:    now().UTC().Format(time.RFC3339),
+		Phase:           phase,
+		Cycle:           cycle,
+		ErrorMessage:    phaseErr.Error(),
+		DeliveryFailure: deliveryFailureCause(phaseErr),
+		ExitCode:        exitCode,
+		AttemptCount:    attempts,
+		Timestamp:       now().UTC().Format(time.RFC3339),
 	}
 	data, merr := json.Marshal(diag)
 	if merr != nil {

@@ -87,6 +87,7 @@ The diagnostic file contains key context fields to enable immediate automated pa
 - `phase` (string): The identifier of the failing phase.
 - `cycle` (integer): The cycle ID in which the failure occurred.
 - `error_message` (string): The non-empty error message returned from the runner.
+- `delivery_failure` (string): The classified submission failure (for example, `prompt submit_wedged (resends=3)`); empty for generic artifact timeouts and non-timeout failures.
 - `exit_code` (integer): The bridge exit code, such as `81` for `ErrArtifactTimeout` or transient errors like `80`, `85`, or `86`.
 - `attempt_count` (integer): The number of attempts executed before the phase aborted.
 - `timestamp` (string): The UTC timestamp when the failure occurred.
@@ -98,6 +99,7 @@ The diagnostic file contains key context fields to enable immediate automated pa
   "phase": "scout",
   "cycle": 173,
   "error_message": "phase scout: bridge: launch exit=81: core: bridge artifact timeout",
+  "delivery_failure": "",
   "exit_code": 81,
   "attempt_count": 2,
   "timestamp": "2026-05-31T20:27:45Z"
@@ -105,6 +107,12 @@ The diagnostic file contains key context fields to enable immediate automated pa
 ```
 
 The presence of the `failure-diag` file serves as a high-signal indicator for automated pipeline alerts. If the pipeline succeeds fully, no `failure-diag` files are created.
+
+### Verified Submission Delivery Failures — Issue / Gap / Solution
+
+- **Issue:** A tmux prompt or nudge could remain parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
+- **Gap:** Both tmux consumer sites recorded the classification without acting on it, and the terminal failure diagnostic exposed only a flat `error_message`. Generic silence and a verified delivery failure therefore looked identical to automation.
+- **Solution:** The prompt site now short-circuits through the existing `ExitArtifactTimeout` marker, while the nudge site carries its classified reason into that same marker. The orchestrator extracts only sentinel-backed `submit_wedged` reasons into `delivery_failure`; generic silence and unrelated failures leave the field empty. The existing resend cap and one-relaunch dispatcher contract are unchanged.
 
 ---
 
