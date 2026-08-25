@@ -215,21 +215,7 @@ func readBindingForConsume(opts *Options, res *RunResult, id string) (continuati
 // worktree/findings_path carry the operator account name, while the snapshot,
 // base and branch refs salvage resumes from are unaffected.
 func appendReleasedForConsume(doc map[string]any, c continuation.Continuation, cycleID string) []any {
-	c = continuation.RedactHostPaths(c)
-	var list []any
-	if prev, ok := doc["released_continuations"].([]any); ok {
-		list = prev
-	}
-	return append(list, map[string]any{
-		"worktree":      c.Worktree,
-		"branch":        c.Branch,
-		"snapshot_sha":  c.SnapshotSHA,
-		"base_sha":      c.BaseSHA,
-		"findings_path": c.FindingsPath,
-		"cycle":         c.Cycle,
-		"released_at":   time.Now().UTC().Format(time.RFC3339),
-		"reason":        "ship-consume-" + cycleID,
-	})
+	return continuation.AppendReleased(doc, c, "ship-consume-"+cycleID)
 }
 
 // releaseBindingForConsume deletes the binding once the consumption move is

@@ -39,6 +39,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 	// there) stops re-halting the breaker without an operator remembering the
 	// manual `evolve inbox ack-fingerprint` step.
 	reconcileConsumedFingerprints(evolveDir, stderr)
+	reconcileConsumedBindings(projectRoot, evolveDir, stderr)
 	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
 	if lerr != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: resolved-fingerprints ledger unreadable (%v) — proceeding without exclusions\n", lerr)

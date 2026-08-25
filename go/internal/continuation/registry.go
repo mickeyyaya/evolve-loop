@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
@@ -225,4 +226,28 @@ func RedactHostPaths(c Continuation) Continuation {
 	c.Worktree = tilde(c.Worktree)
 	c.FindingsPath = tilde(c.FindingsPath)
 	return c
+}
+
+// AppendReleased returns doc's released_continuations[] with binding c
+// appended — the ONE shape every consumption path writes (ship's in-commit
+// consume, the operator `evolve inbox consume`, and the consumed-corpus
+// reconciler), so the salvage pointer a release preserves can never drift
+// between routes. Host paths are redacted here because consumed items are
+// TRACKED and ride commits to the public remote (audit cycle-1507 M1).
+func AppendReleased(doc map[string]any, c Continuation, reason string) []any {
+	c = RedactHostPaths(c)
+	var list []any
+	if prev, ok := doc["released_continuations"].([]any); ok {
+		list = prev
+	}
+	return append(list, map[string]any{
+		"worktree":      c.Worktree,
+		"branch":        c.Branch,
+		"snapshot_sha":  c.SnapshotSHA,
+		"base_sha":      c.BaseSHA,
+		"findings_path": c.FindingsPath,
+		"cycle":         c.Cycle,
+		"released_at":   time.Now().UTC().Format(time.RFC3339),
+		"reason":        reason,
+	})
 }
