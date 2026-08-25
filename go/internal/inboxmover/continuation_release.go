@@ -147,3 +147,64 @@ func cycleFromDirName(name string) int {
 	}
 	return n
 }
+
+// ReconcileConsumedBindings projects inbox/consumed/ into the continuation
+// registry, the way the fingerprint reconciler projects it into the ack
+// ledger: a binding whose item lives ONLY in consumed/ is definitionally dead
+// — leaving it live is the immortal-binding class (cycles 1487/1497; recurred
+// as cycle-1558 through the operator consume, which moved the file but not
+// the binding, and the next wave minted a zero-delivery lane off it).
+//
+// Two guards before any release, both inherited from the audit of cycle-1507
+// (the read-side guard in ResolveContinuationForScope measured 7 of 91 real
+// bindings that a guardless release would have destroyed):
+//   - LIVE COPY: a re-filed item the batch loader can still reach owns the
+//     binding — skip.
+//   - RECENCY: a consumed copy OLDER than the binding is stale evidence (the
+//     id was re-filed and rebound after that retirement) — skip, loudly.
+//
+// The release itself goes through the ONE shared transaction
+// (ReleaseContinuationBinding): preserve-then-delete, loud on a failed
+// preserve, cycle-guarded delete. Per-item failures WARN and never block.
+// Called before every cycle dispatch on the blocker-breaker path — the sweep
+// is O(consumed items) with a registry read per bound id; consumed/ is never
+// pruned, so revisit the cost if the corpus grows an order of magnitude.
+func ReconcileConsumedBindings(opts Options) (released []string) {
+	opts.resolveOpts()
+	dir := filepath.Join(opts.InboxDir, "consumed")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		id := itemIDAt(path)
+		if id == "" {
+			continue
+		}
+		c, ok, rerr := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
+		if rerr != nil {
+			opts.logf("WARN: ", "consumed-reconcile %q: registry unreadable (%v) — binding left in place", id, rerr)
+			continue
+		}
+		if !ok {
+			continue
+		}
+		if scopeHasLiveItem(opts, id) {
+			continue // a re-filed live copy owns the binding
+		}
+		if rc := retiredAtCycle(path); rc > 0 && rc < c.Cycle {
+			opts.logf("WARN: ", "consumed copy of %q is from cycle %d but its binding is NEWER (cycle %d) — stale evidence, not releasing (cycle-1507 recency guard)", id, rc, c.Cycle)
+			continue
+		}
+		if _, rel, relErr := ReleaseContinuationBinding(opts, id, "consumed-reconcile"); relErr != nil {
+			opts.logf("WARN: ", "consumed-reconcile release %q: %v", id, relErr)
+		} else if rel {
+			released = append(released, id)
+		}
+	}
+	return released
+}

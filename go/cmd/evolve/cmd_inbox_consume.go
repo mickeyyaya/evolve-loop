@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 // ackItemFingerprint reads one inbox item, extracts the failure fingerprint
@@ -132,6 +133,9 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)
 		return 1
 	}
+	if releaseConsumedItemBinding(filepath.Dir(evolveDir), dest, stderr) {
+		fmt.Fprintf(stdout, "inbox consume: released continuation binding for %s (salvage pointer preserved on the item)\n", filepath.Base(itemPath))
+	}
 	fp, found, err := ackItemFingerprint(evolveDir, dest, "inbox-consume")
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the fingerprint ack failed: %v\n", dest, err)
@@ -143,4 +147,46 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ and acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", filepath.Base(itemPath), fp)
 	return 0
+}
+
+// releaseConsumedItemBinding releases one just-consumed item's continuation
+// binding through the ONE shared transaction (inboxmover.
+// ReleaseContinuationBinding: preserve-then-delete, loud on a failed
+// preserve, cycle-guarded delete — cycle-1507's H2 is exactly the drift a
+// hand-rolled copy here reintroduced once, caught in review). The direct
+// consume is an explicit operator statement that the work is closed, so no
+// recency guard applies here; the SWEEP (inboxmover.ReconcileConsumedBindings)
+// carries the cycle-1507 guards for everything consumed by other routes.
+func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) bool {
+	id := ""
+	if raw, err := os.ReadFile(itemPath); err == nil {
+		var doc struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(raw, &doc) == nil {
+			id = doc.ID
+		}
+	}
+	if id == "" {
+		return false
+	}
+	_, released, err := inboxmover.ReleaseContinuationBinding(
+		inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr}, id, "inbox-consume")
+	if err != nil {
+		fmt.Fprintf(stderr, "[inbox] WARN: binding release %q: %v\n", id, err)
+		return false
+	}
+	return released
+}
+
+// reconcileConsumedBindings delegates to the canonical consumed-corpus sweep
+// (inboxmover.ReconcileConsumedBindings — live-copy + recency guards, shared
+// release transaction). Runs beside reconcileConsumedFingerprints on the
+// blocker-breaker path, i.e. before EVERY cycle dispatch, not only at boot.
+func reconcileConsumedBindings(projectRoot, evolveDir string, stderr io.Writer) {
+	released := inboxmover.ReconcileConsumedBindings(inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr})
+	for _, id := range released {
+		fmt.Fprintf(stderr, "[loop] blocker-breaker: released stray continuation binding for consumed item %s\n", id)
+	}
+	_ = evolveDir
 }
