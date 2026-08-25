@@ -89,15 +89,65 @@ type completionDetector interface {
 // newCompletionDetector builds the detector for the requested mode. Unknown /
 // empty modes fall back to the artifact contract so a typo can never silently
 // disable completion — it just keeps the legacy behavior.
-func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch) completionDetector {
+func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch, base artifactBaseline) completionDetector {
 	switch mode {
 	case "stdout":
 		return &stdoutDetector{cfg: cfg, deps: deps, lp: lp, threshold: stdoutIdlePolls}
 	case "git":
 		return newGitEvidenceDetector(cfg, deps)
 	default:
-		return &artifactDetector{cfg: cfg}
+		return &artifactDetector{cfg: cfg, baseline: base}
 	}
+}
+
+// artifactBaseline is the PRE-DISPATCH snapshot of the artifact path: what was
+// already on disk before this dispatch's prompt was delivered. Cycle-1550 (and
+// the 1554 lane that pinned it): a correction re-dispatch whose prior failed
+// attempt left its report at the canonical path had those UNCHANGED bytes
+// certified as completion after two stability ticks — no post-dispatch write
+// required — so a stale FAIL report re-graded itself forever. An observation
+// identical to the baseline is the PRIOR attempt's work: it never begins a
+// stability window and never completes, the finality concession included —
+// timeout is the honest outcome for an agent that wrote nothing.
+type artifactBaseline struct {
+	// entries maps each candidate path that existed pre-dispatch to its
+	// (size, mtime) snapshot — the WHOLE artifactCandidatePaths set, not just
+	// the canonical: a stray at a fallback, shadowed at capture time, must
+	// not certify later when the canonical vanishes mid-session.
+	entries map[string]baselineEntry
+}
+
+type baselineEntry struct {
+	size    int64
+	modTime time.Time
+}
+
+// captureArtifactBaseline snapshots the artifact path. MUST be called before
+// prompt delivery (the driver captures it before REPL input seeding): captured
+// later, an instant-writing agent's fresh artifact would be mistaken for the
+// prior attempt's and refused. Any error degrades to an absent baseline —
+// fail-open to the pre-fix behavior, never a new refusal class.
+func captureArtifactBaseline(cfg *Config) artifactBaseline {
+	var b artifactBaseline
+	for _, path := range artifactCandidatePaths(cfg) {
+		fi, err := os.Lstat(path)
+		if err != nil || !fi.Mode().IsRegular() || fi.Size() == 0 {
+			continue // absent/irregular/empty: nothing to refuse later
+		}
+		if b.entries == nil {
+			b.entries = map[string]baselineEntry{}
+		}
+		b.entries[path] = baselineEntry{size: fi.Size(), modTime: fi.ModTime()}
+	}
+	return b
+}
+
+// matches reports whether an observation is byte-for-byte a pre-dispatch
+// artifact (same path, size, and mtime — the same key the stability window
+// uses, so the two checks cannot drift).
+func (b artifactBaseline) matches(path string, fi os.FileInfo) bool {
+	e, ok := b.entries[path]
+	return ok && fi.Size() == e.size && fi.ModTime().Equal(e.modTime)
 }
 
 // gitEvidenceDetector implements the ADR-0027 git-evidence contract: completion
@@ -220,7 +270,8 @@ func shortSHA(s string) string {
 // file that may still be growing; copy+remove is not, and under finality it
 // never runs.
 type artifactDetector struct {
-	cfg *Config
+	cfg      *Config
+	baseline artifactBaseline
 
 	haveLast    bool
 	lastPath    string
@@ -259,12 +310,27 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 	// again), and ctx.Err() still covers a detector polled on a context that
 	// died under it mid-wait — the pre-existing contract, unchanged.
 	if isFinalPoll(ctx) || ctx.Err() != nil {
+		// The finality concession stops at the pre-dispatch baseline: an
+		// artifact byte-identical to what was on disk BEFORE the prompt went
+		// out is the prior attempt's report, and completing on it launders a
+		// stale verdict into a fresh one (cycle-1550). Only an affirmative
+		// match refuses — a stat error here keeps the concession (fail-open).
+		if fi, serr := os.Stat(path); serr == nil && d.baseline.matches(path, fi) {
+			return false, completionEvidence{}, "", nil
+		}
 		return d.completeWith(renameOnlyRelocate)
 	}
 	fi, serr := os.Stat(path)
 	if serr != nil {
 		// Vanished between artifactLocate and here (or unreadable): treat as not
 		// ready and restart the window rather than completing on a stale read.
+		d.haveLast, d.stable = false, 0
+		return false, completionEvidence{}, "", nil
+	}
+	// The unchanged PRE-DISPATCH artifact never begins a window: those bytes
+	// predate this dispatch's prompt and are the prior attempt's work, not
+	// evidence this agent finished (cycle-1550 — the stale-FAIL re-grade loop).
+	if d.baseline.matches(path, fi) {
 		d.haveLast, d.stable = false, 0
 		return false, completionEvidence{}, "", nil
 	}

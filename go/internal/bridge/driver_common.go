@@ -249,9 +249,22 @@ func artifactCanonicalize(cfg *Config, move func(src, dst string) error) (ready 
 // the chokepoint that decides which bytes become the committed deliverable, so
 // a symlink is never followed here (cycle-1256 D3).
 func artifactLocate(cfg *Config) (path string, found bool) {
-	if regularFileNonEmpty(cfg.Artifact) {
-		return cfg.Artifact, true
+	for _, c := range artifactCandidatePaths(cfg) {
+		if regularFileNonEmpty(c) {
+			return c, true
+		}
 	}
+	return "", false
+}
+
+// artifactCandidatePaths is the FULL ordered set of locations artifactLocate
+// can answer from: canonical first, then the fallbacks. Single-sourced so the
+// pre-dispatch baseline (captureArtifactBaseline) snapshots exactly the
+// locations completion can later certify — a stray at a fallback, shadowed by
+// the canonical at capture time, must not launder through the side door when
+// the canonical vanishes mid-session (design-review note 1).
+func artifactCandidatePaths(cfg *Config) []string {
+	out := []string{cfg.Artifact}
 	base := filepath.Base(cfg.Artifact)
 	candidates := []string{filepath.Join(cfg.Workspace, "workspace", base)}
 	if cfg.Worktree != "" {
@@ -260,13 +273,12 @@ func artifactLocate(cfg *Config) (path string, found bool) {
 			filepath.Join(cfg.Worktree, "workspace", base),
 		)
 	}
-	for _, fallback := range candidates {
-		if fallback == cfg.Artifact || !regularFileNonEmpty(fallback) {
-			continue
+	for _, c := range candidates {
+		if c != cfg.Artifact {
+			out = append(out, c)
 		}
-		return fallback, true
 	}
-	return "", false
+	return out
 }
 
 // relocateFile moves src to dst, creating dst's parent directory. It tries an

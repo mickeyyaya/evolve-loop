@@ -60,6 +60,14 @@ type Deps struct {
 	// NewChallengeToken mints the dry-run / artifact challenge token
 	// (bash used `openssl rand -hex 8`). Defaults to 8 random bytes hex.
 	NewChallengeToken func() (string, error)
+	// CaptureBaseline snapshots the PRE-DISPATCH artifact state so the
+	// completion detector can refuse a prior attempt's leftover report
+	// (cycle-1550's stale re-grade loop). Nil defaults to the real
+	// captureArtifactBaseline. Test harnesses whose fake sessions cannot
+	// write files pre-seed the artifact as a stand-in for a MID-SESSION
+	// write; they inject a zero capture to declare exactly that intent —
+	// production never sets this field.
+	CaptureBaseline func(*Config) artifactBaseline
 	// Env is the request-local environment overlay consulted ahead of
 	// os.Getenv (via envchain). nil is treated as empty.
 	Env map[string]string
@@ -217,6 +225,9 @@ func defaultIfZero(val, def int) int {
 // its production default. Keeps NewEngine and tests from each repeating
 // the defaulting logic.
 func (d Deps) withDefaults() Deps {
+	if d.CaptureBaseline == nil {
+		d.CaptureBaseline = captureArtifactBaseline
+	}
 	if d.Runner == nil {
 		d.Runner = execRunner
 	}

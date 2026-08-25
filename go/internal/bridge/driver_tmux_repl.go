@@ -366,6 +366,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// --- Seed any launch-time REPL input (e.g. "/model sonnet") after the
 	// boot marker, before the task prompt. Skipped on a resumed named
 	// session (the seed already ran on the original launch).
+	// Pre-dispatch artifact baseline — captured BEFORE any REPL input or the
+	// prompt is delivered, so nothing the agent writes can be mistaken for the
+	// prior attempt's leftovers (see captureArtifactBaseline). Through the
+	// Deps hook so a fake-session harness can declare its pre-seeded artifact
+	// as a mid-session write; nil (raw Deps) degrades to the real capture.
+	capture := deps.CaptureBaseline
+	if capture == nil {
+		capture = captureArtifactBaseline
+	}
+	artifactBase := capture(cfg)
 	if !namedExists && len(cfg.Realization.REPLInput) > 0 {
 		for _, ln := range cfg.Realization.REPLInput {
 			_ = deps.Tmux.SendKeys(ctx, lp.session, ln, true)
@@ -494,7 +504,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// the stop-review/extend liveness adjudication below is unchanged.
 	var lastEv StopEvent
 	var lastVerdict ReviewVerdict
-	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp)
+	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp, artifactBase)
 	completed := false
 	nudgeSent := false
 	// ADR-0045 I1: the one-shot nudge's outcome window — resolved when the

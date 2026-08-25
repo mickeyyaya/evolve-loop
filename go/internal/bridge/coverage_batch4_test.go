@@ -40,7 +40,7 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 	wt := t.TempDir()
 	// fake runner does NOT write the artifact → success but empty Stdout.
 	fr := &fakeRunner{}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture}) // inert here (headless path); harness uniformity
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: art,

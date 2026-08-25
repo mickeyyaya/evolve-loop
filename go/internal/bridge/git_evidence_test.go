@@ -167,7 +167,7 @@ func TestNewGitEvidenceDetector_MissingTokenWarns(t *testing.T) {
 
 func TestNewCompletionDetector_GitMode(t *testing.T) {
 	cfg := &Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "scout"}
-	if _, ok := newCompletionDetector("git", cfg, Deps{}.withDefaults(), tmuxLaunch{}).(*gitEvidenceDetector); !ok {
+	if _, ok := newCompletionDetector("git", cfg, Deps{}.withDefaults(), tmuxLaunch{}, artifactBaseline{}).(*gitEvidenceDetector); !ok {
 		t.Error("mode \"git\" should build a *gitEvidenceDetector")
 	}
 }
