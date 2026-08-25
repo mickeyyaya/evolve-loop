@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -73,7 +74,12 @@ case "$mode" in
   *)
     printf '%%s\n' "$marker" ;;
 esac
-# Read pasted prompt lines until the session is killed.
+# Read pasted prompt lines until the session is killed. After EVERY consumed
+# line, re-print the input-line marker — real-REPL discipline: a submitted
+# line clears the input and a fresh prompt is drawn. Without this, the pane's
+# last marker keeps the echoed prompt as its tail forever and submit-verify
+# correctly reads "parked" (the v22.20.0 release red was exactly this
+# harness/heuristic mismatch).
 special=""
 while IFS= read -r line; do
   case "$line" in
@@ -84,6 +90,7 @@ while IFS= read -r line; do
         else printf 'PONG' > "${line#ARTIFACT=}"; fi
       fi ;;
   esac
+  printf '%%s\n' "$marker"
 done
 `, marker)
 	path := filepath.Join(dir, "fake-repl-"+mode+".sh")
@@ -165,6 +172,8 @@ func TestRealTmux_HappyPath(t *testing.T) {
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "happy", marker)
 	sess := itSession("happy")
 	deps := itDeps(120 * time.Millisecond)
+	var stderr bytes.Buffer
+	deps.Stderr = &stderr
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
 	code, err := runTmuxREPL(context.Background(), cfg, deps, itLaunch(sess, launchCmd, marker, 0, false))
@@ -172,7 +181,14 @@ func TestRealTmux_HappyPath(t *testing.T) {
 		t.Fatalf("runTmuxREPL err: %v", err)
 	}
 	if code != ExitOK {
-		t.Fatalf("exit = %d, want ExitOK", code)
+		t.Fatalf("exit = %d, want ExitOK; stderr=%s", code, stderr.String())
+	}
+	// The fake models a CLEAN real REPL (marker redrawn after every consumed
+	// line): submit-verify must see a clear input line, not lean on the
+	// ground-truth belt. A resend here means the harness regressed to the
+	// parked shape that produced the v22.20.0 release red.
+	if strings.Contains(stderr.String(), "re-sending Enter") {
+		t.Fatalf("clean-REPL fake triggered submit-verify resends; stderr=%s", stderr.String())
 	}
 	if got := readFile(t, cfg.Artifact); got != "PONG" {
 		t.Fatalf("artifact = %q, want PONG", got)

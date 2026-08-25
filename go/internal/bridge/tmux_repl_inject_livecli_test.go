@@ -40,11 +40,15 @@ set -u
 marker=%q
 printf '%%s\n' "$marker"
 artifact=""
+# Real-REPL discipline: a consumed line clears the input and a fresh prompt is
+# drawn — without the re-printed marker the pane reads as "parked" to
+# submit-verify forever (the v22.20.0 release-red harness/heuristic mismatch).
 while IFS= read -r line; do
   case "$line" in
     ARTIFACT=*) artifact="${line#ARTIFACT=}" ;;
     PROCEED)    [ -n "$artifact" ] && printf 'INJECTED-OK' > "$artifact" ;;
   esac
+  printf '%%s\n' "$marker"
 done
 `, marker)
 	path := filepath.Join(dir, "fake-await-inject.sh")

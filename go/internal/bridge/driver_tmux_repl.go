@@ -611,12 +611,40 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
 		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt", outcome)
 		if outcome.Result == interaction.ResultSubmitWedged {
-			lastVerdict = ReviewVerdict{
-				Action: ReviewPause,
-				Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
+			// GROUND TRUTH outranks the pane heuristic (v22.20.0 release red):
+			// a REPL that consumes its input and answers by SIDE EFFECT alone —
+			// never redrawing its input line — is indistinguishable from
+			// "parked" by the echo match, and the instant 81 here aborted
+			// sessions whose deliverable was already on disk. One read-only
+			// probe: an artifact present that is NOT the pre-dispatch baseline
+			// proves the submission landed; fall through to the normal wait
+			// (the detector's stability window still gates completion). A
+			// genuinely wedged pane has no post-dispatch artifact and still
+			// fast-fails exactly as the retro-stall fix intended.
+			// NOTE: a submit_wedged outcome was already recorded to the
+			// interactions ledger above — with this belt, that record can
+			// co-occur with a SUCCESSFUL phase (the stall was recovered by
+			// ground truth). Consumers must gate on the actual phase error,
+			// never on the ledger token alone (failure_learning.go does).
+			delivered := false
+			if path, found := artifactLocate(cfg); found {
+				// Lstat, matching regularFileNonEmpty's never-follow-symlinks
+				// invariant (cycle-1256 D3) — the belt must not re-resolve a
+				// path the locator deliberately refused to follow.
+				if fi, serr := os.Lstat(path); serr == nil && fi.Mode().IsRegular() && !artifactBase.matches(path, fi) {
+					delivered = true
+				}
 			}
-			writeArtifactTimeoutMarker(false)
-			return ExitArtifactTimeout, nil
+			if delivered {
+				fmt.Fprintf(deps.Stderr, "%s submit-verify: pane looks parked but a post-dispatch deliverable is already on disk — submission evidently landed; continuing the normal wait\n", pfx)
+			} else {
+				lastVerdict = ReviewVerdict{
+					Action: ReviewPause,
+					Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
+				}
+				writeArtifactTimeoutMarker(false)
+				return ExitArtifactTimeout, nil
+			}
 		}
 	}
 	for elapsed := 0; ; elapsed += 2 {
