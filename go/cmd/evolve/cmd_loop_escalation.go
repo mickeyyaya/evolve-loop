@@ -49,11 +49,12 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 		fmt.Fprintf(stderr, "[loop] WARN: could not write pipeline-escalation.json: %v\n", werr)
 	}
 
-	// Auto-file a P0 pipeline-repair inbox item. Deterministic filename (no
-	// clock collision within a cycle) so a repeated halt on the same category
-	// overwrites rather than piling duplicates.
+	// Auto-file a P0 pipeline-repair inbox item. The cycle-scoped identity
+	// preserves distinct halts sharing a category while remaining deterministic
+	// for repeated halts within one cycle.
+	itemID := fmt.Sprintf("pipeline-defect-%s-cycle%d", sf.Category, cycle)
 	item := map[string]any{
-		"id":         fmt.Sprintf("pipeline-defect-%s", sf.Category),
+		"id":         itemID,
 		"created_at": now.Format(time.RFC3339),
 		"weight":     0.99,
 		"title":      fmt.Sprintf("PIPELINE DEFECT (%s): the loop halted — %s", sf.Category, sf.Evidence),
@@ -70,7 +71,7 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 		"notes": fmt.Sprintf("Auto-filed by the ADR-0072 halt at %s. Evidence: %s", now.Format(time.RFC3339), sf.Evidence),
 	}
 	// atomicwrite.JSON creates the inbox dir if needed.
-	itemPath := filepath.Join(projectRoot, ".evolve", "inbox", fmt.Sprintf("pipeline-defect-%s.json", sf.Category))
+	itemPath := filepath.Join(projectRoot, ".evolve", "inbox", itemID+".json")
 	if werr := atomicwrite.JSON(itemPath, item); werr != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: could not auto-file pipeline-repair inbox item: %v\n", werr)
 	}

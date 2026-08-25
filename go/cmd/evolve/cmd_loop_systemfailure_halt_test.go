@@ -104,7 +104,7 @@ func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing
 		t.Errorf("escalation category = %v, want verdict-incoherence", esc["category"])
 	}
 
-	inboxPath := filepath.Join(root, ".evolve", "inbox", "pipeline-defect-verdict-incoherence.json")
+	inboxPath := filepath.Join(root, ".evolve", "inbox", "pipeline-defect-verdict-incoherence-cycle956.json")
 	if _, err := os.Stat(inboxPath); err != nil {
 		t.Errorf("P0 pipeline-repair inbox item not filed at %s: %v", inboxPath, err)
 	}
