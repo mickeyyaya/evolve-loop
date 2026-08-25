@@ -1,0 +1,22 @@
+{
+  "id": "lost-ship-dossier-evidence",
+  "kind": "feature",
+  "title": "Lost-landing evidence must reach the committed dossier — re-filed after the cycle-1546 salvage excised the draft (coupled to the landing-witness redesign)",
+  "summary": "Re-filed 2026-08-23. finalizeCycle stamps the landing-lost SystemFailureSignal onto CycleResult, but writeCycleDossier receives only the terminal outcome string, so the durable record loses the category and evidence — an operator reading knowledge-base/cycles/cycle-N.json cannot see WHY a cycle was downgraded. The cycle-1546 draft (dossier/* changes, dossier_producer signature change threading SystemFailure through, schema extension) was excised with the witness draft because the two land as one surface and the witness half carried HIGH defects.",
+  "fix": "Re-land the dossier half from the preserved draft (branch cycle-42824668-1546, snapshot b9118b55febd235aa6367bf1de62ce2ae45b9b13: internal/dossier/landing_lost.go, dossier_producer* signature change, schemas/cycle-dossier.schema.json), WITH acs/cycle1544 predicates 004-005 restored (evidence reaches the committed dossier; landed sibling carries none; ordinary PASS stays byte-clean). May land before or with the witness redesign — the signal it records is produced by the EXISTING floor (PR #482), so it is not blocked on the witness; only the excision was coupled.",
+  "files": [
+    ".evolve/worktrees/cycle-42824668-1546 (preserved draft; snapshot b9118b55)",
+    "go/internal/core/dossier_producer.go", "go/internal/dossier/", "schemas/cycle-dossier.schema.json",
+    "go/acs/cycle1544/predicates_test.go (salvage note; predicates 004-005 belong here)"
+  ],
+  "acceptance": [
+    "A landing-lost cycle's committed dossier carries the signal's structured category AND evidence text, driven through the REAL writeCycleDossier path.",
+    "A landed sibling with the same transient ship error carries no landing-lost evidence; an ordinary PASS dossier stays byte-clean.",
+    "acs/cycle1544 predicates 004-005 restored and green."
+  ],
+  "connects_to": ["PR #486", "PR #482", "lost-ship-closeout-universal-landing-witness (surface sibling)"],
+  "priority": "high",
+  "weight": 0.82,
+  "created_at": "2026-08-23T12:01:00Z",
+  "notes": "Continuation binding released 2026-08-23 with no item file to carry the salvage pointer — THIS file is that pointer."
+}

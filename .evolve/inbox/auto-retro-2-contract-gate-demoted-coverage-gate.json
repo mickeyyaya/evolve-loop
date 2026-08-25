@@ -1,0 +1,11 @@
+{
+  "action": "recurring failure contract gate demoted enforce-\u003eadvisory on phase coverage-gate (cli=claude-tmux) (3 occurrences)",
+  "evidence_pointer": "[orchestrator] WARN CONTRACT GATE DEMOTED: phase coverage-gate on cli=claude-tmux tripped the contract-gate circuit breaker — the gate is now advisory (enforce→advisory) for the rest of this run, so later phases ship UNGATED. CLI escalation already ran and the escalated CLI failed the contract too. Last violation: coverage-gate deliverable failed contract: [missing_section] required section \"## Coverage Delta\" is missing; [missing_section] required section \"## Uncovered Changed Lines\" is missing; [missing_section] required section \"## Verdict\" is missing; [bad_verdict] no parseable verdict; expected one of [PASS FAIL WARN SKIPPED]",
+  "files": null,
+  "id": "contract-gate-demoted-coverage-gate",
+  "injected_at": "2026-08-22T10:37:59Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "priority": "HIGH",
+  "recurrence": 3,
+  "weight": 0.75
+}

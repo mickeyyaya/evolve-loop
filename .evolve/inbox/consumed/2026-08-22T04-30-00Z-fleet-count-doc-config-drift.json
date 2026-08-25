@@ -1,0 +1,24 @@
+{
+  "id": "fleet-count-doc-config-drift",
+  "kind": "bug",
+  "title": "runtime-reference.md documents fleet.count=2 for August while policy.json carries 3 — and the 2->3 change rode in as a side effect of a routing PR, undoing #430's deliberate reduction with no note",
+  "summary": "Found 2026-08-22 during wave-readiness checks. .evolve/policy.json has fleet={\"count\":3,\"plan_source\":\"triage\",\"min_lanes\":2}, but docs/operations/runtime-reference.md:124 still states 'Fleet note: fleet.count=2 for August 2026 (codex family quota-exhausted until Sep 1); restore 3 via the wave-boundary bounce recipe.' One of the two is wrong, and an operator reading the runtime reference to decide wave width gets the stale number.",
+  "root_cause": "git log -S'\"count\": 3' -- .evolve/policy.json shows the restore landed in c8f98331 (#461, 'feat(routing): retrospective moves to claude/deep — Gemini 3.1 Pro retired from the deep tier'). That PR's own commit message acknowledges codex is quota-benched until 2026-09-01 ('gpt-5.6-sol is the alternative once codex returns from quota bench 2026-09-01') — yet the same commit set the width back to 3 and did not update the doc row that #430 wrote. So this is a config change that rode in on an unrelated routing PR: exactly the class the standing rule guards against, since feedback_ten_lane_concurrency_standing says fleet width is a COMMITMENT changed ONLY via the wave-boundary bounce recipe.",
+  "fix": "Decide which value is intended, then make doc and config agree in ONE change: (a) if width 3 is intended (standing width per feedback_ten_lane_concurrency_standing, and .evolve/cli-health.json shows benches:{} so nothing is actually benching codex out), correct runtime-reference.md:124 to say 3 and record that the August reduction was retired; or (b) if the August reduction still stands, set policy.json back to 2 at a wave boundary. Independently, consider a guard: a test asserting the fleet.count documented in runtime-reference.md matches .evolve/policy.json, so the two can never silently disagree again — the same single-source-with-projection treatment applied elsewhere.",
+  "files": [
+    ".evolve/policy.json (fleet.count=3)",
+    "docs/operations/runtime-reference.md:124 (states fleet.count=2 for August)",
+    "c8f98331 (#461) — the routing PR that restored 3 without touching the doc",
+    "238ac210 (#430) — the operator-approved commit that set 3->2 for August",
+    ".evolve/cli-health.json — benches:{} (empty; nothing is enforcing a codex exclusion)"
+  ],
+  "acceptance": [
+    "runtime-reference.md and .evolve/policy.json state the same fleet.count.",
+    "The reason for the current value is recorded where an operator will read it, including whether the August codex reduction is retired or still pending.",
+    "A guard exists that fails when the documented width and the configured width disagree (or the decision to skip that guard is recorded with a reason)."
+  ],
+  "priority": "medium",
+  "weight": 0.62,
+  "created_at": "2026-08-22T04:30:00Z",
+  "notes": "Config-vs-doc drift, not a runtime defect: the loop reads policy.json, so behavior is width 3 and no lane is stranded (claude is the universal fallback, and a codex quota death fails over rather than dying). The cost is operator-facing — someone sizing a wave from the runtime reference gets the wrong number, and the zero-ship halt protocol is read against wave width. Filed rather than fixed inline because choosing the value is an operator call, not a code call."
+}

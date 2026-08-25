@@ -1,0 +1,25 @@
+{
+  "id": "fleet-pool-test-wallclock-flake",
+  "kind": "bug",
+  "title": "TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning asserts fleet scheduling with three hard 2s wall-clock deadlines — it flakes on contended CI runners and reds unrelated PRs",
+  "summary": "Observed 2026-08-22 on PR #482 (run 32571232531): FAIL on ubuntu-latest, SUCCESS on macos-latest in the SAME CI run, and green locally 5/5 under -race. The test (go/cmd/evolve/cmd_loop_pool_test.go, unchanged since 6e80c7ad on 2026-07-06) synchronizes on three `case <-time.After(2 * time.Second)` deadlines. The ubuntu job runs the whole suite with -race AND coverage AND the integration tier on a shared runner, so a 2s budget for goroutine scheduling is not a safe margin — it is a bet on runner load.",
+  "root_cause": "Wall-clock deadlines used as a synchronization primitive in a concurrency test. A 2s timeout is chosen to be 'obviously enough' on a developer machine, but under -race (which slows execution several-fold) plus coverage instrumentation plus a loaded shared runner, the margin disappears. The failure mode is indistinguishable from a real scheduling defect in the CI log, which is the expensive part: every occurrence costs an operator a flake-vs-real classification against a test they did not touch.",
+  "fix": "Replace the wall-clock deadlines with deterministic synchronization. Preferred: drive the pool with an injected clock or a channel the test controls, so 'sibling still running' is a state the test ESTABLISHES rather than a race it hopes to win. If real elapsed time must be involved, derive the budget from a scaling factor (e.g. a package-level testTimeout that multiplies under -race / on CI via an env-derived constant) instead of a bare 2s literal, and state the reasoning in a comment so the next reader does not tighten it again. Check the sibling tests in the same file for the same pattern before fixing just this one.",
+  "files": [
+    "go/cmd/evolve/cmd_loop_pool_test.go:189,205,221 (the three 2s deadlines)",
+    "CI run 32571232531 (PR #482): ubuntu FAIL / macos SUCCESS, same commit"
+  ],
+  "acceptance": [
+    "The test no longer depends on wall-clock duration for correctness — it passes deterministically under `-race -count=50`.",
+    "Any remaining time budget is derived, not a bare literal, and carries a comment explaining the margin.",
+    "Sibling tests in cmd_loop_pool_test.go sharing the pattern are fixed together or explicitly ruled out."
+  ],
+  "connects_to": [
+    "ci_only_failures_need_ci_constraints — reproduce a CI-only failure under CI's constraint (-race + coverage + load) before blaming the code",
+    "project_integration_tier_scope_flake — the whole-suite-flake class this belongs to"
+  ],
+  "priority": "medium",
+  "weight": 0.58,
+  "created_at": "2026-08-22T12:00:00Z",
+  "notes": "Filed per the standing rule that a CI failure must be CLASSIFIED before retry and a recurring class must be tracked. Classified here as FLAKE on four independent signals: passes locally 5/5 under -race; passes on macos in the same CI run; the test file references none of the changed code paths (no ship-error/ship-binding/finalizeCycle/triage-decision); and it is unmodified since 2026-07-06. Weight is modest because it does not affect production behaviour — but every occurrence taxes an unrelated PR with a false red, and a false red is exactly what trains operators to retry without classifying."
+}

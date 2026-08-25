@@ -1,0 +1,23 @@
+{
+  "id": "requiretmux-tier-quiet-host-backstop",
+  "kind": "feature",
+  "title": "Run the requireTmux integration tier at loop-boot preflight — the quiet-host backstop for coverage that now runs nowhere automatically",
+  "summary": "Follow-up to the bridge env-exclusive change (2026-08-23). internal/bridge's requireTmux-guarded integration tests are now skipped by the in-cycle EGPS tier (they false-RED under wave tmux contention: 13 offenders on cycle-1543, all exit=80, 7/7 PASS in 17.2s quiet) AND they skip in CI (GitHub runners have no tmux). Net: the real-tmux tier currently runs NOWHERE automatically. The honest skip message names the intended backstop: a quiet-host run at loop-boot preflight, where the host is quiet by construction (preflight boot-smoke probes already run sequentially before any lanes launch).",
+  "fix": "Add a preflight step to the loop boot sequence (looppreflight, near the existing per-CLI boot-smoke probes): `go test -tags integration ./internal/bridge/ -run 'TestRealTmux'` with a bounded budget (~60-90s; measured 17.2s quiet). RED fails the preflight loudly BEFORE any lane spends tokens — a broken bridge boot path would otherwise burn whole waves. Respect --skip-preflight / --skip-preflight-boot (CI/offline). Consider caching by go-module content hash so an unchanged bridge package skips the re-run at consecutive boots.",
+  "files": [
+    "go/internal/looppreflight/ (the boot gate to extend)",
+    "go/internal/phases/audit/ciparity.go (envExclusiveQuietHostOnly + the skip message naming this backstop)",
+    "go/internal/bridge/tmux_repl_interactive_test.go (the requireTmux tier)"
+  ],
+  "acceptance": [
+    "A quiet-host requireTmux run executes at loop boot before any lane launches, with a bounded budget, and a RED fails preflight loudly.",
+    "--skip-preflight-boot skips it (CI/offline parity).",
+    "The env-exclusive skip message's named backstop and the implemented backstop are the same thing (no drift: a test pins the message against the preflight step's existence).",
+    "Measured boot-time cost recorded; if a content-hash cache is added, an unchanged bridge package skips the re-run."
+  ],
+  "connects_to": ["bridge env-exclusive change 2026-08-23", "#483 (parity honesty)", "egps-blocks-on-tests-ci-never-runs (retired; the diagnosis half)"],
+  "priority": "medium",
+  "weight": 0.72,
+  "created_at": "2026-08-23T14:00:00Z",
+  "notes": "Weight 0.72: real coverage restoration, but the tests it restores have caught zero true positives in recorded history while producing repeated false REDs — the urgency is completeness, not a live defect. The skip-message honesty already tells operators the manual command in the meantime."
+}

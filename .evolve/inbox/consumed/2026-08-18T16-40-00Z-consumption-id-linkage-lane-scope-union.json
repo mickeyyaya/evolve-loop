@@ -1,0 +1,30 @@
+{
+ "id": "consumption-id-linkage-lane-scope-union",
+ "kind": "bug",
+ "title": "Ship-time consumption resolves triage top_n ids only \u2014 a triage-decomposed lane NEVER consumes its dispatched item (lane-scope todo_ids ignored), silently defeating #466 on most substantial lanes",
+ "summary": "Cycle-1515 (verified by code+artifact trace): lane-scope.json todo_ids=[park-consume-releases-continuation-binding] matched the tracked inbox file's .id exactly, but triage decomposed the work into 3 sub-ids (registry-release-on-park-consume, planner-adoption-live-item-guard, continuation-operator-cli) and consumeCommittedItems extracts ids ONLY from triage-decision.json top_n/skip_shipped \u2014 FindFileByTaskID missed 3x, each an intentionally-silent ErrNotFound continue. The PASS red=0 ship 868b8cf8 carried zero inbox changes; the item stayed pickable until a console commit 4 minutes later. Cycle-1516's parent re-pick was the same class from the other side. Since triage decomposition is the NORM on substantial items, #466's consumption is silently defeated on exactly the lanes that matter most.",
+ "root_cause": "Two id namespaces: the dispatched item's identity (lane-scope.json todo_ids == tracked file .id) vs triage's decomposed working ids (top_n). consumeCommittedItems reads only the latter; the linkage back to the dispatched identity is never consulted.",
+ "fix": "In consumeCommittedItems, union the id set: extractIDs(triage-decision) \u222a laneScope.TodoIDs (core.loadLaneScope already exists and is used by continuation adoption \u2014 reuse, single-source). The dispatched item id is the PRIMARY consumption target; triage sub-ids remain for skip_shipped attribution. Red-first: fixture with lane-scope id X + triage top_n [X1,X2] and a tracked inbox item .id==X \u2014 the PASS ship must consume X in-commit (pins the cycle-1515 shape). Guard: ids in lane-scope but NOT claimed/tracked no-op as today.",
+ "files": [
+  "go/internal/phases/ship/consume.go:62-73 (id extraction)",
+  "go/internal/core/ (loadLaneScope \u2014 reuse seam)",
+  ".evolve/runs/cycle-1515/{lane-scope.json,triage-decision.json} + commit 868b8cf8 (live evidence, agent-traced)"
+ ],
+ "acceptance": [
+  "Decomposed-lane PASS ship consumes the dispatched item in-commit (red-first, cycle-1515 shape).",
+  "Non-decomposed lanes byte-identical.",
+  "Sanctioned-drift + provenance checks (#473) exercise on the consumed pair.",
+  "go vet + ship suites + -race green."
+ ],
+ "connects_to": [
+  "PR #466/#473 (the chain this completes)",
+  "cycle-1516 parent re-pick (same class, other side)",
+  "campaign doc meta-finding #5 (typed state vs prose)",
+  "ADR-0089 releaseBindingForConsume (gated behind the same match \u2014 this fix makes it fire)"
+ ],
+ "priority": "high",
+ "weight": 0.86,
+ "created_at": "2026-08-18T16:40:00Z",
+ "notes": "Filed from the alignment audit's consumption-chain trace (subagent-verified against code + cycle-1515 artifacts). Supersedes my mis-attribution of the 1515 miss to warn-ship-consumption-gap (that item remains valid for its own WARN-verdict quadrant).",
+ "consumed_by": "FIXED by PR #496 (4ca36ded): per-id lane-scope union in committedInboxIDs \u2014 dropped(close-class) consumes, deferred stays, named-engagement keeps menu mates, declined-menu preserved, WARN gets pre-union set. 8 mutants killed; cycle-1552 replay pinned."
+}

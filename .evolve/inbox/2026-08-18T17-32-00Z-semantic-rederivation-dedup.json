@@ -1,0 +1,27 @@
+{
+  "id": "semantic-rederivation-dedup",
+  "kind": "feature",
+  "title": "Retirement is 100% scope-id-keyed \u2014 semantically identical work re-derived under a fresh id (retro-<cycle>-<slug>-<fp> autofiles, P0 prescriptions, eval-born slugs) sails past every guard",
+  "summary": "Alignment-audit finding (ADR-0089 gap #3, confirmed in code): auto-filed ids embed the cycle number (failure_learning.go:501-534) so a later cycle's identical defect mints a new id; dedup checks exact paths/ids only (faillearn/inbox.go writeIfAbsent; retrofile existingIDs). Live instance: cycle-1505's lane re-derived the parked retirement scope from a stale P0's prescription. ADR-0089 never claimed this scope \u2014 genuine open gap, the FOURTH re-dispatch channel (semantic, not typed).",
+  "root_cause": "Identity = id string; no content/semantic linkage across cycles or between prescriptions and existing (incl. parked/consumed) items.",
+  "fix": "DESIGN-leaning: (a) cheap first slice \u2014 autofiled/P0-prescribed items carry a normalized content fingerprint (title+files slug-set hash); filers check it against pending+parked+recently-consumed before minting (log+skip on match); (b) triage guidance: prescriptions naming a parked scope defer to the parked item rather than minting. Avoid over-engineering semantic similarity \u2014 exact normalized-fingerprint match only.",
+  "files": [
+    "go/internal/core/failure_learning.go:501-534",
+    "go/internal/faillearn/inbox.go:72-110",
+    "go/internal/inboxmover/ (retrofile existingIDs)"
+  ],
+  "acceptance": [
+    "Autofiler skips (loudly) when the normalized fingerprint matches an existing pending/parked/consumed-recent item \u2014 red-first with the cycle-1505 shape.",
+    "No suppression of genuinely-new defects (distinct fingerprints mint as today).",
+    "go vet + suites green."
+  ],
+  "connects_to": [
+    "ADR-0089 (explicitly out of its stated scope)",
+    "campaign meta-finding #5",
+    "cycle-1505 fourth-source burn"
+  ],
+  "priority": "medium",
+  "weight": 0.72,
+  "created_at": "2026-08-18T17:32:00Z",
+  "notes": "Filed from the alignment audit; scoped deliberately to exact-fingerprint matching."
+}

@@ -1,0 +1,14 @@
+{
+  "id": "routing-order-authority-followups",
+  "kind": "improvement",
+  "weight": 0.8,
+  "title": "Routing-order authority follow-ups from the cycle-1550 splice-fix design review (4 queued items)",
+  "summary": "Design review of the anchor-fixpoint splice (cycle-1550 fix) APPROVEd with queued follow-ups. (1) WARNING->LEDGER PROMOTION: ApplyUserRouting's unresolvable-anchor and demote-personaless warnings sink to stderr only ([phases] WARN, cmd_cycle.go); nothing consumes stderr into retro/ledger, so a catalog defect can repeat every cycle forever without queuing a fix (the lesson-to-action gap). Promote routing warnings into a cycle artifact or ledger entries. (2) RESUME-PATH ORDER SINGLE-SOURCING: nextFromRoutingPlan (internal/core/resume_transition.go:42-71) consumes the plan's ARRAY order as the execution successor on resume of an inserted phase, while the live walk uses cfg.Order — two ordering authorities that can disagree. ALSO: degradeInsertedSuccessor (resume_transition.go:73-91) routes RoleEvaluate->PhaseAudit, and bug-reproduction's archetype IS evaluate — a no-plan resume of bug-reproduction degrades straight to audit, never through build, recreating the red-test-never-greened shape via the RESUME path; the code comment there ('bug-reproduction resolves to build') is wrong for the tracked spec. Single-source the successor authority on cfg.Order. (3) MINT-BATCH ROUTING: registerMintedPhases (routing_dispatch.go:135-180) calls ApplyUserRouting one spec at a time, so a minted phase anchored to a batch-mate later in the same MintPhases loop still mis-slots; accumulate registered specs and call once per batch to inherit the fixpoint. (4) PRE-BUILD-EVALUATE FLOOR (designed config vocabulary): the invariant 'red-first Evaluate phases must never execute after build' cannot be expressed today — audit/tester are Evaluate-post-build by design, so archetype alone cannot encode it; needs a stage/before field in phase.json (config-not-code rule). Until then the realtree test's named bug-reproduction window pin is the stand-in. ALSO NOTE (soak watch, not a defect): repro/fault-localization now consume the optional-insert budget PRE-build, so cap-tight cycles may clamp a post-build scan that previously ran ('security-scan stopped running' appearance = correct bugfix priority, not a regression).",
+  "connects_to": [
+    "docs/incidents/2026-08-24-anchor-order-splice-misslot.md",
+    "go/internal/core/resume_transition.go",
+    "go/internal/core/routing_dispatch.go",
+    "go/internal/phasespec/routing.go"
+  ],
+  "created_at": "2026-08-24T08:30:00Z"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "continuation-release-cli-authority-gate",
+  "kind": "bug",
+  "title": "evolve continuation release has NO authority gate \u2014 any Bash-capable process (incl. in-cycle agents) can drop a live scope's binding, which the defect-ledger gate treats as anti-tamper lineage evidence",
+  "summary": "Alignment-audit finding (ADR-0089 gap #2): cmd_continuation.go's release subcommand ships with no operator flag, no confirmation, no env gate \u2014 unlike sibling sensitive surfaces (reset-sha -operator, EVOLVE_SHIP_AUTO_CONFIRM). The phase guard blocks in-process Agent/Task only, not Bash invocations of the evolve binary; the registry's 'orchestrator-side only' authority invariant (ADR-0085, cycle-1285 anti-tamper) is silently widened. A lane agent dropping its own scope's binding erases lineage the defect-ledger gate depends on.",
+  "root_cause": "The CLI was added (cycle-1515) after ADR-0089's acceptance; the authority model the audits demanded for retirement actions was applied to VerifiableBy execution debates but not to the new operator surface.",
+  "fix": "Gate the release subcommand like its siblings: require -operator (or EVOLVE_OPERATOR_CONFIRM=1), refuse when a live cycle lease exists for the scope's lane unless -force, and log the release into the ledger (who/when/why) so lineage erasure is itself evidenced. Red-first: ungated invocation refuses; gated succeeds; ledger entry pinned.",
+  "files": [
+    "go/cmd/evolve/cmd_continuation.go:104-144",
+    "go/internal/continuation/registry.go (authority comment)",
+    "docs/architecture/adr/0089 (follow-up note)"
+  ],
+  "acceptance": [
+    "Ungated release refuses with guidance; -operator path succeeds and ledger-records.",
+    "Live-lease scope refuses without -force.",
+    "go vet + suites green."
+  ],
+  "connects_to": [
+    "ADR-0085/0089 authority invariant",
+    "cycle-1285 anti-tamper lineage",
+    "the H1 authority-model audit lineage (1496/1507)"
+  ],
+  "priority": "high",
+  "weight": 0.85,
+  "created_at": "2026-08-18T17:30:00Z",
+  "notes": "Filed from the 3-agent alignment audit. The audits that FAILed lanes twice for missing authority models would fail this CLI too \u2014 apply the same standard to console-built surfaces."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "submitverify-success-path-unobservable",
+  "kind": "bug",
+  "title": "A submit-verify re-send that SUCCEEDS leaves no durable trace — bridge stderr for a phase dispatch is discarded on the success path (engine.go:531-545), so the guard is loud only when it FAILS to recover, and the fix's own effectiveness cannot be measured",
+  "summary": "Found while trying to verify #474 live (wave batch-20260820a-verify). The submit-verify guard added in #474 announces itself on stderr — re-send attempts, the agy 'declares no input-line marker' skip, capture failures, resend-budget exhaustion. But in Engine.Launch the SUCCESS path returns at engine.go:534 (`return resp, nil`) BEFORE the stderr persistence at engine.go:544-545, which writes <agent>-launch-error.txt only on the failure path. Empirically confirmed on cycles 1529/1530: driver-prefixed bridge lines appear in the batch log ONLY during preflight boot probes (lines 42-49); after lane dispatch begins (line 60) not one appears, and a grep over the entire .evolve tree finds no guard output anywhere. The agy router for cycle-1530 exited 0 after 67s — it necessarily executed the empty-inputLineMarker early return and emitted its line, and that line was discarded. CONSEQUENCE: the exact case operators most need to see — the guard DETECTED a parked prompt and RECOVERED it — is invisible, because a successful recovery makes the phase succeed, which discards the evidence. The stall class (cycles 1505/1510/1517/1526) can therefore keep occurring at the same rate with the fix silently absorbing it, and nobody can tell.",
+  "root_cause": "Two mechanisms compound. (1) Bridge-authored deps.Stderr for a phase dispatch is persisted ONLY on the failure path (engine.go:536-545, the R3.6 'bridge-launch-validation-stderr-lost' fix, which was scoped to launch failures). (2) The guard writes exclusively to stderr and to nothing durable — <phase>-interactions.ndjson, which DOES persist regardless of outcome and already carries a `result` field (live example from cycle-1530: {\"kind\":\"auto_respond\",...,\"result\":\"prompt_cleared\"}), receives no submit-verify record. The nudge interaction.Event built at driver_tmux_repl.go:859-863 carries Kind/Phase/Cycle/Trigger/Payload and drops verifySubmitted's return value entirely — both call sites discard it.",
+  "fix": "Give submit-verify a durable, outcome-independent record instead of relying on stderr surviving. Thread verifySubmitted's return (0 = clean-or-inert, 1..2 = recovered after N Enters, max = wedged) into the interaction record: at the nudge site populate the existing Event (driver_tmux_repl.go:859) with the resend count and a result of `submitted_first_try` | `submitted_after_resend` | `wedged` | `not_verified`; at the prompt site emit an equivalent event so prompt-delivery recovery is recorded too. Reuse the existing interaction sink — do NOT add a second store, and do NOT widen engine.go's stderr persistence to the success path (that would dump every driver's chatter into every run dir). Red-first: a fixture whose pane is parked then clears asserts an interactions.ndjson record with result=submitted_after_resend and the resend count; a clean pane asserts submitted_first_try; an empty inputLineMarker asserts not_verified. Guard: no new file, and a run whose guard never engages is byte-identical to today apart from the added record.",
+  "files": [
+    "go/internal/bridge/engine.go:531-545 (success returns before stderr persistence — the mechanism)",
+    "go/internal/bridge/driver_tmux_submitverify.go (verifySubmitted's return value, currently discarded)",
+    "go/internal/bridge/driver_tmux_repl.go:859-863 (the nudge interaction.Event — the natural carrier)",
+    "go/internal/interaction/interaction.go:81+ (Event; already has Result/Trigger semantics)",
+    ".evolve/runs/cycle-1530/router-interactions.ndjson (live proof this sink persists on success)"
+  ],
+  "acceptance": [
+    "A recovered re-send produces a durable interactions.ndjson record naming the outcome and the resend count.",
+    "A clean submission and an unverifiable one are DISTINGUISHABLE in that record (the current silence conflates them).",
+    "No change to engine.go's stderr persistence; no second store; no new artifact file.",
+    "A run whose guard never engages is byte-identical to today apart from the added record.",
+    "go vet + bridge suites + -race green."
+  ],
+  "connects_to": [
+    "PR #474 (the guard this makes measurable) — reviewer finding F3, which I deferred as 'wider than these prescriptions'; that judgment was wrong: it left the success path unobservable",
+    "retro-prompt-delivery-stall (cycles 1505/1510/1517/1526) — the class whose recurrence rate we cannot currently measure",
+    "agent-router-token-resolver-nil (0.65) — same shape: a signal produced and then dropped before anything durable"
+  ],
+  "priority": "high",
+  "weight": 0.84,
+  "created_at": "2026-08-19T19:30:00Z",
+  "notes": "Filed from a live verification attempt, not from code reading: the wave was launched specifically to observe #474 firing and could not, which is the strongest possible evidence for the gap. NOTE the asymmetry this creates today — a phase that FAILS persists the guard's lines via <agent>-launch-error.txt (the case that matters most is covered), so this is a measurability defect rather than a blindness defect. Do not 'fix' it by persisting all stderr on success."
+}

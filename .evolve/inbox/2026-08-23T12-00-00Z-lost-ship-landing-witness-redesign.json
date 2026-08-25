@@ -1,0 +1,26 @@
+{
+  "id": "lost-ship-closeout-universal-landing-witness",
+  "kind": "feature",
+  "title": "Universal landing witness for the lost-landing floor — REDESIGN required: the excised draft cleared the integrity floor on a bare os.Stat of an agent-writable gitignored file",
+  "summary": "Re-filed 2026-08-23 after the cycle-1546 salvage (PR #486) deliberately EXCISED the first draft. The task itself is valid: detectLostLanding treats ship-binding.json presence as the sole landing witness, while the ship state machine has more than one successful exit (SHIPPED_VIA_BUILD, clean no-op completion), so those exits are undefended against false landing-lost flags. The DRAFT was rejected by its own cycle's audit: d22c3331 (HIGH) — landingWitness cleared the floor on a bare os.Stat of an agent-writable, gitignored ship-binding.json, contents never read, symlinks followed; a planted file disarms the integrity floor. d6ed7e1d (HIGH) — worktreeShipBinding joined unvalidated active_worktree from cycle-state.json into a stat path with no absoluteness/containment check. The cycle's lessons digest said: do not defer — EXCISE. It was excised.",
+  "root_cause": "The witness question is real; the draft answered it by trusting an artifact the graded agent can write. Any witness that clears an INTEGRITY floor must be sourced from something the agent cannot forge: read + validate the binding's content against the audit-bound tree SHA (the ship-binding.json already carries audit_bound_tree_sha and commit_sha — verify the commit exists and its tree matches), or witness from the git side (the landing commit reachable from origin/main), never from file presence.",
+  "fix": "Redesign per the constraint above, then land WITH acs/cycle1544 predicates 001-005 restored (they were removed from the suite in PR #486 explicitly so they could travel with this task — see the suite's salvage note). The draft code and its tests are PRESERVED in the salvage snapshot: branch cycle-42824668-1546, snapshot b9118b55febd235aa6367bf1de62ce2ae45b9b13, base 9b4dcd593781 (files: internal/core/lost_landing_floor.go +92, landing_witness_test.go, docs/architecture/lost-landing-witness.md, eval lost-ship-closeout-universal-landing-witness.md). Salvage the TEST INTENT from there; do not salvage the os.Stat witness.",
+  "files": [
+    ".evolve/worktrees/cycle-42824668-1546 (preserved draft; snapshot b9118b55)",
+    "go/acs/cycle1544/predicates_test.go (salvage note names the 5 predicates this task must restore)",
+    "go/internal/core/lost_landing_floor.go (the floor being extended; PR #482 original)",
+    ".evolve/runs/cycle-1546/defect-ledger.json (d22c3331, d6ed7e1d full text)"
+  ],
+  "acceptance": [
+    "A witness can clear the lost-landing floor ONLY from evidence the graded agent cannot forge — pinned by a test in which a planted ship-binding.json does NOT clear the floor.",
+    "SHIPPED_VIA_BUILD and clean-no-op exits are never flagged landing-lost (the draft's AC2, restored).",
+    "The witness is cycle-owned, never repo-wide (the draft's AC4: sibling HEAD movement never credits this cycle).",
+    "acs/cycle1544 predicates 001-005 are restored and green.",
+    "d22c3331 and d6ed7e1d are FIXED dispositions, not DEFERRED."
+  ],
+  "connects_to": ["PR #486 (the salvage that excised the draft)", "PR #482 (the floor being extended)", "lost-ship-dossier-evidence (coupled consumer)"],
+  "priority": "high",
+  "weight": 0.85,
+  "created_at": "2026-08-23T12:00:00Z",
+  "notes": "Continuation binding released 2026-08-23 (registry warned: no item file existed to carry the salvage pointer — THIS file is that pointer). Do not re-adopt the old worktree wholesale: it also carries the pre-#486 acs suite and the out-of-scope retro test."
+}

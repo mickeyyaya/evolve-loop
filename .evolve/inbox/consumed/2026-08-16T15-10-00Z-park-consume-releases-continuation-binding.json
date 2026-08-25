@@ -31,6 +31,6 @@
     "at": "2026-08-18T08:00:00Z",
     "via": "console-manual",
     "cycle": "1515",
-    "resolution": "LANDED as cycle ship 868b8cf8 (23 files/+2462): ADR-0089 continuation-retirement + live-scope guard, evolve continuation CLI (cmd_continuation.go), planner/adoption live-item guards, registry release-on-park/consume (inboxmover continuation_release/retire), ship-side consume_registry_release. In-commit self-consumption did NOT fire on this ship (see acs verdict) \u2014 recorded as further warn-ship-consumption-gap evidence."
+    "resolution": "LANDED as cycle ship 868b8cf8 (23 files/+2462): ADR-0089 continuation-retirement + live-scope guard, evolve continuation CLI (cmd_continuation.go), planner/adoption live-item guards, registry release-on-park/consume (inboxmover continuation_release/retire), ship-side consume_registry_release. In-commit self-consumption did NOT fire on this ship (see acs verdict) \u2014 recorded as further warn-ship-consumption-gap evidence. CORRECTION 2026-08-18 (alignment audit): the no-consume was NOT the warn-ship gap (verdict was PASS red=0) \u2014 it was the triage-decomposition id-namespace mismatch, now precisely filed as consumption-id-linkage-lane-scope-union 0.86."
   }
 }

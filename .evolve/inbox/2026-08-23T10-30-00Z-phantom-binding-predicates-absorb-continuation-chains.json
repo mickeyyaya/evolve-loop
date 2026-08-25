@@ -1,0 +1,32 @@
+{
+  "id": "phantom-binding-predicates-absorb-continuation-chains",
+  "kind": "bug",
+  "title": "An ACS predicate binding BY NAME to a test that no longer resolves reds forever, and on a continuation chain that red is ABSORBING: the lane can never ship, every adoption re-inherits the contradiction (caused 5 of the 8 FAILs in the 1539-1546 streak's dominant class)",
+  "summary": "CONFIRMED 2026-08-23 by console trace of the 1539-1546 streak. cycle-1544 wrote internal/core/worktree_base_test.go plus acs/cycle1544 predicates binding by NAME (assertDefaultSuiteTestsPass greps `--- PASS: <name>` from a -run-narrowed go test). cycle-1546 adopted the continuation and RENAMED two of the three bound tests while greening its own acs/cycle1546 suite 5/5. The inherited suite then demanded phantom names: go test -run prints 'no tests to run', the predicate reds with evidence 'binding test <name> did NOT pass (no tests to run)', EGPS blocks the ship, the cycle FAILs, the worktree is preserved, the continuation re-arms \u2014 and the next cycle inherits both suites and the same contradiction. acs-verdict.json for 1546: own lane 5/5 green, ancestor lane red_count=2, verdict FAIL. Third instance of the class: cycle-1532's TDD predicate bound to TestArtifactTimeoutTransient_LivePaneIsFamilyScopedNotHardCodedText, never created (recorded 2026-08-21).",
+  "root_cause": "Identity by NAME across a package boundary with no resolution check, combined with the anti-gaming design that a missing binding test MUST red (deleting a test to green a gate must not work \u2014 so 'skip if missing' is NOT an acceptable fix). The gap is that a phantom-name red is UNACTIONABLE where it surfaces: it reaches EGPS as a bare red_count at audit time, after the builder is gone, and nothing tells anyone WHICH names went stale or that the cure is a 2-line binding repoint. The 2026-08-23 salvage fixed instance #2 by hand in exactly that way (PR #486).",
+  "fix": "Two composable halves, anti-gaming preserved in both. (A) IN-CYCLE, actionable: when the ACS run reds with 'no tests to run' evidence, classify it as phantom-binding (distinct from a FAILING binding test) and compose a builder correction naming the exact phantom names and the packages searched \u2014 reusing the #480 composeCorrection machinery, so the builder still in the cycle repoints or restores the names instead of the cycle dying. The evidence string is already produced by the predicates' own assert helper; the classification is a substring match on the recorded evidence, not new parsing of arbitrary Go. (B) AUTHORING-TIME belt: extend `evolve eval quality-check` (or the build self-check) to run `go test -list` for every name the staged predicates demand against the CURRENT tree, so a rename that orphans a binding reds IN BUILD with the name list, while the builder can still fix it. Note (B) alone is insufficient \u2014 bindings break LATER via rename in continuation cycles, which is exactly what happened here; (A) is the half that breaks the absorbing state.",
+  "files": [
+    ".evolve/runs/cycle-1546/acs-verdict.json (lanes[]: own 5/5 green, inherited red_count=2, evidence carries 'no tests to run')",
+    ".evolve/worktrees/cycle-42824668-1544/go/internal/core/worktree_base_test.go (the ORIGINAL names)",
+    ".evolve/worktrees/cycle-42824668-1546/go/internal/core/worktree_base_test.go (the RENAMED names)",
+    ".evolve/worktrees/cycle-42824668-1546/go/acs/cycle1544/predicates_test.go (the phantom demands, lines 182,200)",
+    "go/internal/core/retry_backoff.go + evalgate composeCorrection (#480 \u2014 the correction machinery half A reuses)",
+    "PR #486 (the hand-executed cure for instance #2: a 2-line binding repoint)"
+  ],
+  "acceptance": [
+    "An ACS red whose evidence contains 'no tests to run' is classified phantom-binding and composes a builder correction naming the exact phantom test names \u2014 asserted against the REAL cycle-1546 acs-verdict.json lanes structure, not a synthetic fixture.",
+    "A FAILING (existing) binding test still reds exactly as today \u2014 the anti-gaming property is pinned by a test in which the bound test exists and fails.",
+    "A continuation cycle that renames bound tests either gets an in-cycle correction (A) or a build-time red naming the orphans (B) \u2014 proven by driving the 1544->1546 rename shape end-to-end.",
+    "No 'skip if missing' path exists anywhere in the change."
+  ],
+  "connects_to": [
+    "pipeline-defect-infra-systemic (P0) \u2014 this is that halt's root cause, confirmed",
+    "PR #486 \u2014 the salvage that broke instance #2 by hand",
+    "correction-directive machinery from #480 \u2014 half (A) reuses it",
+    "cycle-1532 predicate-binding gap (recorded 2026-08-21, deliberately queued then) \u2014 instance #1 of the class"
+  ],
+  "priority": "high",
+  "weight": 0.6,
+  "created_at": "2026-08-23T10:30:00Z",
+  "notes": "Weight 0.95: this class produced the single largest identified share of the 8-cycle zero-ship streak (EGPS-red cycles 1541/1543/1544/1546 all carry it or its siblings), and it is ABSORBING \u2014 without intervention the same scope fails forever while burning a full cycle each time. The salvage (PR #486) cures the instance, not the class: the next rename in any continuation chain recreates it. Do NOT fix by skipping missing bindings \u2014 that is the gaming vector the red-on-missing design exists to block; fix by making the red actionable in-cycle. || 2026-08-23 HALF (A) DELIVERED, merged as PR #487: acssuite classifies phantom bindings at record time (Result.PhantomBindings; FailingTests as authority so truncation cannot fake one, partial shape covered) and the EGPS gate-block names the phantoms + the cure + the do-NOT-delete boundary. 12/12 mutations bite incl. end-to-end through audit Run. Anti-gaming pinned: verdict unchanged, red stays red. REMAINING: half (B) only \u2014 the authoring-time belt (build self-check runs `go test -list` for every name staged predicates demand against the CURRENT tree, so a rename orphaning a binding reds IN BUILD while the builder can still fix it). Weight may drop to ~0.6 at next triage: the absorbing state is broken (bindings released + the red is now self-curing via the directive); (B) is a belt, not the fix."
+}
