@@ -1,0 +1,103 @@
+{
+  "cycle": 1556,
+  "run_id": "01M0VNK30VWST5WVMMBF8X6WBY",
+  "goal": "Work ordinary high-value bug fixes from the inbox. EXCLUDE one item reserved for console work: transient-artifact-timeout-shortcircuit-the-silence-budget — do not select it. Prefer defects where a produced signal has no consumer, and prove each fix fires on the real production path, not only in unit tests. A bug-reproduction deliverable must land WITH its passing fix or carry t.Skip until fixed — a red test on main blocks every lane.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "FAIL",
+      "duration_ms": 2447456,
+      "started_at": "2026-08-25T05:19:43Z",
+      "ended_at": "2026-08-25T06:14:35Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 18,
+        "output": 2150,
+        "cache_read": 520662,
+        "cache_write": 67932
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 502156,
+      "started_at": "2026-08-25T06:14:35Z",
+      "ended_at": "2026-08-25T06:22:57Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 62,
+        "output": 37521,
+        "cache_read": 3069704,
+        "cache_write": 131680
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "scout|infra-error|d7f21d8c376d",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase \"scout\" correction 1 dispatch failed: scout: bridge: bridge: launch exit=81: artifact-timeout: phase=scout waited=900s interval=300s extends_used=2 max_extends=6 last_review=pause liveness=idle "
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1556",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2949612,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 2447456,
+    "by_archetype_ms": {
+      "control": 502156,
+      "plan": 2447456
+    },
+    "total_tokens": {
+      "input": 80,
+      "output": 39671,
+      "cache_read": 3590366,
+      "cache_write": 199612
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 62,
+        "output": 37521,
+        "cache_read": 3069704,
+        "cache_write": 131680
+      },
+      "plan": {
+        "input": 18,
+        "output": 2150,
+        "cache_read": 520662,
+        "cache_write": 67932
+      }
+    },
+    "wasted_tokens": {
+      "input": 80,
+      "output": 39671,
+      "cache_read": 3590366,
+      "cache_write": 199612
+    },
+    "cache_hit_ratio": 0.9999777186455387,
+    "hot_phase_count": 0
+  }
+}
