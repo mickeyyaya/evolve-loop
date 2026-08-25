@@ -7,7 +7,11 @@ package continuation
 // defect-ledger gate's out-of-band check forever (cycles 1412/1418 — the
 // absorbing-FAIL state).
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestDeleteRegistryEntry_RemovesOnlyTheNamedScope(t *testing.T) {
 	root := t.TempDir()
@@ -76,5 +80,28 @@ func TestDeleteRegistryEntryIfCycle_ReleasesOnlyTheNamedAncestor(t *testing.T) {
 	}
 	if _, ok, _ := ReadRegistryEntry(root, "todo-42"); ok {
 		t.Error("matching binding survived its conditional release")
+	}
+}
+
+// In-package pin for AppendReleased (apicover-enforce): the ONE released-
+// pointer shape every consumption route writes — prior entries preserved,
+// host paths redacted, reason recorded.
+func TestAppendReleased(t *testing.T) {
+	home, herr := os.UserHomeDir()
+	if herr != nil {
+		t.Skipf("no home dir: %v", herr)
+	}
+	doc := map[string]any{"released_continuations": []any{map[string]any{"reason": "earlier"}}}
+	got := AppendReleased(doc, Continuation{Branch: "b", SnapshotSHA: "s", Cycle: 3,
+		Worktree: filepath.Join(home, "wt")}, "test-route")
+	if len(got) != 2 {
+		t.Fatalf("entries = %d, want prior + new", len(got))
+	}
+	entry, _ := got[1].(map[string]any)
+	if entry["reason"] != "test-route" || entry["branch"] != "b" {
+		t.Fatalf("entry = %+v", entry)
+	}
+	if wt, _ := entry["worktree"].(string); wt != "~/wt" {
+		t.Fatalf("worktree %q, want the operator home collapsed to ~ (audit cycle-1507 M1)", wt)
 	}
 }
