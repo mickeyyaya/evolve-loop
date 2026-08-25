@@ -16,7 +16,8 @@ import (
 
 func runTmuxCLI(t *testing.T, fx launchFixture, cli string, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(lookup)})
+	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(lookup),
+		CaptureBaseline: zeroBaselineCapture}) // harness seeds model mid-session writes
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args(cli, extra...), nil, &stdout, &stderr)
 	return code, stderr.String()

@@ -134,10 +134,10 @@ func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(nil),
-	})
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		LookupEnv:       mapLookup(nil),
+		CaptureBaseline: zeroBaselineCapture})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var stdout, stderr bytes.Buffer

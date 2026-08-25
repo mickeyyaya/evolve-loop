@@ -18,12 +18,12 @@ func TestNewCompletionDetector_DefaultsToArtifact(t *testing.T) {
 	cfg := &Config{Artifact: "/tmp/x"}
 	lp := tmuxLaunch{promptMarker: "❯"}
 	for _, mode := range []string{"", "artifact", "bogus-typo"} {
-		if _, ok := newCompletionDetector(mode, cfg, Deps{}, lp).(*artifactDetector); !ok {
+		if _, ok := newCompletionDetector(mode, cfg, Deps{}, lp, artifactBaseline{}).(*artifactDetector); !ok {
 			t.Errorf("mode %q: want *artifactDetector (default-safe), got %T",
-				mode, newCompletionDetector(mode, cfg, Deps{}, lp))
+				mode, newCompletionDetector(mode, cfg, Deps{}, lp, artifactBaseline{}))
 		}
 	}
-	if _, ok := newCompletionDetector("stdout", cfg, Deps{}, lp).(*stdoutDetector); !ok {
+	if _, ok := newCompletionDetector("stdout", cfg, Deps{}, lp, artifactBaseline{}).(*stdoutDetector); !ok {
 		t.Error("mode \"stdout\": want *stdoutDetector")
 	}
 }

@@ -93,10 +93,10 @@ func (f *fakeTmux) sentContains(sub string) bool {
 func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(lookup),
-	})
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		LookupEnv:       mapLookup(lookup),
+		CaptureBaseline: zeroBaselineCapture})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
 	return code, stderr.String()

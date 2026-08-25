@@ -174,6 +174,12 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 	d := extraDeps
 	d.Tmux = tmux
 	d.Sleep = func(time.Duration) {}
+	if d.CaptureBaseline == nil {
+		// Harness default ONLY: pre-seeded artifacts stand in for mid-session
+		// writes. A stale-pre-dispatch scenario must inject the REAL capture
+		// explicitly (see the baseline wiring test).
+		d.CaptureBaseline = zeroBaselineCapture
+	}
 	d.Reviewer = rev
 	eng := newTestEngine(d)
 	var stdout, stderr bytes.Buffer
