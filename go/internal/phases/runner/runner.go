@@ -520,6 +520,34 @@ func (b *BaseRunner) Name() string { return b.hooks.PhaseName() }
 //
 // Bridge errors and missing-prompts errors short-circuit to a FAIL
 // response with the error attached as a diagnostic.
+// artifactSnapshot is the (size, mtime) identity of the canonical artifact at
+// one instant — the same key the bridge's stability window and baseline use,
+// so the runner's and the bridge's notion of "unchanged" cannot drift.
+type artifactSnapshot struct {
+	size    int64
+	modTime time.Time
+}
+
+// statArtifactSnapshot snapshots path if it is a non-empty regular file.
+func statArtifactSnapshot(path string) (artifactSnapshot, bool) {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() == 0 {
+		return artifactSnapshot{}, false
+	}
+	return artifactSnapshot{size: fi.Size(), modTime: fi.ModTime()}, true
+}
+
+// artifactUnchangedSince reports whether path is still byte-identical (by the
+// size+mtime key) to the given pre-dispatch snapshot. Any error reads as
+// changed — fail-open toward the pre-existing reconcile behavior.
+func artifactUnchangedSince(path string, snap artifactSnapshot) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	return fi.Size() == snap.size && fi.ModTime().Equal(snap.modTime)
+}
+
 func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	start := b.nowFn()
 	phase := b.hooks.PhaseName()
@@ -584,6 +612,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 
 	prompt := b.hooks.ComposePrompt(body, req)
 	artifactPath := filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
+	// Pre-dispatch snapshot of the canonical artifact — the runner-side twin of
+	// the bridge's artifactBaseline (cycle-1550, both doors of one room): the
+	// reconcile-on-teardown arm below must never resurrect a byte-identical
+	// leftover from a prior attempt as this session's verdict.
+	preDispatch, hadPreDispatch := statArtifactSnapshot(artifactPath)
 	profileDir := filepath.Join(req.ProjectRoot, ".evolve", "profiles")
 	// Profile JSON files use the AGENT name (e.g., tdd-engineer.json,
 	// builder.json, auditor.json, retrospective.json) — NOT the phase
@@ -943,6 +976,18 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			// passes context.Background()). The ctx-aware bail lives on the clean-exit path
 			// below, where the agent exited 0 and nothing more is coming.
 			res, verr := b.verifyReconcileDeliverable(context.WithoutCancel(ctx), phase, roots)
+			// The stale-leftover gate (cycle-1550): a deliverable byte-identical
+			// to the pre-dispatch snapshot is the PRIOR attempt's report — well-
+			// formed, cycle-scoped challenge token and all — and reconciling it
+			// would re-grade a stale verdict as this session's work. Refuse BOTH
+			// reconcile doors (the well-formed fall-through and the ACS floor)
+			// and let the optional/fatal arms handle it as untrustworthy, with
+			// the cause on record.
+			staleLeftover := hadPreDispatch && artifactUnchangedSince(artifactPath, preDispatch)
+			if staleLeftover && verr == nil && res.OK {
+				verr = fmt.Errorf("deliverable at %s is byte-identical to the pre-dispatch leftover (a prior attempt's report) — reconcile refused (cycle-1550)", artifactPath)
+				res = deliverable.Result{}
+			}
 			switch {
 			case verr == nil && res.OK:
 				// Deliverable survived the timeout — fall through to Classify.
@@ -1002,7 +1047,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 						res.ArtifactPath, res.Content = artifactPath, string(data)
 					}
 				}
-				if acsFloorRescues(phase, req.Workspace, res.Content) {
+				if !staleLeftover && acsFloorRescues(phase, req.Workspace, res.Content) {
 					reconciled = true
 					reconciledRes = res
 					acsFloorRescued = true
@@ -1016,6 +1061,11 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 				msg := bridgeErr.Error()
 				if verr == nil && len(res.Violations) > 0 {
 					msg = fmt.Sprintf("%s; deliverable not trustworthy: %s", msg, res.Violations[0].Message)
+				} else if verr != nil {
+					// Includes the stale-leftover refusal (cycle-1550) — the
+					// forensic dig must see WHY reconcile declined, not only
+					// that the bridge timed out.
+					msg = fmt.Sprintf("%s; deliverable not trustworthy: %v", msg, verr)
 				}
 				// [VERDICT-FORENSIC] The retro's #1 ask (cycle-3): a teardown default-FAIL
 				// today records NO reasoning, so a false-FAIL is a 30-minute forensic dig.

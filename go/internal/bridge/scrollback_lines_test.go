@@ -29,6 +29,7 @@ func runScrollbackPhase(t *testing.T, scrollbackLines int) []int {
 	}
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	eng := newTestEngine(Deps{
+		CaptureBaseline: zeroBaselineCapture, // harness seeds model mid-session writes
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		ScrollbackLines: scrollbackLines,

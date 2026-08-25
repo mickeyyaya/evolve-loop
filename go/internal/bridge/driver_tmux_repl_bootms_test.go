@@ -28,11 +28,11 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	var onBoot []int64
 	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(nil),
-		OnBoot:    func(ms int64) { onBoot = append(onBoot, ms) },
-	})
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		LookupEnv:       mapLookup(nil),
+		OnBoot:          func(ms int64) { onBoot = append(onBoot, ms) },
+		CaptureBaseline: zeroBaselineCapture})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI:          "claude-tmux",
@@ -67,11 +67,11 @@ func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
 	tmux := &fakeTmux{}
 	var onBoot []int64
 	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(nil),
-		OnBoot:    func(ms int64) { onBoot = append(onBoot, ms) },
-	})
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		LookupEnv:       mapLookup(nil),
+		OnBoot:          func(ms int64) { onBoot = append(onBoot, ms) },
+		CaptureBaseline: zeroBaselineCapture})
 
 	resp, _ := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI:          "claude-tmux",
@@ -109,11 +109,11 @@ func TestEngineLaunch_BootMS_ZeroOnWarmNamedSession(t *testing.T) {
 	}
 	var onBoot []int64
 	eng := NewEngine(Deps{
-		Tmux:      tmux,
-		Sleep:     func(time.Duration) {},
-		LookupEnv: mapLookup(nil),
-		OnBoot:    func(ms int64) { onBoot = append(onBoot, ms) },
-	})
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		LookupEnv:       mapLookup(nil),
+		OnBoot:          func(ms int64) { onBoot = append(onBoot, ms) },
+		CaptureBaseline: zeroBaselineCapture})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI:          "claude-tmux",

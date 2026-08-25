@@ -21,6 +21,7 @@ func covDeps() Deps {
 		Now:               time.Now,
 		Tmux:              &fakeTmux{},
 		Sleep:             func(time.Duration) {},
+		CaptureBaseline:   zeroBaselineCapture, // where reached: harness seeds model mid-session writes; inert for pre-dispatch error-path tests
 	}
 }
 

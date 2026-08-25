@@ -31,6 +31,13 @@ func runTmuxOnStopReview(t *testing.T, fx launchFixture, tmux *fakeTmux, rev Sto
 	d := extraDeps
 	d.Tmux = tmux
 	d.Sleep = func(time.Duration) {}
+	if d.CaptureBaseline == nil {
+		// Harness default ONLY: pre-seeded artifacts stand in for mid-session
+		// writes. A test whose scenario is a STALE pre-dispatch artifact must
+		// pass CaptureBaseline: captureArtifactBaseline explicitly (see
+		// TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting).
+		d.CaptureBaseline = zeroBaselineCapture
+	}
 	d.Reviewer = rev
 	d.OnStopReview = spy
 	eng := newTestEngine(d)
