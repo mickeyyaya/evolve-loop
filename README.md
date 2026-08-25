@@ -338,7 +338,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 
 ## Version
 
-**Current (v22.19)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
+**Current (v22.20)** — full release history in [CHANGELOG.md](CHANGELOG.md). Releases are cut via `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
@@ -373,6 +373,7 @@ If you find a gaming pattern the framework didn't catch, please file an issue wi
 | v22.17 | Aug 13 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v22.18 | Aug 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v22.19 | Aug 18 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v22.20 | Aug 25 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
