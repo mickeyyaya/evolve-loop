@@ -39,6 +39,7 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -231,4 +232,115 @@ func TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause(t *tes
 				"bridge boundary, leaving an exhausted retro with a bare artifact timeout\n  got: %s", want, got)
 		}
 	}
+}
+
+// GROUND TRUTH beats the pane heuristic (v22.20.0 release red): a pane that
+// LOOKS parked while a post-dispatch deliverable is already on disk means the
+// submission landed — a REPL that answers by side effect alone never redraws
+// its input line. The wedged short-circuit must yield to the artifact and let
+// the normal wait complete; only a parked pane with NO deliverable keeps the
+// fast-fail (pinned by the AC-001 positive above).
+func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
+	cfg := fixtureConfig(t)
+	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here"}}
+	promptBody, rerr := os.ReadFile(cfg.PromptFile)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	tm := &parkedButDeliveringTmux{FakeTmuxController: base, artifact: cfg.Artifact,
+		parkedText: firstNonEmptyLine(string(promptBody))}
+	deps := fixtureDeps(tm)
+	var stderr bytes.Buffer
+	deps.Stderr = &stderr
+
+	code, err := runTmuxREPL(context.Background(), cfg, deps, tmuxLaunch{
+		name: "claude-tmux", session: "parked-delivered", launchCmd: "claude",
+		promptMarker: tmuxPromptMarkerDefault, inputLineMarker: tmuxPromptMarkerDefault, bootIntervalS: 1,
+	})
+	if err != nil || code != ExitOK {
+		t.Fatalf("runTmuxREPL = (%d, %v), want (%d, nil) — a delivered artifact must beat the parked-pane "+
+			"heuristic; stderr=%s", code, err, ExitOK, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "submission evidently landed") {
+		t.Errorf("the ground-truth override must be loud; stderr=%s", stderr.String())
+	}
+}
+
+// parkedButDeliveringTmux shows a forever-parked input line AND writes the
+// artifact when the prompt is pasted — the side-effect-answering REPL shape.
+type parkedButDeliveringTmux struct {
+	*FakeTmuxController
+	artifact   string
+	parkedText string
+	pasted     bool
+}
+
+func (p *parkedButDeliveringTmux) PasteBuffer(ctx context.Context, session string) error {
+	err := p.FakeTmuxController.PasteBuffer(ctx, session)
+	p.pasted = true
+	_ = os.WriteFile(p.artifact, []byte("delivered\n"), 0o644)
+	return err
+}
+
+func (p *parkedButDeliveringTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
+	out, err := p.FakeTmuxController.CapturePane(ctx, session, scrollback)
+	if p.pasted {
+		return unsubmittedPane(p.parkedText), err
+	}
+	return out, err
+}
+
+// The belt's baseline check is load-bearing: a parked pane with only the PRIOR
+// attempt's stale artifact on disk (byte-identical to the pre-dispatch
+// snapshot) is a genuine delivery failure — the ground-truth override must NOT
+// fire on leftovers, or the wedged fast-fail re-opens the stale re-grade loop.
+func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
+	cfg := fixtureConfig(t)
+	if err := os.WriteFile(cfg.Artifact, []byte("stale prior report\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-10 * time.Minute)
+	if err := os.Chtimes(cfg.Artifact, old, old); err != nil {
+		t.Fatal(err)
+	}
+	promptBody, rerr := os.ReadFile(cfg.PromptFile)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked"}}
+	tm := &parkedNeverDeliveringTmux{FakeTmuxController: base, parkedText: firstNonEmptyLine(string(promptBody))}
+	deps := fixtureDeps(tm)
+	deps.CaptureBaseline = captureArtifactBaseline // REAL capture: the stale file becomes the baseline
+	var stderr bytes.Buffer
+	deps.Stderr = &stderr
+
+	code, err := runTmuxREPL(context.Background(), cfg, deps, tmuxLaunch{
+		name: "claude-tmux", session: "parked-stale", launchCmd: "claude",
+		promptMarker: tmuxPromptMarkerDefault, inputLineMarker: tmuxPromptMarkerDefault, bootIntervalS: 1,
+	})
+	if err != nil || code != ExitArtifactTimeout {
+		t.Fatalf("runTmuxREPL = (%d, %v), want (%d, nil) — a stale leftover must not defuse the wedged "+
+			"fast-fail; stderr=%s", code, err, ExitArtifactTimeout, stderr.String())
+	}
+}
+
+// parkedNeverDeliveringTmux: forever-parked input line, writes nothing.
+type parkedNeverDeliveringTmux struct {
+	*FakeTmuxController
+	parkedText string
+	pasted     bool
+}
+
+func (p *parkedNeverDeliveringTmux) PasteBuffer(ctx context.Context, session string) error {
+	err := p.FakeTmuxController.PasteBuffer(ctx, session)
+	p.pasted = true
+	return err
+}
+
+func (p *parkedNeverDeliveringTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
+	out, err := p.FakeTmuxController.CapturePane(ctx, session, scrollback)
+	if p.pasted {
+		return unsubmittedPane(p.parkedText), err
+	}
+	return out, err
 }
