@@ -86,19 +86,34 @@ func TestFindLatestAudit_EmptyRunID_ReturnsLatest(t *testing.T) {
 	}
 }
 
-// TestFindLatestAudit_RunIDNoMatch_FallsBackToLatest: runID set but no entry
-// carries it (legacy/unstamped) → fall back to the latest auditor entry (zero
-// regression for pre-S4 ledgers).
-func TestFindLatestAudit_RunIDNoMatch_FallsBackToLatest(t *testing.T) {
+// TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind: runID set but every
+// auditor entry is unstamped → hard integrity stop (NO_AUDITOR), never a bind.
+// FLIPPED 2026-08-26 from _FallsBackToLatest: the old pin's "zero regression
+// for pre-S4 ledgers" premise is dead (every current recorder stamps run_id),
+// and cycle-1571 proved the fallback is the H3 fail-open hole — a FAILed
+// cycle's ship bound cycle-1570's audit and returned AUDIT_BINDING_HEAD_MOVED
+// instead of this run's FAIL, burning a re-audit slot; had the foreign entry's
+// git_head matched HEAD, the FAILed cycle would have SHIPPED on a sibling's
+// PASS. "This run produced no independent review" is an integrity stop, not a
+// recoverable lookup miss.
+func TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind(t *testing.T) {
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		`{"role":"auditor","kind":"agent_subprocess","git_head":"shaOld"}`+"\n"+
 			`{"role":"auditor","kind":"agent_subprocess","git_head":"shaNew"}`+"\n")
-	e, err := findLatestAudit(ledger, "Z")
-	if err != nil {
-		t.Fatalf("findLatestAudit: %v", err)
-	}
-	if e.GitHEAD != "shaNew" {
-		t.Errorf("no-match fallback got git_head=%q, want latest shaNew", e.GitHEAD)
-	}
+	_, err := findLatestAudit(ledger, "Z")
+	wantShipErr(t, err, core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, "independent review")
+}
+
+// TestFindLatestAudit_ForeignRunOnly_RefusesBind pins cycle-1571's exact H3
+// shape: the only auditor entries belong to a DIFFERENT run (a sibling lane in
+// the same HEAD window). Binding them lets one cycle's ship gate be satisfied
+// by another cycle's audit; the error must name the refused foreign entry so
+// an operator can see what would have been bound.
+func TestFindLatestAudit_ForeignRunOnly_RefusesBind(t *testing.T) {
+	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
+	mustWrite(t, ledger,
+		`{"role":"auditor","kind":"agent_subprocess","run_id":"A","git_head":"shaA"}`+"\n")
+	_, err := findLatestAudit(ledger, "B")
+	wantShipErr(t, err, core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, "run A")
 }

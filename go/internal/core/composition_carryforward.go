@@ -65,7 +65,7 @@ const compositionArtifactDirName = "composition-artifacts"
 // pre-rebase audited state (what the bound audit reviewed). Nil (default)
 // keeps the composition fast path off — recovery behaves exactly as it does
 // today.
-func WithCompositionSnapshot(fn func(ctx context.Context, worktree string) (CompositionAuditSnapshot, error)) Option {
+func WithCompositionSnapshot(fn func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)) Option {
 	return func(o *Orchestrator) { o.compositionSnapshot = fn }
 }
 
@@ -113,7 +113,7 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 	if worktree == "" {
 		return false
 	}
-	snap, err := o.compositionSnapshot(ctx, worktree)
+	snap, err := o.compositionSnapshot(ctx, worktree, cs.RunID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: snapshot unavailable: %v; falling back to full re-audit\n", err)
 		return false
@@ -191,7 +191,7 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 	if worktree == "" {
 		return false
 	}
-	snap, err := o.compositionSnapshot(ctx, worktree)
+	snap, err := o.compositionSnapshot(ctx, worktree, cs.RunID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: snapshot unavailable: %v; falling back to full re-audit\n", err)
 		return false

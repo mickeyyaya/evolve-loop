@@ -32,7 +32,7 @@
 //     ledger.WriteCompositionVerdict call.
 //  2. Three new exported Options, each nil by default (⇒ the composition
 //     fast path never fires; recovery behaves exactly as it does today):
-//     - core.WithCompositionSnapshot(func(ctx, worktree string)
+//     - core.WithCompositionSnapshot(func(ctx, worktree, runID string)
 //     (core.CompositionAuditSnapshot, error)) — captures the lane's
 //     pre-rebase audited state.
 //     - core.WithCompositionGateRunner(func(ctx, worktree string)
@@ -177,7 +177,7 @@ type compositionCycleFixture struct {
 // three composition seams set from snap/gates/write.
 func newCompositionFixture(
 	repoDir string,
-	snap func(context.Context, string) (core.CompositionAuditSnapshot, error),
+	snap func(context.Context, string, string) (core.CompositionAuditSnapshot, error),
 	gates func(context.Context, string) map[string]string,
 	write func(string, core.CompositionVerdictInput) error,
 ) compositionCycleFixture {
@@ -223,7 +223,7 @@ func TestRecoverFromShipError_CleanRebase_WritesCompositionVerdictAndSkipsReaudi
 	}
 	var wrote []core.CompositionVerdictInput
 	fx := newCompositionFixture(dir,
-		func(context.Context, string) (core.CompositionAuditSnapshot, error) {
+		func(context.Context, string, string) (core.CompositionAuditSnapshot, error) {
 			return core.CompositionAuditSnapshot{
 				LaneAuditRef: "audit-artifact-sha",
 				AuditedBase:  "old-main-sha",
@@ -278,7 +278,7 @@ func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *te
 	dir, _ := initCleanRebaseRepoT(t)
 	var wrote []core.CompositionVerdictInput
 	fx := newCompositionFixture(dir,
-		func(context.Context, string) (core.CompositionAuditSnapshot, error) {
+		func(context.Context, string, string) (core.CompositionAuditSnapshot, error) {
 			return core.CompositionAuditSnapshot{
 				LaneAuditRef: "audit-artifact-sha",
 				AuditedBase:  "old-main-sha",
@@ -322,7 +322,7 @@ func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudi
 	}
 	var wrote []core.CompositionVerdictInput
 	fx := newCompositionFixture(dir,
-		func(context.Context, string) (core.CompositionAuditSnapshot, error) {
+		func(context.Context, string, string) (core.CompositionAuditSnapshot, error) {
 			return core.CompositionAuditSnapshot{
 				LaneAuditRef: "audit-artifact-sha",
 				AuditedBase:  "old-main-sha",
@@ -365,7 +365,7 @@ func TestRecoverFromShipError_CleanRebase_WriterFailureFallsBackToFullAudit(t *t
 		t.Fatalf("compute fixture patch-id: %v", err)
 	}
 	fx := newCompositionFixture(dir,
-		func(context.Context, string) (core.CompositionAuditSnapshot, error) {
+		func(context.Context, string, string) (core.CompositionAuditSnapshot, error) {
 			return core.CompositionAuditSnapshot{
 				LaneAuditRef: "audit-artifact-sha",
 				AuditedBase:  "old-main-sha",
