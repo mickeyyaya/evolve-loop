@@ -1,9 +1,9 @@
 {
   "name": "preliminary-study",
   "role": "preliminary-study",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "cli_fallback": [
-    "codex-tmux"
+    "claude-tmux"
   ],
   "model_tier_default": "deep",
   "allowed_tools": [

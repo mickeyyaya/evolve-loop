@@ -44,27 +44,29 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 	}
 }
 
-// TestRetrospectiveRoutesToClaudeDeep pins the 2026-08-14 operator-directed
-// reroute: Gemini 3.1 Pro (agy's deep tier) is the weakest deep-tier model in
-// the fleet, and retro post-mortems are reasoning-heavy — they run on
-// claude/deep (opus; gpt-5.6-sol is the alternative once codex returns from
-// quota bench). agy keeps memo (balanced → Gemini 3.7 Flash); its family-pure
-// tier map is untouched — this is a ROUTING change, never a cross-family map
-// entry (D7).
-func TestRetrospectiveRoutesToClaudeDeep(t *testing.T) {
+// TestRetrospectiveRoutesToCodexSol pins the 2026-08-26 operator-directed
+// reroute (supersedes the 2026-08-14 claude/deep pin, whose own comment named
+// this move: "gpt-5.6-sol is the alternative once codex returns from quota
+// bench" — codex returned, live-verified at 44% dispatch share with zero
+// quota halts). Retro post-mortems are the single biggest deep-tier consumer
+// (~40% of deep dispatches) and are NOT adversarial-vs-builder work, so they
+// lead the deep→sol arrangement: codex/deep (gpt-5.6-sol at xhigh), claude as
+// the explicit fallback (universal-fallback rule; agy stays banned from
+// fallback chains).
+func TestRetrospectiveRoutesToCodexSol(t *testing.T) {
 	loader := NewFromDir(realProfilesDir(t))
 	p, err := loader.Get("retrospective")
 	if err != nil {
 		t.Fatalf("load profile: %v", err)
 	}
-	if p.CLI != "claude-tmux" {
-		t.Fatalf("CLI=%q, want claude-tmux (operator model-strength directive)", p.CLI)
+	if p.CLI != "codex-tmux" {
+		t.Fatalf("CLI=%q, want codex-tmux (2026-08-26 deep-tier sol arrangement)", p.CLI)
 	}
-	if len(p.CLIFallback) != 0 {
-		t.Fatalf("CLIFallback=%v, want [] — claude is the universal fallback; a self-fallback is a dead entry", p.CLIFallback)
+	if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
+		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 	}
 	if p.ModelTierEnvelope == nil || p.ModelTierEnvelope.Default != "deep" {
-		t.Fatalf("envelope default must stay deep (opus): %+v", p.ModelTierEnvelope)
+		t.Fatalf("envelope default must stay deep (gpt-5.6-sol): %+v", p.ModelTierEnvelope)
 	}
 }
 
