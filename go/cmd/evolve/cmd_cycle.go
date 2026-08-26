@@ -55,6 +55,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -563,7 +564,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		// dispatches; at enforce it turns one unclassified fatal pane into a
 		// validated promotion (each promotion saves ~20 min of maxExtends
 		// burn on every future occurrence).
-		core.WithFailureAdviser(core.NewFailureAdvisor(br)),
+		core.WithFailureAdviser(core.NewFailureAdvisor(br, failureAdvisorOpts(projectRoot)...)),
 		// R9.1 triage-capacity: record shipped cycles' committed-floor counts
 		// into the rolling throughput window (state.json:triageThroughput) —
 		// the observed-capacity signal the R9.2 clamp bounds triage with.
@@ -959,4 +960,22 @@ func scopePathResolver(projectRoot, taskID string) string {
 		return ""
 	}
 	return st.Path
+}
+
+// failureAdvisorOpts resolves the failure advisor's dispatch identity from its
+// tracked profile (.evolve/profiles/failure-advisor.json), mirroring the
+// router advisor's WithProposerCLI wiring above. Review of the 2026-08-26
+// deep-tier arrangement found the advisor hardcoding claude-tmux/opus and
+// never reading its profile — dormant today (advise hook gates on
+// PhaseRecovery=enforce) but wrong the moment that stage flips. Absent or
+// unreadable profile keeps the compiled default (fail-open).
+func failureAdvisorOpts(projectRoot string) []core.FailureAdvisorOption {
+	// GitRoot pinned to projectRoot: resolvellm's git-root fallback shells
+	// `git rev-parse` from the PROCESS cwd, which in worktree/plane setups can
+	// resolve a DIFFERENT tree's profile than the one this cycle runs against.
+	r, err := resolvellm.Resolve("failure-advisor", resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
+	if err != nil || r.CLI == "" {
+		return nil
+	}
+	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(r.CLI)}
 }

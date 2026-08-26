@@ -10,44 +10,30 @@ package profiles
 // codex silently puts codex in judgment of codex.
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestDeepTierFamilyArrangement(t *testing.T) {
-	dir := realProfilesDir(t)
 	exceptions := map[string]string{
 		"auditor":            "claude-tmux", // cross-family floor vs the codex builder
 		"adversarial-review": "claude-tmux", // adversarial independence, same principle
 		"router":             "agy-tmux",    // advisor brain — separate decision
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// TrackedRealProfileNames is the package's ONE funnel over the live
+	// profiles dir: the runtime mints untracked stubs into the same directory,
+	// and a raw ReadDir scanner reds on state no CI checkout can see (the
+	// 2026-08-09 zero-ship batch, fingerprint cd49274beab2) — exactly the
+	// shape this test's first draft reintroduced.
+	loader, names := RealTreeProfiles(t)
 	checked := 0
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+	for _, name := range names {
+		p, gerr := loader.Get(name)
+		if gerr != nil {
 			continue
 		}
-		raw, rerr := os.ReadFile(filepath.Join(dir, e.Name()))
-		if rerr != nil {
+		if p.ModelTierDefault != "deep" && p.ModelTierDefault != "top" {
 			continue
 		}
-		var p struct {
-			CLI         string   `json:"cli"`
-			Tier        string   `json:"model_tier_default"`
-			CLIFallback []string `json:"cli_fallback"`
-		}
-		if json.Unmarshal(raw, &p) != nil {
-			continue
-		}
-		if p.Tier != "deep" && p.Tier != "top" {
-			continue
-		}
-		name := e.Name()[:len(e.Name())-len(".json")]
 		checked++
 		if want, ok := exceptions[name]; ok {
 			if p.CLI != want {
@@ -61,6 +47,7 @@ func TestDeepTierFamilyArrangement(t *testing.T) {
 		if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
 			t.Errorf("%s: cli_fallback=%v, want [claude-tmux] (universal fallback; agy banned)", name, p.CLIFallback)
 		}
+		_ = p
 	}
 	if checked < 20 {
 		t.Fatalf("only %d deep/top profiles checked — the arrangement guard lost its corpus", checked)
