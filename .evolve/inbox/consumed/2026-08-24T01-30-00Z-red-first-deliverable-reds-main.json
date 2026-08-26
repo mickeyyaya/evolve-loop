@@ -1,0 +1,54 @@
+{
+  "acceptance": [
+    "A shipping diff that ADDS a test failing in the shipped tree cannot land silently — blocked with the land-with-green-or-skip directive, or landed Skip'd with a tracking marker.",
+    "The guard's cost is bounded to newly-added test files in the diff, and requireTmux-style env-exclusive tests are handled with the honest-backstop rules, never a false claim.",
+    "Pinned against BOTH real occurrences' shapes.",
+    "The audit-side question is answered with evidence: did the auditor see the red and PASS it, or could it not run the test?"
+  ],
+  "connects_to": [
+    "#482 + ee44e7ec (the two console greens)",
+    "#490 (env-exclusive honesty)",
+    "consumption_must_ride_the_landing"
+  ],
+  "consumed": {
+    "at": "2026-08-26T09:53:26Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "a8ea8dfa4fac76794968d98da42c78ecd2e0dc35",
+    "branch": "cycle-42824668-1559",
+    "cycle": 1559,
+    "findings_path": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1559/audit-fail-reason.json",
+    "snapshot_sha": "ce0d8b4aedd636ddfe71b7666a1761b348a7ba21",
+    "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1559"
+  },
+  "created_at": "2026-08-24T01:30:00Z",
+  "files": [
+    "dcab9337 / 25040cea (the two red ships)",
+    "go/internal/phases/ship/repocontract.go (the ship-time scanner pack — candidate host for (A))",
+    "go/internal/phases/audit/ciparity.go (env-exclusive list — the blind-spot interaction)",
+    ".evolve/phases/bug-reproduction/ (the red-first contract — candidate host for (B))"
+  ],
+  "fix": "Options, needing a design pass rather than a reflex: (A) ship-time guard — the repo-contract scanner pack (or a new-test-red check) runs any NEWLY-ADDED test files in the shipping diff under their own tags before the ff-merge; a new test that FAILS blocks the ship with 'land it with its green or mark it Skip-until-\u003cissue\u003e'. Bounded cost: only NEW test files, only in the diff. (B) contract rule — bug-reproduction deliverables land with t.Skip + a tracking marker until the fixing cycle unskips; the reproduction stays executable-but-not-blocking. (C) both: (B) as the authoring convention, (A) as the floor. Note the env-exclusive interaction: (A) runs at ship in the lane worktree — quiet-host caveats apply to requireTmux-style tests (skip those with the honest note, CI-parity rules from #483/#490).",
+  "id": "red-first-deliverable-reds-main",
+  "kind": "bug",
+  "notes": "Weight 0.87: reds main for every PR and every lane each time it fires (~7h of blocked CI on the first occurrence), and the class recurred within 36 hours. Root cause deliberately marked partial — the audit-side half needs its trace before choosing (A)/(B)/(C), per the confirm-before-fixing discipline that has now retracted two wrong premises this week.",
+  "priority": "high",
+  "released_continuations": [
+    {
+      "base_sha": "a8ea8dfa4fac76794968d98da42c78ecd2e0dc35",
+      "branch": "cycle-42824668-1559",
+      "cycle": 1559,
+      "findings_path": "~/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1559/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-08-26T09:53:26Z",
+      "snapshot_sha": "ce0d8b4aedd636ddfe71b7666a1761b348a7ba21",
+      "worktree": "~/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1559"
+    }
+  ],
+  "root_cause": "PARTIALLY CONFIRMED. The bug-reproduction phase's contract is red-first BY DESIGN (reproduce before fix); what is missing is the coupling rule: a reproduction may only LAND with its green, or explicitly skipped-until-fixed. Nothing at ship time asks 'does this diff add a test that FAILS in the tree being shipped?'. The env-exclusive skip (by design, per-package) widens the blind spot: a new integration-tagged test in an env-exclusive package is invisible to the lane's own gates by construction. NOT yet traced: why the lane's audit graded PASS a diff whose stated deliverable includes a failing test — whether the auditor knew (report may frame it as red-first contract met) or could not run it (env-exclusive).",
+  "summary": "Two confirmed occurrences. (1) dcab9337 (cycle-1538, 2026-08-22): carryover_triage_drop_reproduction_test.go landed red-first with no implementation; main's go job red for ~6h50m until the console landed the green (#482). (2) 25040cea (cycle-1547, 2026-08-23): manual_consume_reproduction_test.go landed red-first with no implementation; main red until the console landed the green (ee44e7ec). Both rode through because the red test lived where the lane's own gates could not see it: (1) the default-tags suite gap of that day; (2) internal/phases/ship is env-exclusive in the in-cycle integration tier, so the lane's EGPS never ran the new test while CI (which does run ship's tier) failed post-merge. (3) cycle-1550 (2026-08-24, soak-20260824a wave 1): THIRD occurrence, new mechanism evidence — phase-plan.json AND phase-replan.json both scheduled bug-reproduction at index 3 (ahead of tdd=4, build=5), but cycle-state.json:completed_phases ran it EIGHTH (post-build; build-report sealed 10:30, red test TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite written 10:47 into go/internal/bridge/completion_test.go), with routing-decision-8.json recording reason 'plan:bug-reproduction' — the executor believed it was following the plan. So the class has TWO layers: (a) the standing question in this item (ship-gate vs t.Skip convention for red-first deliverables), and (b) a plan-vs-execution ORDERING INVERSION: a phase planned pre-build executes post-build while citing the plan as its reason. Layer (b) is the mechanism that manufactures doomed lanes: a red-first repro authored after its builder finished can never be greened. ACS was PASS/168-green and the lane diff clean — audit's FAIL on H1 was CORRECT behavior; do not treat this occurrence as a verdict-coherence forgery (the auto-escalation's canned repro_hint says 'forged a negative verdict' — that hypothesis is WRONG for this instance). Root-cause target for layer (b): why the phase executor's ordering diverged from phase-plan index while logging plan: as the reason (replan/insertion interplay? plan-index vs plan-order lookup?). cyclerun_remediate.go:57-59 loopNext-unless-FAIL + policy RemediablePhases=[coverage-gate] mean no repair rung exists for a PASS-verdict phase that poisons the tree. Related: 2026-08-16T18-00-00Z-phase-authored-red-tests-poison-egps.json (same family, filed earlier). LAYER-B ROOT CAUSE CONFIRMED (2026-08-24 console trace): phasespec.ApplyUserRouting/spliceAfter (go/internal/phasespec/routing.go:47-69) is ANCHOR-ORDER SENSITIVE — specs arrive alphabetically sorted (DiscoverUserSpecs, discover.go:97-98), and a spec whose After anchor is an alphabetically-LATER catalog phase finds the anchor absent from cfg.Order at splice time and silently takes the before-audit fallback slot. bug-reproduction (after: fault-localization) \u003c fault-localization alphabetically -\u003e spliced first -\u003e anchor miss -\u003e lands just before audit = post-build, exactly where cycle-1550 executed it 8th. The phase-plan's ordering is advisory-only by construction (router walks effectiveOrder=cfg.Order; plan gates membership not position). FIX CLASS: fixpoint splice (repeat passes until no spec places by anchor, then fallback the remainder with a WARNING naming the unresolved anchor). Console-first fix in progress.",
+  "title": "A lane can ship a deliberately-FAILING test as its deliverable and red main for everyone — twice now, both times invisible to the lane's own gates",
+  "weight": 0.9
+}

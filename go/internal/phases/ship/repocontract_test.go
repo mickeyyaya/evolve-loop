@@ -244,6 +244,92 @@ func TestRepoContractGate_RedErrorMessageNamesFailingTests(t *testing.T) {
 	}
 }
 
+// TestRepoContractGate_NewlyAddedFailingTestBlocksShip reproduces the red-main
+// escape: the shipping diff adds a failing Go test outside the four fixed
+// suites. The real scanner must detect it before a ship can proceed.
+func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
+	repo := makeRepo(t)
+	goDir := filepath.Join(repo, "go")
+	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+	runGit(t, repo, "add", "go")
+	runGit(t, repo, "commit", "-qm", "add green scanner suites")
+
+	const failingTest = "TestNewlyAddedRed"
+	mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "red_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc "+failingTest+"(t *testing.T) { t.Fatal(\"deliberate red\") }\n")
+	runGit(t, repo, "add", "go/internal/reproduction/red_test.go")
+
+	err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard)
+	if err == nil {
+		t.Fatal("a newly added failing test must block ship before it can red main")
+	}
+	se, ok := shiperr.AsShipError(err)
+	if !ok || se.Code != shiperr.CodeRepoContractGate {
+		t.Fatalf("error = %v, want structured REPO_CONTRACT_GATE for %s", err, failingTest)
+	}
+	if !strings.Contains(err.Error(), failingTest) {
+		t.Fatalf("gate error must name %s, got %q", failingTest, err)
+	}
+}
+
+// TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles is the
+// bounded-scope half of the same AC: the added-test detector must select
+// ONLY newly added Go `_test.go` files. A pre-existing tracked test that was
+// merely MODIFIED to go red (the fixed four packages already own modified-test
+// regressions in their own scope), a newly added NON-test `.go` file, and an
+// empty candidate set (a shipping diff that adds nothing) must never trip the
+// gate — a scanner that over-selects would false-RED an honest ship exactly as
+// badly as under-selecting lets a red one through.
+func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *testing.T) {
+	t.Run("modified test and non-test additions are excluded", func(t *testing.T) {
+		repo := makeRepo(t)
+		goDir := filepath.Join(repo, "go")
+		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+		}
+		trackedTest := filepath.Join(goDir, "internal", "tracked", "tracked_test.go")
+		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) {}\n")
+		runGit(t, repo, "add", "go")
+		runGit(t, repo, "commit", "-qm", "baseline: green suites + tracked test")
+
+		// MODIFY the already-tracked test to go red. Modified files are NOT
+		// "newly added" and must be excluded from this detector.
+		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) { t.Fatal(\"now red via modification, not addition\") }\n")
+		runGit(t, repo, "add", "go/internal/tracked/tracked_test.go")
+
+		// A newly ADDED non-test Go file: never a test-selection target.
+		mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "helper.go"), "package reproduction\n\nfunc Helper() int { return 1 }\n")
+		runGit(t, repo, "add", "go/internal/reproduction/helper.go")
+
+		// A newly ADDED, genuinely green test file: selected, and must not
+		// itself cause a false RED.
+		mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "green_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc TestNewlyAddedGreen(t *testing.T) {}\n")
+		runGit(t, repo, "add", "go/internal/reproduction/green_test.go")
+
+		if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard); err != nil {
+			t.Fatalf("a modified (not added) red test and a non-test addition must not gate the ship, got %v", err)
+		}
+	})
+
+	t.Run("empty candidate set produces no false gate execution", func(t *testing.T) {
+		repo := makeRepo(t)
+		goDir := filepath.Join(repo, "go")
+		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+		}
+		runGit(t, repo, "add", "go")
+		runGit(t, repo, "commit", "-qm", "baseline only, nothing staged")
+
+		if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard); err != nil {
+			t.Fatalf("a shipping diff that adds no test files must not produce a false RED, got %v", err)
+		}
+	})
+}
+
 // TestClassifyPackEvents_SeparatesRealFailuresFromNoise pins the parser that
 // makes the whole classification real. The seam-swapping tests above cannot
 // reach it, so without this the `go test -json` decoding would be untested
@@ -317,5 +403,141 @@ func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(ws, scanLogName)); statErr != nil {
 		t.Fatalf("runNative must thread req.Workspace into the gate so the scan log lands in the run dir: %v", statErr)
+	}
+}
+
+// TestPhaseRunNative_NewlyAddedFailingTestPreventsRun is the production-path
+// proof for the added-test-red-gate: a REAL newly added failing test, driven
+// through Phase.runNative (not runRepoContractGate directly), must stop the
+// ship before any git/ship action and surface the structured repo-contract
+// error. TestRunNative_RepoContractGateReceivesRunWorkspace already proves the
+// wiring with a faked pack outcome; this proves it with the real scanner
+// exercising a real newly-added test file, closing the gap a helper-only
+// detector would leave (a detector correct in isolation but never reached from
+// the native ship path).
+func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
+	repo := makeRepo(t)
+	goDir := filepath.Join(repo, "go")
+	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+	runGit(t, repo, "add", "go")
+	runGit(t, repo, "commit", "-qm", "add green scanner suites")
+
+	const failingTest = "TestNewlyAddedRedViaRunNative"
+	mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "red_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc "+failingTest+"(t *testing.T) { t.Fatal(\"deliberate red\") }\n")
+	runGit(t, repo, "add", "go/internal/reproduction/red_test.go")
+
+	ws := t.TempDir()
+	p := New(Config{RepoContractGate: "enforce"})
+	resp, err := p.runNative(context.Background(), core.PhaseRequest{
+		Cycle:       1555,
+		Workspace:   ws,
+		ProjectRoot: repo,
+	}, "msg", time.Now())
+
+	if err == nil {
+		t.Fatal("runNative must stop before ship/git work when a newly added test is red")
+	}
+	if !strings.Contains(err.Error(), "repo-contract gate") {
+		t.Fatalf("block must come from the repo-contract gate (proves it fired before any git/ship action), got %v", err)
+	}
+	if !strings.Contains(err.Error(), failingTest) {
+		t.Fatalf("error must name %s, got %v", failingTest, err)
+	}
+	if resp.Verdict == core.VerdictPASS {
+		t.Fatalf("gate block must not report PASS, got %q", resp.Verdict)
+	}
+	if _, statErr := os.Stat(filepath.Join(ws, scanLogName)); statErr != nil {
+		t.Fatalf("scan log must land in the run workspace even on the real-repo path: %v", statErr)
+	}
+}
+
+// TestRunNative_AddedSkippedTestDoesNotBlockShip is the negative half of the
+// production-path proof: a newly added test that is honestly `t.Skip`-ped
+// (a tracked known gap, not a hidden failure) must NOT trip the repo-contract
+// gate. A detector that classified "skip" as "fail" would turn every legitimate
+// skip into a false RED — skip must stay an honest, non-blocking signal here
+// exactly as it is elsewhere in this pipeline.
+func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
+	repo := makeRepo(t)
+	goDir := filepath.Join(repo, "go")
+	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+	runGit(t, repo, "add", "go")
+	runGit(t, repo, "commit", "-qm", "add green scanner suites")
+
+	mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "skip_test.go"),
+		"package reproduction\n\nimport \"testing\"\n\nfunc TestNewlyAddedSkipped(t *testing.T) { t.Skip(\"tracked known gap\") }\n")
+	runGit(t, repo, "add", "go/internal/reproduction/skip_test.go")
+
+	ws := t.TempDir()
+	p := New(Config{RepoContractGate: "enforce"})
+	_, err := p.runNative(context.Background(), core.PhaseRequest{
+		Cycle:       1555,
+		Workspace:   ws,
+		ProjectRoot: repo,
+	}, "msg", time.Now())
+
+	if err != nil && strings.Contains(err.Error(), "repo-contract gate") {
+		t.Fatalf("a skipped reproducer must not block at the repo-contract gate, got %v", err)
+	}
+	body, readErr := os.ReadFile(filepath.Join(ws, scanLogName))
+	if readErr != nil {
+		t.Fatalf("scan log must still be written on the skip path: %v", readErr)
+	}
+	if strings.Contains(string(body), "TestNewlyAddedSkipped") && strings.Contains(string(body), "FAIL") {
+		t.Fatalf("skipped test must not be classified as a failure in the scan log, got %q", body)
+	}
+}
+
+// TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded — T1 AC3, the
+// third pinned incident shape (cycle-1559 addition to the red-first lane). A
+// newly added test file that is genuinely un-runnable on a quiet host (the
+// `requires_tmux` build-constraint convention scout flagged) must NEVER be
+// silently claimed green: with no `-tags requires_tmux`, its lone-file
+// package has "build constraints exclude all Go files" — indistinguishable
+// from a genuine compile break unless the gate special-cases it — while
+// simply skipping the package with no record at all launders it as
+// "nothing to see here". Both are dishonest. The gate must (1) not fail the
+// ship over an env-exclusive candidate it correctly cannot run, and (2)
+// leave a durable, explicit backstop record in the scan log naming the file
+// and its exclusion reason so the coverage gap is auditable, not silent.
+func TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded(t *testing.T) {
+	repo := makeRepo(t)
+	goDir := filepath.Join(repo, "go")
+	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+	runGit(t, repo, "add", "go")
+	runGit(t, repo, "commit", "-qm", "add green scanner suites")
+
+	const excludedFile = "go/internal/reproduction/tmux_test.go"
+	mustWrite(t, filepath.Join(repo, excludedFile),
+		"//go:build requires_tmux\n\npackage reproduction\n\nimport \"testing\"\n\nfunc TestNewlyAddedRequiresTmux(t *testing.T) { t.Fatal(\"must never run without tmux\") }\n")
+	runGit(t, repo, "add", excludedFile)
+
+	ws := t.TempDir()
+	err := runRepoContractGate(context.Background(), "enforce", repo, ws, io.Discard)
+	if err != nil {
+		t.Fatalf("an honestly env-exclusive added test must not block the ship, got %v", err)
+	}
+	body, readErr := os.ReadFile(filepath.Join(ws, scanLogName))
+	if readErr != nil {
+		t.Fatalf("scan log must be written on the env-exclusive path: %v", readErr)
+	}
+	text := string(body)
+	if !strings.Contains(text, excludedFile) {
+		t.Fatalf("scan log must name the excluded candidate %s, got %q", excludedFile, text)
+	}
+	if !strings.Contains(text, "requires_tmux") {
+		t.Fatalf("scan log must record the exclusion reason (requires_tmux), got %q", text)
+	}
+	if !strings.Contains(strings.ToLower(text), "exclud") {
+		t.Fatalf("scan log must explicitly mark the candidate as EXCLUDED, not silently omitted or claimed green, got %q", text)
 	}
 }

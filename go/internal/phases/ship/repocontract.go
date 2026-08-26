@@ -40,6 +40,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go/build"
+	"go/build/constraint"
 	"io"
 	"os"
 	"os/exec"
@@ -85,7 +87,19 @@ func (o packOutcome) realRed() bool { return o.err != nil && len(o.failedTests) 
 var repoContractTestFn = defaultRepoContractTest
 
 func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Writer) packOutcome {
-	args := append([]string{"test", "-json", "-count=1"}, repoContractPackages...)
+	return runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
+}
+
+func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Writer, packages []string) packOutcome {
+	return runRepoContractPackagesWithTags(ctx, moduleDir, out, packages, nil)
+}
+
+func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out io.Writer, packages, tags []string) packOutcome {
+	args := []string{"test", "-json", "-count=1"}
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+	args = append(args, packages...)
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	stdout, err := cmd.StdoutPipe()
@@ -208,39 +222,203 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 %s (module %s)\n",
 		strings.Join(repoContractPackages, " "), moduleDir)
 
-	first := repoContractTestFn(ctx, moduleDir, out)
+	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
+		return repoContractTestFn(ctx, moduleDir, out)
+	}); err != nil {
+		return err
+	}
+
+	groups, excluded, discoveryErr := addedTestPackageGroups(projectRoot)
+	if discoveryErr != nil {
+		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: discovery unavailable (%v) — skipped; no added tests were scanned\n", discoveryErr)
+		return nil
+	}
+	for _, path := range excluded {
+		fmt.Fprintf(out, "[ship] repo-contract gate: EXCLUDED %s (requires_tmux or another build constraint unavailable on this host; backstop required)\n", path)
+	}
+	for _, group := range groups {
+		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1")
+		if len(group.tags) > 0 {
+			fmt.Fprintf(out, " -tags %s", strings.Join(group.tags, ","))
+		}
+		fmt.Fprintf(out, " %s\n", strings.Join(group.packages, " "))
+		if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
+			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.packages, group.tags)
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runClassifiedPack(ctx context.Context, out io.Writer, workspace, name string, run func() packOutcome) error {
+	first := run()
 	switch {
 	case first.green():
 		return nil
 	case first.realRed():
-		// A genuine RED is NOT retried: a retry doubles every red ship's
-		// wall-time and risks a flaky-but-real suite passing by luck, which
-		// would launder the violation onto main.
-		return contractRed(first)
+		return contractRed(name, first)
 	}
-	fmt.Fprintf(out, "[ship] repo-contract gate: pack exited nonzero with NO test-level failure (%v) — retrying once before classing it infra (cycle-1402/1403/1405 false-RED class)\n", first.err)
-	second := repoContractTestFn(ctx, moduleDir, out)
+	fmt.Fprintf(out, "[ship] repo-contract %s exited nonzero with NO test-level failure (%v) — retrying once before classing it infra (cycle-1402/1403/1405 false-RED class)\n", name, first.err)
+	second := run()
 	switch {
 	case second.green():
 		fmt.Fprintf(out, "[ship] repo-contract gate: retry GREEN — first failure was infra noise, ship proceeds\n")
 		return nil
 	case second.realRed():
-		return contractRed(second)
+		return contractRed(name, second)
 	}
-	// Exactly two attempts, never a loop: a third run would trade a false RED
-	// for a retry storm on a genuinely broken toolchain.
 	return shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
-		fmt.Sprintf("repo-contract scanner pack exited nonzero TWICE with no test-level failure (attempt 1: %v; attempt 2: %v) — INFRA fault, not a contract violation; safe to re-dispatch. Scanner output: %s",
-			first.err, second.err, scanLogHint(workspace)))
+		fmt.Sprintf("repo-contract %s exited nonzero TWICE with no test-level failure (attempt 1: %v; attempt 2: %v) — INFRA fault, not a contract violation; safe to re-dispatch. Scanner output: %s",
+			name, first.err, second.err, scanLogHint(workspace)))
+}
+
+type addedTestGroup struct {
+	tags     []string
+	packages []string
+}
+
+func addedTestPackages(projectRoot string) (packages, excluded []string) {
+	groups, excluded, _ := addedTestPackageGroups(projectRoot)
+	for _, group := range groups {
+		packages = append(packages, group.packages...)
+	}
+	sort.Strings(packages)
+	return packages, excluded
+}
+
+func addedTestPackageGroups(projectRoot string) (groups []addedTestGroup, excluded []string, retErr error) {
+	cmd := exec.Command("git", "-C", projectRoot, "diff", "--cached", "--name-only", "--diff-filter=A")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, nil, fmt.Errorf("git diff --cached: %w", err)
+	}
+	packagesByTags := map[string]map[string]bool{}
+	tagsByKey := map[string][]string{}
+	for _, path := range strings.Fields(string(output)) {
+		if !strings.HasPrefix(path, "go/") || !strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		file := filepath.Join(projectRoot, path)
+		tags, runnable, matchErr := addedTestBuildTags(file)
+		if matchErr != nil {
+			return nil, nil, fmt.Errorf("inspect %s: %w", path, matchErr)
+		}
+		if !runnable {
+			excluded = append(excluded, path)
+			continue
+		}
+		pkg := "./" + filepath.ToSlash(filepath.Dir(strings.TrimPrefix(path, "go/")))
+		key := strings.Join(tags, ",")
+		if packagesByTags[key] == nil {
+			packagesByTags[key] = map[string]bool{}
+			tagsByKey[key] = tags
+		}
+		packagesByTags[key][pkg] = true
+	}
+	keys := make([]string, 0, len(packagesByTags))
+	for key := range packagesByTags {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		group := addedTestGroup{tags: tagsByKey[key]}
+		for pkg := range packagesByTags[key] {
+			group.packages = append(group.packages, pkg)
+		}
+		sort.Strings(group.packages)
+		groups = append(groups, group)
+	}
+	sort.Strings(excluded)
+	return groups, excluded, nil
+}
+
+func addedTestBuildTags(path string) ([]string, bool, error) {
+	dir, name := filepath.Dir(path), filepath.Base(path)
+	match, err := build.Default.MatchFile(dir, name)
+	if err != nil || match {
+		return nil, match, err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = f.Close() }()
+
+	var expr constraint.Expr
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if constraint.IsGoBuild(line) {
+			expr, err = constraint.Parse(line)
+			break
+		}
+		if line != "" && !strings.HasPrefix(line, "//") {
+			break
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, false, err
+	}
+	if err != nil || expr == nil {
+		return nil, false, err
+	}
+	tagSet := map[string]bool{}
+	collectBuildTags(expr, tagSet)
+	// minimal: exhaustive tag selection is capped at 12 tags; upgrade to a
+	// constraint solver if real added tests exceed that ceiling.
+	if tagSet["requires_tmux"] || len(tagSet) > 12 {
+		return nil, false, nil
+	}
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	for mask := 1; mask < 1<<len(tags); mask++ {
+		candidate := make([]string, 0, len(tags))
+		for i, tag := range tags {
+			if mask&(1<<i) != 0 {
+				candidate = append(candidate, tag)
+			}
+		}
+		ctx := build.Default
+		ctx.BuildTags = candidate
+		if match, matchErr := ctx.MatchFile(dir, name); matchErr != nil {
+			return nil, false, matchErr
+		} else if match {
+			return candidate, true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+func collectBuildTags(expr constraint.Expr, tags map[string]bool) {
+	switch x := expr.(type) {
+	case *constraint.TagExpr:
+		tags[x.Tag] = true
+	case *constraint.NotExpr:
+		collectBuildTags(x.X, tags)
+	case *constraint.AndExpr:
+		collectBuildTags(x.X, tags)
+		collectBuildTags(x.Y, tags)
+	case *constraint.OrExpr:
+		collectBuildTags(x.X, tags)
+		collectBuildTags(x.Y, tags)
+	}
 }
 
 // contractRed builds the genuine-violation ship error, naming the parsed
 // failing tests so ship-error.json carries them directly instead of the bare
 // "exit status 1" that made cycle-1402/1403 undiagnosable.
-func contractRed(o packOutcome) error {
+func contractRed(packName string, o packOutcome) error {
+	detail := "added-test backstop"
+	if packName == "scanner pack" {
+		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest)"
+	}
 	return shiperr.NewShipError(shiperr.CodeRepoContractGate, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
-		fmt.Sprintf("repo-contract scanner pack RED in the lane worktree (%v) — failing: %s — pushing would red main; fix the violation in-lane (the four suites: phasespec, profiles, phasecoherence, routingtest)",
-			o.err, strings.Join(o.failedTests, ", ")))
+		fmt.Sprintf("repo-contract %s RED in the lane worktree (%v) — failing: %s — pushing would red main; land the green fix or use an explicit t.Skip for an intentionally red-first reproducer",
+			detail, o.err, strings.Join(o.failedTests, ", ")))
 }
 
 // openScanLog opens the run-dir scan log, truncating any prior attempt's file.
