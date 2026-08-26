@@ -26,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
@@ -144,7 +145,20 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
 	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
 
+	// CLI resolution chain: EVOLVE_CLI > profile.cli > claude-tmux — matching
+	// BaseRunner (runner.go). This hand-rolled runner had regressed to the
+	// cycle-107 class (EVOLVE_CLI-or-hardcoded, profile.cli ignored), which
+	// made the 2026-08-26 deep-tier sol arrangement's flagship flip —
+	// retrospective, ~40% of deep dispatch volume — dead on arrival until
+	// review caught it against the dispatched BridgeRequest.
 	cli := req.Env["EVOLVE_CLI"]
+	if cli == "" {
+		if loader := profiles.NewFromDir(filepath.Join(req.ProjectRoot, ".evolve", "profiles")); loader != nil {
+			if prof, perr := loader.Get("retrospective"); perr == nil && prof.CLI != "" {
+				cli = prof.CLI
+			}
+		}
+	}
 	if cli == "" {
 		cli = "claude-tmux"
 	}

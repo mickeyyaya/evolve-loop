@@ -1,8 +1,10 @@
 {
   "name": "rollout-plan",
   "role": "rollout-plan",
-  "cli": "claude-tmux",
-  "cli_fallback": [],
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
   "model_tier_default": "deep",
   "allowed_tools": [
     "Read",
