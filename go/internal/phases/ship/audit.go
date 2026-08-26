@@ -191,20 +191,22 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 
 var auditBoundTreeSHARe = regexp.MustCompile(`(?m)^audit_bound_tree_sha:\s*` + "`?" + `([0-9a-f]+)` + "`?")
 
-// findLatestAudit walks ledger.jsonl backwards, returning the most
-// recent agent_subprocess entry with role=auditor.
+// findLatestAudit returns the auditor ledger entry ship binds to, walking
+// ledger.jsonl backwards for the most recent agent_subprocess entry with
+// role=auditor. When runID is set, ONLY an entry stamped with THIS run may
+// bind (ADR-0049 S4 / gap G5); a miss is a hard integrity stop, never a
+// fallback. The pre-2026-08-26 cross-run fallback was cycle-1571's H3
+// fail-open hole: a FAILed cycle (which then emitted no auditor entry) bound
+// a sibling lane's audit — surfacing as AUDIT_BINDING_HEAD_MOVED instead of
+// this run's FAIL, and, when the sibling shares HEAD, capable of SHIPPING a
+// FAILed cycle on the sibling's PASS. Same failure shape as the 2026-05-29
+// "ancient bash-era auditor entry" incident, closed at the consumer this time.
+// Standalone runID=="" keeps binding the latest auditor entry overall.
 //
 // Missing/empty ledger → IntegrityError. Found-but-no-auditor →
 // IntegrityError. Any unmarshal error on a candidate line is treated as
 // "not an auditor entry" (forward-compat: alien lines should not crash
 // ship-gate).
-// findLatestAudit returns the auditor ledger entry ship binds to. When runID is
-// set, it prefers the latest auditor entry stamped with THIS run (ADR-0049 S4 /
-// gap G5), so a concurrent run's later auditor entry can't be bound; it falls
-// back to the latest auditor entry overall when none matches (standalone
-// runID=="" or a legacy/unstamped entry), preserving pre-S4 behavior with zero
-// regression. No-op for the live loop: today's single run's entry IS the latest,
-// so the exact match returns the same entry.
 func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
@@ -216,7 +218,7 @@ func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 			"ship: read ledger: "+err.Error(), "ledger_path", ledgerPath)
 	}
 	lines := strings.Split(string(raw), "\n")
-	var latestAny *auditEntry // latest auditor entry regardless of run (fallback)
+	var latestForeign *auditEntry // newest refused entry, for the error's forensics only
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
@@ -233,16 +235,23 @@ func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 			entry := e
 			return &entry, nil
 		}
-		if latestAny == nil {
+		if latestForeign == nil {
 			entry := e
-			latestAny = &entry
+			latestForeign = &entry
 		}
 	}
-	if latestAny != nil {
-		return latestAny, nil
+	msg := "no Auditor ledger entry found — independent review missing"
+	if latestForeign != nil {
+		foreignRun := latestForeign.RunID
+		if foreignRun == "" {
+			foreignRun = "<unstamped>"
+		}
+		msg = fmt.Sprintf(
+			"no Auditor ledger entry for run %s — independent review missing (refused to bind foreign run %s, git_head=%s: one cycle's ship gate must never be satisfied by another cycle's audit)",
+			runID, foreignRun, latestForeign.GitHEAD)
 	}
 	return nil, shipErr(core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, core.StageVerifyClass,
-		"no Auditor ledger entry found — independent review missing", "ledger_path", ledgerPath)
+		msg, "ledger_path", ledgerPath)
 }
 
 // parseVerdicts grep-and-awk's the audit report for PASS/WARN/FAIL.

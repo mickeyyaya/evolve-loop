@@ -105,6 +105,7 @@ func runComposedGates(ctx context.Context, worktree string) map[string]string {
 type auditLedgerEntry struct {
 	Role           string `json:"role"`
 	Kind           string `json:"kind"`
+	RunID          string `json:"run_id"`
 	ArtifactSHA256 string `json:"artifact_sha256"`
 	GitHEAD        string `json:"git_head"`
 }
@@ -115,9 +116,9 @@ type auditLedgerEntry struct {
 // patch-id. For a clean rebase, git patch-id is offset-insensitive, so this
 // pre-rebase diff recomputes to the same patch-id as the post-rebase composed
 // diff — the RUNG 0 identity check compositionCarryForward enforces.
-func readCompositionSnapshot(ctx context.Context, worktree string) (core.CompositionAuditSnapshot, error) {
+func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.CompositionAuditSnapshot, error) {
 	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
-	entry, err := latestAuditEntry(ledgerPath)
+	entry, err := latestAuditEntry(ledgerPath, runID)
 	if err != nil {
 		return core.CompositionAuditSnapshot{}, err
 	}
@@ -140,10 +141,16 @@ func readCompositionSnapshot(ctx context.Context, worktree string) (core.Composi
 }
 
 // latestAuditEntry walks ledger.jsonl backwards for the most recent bound
-// auditor entry. Mirrors ship.findLatestAudit's tolerance: alien/unparseable
-// lines are skipped; an absent or auditor-less ledger is an error the
+// auditor entry OF THIS RUN. Run-scoped since 2026-08-26, same hardening as
+// ship.findLatestAudit (whose old cross-run fallback was cycle-1571's H3
+// fail-open hole): the ledger is host-global across fleet worktrees, and the
+// producer now records auditor entries for FAIL verdicts too, so an unscoped
+// "latest" can be a sibling lane's — or a FAILed — audit. runID=="" (no run
+// context) keeps latest-any. findCompositionVerdict's LaneAuditRef equality
+// against this run's own bound artifact remains the downstream safety net
+// either way. Alien/unparseable lines are skipped; a miss is an error the
 // snapshot surfaces so compositionCarryForward fails closed to full re-audit.
-func latestAuditEntry(ledgerPath string) (auditLedgerEntry, error) {
+func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
 		return auditLedgerEntry{}, fmt.Errorf("composition snapshot: read ledger %s: %w", ledgerPath, err)
@@ -158,11 +165,14 @@ func latestAuditEntry(ledgerPath string) (auditLedgerEntry, error) {
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue
 		}
-		if e.Kind == "agent_subprocess" && e.Role == "auditor" && e.GitHEAD != "" {
+		if e.Kind != "agent_subprocess" || e.Role != "auditor" || e.GitHEAD == "" {
+			continue
+		}
+		if runID == "" || e.RunID == runID {
 			return e, nil
 		}
 	}
-	return auditLedgerEntry{}, fmt.Errorf("composition snapshot: no bound auditor entry in %s", ledgerPath)
+	return auditLedgerEntry{}, fmt.Errorf("composition snapshot: no bound auditor entry for run %q in %s (foreign-run entries refused)", runID, ledgerPath)
 }
 
 // gitDiffCapture runs `git diff <spec>` in worktree and returns its stdout.

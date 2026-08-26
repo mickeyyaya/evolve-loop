@@ -321,7 +321,7 @@ type Orchestrator struct {
 	// The composition root binds the writer closure to the real
 	// ledger.WriteCompositionVerdict; core stays adapter-agnostic (ledger
 	// already imports core, so a direct import would cycle).
-	compositionSnapshot      func(ctx context.Context, worktree string) (CompositionAuditSnapshot, error)
+	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
 
