@@ -85,6 +85,29 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 		cfg.WhenToUse = mintedStubWhenToUse
 	}
 
+	// Mint-time persona-resolvability default (2026-08-26, instance #5 of the
+	// persona-less-phase class — the cycle-1567/1568 halt): the mint's OWN
+	// dispatch runs on the inline PromptBody, but the persisted phase.json
+	// outlives the process, and a stub whose derived persona
+	// (agents/evolve-<name>.md) exists nowhere both reds the tracked-menu
+	// guard the moment ship's bind sweeps it into tracking (the lane-only
+	// internal/core regression) and schedules a next-cycle dispatch that dies
+	// at load-agent. Stamp catalog:"on-demand" at the same construction seam
+	// as the SELECT-metadata default above — off the menu until someone writes
+	// the persona, exactly the tracked-phase remedy (#493). A mint whose
+	// persona DOES resolve, or that carries an explicit catalog word, keeps it
+	// verbatim.
+	if cfg.Catalog == "" {
+		resolvable := false
+		if r.Prompts != nil {
+			_, aerr := r.Prompts.Agent(cfg.AgentName())
+			resolvable = aerr == nil
+		}
+		if !resolvable {
+			cfg.Catalog = phasespec.CatalogOnDemand
+		}
+	}
+
 	spec := cfg.Spec()
 	if violations := phasespec.ValidateUserSpec(spec); len(violations) > 0 {
 		return Result{}, fmt.Errorf("phaseregistrar: invalid spec %q: %s", spec.Name, strings.Join(violations, "; "))
