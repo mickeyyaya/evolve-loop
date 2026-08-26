@@ -30,7 +30,7 @@ import (
 func TestOrchestrator_CompositionFastPathWired(t *testing.T) {
 	t.Parallel()
 
-	dummySnapshot := func(ctx context.Context, worktree string) (CompositionAuditSnapshot, error) {
+	dummySnapshot := func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error) {
 		return CompositionAuditSnapshot{}, nil
 	}
 	dummyGateRunner := func(ctx context.Context, worktree string) map[string]string { return nil }

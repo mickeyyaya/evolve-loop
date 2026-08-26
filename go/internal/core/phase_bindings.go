@@ -26,7 +26,12 @@ func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, project
 		verdict:      verdict,
 	}
 	switch {
-	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN):
+	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN || verdict == VerdictFAIL):
+		// FAIL included since cycle-1571 H3: without a binding, ship's lookup
+		// has nothing for this run and the FAIL verdict is invisible to the
+		// gate built to enforce it — the binding is how ship reads THIS run's
+		// report and returns the honest VERDICT_FAIL terminal. SKIPPED stays
+		// excluded (no audit ran, no artifact to bind).
 		o.recordPhaseBinding(ctx, phase, in)
 	case phase == PhaseBuild && verdict != VerdictSKIPPED:
 		o.recordPhaseBinding(ctx, phase, in)
@@ -138,10 +143,12 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}
 	artSum := sha256.Sum256(artBytes)
 	// exit_code mirrors the Unix-convention auditor signal ship tolerates (0|1):
-	// 0 = clean PASS, 1 = findings (WARN). Ship's binding accepts both; this
-	// keeps the ledger semantically accurate for operators reading it.
+	// 0 = clean PASS, 1 = findings (WARN and FAIL alike — the auditor process
+	// ran to completion; the verdict severity lives in the bound artifact,
+	// which is where ship reads it). 2+ would trip ship's exit-code gate
+	// BEFORE the verdict parse and mask VERDICT_FAIL behind AUDITOR_EXIT.
 	exitCode := 0
-	if verdict == VerdictWARN {
+	if verdict == VerdictWARN || verdict == VerdictFAIL {
 		exitCode = 1
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
@@ -178,6 +185,13 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// fail-open: a skipped Lookup costs one shadow log line, but a poisoned
 	// Put sits in the shared store for every future consumer. No base
 	// identity ⇒ no cache write.
+	// FAIL verdicts are ledger-bound above but never cache-projected: the
+	// cache exists to let identical known-good trees skip a re-audit, and its
+	// consumers were designed against PASS|WARN content only. A FAILed tree
+	// re-audits from scratch.
+	if verdict == VerdictFAIL {
+		return
+	}
 	if worktreeBase == "" {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put skipped (cycle %d): no worktree base identity\n", cycle)
 		return
