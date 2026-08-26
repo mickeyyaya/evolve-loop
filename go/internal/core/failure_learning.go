@@ -233,7 +233,9 @@ type phaseFailureDiag struct {
 	Timestamp       string `json:"timestamp"`
 }
 
-func deliveryFailureCause(err error) string {
+// DeliveryFailureCause returns the classified prompt-delivery failure reason,
+// or an empty string when the error is not an evidenced delivery failure.
+func DeliveryFailureCause(err error) string {
 	if !errors.Is(err, ErrArtifactTimeout) {
 		return ""
 	}
@@ -263,7 +265,7 @@ func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, a
 		Phase:           phase,
 		Cycle:           cycle,
 		ErrorMessage:    phaseErr.Error(),
-		DeliveryFailure: deliveryFailureCause(phaseErr),
+		DeliveryFailure: DeliveryFailureCause(phaseErr),
 		ExitCode:        exitCode,
 		AttemptCount:    attempts,
 		Timestamp:       now().UTC().Format(time.RFC3339),

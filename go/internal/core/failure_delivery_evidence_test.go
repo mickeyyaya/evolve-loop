@@ -77,6 +77,9 @@ func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any 
 // <phase>-failure-diag.json, not only a free-text error_message. Today the
 // struct has no such field at all, so this is RED on the missing key.
 func TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable(t *testing.T) {
+	if cause := DeliveryFailureCause(wedgedPromptTimeoutErr()); !strings.Contains(cause, "submit_wedged") {
+		t.Fatalf("DeliveryFailureCause() = %q, want classified submit_wedged reason", cause)
+	}
 	got := readFailureDiag(t, "retro", wedgedPromptTimeoutErr())
 
 	val, ok := got[deliveryFailureDiagField]

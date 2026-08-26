@@ -6,6 +6,7 @@ package retro
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,12 +22,16 @@ import (
 type fakeBridge struct {
 	resp          core.BridgeResponse
 	err           error
+	errs          []error
 	writeArtifact string
 	writeLesson   string
 	gotReq        core.BridgeRequest
+	launches      int
 }
 
 func (f *fakeBridge) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	call := f.launches
+	f.launches++
 	f.gotReq = req
 	if f.writeArtifact != "" && req.ArtifactPath != "" {
 		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
@@ -35,6 +40,9 @@ func (f *fakeBridge) Launch(ctx context.Context, req core.BridgeRequest) (core.B
 	}
 	if f.writeLesson != "" {
 		_ = os.WriteFile(filepath.Join(req.Workspace, "failure-lesson.yaml"), []byte(f.writeLesson), 0o644)
+	}
+	if call < len(f.errs) {
+		return f.resp, f.errs[call]
 	}
 	return f.resp, f.err
 }
@@ -181,6 +189,59 @@ func TestRun_BridgeError_FAIL(t *testing.T) {
 	}
 }
 
+func TestRun_SubmitWedgedDeliveryFailure_RelaunchesOnce(t *testing.T) {
+	ws := t.TempDir()
+	fb := &fakeBridge{
+		errs:          []error{submitWedgedTimeoutErr(), nil},
+		writeArtifact: "# Retrospective\n## Root Cause\ndelivery stalled\n## Lessons\nrelaunch verified\n",
+		writeLesson:   "id: retry-delivery-failure\n",
+	}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fb.launches != 2 {
+		t.Fatalf("Launch calls=%d, want 2: a verified submit_wedged delivery failure must be relaunched once", fb.launches)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Fatalf("Verdict=%q, want PASS after the relaunch succeeds", resp.Verdict)
+	}
+}
+
+func TestRun_GenericArtifactTimeout_DoesNotRelaunch(t *testing.T) {
+	fb := &fakeBridge{err: genericSilenceTimeoutErr()}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: t.TempDir(),
+		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fb.launches != 1 {
+		t.Fatalf("Launch calls=%d, want 1: a generic silence timeout has no verified delivery failure and must not relaunch", fb.launches)
+	}
+	if resp.Verdict != core.VerdictFAIL {
+		t.Fatalf("Verdict=%q, want FAIL after the generic timeout", resp.Verdict)
+	}
+}
+
+func submitWedgedTimeoutErr() error {
+	return fmt.Errorf("bridge: launch exit=81: artifact-timeout: phase=retro waited=0s interval=300s transient=false reason=%q: %w",
+		"prompt submit_wedged (resends=3)", core.ErrArtifactTimeout)
+}
+
+func genericSilenceTimeoutErr() error {
+	return fmt.Errorf("bridge: launch exit=81: artifact-timeout: phase=retro waited=1800s interval=900s transient=false reason=%q: %w",
+		"no output during the last 900s interval — stalled; pause for investigation", core.ErrArtifactTimeout)
+}
+
 func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 	phase := New(Config{Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
@@ -281,5 +342,116 @@ func TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(ws, "failure-lesson"), []byte("x"), 0o644) // no .yaml
 	if hasFailureLesson(ws) {
 		t.Errorf("returned true with no matching .yaml; want false")
+	}
+}
+
+// --- retro-model-auto-normalization (Bug B) -------------------------------
+//
+// Retro is a hand-rolled runner: it never passes through BaseRunner, so it
+// never reaches the single dispatch resolver that expands the "auto" model
+// sentinel (llmroute.Resolve → resolvellm). These tests pin the dispatched
+// core.BridgeRequest.Model — the value that actually reaches the CLI — rather
+// than resolvellm in isolation.
+
+func writeRetroProfileDoc(t *testing.T, projectRoot, body string) {
+	t.Helper()
+	dir := filepath.Join(projectRoot, ".evolve", "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir profiles: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "retrospective.json"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write retrospective profile: %v", err)
+	}
+}
+
+// runRetroForModel drives the real Phase.Run route against a temp project root
+// holding the given retrospective profile, and returns the dispatched request.
+func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest {
+	t.Helper()
+	// Isolate from any ambient profile roots so the temp project root is the
+	// only profile source resolvellm can see.
+	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+
+	projectRoot := t.TempDir()
+	writeRetroProfileDoc(t, projectRoot, profile)
+
+	fb := &fakeBridge{
+		writeArtifact: "# Retrospective\n## Root Cause\nx\n## Lessons\ny\n",
+		writeLesson:   "id: model-normalization\n",
+	}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body"), Model: cfgModel})
+	if _, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: projectRoot, Workspace: t.TempDir(),
+		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fb.launches != 1 {
+		t.Fatalf("Launch calls=%d, want 1", fb.launches)
+	}
+	return fb.gotReq
+}
+
+const retroProfileDeep = `{"name":"retrospective","role":"retrospective","cli":"codex-tmux","model_tier_default":"deep"}`
+
+// AC: Retro never sends BridgeRequest.Model == "auto" — the unset/sentinel case
+// must resolve to the profile's tier before dispatch.
+func TestRun_AutoModel_ResolvedBeforeDispatch(t *testing.T) {
+	got := runRetroForModel(t, "", retroProfileDeep)
+	if got.Model == "auto" {
+		t.Fatalf("BridgeRequest.Model=%q — the unresolved sentinel reached the bridge", got.Model)
+	}
+	if got.Model != "deep" {
+		t.Errorf("BridgeRequest.Model=%q, want %q (retrospective profile model_tier_default)", got.Model, "deep")
+	}
+}
+
+// AC: an explicitly configured tier survives unchanged (no resolution applied).
+func TestRun_ExplicitModel_PassesThroughUnchanged(t *testing.T) {
+	got := runRetroForModel(t, "balanced", retroProfileDeep)
+	if got.Model != "balanced" {
+		t.Errorf("BridgeRequest.Model=%q, want %q — an explicit tier must not be re-resolved", got.Model, "balanced")
+	}
+}
+
+// AC (edge): a profile with no model_tier_default must still not dispatch the
+// sentinel — it resolves to the established default tier.
+func TestRun_AutoModel_ProfileWithoutTier_ResolvesToDefaultNotAuto(t *testing.T) {
+	got := runRetroForModel(t, "", `{"name":"retrospective","role":"retrospective","cli":"codex-tmux"}`)
+	if got.Model == "auto" || got.Model == "" {
+		t.Fatalf("BridgeRequest.Model=%q — want a resolved tier, never the sentinel", got.Model)
+	}
+	if got.Model != "balanced" {
+		t.Errorf("BridgeRequest.Model=%q, want %q (resolvellm's established default tier)", got.Model, "balanced")
+	}
+}
+
+// AC (negative/OOD): the sentinel must never survive resolution even when the
+// project root has no retrospective profile at all.
+func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
+	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	projectRoot := t.TempDir()
+
+	fb := &fakeBridge{
+		writeArtifact: "# Retrospective\n## Root Cause\nx\n## Lessons\ny\n",
+		writeLesson:   "id: model-normalization\n",
+	}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	_, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: projectRoot, Workspace: t.TempDir(),
+		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
+	})
+	if err != nil {
+		// Failing loudly instead of dispatching the sentinel is an acceptable
+		// resolution of this AC; it must not have launched with "auto".
+		if fb.launches > 0 && fb.gotReq.Model == "auto" {
+			t.Fatalf("launched with Model=%q before failing", fb.gotReq.Model)
+		}
+		return
+	}
+	if fb.gotReq.Model == "auto" {
+		t.Fatalf("BridgeRequest.Model=%q — the sentinel reached the bridge with no profile present", fb.gotReq.Model)
 	}
 }

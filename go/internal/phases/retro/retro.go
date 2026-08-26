@@ -151,27 +151,41 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	// made the 2026-08-26 deep-tier sol arrangement's flagship flip —
 	// retrospective, ~40% of deep dispatch volume — dead on arrival until
 	// review caught it against the dispatched BridgeRequest.
+	var prof profiles.Profile
+	haveProf := false
+	if loader := profiles.NewFromDir(filepath.Join(req.ProjectRoot, ".evolve", "profiles")); loader != nil {
+		if loaded, err := loader.Get("retrospective"); err == nil {
+			prof = loaded
+			haveProf = true
+		}
+	}
 	cli := req.Env["EVOLVE_CLI"]
 	if cli == "" {
-		if loader := profiles.NewFromDir(filepath.Join(req.ProjectRoot, ".evolve", "profiles")); loader != nil {
-			if prof, perr := loader.Get("retrospective"); perr == nil && prof.CLI != "" {
-				cli = prof.CLI
-			}
+		if haveProf && prof.CLI != "" {
+			cli = prof.CLI
 		}
 	}
 	if cli == "" {
 		cli = "claude-tmux"
 	}
 
+	model := p.model
+	if model == "auto" {
+		model = "balanced"
+		if haveProf && prof.ModelTierDefault != "" {
+			model = prof.ModelTierDefault
+		}
+	}
+
 	// Skill overlays: resolve the tier-gated persona for this retro launch and
 	// thread the NAMES onto BridgeRequest.Skills, matching the phase runner — a
 	// deep/top-tier retro gets the fable operating-discipline overlay. Fail-open.
-	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, p.model)
+	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
 
-	bres, bridgeErr := p.bridge.Launch(ctx, core.BridgeRequest{
+	bridgeReq := core.BridgeRequest{
 		CLI:                cli,
 		Profile:            profilePath,
-		Model:              p.model,
+		Model:              model,
 		Prompt:             prompt,
 		Workspace:          req.Workspace,
 		Worktree:           retroWorktree(req),
@@ -181,7 +195,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Cycle:              req.Cycle,
 		Env:                req.Env,
 		Skills:             overlaySkills,
-	})
+	}
+	bres, bridgeErr := p.bridge.Launch(ctx, bridgeReq)
+	if bridgeErr != nil && core.DeliveryFailureCause(bridgeErr) != "" {
+		bres, bridgeErr = p.bridge.Launch(ctx, bridgeReq)
+	}
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 
 	if bridgeErr != nil {
