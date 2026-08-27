@@ -114,6 +114,14 @@
       "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded",
       "response_keys": null,
       "policy": "escalate"
+    },
+    {
+      "name": "plan_question",
+      "regex": "(?s)Question \\d+/\\d+ \\(\\d+ unanswered\\).{0,900}enter to submit answer[^\\n]*\\s*\\z",
+      "response_keys": "Enter",
+      "tail_lines": 9,
+      "policy": "auto_respond",
+      "note": "Codex plan-mode clarifying-question picker (collaboration_modes is graduated-on in 0.147.0; entry is /plan or Shift+Tab, in-session). Enter submits the pre-selected '(Recommended)' option; a bare Enter is correct here because the right answer is the pre-selection, not a fixed index. BOTTOM-ANCHORED (\\z) for the same reasons as claude's plan_approval - critically including the answered-picker re-fire, which matters more on this CLI because codex-tmux captures bootScrollback=200 lines, the depth that produced the 2026-06-03 trust-dialog loop-guard abandon. The picker is multi-question, so the rule must stay multi-fire (NOT once:true) and answer each live question while never re-firing on a dismissed one. Span bound 900 (live: 464-494, sampled on a single 4-option form, so the bound carries slack for longer forms; 900 not 1200 because Go RE2 caps repeat counts at 1000 and an over-large bound makes the rule SILENTLY INERT - decideAutoRespond swallows the compile error); tail is the remainder of the footer line only (live: 47 chars, no newline). Source: docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md."
     }
   ],
   "stub": false,

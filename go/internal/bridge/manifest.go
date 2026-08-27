@@ -65,6 +65,18 @@ type ManifestPrompt struct {
 	// re-match every poll and trip the loop guard. Recurring prompts (per-edit
 	// approval, AskUserQuestion menus) leave this false.
 	Once bool `json:"once"`
+	// TailLines restricts matching to the LAST n lines of the captured pane.
+	// A live modal is always at the bottom; anything that has scrolled above it
+	// — a dialog the agent already answered, or one quoted in a file the agent
+	// is reading — is then structurally unmatchable rather than merely
+	// improbable. Zero (the default) matches the whole capture, so existing
+	// rules are unaffected.
+	//
+	// This exists because a byte-distance bound cannot express "is it live":
+	// a generous tail bound still matches a dismissed dialog with a little
+	// output under it, and a tight one breaks when the dialog's own footer
+	// wraps. Line windows survive both.
+	TailLines int `json:"tail_lines"`
 }
 
 // Manifest is a per-CLI capability manifest (schema v1). Drives probe
