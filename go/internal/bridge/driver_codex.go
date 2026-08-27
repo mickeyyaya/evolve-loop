@@ -8,9 +8,14 @@ import (
 )
 
 // codexDriver is the OpenAI Codex CLI driver — the Go port of
-// drivers/codex.sh (`codex exec --output-last-message`). Codex has no
-// claude-style plan mode, so it rejects permission_mode loudly rather
-// than silently ignoring an operator's safety declaration.
+// drivers/codex.sh (`codex exec --output-last-message`). Codex exposes no
+// --permission-mode FLAG (it uses approval_policy/sandbox_mode instead), so it
+// rejects permission_mode loudly rather than silently ignoring an operator's
+// safety declaration. NOTE: this is about the flag, not the feature — codex DOES
+// have plan mode (0.147.0 ships collaboration_modes graduated-on; entry is
+// `/plan` or Shift+Tab, in-session). An earlier form of this comment said "codex
+// has no claude-style plan mode" and was read as settling the capability
+// question; see docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md.
 type codexDriver struct{}
 
 func (codexDriver) Name() string { return "codex" }

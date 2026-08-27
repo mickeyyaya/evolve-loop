@@ -140,7 +140,14 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 		if err != nil {
 			continue
 		}
-		if !re.MatchString(pane) {
+		// A rule may restrict itself to the tail of the capture (see
+		// ManifestPrompt.TailLines): live modals sit at the bottom, so this is
+		// how a rule says "only if this is on screen NOW".
+		subject := pane
+		if p.TailLines > 0 {
+			subject = lastLines(subject, p.TailLines)
+		}
+		if !re.MatchString(subject) {
 			continue
 		}
 		// ADR-0047 state-gate: a policy=escalate prompt (rate_limit/quota/auth)
@@ -299,6 +306,19 @@ func (ar *autoResponder) firedRuleOnce(prevCounts map[string]int) bool {
 	return false
 }
 
+// firedRuleName returns the rule whose count just incremented, so an
+// auto-response can be attributed in the phase log. Escalations already name
+// their pattern; sends did not, which left the most consequential injections
+// (a keystroke into a modal) the least greppable thing in the log.
+func (ar *autoResponder) firedRuleName(prevCounts map[string]int) string {
+	for _, p := range ar.prompts {
+		if ar.counts[p.Name] > prevCounts[p.Name] {
+			return p.Name
+		}
+	}
+	return "unknown"
+}
+
 // pendingAutoRespond is one injection awaiting its outcome: the rule/source
 // that fired, its compiled pattern (re-checked against the NEXT capture), the
 // payload, the send timestamp, and the I1 Kind/Trigger to record under (an
@@ -426,7 +446,7 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 			humanSendKeysCSV(ctx, ar.deps, session, keysCSV)
 		} else {
 			sendKeySequence(ctx, ar.deps, session, keysCSV)
-			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s\n", keysCSV)
+			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s (rule=%s)\n", keysCSV, ar.firedRuleName(prevCounts))
 		}
 		ar.openPending(prevCounts, keysCSV)
 		return "", 1

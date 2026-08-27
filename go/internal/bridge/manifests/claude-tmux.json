@@ -155,6 +155,14 @@
       "response_keys": "Enter",
       "policy": "auto_respond",
       "note": "Cosmetic redraw prompt; just press Enter"
+    },
+    {
+      "name": "plan_approval",
+      "regex": "(?s)ready to execute\\. Would you like to proceed\\?.{0,400}2\\.\\s+Yes, manually approve edits.{0,300}ctrl\\+g to edit in Vim.{0,200}\\.md\\s*\\z",
+      "response_keys": "Enter",
+      "tail_lines": 9,
+      "policy": "auto_respond",
+      "note": "ExitPlanMode approval. Enter accepts the pre-highlighted option 1, an approval in both observed launch-mode variants. BOTTOM-ANCHORED (\\z): a live dialog is always at the END of the capture, so scrollback that has scrolled up - including this repo's OWN docs and test fixtures, which quote the dialog verbatim on tracked files an agent may cat - cannot match. That single anchor closes the self-match, the answered-dialog re-fire, and the diff-line-deletion attacks together; distance bounds alone did not (a matcher that DELETES lines can shrink any gap). Tail bound 400 (live: 155, and the footer carries a variable-length plan path). Response is a bare Enter, NOT the explicit '1,Enter' the per_edit_approval note argues for: Enter is what was verified live against this dialog and '1' as a hotkey was not, and shipping an unverified keystroke is the exact class of error this rule exists to prevent. Source: docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md."
     }
   ],
   "_notes_on_removed_patterns": {
