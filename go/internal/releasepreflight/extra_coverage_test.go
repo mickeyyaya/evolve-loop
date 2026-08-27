@@ -171,7 +171,7 @@ func TestCheckRecentAudit_AllPhantom(t *testing.T) {
 		auditEntry("", "2026-05-27T00:00:00Z"),                             // empty path → phantom
 		auditEntry("/nonexistent/audit-report.md", "2026-05-27T00:00:00Z"), // missing → phantom
 	)
-	got, err := checkRecentAudit(ledger, false, time.Now())
+	got, err := checkRecentAudit(ledger, "", false, time.Now())
 	if err != nil {
 		t.Errorf("all-phantom must be advisory (no error), got: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestCheckRecentAudit_UnreadableArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := writeLedger(t, auditEntry(artDir, "2026-05-27T00:00:00Z"))
-	_, err := checkRecentAudit(ledger, false, time.Now())
+	_, err := checkRecentAudit(ledger, "", false, time.Now())
 	if err == nil {
 		t.Error("expected read error when artifact is a directory")
 	}
@@ -207,7 +207,7 @@ func TestCheckRecentAudit_MissingTS(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := writeLedger(t, auditEntry(art, "")) // no ts
-	_, err := checkRecentAudit(ledger, false, time.Now())
+	_, err := checkRecentAudit(ledger, "", false, time.Now())
 	if err == nil {
 		t.Error("expected 'ledger entry missing ts' error")
 	}
@@ -349,7 +349,7 @@ func TestRun_GateTestsRunWithStubSeam(t *testing.T) {
 func TestCheckRecentAudit_NoAuditorEntries(t *testing.T) {
 	t.Parallel()
 	ledger := writeLedger(t, `{"role":"builder","ts":"2026-05-27T00:00:00Z"}`+"\n")
-	got, err := checkRecentAudit(ledger, false, time.Now())
+	got, err := checkRecentAudit(ledger, "", false, time.Now())
 	if err != nil {
 		t.Errorf("no-auditor-entry must be advisory (no error), got: %v", err)
 	}
@@ -366,7 +366,7 @@ func TestCheckRecentAudit_NoAuditorEntries(t *testing.T) {
 func TestCheckRecentAudit_AbsentLedger(t *testing.T) {
 	t.Parallel()
 	absent := filepath.Join(t.TempDir(), "nonexistent", "ledger.jsonl")
-	got, err := checkRecentAudit(absent, false, time.Now())
+	got, err := checkRecentAudit(absent, "", false, time.Now())
 	if err != nil {
 		t.Errorf("absent ledger must be advisory (no error), got: %v", err)
 	}
@@ -386,7 +386,7 @@ func TestCheckRecentAudit_NoVerdictNonStrict(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
-	_, err := checkRecentAudit(ledger, false, time.Now())
+	_, err := checkRecentAudit(ledger, "", false, time.Now())
 	fixtures.RequireErrContains(t, err, "does not declare 'Verdict: PASS' or 'Verdict: WARN'")
 }
 
@@ -400,7 +400,7 @@ func TestCheckRecentAudit_NoVerdictStrict(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
-	_, err := checkRecentAudit(ledger, true, time.Now())
+	_, err := checkRecentAudit(ledger, "", true, time.Now())
 	fixtures.RequireErrContains(t, err, "STRICT_PASS")
 }
 
@@ -414,7 +414,7 @@ func TestCheckRecentAudit_UnparseableTS(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := writeLedger(t, auditEntry(art, "not-a-date"))
-	res, err := checkRecentAudit(ledger, false, time.Now())
+	res, err := checkRecentAudit(ledger, "", false, time.Now())
 	if err != nil {
 		t.Errorf("unparseable ts should skip age check (nil err), got %v", err)
 	}

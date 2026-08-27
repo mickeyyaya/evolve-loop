@@ -185,11 +185,13 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// fail-open: a skipped Lookup costs one shadow log line, but a poisoned
 	// Put sits in the shared store for every future consumer. No base
 	// identity ⇒ no cache write.
-	// FAIL verdicts are ledger-bound above but never cache-projected: the
-	// cache exists to let identical known-good trees skip a re-audit, and its
-	// consumers were designed against PASS|WARN content only. A FAILed tree
-	// re-audits from scratch.
-	if verdict == VerdictFAIL {
+	// Ledger-bound above, but only a REUSABLE verdict is cache-projected: the
+	// cache exists to let identical known-good trees skip a re-audit, so a FAIL
+	// (a rejection) and a SKIPPED (no audit ran) must never enter it. The
+	// vocabulary lives in verdictcache.Reusable, the same predicate the store's
+	// write guard and the RUNG 0 composition snapshot use, so the three sites
+	// cannot drift apart (the ProbeEligible precedent, ADR-0048 cycle-1488).
+	if !verdictcache.Reusable(verdict) {
 		return
 	}
 	if worktreeBase == "" {

@@ -264,6 +264,10 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		ChallengeToken: token,
 		GitHEAD:        gitHead,
 		TreeStateSHA:   treeDiff,
+		// Cycle-1571 H1: ship's binding lookup is run-scoped, so an entry with
+		// no run identity can never be bound. Resolved from the run workspace
+		// because this runner may execute out of the orchestrator's process.
+		RunID: core.RunIDFromWorkspace(req.Workspace),
 	}
 	if ledgerErr := r.cfg.Ledger.Append(ctx, entry); ledgerErr != nil {
 		// Surface ledger-append failure as a diagnostic but don't shadow

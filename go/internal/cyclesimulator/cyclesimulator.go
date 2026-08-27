@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // Exit codes (matches cycle-simulator.sh):
@@ -321,6 +323,13 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 		"prev_hash":       prevHash,
 		"simulated":       true,
 	}
+	// Cycle-1571 H1: a run-scoped binding lookup refuses an entry with no run
+	// identity. The simulator writes into the SAME ledger as the real loop, so
+	// its entries carry it too — resolved from the artifact's own run workspace.
+	// Set only when resolvable, mirroring core's `json:"run_id,omitempty"`.
+	if runID := core.RunIDFromWorkspace(filepath.Dir(artifactPath)); runID != "" {
+		entry["run_id"] = runID
+	}
 	line, err := jsonCompact(entry)
 	if err != nil {
 		return err
@@ -389,13 +398,23 @@ func runGit(dir string, args ...string) string {
 }
 
 // jsonCompact serializes a map[string]any with a stable key order matching
-// the bash jq -nc output: ts, cycle, role, kind, model, exit_code, duration_s,
-// artifact_path, artifact_sha256, challenge_token, git_head, tree_state_sha,
-// entry_seq, prev_hash, simulated. Stable order is load-bearing for
-// downstream hash-chain verifiers that recompute SHA over the raw line.
+// the bash jq -nc output: ts, cycle, run_id, role, kind, model, exit_code,
+// duration_s, artifact_path, artifact_sha256, challenge_token, git_head,
+// tree_state_sha, entry_seq, prev_hash, simulated. Stable order is load-bearing
+// for downstream hash-chain verifiers that recompute SHA over the raw line.
+//
+// The list below is an ALLOWLIST, not a sort order: a key absent from it is
+// silently dropped however the caller populated the map. That is how run_id was
+// first "added" to the simulator and emitted nothing (go-review CRITICAL) — keep
+// this comment and the slice in step.
 func jsonCompact(m map[string]any) (string, error) {
 	keys := []string{
-		"ts", "cycle", "role", "kind", "model", "exit_code", "duration_s",
+		// run_id sits right after cycle, matching the field order the other
+		// agent_subprocess writers emit. jsonCompact is an ALLOWLIST: a key
+		// absent from this slice is silently dropped no matter what the caller
+		// put in the map, which is how the first attempt at stamping the
+		// simulator looked correct and emitted nothing (go-review CRITICAL).
+		"ts", "cycle", "run_id", "role", "kind", "model", "exit_code", "duration_s",
 		"artifact_path", "artifact_sha256", "challenge_token",
 		"git_head", "tree_state_sha", "entry_seq", "prev_hash", "simulated",
 	}

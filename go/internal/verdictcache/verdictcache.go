@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // schemaVersion is the on-disk format version of .evolve/verdict-cache.json.
@@ -105,12 +107,40 @@ func ProbeEligible(baseTreeSHA, candidateTreeSHA string) bool {
 	return baseTreeSHA == "" || candidateTreeSHA != baseTreeSHA
 }
 
+// Reusable reports whether a verdict may let a later run skip work on its
+// strength. PASS and WARN ship (WARN by the fluent-audit default); FAIL is a
+// rejection and SKIPPED means no audit ran, so neither may be carried forward,
+// and an out-of-vocabulary string is never trusted.
+//
+// This is the SINGLE definition of the cacheable/carry-forward vocabulary.
+// Before cycle-1571 it existed three times over: documented on Entry.Verdict,
+// enforced nowhere by the store, and hand-written as `verdict == VerdictFAIL`
+// at the binding call site — while the RUNG 0 composition snapshot, which needs
+// the same rule, consulted no verdict at all and would carry a REJECTED audit
+// forward. One predicate, so the three sites cannot drift (§3.5).
+func Reusable(verdict string) bool {
+	// The canonical constants, not literals: this predicate exists so the
+	// vocabulary has ONE definition, and re-typing the words here would leave a
+	// copy that can drift from the enum every other reader keys on. cyclestate
+	// is a zero-dependency leaf (verified: it does not import this package), so
+	// the edge is safe — importing core would not be.
+	return verdict == cyclestate.VerdictPASS || verdict == cyclestate.VerdictWARN
+}
+
 // Put upserts e keyed by e.TreeSHA (read-modify-write + temp+rename). An empty
 // TreeSHA is a no-op (a verdict with no content identity cannot be
 // content-addressed) — never an error, so a best-effort caller need not branch.
+//
+// A non-Reusable verdict is REFUSED: this store is shared, its entries outlive
+// the cycle that wrote them, and the enforce-stage lookup would skip real work
+// on a rejected tree's strength. The write side fails closed on purpose — the
+// same asymmetry the binding call site documents.
 func (s *Store) Put(e Entry) error {
 	if e.TreeSHA == "" {
 		return nil
+	}
+	if !Reusable(e.Verdict) {
+		return fmt.Errorf("verdictcache: refusing to cache verdict %q for tree %s — only PASS/WARN are reusable", e.Verdict, e.TreeSHA)
 	}
 	if e.CachedAt.IsZero() {
 		e.CachedAt = s.now().UTC()
