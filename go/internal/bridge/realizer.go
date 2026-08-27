@@ -153,15 +153,44 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	return r
 }
 
-// dedupeLaunchFlags returns a copy of in with subsequent duplicates removed,
-// preserving order. Treats each token as an independent unit — a flag with
-// distinct values (e.g. -m gpt-5.4 vs -m gpt-5.5) is correctly kept twice
-// because the token values differ. Use ONLY for boolean-style flags
-// (--yolo, --dangerously-skip-permissions) where a duplicate is purely
-// redundant; flag-value pairs that legitimately repeat (e.g. multiple
-// --include patterns) should NOT be deduped this way. The current callers
-// from Realize emit boolean flags or unique flag/value pairs, so this
-// matches the contract.
+// dedupeLaunchFlags returns a copy of in with subsequent duplicate UNITS
+// removed, preserving order. A unit is a flag-value PAIR when a `-`-prefixed
+// token is followed by a non-flag token (`-c key=val`, `-m model`), otherwise
+// the single token (`--yolo`). So a flag repeated with distinct values is kept
+// in full, while an identical pair or a repeated boolean collapses.
+//
+// LIMITATION, deliberate and pinned: pairing keys on "the next token does not
+// start with `-`", NOT on flag arity, which nothing here can know. So a value
+// that itself begins with `-` is not recognised as a value, and that pair
+// degrades to the old token-wise behaviour — `--min -1 --max -1` still yields
+// `--min -1 --max`, dropping the second `-1` and leaving `--max` dangling. No
+// manifest or tracked profile emits a `-`-leading value today; the case is
+// pinned in realizer_dedupe_pairs_test.go so a future one is caught here rather
+// than in a lane. An empty next token is likewise not treated as a value (see
+// the guard below).
+//
+// It used to dedupe individual tokens, which did neither thing its own comment
+// claimed. `-m gpt-5.4 -m gpt-5.5` became `-m gpt-5.4 gpt-5.5` — the repeated
+// FLAG dropped, both VALUES kept, i.e. a different command line rather than a
+// deduplicated one, with the second value silently demoted to a positional.
+// Latent until codex's effort param needed two `-c` overrides
+// (model_reasoning_effort + plan_mode_reasoning_effort) and the realized argv
+// came out as `-c model_reasoning_effort=high plan_mode_reasoning_effort=high`.
+// Caught by an exact-argv pin, which is the argument for pinning argv exactly.
+//
+// Its original purpose (cycle-124 G1a) was a manifest's default_args declaring
+// a flag that a param also emits — e.g. agy-tmux declaring
+// --dangerously-skip-permissions in both. That collision no longer exists on
+// any manifest (claude-tmux and agy-tmux both ship default_args: []), so the
+// live jobs today are the internal-duplicate typo guard and, above all, NOT
+// corrupting codex's two `-c` overrides. Order-preserving, keep-first, so an
+// operator-declared default retains the leading position. Idempotent.
+//
+// One asymmetry versus the old behaviour, recorded rather than fixed: a bare
+// flag no longer dedupes against the same flag used as a pair, so
+// ["-c","a=1","-c"] keeps the dangling "-c" where token-wise dedupe dropped it.
+// Only reachable through an operator typo in extra_flags_by_cli, and a dangling
+// -c is a loud codex parse error rather than a silent wrong command line.
 func dedupeLaunchFlags(in []string) []string {
 	if len(in) <= 1 {
 		return in
@@ -173,12 +202,31 @@ func dedupeLaunchFlags(in []string) []string {
 	// caller hold a pre-dedupe reference for diagnostics without
 	// witnessing in-place writes through it.
 	out := make([]string, 0, len(in))
-	for _, tok := range in {
-		if _, dup := seen[tok]; dup {
+	for i := 0; i < len(in); i++ {
+		tok := in[i]
+		// NUL joins the pair key so a value containing the separator cannot
+		// forge a collision with a different flag/value split.
+		unit, paired := tok, false
+		// in[i+1] != "": an empty token is manifest noise (a typo or a stray
+		// element), not a flag's value. Pairing with it would preserve that
+		// noise and let two different flags with empty values collide on the
+		// bare "" key. Empty tokens therefore stay standalone and collapse, as
+		// they did before this rewrite.
+		if strings.HasPrefix(tok, "-") && i+1 < len(in) && in[i+1] != "" && !strings.HasPrefix(in[i+1], "-") {
+			unit, paired = tok+"\x00"+in[i+1], true
+		}
+		if _, dup := seen[unit]; dup {
+			if paired {
+				i++ // drop the pair's value alongside its flag
+			}
 			continue
 		}
-		seen[tok] = struct{}{}
+		seen[unit] = struct{}{}
 		out = append(out, tok)
+		if paired {
+			out = append(out, in[i+1])
+			i++
+		}
 	}
 	return out
 }

@@ -130,15 +130,62 @@ either dialog or of the plan-mode footer. No phase agent has entered plan mode
 in production. The rules exist so that the first one to do so does not cost a
 lane.
 
-## Operational note for enabling plan mode deliberately
+## Operational note for enabling plan mode deliberately (SUPERSEDED — see the follow-up below)
 
 Entering plan mode on codex **silently drops reasoning effort to the plan-mode
 preset** — observed live as `gpt-5.6-sol xhigh` → `gpt-5.6-sol medium` the moment
-`/plan` engaged. Anyone turning plan mode on for a phase must also pin
-`plan_mode_reasoning_effort` in `config.toml`, or the hardest work gets planned
-at the weakest tier. There is no documented config key that forces a session to
+`/plan` engaged. **Superseded 2026-08-27:** the loop now emits
+`-c plan_mode_reasoning_effort=<tier>` on every codex launch, so no operator
+action is needed and `config.toml` is the wrong place for it anyway — it is
+host-global (no per-phase tier), it leaks into the operator's own interactive
+sessions, and that file is already append-only trust state serialised under a
+lock by `codex_pretrust.go`. The original advice is kept here only so the
+follow-up section reads in sequence. There is no documented config key that forces a session to
 *start* in plan mode; entry is `/plan` or Shift+Tab, both in-session, which the
 tmux drivers can send.
+
+## Follow-up (2026-08-27, later) — the effort downgrade is now fixed, and fixing it exposed a realizer defect
+
+**Issue.** The operational note above said plan mode drops codex's reasoning
+effort and left the fix to whoever enabled plan mode. That was too passive: the
+loop passes `-c model_reasoning_effort=<tier>` on every codex launch, and plan
+mode ignores it. Codex's config reference is explicit — `plan_mode_reasoning_effort`
+is a "plan-mode-specific reasoning override" and "when unset, Plan mode uses its
+built-in preset default"; there is no fallback to the general key, and no
+plan-mode *model* key at all (`model` applies across modes).
+
+Verified live on codex-cli 0.147.0, launched as the loop launches it:
+
+| launch | before `/plan` | after `/plan` |
+|---|---|---|
+| `-m gpt-5.6-sol -c model_reasoning_effort=xhigh` | `gpt-5.6-sol xhigh` | **`gpt-5.6-sol medium`** |
+| … plus `-c plan_mode_reasoning_effort=xhigh` | `gpt-5.6-sol xhigh` | **`gpt-5.6-sol xhigh`** |
+
+**Gap.** Every parity assertion in the tree pins *launch flags*, so all of them
+stayed green while the session ran a tier lower. A gate that cannot observe the
+downgrade is worse than no gate, because it gets cited as evidence the downgrade
+did not happen.
+
+**Solution.** Every tier in `codex-tmux.json`'s effort param now emits both keys
+in lockstep, so plan mode inherits the phase's tier instead of a preset.
+
+**And the realizer would have silently dropped it.** `dedupeLaunchFlags` deduped
+individual TOKENS, so the second `-c` was discarded as a duplicate and the
+realized argv became `-c model_reasoning_effort=high plan_mode_reasoning_effort=high`
+— the plan key demoted to a bare positional. Its own doc comment had warned that
+"flag-value pairs that legitimately repeat should NOT be deduped this way", and
+separately claimed `-m a -m b` was "correctly kept twice", which was false: that
+input produced `-m a b`, passing a model name as a positional argument, i.e. into
+the prompt. Two tests **endorsed** the old behaviour — one calling it "the documented
+contract", one a "documented footgun" — while two exact-argv expectations
+**detected** it (the realized-manifest pin and the end-to-end launch string). A
+wrong belief replicated in the prose, caught by the assertions that spelled the
+command line out in full. Dedupe now operates on flag-value **units**; the two
+endorsing pins are flipped and the two detecting pins updated to the corrected
+argv, each with the reason recorded.
+
+The exact-argv assertions are what caught this. Had they used `Contains` instead
+of equality, the dropped flag would have shipped silently.
 
 ## Two further defects this work surfaced
 

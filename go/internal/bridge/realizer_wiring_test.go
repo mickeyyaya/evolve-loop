@@ -116,7 +116,11 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// is in chatgpt_safe_models, so the realized balanced tier
 			// (gpt-5.6-terra) passes through. The leak-absent assertions below
 			// are what this case actually guards; the model value rides along.
-			want:   "codex --yolo -m gpt-5.6-terra -c 'model_reasoning_effort=high'",
+			// The second -c is the plan-mode effort override (2026-08-27). This
+			// is the END-TO-END launch string reaching tmux, so it is also the
+			// wiring proof that the flag survives realization, dedupe and
+			// quoting — the three places it could have been dropped.
+			want:   "codex --yolo -m gpt-5.6-terra -c 'model_reasoning_effort=high' -c 'plan_mode_reasoning_effort=high'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}
