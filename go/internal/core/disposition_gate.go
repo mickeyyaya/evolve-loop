@@ -40,6 +40,25 @@ type disposition struct {
 	ProposedItem  string `json:"proposed_item"`
 }
 
+// readDispositionLegitimacy returns disposition.json's legitimacy field, or ""
+// when the file is absent, unreadable, or malformed. It is the fail-SOFT
+// counterpart to VerifyDisposition's fail-HARD gate, and exists for readers that
+// treat the disposition as EVIDENCE rather than as a contract — the audit-repair
+// rule, which must never grant a retry on the strength of a file it could not
+// read. Returning "" there means "not eligible", so soft-failing is the safe
+// direction; VerifyDisposition remains the only enforcement path.
+func readDispositionLegitimacy(workspace string) string {
+	b, err := os.ReadFile(filepath.Join(workspace, "disposition.json"))
+	if err != nil {
+		return ""
+	}
+	var d disposition
+	if err := json.Unmarshal(b, &d); err != nil {
+		return ""
+	}
+	return d.Legitimacy
+}
+
 // Disposition enum vocabularies. Out-of-vocabulary values are rejected with the
 // offending field named, so a JSON-parses-cleanly document still fails the gate.
 var (

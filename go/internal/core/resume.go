@@ -381,6 +381,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// (bounded only by the resume safety counter — ~15 LLM dispatches).
 			// The next pre-phase WriteCycleState persists the consumed slot.
 			consumeBookkeepingRegradeGrant(&cs, reason)
+			consumeAuditRepairGrant(&cs, reason)
 			result.RetroDecision = reason
 			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
 			// a floor category halts + escalates rather than looping as task-level.

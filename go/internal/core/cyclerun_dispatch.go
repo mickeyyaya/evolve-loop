@@ -109,6 +109,11 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		phaseCtx["previous_verdict"] = cr.lastVerdict
 	}
+	// Audit-repair re-dispatch: hand tdd/build the audit's OWN rejection so the
+	// repair is targeted instead of blind. State-derived (see
+	// seedAuditRepairContext) and copy-on-write, so it cannot leak into later
+	// phases or diverge from the resume path.
+	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
 	phaseReq := PhaseRequest{
 		Cycle:         cr.cycle,
 		ProjectRoot:   cr.req.ProjectRoot,
