@@ -226,10 +226,18 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 // order-preserving dedupe: when a manifest declares the same token in
 // default_args AND one of its params channels emits the same token, the
 // duplicate is silently dropped (the operator-declared default keeps the
-// leading position). This is the documented invariant for boolean-style
-// flags; flag/value PAIRS with different VALUES are preserved (the dedup is
-// token-level, so `--model gpt-5.4` and `--model gpt-5.5` would both
-// survive — neither matches the other as tokens).
+// leading position). This is the documented invariant for boolean-style flags;
+// flag/value PAIRS with different VALUES are preserved because dedupe keys on
+// the PAIR.
+//
+// This comment previously said the opposite — that dedupe was "token-level, so
+// `--model gpt-5.4` and `--model gpt-5.5` would both survive — neither matches
+// the other as tokens". That was the exact belief the assertion below encoded,
+// and it was false in a way the sentence hid: token-wise dedupe dropped the
+// second `--model` and kept BOTH values, yielding `--model gpt-5.4 gpt-5.5` and
+// demoting a model name to a positional argument (i.e. into the prompt, since
+// the tmux launch line carries no other positional). Corrected 2026-08-27 with
+// the assertion, so the prose and the pin can no longer disagree.
 func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 	// Collision case: default_args declares the same flag the bypass channel
 	// emits. Result must contain it exactly ONCE, at the leading position.
@@ -243,9 +251,9 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		t.Fatalf("colliding token must dedupe to one; got %v, want [--bypass]", got.LaunchFlags)
 	}
 
-	// Distinct-value case: different VALUES of the same FLAG NAME survive
-	// (token-level dedupe doesn't conflate them). This is the property that
-	// makes the dedupe safe for non-boolean params.
+	// Distinct-value case: different VALUES of the same FLAG NAME each survive
+	// as their own pair. See this function's header for why the previous
+	// wording here was wrong.
 	m2 := Manifest{
 		CLI:         "hypo2",
 		DefaultArgs: []string{"--model", "gpt-5.4"},
@@ -255,14 +263,12 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		ModelTierMap: map[string]string{"sonnet": "gpt-5.5"},
 	}
 	got2 := Realize(m2, LaunchIntent{ModelTier: "sonnet"})
-	// First --model appears (default_args), gpt-5.4 appears, second --model is
-	// a duplicate token (dropped), gpt-5.5 appears. Net result keeps both
-	// values but only the first --model — accept that minor weirdness as the
-	// documented contract: dedupe is intentionally token-level, not
-	// flag-pair-aware. Callers that need pair semantics must not declare the
-	// flag in both default_args and params.
-	if !reflect.DeepEqual(got2.LaunchFlags, []string{"--model", "gpt-5.4", "gpt-5.5"}) {
-		t.Fatalf("token-level dedupe contract violated; got %v, want [--model gpt-5.4 gpt-5.5]", got2.LaunchFlags)
+	// FLIPPED 2026-08-27 (header explains why): both pairs survive, and
+	// last-one-wins lets the param-resolved tier take effect — which is what a
+	// caller declaring the param wanted. Declaring the same flag in both
+	// default_args and params remains poor hygiene, but is no longer harmful.
+	if !reflect.DeepEqual(got2.LaunchFlags, []string{"--model", "gpt-5.4", "--model", "gpt-5.5"}) {
+		t.Fatalf("pair-level dedupe expected; got %v, want [--model gpt-5.4 --model gpt-5.5]", got2.LaunchFlags)
 	}
 }
 
@@ -291,9 +297,16 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 			[]string{"--flag", "value"},
 		},
 		{
-			"flag-value pair with DISTINCT values → flag dedup, both values kept (documented footgun)",
+			// FLIPPED 2026-08-27: this pinned a documented FOOTGUN — token-wise
+			// dedupe dropped the repeated flag and kept both values, silently
+			// rewriting `--model x --model y` into `--model x y` and demoting
+			// the second value to a positional. dedupeLaunchFlags now dedupes
+			// flag-value PAIRS as units, which is what its doc comment always
+			// claimed. Exposed by codex's effort param needing two `-c`
+			// overrides; see codex_plan_effort_test.go.
+			"flag-value pair with DISTINCT values → both pairs kept intact",
 			[]string{"--model", "x", "--model", "y"},
-			[]string{"--model", "x", "y"},
+			[]string{"--model", "x", "--model", "y"},
 		},
 		{
 			"heterogeneous duplicates → first occurrence wins, order preserved",

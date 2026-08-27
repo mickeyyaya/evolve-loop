@@ -31,23 +31,32 @@
       "from": "model_tier_map"
     },
     "effort": {
+      "_note": "Each tier emits TWO -c overrides. Codex's plan mode does not inherit model_reasoning_effort: its config reference calls plan_mode_reasoning_effort a plan-mode-specific override and says an unset value falls back to codex's OWN built-in preset, not to the general key. Observed live on 0.147.0 launched as the loop launches it: the status bar read 'gpt-5.6-sol xhigh' before /plan and 'gpt-5.6-sol medium' after; adding the override held xhigh. There is no plan-mode MODEL key - 'model' applies across modes, so -m needs no counterpart. The two keys must move together (codex_plan_effort_test.go). Safe on codex builds predating the key: unknown -c keys are tolerated by default - --strict-config exists precisely to opt INTO erroring on unrecognised fields, and the loop never passes it (verified: 'codex doctor -c definitely_bogus_key_xyz=1' exits 0).",
       "channel": "flag",
       "values": {
         "low": [
           "-c",
-          "model_reasoning_effort=low"
+          "model_reasoning_effort=low",
+          "-c",
+          "plan_mode_reasoning_effort=low"
         ],
         "medium": [
           "-c",
-          "model_reasoning_effort=medium"
+          "model_reasoning_effort=medium",
+          "-c",
+          "plan_mode_reasoning_effort=medium"
         ],
         "high": [
           "-c",
-          "model_reasoning_effort=high"
+          "model_reasoning_effort=high",
+          "-c",
+          "plan_mode_reasoning_effort=high"
         ],
         "xhigh": [
           "-c",
-          "model_reasoning_effort=xhigh"
+          "model_reasoning_effort=xhigh",
+          "-c",
+          "plan_mode_reasoning_effort=xhigh"
         ]
       },
       "default": "high"
