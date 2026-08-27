@@ -1,6 +1,8 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,6 +35,48 @@ func ResolveCycleStatePath(evolveDir string) string {
 // the worktree read the run's OWN state — under concurrent runs the global
 // cycle-state.json holds whichever run wrote last.
 const RunStateFile = "run.json"
+
+// RunIDFromWorkspace resolves the run identity recorded in a run workspace's
+// run.json mirror. It is the SINGLE resolver every out-of-process ledger writer
+// uses to stamp run_id, so the identity ship's run-scoped binding lookup keys on
+// has one derivation rather than one per writer.
+//
+// Cycle-1571 H1: PR #503 made run_id load-bearing at the ship gate (a binding
+// lookup refuses an entry that is not THIS run's), on the premise that every
+// recorder already stamped it. Three of the four agent_subprocess writers did
+// not — they run in a separate process from the orchestrator, so the in-memory
+// currentRunID that stampingLedger uses is simply unavailable to them. The run
+// workspace they are already handed carries the id on disk.
+//
+// Fail-SOFT by design: an unresolvable id returns "" and the caller OMITS the
+// field rather than stamping an empty identity. The fail-CLOSED half belongs to
+// the consumer — ship refuses to bind an unstamped entry — and inventing or
+// zero-filling an identity here would defeat exactly that.
+func RunIDFromWorkspace(workspace string) string {
+	if workspace == "" {
+		return ""
+	}
+	path := filepath.Join(workspace, RunStateFile)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		// A missing run.json is legitimate (standalone dispatch outside a cycle);
+		// anything else — a permission error, a truncated read — is a real fault
+		// that would otherwise be indistinguishable from "no run id yet", which
+		// is the same asserted-not-verified shape that produced this defect.
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "[core] WARN run-id resolve: read %s: %v (entry will be written unstamped and cannot be bound)\n", path, err)
+		}
+		return ""
+	}
+	var probe struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal(b, &probe); err != nil {
+		fmt.Fprintf(os.Stderr, "[core] WARN run-id resolve: parse %s: %v (entry will be written unstamped and cannot be bound)\n", path, err)
+		return ""
+	}
+	return probe.RunID
+}
 
 // CycleStateFile is the global per-cycle state file under .evolve/. The single
 // home for the filename (was a string literal repeated across storage /

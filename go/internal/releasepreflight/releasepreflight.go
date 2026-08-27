@@ -79,6 +79,10 @@ type Options struct {
 	NameGuard        func(repoRoot string) ([]naminguard.Violation, error) // step 5 sub-check
 	SimulationRunner func(repoRoot string) error                           // advisory step (post-step-5)
 	CIConclusion     func(repoRoot string) (CIRunStatus, error)            // release-commit CI hard-gate
+	// HeadSHA resolves the commit being released, so step 4 can tell an audit
+	// OF THIS COMMIT from an unrelated lane's audit. An empty result keeps the
+	// conservative branch: scoping the veto must never become an escape hatch.
+	HeadSHA func(repoRoot string) (string, error)
 }
 
 // CIRunStatus is the remote GitHub CI verdict for the release commit (HEAD at
@@ -92,11 +96,15 @@ type CIRunStatus struct {
 
 // Result captures what happened; populated even on failure for diagnostics.
 type Result struct {
-	StepsPassed     int
-	StepsTotal      int
-	CurrentVersion  string
-	AuditArtifact   string
-	AuditVerdict    string // "PASS", "WARN", or "NONE" (no on-disk audit available — advisory; CI-green is the authoritative gate)
+	StepsPassed    int
+	StepsTotal     int
+	CurrentVersion string
+	AuditArtifact  string
+	// AuditVerdict is "PASS", "WARN", "NONE" (no usable on-disk audit) or
+	// "SCOPED_OUT" (an audit was found and did not pass, but did not examine the
+	// release commit's committed tree). NONE and SCOPED_OUT are both advisory —
+	// CI-green on the release commit is the authoritative gate.
+	AuditVerdict    string
 	AuditAge        time.Duration
 	PhantomEntries  int
 	GateTestsPassed int
@@ -188,6 +196,16 @@ func defaultGitClean(repoRoot string) (bool, error) {
 		return false, fmt.Errorf("git diff failed: %v", err)
 	}
 	return false, err
+}
+
+// defaultHeadSHA runs `git -C <repo> rev-parse HEAD` — the commit being
+// released, and the operand step 4 compares an auditor entry's git_head against.
+func defaultHeadSHA(repoRoot string) (string, error) {
+	out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // defaultCurrentBranch runs `git -C <repo> symbolic-ref --short HEAD`.
@@ -401,7 +419,18 @@ func Run(opts Options) (Result, error) {
 	if opts.DryRun {
 		logf("DRY-RUN: would check %s for recent auditor PASS", opts.LedgerPath)
 	} else {
-		auditRes, err := checkRecentAudit(opts.LedgerPath, opts.StrictPass, now())
+		headFn := opts.HeadSHA
+		if headFn == nil {
+			headFn = defaultHeadSHA
+		}
+		// Resolution failure is not fatal: an empty head simply keeps step 4's
+		// conservative branch, which is the same posture as before this scoping.
+		releaseHead, headErr := headFn(opts.RepoRoot)
+		if headErr != nil {
+			logf("advisory: could not resolve the release commit (%v) — a failing audit will be treated as blocking", headErr)
+			releaseHead = ""
+		}
+		auditRes, err := checkRecentAudit(opts.LedgerPath, releaseHead, opts.StrictPass, now())
 		if err != nil {
 			return res, fmt.Errorf("%w: %v", ErrCheckFailed, err)
 		}
@@ -409,12 +438,20 @@ func Run(opts Options) (Result, error) {
 		res.AuditVerdict = auditRes.verdict
 		res.AuditAge = auditRes.age
 		res.PhantomEntries = auditRes.phantomCount
-		if auditRes.verdict == auditVerdictNone {
+		switch auditRes.verdict {
+		case auditVerdictScopedOut:
+			// An audit exists and did not pass, but it did not examine this
+			// release commit's committed tree. Name the artifact and both
+			// commits: reporting it as "no audit" would misdirect an operator
+			// debugging a blocked release toward a missing-artifact hunt.
+			logf("advisory: the most recent audit (%s) did not pass, but it did not audit this release commit's tree (audited %s, releasing %s) — CI-green on the release commit is the authoritative gate (/publish). Not treating it as a veto.",
+				auditRes.artifact, shortSHA(auditRes.auditedHead), shortSHA(releaseHead))
+		case auditVerdictNone:
 			// Determinism: no on-disk audit available in this worktree (clean
 			// checkout / CI / GC'd artifacts). The authoritative release gate is
 			// CI-green on the release commit (enforced by /publish) — advisory only.
 			logf("advisory: no on-disk audit in this worktree — CI-green on the release commit is the authoritative gate (/publish). Skipping the audit-PASS check.")
-		} else {
+		default:
 			if auditRes.phantomCount > 0 {
 				logf("WARN: skipped %d phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry.", auditRes.phantomCount)
 			}
@@ -539,6 +576,9 @@ func Run(opts Options) (Result, error) {
 // --- Audit-ledger walker ---------------------------------------------------
 
 type auditResult struct {
+	// auditedHead is the commit the scoped-out entry bound, retained so the
+	// operator log can name it rather than claiming no audit exists.
+	auditedHead  string
 	artifact     string
 	verdict      string // "PASS" or "WARN"
 	age          time.Duration
@@ -550,6 +590,42 @@ var roleAuditorRE = regexp.MustCompile(`"role":"auditor"`)
 
 // artifactPathRE extracts the artifact_path field (matches jq -r .artifact_path).
 var artifactPathRE = regexp.MustCompile(`"artifact_path":"([^"]*)"`)
+
+// gitHeadRE extracts the git_head field — the commit an auditor entry bound.
+var gitHeadRE = regexp.MustCompile(`"git_head":"([^"]*)"`)
+
+// worktreeTreeSHARE extracts worktree_tree_sha, present ONLY when the audit
+// examined uncommitted worktree changes — i.e. it is the marker of a cycle/lane
+// audit as opposed to an audit of a committed tree.
+var worktreeTreeSHARE = regexp.MustCompile(`"worktree_tree_sha":"([^"]*)"`)
+
+// auditedUncommittedWork reports whether the entry bound a worktree delta.
+func auditedUncommittedWork(line string) bool {
+	m := worktreeTreeSHARE.FindStringSubmatch(line)
+	return len(m) >= 2 && m[1] != ""
+}
+
+// shortSHA abbreviates a commit for operator-facing logs; "" stays "unknown".
+func shortSHA(sha string) string {
+	if sha == "" {
+		return "unknown"
+	}
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
+// entryHead returns the commit the auditor ledger line bound, or "" when the
+// line carries none (legacy entries). An unknown head is never treated as a
+// match, so it falls to the conservative branch.
+func entryHead(line string) string {
+	m := gitHeadRE.FindStringSubmatch(line)
+	if len(m) < 2 {
+		return ""
+	}
+	return m[1]
+}
 
 // tsFieldRE extracts the ts field.
 var tsFieldRE = regexp.MustCompile(`"ts":"([^"]*)"`)
@@ -613,7 +689,13 @@ var (
 // enforced by the /publish skill. A present-but-failed audit still hard-blocks.
 const auditVerdictNone = "NONE"
 
-func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResult, error) {
+// auditVerdictScopedOut marks that an audit WAS found and did not pass, but did
+// not examine the release commit's committed tree. Distinct from auditVerdictNone
+// so the operator log cannot claim "no on-disk audit" about an audit that exists
+// and failed — an operator debugging a blocked release must not be misdirected.
+const auditVerdictScopedOut = "SCOPED_OUT"
+
+func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time) (auditResult, error) {
 	var res auditResult
 	body, err := os.ReadFile(ledgerPath)
 	if err != nil {
@@ -672,6 +754,51 @@ func checkRecentAudit(ledgerPath string, strict bool, now time.Time) (auditResul
 	}
 	verdict, ok := extractVerdict(string(artifactBody), strict)
 	if !ok {
+		// Cycle-1571 H4. A non-acceptable verdict vetoes the release only when
+		// the audit actually examined what is being released. Before PR #503 a
+		// FAILed cycle wrote no auditor entry, so this branch was effectively
+		// unreachable; #503 made FAIL entries exist, and the newest is routinely
+		// a FAILed lane cycle with no bearing on the release. Vetoing on that is
+		// false, and it contradicts this step's own determinism rule, which
+		// advisory-skips a MISSING audit precisely because CI-green on the
+		// release commit is authoritative.
+		//
+		// TWO discriminators are needed, and head alone is NOT enough — the
+		// first draft of this fix assumed a lane audit binds a lane worktree
+		// head, and that is false: recordAuditBinding resolves git_head with
+		// `rev-parse HEAD` against the PROJECT ROOT, so every concurrent lane
+		// records main's tip. Verified in the runtime ledger: cycles 1572, 1573
+		// and 1574 all carry git_head 31ae6518, each with a distinct
+		// worktree_tree_sha. Scoping on head alone would still have vetoed the
+		// very release that motivated this change.
+		//
+		//   1. a different git_head  ⇒ it audited another commit entirely;
+		//   2. a worktree_tree_sha   ⇒ a cycle/lane audit, not an audit of the
+		//      committed tree.
+		//
+		// On (2), precisely: this is NOT a delta marker. worktreeContentSHA runs
+		// `git add -A; git write-tree`, which yields a tree even for a clean
+		// worktree, so EVERY orchestrator cycle audit records one. It is absent
+		// because the other writer — subagent/run.go, the manual
+		// `evolve subagent run auditor` release audit — never emits it. So the
+		// field identifies which writer produced the entry, which is exactly the
+		// cut wanted here: a manual audit of the released commit keeps its veto.
+		// Anyone later tempted to stamp worktree_tree_sha on run.go's entry
+		// should know it would make release audits look like cycle audits and
+		// silently re-open this hole.
+		//
+		// An audit of the release commit itself has neither, so its rejection
+		// still blocks. An unresolvable releaseHead keeps the conservative
+		// block: we cannot prove the failing audit is unrelated, so we do not
+		// assume it — scoping is never a bypass.
+		auditedHead := entryHead(candidate)
+		scopedOut := releaseHead != "" &&
+			((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(candidate))
+		if scopedOut {
+			res.verdict = auditVerdictScopedOut
+			res.auditedHead = auditedHead
+			return res, nil
+		}
 		if strict {
 			return res, fmt.Errorf("EVOLVE_RELEASE_STRICT_PASS=1 and most recent audit-report.md does not declare 'Verdict: PASS' (%s)",
 				res.artifact)

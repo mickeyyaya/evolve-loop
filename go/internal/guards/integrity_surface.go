@@ -71,6 +71,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/activating_fields_guard_test.go", Rationale: "ADR-0058 registry trust anchor (drift-loud activating-fields guard)"},
 	{Fragment: "/go/internal/core/orchestrator_guard_test.go", Rationale: "inserted-phase tree-diff guard pin (cycle-274 G)"},
 	{Fragment: "/go/internal/core/phase_advisor_guard_test.go", Rationale: "advisor routing guard pin"},
+	{Fragment: "/go/internal/core/ledger_runid_writers_guard_test.go", Rationale: "the agent_subprocess run_id writer guard: closes the writer set and requires each writer to call core.RunIDFromWorkspace. Since #503 a run-scoped binding REFUSES an entry with no run_id, so a cycle that quietly delisted a writer here would make everything that writer emits unbindable and hard-stop ship at AUDIT_BINDING_NO_AUDITOR (cycle-1571 H1)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard.go", Rationale: "staging-time backstop against compiled-binary commits (tracked-binary-in-acs-dir class fix)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},
 	{Fragment: "/go/internal/bridge/driver_tmux_submitverify_guard_test.go", Rationale: "submit-verify's own keep-guard: pins that every real tmux driver declares an input-line marker (a family that omits it goes inert) and that a failed verification stays loud — a cycle editing this could re-open the cycles 1505/1510/1517 unsubmitted-prompt stall unobserved"},

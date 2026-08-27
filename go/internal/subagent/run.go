@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -415,6 +416,7 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 			GitHEAD:        gitHead,
 			TreeStateSHA:   treeDiff,
 			QualityTier:    capabilityTier(insp.Manifest),
+			RunID:          core.RunIDFromWorkspace(req.WorkspacePath),
 		}, opts.Now); err != nil {
 			return res, fmt.Errorf("subagent/run: ledger write: %w", err)
 		}
@@ -513,6 +515,10 @@ type subprocessLedger struct {
 	GitHEAD        string
 	TreeStateSHA   string
 	QualityTier    string
+	// RunID is the CA.5 run identity. Empty when it cannot be resolved from the
+	// run workspace, in which case the key is OMITTED from the line (parity with
+	// core.LedgerEntry's `json:"run_id,omitempty"`), never written as "".
+	RunID string
 }
 
 // writeSubprocessLedger appends a `kind: "agent_subprocess"` entry. Field
@@ -529,12 +535,31 @@ func writeSubprocessLedger(ledgerPath string, e subprocessLedger, now func() tim
 	if err != nil {
 		return err
 	}
+	// run_id is emitted as a whole fragment so an unresolved identity omits the
+	// key entirely instead of writing "run_id":"". Both decode to RunID == ""
+	// for every in-tree reader, so this is NOT about a third state — it is
+	// byte-shape parity with core.LedgerEntry's `json:"run_id,omitempty"` and
+	// the additive-key rule bytestability_test.go pins: an unstamped entry stays
+	// byte-identical to what this writer emitted before.
+	//
+	// The fragment is passed as an ARGUMENT (%s), never concatenated into the
+	// format string: fmt does not rescan arguments for verbs, but it does rescan
+	// the format. A '%' inside a spliced value would be read as a verb, consume
+	// the next argument and shift every field after it — silently, since the
+	// write still succeeds. jsonStringEscape cannot prevent that (it escapes
+	// \ " \n \r \t, and escaping is the wrong layer for a format hazard);
+	// argument position is what makes it structurally impossible.
+	runIDField := ""
+	if e.RunID != "" {
+		runIDField = `"run_id":"` + jsonStringEscape(e.RunID) + `",`
+	}
 	line := fmt.Sprintf(
-		`{"ts":"%s","cycle":%d,"role":"%s","kind":"agent_subprocess","model":"%s","exit_code":%d,`+
+		`{"ts":"%s","cycle":%d,%s"role":"%s","kind":"agent_subprocess","model":"%s","exit_code":%d,`+
 			`"duration_s":"%s","artifact_path":"%s","artifact_sha256":"%s","challenge_token":"%s",`+
 			`"git_head":"%s","tree_state_sha":"%s","entry_seq":%d,"prev_hash":"%s","quality_tier":"%s","cli_resolution":null}`,
 		jsonStringEscape(now().UTC().Format("2006-01-02T15:04:05Z")),
 		e.Cycle,
+		runIDField,
 		jsonStringEscape(e.Role),
 		jsonStringEscape(e.Model),
 		e.ExitCode,
