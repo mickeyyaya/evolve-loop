@@ -55,6 +55,7 @@ var additiveCycleStateKeys = []string{
 	"ship_fail_reasons",             // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
 	"bookkeeping_regrade_attempted", // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
 	"audit_repair_attempts",         // in-cycle audit-repair loop bound (wave-3 cycles 1572/1573/1574)
+	"audit_repair_active",           // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

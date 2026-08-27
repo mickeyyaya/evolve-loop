@@ -426,12 +426,6 @@ type Orchestrator struct {
 	// policy.json at the composition root; absent ⇒ compiled defaults.
 	failurePolicy policy.SystemFailurePolicy
 
-	// maxAuditRepairAttempts bounds the in-cycle audit-repair loop. Resolved
-	// from workflow.max_audit_repair_attempts at the composition root; 0
-	// disables repair entirely, which is how the feature is turned off — as
-	// configuration, never as a flag.
-	maxAuditRepairAttempts int
-
 	// maxPhaseIterations bounds RunCycle's dispatch loop (the transition-table
 	// cycle guard). 0 ⇒ defaultMaxPhaseIterations. Injected via
 	// WithMaxPhaseIterations; tests set it low to exercise the C1
@@ -645,12 +639,6 @@ func WithFailurePolicy(fp policy.SystemFailurePolicy) Option {
 	return func(o *Orchestrator) { o.failurePolicy = fp }
 }
 
-// WithMaxAuditRepairAttempts injects the in-cycle audit-repair cap
-// (workflow.max_audit_repair_attempts). Zero disables repair.
-func WithMaxAuditRepairAttempts(n int) Option {
-	return func(o *Orchestrator) { o.maxAuditRepairAttempts = n }
-}
-
 // WithMaxPhaseIterations overrides the dispatch-loop iteration bound (the
 // transition-table cycle guard). n<=0 is ignored so the defaultMaxPhaseIterations
 // safety oracle stands; tests set it low to drive RunCycle into the C1
@@ -802,23 +790,22 @@ func (o *Orchestrator) HasRunner(p Phase) bool {
 
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
-		storage:                storage,
-		ledger:                 ledger,
-		runners:                runners,
-		sm:                     NewStateMachine(),
-		now:                    time.Now,
-		gitHEAD:                defaultGitHEAD,
-		gitMutationLock:        defaultGitMutationLock,
-		gitDirtyPaths:          defaultGitDirtyPaths,
-		worktree:               gitWorktree{},
-		strategy:               router.StaticPreset{},
-		retryConfig:            policy.Policy{}.RetryConfig(),
-		workflowConfig:         policy.Policy{}.WorkflowConfig(),
-		chronicle:              policy.Policy{}.ChronicleConfig(),
-		failurePolicy:          policy.DefaultSystemFailurePolicy(),
-		maxAuditRepairAttempts: policy.DefaultMaxAuditRepairAttempts,
-		reviewer:               noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
-		observer:               noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+		storage:         storage,
+		ledger:          ledger,
+		runners:         runners,
+		sm:              NewStateMachine(),
+		now:             time.Now,
+		gitHEAD:         defaultGitHEAD,
+		gitMutationLock: defaultGitMutationLock,
+		gitDirtyPaths:   defaultGitDirtyPaths,
+		worktree:        gitWorktree{},
+		strategy:        router.StaticPreset{},
+		retryConfig:     policy.Policy{}.RetryConfig(),
+		workflowConfig:  policy.Policy{}.WorkflowConfig(),
+		chronicle:       policy.Policy{}.ChronicleConfig(),
+		failurePolicy:   policy.DefaultSystemFailurePolicy(),
+		reviewer:        noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
+		observer:        noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
 	}
 	for _, opt := range opts {
 		opt(o)

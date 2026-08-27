@@ -124,7 +124,7 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 			Level:    policy.LevelSystem,
 			Evidence: d.Evidence,
 			Halt:     true,
-		}, repairEligibility{Reason: "deterministic floor candidate " + d.FloorCandidate}
+		}, repairEligibility{}
 	}
 
 	// The audit-repair corroboration rule is evaluated HERE, in the same pass
@@ -135,15 +135,15 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 	elig := decideRepairEligibility(repairEligibilityInput{
 		DeterministicFloorCandidate: d.FloorCandidate,
 		AgentClaimedFloor:           agentClaimedFloor,
-		Legitimacy:                  readDispositionLegitimacy(cs.WorkspacePath),
+		Legitimacy:                  readDispositionLegitimacy(cs.WorkspacePath, cs.CycleID),
 		Attempts:                    cs.AuditRepairAttempts,
-		MaxAttempts:                 o.maxAuditRepairAttempts,
+		MaxAttempts:                 o.auditRepairCap(),
 	})
 
 	// (2) Orchestrator judgment — a floor-category classification halts even
 	// when its own proposed action is a retry (the F2-b cycle-1001 shape).
 	//
-	// NARROWED (audit-repair, wave-3 cycles 1572/1573/1374): this gate consumes
+	// NARROWED (audit-repair, wave-3 cycles 1572/1573/1574): this gate consumes
 	// PROSE. When the deterministic gate is silent AND the same agent's own
 	// disposition.json says legit-rejection, the agent has contradicted itself
 	// and the cycle is repaired instead of halted. Every other shape — an
@@ -154,10 +154,21 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 		if ev == "" {
 			ev = dec.Justification
 		}
+		evidence := "orchestrator-classified " + dec.Category + ": " + ev
+		// Surface the corroboration verdict (review MEDIUM): elig.Incoherent and
+		// elig.Reason were computed, documented as forensics, and then discarded,
+		// so an operator staring at an exhausted-budget halt could not tell it
+		// from an ordinary system failure — even though the contradiction is the
+		// whole reason this feature exists.
+		if elig.Incoherent {
+			evidence += " [classifier contradiction: the same agent's disposition says legit-rejection and the deterministic candidate is empty; " + elig.Reason + "]"
+		} else if elig.Reason != "" {
+			evidence += " [repair declined: " + elig.Reason + "]"
+		}
 		return &SystemFailureSignal{
 			Category: dec.Category,
 			Level:    policy.LevelSystem,
-			Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
+			Evidence: evidence,
 			Halt:     true,
 		}, elig
 	}

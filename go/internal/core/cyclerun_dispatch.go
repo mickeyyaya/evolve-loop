@@ -114,6 +114,11 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// seedAuditRepairContext) and copy-on-write, so it cannot leak into later
 	// phases or diverge from the resume path.
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
+	// The repair round ENDS at its own audit: past this point a later re-entry
+	// into tdd/build is unrelated work and must not inherit the brief.
+	if next == PhaseAudit {
+		cr.cs.AuditRepairActive = false
+	}
 	phaseReq := PhaseRequest{
 		Cycle:         cr.cycle,
 		ProjectRoot:   cr.req.ProjectRoot,

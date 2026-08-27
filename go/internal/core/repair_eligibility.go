@@ -98,6 +98,7 @@ const CtxKeyAuditRepairFindings = "audit_repair_findings"
 func consumeAuditRepairGrant(cs *CycleState, reason string) {
 	if strings.HasPrefix(reason, auditRepairReasonPrefix) {
 		cs.AuditRepairAttempts++
+		cs.AuditRepairActive = true
 	}
 }
 
@@ -144,7 +145,8 @@ func decideRepairEligibility(in repairEligibilityInput) repairEligibility {
 	return repairEligibility{Eligible: true, Incoherent: contradicted, Reason: reason}
 }
 
-// repairSeededPhases are the phases a repair brief can actually be acted on.
+// repairSeededPhase reports whether a repair brief can actually be acted on by
+// this phase.
 // Audit re-reads its own artifacts, so re-injecting its own rejection would be
 // circular; retro already holds the full dossier.
 func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
@@ -162,18 +164,33 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 // Absent/unreadable findings degrade to "no key", which the prompts treat as
 // today's behaviour; readContinuationFindings already warns loudly on that path
 // so the operator can tell "none existed" from "we looked in the wrong place".
-func seedAuditRepairContext(ctx map[string]string, next Phase, cs CycleState) map[string]string {
-	if cs.AuditRepairAttempts <= 0 || !repairSeededPhase(next) {
-		return ctx
+func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
+	if !cs.AuditRepairActive || !repairSeededPhase(next) {
+		return base
 	}
 	findings := readContinuationFindings(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json"))
 	if findings == "" {
-		return ctx
+		return base
 	}
-	out := make(map[string]string, len(ctx)+1)
-	for k, v := range ctx {
+	out := make(map[string]string, len(base)+1)
+	for k, v := range base {
 		out[k] = v
 	}
 	out[CtxKeyAuditRepairFindings] = findings
 	return out
+}
+
+// auditRepairCap is the in-cycle repair bound, read from the ONE resolved
+// workflow-config surface every sibling knob uses (StrictAudit, PSMASEnabled,
+// BackfillEnabled, PhaseEnables), which cmd_cycle.go injects unconditionally via
+// WithWorkflowConfig.
+//
+// It replaced a dedicated field fed by a dedicated Option. Both reviewers found
+// the same defect independently: nothing in cmd/evolve ever called that Option,
+// so an operator's workflow.max_audit_repair_attempts — including the documented
+// "0 disables repair" off-switch — never reached the orchestrator, while every
+// test passed by calling the Option itself. Two sources of truth for one knob is
+// the bug; there is now one.
+func (o *Orchestrator) auditRepairCap() int {
+	return o.workflowConfig.MaxAuditRepairAttempts
 }
