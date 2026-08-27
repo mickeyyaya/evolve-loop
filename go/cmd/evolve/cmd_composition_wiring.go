@@ -25,6 +25,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
 // compositionOptions binds all three composition closures. Appending these
@@ -106,6 +108,7 @@ type auditLedgerEntry struct {
 	Role           string `json:"role"`
 	Kind           string `json:"kind"`
 	RunID          string `json:"run_id"`
+	ArtifactPath   string `json:"artifact_path"`
 	ArtifactSHA256 string `json:"artifact_sha256"`
 	GitHEAD        string `json:"git_head"`
 }
@@ -120,6 +123,9 @@ func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.
 	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
 	entry, err := latestAuditEntry(ledgerPath, runID)
 	if err != nil {
+		return core.CompositionAuditSnapshot{}, err
+	}
+	if err := requireReusableAudit(entry); err != nil {
 		return core.CompositionAuditSnapshot{}, err
 	}
 	// Three-dot: the lane's change against the merge-base with main — i.e.
@@ -173,6 +179,47 @@ func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
 		}
 	}
 	return auditLedgerEntry{}, fmt.Errorf("composition snapshot: no bound auditor entry for run %q in %s (foreign-run entries refused)", runID, ledgerPath)
+}
+
+// requireReusableAudit refuses to build a carry-forward snapshot from an audit
+// that did not pass. Cycle-1571 H2: the run-scoping added alongside this
+// function closed only half the hazard its own comment named — a FAILed audit
+// belonging to THIS run still bound, so RUNG 0 would run the full composed-tree
+// gate set and write a composition-verdict record certifying the carry-forward
+// of a REJECTION into a hash-chained ledger. Ship blocks the result downstream,
+// so the cost is a wasted gate pass and a dishonest provenance record.
+//
+// The verdict is read from the bound ARTIFACT, not the ledger entry: exit_code
+// is 1 for WARN and FAIL alike, and the binding recorder states plainly that
+// severity lives in the artifact. Deliberately no fallback to an older PASS —
+// if this run's newest audit says FAIL, carry-forward declines rather than
+// reaching behind it. Every failure path here fails CLOSED to a full re-audit.
+func requireReusableAudit(entry auditLedgerEntry) error {
+	if entry.ArtifactPath == "" {
+		return fmt.Errorf("composition snapshot: bound auditor entry has no artifact_path — cannot confirm its verdict")
+	}
+	body, err := os.ReadFile(entry.ArtifactPath)
+	if err != nil {
+		return fmt.Errorf("composition snapshot: read audit artifact %s: %w", entry.ArtifactPath, err)
+	}
+	sentinel, ok := phasecontract.ParseVerdictSentinelFull(string(body))
+	if !ok {
+		return fmt.Errorf("composition snapshot: audit artifact %s declares no parseable verdict sentinel", entry.ArtifactPath)
+	}
+	// The sentinel must be the AUDIT phase's own. ParseVerdictSentinelFull is
+	// tail-anchored, so a foreign-phase sentinel quoted into the artifact (a
+	// build-report block pasted as evidence) would otherwise be able to satisfy
+	// a carry-forward. Ship's reader states this rule explicitly and this one is
+	// modelled on it — phases/ship/audit.go, "only an exact 'audit' phase is trusted".
+	if sentinel.Phase != string(core.PhaseAudit) {
+		return fmt.Errorf("composition snapshot: audit artifact %s carries a %q-phase verdict sentinel, not audit",
+			entry.ArtifactPath, sentinel.Phase)
+	}
+	if !verdictcache.Reusable(sentinel.Verdict) {
+		return fmt.Errorf("composition snapshot: refusing to carry forward a %s audit (%s) — only PASS/WARN are reusable",
+			sentinel.Verdict, entry.ArtifactPath)
+	}
+	return nil
 }
 
 // gitDiffCapture runs `git diff <spec>` in worktree and returns its stdout.

@@ -109,6 +109,35 @@ so a lost/corrupt cache only costs time, never correctness (same degradation con
 > deferred refinement; `ProbeEligible` is the part of that stronger key the existing identity can
 > express today.
 
+> **Addendum (2026-08-27, cycle-1571 H2) — the cacheable-verdict vocabulary is
+> now a predicate, not a comment.** Slice B's Decision above says the cache binds
+> an audit **PASS**. The implementation has been broader than that text since
+> before this addendum — `recordAuditBinding` projects **PASS and WARN**, WARN
+> shipping by the fluent-audit default — and the exclusion of FAIL lived as an
+> inline `verdict == VerdictFAIL` check at the one call site, while `Store.Put`
+> validated nothing at all and would accept `"banana"`.
+>
+> That mattered once a *second* consumer needed the same rule. The RUNG 0
+> composition snapshot must refuse to carry a REJECTED audit forward, and it was
+> consulting no verdict whatsoever (cycle-1571 H2: a FAILed audit of this run was
+> taken as "the audited snapshot", running the full composed-tree gate set and
+> writing a `composition-verdict` record certifying the carry-forward of a
+> rejection). So the vocabulary is now one exported predicate,
+> `verdictcache.Reusable(verdict)` — PASS or WARN — consumed at three sites: the
+> binding projection's guard, the composition snapshot's refusal, and `Store.Put`
+> itself, which now fails closed on a non-reusable verdict rather than poisoning
+> a store whose entries outlive the cycle that wrote them.
+>
+> This is the same move, for the same reason, as the `ProbeEligible` addendum
+> directly above: one predicate so the sites cannot drift. It also removes a
+> precondition for the Slice B enforce flip — before it, an enforce-stage
+> `Lookup` could have skipped real work on a rejected tree's strength.
+>
+> Unchanged: the ledger still records **every** audit that ran, FAIL included
+> (that binding is what lets ship read this run's own verdict). The asymmetry is
+> deliberate — the hash-chained ledger records occurrence; the cache records only
+> decisions a later run may reuse.
+
 ### Slice C — Resilient ship (all-or-nothing)
 
 Make the commit→verify→push sequence transactional. Two options; **recommend C1**:
