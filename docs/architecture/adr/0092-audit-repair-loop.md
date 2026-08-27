@@ -109,6 +109,37 @@ exists to protect. It is `disposition.json` being written when it is supposed to
 `VerifyDisposition` is documented as fail-HARD ("retro cannot complete" without it), yet it
 is routinely absent on failed cycles. That gap is filed separately.
 
+**A SECOND, UNRELATED GAP — a load-bearing dependency on a known defect. Read this before
+touching the retro verdict.**
+The repair branch lives in `decideAfterRetro` BELOW its opening early return:
+
+```go
+if retroVerdict == VerdictPASS {
+    return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), ...  // "retro-recovered: ship"
+}
+```
+
+So repair is only reachable when the retro verdict is NOT PASS. That condition holds today
+because the retro gate is broken: `hasFailureLesson` scans the cycle workspace for
+`failure-lesson*.yaml` while the persona writes `.evolve/instincts/lessons/inst-<id>.yaml`,
+so retro reports FAIL even when a full retrospective was written. Sampling every cycle
+directory in the runtime plane that recorded a retro verdict (238 of them): 220 carry a
+retrospective-report.md larger than 500 bytes AND no workspace `failure-lesson*.yaml` —
+92%. Reproduce by scanning `.evolve/runs/cycle-*/phase-timing.json` for a retro entry with
+`verdict:"FAIL"` and checking those two artifacts; the full method and the wave-3/4
+breakdown are in the analysis cited below.
+
+**Repairing that gate WITHOUT also fixing the routing makes this ADR's repair branch
+unreachable.** Nothing announces that — no gate reds, no test fails, the branch simply
+stops being taken — though the downstream symptom is loud rather than silent. A
+correctly-PASSing retro would short-circuit to ship — skipping the floor, the bookkeeping
+regrade, and this repair loop — and ship would then refuse the cycle anyway with
+`CodeAuditBindingVerdictFail`, converting a clean end-of-cycle into a ShipError.
+The routing is the half to fix first: a retro PASS on a FAILed cycle must fall through the
+same floor → regrade → repair → adapter ladder, because retro PASS means "the post-mortem
+deliverable is complete", never "the cycle recovered". Analysis:
+`docs/architecture/retry-architecture-review-2026-08-27.md`.
+
 **What this does not change.** Ship-time audit binding is untouched: each repair attempt
 writes its own auditor ledger entry and ship binds the newest run-scoped one
 (ADR-0084/#503/#504). Repair attempts are intra-cycle and do not each count as cycle
