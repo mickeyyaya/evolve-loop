@@ -105,8 +105,12 @@ func TestTierModelsFor(t *testing.T) {
 	// cross-family coverage lives in cli_fallback, never a CLI's own tier map).
 	agy := tierModelsFor("agy")
 	wantAgy := map[string]string{
-		"fast":     "Gemini Flash 3.7 (Low)",
-		"balanced": "Gemini Flash 3.7 (High)",
+		// Corrected 2026-08-28: these pinned "Gemini Flash 3.7 (...)", a
+		// transposition agy REJECTS (it warns once and serves Gemini 3.5
+		// Flash (Medium) for the session). The pin fossilized the defect —
+		// it was green the whole time the tier was silently downgraded.
+		"fast":     "Gemini 3.7 Flash (Low)",
+		"balanced": "Gemini 3.7 Flash (High)",
 		"deep":     "Gemini 3.1 Pro (High)",
 	}
 	for tier, m := range wantAgy {
