@@ -49,7 +49,7 @@ Maximum velocity, zero shortcuts. Worktrees are provisioned natively — agents 
 
 ## Go Project Conventions
 
-After editing any Go file, run `gofmt -l .`, `go vet ./...`, and `go test ./...` (from the `go/` module root) before opening a PR. Add table-driven edge-case tests for any bug that was root-caused during a pipeline stall.
+After editing any Go file, run `gofmt -l .`, `go vet ./...`, and `go test -count=1 ./...` (from the `go/` module root) before opening a PR. **`-count=1` is required, not optional:** Go's test cache does not track file reads that escape the module root via `..`, and many tests read `.evolve/profiles/*.json` that way — so after a config-only edit a bare `go test ./...` serves a stale `ok (cached)` while the regression is live on disk (reproduced 2026-08-28). CI and `make test` already pass `-count=1`; local verification was the gap. Add table-driven edge-case tests for any bug that was root-caused during a pipeline stall.
 
 ## Shell conventions
 
