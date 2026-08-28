@@ -184,7 +184,12 @@ func NewStateMachine() *StateMachine {
 		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
-		PhaseAudit:        {PhaseShip: true, PhaseRetro: true},
+		// PhaseTDD/PhaseBuild are the audit-FAIL RE-ENTRY edges: a task-level
+		// rejection re-enters the dev cycle in the same cycle rather than tearing
+		// it down (see audit_fail_decision.go). They are legal ONLY through
+		// decideAfterAuditFail, which computes the deterministic policy envelope
+		// first — the ADR-0072 floor is evaluated before either edge can be taken.
+		PhaseAudit: {PhaseShip: true, PhaseRetro: true, PhaseTDD: true, PhaseBuild: true},
 		// retro→audit is the bookkeeping-regrade micro-cycle edge (bounded to
 		// once per cycle by CycleState.BookkeepingRegradeAttempted): a FAIL
 		// explained ONLY by bookkeeping gates re-runs audit on the same

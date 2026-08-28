@@ -60,10 +60,13 @@ func cycleCatalog() []ScenarioSpec {
 			ExpectPhases(intent, scout, triage, tdd, planner, build, audit, ship)),
 
 		// --- Retro arcs (SM + decideAfterRetro driven; routing-on coexists) ---
-		Scenario("retro PASS recovers to ship",
+		// A retro PASS is a deliverable-completeness verdict, never recovery: the
+		// tree is byte-identical to the one audit rejected. Same disposition as
+		// the retro-FAIL scenario immediately below.
+		Scenario("retro PASS is not recovery — same disposition as retro FAIL",
 			Cycle(), Enforce(), MediumCycle(),
 			PhaseVerdict(audit, "FAIL"), PhaseVerdict(retro, "PASS"),
-			ExpectRetro("retro-recovered: ship")),
+			ExpectRetro("proceed:")),
 		Scenario("retro FAIL no history proceeds to end",
 			Cycle(), Enforce(), MediumCycle(),
 			PhaseVerdict(audit, "FAIL"), PhaseVerdict(retro, "FAIL"),

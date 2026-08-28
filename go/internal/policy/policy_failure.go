@@ -184,6 +184,19 @@ func (fp SystemFailurePolicy) IsFloor(category string) bool {
 	return ok && c.Floor
 }
 
+// RetryPolicyFor returns the declarative retry policy for a failure category —
+// the Action / MaxRetries / FixType fields that ADR-0072 has always declared and
+// that nothing consumed. It completes the accessor set beside IsFloor and
+// IsSystemLevel so the retry decision reads the SAME table the floor does,
+// instead of a parallel knob (the max_audit_repair_attempts duplication).
+//
+// ok is false for an unrecognised category; callers must treat that as
+// "no retry", never as a default-allow.
+func (fp SystemFailurePolicy) RetryPolicyFor(category string) (FailureCategory, bool) {
+	c, ok := fp.Categories[category]
+	return c, ok
+}
+
 // IsSystemLevel reports whether the named category halts the loop.
 func (fp SystemFailurePolicy) IsSystemLevel(category string) bool {
 	c, ok := fp.Categories[category]
