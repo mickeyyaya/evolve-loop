@@ -38,16 +38,28 @@ func effortProfilesDir(t *testing.T) string {
 // basename each phase resolves to.
 func TestEffortDefaults_Matrix(t *testing.T) {
 	loader := NewFromDir(effortProfilesDir(t))
-	// 2026-08-24 operator directive: phases whose model_tier_default is
-	// deep/top run at xhigh effort (auditor, adversarial-review here); the
-	// fast/balanced rows keep the cycle-566 cost matrix.
+	// 2026-08-28 operator directive supersedes the 2026-08-24 xhigh rung for
+	// the CODEX-routed deep/top phases: they run at max, the rung above xhigh
+	// that codex 0.147.0 exposes via /model -> "More reasoning..." -> Max
+	// (verified live: `-c model_reasoning_effort=max` renders "gpt-5.6-sol max"
+	// in the status bar, and holds through /plan with the paired plan-mode key).
+	//
+	// The two CLAUDE-routed deep/top graders deliberately STAY at xhigh:
+	// Anthropic's own Opus guidance (docs/research/fable-simulation-2026/
+	// model-profiles.md) recommends xhigh for coding/agentic work and warns max
+	// "can be prone to overthinking". Different family, different ceiling — the
+	// abstract effort dial is realized per family, so this split is by design,
+	// not drift. The fast/balanced rows keep the cycle-566 cost matrix.
 	want := map[string]string{
 		"scout":              "low",
 		"triage":             "low",
 		"tdd-engineer":       "medium",
-		"auditor":            "xhigh",
 		"builder":            "medium",
+		"auditor":            "xhigh",
 		"adversarial-review": "xhigh",
+		"retrospective":      "max",
+		"premise-challenge":  "max",
+		"intent":             "max",
 	}
 	for profile, effort := range want {
 		p, err := loader.Get(profile)
