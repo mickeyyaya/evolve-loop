@@ -95,7 +95,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// undefined -m short flag stays in `absent` (space-delimited so the
 			// substring can't match inside --model) — the cycle-154 regression
 			// lock. Model "sonnet" → legacy ladder → balanced → offline default.
-			want:   "agy --model 'Gemini Flash 3.7 (High)' --dangerously-skip-permissions",
+			want:   "agy --model 'Gemini 3.7 Flash (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 		{
