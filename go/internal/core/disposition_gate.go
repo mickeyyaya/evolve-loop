@@ -40,6 +40,45 @@ type disposition struct {
 	ProposedItem  string `json:"proposed_item"`
 }
 
+// readDispositionLegitimacy returns disposition.json's legitimacy field, or ""
+// when the file is absent, unreadable, or malformed. It is the fail-SOFT
+// counterpart to VerifyDisposition's fail-HARD gate, and exists for readers that
+// treat the disposition as EVIDENCE rather than as a contract — the audit-repair
+// rule, which must never grant a retry on the strength of a file it could not
+// read. Returning "" there means "not eligible", so soft-failing is the safe
+// direction; VerifyDisposition remains the only enforcement path.
+func readDispositionLegitimacy(workspace string, cycle int) string {
+	b, err := os.ReadFile(filepath.Join(workspace, "disposition.json"))
+	if err != nil {
+		return ""
+	}
+	var d disposition
+	if err := json.Unmarshal(b, &d); err != nil {
+		return ""
+	}
+	// IDENTITY FIRST (adversarial review, CRITICAL). A disposition is
+	// agent-authored prose ABOUT a failure; the only part of it a machine
+	// computed is the fingerprint/recurrence pair, and crossCheckAgainstDigest
+	// exists precisely to stop an agent inventing a failure identity. Reading
+	// legitimacy past that check let a fabricated, stale, or copied disposition
+	// convert a genuine ADR-0072 system-failure HALT into a granted repair.
+	//
+	// Unverifiable is NOT verified-good: a missing or malformed digest returns
+	// "" (no repair), because the safe direction here is to decline.
+	if err := crossCheckAgainstDigest(workspace, d); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN disposition identity unverified (%v) — legitimacy not trusted for repair\n", err)
+		return ""
+	}
+	// A disposition left in the workspace by a DIFFERENT cycle is stale evidence
+	// about someone else's failure. cycle<=0 means the caller has no cycle to
+	// check against, which is again not a licence to trust.
+	if cycle <= 0 || d.Cycle != cycle {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN disposition names cycle %d, not %d — legitimacy not trusted for repair\n", d.Cycle, cycle)
+		return ""
+	}
+	return d.Legitimacy
+}
+
 // Disposition enum vocabularies. Out-of-vocabulary values are rejected with the
 // offending field named, so a JSON-parses-cleanly document still fails the gate.
 var (

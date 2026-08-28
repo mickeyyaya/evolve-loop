@@ -47,9 +47,13 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	// scenario pins grep for, and the ADR-0072 S4 floor signal (non-nil ⇒ a
 	// floor category was detected — see decideAfterRetro).
 	detNext, extraEnv, detReason, sig := o.decideAfterRetro(cs, retroVerdict, history)
-	if retroVerdict == VerdictPASS {
-		return detNext, extraEnv, detReason, nil // PASS recovers; not a failure branch
-	}
+	// NOTE: there is deliberately no retro-PASS early return here. The previous one
+	// returned `nil` for the signal, DISCARDING a deterministic ADR-0072 floor
+	// candidate whenever the retrospective happened to be well written — a system
+	// failure could escape the "non-bypassable" halt by writing a good post-mortem.
+	// Retro is reached only from an audit FAIL, so a PASS on this arm is the
+	// PHASE's verdict, never the cycle's: it is a failure branch like any other and
+	// takes the same floor → regrade → router path.
 	// ADR-0072 S4 (F1): the Go floor sits ABOVE the router. A floor category
 	// HALTS even when the routing strategy would propose a retry — "orchestrator
 	// decides, Go enforces floor". Enforced here, before o.strategy.Decide, so a
@@ -118,33 +122,73 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 			Halt:     true,
 		}
 	}
-	// (2) Orchestrator judgment — a floor-category classification halts even
-	// when its own proposed action is a retry (the F2-b cycle-1001 shape).
-	if dec, _ := readFailureDecision(cs.WorkspacePath); dec != nil && o.failurePolicy.IsFloor(dec.Category) {
-		ev := dec.Evidence
-		if ev == "" {
-			ev = dec.Justification
-		}
-		return &SystemFailureSignal{
-			Category: dec.Category,
-			Level:    policy.LevelSystem,
-			Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
-			Halt:     true,
-		}
+
+	// (2) Orchestrator judgment — a floor-category classification halts even when
+	// its own proposed action is a retry (the F2-b cycle-1001 shape).
+	//
+	// NARROWED (wave-3 cycles 1572/1573/1574): this gate consumes PROSE. When the
+	// deterministic gate is silent AND the same agent's own disposition.json says
+	// legit-rejection, the agent has contradicted itself, and prose alone does not
+	// outrank two corroborating deterministic signals. Every other shape — an
+	// uncontradicted claim, or an absent/indeterminate/unverifiable disposition —
+	// halts exactly as before.
+	//
+	// This is the CORROBORATION half of ADR-0092. Its retry half is gone: retries
+	// are now decided at the audit chokepoint from the audit's own declared class
+	// and the ADR-0072 policy table (audit_fail_decision.go), so this gate no
+	// longer gates anything but the halt it was always about.
+	dec, _ := readFailureDecision(cs.WorkspacePath)
+	if dec == nil || !o.failurePolicy.IsFloor(dec.Category) {
+		return nil
 	}
-	return nil
+	contradicted := readDispositionLegitimacy(cs.WorkspacePath, cs.CycleID) == legitRejection
+	if contradicted {
+		return nil
+	}
+	ev := dec.Evidence
+	if ev == "" {
+		ev = dec.Justification
+	}
+	return &SystemFailureSignal{
+		Category: dec.Category,
+		Level:    policy.LevelSystem,
+		Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
+		Halt:     true,
+	}
 }
 
 func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string, sig *SystemFailureSignal) {
-	// retro PASS → ship; no failureadapter consultation, no floor (nothing failed).
-	if retroVerdict == VerdictPASS {
-		return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), nil, "retro-recovered: ship", nil
+	// A retro verdict answers "is the post-mortem deliverable complete?" — retro.go
+	// computes it as "retrospective non-empty AND a failure-lesson exists". It has
+	// never answered "did the cycle recover", and this branch used to read it as if
+	// it did, short-circuiting a retro PASS straight to ship
+	// ("retro-recovered: ship", pinned since 2026-05-23).
+	//
+	// It cannot be recovery. Retro is reached ONLY from an audit FAIL, and the retro
+	// persona is read-only outside its own artifacts — so the tree ship would commit
+	// is BYTE-IDENTICAL to the one the auditor rejected. The route looked viable only
+	// while ship's audit binding could be satisfied by another cycle's PASS entry;
+	// once #503 made ship fail closed with CodeAuditBindingVerdictFail, its only
+	// possible outcome became a guaranteed ShipError. See
+	// retro_verdict_semantics_test.go and
+	// docs/architecture/retry-architecture-review-2026-08-27.md.
+	//
+	// So a retro PASS now falls through to the SAME ladder a retro FAIL takes. The
+	// cycle's verdict is what the floor and the dossier must see: retro is reached
+	// only on failure, so a PASS here is the PHASE's verdict, never the CYCLE's.
+	// Substituting keeps every FAIL/WARN path byte-identical (CheckVerdictCoherence
+	// receives exactly what it received before) and stops a well-written
+	// retrospective from making a failed cycle look coherent.
+	cycleVerdict := retroVerdict
+	if cycleVerdict == VerdictPASS {
+		cycleVerdict = VerdictFAIL
 	}
 	// ADR-0072 S4: the Go floor is the FIRST disposition of a failed cycle — a
 	// floor category (verdict-incoherence / infra-systemic) HALTS before any
 	// adapter or router branch, the non-bypassable "Go enforces floor" boundary
 	// that applies to every stage and the resume path alike.
-	if s := o.applyFailureDecisionFloor(cs, retroVerdict); s != nil {
+	s := o.applyFailureDecisionFloor(cs, cycleVerdict)
+	if s != nil {
 		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
 	}
 	// Bookkeeping regrade (below the floor, above the adapter/router): a FAIL

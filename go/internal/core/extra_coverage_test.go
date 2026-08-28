@@ -338,9 +338,16 @@ func TestDecideAfterRetro(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{now: coverNow}
 
+	// A retro PASS is NOT recovery — retro reports on a cycle whose audit FAILed
+	// and cannot change the tree, so it takes the same disposition ladder a retro
+	// FAIL takes. With an empty CycleState the ladder's terminal arm is the
+	// adapter's PROCEED, identical to the FAIL arm below.
 	next, env, reason, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil)
-	if next != PhaseShip || !strings.Contains(reason, "retro-recovered") {
-		t.Errorf("PASS arm = (%s, %q), want ship/retro-recovered", next, reason)
+	if next == PhaseShip {
+		t.Errorf("PASS arm = (%s, %q), must not ship a cycle the auditor rejected", next, reason)
+	}
+	if !strings.Contains(reason, "proceed:") {
+		t.Errorf("PASS arm reason = %q, want the same proceed: disposition as a retro FAIL", reason)
 	}
 	if env != nil {
 		t.Errorf("PASS arm should set no extra env, got %v", env)

@@ -327,7 +327,7 @@ func TestName(t *testing.T) {
 // os.ReadDir error path: when the workspace doesn't exist, the helper
 // returns false (and the run path treats that as no-lesson-written).
 func TestHasFailureLesson_NonexistentWorkspace_False(t *testing.T) {
-	got := hasFailureLesson("/path/that/does/not/exist/at/all")
+	got := hasFailureLesson("", "/path/that/does/not/exist/at/all", 0)
 	if got {
 		t.Errorf("hasFailureLesson on missing dir = true, want false")
 	}
@@ -340,7 +340,7 @@ func TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(ws, "failure-lesson-subdir"), 0o755)
 	_ = os.WriteFile(filepath.Join(ws, "lesson.txt"), []byte("x"), 0o644)
 	_ = os.WriteFile(filepath.Join(ws, "failure-lesson"), []byte("x"), 0o644) // no .yaml
-	if hasFailureLesson(ws) {
+	if hasFailureLesson("", ws, 0) {
 		t.Errorf("returned true with no matching .yaml; want false")
 	}
 }

@@ -1,12 +1,22 @@
 package bridge
 
-// effort_xhigh_test.go — 2026-08-24 operator directive: deep/top-tier phases
-// run at xhigh reasoning effort. Two contracts: (1) xhigh REALIZES on the
-// families with an effort dial (realizeScalar silently drops unmapped enum
-// values, so a missing codex mapping would silently lose the dial — worse
-// than high); (2) EVERY tracked profile's effort_level is realizable by its
-// own family's manifest — the class guard, so a future profile value can
-// never silently no-op on a values-mapped manifest.
+// effort_toprungs_test.go — the top of the reasoning ladder, pinned per family.
+//
+// 2026-08-24 put deep/top phases at xhigh; 2026-08-28 moves the CODEX-routed
+// ones to max, the rung above it. Both rungs are pinned here because both are
+// live: codex deep/top at max, the claude graders deliberately still at xhigh.
+//
+// Two contracts: (1) each rung REALIZES on the families with an effort dial —
+// realizeScalar silently drops unmapped enum values, so a missing codex
+// mapping loses the dial with no error (observed exactly that way: the max row
+// failed with flags [--yolo], the dial simply absent); (2) EVERY tracked
+// profile's effort_level is realizable by its own family's manifest — the
+// class guard, so a future profile value can never silently no-op.
+//
+// Ladder verified live against codex 0.147.0 (/model -> "More reasoning..."):
+// low, medium, high, xhigh, max, ultra. claude exposes low..max via --effort
+// (its picker's "Ultracode" is an orchestration mode, NOT an --effort token —
+// `--effort ultracode` silently falls back to xhigh).
 
 import (
 	"encoding/json"
@@ -27,21 +37,34 @@ func repoRootForEffort(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 }
 
-func TestEffortXhigh_RealizesOnCodexAndClaude(t *testing.T) {
+// ASYMMETRY, stated so these rows are not over-read: codex-tmux maps effort
+// through a values TABLE, so an unmapped rung silently drops — that is the bug
+// class here, and the codex rows are what catch it. claude-tmux declares effort
+// as pass-through (flag, no values table), so realizeScalar appends ANY string;
+// its rows would pass for "banana" just as readily as for "max". They therefore
+// prove the pass-through MECHANISM is wired (they would fail if the channel
+// flipped to noop, the flag were renamed, or a restrictive values table were
+// added without the rung) — they prove NOTHING about max being a valid claude
+// effort, and no claude-routed profile ships max today. Claimed narrowly on
+// purpose: a guard cited for more than it checks is worse than no guard.
+func TestEffortTopRungs_RealizeOnCodexAndClaude(t *testing.T) {
 	for _, tc := range []struct {
 		manifest string
+		effort   string
 		want     []string
 	}{
-		{"codex-tmux", []string{"-c", "model_reasoning_effort=xhigh"}},
-		{"claude-tmux", []string{"--effort", "xhigh"}},
+		{"codex-tmux", "xhigh", []string{"-c", "model_reasoning_effort=xhigh"}},
+		{"claude-tmux", "xhigh", []string{"--effort", "xhigh"}},
+		{"codex-tmux", "max", []string{"-c", "model_reasoning_effort=max"}},
+		{"claude-tmux", "max", []string{"--effort", "max"}},
 	} {
 		m, err := LoadManifest(tc.manifest)
 		if err != nil {
 			t.Fatalf("LoadManifest(%s): %v", tc.manifest, err)
 		}
-		r := Realize(m, LaunchIntent{Effort: "xhigh"})
+		r := Realize(m, LaunchIntent{Effort: tc.effort})
 		if !containsSubsequence(r.LaunchFlags, tc.want) {
-			t.Errorf("%s: xhigh effort did not realize — flags %v want subsequence %v", tc.manifest, r.LaunchFlags, tc.want)
+			t.Errorf("%s: %s effort did not realize — flags %v want subsequence %v", tc.manifest, tc.effort, r.LaunchFlags, tc.want)
 		}
 	}
 }

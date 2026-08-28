@@ -79,5 +79,5 @@
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)"
   ],
   "output_artifact": ".evolve/runs/cycle-{cycle}/swarm-plan.md",
-  "effort_level": "xhigh"
+  "effort_level": "max"
 }

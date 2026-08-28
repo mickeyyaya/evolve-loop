@@ -51,6 +51,12 @@ type RefreshDeps struct {
 	// path fails for that CLI. Optional; a CLI with neither live data nor a
 	// fallback is skipped.
 	Fallback map[string]map[string]string
+	// EffortListers discovers each CLI's reasoning-effort ladder. Optional and
+	// per-CLI: a CLI with no entry simply records no ladder. Enrichment only —
+	// a discovery failure is logged and the refresh continues, because models
+	// are the payload and losing the catalog to a `--help` hiccup would be a
+	// worse outcome than the missing-rung blindness this closes.
+	EffortListers map[string]EffortLister
 	// AllowedFamilies is a per-CLI model-family allow-list (from policy.json
 	// catalog.allowed_families). A CLI's live-queried ids are filtered to its
 	// allowed families (via FilterByFamily) BEFORE reaching Classify, so a
@@ -93,13 +99,15 @@ func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error
 
 	snaps := make([]modelcatalog.CLISnapshot, 0, len(deps.CLIs))
 	for _, cli := range deps.CLIs {
+		efforts := discoverEfforts(ctx, cli, deps, log)
 		tiers, available, hash := liveTiers(ctx, cli, deps, log)
 		if len(tiers) > 0 {
 			// Live-queried → authoritative; only these entries drive dispatch
 			// (modelcatalog.DispatchModel gates on SourceLive).
 			snaps = append(snaps, modelcatalog.CLISnapshot{
 				CLI: cli, Ready: true, TierModels: tiers,
-				Available: available, Source: modelcatalog.SourceLive,
+				Available: available, Efforts: efforts,
+				Source:         modelcatalog.SourceLive,
 				CandidatesHash: hash,
 			})
 			continue
@@ -112,7 +120,8 @@ func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error
 		// Detect fallback is informational only — NOT dispatch-authoritative.
 		fmt.Fprintf(log, "[modelquery] WARN %s: live query unavailable; using detect fallback\n", cli)
 		snaps = append(snaps, modelcatalog.CLISnapshot{
-			CLI: cli, Ready: true, TierModels: fb, Source: modelcatalog.SourceDetect,
+			CLI: cli, Ready: true, TierModels: fb, Efforts: efforts,
+			Source: modelcatalog.SourceDetect,
 		})
 	}
 	return modelcatalog.BuildFromSnapshots(snaps, now().UTC()), nil
@@ -180,4 +189,25 @@ func coversCanonicalTiers(tiers map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// discoverEfforts asks the CLI's registered EffortLister for its ladder.
+//
+// Fail-soft by design, and the two silent outcomes are kept distinct in the
+// LOG even though both record nothing: "no lister" means this CLI's ladder is
+// not discoverable by us (codex — its rungs live only behind a picker
+// submenu), while an error means we asked and could not tell. Recording an
+// empty ladder for either is correct; claiming a discovered "no dial" for
+// either would not be.
+func discoverEfforts(ctx context.Context, cli string, deps RefreshDeps, log io.Writer) []string {
+	l, ok := deps.EffortListers[cli]
+	if !ok || l == nil {
+		return nil
+	}
+	rungs, err := l.ListEfforts(ctx, cli)
+	if err != nil {
+		fmt.Fprintf(log, "[modelquery] WARN %s: effort-ladder discovery failed (%v); models unaffected\n", cli, err)
+		return nil
+	}
+	return rungs
 }

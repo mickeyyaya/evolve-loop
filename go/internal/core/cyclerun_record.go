@@ -138,6 +138,32 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict
 
+	// Audit-FAIL disposition (retry + retro redesign). Decided HERE, at the audit
+	// chokepoint, from the audit's OWN declared failure class and the ADR-0072
+	// policy table — not after a full retrospective, and not from agent prose. The
+	// table has always declared code-audit-fail as {task, retry-with-fix,
+	// MaxRetries: 2}; nothing consumed it until now.
+	//
+	// scheduledNext is the authoritative-injection seam, so the dynamic-routing
+	// override cannot second-guess this decision — the same protection the retro
+	// branch has, and structurally the fix for the class of defect where a router
+	// silently ate a granted repair.
+	if cr.current == PhaseAudit && dr.resp.Verdict == VerdictFAIL {
+		branch, reason, sysFail := cr.o.decideAfterAuditFail(cr.cs)
+		// Spends a retry attempt and marks the repair round active, so the audit's
+		// own findings are seeded into the re-dispatched tdd/build prompts.
+		consumeAuditRepairGrant(&cr.cs, reason)
+		if sysFail != nil && cr.result.SystemFailure == nil {
+			cr.result.SystemFailure = sysFail
+		}
+		if branch != PhaseRetro {
+			if !cr.o.sm.CanTransition(PhaseAudit, branch) {
+				return loopAbort, fmt.Errorf("audit→%s not allowed by state machine", branch)
+			}
+			cr.scheduledNext = branch
+		}
+	}
+
 	// Retro is the one phase whose successor isn't verdict-driven: the
 	// failure-adapter consults cycle history (state.FailedAt) and the retro
 	// verdict to pick {ship | tdd | end}. Set scheduledNext so the next loop
@@ -181,6 +207,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		// instead of looping retro→audit forever. Before the gateErr prepend
 		// below, which would break the prefix match.
 		consumeBookkeepingRegradeGrant(&cr.cs, reason)
+		consumeAuditRepairGrant(&cr.cs, reason)
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
 		// S2 disposition gate, verdict path (mirrors recordFailureLearning's
 		// contract — cycle-1046 live gap): an absent/invalid disposition is

@@ -120,8 +120,8 @@
   ],
   "stub": false,
   "model_tier_map": {
-    "fast": "Gemini Flash 3.7 (Low)",
-    "balanced": "Gemini Flash 3.7 (High)",
+    "fast": "Gemini 3.7 Flash (Low)",
+    "balanced": "Gemini 3.7 Flash (High)",
     "deep": "Gemini 3.1 Pro (High)",
     "top": "Gemini 3.1 Pro (High)"
   },

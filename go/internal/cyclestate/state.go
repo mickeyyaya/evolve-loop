@@ -119,6 +119,22 @@ type CycleState struct {
 	// run-local variable. Empty (omitted) for pre-field checkpoints and
 	// worktree-less cycles → the normalize degrades to a no-op.
 	WorktreeBaseSHA string `json:"worktree_base_sha,omitempty"`
+	// AuditRepairAttempts counts the in-cycle audit repairs already dispatched
+	// (audit-repair loop). It lives in cycle state rather than orchestrator
+	// memory so the count survives the retro→tdd→build→audit round trip AND a
+	// crash-resume — an in-memory counter would silently reset on resume and
+	// hand a failing cycle unlimited retries. Additive omitempty: pre-field
+	// checkpoints decode as 0, which is exactly "no repair attempted yet".
+	AuditRepairAttempts int `json:"audit_repair_attempts,omitempty"`
+	// AuditRepairActive marks that the cycle is CURRENTLY inside a repair round
+	// — set when a repair is granted, cleared when audit is re-dispatched. It is
+	// deliberately separate from the counter above: AuditRepairAttempts is
+	// monotonic, so gating the repair-brief injection on it leaked a stale
+	// rejection into any later re-entry into tdd/build (Ship->Build and
+	// Debugger->TDD are both legal edges), telling an agent doing unrelated
+	// ship-error recovery that "this cycle's audit REJECTED your previous build".
+	// A counter answers "how many"; this answers "right now".
+	AuditRepairActive bool `json:"audit_repair_active,omitempty"`
 	// AuditFailReasons: the error-severity diagnostics behind an audit FAIL
 	// verdict recorded by the runner's OWN gates (set in-process at the
 	// recordFloorVerdictFailure chokepoint; cleared on every audit re-dispatch).

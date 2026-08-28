@@ -50,7 +50,7 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 // bench" — codex returned, live-verified at 44% dispatch share with zero
 // quota halts). Retro post-mortems are the single biggest deep-tier consumer
 // (~40% of deep dispatches) and are NOT adversarial-vs-builder work, so they
-// lead the deep→sol arrangement: codex/deep (gpt-5.6-sol at xhigh), claude as
+// lead the deep→sol arrangement: codex/deep (gpt-5.6-sol at max), claude as
 // the explicit fallback (universal-fallback rule; agy stays banned from
 // fallback chains).
 func TestRetrospectiveRoutesToCodexSol(t *testing.T) {

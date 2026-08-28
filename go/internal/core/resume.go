@@ -283,6 +283,21 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
+		// Resume-path parity for the audit-repair brief (review MEDIUM): the
+		// budget half was already mirrored below via consumeAuditRepairGrant, but
+		// without seeding HERE a cycle that crashed mid-repair burned an attempt
+		// and rebuilt BLIND — the exact crash-resilience case the persisted
+		// counter exists for. Same state-derived rule as the live loop.
+		// NEXT, not current: at this point `current` is the phase that ran in the
+		// PREVIOUS iteration (it is reassigned to next only at the bottom of the
+		// loop). Using it meant the first TDD dispatch after a resumed repair
+		// grant — Retro->TDD, the exact crash-resume case this exists for — saw
+		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
+		// line in this block keys on next for the same reason.
+		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
+		if next == PhaseAudit {
+			cs.AuditRepairActive = false
+		}
 		resp, err := runner.Run(ctx, PhaseRequest{
 			Cycle:       cycle,
 			ProjectRoot: req.ProjectRoot,
@@ -297,7 +312,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			GoalHash:      req.GoalHash,
 			PreviousPhase: string(current),
 			Env:           envSnap,
-			Context:       ctxSnap,
+			Context:       phaseCtx,
 		})
 		if err != nil {
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
@@ -362,6 +377,26 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, "", cs.PhaseStartedAt))
 		current = next
 		lastVerdict = resp.Verdict
+
+		// Resume-path parity for the audit-FAIL disposition (ADR-0093). Without
+		// this branch the resume surface falls through to sm.Next(audit, FAIL) =
+		// retro, so a resumed cycle could NEVER repair — and since retro is now
+		// terminal, the retry the policy table grants would be silently
+		// unreachable on exactly the surface that exists for recovery. The live
+		// loop's branch is cyclerun_record.go; both call the same primitive.
+		if current == PhaseAudit && resp.Verdict == VerdictFAIL {
+			branch, reason, sysFail := o.decideAfterAuditFail(cs)
+			consumeAuditRepairGrant(&cs, reason)
+			if sysFail != nil && result.SystemFailure == nil {
+				result.SystemFailure = sysFail
+			}
+			if branch != PhaseRetro {
+				if !o.sm.CanTransition(PhaseAudit, branch) {
+					return result, fmt.Errorf("audit→%s not allowed by state machine", branch)
+				}
+				scheduledNext = branch
+			}
+		}
 
 		// History-branch gate (ADR-0058): the branch-entry CONDITION is lockstep
 		// with recordAndBranch (both key on successorStrategy == history, which
