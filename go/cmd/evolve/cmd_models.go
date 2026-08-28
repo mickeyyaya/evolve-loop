@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
@@ -186,9 +187,16 @@ func emitCatalogJSON(cat modelcatalog.Catalog, stdout, stderr io.Writer) int {
 
 func printCatalogHuman(w io.Writer, cat modelcatalog.Catalog) {
 	for _, cli := range sortedCLIs(cat) {
-		tm := cat.CLIs[cli].TierModels
+		e := cat.CLIs[cli]
+		tm := e.TierModels
 		fmt.Fprintf(w, "  %-8s fast=%-16s balanced=%-16s deep=%s\n",
 			cli, dash(tm["fast"]), dash(tm["balanced"]), dash(tm["deep"]))
+		// Show the discovered ladder. Printing it is the point: a rung the CLI
+		// gained is only actionable if an operator can SEE that the offering
+		// moved. Silence here is what let codex's max rung go unnoticed.
+		if len(e.Efforts) > 0 {
+			fmt.Fprintf(w, "  %-8s efforts: %s\n", "", strings.Join(e.Efforts, ", "))
+		}
 	}
 }
 

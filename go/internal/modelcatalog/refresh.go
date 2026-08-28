@@ -26,6 +26,10 @@ type CLISnapshot struct {
 	// Available is the raw enumerated model-id list (audit trail), passed
 	// through to CLIEntry.Available. Optional; nil for detect-derived snapshots.
 	Available []string
+	// Efforts is the discovered reasoning-effort ladder, passed through to
+	// CLIEntry.Efforts. Optional; nil when the CLI's ladder is not
+	// discoverable or discovery failed.
+	Efforts []string
 	// Source is the provenance written to CLIEntry.Source (SourceLive /
 	// SourceDetect). Empty defaults to SourceDetect — a snapshot of unknown
 	// provenance is treated as the non-authoritative kind.
@@ -63,7 +67,7 @@ func BuildFromSnapshots(snaps []CLISnapshot, fetchedAt time.Time) Catalog {
 		if source == "" {
 			source = SourceDetect
 		}
-		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Source: source, CandidatesHash: s.CandidatesHash}
+		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Efforts: s.Efforts, Source: source, CandidatesHash: s.CandidatesHash}
 	}
 	return cat
 }

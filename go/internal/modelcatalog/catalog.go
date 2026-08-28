@@ -44,6 +44,13 @@ type CLIEntry struct {
 	// Available is the raw enumerated model-id list as offered by the CLI, kept
 	// as an audit/debug trail. Not consumed at dispatch.
 	Available []string `json:"available,omitempty"`
+	// Efforts is the CLI's reasoning-effort ladder as the CLI itself reports
+	// it, in its own order (e.g. low,medium,high,xhigh,max). Empty means the
+	// ladder was not discovered — NOT that the CLI has no dial. The two are
+	// deliberately indistinguishable here because only the discovering side
+	// knows which it was, and recording a guess is how a missing rung starts
+	// looking like an absent feature.
+	Efforts []string `json:"efforts,omitempty"`
 	// Source records provenance: "live" (queried from the CLI itself) vs
 	// "detect" (derived from the static, possibly-degenerate manifest map).
 	// Only "live" entries are trustworthy enough to OVERRIDE the manifest at
