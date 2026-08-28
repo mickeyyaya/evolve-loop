@@ -48,18 +48,21 @@ func TestDecideAfterRetro_EmitsRoutingDecisionArtifact(t *testing.T) {
 	}
 }
 
-func TestDecideAfterRetro_PassArmShipsWithoutArtifact(t *testing.T) {
+// Renamed from TestDecideAfterRetro_PassArmShipsWithoutArtifact. The PASS arm no
+// longer ships and IS a failure branch, so it consults the router and records a
+// routing decision like every other failure branch.
+func TestDecideAfterRetroRouted_PassArmIsAFailureBranch(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
 	o := advisoryOrchestrator(led, router.StaticPreset{})
 	ws := t.TempDir()
 
 	next, _, _, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictPASS, nil, router.RouteInput{})
-	if next != PhaseShip {
-		t.Errorf("next = %s, want ship (retro PASS recovers)", next)
+	if next == PhaseShip {
+		t.Errorf("next = %s, must not ship a cycle whose audit FAILed", next)
 	}
-	if entries, _ := filepath.Glob(filepath.Join(ws, "routing-decision-*.json")); len(entries) != 0 {
-		t.Errorf("PASS arm is not a failure branch; no artifact expected, got %v", entries)
+	if entries, _ := filepath.Glob(filepath.Join(ws, "routing-decision-*.json")); len(entries) == 0 {
+		t.Error("PASS arm IS a failure branch and must record its routing decision like the FAIL arm")
 	}
 }
 

@@ -1,6 +1,6 @@
 {
-  "name": "failure-advisor",
-  "role": "failure-advisor",
+  "name": "failure-adjudicator",
+  "role": "failure-adjudicator",
   "cli": "codex-tmux",
   "model_tier_default": "deep",
   "allowed_tools": [
@@ -12,8 +12,8 @@
     "Bash(head:*)",
     "Bash(tail:*)",
     "Bash(evolve phase verify:*)",
-    "Write(.evolve/runs/cycle-*/failure-advice.json)",
-    "Edit(.evolve/runs/cycle-*/failure-advice.json)"
+    "Write(.evolve/runs/cycle-*/failure-adjudication.json)",
+    "Edit(.evolve/runs/cycle-*/failure-adjudication.json)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",
@@ -51,7 +51,7 @@
   ],
   "max_budget_usd": 0.5,
   "max_turns": 8,
-  "output_artifact": ".evolve/runs/cycle-{cycle}/failure-advice.json",
+  "output_artifact": ".evolve/runs/cycle-{cycle}/failure-adjudication.json",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
@@ -70,9 +70,9 @@
     "all"
   ],
   "stream_output": true,
-  "generated_from": "hand-authored (ADR-0044 Slice 5)",
+  "generated_from": "hand-authored (ADR-0093 retry envelope + terminal retro)",
   "cli_fallback": [
     "claude-tmux"
   ],
-  "effort_level": "max"
+  "effort_level": "xhigh"
 }

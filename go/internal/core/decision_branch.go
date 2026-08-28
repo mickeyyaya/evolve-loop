@@ -47,9 +47,13 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	// scenario pins grep for, and the ADR-0072 S4 floor signal (non-nil ⇒ a
 	// floor category was detected — see decideAfterRetro).
 	detNext, extraEnv, detReason, sig := o.decideAfterRetro(cs, retroVerdict, history)
-	if retroVerdict == VerdictPASS {
-		return detNext, extraEnv, detReason, nil // PASS recovers; not a failure branch
-	}
+	// NOTE: there is deliberately no retro-PASS early return here. The previous one
+	// returned `nil` for the signal, DISCARDING a deterministic ADR-0072 floor
+	// candidate whenever the retrospective happened to be well written — a system
+	// failure could escape the "non-bypassable" halt by writing a good post-mortem.
+	// Retro is reached only from an audit FAIL, so a PASS on this arm is the
+	// PHASE's verdict, never the cycle's: it is a failure branch like any other and
+	// takes the same floor → regrade → router path.
 	// ADR-0072 S4 (F1): the Go floor sits ABOVE the router. A floor category
 	// HALTS even when the routing strategy would propose a retry — "orchestrator
 	// decides, Go enforces floor". Enforced here, before o.strategy.Decide, so a
@@ -61,14 +65,6 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	// like the floor — ABOVE the router. Letting the strategy override it to
 	// tdd/end would eat the one bounded re-audit the grant exists to provide.
 	if strings.HasPrefix(detReason, BookkeepingRegradeReasonPrefix) {
-		return detNext, extraEnv, detReason, nil
-	}
-	// A granted audit repair is the same shape of deterministic, BOUNDED
-	// micro-recovery: letting the strategy override it to end would silently
-	// discard the one repair the grant exists to provide, while every unit test
-	// on decideAfterRetro stayed green. Bounded by CycleState.AuditRepairAttempts,
-	// so returning above the router cannot loop.
-	if strings.HasPrefix(detReason, auditRepairReasonPrefix) {
 		return detNext, extraEnv, detReason, nil
 	}
 
@@ -113,7 +109,7 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 // cannot survive a floor category — the deterministic candidate is checked first
 // (caught even with no orchestrator running), then the orchestrator's judgment.
 // Returns nil when no floor bites; the caller then routes / falls back normally.
-func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) (*SystemFailureSignal, repairEligibility) {
+func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) *SystemFailureSignal {
 	d := buildFailureDossier(cs, retroVerdict, o.failurePolicy)
 	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
 
@@ -124,67 +120,74 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 			Level:    policy.LevelSystem,
 			Evidence: d.Evidence,
 			Halt:     true,
-		}, repairEligibility{}
+		}
 	}
 
-	// The audit-repair corroboration rule is evaluated HERE, in the same pass
-	// that built the dossier, so the deterministic candidate is read once and
-	// the halt decision and the repair decision can never disagree about it.
-	dec, _ := readFailureDecision(cs.WorkspacePath)
-	agentClaimedFloor := dec != nil && o.failurePolicy.IsFloor(dec.Category)
-	elig := decideRepairEligibility(repairEligibilityInput{
-		DeterministicFloorCandidate: d.FloorCandidate,
-		AgentClaimedFloor:           agentClaimedFloor,
-		Legitimacy:                  readDispositionLegitimacy(cs.WorkspacePath, cs.CycleID),
-		Attempts:                    cs.AuditRepairAttempts,
-		MaxAttempts:                 o.auditRepairCap(),
-	})
-
-	// (2) Orchestrator judgment — a floor-category classification halts even
-	// when its own proposed action is a retry (the F2-b cycle-1001 shape).
+	// (2) Orchestrator judgment — a floor-category classification halts even when
+	// its own proposed action is a retry (the F2-b cycle-1001 shape).
 	//
-	// NARROWED (audit-repair, wave-3 cycles 1572/1573/1574): this gate consumes
-	// PROSE. When the deterministic gate is silent AND the same agent's own
-	// disposition.json says legit-rejection, the agent has contradicted itself
-	// and the cycle is repaired instead of halted. Every other shape — an
-	// uncontradicted claim, an absent/indeterminate disposition, or an
-	// exhausted repair budget — halts exactly as before.
-	if agentClaimedFloor && !elig.Eligible {
-		ev := dec.Evidence
-		if ev == "" {
-			ev = dec.Justification
-		}
-		evidence := "orchestrator-classified " + dec.Category + ": " + ev
-		// Surface the corroboration verdict (review MEDIUM): elig.Incoherent and
-		// elig.Reason were computed, documented as forensics, and then discarded,
-		// so an operator staring at an exhausted-budget halt could not tell it
-		// from an ordinary system failure — even though the contradiction is the
-		// whole reason this feature exists.
-		if elig.Incoherent {
-			evidence += " [classifier contradiction: the same agent's disposition says legit-rejection and the deterministic candidate is empty; " + elig.Reason + "]"
-		} else if elig.Reason != "" {
-			evidence += " [repair declined: " + elig.Reason + "]"
-		}
-		return &SystemFailureSignal{
-			Category: dec.Category,
-			Level:    policy.LevelSystem,
-			Evidence: evidence,
-			Halt:     true,
-		}, elig
+	// NARROWED (wave-3 cycles 1572/1573/1574): this gate consumes PROSE. When the
+	// deterministic gate is silent AND the same agent's own disposition.json says
+	// legit-rejection, the agent has contradicted itself, and prose alone does not
+	// outrank two corroborating deterministic signals. Every other shape — an
+	// uncontradicted claim, or an absent/indeterminate/unverifiable disposition —
+	// halts exactly as before.
+	//
+	// This is the CORROBORATION half of ADR-0092. Its retry half is gone: retries
+	// are now decided at the audit chokepoint from the audit's own declared class
+	// and the ADR-0072 policy table (audit_fail_decision.go), so this gate no
+	// longer gates anything but the halt it was always about.
+	dec, _ := readFailureDecision(cs.WorkspacePath)
+	if dec == nil || !o.failurePolicy.IsFloor(dec.Category) {
+		return nil
 	}
-	return nil, elig
+	contradicted := readDispositionLegitimacy(cs.WorkspacePath, cs.CycleID) == legitRejection
+	if contradicted {
+		return nil
+	}
+	ev := dec.Evidence
+	if ev == "" {
+		ev = dec.Justification
+	}
+	return &SystemFailureSignal{
+		Category: dec.Category,
+		Level:    policy.LevelSystem,
+		Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
+		Halt:     true,
+	}
 }
 
 func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string, sig *SystemFailureSignal) {
-	// retro PASS → ship; no failureadapter consultation, no floor (nothing failed).
-	if retroVerdict == VerdictPASS {
-		return o.recoveryTarget(PhaseRetro, VerdictPASS, PhaseShip), nil, "retro-recovered: ship", nil
+	// A retro verdict answers "is the post-mortem deliverable complete?" — retro.go
+	// computes it as "retrospective non-empty AND a failure-lesson exists". It has
+	// never answered "did the cycle recover", and this branch used to read it as if
+	// it did, short-circuiting a retro PASS straight to ship
+	// ("retro-recovered: ship", pinned since 2026-05-23).
+	//
+	// It cannot be recovery. Retro is reached ONLY from an audit FAIL, and the retro
+	// persona is read-only outside its own artifacts — so the tree ship would commit
+	// is BYTE-IDENTICAL to the one the auditor rejected. The route looked viable only
+	// while ship's audit binding could be satisfied by another cycle's PASS entry;
+	// once #503 made ship fail closed with CodeAuditBindingVerdictFail, its only
+	// possible outcome became a guaranteed ShipError. See
+	// retro_verdict_semantics_test.go and
+	// docs/architecture/retry-architecture-review-2026-08-27.md.
+	//
+	// So a retro PASS now falls through to the SAME ladder a retro FAIL takes. The
+	// cycle's verdict is what the floor and the dossier must see: retro is reached
+	// only on failure, so a PASS here is the PHASE's verdict, never the CYCLE's.
+	// Substituting keeps every FAIL/WARN path byte-identical (CheckVerdictCoherence
+	// receives exactly what it received before) and stops a well-written
+	// retrospective from making a failed cycle look coherent.
+	cycleVerdict := retroVerdict
+	if cycleVerdict == VerdictPASS {
+		cycleVerdict = VerdictFAIL
 	}
 	// ADR-0072 S4: the Go floor is the FIRST disposition of a failed cycle — a
 	// floor category (verdict-incoherence / infra-systemic) HALTS before any
 	// adapter or router branch, the non-bypassable "Go enforces floor" boundary
 	// that applies to every stage and the resume path alike.
-	s, repair := o.applyFailureDecisionFloor(cs, retroVerdict)
+	s := o.applyFailureDecisionFloor(cs, cycleVerdict)
 	if s != nil {
 		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
 	}
@@ -198,16 +201,6 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 		return o.recoveryTarget(PhaseRetro, recoveryKeyBookkeepingRegrade, PhaseAudit), nil,
 			BookkeepingRegradeReasonPrefix + "meta-only audit FAIL with non-FAIL narrative; re-dispatching audit once in-cycle", nil
 	}
-	// Audit-repair: a task-level rejection re-enters the build with the audit's
-	// own reasoning rather than tearing the cycle down. Sits BELOW the floor
-	// (a system failure still halts first) and below the bookkeeping regrade
-	// (a cheaper, more targeted re-dispatch wins when it applies), and ABOVE
-	// the adapter, whose only retry rule is the infra-transient EPERM fallback
-	// — it has no notion of "the audit rejected the work, go fix it".
-	if repair.Eligible {
-		return o.recoveryTarget(PhaseRetro, repairRecoveryKey, PhaseTDD), nil, auditRepairReasonPrefix + repair.Reason, nil
-	}
-
 	entries := entriesFromRecords(history)
 	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
 	switch dec.Action {

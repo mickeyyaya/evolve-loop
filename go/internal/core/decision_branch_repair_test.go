@@ -17,14 +17,10 @@ package core
 // time produced three FAILs that two deterministic signals called task-level.
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // writeDisposition writes the retro agent's disposition.json. Only the fields
@@ -73,7 +69,6 @@ const agentFloorClaim = `{"category":"infra-systemic","level":"system","evidence
 // the cycle is REPAIRED rather than halted.
 func TestDecideAfterRetro_RepairsWhenAgentFloorIsContradicted(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	// code-audit-fail keeps the DETERMINISTIC dossier candidate empty.
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
@@ -82,16 +77,14 @@ func TestDecideAfterRetro_RepairsWhenAgentFloorIsContradicted(t *testing.T) {
 	writeFailureDigest(t, dir, repairFixtureFingerprint, 1573)
 	cs := CycleState{CycleID: 1573, WorkspacePath: dir}
 
-	next, _, reason, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
+	// The CORROBORATION half of ADR-0092 survives the retry redesign: prose alone
+	// does not outrank two corroborating deterministic signals. Its RETRY half is
+	// gone — retries are decided at the audit chokepoint from the audit's own
+	// declared class — so this asserts the halt disposition only.
+	_, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
 
 	if sig != nil {
 		t.Fatalf("a contradicted agent floor claim must NOT halt; sig=%+v", sig)
-	}
-	if next != PhaseTDD {
-		t.Errorf("next = %s, want tdd (repair re-enters at the test-first phase)", next)
-	}
-	if !strings.Contains(reason, "audit-repair") {
-		t.Errorf("reason = %q, want it to name the audit-repair branch", reason)
 	}
 }
 
@@ -100,7 +93,6 @@ func TestDecideAfterRetro_RepairsWhenAgentFloorIsContradicted(t *testing.T) {
 // TestDecideAfterRetroFloor_Cycle1001JudgmentHalt does today.
 func TestDecideAfterRetro_HaltsWhenNoDispositionContradictsTheAgent(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
 	writeDecision(t, dir, agentFloorClaim)
@@ -121,7 +113,6 @@ func TestDecideAfterRetro_HaltsWhenNoDispositionContradictsTheAgent(t *testing.T
 // with a friendly disposition.
 func TestDecideAfterRetro_DeterministicFloorBeatsLegitRejection(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	// infra-systemic here DOES produce a deterministic dossier candidate.
 	writeAuditWithFailure(t, dir, "FAIL", "infra-systemic", "all CLI families exhausted")
@@ -139,80 +130,6 @@ func TestDecideAfterRetro_DeterministicFloorBeatsLegitRejection(t *testing.T) {
 	}
 }
 
-// The cap is real: at MaxAttempts the cycle falls through to today's behavior.
-func TestDecideAfterRetro_RepairStopsAtTheCap(t *testing.T) {
-	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
-	dir := t.TempDir()
-	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
-	writeDecision(t, dir, agentFloorClaim)
-	writeDisposition(t, dir, "legit-rejection")
-	writeFailureDigest(t, dir, repairFixtureFingerprint, 1573)
-	cs := CycleState{CycleID: 1573, WorkspacePath: dir, AuditRepairAttempts: 2}
-
-	next, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
-
-	if next == PhaseTDD {
-		t.Error("next = tdd at the cap; repair must stop after MaxAttempts")
-	}
-	if sig == nil || !sig.Halt {
-		t.Fatalf("at the cap the uncontradicted-agent halt applies again; sig=%+v", sig)
-	}
-}
-
-// Repair disabled by configuration (cap 0) behaves exactly as today.
-func TestDecideAfterRetro_CapZeroDisablesRepair(t *testing.T) {
-	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 0
-	dir := t.TempDir()
-	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
-	writeDecision(t, dir, agentFloorClaim)
-	writeDisposition(t, dir, "legit-rejection")
-	writeFailureDigest(t, dir, repairFixtureFingerprint, 1573)
-	cs := CycleState{CycleID: 1573, WorkspacePath: dir}
-
-	_, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
-
-	if sig == nil || !sig.Halt {
-		t.Fatalf("cap 0 disables repair, so the agent floor claim halts; sig=%+v", sig)
-	}
-}
-
-// THE LIVE PATH. decideAfterRetroRouted is what the loop actually calls; every
-// test above drives the deterministic decideAfterRetro underneath it. A repair
-// granted deterministically and then handed to the router can be OVERRIDDEN by
-// the strategy — eating the one bounded recovery the grant exists to provide,
-// with every unit test still green. That is the unit-green-is-not-live-green
-// shape, and it is why the sibling bookkeeping regrade returns ABOVE the router
-// with the comment "letting the strategy override it to tdd/end would eat the
-// one bounded re-audit the grant exists to provide".
-//
-// The strategy here proposes "end" — the override that would silently discard
-// the repair.
-func TestDecideAfterRetroRouted_RepairSurvivesTheRouter(t *testing.T) {
-	o := floorOrchestrator(fixedNextStrategy{next: "end"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
-	dir := t.TempDir()
-	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
-	writeDecision(t, dir, agentFloorClaim)
-	writeDisposition(t, dir, "legit-rejection")
-	writeFailureDigest(t, dir, repairFixtureFingerprint, 1573)
-	cs := CycleState{CycleID: 1573, WorkspacePath: dir}
-
-	next, _, reason, sig := o.decideAfterRetroRouted(
-		context.Background(), 1573, cs, 1, VerdictFAIL, nil, router.RouteInput{})
-
-	if sig != nil {
-		t.Fatalf("a contradicted agent floor claim must not halt on the live path; sig=%+v", sig)
-	}
-	if next != PhaseTDD {
-		t.Errorf("next = %s, want tdd — the router ate the repair grant", next)
-	}
-	if !strings.Contains(reason, "audit-repair") {
-		t.Errorf("reason = %q, want the audit-repair contract string preserved through the routed path", reason)
-	}
-}
-
 // ---- C1: the disposition is agent-authored PROSE and must not be trusted on its
 // own word. crossCheckAgainstDigest exists precisely to stop an agent inventing a
 // failure identity, and the repair rule was reading legitimacy straight past it.
@@ -221,7 +138,6 @@ func TestDecideAfterRetroRouted_RepairSurvivesTheRouter(t *testing.T) {
 
 func TestDecideAfterRetro_RefusesRepairOnFabricatedFailureIdentity(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
 	writeDecision(t, dir, agentFloorClaim)
@@ -244,7 +160,6 @@ func TestDecideAfterRetro_RefusesRepairOnFabricatedFailureIdentity(t *testing.T)
 // evidence about someone else's failure.
 func TestDecideAfterRetro_RefusesRepairOnForeignCycleDisposition(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
 	writeDecision(t, dir, agentFloorClaim)
@@ -263,7 +178,6 @@ func TestDecideAfterRetro_RefusesRepairOnForeignCycleDisposition(t *testing.T) {
 // verified-good. Absence of evidence never grants repair.
 func TestDecideAfterRetro_RefusesRepairWhenIdentityIsUnverifiable(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
 	writeDecision(t, dir, agentFloorClaim)
@@ -275,33 +189,5 @@ func TestDecideAfterRetro_RefusesRepairWhenIdentityIsUnverifiable(t *testing.T) 
 
 	if sig == nil || !sig.Halt {
 		t.Fatalf("an unverifiable disposition identity must not buy a repair; sig=%+v", sig)
-	}
-}
-
-// M5: when the budget is spent, the HALT must still say WHY it is the same
-// classifier-contradiction class that motivated this feature. Without this an
-// operator sees a bare "orchestrator-classified infra-systemic" and has no way to
-// tell it from an ordinary system failure — the contradiction was computed,
-// documented as "a forensics signal", and then discarded.
-func TestDecideAfterRetro_ExhaustedRepairHaltNamesTheContradiction(t *testing.T) {
-	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
-	o.workflowConfig.MaxAuditRepairAttempts = 2
-	dir := t.TempDir()
-	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
-	writeDecision(t, dir, agentFloorClaim)
-	writeDisposition(t, dir, "legit-rejection")
-	writeFailureDigest(t, dir, repairFixtureFingerprint, 1573)
-	cs := CycleState{CycleID: 1573, WorkspacePath: dir, AuditRepairAttempts: 2}
-
-	_, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
-
-	if sig == nil {
-		t.Fatal("exhausted repair with an uncorroborated agent floor claim must halt")
-	}
-	if !strings.Contains(sig.Evidence, "contradict") {
-		t.Errorf("halt evidence does not name the classifier contradiction:\n%s", sig.Evidence)
-	}
-	if !strings.Contains(sig.Evidence, "exhausted") {
-		t.Errorf("halt evidence does not say the repair budget was spent:\n%s", sig.Evidence)
 	}
 }

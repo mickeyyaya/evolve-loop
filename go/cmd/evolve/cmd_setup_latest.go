@@ -114,10 +114,7 @@ func (l perCLIScratchLister) List(ctx context.Context, cli string) ([]string, er
 		salvageProbeDiagnostics(scratch, l.evolveDir, cli, time.Now, l.log)
 		_ = os.RemoveAll(scratch)
 	}()
-	router := modelquery.Router{
-		ByCLI:   map[string]modelquery.Lister{"ollama": modelquery.OllamaLister{}},
-		Default: modelquery.RecipeLister{Capturer: bridgeModelCapturer{workspace: scratch}},
-	}
+	router := modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch})
 	return router.List(ctx, cli)
 }
 

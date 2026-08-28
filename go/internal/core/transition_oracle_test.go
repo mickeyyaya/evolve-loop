@@ -65,11 +65,20 @@ var legalityGolden = map[Phase][]Phase{
 	PhaseTDD:          {PhaseBuildPlanner, PhaseBuild},
 	PhaseBuildPlanner: {PhaseBuild},
 	PhaseBuild:        {PhaseAudit},
-	PhaseAudit:        {PhaseShip, PhaseRetro},
-	PhaseRetro:        {PhaseShip, PhaseTDD, PhaseEnd, PhaseAudit},
-	PhaseShip:         {PhaseEnd, PhaseDebugger, PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip},
-	PhaseDebugger:     {PhaseShip, PhaseAudit, PhaseBuild, PhaseTDD, PhaseEnd},
-	PhaseEnd:          {},
+	// DELIBERATE WIDENING (retry + retro redesign, 2026-08-28). PhaseTDD and
+	// PhaseBuild are the audit-FAIL re-entry edges: a TASK-level rejection — per
+	// the ADR-0072 failure_policy category table, which has always declared
+	// code-audit-fail as {task, retry-with-fix, MaxRetries: 2} — re-enters the dev
+	// cycle in the SAME cycle instead of tearing it down. Reachable only through
+	// decideAfterAuditFail, which evaluates the deterministic floor FIRST, so a
+	// floor category halts before either edge is offered. This anchor is
+	// config-independent on purpose: widening it must be an explicit edit like
+	// this one, never a side effect of a config change.
+	PhaseAudit:    {PhaseShip, PhaseRetro, PhaseTDD, PhaseBuild},
+	PhaseRetro:    {PhaseShip, PhaseTDD, PhaseEnd, PhaseAudit},
+	PhaseShip:     {PhaseEnd, PhaseDebugger, PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip},
+	PhaseDebugger: {PhaseShip, PhaseAudit, PhaseBuild, PhaseTDD, PhaseEnd},
+	PhaseEnd:      {},
 }
 
 func assertNextCell(t *testing.T, p Phase, v string, want oracleCell) {

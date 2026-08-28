@@ -16,6 +16,7 @@ package core
 // storm for resumed cycles.
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -75,35 +76,59 @@ func TestConsumeAuditRepairGrant_IncrementsOnlyOnARepairReason(t *testing.T) {
 	}
 }
 
-// The reason string the branch emits MUST be the one the consumer keys on. A
-// literal on either side that drifts from the other silently disables the
-// bound — the branch would grant repairs that nothing ever counts.
+// The reason string the emitter produces MUST be the one the consumer keys on.
+// A literal on either side that drifts from the other silently disables the bound:
+// the branch would grant repairs that nothing ever counts.
+//
+// This test previously read decision_branch.go — where the emitter USED to live.
+// The redesign moved it to audit_fail_decision.go and the test kept passing its own
+// stale target until it didn't, which is the same false-confidence shape it was
+// written to prevent. It now targets the emitter and, more importantly, is backed by
+// TestOrchestrator_AuditFailRetriesTheDevCycle and
+// TestResumePath_ReachesTheAuditFailDisposition, which prove the bound end-to-end
+// rather than by inspection.
 func TestAuditRepairReasonPrefix_IsSingleSourced(t *testing.T) {
-	body, err := os.ReadFile("decision_branch.go")
+	body, err := os.ReadFile("audit_fail_decision.go")
 	if err != nil {
-		t.Fatalf("read decision_branch.go: %v", err)
+		t.Fatalf("read audit_fail_decision.go: %v", err)
 	}
 	if strings.Contains(string(body), `"audit-repair: "`) {
-		t.Error("decision_branch.go builds the repair reason from a LITERAL; it must use auditRepairReasonPrefix so the emitter and the consumer cannot drift")
+		t.Error("the emitter builds the repair reason from a LITERAL; it must use auditRepairReasonPrefix so emitter and consumer cannot drift")
 	}
 	if !strings.Contains(string(body), "auditRepairReasonPrefix") {
-		t.Error("decision_branch.go does not reference auditRepairReasonPrefix; the repair grant would be unattributable")
+		t.Error("the emitter does not reference auditRepairReasonPrefix; a granted repair would be unattributable to the consumer")
 	}
 }
 
-// BOTH branch surfaces must consume the grant. cyclerun_record.go is the live
-// loop; resume.go is the crash-resume path. A resume that skips the increment
-// hands a resumed cycle a fresh, unbounded repair budget — which is precisely
-// how the bookkeeping bound was documented to have failed before.
-func TestAuditRepairGrant_ConsumedOnBothBranchSurfaces(t *testing.T) {
-	for _, f := range []string{"cyclerun_record.go", "resume.go"} {
-		body, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatalf("read %s: %v", f, err)
+// BOTH dispatch surfaces must actually REACH the audit-FAIL disposition.
+//
+// The previous version of this test was a strings.Contains grep for
+// "consumeAuditRepairGrant(" in each file. It passed while resume.go's copy was
+// DEAD CODE and while resume.go had no audit-FAIL branch at all — the feature was
+// unreachable on the entire resume surface and a green suite said nothing. That is
+// the false-confidence shape this codebase keeps producing, so this now drives the
+// resume path and asserts the disposition it actually reaches.
+func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictFAIL, PhaseRetro: VerdictFAIL})
+	runners[PhaseAudit] = &classDeclaringAuditRunner{t: t}
+	o := NewOrchestrator(st, led, runners)
+	root := t.TempDir()
+
+	res, _ := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root},
+		&ResumePoint{Phase: string(PhaseAudit), CycleID: 1577})
+
+	// A resumed audit FAIL must re-enter the dev cycle exactly as the live loop
+	// does, not fall through to the terminal retro.
+	reentered := false
+	for _, p := range res.PhasesRun {
+		if p == PhaseTDD || p == PhaseBuild {
+			reentered = true
 		}
-		if !strings.Contains(string(body), "consumeAuditRepairGrant(") {
-			t.Errorf("%s does not call consumeAuditRepairGrant; the repair bound drifts out of this surface", f)
-		}
+	}
+	if !reentered {
+		t.Errorf("a resumed audit FAIL never re-entered the dev cycle; phases=%v", res.PhasesRun)
 	}
 }
 

@@ -246,10 +246,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 	}()
 
 	capturer := bridgeModelCapturer{workspace: scratch}
-	router := modelquery.Router{
-		ByCLI:   map[string]modelquery.Lister{"ollama": modelquery.OllamaLister{}},
-		Default: modelquery.RecipeLister{Capturer: capturer},
-	}
+	router := modelquery.DefaultRouter(capturer)
 	dispatcher := bridgePromptDispatcher{workspace: scratch, projectRoot: projectRoot}
 	// D7 family gate: read policy.json catalog.allowed_families so each CLI's
 	// live candidates are family-filtered before classification. Load is
