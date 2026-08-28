@@ -57,6 +57,18 @@
           "model_reasoning_effort=xhigh",
           "-c",
           "plan_mode_reasoning_effort=xhigh"
+        ],
+        "max": [
+          "-c",
+          "model_reasoning_effort=max",
+          "-c",
+          "plan_mode_reasoning_effort=max"
+        ],
+        "ultra": [
+          "-c",
+          "model_reasoning_effort=ultra",
+          "-c",
+          "plan_mode_reasoning_effort=ultra"
         ]
       },
       "default": "high"
