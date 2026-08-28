@@ -570,11 +570,17 @@ func TestStateMachine_NextFromStart(t *testing.T) {
 // --- failure-adapter retro branching (M3) ---
 
 // Retro PASS short-circuits to ship — failureadapter not consulted.
-func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
+// Renamed from TestOrchestrator_RetroPASS_RoutesToShip, whose fixture comment read
+// "Even with prior failures, retro PASS overrides and ships" — the clearest
+// statement of the category error being corrected. A retro verdict reports whether
+// the POST-MORTEM is complete; it cannot override a failure it merely described,
+// and the retro persona is read-only outside its own artifacts, so the tree here is
+// byte-identical to the one the auditor rejected.
+func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 0,
 		FailedAt: []FailedRecord{
-			// Even with prior failures, retro PASS overrides and ships.
+			// Prior failures stand: a well-written retrospective does not clear them.
 			{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail"},
 			{Cycle: 2, Verdict: "FAIL", Classification: "code-build-fail"},
 		},
@@ -591,7 +597,7 @@ func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	// After retro PASS, ship should have run.
-	wantTail := []Phase{PhaseAudit, PhaseRetro, PhaseShip}
+	wantTail := []Phase{PhaseAudit, PhaseRetro}
 	got := res.PhasesRun
 	if len(got) < len(wantTail) {
 		t.Fatalf("not enough phases: %v", got)
@@ -605,8 +611,13 @@ func TestOrchestrator_RetroPASS_RoutesToShip(t *testing.T) {
 	// Disposition contract (cycle-1046 verdict-path wiring): fixtures carry no
 	// disposition.json, so the gate prefixes its loud reason — the branch
 	// decision must still be carried (suffix), and the gate must be audible.
-	if !strings.HasSuffix(res.RetroDecision, "retro-recovered: ship") {
-		t.Errorf("RetroDecision=%q, want retro-recovered: ship suffix", res.RetroDecision)
+	for _, p := range res.PhasesRun {
+		if p == PhaseShip {
+			t.Fatalf("ship ran after an audit FAIL that only a retrospective 'recovered'; phases=%v", res.PhasesRun)
+		}
+	}
+	if strings.Contains(res.RetroDecision, "retro-recovered") {
+		t.Errorf("RetroDecision=%q still claims recovery", res.RetroDecision)
 	}
 	if !strings.Contains(res.RetroDecision, "disposition-gate:") {
 		t.Errorf("RetroDecision=%q must surface the disposition-gate reason when no disposition was delivered", res.RetroDecision)

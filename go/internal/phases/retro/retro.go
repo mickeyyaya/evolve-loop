@@ -6,8 +6,10 @@
 // Verdict mapping:
 //
 //   - previous verdict != FAIL/WARN → SKIPPED, no bridge call
-//   - retrospective.md non-empty AND at least one failure-lesson*.yaml
-//     present in workspace → PASS
+//   - retrospective.md non-empty AND a failure lesson for THIS cycle → PASS
+//     (resolved where the persona writes them: .evolve/instincts/lessons/
+//     inst-L<cycle>*.yaml; the legacy workspace failure-lesson*.yaml shape is
+//     still accepted — see hasFailureLesson)
 //   - otherwise → FAIL
 package retro
 
@@ -16,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -231,7 +234,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		}
 	}
 	verdict := core.VerdictPASS
-	if strings.TrimSpace(content) == "" || !hasFailureLesson(req.Workspace) {
+	if strings.TrimSpace(content) == "" || !hasFailureLesson(req.ProjectRoot, req.Workspace, req.Cycle) {
 		verdict = core.VerdictFAIL
 	}
 
@@ -257,10 +260,57 @@ func composePrompt(body string, req core.PhaseRequest, prev string) string {
 	return b.String()
 }
 
-// hasFailureLesson reports whether the workspace contains any file
-// matching failure-lesson*.yaml. The retrospective agent emits the file
-// alongside retrospective.md; without it, the retro is incomplete.
-func hasFailureLesson(ws string) bool {
+// lessonsDirRel is where the retro persona is instructed to write lessons
+// (agents/evolve-retrospective.md: "Output path:
+// .evolve/instincts/lessons/inst-LXXX-<slug>.yaml"). Single-sourced here so the
+// gate's search location and the persona's documented output path cannot drift —
+// the drift that graded 220 of 238 retros FAIL for not producing an artifact the
+// persona is instructed never to produce.
+const lessonsDirRel = ".evolve/instincts/lessons"
+
+// lessonPrefixForCycle is the persona's own id convention: inst-L<cycle><suffix>,
+// e.g. inst-L1574a-<slug>.yaml. Matching on it keeps the check CYCLE-SCOPED —
+// 600 lessons exist in that directory (135 inst-L*, 464 an older cycle-<N>-*
+// convention), and a gate that accepted any of them would pass unconditionally,
+// converting a permanently-failing gate into a rubber stamp.
+func lessonPrefixForCycle(cycle int) string {
+	return "inst-L" + strconv.Itoa(cycle)
+}
+
+// matchesCycleLesson requires a NON-DIGIT delimiter after the cycle number. A
+// plain prefix match would let cycle 157's gate be satisfied by
+// inst-L1574a-<slug>.yaml, and cycle 1's by any lesson whose number starts with 1
+// — re-opening the rubber-stamp hole the cycle-scoping exists to close.
+func matchesCycleLesson(name, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	if len(name) == len(prefix) {
+		return true
+	}
+	c := name[len(prefix)]
+	return c < '0' || c > '9'
+}
+
+// hasFailureLesson reports whether THIS cycle produced a failure lesson, looking
+// where the persona actually writes them and, for the pre-2026-08 corpus, in the
+// workspace as well.
+func hasFailureLesson(projectRoot, ws string, cycle int) bool {
+	if cycle > 0 && projectRoot != "" {
+		prefix := lessonPrefixForCycle(cycle)
+		if entries, err := os.ReadDir(filepath.Join(projectRoot, lessonsDirRel)); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				n := e.Name()
+				if matchesCycleLesson(n, prefix) && strings.HasSuffix(n, ".yaml") {
+					return true
+				}
+			}
+		}
+	}
+	// Legacy: cycle-1571-era runs wrote failure-lesson*.yaml into the workspace.
 	entries, err := os.ReadDir(ws)
 	if err != nil {
 		return false

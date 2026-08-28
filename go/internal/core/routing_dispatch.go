@@ -106,6 +106,12 @@ func (o *Orchestrator) candidatePhase(s string) Phase {
 // SpineSatisfiedUpTo independently guards the mandatory anchors, so an optional
 // insertion between anchors cannot skip the spine or reach ship illegitimately.
 func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
+	// Decision-only edges are legal in the graph but NOT proposable by the routing
+	// advisor — see decisionOnlyEdge. Checked before the built-in delegate so the
+	// advisor cannot reach them by any route.
+	if decisionOnlyEdge(from, cand) {
+		return false
+	}
 	if from.IsValid() && cand.IsValid() {
 		return o.sm.CanTransition(from, cand) // both built-in: hardcoded graph
 	}

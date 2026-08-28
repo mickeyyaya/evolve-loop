@@ -2,82 +2,35 @@ package core
 
 import (
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
-// repair_eligibility.go — the audit-repair corroboration rule.
+// repair_eligibility.go — the in-cycle repair BOOKKEEPING: the durable attempt
+// counter, the grant primitive, and the findings-injection seam.
 //
-// An audit FAIL is terminal today: statemachine.go gives PhaseAudit exactly two
-// successors (Ship on PASS/WARN, Retro on FAIL), so a rejected cycle pays a full
-// teardown — worktree preservation, a 20-47 minute retrospective, continuation
-// minting, and a fresh cycle's scout+triage+localization — to fix what a rebuild
-// could often have addressed in place. This rule is the single decision that
-// makes a bounded in-cycle repair possible: is THIS failure repairable?
+// Its former eligibility RULE is gone (ADR-0093). Retries are now decided at the
+// audit chokepoint from the audit's own declared failure class and the ADR-0072
+// policy table — see audit_fail_decision.go and retry_envelope.go. One retry
+// authority, not two: the deleted rule was a second mechanism built beside a
+// declarative policy that had always declared the same cap and that nothing read.
 //
-// It is a pure function on purpose. Every I/O concern (reading the dossier,
-// resolving which categories are policy floors) is inverted into the input, so
-// the rule is exhaustively table-testable and has exactly one place to change.
+// What survives here is the machinery a retry still needs wherever it is decided:
+// a bound that outlives a crash, one primitive that spends it, and the seam that
+// hands the rebuilding agent the audit's own findings.
 //
-// WHY IT IS SHAPED THIS WAY. Wave-3 cycles 1572/1573/1574 each halted under
-// applyFailureDecisionFloor gate 2 — the agent-authored failure-decision.json
-// category "infra-systemic". But all three failure-dossier.json record
-// floor_candidate:"" (the DETERMINISTIC gate never fired), while the SAME retro
-// agent's disposition.json recorded legitimacy:"legit-rejection". One agent
-// contradicted itself inside one cycle and the prose half won, halting three
-// cycles that two deterministic signals called task-level. That is the
-// proxy-as-verdict class of docs/incidents/2026-08-12-proxy-as-verdict-findings.md.
-//
-// What this rule does NOT do: weaken ADR-0072. A deterministic floor candidate
-// is absolute here, exactly as it is in gate 1. The only authority narrowed is
-// prose contradicted by the deterministic evidence AND by the agent's own
-// disposition.
-type repairEligibilityInput struct {
-	// DeterministicFloorCandidate is failureDossier.FloorCandidate — the
-	// machine-computed floor category. Non-empty ⇒ no repair, unconditionally.
-	DeterministicFloorCandidate string
-	// AgentClaimedFloor reports whether failure-decision.json's category is a
-	// policy floor. Resolved by the caller (policy is not this rule's concern);
-	// used only to record an incoherence, never to grant repair.
-	AgentClaimedFloor bool
-	// Legitimacy is disposition.json's legitimacy field, validated against the
-	// single-sourced validLegitimacy vocabulary in disposition_gate.go.
-	Legitimacy string
-	// Attempts is how many repairs this cycle has already dispatched.
-	Attempts int
-	// MaxAttempts is the configured cap (workflow.max_audit_repair_attempts).
-	// Zero disables repair — the off switch is configuration, not a flag.
-	MaxAttempts int
-}
+// The legitRejection vocabulary word below is retained for the CORROBORATION half
+// of ADR-0092, which is still live in applyFailureDecisionFloor: an agent-authored
+// floor claim contradicted by both the deterministic evidence and the agent's own
+// disposition does not halt. That narrowing is unchanged; only its retry-granting
+// half was removed.
 
-// repairEligibility is the decision. Reason is always populated: a decision an
-// operator cannot read is a decision they cannot audit.
-type repairEligibility struct {
-	Eligible bool
-	// Incoherent records that the agent claimed a floor category while the
-	// deterministic gate was silent AND its own disposition said task-level.
-	// It is a forensics signal about classifier disagreement, deliberately
-	// distinct from Eligible — see the dedicated test.
-	Incoherent bool
-	Reason     string
-}
-
-// legitRejection is the one disposition vocabulary word that describes "the
-// auditor was right and the defect is in the task's own work" — the only
-// classification a rebuild can actually address. Declared here rather than
-// inlined so the link to validLegitimacy is explicit at the point of use.
+// legitRejection is the disposition vocabulary word meaning "the auditor was right
+// and the defect is in the task's own work" — the only classification that can
+// contradict an agent's own floor claim.
 const legitRejection = "legit-rejection"
 
-// repairRecoveryKey is the phase-catalog Recovery.Targets key for the repair
-// branch. Routing through recoveryTarget keeps the destination CONFIG-selected
-// (spec.Recovery.Targets[key]) with PhaseTDD only as the literal fallback, and
-// leaves CanTransition as the legality constraint — the same contract every
-// other control-phase recovery already uses. No new mechanism, and no new edge
-// in the transition table: Retro→TDD is already legal.
-const repairRecoveryKey = "REPAIR_RETRY"
-
 // auditRepairReasonPrefix tags the branch reason a repair grant emits. The
-// emitter (decideAfterRetro) and the consumer (consumeAuditRepairGrant) key on
+// emitter (decideAfterAuditFail) and the consumer (consumeAuditRepairGrant) key on
 // this ONE constant: a literal on either side that drifts from the other would
 // silently disable the bound, granting repairs that nothing counts.
 const auditRepairReasonPrefix = "audit-repair: "
@@ -100,49 +53,6 @@ func consumeAuditRepairGrant(cs *CycleState, reason string) {
 		cs.AuditRepairAttempts++
 		cs.AuditRepairActive = true
 	}
-}
-
-// decideRepairEligibility applies the corroboration rule. Conservative by
-// construction: absence of evidence never grants repair.
-func decideRepairEligibility(in repairEligibilityInput) repairEligibility {
-	// Gate 1 parity. A deterministic floor candidate ends the conversation —
-	// and it ends it BEFORE the incoherence check, because an agent that agrees
-	// with the deterministic evidence is not contradicting anything.
-	if in.DeterministicFloorCandidate != "" {
-		return repairEligibility{
-			Reason: "deterministic floor candidate " + in.DeterministicFloorCandidate + "; repair cannot outrank ADR-0072 gate 1",
-		}
-	}
-
-	// The agent claimed a floor while the deterministic gate stayed silent.
-	// Whether that is a contradiction depends on the agent's OWN disposition,
-	// checked below; record the claim now so both exits can report it.
-	contradicted := in.AgentClaimedFloor && in.Legitimacy == legitRejection
-
-	if !validLegitimacy[in.Legitimacy] {
-		reason := "disposition legitimacy absent or out-of-vocabulary"
-		if in.Legitimacy != "" {
-			reason = "disposition legitimacy " + in.Legitimacy + " is out-of-vocabulary"
-		}
-		return repairEligibility{Reason: reason + "; absence of evidence does not grant repair"}
-	}
-	if in.Legitimacy != legitRejection {
-		return repairEligibility{
-			Reason: "disposition legitimacy " + in.Legitimacy + " is not a task-level rejection; a rebuild cannot address it",
-		}
-	}
-	if in.Attempts >= in.MaxAttempts {
-		return repairEligibility{
-			Incoherent: contradicted,
-			Reason:     "repair attempts exhausted (" + strconv.Itoa(in.Attempts) + "/" + strconv.Itoa(in.MaxAttempts) + ")",
-		}
-	}
-
-	reason := "task-level rejection, attempt " + strconv.Itoa(in.Attempts+1) + "/" + strconv.Itoa(in.MaxAttempts)
-	if contradicted {
-		reason += "; agent claimed a floor category contradicted by an empty deterministic candidate and its own legit-rejection disposition"
-	}
-	return repairEligibility{Eligible: true, Incoherent: contradicted, Reason: reason}
 }
 
 // repairSeededPhase reports whether a repair brief can actually be acted on by
@@ -178,19 +88,4 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 	}
 	out[CtxKeyAuditRepairFindings] = findings
 	return out
-}
-
-// auditRepairCap is the in-cycle repair bound, read from the ONE resolved
-// workflow-config surface every sibling knob uses (StrictAudit, PSMASEnabled,
-// BackfillEnabled, PhaseEnables), which cmd_cycle.go injects unconditionally via
-// WithWorkflowConfig.
-//
-// It replaced a dedicated field fed by a dedicated Option. Both reviewers found
-// the same defect independently: nothing in cmd/evolve ever called that Option,
-// so an operator's workflow.max_audit_repair_attempts — including the documented
-// "0 disables repair" off-switch — never reached the orchestrator, while every
-// test passed by calling the Option itself. Two sources of truth for one knob is
-// the bug; there is now one.
-func (o *Orchestrator) auditRepairCap() int {
-	return o.workflowConfig.MaxAuditRepairAttempts
 }

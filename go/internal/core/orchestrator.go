@@ -426,6 +426,11 @@ type Orchestrator struct {
 	// policy.json at the composition root; absent ⇒ compiled defaults.
 	failurePolicy policy.SystemFailurePolicy
 
+	// retryAdjudicator proposes how to dispose of an audit FAIL among the actions
+	// the deterministic policy already made legal. nil is a supported production
+	// state (Null Object): policy alone is sufficient authority to grant a retry.
+	retryAdjudicator RetryAdjudicator
+
 	// maxPhaseIterations bounds RunCycle's dispatch loop (the transition-table
 	// cycle guard). 0 ⇒ defaultMaxPhaseIterations. Injected via
 	// WithMaxPhaseIterations; tests set it low to exercise the C1
@@ -637,6 +642,12 @@ func WithFailureCountReader(fn func(id string) int) Option {
 // (ADR-0072). The zero-option default is the compiled DefaultSystemFailurePolicy.
 func WithFailurePolicy(fp policy.SystemFailurePolicy) Option {
 	return func(o *Orchestrator) { o.failurePolicy = fp }
+}
+
+// WithRetryAdjudicator injects the audit-FAIL adjudication Strategy. Absent, the
+// deterministic policy decides alone.
+func WithRetryAdjudicator(a RetryAdjudicator) Option {
+	return func(o *Orchestrator) { o.retryAdjudicator = a }
 }
 
 // WithMaxPhaseIterations overrides the dispatch-loop iteration bound (the

@@ -378,6 +378,26 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		current = next
 		lastVerdict = resp.Verdict
 
+		// Resume-path parity for the audit-FAIL disposition (ADR-0093). Without
+		// this branch the resume surface falls through to sm.Next(audit, FAIL) =
+		// retro, so a resumed cycle could NEVER repair — and since retro is now
+		// terminal, the retry the policy table grants would be silently
+		// unreachable on exactly the surface that exists for recovery. The live
+		// loop's branch is cyclerun_record.go; both call the same primitive.
+		if current == PhaseAudit && resp.Verdict == VerdictFAIL {
+			branch, reason, sysFail := o.decideAfterAuditFail(cs)
+			consumeAuditRepairGrant(&cs, reason)
+			if sysFail != nil && result.SystemFailure == nil {
+				result.SystemFailure = sysFail
+			}
+			if branch != PhaseRetro {
+				if !o.sm.CanTransition(PhaseAudit, branch) {
+					return result, fmt.Errorf("audit→%s not allowed by state machine", branch)
+				}
+				scheduledNext = branch
+			}
+		}
+
 		// History-branch gate (ADR-0058): the branch-entry CONDITION is lockstep
 		// with recordAndBranch (both key on successorStrategy == history, which
 		// owns the degrade). The branch BODY differs by design — resume takes the
@@ -396,7 +416,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// (bounded only by the resume safety counter — ~15 LLM dispatches).
 			// The next pre-phase WriteCycleState persists the consumed slot.
 			consumeBookkeepingRegradeGrant(&cs, reason)
-			consumeAuditRepairGrant(&cs, reason)
 			result.RetroDecision = reason
 			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
 			// a floor category halts + escalates rather than looping as task-level.

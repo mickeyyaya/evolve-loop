@@ -1,8 +1,14 @@
 # ADR-0092 — An audit rejection is repairable in-cycle, and prose alone may no longer outrank the deterministic floor
 
-- **Status:** Accepted (2026-08-27) — repair defaults ON at 2 attempts
-  (`policy.DefaultMaxAuditRepairAttempts`); `workflow.max_audit_repair_attempts: 0`
-  disables it.
+- **Status:** **SUPERSEDED (2026-08-28) by [ADR-0093](0093-retry-envelope-and-terminal-retro.md).**
+  Its retry half — `policy.DefaultMaxAuditRepairAttempts`,
+  `workflow.max_audit_repair_attempts`, and the disposition-prose eligibility rule —
+  is DELETED: it was a second mechanism built beside ADR-0072's declarative retry
+  policy, which had always declared the same cap of 2 and which nothing consumed.
+  Measured reachable on only 3 of 16 recent failures because it depended on retro
+  writing a disposition. Its CORROBORATION half survives (prose contradicted by two
+  deterministic signals still loses), as do its durable attempt counter, its
+  findings-injection seam, and its routed-path protection.
 - **Driving evidence:** wave 3, cycles 1572/1573/1574 (2026-08-27). Three lanes spent
   **367 minutes** to deliver three audit FAILs and **zero ships**. Two of the three root
   causes were the *staged index contents* rather than the code: 1572 had 10 green ACS

@@ -764,14 +764,6 @@ func (p Policy) DispatchConfig() DispatchConfig {
 	return c
 }
 
-// DefaultMaxAuditRepairAttempts is the compiled default for the in-cycle
-// audit-repair loop, following the repo convention that gates and loop
-// behaviour default ON as Go constants rather than requiring a policy.json
-// block. Two attempts: enough to absorb the staged-index and narrative-fidelity
-// rejections that dominated wave 3, bounded low enough that a genuinely broken
-// cycle still reaches retro promptly.
-const DefaultMaxAuditRepairAttempts = 2
-
 // WorkflowPolicy is the .evolve/policy.json "workflow" block.
 type WorkflowPolicy struct {
 	MaxConsecutiveFails   int               `json:"max_consecutive_fails,omitempty"`
@@ -796,13 +788,6 @@ type WorkflowPolicy struct {
 	// env read (flag-reduction, ADR-0064). A plain bool (not *bool): false is the
 	// product default, so an absent block and an explicit false are the same posture.
 	StrictAudit bool `json:"strict_audit,omitempty"`
-	// MaxAuditRepairAttempts caps the in-cycle audit-repair loop: on a
-	// task-level audit rejection the cycle re-enters tdd→build→audit with the
-	// verdict's reasoning rather than tearing down. Absent ⇒
-	// DefaultMaxAuditRepairAttempts. An explicit 0 disables repair — the off
-	// switch is configuration, not a feature flag. A *int (not int) so an
-	// explicit 0 is distinguishable from an absent key.
-	MaxAuditRepairAttempts *int `json:"max_audit_repair_attempts,omitempty"`
 	// CompactPrompts enables on-demand reference-section stripping from disk-loaded
 	// agent docs before dispatch (strips "## Reference Index (Layer 3, on-demand)"
 	// and everything after it). Absent/nil = default ON; explicit false opts out.
@@ -836,8 +821,6 @@ type WorkflowConfig struct {
 	ConsensusAuditEnabled bool
 	PSMASEnabled          bool
 	StrictAudit           bool
-	// MaxAuditRepairAttempts is the resolved in-cycle audit-repair cap.
-	MaxAuditRepairAttempts int
 	// CompactPrompts mirrors WorkflowPolicy.CompactPrompts with the default applied.
 	// Default true: phase runners strip the on-demand reference tail before dispatch.
 	CompactPrompts bool
@@ -876,9 +859,8 @@ type WorkflowConfig struct {
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
 func (p Policy) WorkflowConfig() WorkflowConfig {
 	c := WorkflowConfig{
-		MaxConsecutiveFails:    1,
-		MaxAuditRepairAttempts: DefaultMaxAuditRepairAttempts,
-		MaxCyclesCap:           25,
+		MaxConsecutiveFails: 1,
+		MaxCyclesCap:        25,
 		// Cycle count is optional: with no explicit --cycles the advisor decides
 		// how many cycles the goal needs — completion-driven (stop when the
 		// backlog drains), bounded by MaxCyclesCap. Override with
@@ -902,9 +884,6 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	}
 	if p.Workflow.MaxConsecutiveFails > 0 {
 		c.MaxConsecutiveFails = p.Workflow.MaxConsecutiveFails
-	}
-	if p.Workflow.MaxAuditRepairAttempts != nil && *p.Workflow.MaxAuditRepairAttempts >= 0 {
-		c.MaxAuditRepairAttempts = *p.Workflow.MaxAuditRepairAttempts
 	}
 	if p.Workflow.MaxCyclesCap > 0 {
 		c.MaxCyclesCap = p.Workflow.MaxCyclesCap
