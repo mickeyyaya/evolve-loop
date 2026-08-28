@@ -262,6 +262,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		Classifier:      modelquery.CLIClassifier{CLI: classifierCLI, Dispatcher: dispatcher},
 		Fallback:        fallback,
 		AllowedFamilies: allowedFamilies,
+		EffortListers:   modelquery.DefaultEffortListers(),
 		Prior:           prior,
 		Freshness:       freshnessFromManifests(readyCLIs),
 		Now:             time.Now,
