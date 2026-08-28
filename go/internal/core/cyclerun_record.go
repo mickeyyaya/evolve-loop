@@ -181,6 +181,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		// instead of looping retro→audit forever. Before the gateErr prepend
 		// below, which would break the prefix match.
 		consumeBookkeepingRegradeGrant(&cr.cs, reason)
+		consumeAuditRepairGrant(&cr.cs, reason)
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
 		// S2 disposition gate, verdict path (mirrors recordFailureLearning's
 		// contract — cycle-1046 live gap): an absent/invalid disposition is

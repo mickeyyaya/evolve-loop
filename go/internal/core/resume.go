@@ -283,6 +283,21 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
+		// Resume-path parity for the audit-repair brief (review MEDIUM): the
+		// budget half was already mirrored below via consumeAuditRepairGrant, but
+		// without seeding HERE a cycle that crashed mid-repair burned an attempt
+		// and rebuilt BLIND — the exact crash-resilience case the persisted
+		// counter exists for. Same state-derived rule as the live loop.
+		// NEXT, not current: at this point `current` is the phase that ran in the
+		// PREVIOUS iteration (it is reassigned to next only at the bottom of the
+		// loop). Using it meant the first TDD dispatch after a resumed repair
+		// grant — Retro->TDD, the exact crash-resume case this exists for — saw
+		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
+		// line in this block keys on next for the same reason.
+		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
+		if next == PhaseAudit {
+			cs.AuditRepairActive = false
+		}
 		resp, err := runner.Run(ctx, PhaseRequest{
 			Cycle:       cycle,
 			ProjectRoot: req.ProjectRoot,
@@ -297,7 +312,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			GoalHash:      req.GoalHash,
 			PreviousPhase: string(current),
 			Env:           envSnap,
-			Context:       ctxSnap,
+			Context:       phaseCtx,
 		})
 		if err != nil {
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
@@ -381,6 +396,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// (bounded only by the resume safety counter — ~15 LLM dispatches).
 			// The next pre-phase WriteCycleState persists the consumed slot.
 			consumeBookkeepingRegradeGrant(&cs, reason)
+			consumeAuditRepairGrant(&cs, reason)
 			result.RetroDecision = reason
 			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
 			// a floor category halts + escalates rather than looping as task-level.
