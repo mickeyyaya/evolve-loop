@@ -15,11 +15,8 @@ package profiles
 // tdd-engineer/adversarial-review pin nothing. GREEN once the config is aligned.
 
 import (
-	"encoding/json"
-	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -60,9 +57,9 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 		"builder":            "medium",
 		"auditor":            "xhigh",
 		"adversarial-review": "xhigh",
-		"retrospective":      codexDeepTopEffort,
-		"premise-challenge":  codexDeepTopEffort,
-		"intent":             codexDeepTopEffort,
+		"retrospective":      maxEffortRung,
+		"premise-challenge":  maxEffortRung,
+		"intent":             maxEffortRung,
 	}
 	for profile, effort := range want {
 		p, err := loader.Get(profile)
@@ -75,10 +72,12 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 	}
 }
 
-// codexDeepTopEffort is the single source for the 2026-08-28 directive's rung.
-// The matrix pin below and the class guard both read it, so the next directive
-// change is one edit rather than two that can drift apart.
-const codexDeepTopEffort = "max"
+// maxEffortRung is the single source for the top reasoning rung, read by all
+// THREE guards in this file: the per-phase matrix pin, the codex deep/top class
+// guard, and the CLI-agnostic converse guard. Named for the rung rather than
+// for codex — the converse guard polices every family, so a codex-specific
+// name would mislead the next reader deciding whether it is safe to reuse.
+const maxEffortRung = "max"
 
 // CLASS GUARD for the 2026-08-28 directive. The original change swept the 21
 // codex deep/top profiles that existed at that moment — a point-in-time edit.
@@ -109,53 +108,95 @@ const codexDeepTopEffort = "max"
 // regression was live on disk. CI and `make test` already pass -count=1; the
 // exposure is local verification.
 func TestCodexDeepTierProfilesAllRunAtMax(t *testing.T) {
-	dir := effortProfilesDir(t)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		// FATAL, deliberately diverging from the sibling guard in
-		// internal/bridge, which SKIPs when the profiles dir is missing. That
-		// leniency suits a realizability check that can be legitimately
-		// unrunnable; it does not suit this one. `.evolve/profiles` is tracked
-		// and always present in a real checkout, so an unreadable dir here
-		// means the guard is not looking at anything — and a guard that goes
-		// quiet when its input vanishes is the failure mode this file exists
-		// to prevent.
-		t.Fatalf("read profiles dir: %v", err)
-	}
+	// Through RealTreeProfiles, NOT a raw directory scan. The runtime mints
+	// UNTRACKED profile stubs into .evolve/profiles; a scanner that binds
+	// everything on disk reds on state that can never reach a CI checkout
+	// (the 2026-08-09 zero-ship batch, fingerprint cd49274beab2).
+	//
+	// This is not hypothetical here: the first version of this guard DID scan
+	// raw, and it failed in the live runtime plane on two minted stubs
+	// (disposition-preflight, regression-predicate-precheck) that carry no
+	// effort_level at all — it would have red the test gate on every cycle.
+	loader, names := RealTreeProfiles(t)
 	checked := 0
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+	for _, name := range names {
+		p, err := loader.Get(name)
 		if err != nil {
-			t.Fatalf("read %s: %v", e.Name(), err)
-		}
-		var p struct {
-			CLI              string `json:"cli"`
-			ModelTierDefault string `json:"model_tier_default"`
-			EffortLevel      string `json:"effort_level"`
-		}
-		if err := json.Unmarshal(raw, &p); err != nil {
-			// Do NOT skip. A corrupted profile silently dropping out of
-			// `checked` would undercut the vacuity assertion below: the guard
-			// would report "selector matched profiles" while quietly not
-			// examining this one.
-			t.Errorf("profile %s: unreadable JSON (%v) — it cannot be checked, so it cannot be trusted", e.Name(), err)
+			// Reported, not skipped. Get does more than decode — it also
+			// expands $include_policy — so a tracked profile with perfectly
+			// valid routing fields can fail here for an unrelated reason and
+			// silently drop out of `checked`, weakening the vacuity guard.
+			// Loud beats quiet: the guard exists to notice things.
+			t.Errorf("profile %s: Get failed (%v) — it cannot be checked, so it cannot be trusted", name, err)
 			continue
 		}
 		if p.CLI != "codex-tmux" || (p.ModelTierDefault != "deep" && p.ModelTierDefault != "top") {
 			continue
 		}
 		checked++
-		if p.EffortLevel != codexDeepTopEffort {
-			t.Errorf("profile %s: codex %s-tier effort_level = %q, want \"max\" (2026-08-28 operator directive). A codex deep/top phase left at a lower rung runs quieter than its siblings with nothing reporting it.",
-				e.Name(), p.ModelTierDefault, p.EffortLevel)
+		if p.EffortLevel != maxEffortRung {
+			t.Errorf("profile %s: codex %s-tier effort_level = %q, want %q (2026-08-28 operator directive). A codex deep/top phase left at a lower rung runs quieter than its siblings with nothing reporting it.",
+				name, p.ModelTierDefault, p.EffortLevel, maxEffortRung)
 		}
 	}
-	// Guard the guard: if the selector ever stops matching (a cli rename, a
-	// field rename), this must fail loudly rather than pass over zero profiles.
 	if checked == 0 {
-		t.Fatal("matched NO codex deep/top profiles — the selector is broken and this guard is vacuous")
+		t.Fatal("matched NO tracked codex deep/top profiles — the selector is broken and this guard is vacuous")
+	}
+}
+
+// The CONVERSE of TestCodexDeepTierProfilesAllRunAtMax, per the 2026-08-29
+// operator directive: "the max thinking level should only apply to deep/top
+// model". Together the two make it a biconditional for codex — deep/top ⟺ max —
+// and this half alone constrains EVERY family, so `max` can never drift onto a
+// fast/balanced phase.
+//
+// Why pin a constraint nothing violates today: max is the most expensive rung
+// on every CLI that has one (codex's own picker warns "Max and Ultra consume
+// usage limits faster"). A fast/balanced phase is fast/balanced BECAUSE it was
+// costed that way — scout and triage sit at low under the cycle-566 matrix.
+// Silently promoting one to max would raise spend with nothing reporting it:
+// the same shape as every other defect this file guards, a change nobody sees.
+//
+// CLI-AGNOSTIC on purpose. The directive is about thinking level vs model tier,
+// not about codex — claude exposes max too, and the moment a claude profile
+// adopts it the same rule must hold.
+//
+// NOTE on escalation: this reads the DECLARED tier, like its sibling. A phase
+// floor-escalated at dispatch (scout.json → deep on cycle 1 via
+// model_tier_overrides) keeps its declared effort, and that is COMPLIANT:
+// scout runs low, and low is not max. The directive restricts where max may
+// APPEAR; it does not require an escalated phase to adopt it.
+func TestMaxEffortOnlyOnDeepOrTopProfiles(t *testing.T) {
+	// Same funnel, same reason — see the sibling above.
+	loader, names := RealTreeProfiles(t)
+	checked := 0
+	for _, name := range names {
+		p, err := loader.Get(name)
+		if err != nil {
+			// Reported, not skipped. Get does more than decode — it also
+			// expands $include_policy — so a tracked profile with perfectly
+			// valid routing fields can fail here for an unrelated reason and
+			// silently drop out of `checked`, weakening the vacuity guard.
+			// Loud beats quiet: the guard exists to notice things.
+			t.Errorf("profile %s: Get failed (%v) — it cannot be checked, so it cannot be trusted", name, err)
+			continue
+		}
+		if p.EffortLevel != maxEffortRung {
+			continue
+		}
+		checked++
+		// An unset model_tier_default resolves to "balanced" (resolvellm), so
+		// an omitted field is a violation, not an exemption.
+		tier := p.ModelTierDefault
+		if tier == "" {
+			tier = "balanced"
+		}
+		if tier != "deep" && tier != "top" {
+			t.Errorf("profile %s (cli %s): effort_level %q on a %q-tier phase — max is reserved for deep/top models (2026-08-29 directive). It is the most expensive rung; a fast/balanced phase was costed that way deliberately.",
+				name, p.CLI, p.EffortLevel, tier)
+		}
+	}
+	if checked == 0 {
+		t.Fatalf("matched NO tracked profiles at effort %q — the selector is broken and this guard is vacuous", maxEffortRung)
 	}
 }
