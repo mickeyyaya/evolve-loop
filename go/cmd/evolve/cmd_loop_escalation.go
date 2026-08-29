@@ -33,6 +33,18 @@ type pipelineEscalation struct {
 // (a halt that also fails to leave a breadcrumb must not do so silently).
 func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, stderr io.Writer) {
 	now := time.Now().UTC()
+	nextAction := fmt.Sprintf("Diagnose the PIPELINE (not the task) from the system-failure evidence: %s. Fix the pipeline defect, then resume: evolve loop --resume.", sf.Evidence)
+	reproHint := fmt.Sprintf("Reproduce and root-cause the reported system failure: %s.", sf.Evidence)
+	summary := fmt.Sprintf("ADR-0072 system-failure halt at cycle %d (category=%s). Evidence: %s. This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.", cycle, sf.Category, sf.Evidence)
+	rootCause := fmt.Sprintf("The system-failure signal reported: %s. Preserve this evidence while identifying the pipeline cause.", sf.Evidence)
+	fix := fmt.Sprintf("Root-cause the pipeline failure described by the recorded evidence: %s. Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.", sf.Evidence)
+	if sf.Category == "verdict-incoherence" {
+		nextAction = "Diagnose the PIPELINE (not the task). Read the cycle's audit-report.md + acs-verdict.json (both green) against the recorded verdict; the runner/verdict-surface path forged a negative verdict. Fix the pipeline defect, then resume: evolve loop --resume."
+		reproHint = "The verdict-surface path recorded a negative verdict while the phase artifacts are green — compare recorded outcome vs on-disk evolve-verdict (internal/coherence.CheckVerdictCoherence)."
+		summary = fmt.Sprintf("ADR-0072 system-failure halt at cycle %d. The pipeline forged a verdict (category=%s): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure — retrying the task reproduces it.", cycle, sf.Category)
+		rootCause = "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072."
+		fix = "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed."
+	}
 	esc := pipelineEscalation{
 		Schema:     1,
 		Category:   sf.Category,
@@ -41,8 +53,8 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 		Cycle:      cycle,
 		Workspace:  workspace,
 		DetectedAt: now.Format(time.RFC3339),
-		NextAction: "Diagnose the PIPELINE (not the task). Read the cycle's audit-report.md + acs-verdict.json (both green) against the recorded verdict; the runner/verdict-surface path forged a negative verdict. Fix the pipeline defect, then resume: evolve loop --resume.",
-		ReproHint:  "The verdict-surface path recorded a negative verdict while the phase artifacts are green — compare recorded outcome vs on-disk evolve-verdict (internal/coherence.CheckVerdictCoherence).",
+		NextAction: nextAction,
+		ReproHint:  reproHint,
 	}
 	escPath := filepath.Join(evolveDir, "pipeline-escalation.json")
 	if werr := atomicwrite.JSON(escPath, esc); werr != nil {
@@ -60,9 +72,9 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 		"title":      fmt.Sprintf("PIPELINE DEFECT (%s): the loop halted — %s", sf.Category, sf.Evidence),
 		"kind":       "pipeline-repair",
 		"priority":   "P0",
-		"summary":    fmt.Sprintf("ADR-0072 system-failure halt at cycle %d. The pipeline forged a verdict (category=%s): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure — retrying the task reproduces it.", cycle, sf.Category),
-		"root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
-		"fix":        "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+		"summary":    summary,
+		"root_cause": rootCause,
+		"fix":        fix,
 		"connects_to": []string{
 			"docs/architecture/adr/0072-system-failure-policy-and-halt.md",
 			filepath.Join(".evolve", "pipeline-escalation.json"),

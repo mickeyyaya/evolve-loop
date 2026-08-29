@@ -64,6 +64,136 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	}
 }
 
+func TestWritePipelineEscalation_ConsecutiveFailuresPreservesEvidence(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	evidence := "consecutive audit failures (rule=consecutive-audit-failures fingerprint=abc123)"
+	sf := &cyclestate.SystemFailureSignal{
+		Category: "pipeline-blocker",
+		Level:    "system",
+		Evidence: evidence,
+		Halt:     true,
+	}
+	writePipelineEscalation(evolveDir, root, 1579, filepath.Join(root, ".evolve/runs/cycle-1579"), sf, os.Stderr)
+
+	escB, err := os.ReadFile(filepath.Join(evolveDir, "pipeline-escalation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var esc map[string]any
+	if err := json.Unmarshal(escB, &esc); err != nil {
+		t.Fatal(err)
+	}
+	itemB, err := os.ReadFile(filepath.Join(root, ".evolve/inbox/pipeline-defect-pipeline-blocker-cycle1579.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var item map[string]any
+	if err := json.Unmarshal(itemB, &item); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, text := range map[string]string{
+		"next_action": esc["next_action"].(string),
+		"repro_hint":  esc["repro_hint"].(string),
+		"summary":     item["summary"].(string),
+		"root_cause":  item["root_cause"].(string),
+		"fix":         item["fix"].(string),
+	} {
+		if !strings.Contains(text, evidence) {
+			t.Errorf("%s = %q, want original halt evidence %q", name, text, evidence)
+		}
+		if strings.Contains(strings.ToLower(text), "green") || strings.Contains(strings.ToLower(text), "forged") {
+			t.Errorf("%s = %q, must not invent green artifacts or a forged verdict for pipeline-blocker", name, text)
+		}
+	}
+}
+
+func TestWritePipelineEscalation_VerdictIncoherenceKeepsArtifactGuidance(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sf := &cyclestate.SystemFailureSignal{
+		Category: "verdict-incoherence",
+		Level:    "system",
+		Evidence: "recorded=FAIL but audit=PASS and acs=PASS",
+		Halt:     true,
+	}
+	writePipelineEscalation(evolveDir, root, 1579, filepath.Join(root, ".evolve/runs/cycle-1579"), sf, os.Stderr)
+
+	escB, err := os.ReadFile(filepath.Join(evolveDir, "pipeline-escalation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var esc map[string]any
+	if err := json.Unmarshal(escB, &esc); err != nil {
+		t.Fatal(err)
+	}
+	nextAction := esc["next_action"].(string)
+	if !strings.Contains(nextAction, "audit-report.md + acs-verdict.json") || !strings.Contains(nextAction, "forged a negative verdict") {
+		t.Errorf("next_action = %q, want verdict/artifact comparison guidance", nextAction)
+	}
+}
+
+// TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly is AC3: a
+// system-failure category the escalation renderer has never seen (neither
+// "pipeline-blocker" nor "verdict-incoherence") must still surface the
+// signal's own evidence verbatim, and must never invent the
+// verdict-incoherence root-cause narrative ("forged", "green") that only
+// applies to that one specific category.
+func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	evidence := "unrecognized halt signal from a future system-failure rule"
+	sf := &cyclestate.SystemFailureSignal{
+		Category: "future-unknown-category",
+		Level:    "system",
+		Evidence: evidence,
+		Halt:     true,
+	}
+	writePipelineEscalation(evolveDir, root, 1579, filepath.Join(root, ".evolve/runs/cycle-1579"), sf, os.Stderr)
+
+	escB, err := os.ReadFile(filepath.Join(evolveDir, "pipeline-escalation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var esc map[string]any
+	if err := json.Unmarshal(escB, &esc); err != nil {
+		t.Fatal(err)
+	}
+	itemB, err := os.ReadFile(filepath.Join(root, ".evolve/inbox/pipeline-defect-future-unknown-category-cycle1579.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var item map[string]any
+	if err := json.Unmarshal(itemB, &item); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, text := range map[string]string{
+		"next_action": esc["next_action"].(string),
+		"repro_hint":  esc["repro_hint"].(string),
+		"summary":     item["summary"].(string),
+		"root_cause":  item["root_cause"].(string),
+		"fix":         item["fix"].(string),
+	} {
+		if !strings.Contains(text, evidence) {
+			t.Errorf("%s = %q, want original halt evidence %q for an unknown category", name, text, evidence)
+		}
+		if strings.Contains(strings.ToLower(text), "green") || strings.Contains(strings.ToLower(text), "forged") {
+			t.Errorf("%s = %q, must not invent a verdict-incoherence root cause for an unrecognized category", name, text)
+		}
+	}
+}
+
 // TestWritePipelineEscalation_IdentityIncludesCycleNumber pins the fix for the
 // todo-halt-autofiler-mints-unique-ids carryover (state.json): the auto-filed
 // inbox item's id must be minted as pipeline-defect-<category>-cycle<N>, never
