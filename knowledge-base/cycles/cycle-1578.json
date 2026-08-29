@@ -1,0 +1,297 @@
+{
+  "cycle": 1578,
+  "run_id": "01M15DKAVVVWV2Z7GGEMP4FT6A",
+  "goal": "Fix evolve-loop pipeline defects that stop cycles from shipping. Prioritise pipeline-integrity items already queued in .evolve/inbox and carryoverTodos: verdict/disposition routing, gate correctness, and any guard that binds runtime-minted state. Each cycle must land one shippable, tested fix.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 692165,
+      "started_at": "2026-08-29T00:15:36Z",
+      "ended_at": "2026-08-29T00:27:08Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 349345,
+      "started_at": "2026-08-29T00:32:36Z",
+      "ended_at": "2026-08-29T00:38:26Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 2000,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 115145,
+      "started_at": "2026-08-29T00:38:28Z",
+      "ended_at": "2026-08-29T00:40:23Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 30,
+        "output": 8731,
+        "cache_read": 694628,
+        "cache_write": 63780
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 241194,
+      "started_at": "2026-08-29T00:40:23Z",
+      "ended_at": "2026-08-29T00:44:25Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 314322,
+      "started_at": "2026-08-29T00:44:25Z",
+      "ended_at": "2026-08-29T00:49:40Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 22100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1703273,
+      "started_at": "2026-08-29T00:49:40Z",
+      "ended_at": "2026-08-29T01:19:32Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "error-handling-scan",
+      "verdict": "PASS",
+      "duration_ms": 317783,
+      "started_at": "2026-08-29T01:19:32Z",
+      "ended_at": "2026-08-29T01:24:50Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "coverage-gate",
+      "verdict": "PASS",
+      "duration_ms": 484786,
+      "started_at": "2026-08-29T01:24:50Z",
+      "ended_at": "2026-08-29T01:32:55Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 364843,
+      "started_at": "2026-08-29T01:32:55Z",
+      "ended_at": "2026-08-29T01:40:31Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 52,
+        "output": 26451,
+        "cache_read": 2707575,
+        "cache_write": 145809
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 401274,
+      "started_at": "2026-08-29T01:40:31Z",
+      "ended_at": "2026-08-29T01:47:13Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 26100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 2196658,
+      "started_at": "2026-08-29T01:47:13Z",
+      "ended_at": "2026-08-29T02:25:01Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 21614,
+      "started_at": "2026-08-29T02:25:01Z",
+      "ended_at": "2026-08-29T02:28:59Z",
+      "archetype": "evaluate",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 1827669,
+      "started_at": "2026-08-29T02:28:59Z",
+      "ended_at": "2026-08-29T02:59:27Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|infra-error|4dfa0ca6ff87",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase audit: core: all CLI families quota-exhausted (exit=85): every family in the fallback chain returned exit=85 across 2 attempts; checkpoint written — resume with `evolve loop --resume` after qu"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1578",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 9030071,
+    "phase_count": 13,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 2196658,
+    "by_archetype_ms": {
+      "build": 3899931,
+      "control": 1827669,
+      "evaluate": 1430220,
+      "plan": 1872251
+    },
+    "total_tokens": {
+      "input": 82,
+      "output": 85382,
+      "cache_read": 3402203,
+      "cache_write": 209589
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 52,
+        "output": 26451,
+        "cache_read": 2707575,
+        "cache_write": 145809
+      },
+      "plan": {
+        "input": 30,
+        "output": 58931,
+        "cache_read": 694628,
+        "cache_write": 63780
+      }
+    },
+    "wasted_tokens": {
+      "input": 52,
+      "output": 26451,
+      "cache_read": 2707575,
+      "cache_write": 145809
+    },
+    "cache_hit_ratio": 0.9999758985505329,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "fault-localization",
+      "audit"
+    ]
+  }
+}
