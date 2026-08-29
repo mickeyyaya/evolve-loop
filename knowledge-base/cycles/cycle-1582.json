@@ -1,0 +1,119 @@
+{
+  "cycle": 1582,
+  "run_id": "01M15R6S714EM0S6Q8RHFDBAFP",
+  "goal": "Fix evolve-loop pipeline defects that stop cycles from shipping. Prioritise pipeline-integrity items already queued in .evolve/inbox and carryoverTodos: verdict/disposition routing, gate correctness, and any guard that binds runtime-minted state. Each cycle must land one shippable, tested fix.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 653293,
+      "started_at": "2026-08-29T03:17:57Z",
+      "ended_at": "2026-08-29T03:28:51Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 24188,
+      "started_at": "2026-08-29T03:39:24Z",
+      "ended_at": "2026-08-29T03:40:40Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 627578,
+      "started_at": "2026-08-29T03:40:40Z",
+      "ended_at": "2026-08-29T03:51:07Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "triage|infra-error|93d06ea8d19f",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase triage: core: all CLI families quota-exhausted (exit=85): every family in the fallback chain returned exit=85 across 2 attempts; checkpoint written — resume with `evolve loop --resume` after q"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1582",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1305059,
+    "phase_count": 3,
+    "retried_count": 1,
+    "longest_phase": "scout",
+    "longest_ms": 653293,
+    "by_archetype_ms": {
+      "control": 627578,
+      "plan": 677481
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}
