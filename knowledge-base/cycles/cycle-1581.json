@@ -1,0 +1,135 @@
+{
+  "cycle": 1581,
+  "run_id": "01M15R6S6NQYN9NNAY051843D1",
+  "goal": "Fix evolve-loop pipeline defects that stop cycles from shipping. Prioritise pipeline-integrity items already queued in .evolve/inbox and carryoverTodos: verdict/disposition routing, gate correctness, and any guard that binds runtime-minted state. Each cycle must land one shippable, tested fix.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 470278,
+      "started_at": "2026-08-29T03:16:27Z",
+      "ended_at": "2026-08-29T03:24:17Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 168366,
+      "started_at": "2026-08-29T03:28:48Z",
+      "ended_at": "2026-08-29T03:42:30Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "FAIL",
+      "duration_ms": 21522,
+      "started_at": "2026-08-29T03:42:30Z",
+      "ended_at": "2026-08-29T03:43:42Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 4556303,
+      "started_at": "2026-08-29T03:43:42Z",
+      "ended_at": "2026-08-29T04:59:38Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "tdd|infra-error|81999dc44a15",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase tdd: core: all CLI families quota-exhausted (exit=85): every family in the fallback chain returned exit=85 across 2 attempts; checkpoint written — resume with `evolve loop --resume` after quot"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1581",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 5216469,
+    "phase_count": 4,
+    "retried_count": 2,
+    "longest_phase": "retro",
+    "longest_ms": 4556303,
+    "by_archetype_ms": {
+      "control": 4556303,
+      "plan": 660166
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}
