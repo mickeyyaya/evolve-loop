@@ -5,13 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 // ResumePoint describes a checkpointed cycle that can be resumed.
@@ -29,6 +34,13 @@ type ResumePoint struct {
 	SavedAt         string   // checkpoint.savedAt
 	AutoAttempts    int      // checkpoint.autoResumeAttempts (post-bump)
 	AutoMaxAttempts int      // checkpoint.autoResumeMaxAttempts
+	// StatePath is the cycle-state file this checkpoint was read from. For a
+	// host-global resume it is the singleton; for a checkpoint DISCOVERED in a
+	// fleet lane's per-run file it is that per-run path — and the caller must
+	// route the resumed run's own state writes back to it (via
+	// ipcenv.CycleStateFileKey), or the next pause orphans a checkpoint in the
+	// singleton all over again.
+	StatePath string
 }
 
 // ResumeOptions wires test seams + operator overrides for LoadResumeState.
@@ -43,6 +55,9 @@ type ResumeOptions struct {
 	// PathExists tests whether a worktree path is still on disk.
 	// Defaults to os.Stat.
 	PathExists func(path string) bool
+	// Log receives operator-facing breadcrumbs from per-run discovery (e.g.
+	// "skipping stale checkpoint X, resuming older Y"). nil discards.
+	Log io.Writer
 }
 
 // ErrNoCheckpoint is returned when cycle-state.json lacks a usable
@@ -69,6 +84,148 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 	}
 
 	statePath := ResolveCycleStatePath(evolveDir) // fleet per-run override when set
+	rp, err := loadResumeStateFrom(statePath, projectRoot, opts)
+	if err == nil {
+		return rp, nil
+	}
+	// Discovery fallback — the 2026-08-29 incident. Fleet lanes write their
+	// quota/escalation checkpoints through the SAME resolver, but with
+	// ipcenv.CycleStateFileKey set, so the checkpoint lands in the lane's
+	// per-run cycle-state file. A later host-global `evolve loop --resume`
+	// (fresh process, no override) resolved only the singleton and reported
+	// "no live checkpoint" while three live quota-likely checkpoints sat in
+	// .evolve/runs/cycle-158*/cycle-state.json — abandoning a lane that had
+	// already completed build and reached audit. The writer learned fleet
+	// isolation; the reader had not.
+	//
+	// Scope, deliberately narrow:
+	//   - only on ErrNoCheckpoint (a stale PRIMARY checkpoint is a real answer
+	//     about a real checkpoint — never scan past it);
+	//   - only when NO env override is set: inside a lane the override IS the
+	//     authority, and scanning siblings would let one lane resume another's
+	//     cycle.
+	if !errors.Is(err, ErrNoCheckpoint) || os.Getenv(ipcenv.CycleStateFileKey) != "" {
+		return nil, err
+	}
+	rp, derr := discoverPerRunResumeState(evolveDir, projectRoot, opts)
+	if derr != nil {
+		if errors.Is(derr, errNoPerRunCandidates) {
+			// Nothing anywhere — keep the primary error, extended with where
+			// discovery looked, so the operator does not rediscover the split.
+			return nil, fmt.Errorf("%w (also scanned %s for fleet per-run checkpoints: none live)", err, filepath.Join(evolveDir, "runs"))
+		}
+		return nil, derr
+	}
+	return rp, nil
+}
+
+// errNoPerRunCandidates reports that the per-run scan found no live
+// checkpoint blocks at all (as opposed to finding one that failed validation).
+var errNoPerRunCandidates = errors.New("resume: no per-run checkpoint candidates")
+
+// resumableReasons are the checkpoint reasons another process may legitimately
+// resume: the ESCALATION pauses, written once when a run deliberately stops.
+//
+// "phase-complete" is deliberately absent. PhaseBoundaryCheckpointer writes an
+// enabled phase-complete block after EVERY phase of a HEALTHY run — it is a
+// crash-recovery breadcrumb for the SAME process, and its shape defeats the
+// stale-checks (gitHead is always "", and a live lane's worktree exists), so
+// admitting it would let a host-global --resume double-drive a running lane,
+// or silently resurrect a cycle that already ran to a terminal FAIL.
+var resumableReasons = map[string]bool{
+	"quota-likely":       true,
+	"batch-cap-near":     true,
+	"operator-requested": true,
+	"stall-inactivity":   true,
+}
+
+// discoverPerRunResumeState scans evolveDir/runs/*/cycle-state.json for
+// checkpoints another process may resume: enabled, an escalation reason
+// (resumableReasons), and NO fresh lease — the run-dir heartbeat gc already
+// trusts (runlease.Fresh); a fresh lease means the lane is alive right now and
+// resuming it would double-drive the cycle. A quota-paused lane's process has
+// exited, so its heartbeat is stale and it stays discoverable.
+//
+// Candidates load newest-first (savedAt, then cycle_id) and the newest VALID
+// one wins. Lanes are independent — no supersession — so when the newest is
+// stale an older valid sibling is resumed, with a breadcrumb on opts.Log
+// naming the skipped one (the operator must learn it needs attention NOW, not
+// when a later resume trips over it). Only when every candidate fails does the
+// newest's error return — stale must say stale, because "nothing to resume"
+// tells the operator to relaunch fresh and burn the preserved progress.
+func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
+	entries, rerr := os.ReadDir(filepath.Join(evolveDir, "runs"))
+	if rerr != nil {
+		return nil, errNoPerRunCandidates
+	}
+	type candidate struct {
+		path    string
+		savedAt string
+		cycle   int
+	}
+	var cands []candidate
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		path := filepath.Join(evolveDir, "runs", e.Name(), CycleStateFile)
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var blob map[string]any
+		if json.Unmarshal(raw, &blob) != nil {
+			continue
+		}
+		cp, ok := blob["checkpoint"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if enabled, _ := cp["enabled"].(bool); !enabled {
+			continue
+		}
+		if !resumableReasons[strFromAny(cp["reason"])] {
+			continue
+		}
+		if l, ok, _ := runlease.Read(filepath.Join(evolveDir, "runs", e.Name())); ok && runlease.Fresh(l, time.Now(), 0) {
+			continue // lane is ALIVE — never resume out from under it
+		}
+		cands = append(cands, candidate{path: path, savedAt: strFromAny(cp["savedAt"]), cycle: intFromAny(blob["cycle_id"])})
+	}
+	if len(cands) == 0 {
+		return nil, errNoPerRunCandidates
+	}
+	// Newest first. savedAt is RFC3339, so string order IS time order; the
+	// cycle id breaks ties (two lanes checkpointed in the same second).
+	sort.Slice(cands, func(i, j int) bool {
+		if cands[i].savedAt != cands[j].savedAt {
+			return cands[i].savedAt > cands[j].savedAt
+		}
+		return cands[i].cycle > cands[j].cycle
+	})
+	var firstErr error
+	log := opts.Log
+	if log == nil {
+		log = io.Discard
+	}
+	for _, c := range cands {
+		rp, err := loadResumeStateFrom(c.path, projectRoot, opts)
+		if err == nil {
+			return rp, nil
+		}
+		fmt.Fprintf(log, "[resume] skipping %s: %v\n", c.path, err)
+		if firstErr == nil {
+			firstErr = fmt.Errorf("per-run checkpoint %s: %w", c.path, err)
+		}
+	}
+	return nil, firstErr
+}
+
+// loadResumeStateFrom reads ONE state file, extracts the checkpoint block,
+// validates HEAD + worktree, and returns a ResumePoint. This is the former
+// body of LoadResumeState, extracted verbatim so the primary path and the
+// per-run discovery share one loader and cannot drift.
+func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -91,6 +248,7 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 	}
 
 	rp := &ResumePoint{
+		StatePath:       statePath,
 		CycleID:         intFromAny(blob["cycle_id"]),
 		Phase:           strFromAny(cp["resumeFromPhase"]),
 		WorktreePath:    strFromAny(cp["worktreePath"]),
@@ -124,6 +282,32 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 	}
 
 	return rp, nil
+}
+
+// ActivateResumeStatePath points this process's cycle-state resolution at the
+// file rp's checkpoint was read from, when that differs from the current
+// resolution — the write-back half of per-run checkpoint discovery. A resumed
+// cycle that keeps writing to the host-global singleton while its checkpoint
+// lives in a per-run file re-creates the split this feature closes: its next
+// quota pause would checkpoint one place and be sought in another.
+//
+// It reuses the SAME mechanism a fleet lane uses at spawn
+// (ipcenv.CycleStateFileKey, see cyclerun.go) rather than a second channel.
+// The returned restore func puts the previous value back; a no-op restore is
+// returned when nothing needed to change.
+func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
+	if rp == nil || rp.StatePath == "" || rp.StatePath == ResolveCycleStatePath(evolveDir) {
+		return func() {}
+	}
+	prev, had := os.LookupEnv(ipcenv.CycleStateFileKey)
+	_ = os.Setenv(ipcenv.CycleStateFileKey, rp.StatePath)
+	return func() {
+		if had {
+			_ = os.Setenv(ipcenv.CycleStateFileKey, prev)
+		} else {
+			_ = os.Unsetenv(ipcenv.CycleStateFileKey)
+		}
+	}
 }
 
 // RunCycleFromPhase resumes an in-flight cycle starting at the given
