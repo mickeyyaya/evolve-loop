@@ -38,7 +38,7 @@ func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, _ := initVerdictCacheProbeRepo(t)
 			if tt.dirty {
-				if err := os.WriteFile(filepath.Join(repo, "changed.txt"), []byte("changes"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("changes"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}

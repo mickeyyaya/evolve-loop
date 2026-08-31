@@ -119,8 +119,8 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
 		return
 	}
-	// Worktree CHANGES tree: stage everything (respects .gitignore) and write a
-	// tree object = exactly the tree ship will commit. This is what the auditor
+	// Worktree CHANGES tree: stage tracked changes and write a tree object = the
+	// tree ship will commit from the builder-declared index. This is what the auditor
 	// SHOULD bind (it audited the worktree's working changes); its persona binds
 	// HEAD^{tree} = the unchanged base, which can never equal the changes-commit
 	// tree → INTEGRITY_TREE_DRIFT every cycle (cycle-152). Ship prefers this
@@ -216,9 +216,10 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}
 }
 
-// worktreeContentSHA stages the worktree (git add -A, respecting .gitignore) and
-// writes a tree object (git write-tree) — the content identity of the cycle's
-// changes. It is the SINGLE source for both the audit binding's WorktreeTreeSHA
+// worktreeContentSHA stages tracked worktree changes while retaining already
+// staged new files, then writes a tree object (git write-tree) — the content
+// identity of the cycle's declared changes. Unstaged untracked files are not
+// adopted. It is the SINGLE source for both the audit binding's WorktreeTreeSHA
 // (recordAuditBinding) and the ADR-0048 Slice B verdict-cache key, so the value
 // recorded and the value looked up are computed identically. Best-effort:
 // returns "" when worktree is empty or git fails (callers degrade — ship falls
@@ -227,8 +228,8 @@ func worktreeContentSHA(ctx context.Context, worktree string) string {
 	if worktree == "" {
 		return ""
 	}
-	if _, _, aerr := gitCapture(ctx, worktree, "add", "-A"); aerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git add -A failed: %v\n", aerr)
+	if _, _, aerr := gitCapture(ctx, worktree, "add", "-u"); aerr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git add -u failed: %v\n", aerr)
 		return ""
 	}
 	wt, code, werr := gitCapture(ctx, worktree, "write-tree")
@@ -452,7 +453,7 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 // Timing/integrity: this runs in the BUILD iteration of recordAndBranch (after
 // emitPhaseBindings(PhaseBuild), which does NOT compute a tree SHA) and stages the
 // regenerated file. The AUDIT iteration's emitPhaseBindings(PhaseAudit) then runs
-// worktreeContentSHA (git add -A + write-tree), binding the tree that INCLUDES the
+// worktreeContentSHA (git add -u + write-tree), binding the already-staged
 // regenerated projection — so committed_tree == audit_bound_tree holds (no
 // CodeIntegrityTreeDrift).
 func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) {

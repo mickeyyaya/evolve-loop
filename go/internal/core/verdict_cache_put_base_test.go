@@ -114,6 +114,7 @@ func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(worktree, "feature.go"), []byte("package feature\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	gitOut(t, worktree, "add", "feature.go")
 	putBaseAdvance(t, projectRoot)
 	ws := putBaseWorkspace(t)
 
