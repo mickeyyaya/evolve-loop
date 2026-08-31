@@ -12,7 +12,7 @@ import (
 // precise Code, a severity Class, the Stage it failed at, and a Debug map. The
 // orchestrator errors.As-matches it to decide recovery. These tests name AND
 // exercise the 4 protocol types, the 2 previously-uncovered ShipStage consts,
-// and all 32 previously-uncovered ShipErrorCode consts, asserting the REAL
+// and all 33 previously-uncovered ShipErrorCode consts, asserting the REAL
 // construction + rendering + class-pairing contracts (not value padding).
 //
 // There is intentionally NO code->class mapper function in core: the class is
@@ -33,10 +33,13 @@ type shipCodeCase struct {
 	stage ShipStage
 }
 
-// allShipCodeCases enumerates the 32 codes targeted by apicover, each paired
+// allShipCodeCases enumerates the 33 codes targeted by apicover, each paired
 // with its canonical production Class + Stage (see file header for provenance).
 func allShipCodeCases() []shipCodeCase {
 	return []shipCodeCase{
+		// verify-explanation
+		{CodeExplanationDocumentation, ShipClassPrecondition, StageVerifyExplanation},
+
 		// verify-self-sha
 		{CodeSelfSHATampered, ShipClassIntegrity, StageVerifySelfSHA},
 		{CodeSelfSHAIO, ShipClassTransient, StageVerifySelfSHA},
@@ -125,8 +128,9 @@ func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 		stage    ShipStage
 		wantWire string
 	}{
-		{StageVerifySelfSHA, "verify-self-sha"}, // first ship stage: TOFU self-SHA pin
-		{StagePostShip, "post-ship"},            // last ship stage: post-push tree-drift guard
+		{StageVerifyExplanation, "verify-explanation"}, // preflight: Build explanation contract
+		{StageVerifySelfSHA, "verify-self-sha"},        // first legacy ship stage: TOFU self-SHA pin
+		{StagePostShip, "post-ship"},                   // last ship stage: post-push tree-drift guard
 	}
 	seen := map[ShipStage]bool{}
 	for _, tc := range cases {
@@ -148,12 +152,12 @@ func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 		}
 	}
 	// The two consts must be distinct from each other.
-	if StagePostShip == StageVerifySelfSHA {
-		t.Fatal("StagePostShip and StageVerifySelfSHA must be distinct stages")
+	if StagePostShip == StageVerifySelfSHA || StageVerifyExplanation == StageVerifySelfSHA {
+		t.Fatal("ship stages must have distinct identities")
 	}
 }
 
-// TestShipErrorCodes_ConstructAndClassify drives all 32 target codes through
+// TestShipErrorCodes_ConstructAndClassify drives all 33 target codes through
 // the REAL constructor with their canonical production class+stage, then
 // asserts each produces a well-formed, errors.As-recoverable ShipError whose
 // Code/Class/Stage round-trip and whose Error() carries the code wire string.
@@ -161,8 +165,8 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 	t.Parallel()
 
 	cases := allShipCodeCases()
-	if len(cases) != 32 { // 33 target codes minus CodeUnknown (tested separately); +1 CodeControlPlaneViolation (ADR-0064)
-		t.Fatalf("table drift: have %d code cases, want 32 (CodeUnknown is separate)", len(cases))
+	if len(cases) != 33 { // CodeUnknown has no canonical production class and is tested separately.
+		t.Fatalf("table drift: have %d code cases, want 33 (CodeUnknown is separate)", len(cases))
 	}
 
 	seenWire := map[string]bool{}

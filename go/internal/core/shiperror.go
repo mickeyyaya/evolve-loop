@@ -28,15 +28,18 @@ const (
 
 // Ship stages.
 const (
-	StageVerifySelfSHA = shiperr.StageVerifySelfSHA
-	StageVerifyClass   = shiperr.StageVerifyClass
-	StageAtomicShip    = shiperr.StageAtomicShip
-	StagePostShip      = shiperr.StagePostShip
-	StageArgs          = shiperr.StageArgs
+	StageVerifyExplanation = shiperr.StageVerifyExplanation
+	StageVerifySelfSHA     = shiperr.StageVerifySelfSHA
+	StageVerifyClass       = shiperr.StageVerifyClass
+	StageAtomicShip        = shiperr.StageAtomicShip
+	StagePostShip          = shiperr.StagePostShip
+	StageArgs              = shiperr.StageArgs
 )
 
 // Precise failure identities (grouped by stage).
 const (
+	CodeExplanationDocumentation = shiperr.CodeExplanationDocumentation
+
 	CodeSelfSHATampered = shiperr.CodeSelfSHATampered
 	CodeSelfSHAIO       = shiperr.CodeSelfSHAIO
 

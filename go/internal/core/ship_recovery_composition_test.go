@@ -61,14 +61,17 @@ package core_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
 // errWriteBoom is the forced compositionVerdictWriter failure used by
@@ -98,6 +101,43 @@ func (f fixedWorktree) Cleanup(string, string) error       { return nil }
 type countingRunner struct {
 	name  string
 	calls int
+}
+
+type explanationWritingRunner struct {
+	calls int
+}
+
+func (r *explanationWritingRunner) Name() string { return string(core.PhaseBuild) }
+func (r *explanationWritingRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	r.calls++
+	diff := runGitOutput(req.Worktree, "diff", "--name-only", req.WorktreeBaseSHA, "--")
+	report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material implementation changes\n"
+	if strings.Contains("\n"+diff+"\n", "\nlane.txt\n") {
+		doc, err := explanationdocs.DocumentPath(req.Cycle, req.RunID)
+		if err != nil {
+			return core.PhaseResponse{}, err
+		}
+		body := "# Build Explanation\n\n## Build Binding\n- Cycle: " + fmt.Sprint(req.Cycle) + "\n- Base SHA: " + req.WorktreeBaseSHA + "\n\n" +
+			"## Summary\nThe lane change is replayed on the latest fleet base.\n\n" +
+			"## Rationale\nRebuilding the explanation after rebase keeps its evidence bound to the exact tree that Audit and Ship verify.\n\n" +
+			"## Changed Areas\n- `lane.txt` — carries the lane-specific behavior replayed by this cycle.\n\n" +
+			"## Design Decisions\nThe lane remains isolated in its existing file and introduces no new abstraction.\n\n" +
+			"## Verification\nThe recovery integration suite runs Build, Audit, and Ship against the rebased tree.\n\n" +
+			"## Compatibility\nNo public interface changes.\n\n## Limitations\nNo migration is needed.\n"
+		if err := writeFileT(filepath.Join(req.Worktree, filepath.FromSlash(doc)), body); err != nil {
+			return core.PhaseResponse{}, err
+		}
+		report = "## Explanation Documentation\n- Status: REQUIRED\n- Document: " + doc + "\n"
+	}
+	if err := writeFileT(filepath.Join(req.Workspace, "build-report.md"), report); err != nil {
+		return core.PhaseResponse{}, err
+	}
+	return core.PhaseResponse{Phase: string(core.PhaseBuild), Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
+}
+
+func runGitOutput(dir string, args ...string) string {
+	out, _ := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+	return strings.TrimSpace(string(out))
 }
 
 func (r *countingRunner) Name() string { return r.name }
@@ -167,9 +207,11 @@ func initCleanRebaseRepoT(t *testing.T) (dir string, preRebaseDiff []byte) {
 // compositionCycleFixture bundles the ship/audit stubs and Orchestrator
 // wired for one composition-carry-forward scenario.
 type compositionCycleFixture struct {
-	ship  *shipErrorStub
-	audit *countingRunner
-	o     *core.Orchestrator
+	ship    *shipErrorStub
+	audit   *countingRunner
+	build   *explanationWritingRunner
+	storage *recStorage
+	o       *core.Orchestrator
 }
 
 // newCompositionFixture wires an Orchestrator whose ship runner fails once
@@ -187,17 +229,20 @@ func newCompositionFixture(
 		errOnFail: core.NewShipError(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip, "peer landed during audit->ship gap"),
 	}
 	audit := &countingRunner{name: "audit"}
+	build := &explanationWritingRunner{}
 	runners := newRunners(map[core.Phase]core.PhaseRunner{
 		core.PhaseShip:  ship,
 		core.PhaseAudit: audit,
+		core.PhaseBuild: build,
 	})
-	o := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, runners,
+	storage := &recStorage{}
+	o := core.NewOrchestrator(storage, &fakeLedger{}, runners,
 		core.WithWorktreeProvisioner(fixedWorktree{dir: repoDir}),
 		core.WithCompositionSnapshot(snap),
 		core.WithCompositionGateRunner(gates),
 		core.WithCompositionVerdictWriter(write),
 	)
-	return compositionCycleFixture{ship: ship, audit: audit, o: o}
+	return compositionCycleFixture{ship: ship, audit: audit, build: build, storage: storage, o: o}
 }
 
 func runCompositionCycle(t *testing.T, o *core.Orchestrator) error {
@@ -215,7 +260,7 @@ func runCompositionCycle(t *testing.T, o *core.Orchestrator) error {
 // matches the audited snapshot AND whose composed-tree gates are all green
 // must write a composition-verdict entry and route straight back to ship,
 // skipping the full re-audit the router would otherwise force.
-func TestRecoverFromShipError_CleanRebase_WritesCompositionVerdictAndSkipsReaudit(t *testing.T) {
+func TestRecoverFromShipError_CleanRebase_RebuildsBaseBoundExplanationBeforeReaudit(t *testing.T) {
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {
@@ -244,27 +289,11 @@ func TestRecoverFromShipError_CleanRebase_WritesCompositionVerdictAndSkipsReaudi
 	if fx.ship.calls != 2 {
 		t.Fatalf("ship calls = %d, want 2 (fail once → composition carry-forward → reship)", fx.ship.calls)
 	}
-	// Builder correction (cycle 801): TestOrchestrator_RecoveryDepthBudget
-	// (cyclelevel_failure_test.go) already pins "1 initial audit + N
-	// recovery re-audits" as this harness's baseline (audit always runs
-	// once before ship's first attempt in the static pipeline — an
-	// integrity-floor invariant, ship ⇒ audit). A valid composition
-	// carry-forward skips the REDUNDANT recovery re-audit (2 → 1), not the
-	// legitimate initial one (1 → 0, which would violate the floor). This
-	// file's original literal assertion (`!= 0`) was off-by-one from that
-	// established baseline; the surrounding prose ("route straight back to
-	// ship WITHOUT re-running audit") already documents the correct intent.
-	if fx.audit.calls != 1 {
-		t.Fatalf("audit calls = %d, want 1 — a valid composition carry-forward must SKIP the redundant re-audit (baseline: 1 initial + 0 recovery)", fx.audit.calls)
+	if fx.build.calls != 2 || fx.audit.calls != 2 {
+		t.Fatalf("calls build=%d audit=%d, want 2/2 — a base-bound explanation must be regenerated and re-audited after rebase", fx.build.calls, fx.audit.calls)
 	}
-	if len(wrote) != 1 {
-		t.Fatalf("compositionVerdictWriter must be called exactly once, got %d calls", len(wrote))
-	}
-	if wrote[0].PatchID != patchID {
-		t.Errorf("written PatchID = %q, want the recomputed fixture patch-id %q", wrote[0].PatchID, patchID)
-	}
-	if got := ciparity.MissingComposedGates(wrote[0].GateResults); got != nil {
-		t.Errorf("written GateResults must clear every required composed gate, missing %v", got)
+	if len(wrote) != 0 {
+		t.Fatalf("composition carry-forward must not bypass base-bound explanation regeneration, writer calls=%d", len(wrote))
 	}
 }
 

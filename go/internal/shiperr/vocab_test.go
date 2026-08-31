@@ -12,6 +12,7 @@ func TestVocabularyWireStrings(t *testing.T) {
 		got  ShipErrorCode
 		want string
 	}{
+		{CodeExplanationDocumentation, "EXPLANATION_DOCUMENTATION"},
 		{CodeSelfSHATampered, "SELF_SHA_TAMPERED"},
 		{CodeSelfSHAIO, "SELF_SHA_IO"},
 		{CodeAuditBindingHeadMoved, "AUDIT_BINDING_HEAD_MOVED"},
@@ -77,6 +78,7 @@ func TestVocabularyWireStrings(t *testing.T) {
 		got  ShipStage
 		want string
 	}{
+		{StageVerifyExplanation, "verify-explanation"},
 		{StageVerifySelfSHA, "verify-self-sha"},
 		{StageVerifyClass, "verify-class"},
 		{StageAtomicShip, "atomic-ship"},

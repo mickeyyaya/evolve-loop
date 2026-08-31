@@ -411,13 +411,14 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	o.currentRunID.Store(runID)
 	stack = append(stack, func(_, _ bool) { o.currentRunID.Store("") })
 	cs := CycleState{
-		CycleID:        cycle,
-		Phase:          string(PhaseStart),
-		StartedAt:      startedAt,
-		PhaseStartedAt: startedAt,
-		WorkspacePath:  RunWorkspacePath(req.ProjectRoot, cycle),
-		IntentRequired: intentRequired,
-		RunID:          runID,
+		CycleID:                         cycle,
+		Phase:                           string(PhaseStart),
+		StartedAt:                       startedAt,
+		PhaseStartedAt:                  startedAt,
+		WorkspacePath:                   RunWorkspacePath(req.ProjectRoot, cycle),
+		IntentRequired:                  intentRequired,
+		RunID:                           runID,
+		ExplanationDocumentationVersion: o.explanationContractVersion,
 	}
 	// Fleet cycle-state isolation (ADR-0049): under the fleet supervisor two
 	// lanes run concurrently. Point THIS lane's cycle-state reads+writes at its

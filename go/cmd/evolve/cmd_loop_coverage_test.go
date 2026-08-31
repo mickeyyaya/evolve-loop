@@ -249,7 +249,9 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fixtures.FakeStorage{}
+		st := &fixtures.FakeStorage{CycleState: core.CycleState{
+			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: wt,
+		}}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseBuild: errorRunner{phase: "build"}, // errors → resume err branch
@@ -326,7 +328,9 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fixtures.FakeStorage{}
+		st := &fixtures.FakeStorage{CycleState: core.CycleState{
+			CycleID: 1, Phase: string(core.PhaseAudit), ActiveWorktree: wt,
+		}}
 		ld := newFakeLedger()
 		// Audit + downstream all FAIL → final verdict is FAIL
 		runners := map[core.Phase]core.PhaseRunner{
@@ -426,6 +430,7 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	initLoopContractRepo(t, projectRoot)
 	writeDispatchPolicy(t, evolveDir, "verify")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
@@ -476,7 +481,16 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 type failVerdictRunner struct{ name string }
 
 func (f failVerdictRunner) Name() string { return f.name }
-func (failVerdictRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse, error) {
+func (f failVerdictRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	if f.name == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0 {
+		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+			return core.PhaseResponse{}, err
+		}
+		report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material changes\n"
+		if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
+			return core.PhaseResponse{}, err
+		}
+	}
 	return core.PhaseResponse{Verdict: core.VerdictFAIL}, nil
 }
 
@@ -491,6 +505,7 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	initLoopContractRepo(t, projectRoot)
 	writeDispatchPolicy(t, evolveDir, "off") // skip verify so policy doesn't intercept
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
@@ -632,7 +647,9 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string) orchDeps {
-		st := &fixtures.FakeStorage{}
+		st := &fixtures.FakeStorage{CycleState: core.CycleState{
+			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: worktree,
+		}}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseBuild: noopRunner{name: "build"},

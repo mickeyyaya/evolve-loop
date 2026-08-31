@@ -189,20 +189,17 @@ const envSandboxMode = "EVOLVE_SANDBOX"
 
 // sandboxPrefixForLaunch is the shared adapter that turns the SandboxWrap
 // decision into a per-driver consumable. Returns (prefix []string, true) only
-// when this is a source-writing phase (cfg.Worktree non-empty) AND the wrap
-// is available; otherwise (nil, false) for "run unwrapped". Centralizing the
-// gate here keeps every driver call site identical. Takes *Config to match
-// the driver-call convention (cfg is passed by pointer throughout this pkg).
+// when the launch carries a worktree or explicitly requires confinement and
+// the wrap is available; otherwise (nil, false) for "run unwrapped".
 func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
-	if cfg == nil || cfg.Worktree == "" {
+	if cfg == nil || cfg.Worktree == "" && !cfg.RequireSandbox {
 		return nil, false // not a source-writing phase
 	}
 	if deps.SandboxWrap == nil {
 		return nil, false
 	}
-	// Reaching here means cfg.Worktree != "", which guarantees a CLOUD
-	// model-reaching CLI: ollama-tmux — the only local driver — rejects any
-	// non-empty Worktree at launch (driver_ollamatmux.go), so only
+	// Reaching here means a cloud model CLI requested confinement. ollama-tmux —
+	// the only local driver — never requests this wrapper, so only
 	// claude/codex/agy-tmux get here. That covers both source-writing phases
 	// (built-in build/tdd or a custom writes_source phase) AND the boot/live-smoke
 	// probes, which set a scratch Worktree via applyScratchCwd — all of them need
@@ -286,19 +283,21 @@ func joinPrefixForTmux(prefix []string) string {
 	return strings.Join(parts, " ")
 }
 
-// wrapHeadlessInvocation transforms a (name, args) pair into the sandboxed
-// equivalent: when the sandbox prefix is available, name becomes prefix[0]
-// (e.g. "sandbox-exec") and args becomes prefix[1:]+[name]+oldArgs. Otherwise
-// returns the inputs unchanged. Centralizes the rewrite so claude-p and codex
-// drivers (and any future headless driver) share one path.
-func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (string, []string) {
+// wrapHeadlessInvocation transforms a command into its sandboxed equivalent
+// and reports whether confinement was installed. Callers that require a
+// sandbox fail closed when wrapped is false.
+func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (wrappedName string, wrappedArgs []string, wrapped bool) {
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
 	if !ok {
-		return name, args
+		return name, args, false
 	}
 	newArgs := make([]string, 0, len(prefix)-1+1+len(args))
 	newArgs = append(newArgs, prefix[1:]...)
 	newArgs = append(newArgs, name)
 	newArgs = append(newArgs, args...)
-	return prefix[0], newArgs
+	return prefix[0], newArgs, true
+}
+
+func sandboxRequiredButUnavailable(cfg *Config, wrapped bool) bool {
+	return cfg != nil && cfg.RequireSandbox && !wrapped
 }

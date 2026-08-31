@@ -104,10 +104,11 @@ func TestProtectedSurfaceManifest_EveryEntryDenies(t *testing.T) {
 // the newly protected surfaces must stay writable by a cycle.
 func TestProtectedSurfaceManifest_NonProtectedPathsStillAllow(t *testing.T) {
 	allowed := []string{
-		// core stays writable — only its four gate-shaped files are pinned.
-		"/wt/go/internal/core/orchestrator.go",
-		// ship phase impl stays writable — only binary_staging_guard*.go is pinned.
-		"/wt/go/internal/phases/ship/native.go",
+		// Unrelated core source stays writable; explanation lifecycle call sites
+		// are enrolled individually below.
+		"/wt/go/internal/core/observer.go",
+		// Unrelated ship helpers remain writable; the native gate entrypoint is pinned.
+		"/wt/go/internal/phases/ship/output.go",
 		// cycles legitimately write their OWN predicates (regression/ is the gate).
 		"/wt/go/acs/cycle21/predicates_test.go",
 		// non-SSOT flagregistry code stays writable.
@@ -118,6 +119,69 @@ func TestProtectedSurfaceManifest_NonProtectedPathsStillAllow(t *testing.T) {
 		if IsProtectedSurface(p) {
 			t.Errorf("IsProtectedSurface(%q) = true, want false (the manifest must stay "+
 				"NARROW; over-blocking breaks legitimate cycle writes)", p)
+		}
+	}
+}
+
+func TestProtectedSurfaceManifest_CoversExplanationTrustBoundary(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/explanationdocs/explanationdocs.go",
+		"go/internal/core/build_explanation_handoff.go",
+		"go/internal/core/build_floor_reviewer.go",
+		"go/internal/core/reviewer.go",
+		"go/internal/core/orchestrator.go",
+		"go/internal/core/cyclerun.go",
+		"go/internal/core/cyclerun_dispatch.go",
+		"go/internal/core/cyclerun_review.go",
+		"go/internal/core/cyclerun_remediate.go",
+		"go/internal/core/continuation_stamp.go",
+		"go/internal/core/evaluate_batch.go",
+		"go/internal/core/failure_learning.go",
+		"go/internal/core/ship_recovery.go",
+		"go/internal/core/resume.go",
+		"go/internal/core/ports.go",
+		"go/internal/core/phase.go",
+		"go/internal/cyclestate/state.go",
+		"go/internal/phaseio/handoffs.go",
+		"go/internal/reportdoc/reportdoc.go",
+		"go/internal/phases/runner/runner.go",
+		"go/internal/bridge/sandbox_wrap.go",
+		"go/internal/bridge/engine.go",
+		"go/internal/bridge/launch.go",
+		"go/internal/bridge/driver_agy.go",
+		"go/internal/bridge/driver_claudep.go",
+		"go/internal/bridge/driver_codex.go",
+		"go/internal/bridge/driver_tmux_repl.go",
+		"go/internal/bridge/driver_agytmux.go",
+		"go/internal/bridge/driver_claudetmux.go",
+		"go/internal/bridge/driver_codextmux.go",
+		"go/internal/bridge/driver.go",
+		"go/internal/adapters/bridge/bridge.go",
+		"go/internal/adapters/sandbox/sandbox.go",
+		"go/internal/adapters/sandbox/confinement.go",
+		"go/internal/looppreflight/checks.go",
+		"go/internal/looppreflight/drivers.go",
+		"go/internal/preflight/preflight.go",
+		"go/internal/phases/audit/explanation_review_gate.go",
+		"go/internal/phases/audit/audit.go",
+		"go/internal/phases/retro/explanation_review_gate.go",
+		"go/internal/phases/retro/retro.go",
+		"go/internal/phases/ship/native_explanation_gate.go",
+		"go/internal/phases/ship/native.go",
+		"go/internal/phases/ship/ship.go",
+		"go/internal/phases/ship/gitops.go",
+		"agents/evolve-builder-reference.md",
+		"agents/evolve-auditor-reference.md",
+		"agents/evolve-retrospective.md",
+		"schemas/handoff/build-report.schema.json",
+		"schemas/handoff/audit-report.schema.json",
+		"schemas/handoff/retrospective-report.schema.json",
+		".evolve/profiles/builder.json",
+		".evolve/profiles/auditor.json",
+		".evolve/build-explanation-contracts/cycle-42.json",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("explanation trust-boundary path %q is not protected", path)
 		}
 	}
 }

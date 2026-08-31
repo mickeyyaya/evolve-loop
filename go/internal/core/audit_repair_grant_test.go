@@ -116,8 +116,11 @@ func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
 	o := NewOrchestrator(st, led, runners)
 	root := t.TempDir()
 
-	res, _ := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root},
+	res, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root},
 		&ResumePoint{Phase: string(PhaseAudit), CycleID: 1577})
+	if err != nil {
+		t.Fatalf("resume cycle: %v", err)
+	}
 
 	// A resumed audit FAIL must re-enter the dev cycle exactly as the live loop
 	// does, not fall through to the terminal retro.

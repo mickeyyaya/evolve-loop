@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // scriptedRunner returns a CmdRunner that responds to (binary, firstArg)
@@ -68,6 +70,45 @@ func (s *scriptedRunner) runner() CmdRunner {
 			_, _ = stderr.Write([]byte(script.stderr))
 		}
 		return script.exit, script.err
+	}
+}
+
+func TestAtomicShip_TypedWorktreeRejectsTamperedRunMirror(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-7")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "run.json"), []byte(`{"active_worktree":""}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	trustedWorktree := t.TempDir()
+	runner := &scriptedRunner{scripts: map[string]struct {
+		stdout string
+		stderr string
+		exit   int
+		err    error
+	}{
+		"git symbolic-ref": {stdout: "main\n"},
+	}}
+	opts := &Options{
+		Class:          ClassCycle,
+		ProjectRoot:    root,
+		WorkspacePath:  workspace,
+		ActiveWorktree: trustedWorktree,
+		DryRun:         true,
+		Runner:         runner.runner(),
+	}
+
+	err := atomicShip(context.Background(), opts, &RunResult{})
+	shipError, ok := core.AsShipError(err)
+	if !ok || shipError.Code != core.CodeWorktreeResolve || !strings.Contains(err.Error(), "run.json") {
+		t.Fatalf("tampered run mirror must fail closed with WORKTREE_RESOLVE: %v", err)
+	}
+	for _, call := range runner.calls {
+		if call == "git add" || call == "git commit" || call == "git push" {
+			t.Fatalf("tampered run mirror reached git mutation: calls=%v", runner.calls)
+		}
 	}
 }
 

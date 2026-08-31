@@ -31,7 +31,6 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
-	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -134,30 +133,27 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: builder fix failed (%v, verdict=%s) — gate FAIL stands\n", berr, bresp.Verdict)
 		return loopNext, nil
 	}
-	if fixSnapOK {
-		// Same recovery-then-check the normal build path gets; a surviving
-		// main-tree leak voids the round (original FAIL stands, loudly).
-		recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline, true)
-		if res := fixGuard.Check(cr.ctx, cr.req.ProjectRoot, fixBefore); !res.SnapshotMissed && !res.OK() {
-			// Same classification vocabulary as the main guard, including the
-			// verified-mint exemption — in fleet mode a concurrent lane's mint
-			// landing during the fix window must not spuriously void the round.
-			mints, _ := mintregistry.ActiveNames(mintregistry.Path(cr.req.ProjectRoot), cr.o.now())
-			mints = verifiedActiveMints(cr.req.ProjectRoot, mints)
-			var real []string
-			for _, lp := range res.Leaked {
-				if isLegitimateMainTreePath(lp) || isActiveMintPhasePath(mints, lp) {
-					continue
-				}
-				real = append(real, lp)
-			}
-			if len(real) > 0 {
-				note := fmt.Sprintf("%s: round %d voided (fix leaked to main tree: %v)", next, round, real)
-				cr.result.Remediations = append(cr.result.Remediations, note)
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
-				return loopNext, nil
-			}
+	fixResult := dispatchResult{
+		resp: bresp, attemptCount: 1, phaseWorktree: cr.cs.ActiveWorktree,
+		runner: builder, phaseReq: breq, treeGuard: fixGuard, beforeDirty: fixBefore,
+		snapshotFailed: !fixSnapOK,
+	}
+	if act, reviewErr := cr.reviewAndGuard(PhaseBuild, &fixResult); act == loopAbort {
+		note := fmt.Sprintf("%s: round %d voided (Build review rejected: %v)", next, round, reviewErr)
+		cr.result.Remediations = append(cr.result.Remediations, note)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
+		return loopNext, nil
+	}
+	bresp = fixResult.resp
+	if cr.cs.ExplanationDocumentationVersion != 0 {
+		handoff := projectBuildExplanation(cr.req.ProjectRoot, cr.cs)
+		if handoff.State != BuildExplanationAvailable {
+			note := fmt.Sprintf("%s: round %d voided (resealed Build explanation unavailable: %s)", next, round, handoff.Error)
+			cr.result.Remediations = append(cr.result.Remediations, note)
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
+			return loopNext, nil
 		}
+		handoff.apply(&dr.phaseReq)
 	}
 
 	// Fresh timing window for the re-run: recordAndBranch later records the

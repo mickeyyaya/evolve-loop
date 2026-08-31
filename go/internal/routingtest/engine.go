@@ -2,6 +2,9 @@ package routingtest
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -158,6 +161,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	}
 
 	projectRoot := t.TempDir()
+	initScenarioRepo(t, projectRoot)
 	cycle := s.LastCycle + 1
 	ws := seedWorkspace(t, projectRoot, cycle, s.Signals.HandoffFiles())
 
@@ -217,6 +221,24 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 		}
 		if !sameSet(agent.seen, s.Expect.ProposeAt) {
 			t.Errorf("Proposer invoked at %v, want exactly %v (hybrid cadence)", agent.seen, s.Expect.ProposeAt)
+		}
+	}
+}
+
+func initScenarioRepo(t *testing.T, root string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "test@evolve-loop.test"},
+		{"config", "user.name", "Evolve Test"},
+		{"add", ".gitignore"},
+		{"commit", "-q", "-m", "scenario base"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, strings.TrimSpace(string(out)))
 		}
 	}
 }

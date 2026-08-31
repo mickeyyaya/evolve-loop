@@ -25,6 +25,7 @@ Assembled by `role-context-builder.sh memo` (or, in absence of a memo role, by t
 - `scout-report.md` — full backlog (`## Selected Tasks` + `## Deferred` + `## Carryover Decisions`)
 - `triage-report.md` — present unless triage opted out via `workflow.phase_enables.triage=off` (v8.59.0+ default-on). Read `## deferred` and `## dropped` sections.
 - `state.json:carryoverTodos[]` — current backlog (so you don't duplicate ids)
+- Cycle Context explanation fields — the verified cycle-owned explanation document path and SHA256 for this PASS cycle; include the document in Memo's Artifact Index when present, but do not re-audit or edit it
 
 ## File inspection: use Read, not cat/head/tail (cycle-62 B4)
 

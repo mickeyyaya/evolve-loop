@@ -41,6 +41,11 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	args := []string{"-p", prompt, "--dangerously-skip-permissions"}
 	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["agy"])
 	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
+	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "agy"), args)
+	if sandboxRequiredButUnavailable(cfg, wrapped) {
+		fmt.Fprintln(deps.Stderr, "[agy] required OS sandbox is unavailable; refusing an unconfined launch")
+		return ExitSafetyGate, nil
+	}
 
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {
@@ -49,7 +54,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	defer closeFn()
 
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
-	rc, err := deps.Runner(ctx, resolveBinary(deps, "agy"), cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[agy] %w", err)
 	}

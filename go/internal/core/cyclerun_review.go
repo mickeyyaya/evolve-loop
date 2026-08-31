@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 )
@@ -23,6 +24,21 @@ import (
 // dispatch failure, a worktree-leak recovery failure, or a real tree-diff leak;
 // loopNext otherwise.
 func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, error) {
+	// Relocate any main-tree escape before reviewers inspect and seal the
+	// deliverable. In particular, Build's explanation verifier must derive its
+	// material path set after recovery; sealing first would let recovered source
+	// appear after the documentation snapshot was approved.
+	if phaseErr := cr.recoverBeforeReview(next); phaseErr != nil {
+		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
+		cr.recordFailureLearning(next, phaseErr, 1)
+		return loopAbort, phaseErr
+	}
+	// Host-owned normalization can change Build content (gofmt and derived
+	// projections), so it must finish before any reviewer validates and seals
+	// the explanation snapshot. The same seam also preserves the historical
+	// normalization of other worktree phases before their handoff.
+	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs)
+
 	// Workstream E2: per-phase deliverable review gate. Runs ONLY for
 	// non-SKIPPED verdicts (a SKIPPED phase produced no deliverable to
 	// review) and BEFORE the tree-diff guard + ledger append, so a reject
@@ -32,12 +48,15 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	// re-dispatches up to the configured correction limit before aborting.
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
 		rin := ReviewInput{
-			Phase:           string(next),
-			WorktreeBaseSHA: cr.cs.WorktreeBaseSHA,
-			Response:        dr.resp,
-			Workspace:       cr.cs.WorkspacePath,
-			Worktree:        dr.phaseWorktree,
-			ProjectRoot:     cr.req.ProjectRoot,
+			Cycle:                           cr.cycle,
+			RunID:                           cr.cs.RunID,
+			ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
+			Phase:                           string(next),
+			WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
+			Response:                        dr.resp,
+			Workspace:                       cr.cs.WorkspacePath,
+			Worktree:                        dr.phaseWorktree,
+			ProjectRoot:                     cr.req.ProjectRoot,
 		}
 		// baseRoutingCLI is the routing CLI this phase was DISPATCHED with (the
 		// advisor overlay under model_routing=auto; empty otherwise). The
@@ -298,6 +317,19 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 				cr.recordFailureLearning(next, phaseErr, corr)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
+			// A correction is a fresh phase dispatch. Recover its main-tree
+			// escapes before the corrected deliverable is reviewed or sealed,
+			// exactly as for the initial dispatch above.
+			if phaseErr := cr.recoverBeforeReview(next); phaseErr != nil {
+				recordCorrection(interaction.ResultRejectedAgain)
+				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
+				cr.recordFailureLearning(next, phaseErr, corr)
+				return loopAbort, wrapCycleLevelError(next, phaseErr)
+			}
+			// A correction is a fresh authoring pass and may reintroduce
+			// unformatted or generated content. Normalize again before the
+			// corrected deliverable is reviewed and sealed.
+			cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs)
 			// rin.Response is refreshed for reviewer consistency; the deliverable
 			// reviewer reads the filesystem (workspace/worktree), not this field.
 			rin.Response = dr.resp
@@ -332,6 +364,25 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		}
 	}
 
+	// A legitimate post-Build source writer (notably test-amplification) can
+	// change the whole-diff digest without changing the material behavior the
+	// Builder documented. Refresh that host snapshot after its deliverable is
+	// final. If material scope changed, preserve phase ownership by routing back
+	// through Build instead of letting the host rewrite the rationale.
+	if cr.postBuildExplanationRefreshEligible(next) {
+		requiresBuild, err := explanationdocs.RefreshResult(cr.ctx, explanationBinding(cr.req.ProjectRoot, cr.cs))
+		if err != nil {
+			phaseErr := fmt.Errorf("refresh Build explanation after %s: %w", next, err)
+			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
+			cr.recordFailureLearning(next, phaseErr, 1)
+			return loopAbort, phaseErr
+		}
+		if requiresBuild {
+			fmt.Fprintf(os.Stderr, "[orchestrator] phase %s changed material scope after Build — routing back to Build for owner-authored explanation\n", next)
+			cr.scheduledNext = PhaseBuild
+		}
+	}
+
 	if next == PhaseShip && dr.resp.Verdict == VerdictPASS {
 		// Ship landed AND survived the deliverable review gate above — the
 		// worktree is merged, normal exit cleanup applies. Deliberately
@@ -350,25 +401,6 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	// success. Snapshot failures (pre OR post) degrade silently — the
 	// guard is belt-and-suspenders to the OS sandbox, so a transient git
 	// read error must never cause a false abort.
-	// Cycle-160 fix (Option A): a non-Claude builder (agy/codex in tmux) is
-	// not bound by the Claude-only role-gate, and the OS sandbox is off on
-	// nested-macOS, so it can write build output to the MAIN tree instead of
-	// its worktree. Relocate any such leak into the worktree (staged, so audit
-	// sees it) and restore main BEFORE the tree-diff guard runs. Runs
-	// unconditionally after build (no-op when clean) because the guard's
-	// `git diff --name-only HEAD` baseline is tracked-only and misses
-	// pure-untracked leaks. On recovery FAILURE we abort explicitly — the
-	// tree-diff guard only backstops tracked leaks, so a failed recovery
-	// of an untracked leak must not slip past into audit.
-	if cr.o.leakRecoverablePhase(next) && cr.cs.ActiveWorktree != "" {
-		if !recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline, cr.o.worktreePhase(next)) {
-			phaseErr := fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for audit)", next)
-			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
-			cr.recordFailureLearning(next, phaseErr, 1)
-			return loopAbort, phaseErr
-		}
-	}
-
 	if dr.treeGuard != nil && !dr.snapshotFailed {
 		res := dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty)
 		if res.SnapshotMissed {
@@ -467,6 +499,21 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	}
 
 	return loopNext, nil
+}
+
+func (cr *cycleRun) postBuildExplanationRefreshEligible(completed Phase) bool {
+	return cr.cs.ExplanationDocumentationVersion != 0 && completed != PhaseBuild &&
+		cr.o.worktreePhase(completed) && containsString(cr.cs.CompletedPhases, string(PhaseBuild))
+}
+
+func (cr *cycleRun) recoverBeforeReview(next Phase) error {
+	if !cr.o.leakRecoverablePhase(next) || cr.cs.ActiveWorktree == "" {
+		return nil
+	}
+	if recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline, cr.o.worktreePhase(next)) {
+		return nil
+	}
+	return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", next)
 }
 
 // filterRealLeaks applies the tree-diff guard's classifier chain to the

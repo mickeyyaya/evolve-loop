@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -39,6 +40,14 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	b.WriteString(runner.BaseCycleContext(body, req))
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
+	}
+	if req.WorktreeBaseSHA != "" {
+		fmt.Fprintf(&b, "- worktree_base_sha: %s\n", req.WorktreeBaseSHA)
+	}
+	if req.ExplanationDocumentationVersion != 0 {
+		if document, err := explanationdocs.DocumentPath(req.Cycle, req.RunID); err == nil {
+			fmt.Fprintf(&b, "- explanation_document: %s\n", document)
+		}
 	}
 	// Cycle-776 (fleet-lane-provisioning-split residual): render the pinned
 	// lane scope so the builder binds ONLY to this lane's task ids.

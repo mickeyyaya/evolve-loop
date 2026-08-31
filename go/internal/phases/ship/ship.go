@@ -126,16 +126,22 @@ func NewWithDefaultRunnerStage(stage config.Stage) *Phase {
 // the manifest gate permanently shadow no matter what policy.json said).
 func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 	return Options{
-		Class:         ClassCycle, // PhaseRunner only invokes for cycle commits
-		CommitMessage: msg,
-		ProjectRoot:   req.ProjectRoot,
-		WorkspacePath: req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
-		RunID:         req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
-		PluginRoot:    req.Env["EVOLVE_PLUGIN_ROOT"],
-		Env:           req.Env,
-		PhaseIO:       p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
-		ManifestGate:  p.manifestGate,
-		Runner:        sysexec.DefaultRunner,
+		Class:                           ClassCycle, // PhaseRunner only invokes for cycle commits
+		CommitMessage:                   msg,
+		ProjectRoot:                     req.ProjectRoot,
+		WorkspacePath:                   req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
+		RunID:                           req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
+		CycleID:                         req.Cycle,
+		ActiveWorktree:                  req.Worktree,
+		WorktreeBaseSHA:                 req.WorktreeBaseSHA,
+		ExplanationDocumentationVersion: req.ExplanationDocumentationVersion,
+		BuildExplanation:                req.BuildExplanation,
+		RequireBuildExplanationHandoff:  req.ExplanationDocumentationVersion != 0,
+		PluginRoot:                      req.Env["EVOLVE_PLUGIN_ROOT"],
+		Env:                             req.Env,
+		PhaseIO:                         p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
+		ManifestGate:                    p.manifestGate,
+		Runner:                          p.runner,
 	}
 }
 

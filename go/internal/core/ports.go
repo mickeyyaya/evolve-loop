@@ -288,9 +288,12 @@ type BridgeRequest struct {
 	// difficulty-conditioned budgets — a large cycle's build gets a longer
 	// deadline). 0 or 1 = unscaled; <1 never shrinks. The engine applies it to
 	// the per-agent policy base (or the builtin when the map has no entry).
-	BudgetScale float64           `json:"budget_scale,omitempty"`
-	Env         map[string]string `json:"env,omitempty"`
-	ExtraFlags  []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
+	BudgetScale float64 `json:"budget_scale,omitempty"`
+	// RequireSandbox fails the launch closed when filesystem confinement is
+	// unavailable. Activated Build explanation contracts set this for Builder.
+	RequireSandbox bool              `json:"require_sandbox,omitempty"`
+	Env            map[string]string `json:"env,omitempty"`
+	ExtraFlags     []string          `json:"extra_flags,omitempty"` // direct inner-CLI pass-through (after `--`)
 	// PermissionMode is the resolved per-phase permission mode (the
 	// EVOLVE_<AGENT>_PERMISSION_MODE override the runner resolves with the
 	// agent name). The bridge realizes it per-CLI via the LaunchIntent —

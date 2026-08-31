@@ -5,10 +5,106 @@ package core
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
+
+type correctionLeakRunner struct {
+	projectRoot string
+	calls       int
+}
+
+func (r *correctionLeakRunner) Name() string { return string(PhaseBuild) }
+func (r *correctionLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	r.calls++
+	if r.calls == 2 {
+		path := filepath.Join(r.projectRoot, "go/internal/phases/backfill/corrected.go")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return PhaseResponse{}, err
+		}
+		if err := os.WriteFile(path, []byte("package backfill\n"), 0o644); err != nil {
+			return PhaseResponse{}, err
+		}
+	}
+	return PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
+}
+
+type correctionLeakReviewer struct {
+	projectRoot string
+	worktree    string
+	calls       int
+}
+
+func (r *correctionLeakReviewer) Review(_ context.Context, in ReviewInput) ReviewResult {
+	if in.Phase != string(PhaseBuild) {
+		return ReviewResult{Approve: true}
+	}
+	r.calls++
+	if r.calls == 1 {
+		return ReviewResult{Approve: false, Reason: "exercise correction dispatch"}
+	}
+	if _, err := os.Stat(filepath.Join(r.worktree, "go/internal/phases/backfill/corrected.go")); err != nil {
+		return ReviewResult{Approve: false, Reason: "corrected source was not recovered into the worktree before review"}
+	}
+	if status := gitInRepoNoFatal(r.projectRoot, "status", "--porcelain", "-uall"); status != "" {
+		return ReviewResult{Approve: false, Reason: "main tree was not clean before corrected deliverable review: " + status}
+	}
+	return ReviewResult{Approve: true}
+}
+
+// A correction is a fresh Builder dispatch and therefore has the same sandbox
+// escape risk as the initial dispatch. The corrected deliverable must be
+// recovered before its reviewer sees or seals it.
+func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
+	repo, wt := realWorktree(t)
+	workspace := t.TempDir()
+	runner := &correctionLeakRunner{projectRoot: repo, calls: 1} // initial dispatch already completed
+	reviewer := &correctionLeakReviewer{projectRoot: repo, worktree: wt}
+	retryCfg := policy.Policy{}.RetryConfig()
+	retryCfg.ContractCorrectionRetries = 1
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
+		WithReviewer(reviewer),
+		WithRetryConfig(retryCfg),
+	)
+	cr := &cycleRun{
+		o:                 o,
+		ctx:               context.Background(),
+		req:               CycleRequest{ProjectRoot: repo},
+		cycle:             7,
+		mainDirtyBaseline: porcelainDirtySet(context.Background(), repo),
+		cs:                CycleState{CycleID: 7, WorkspacePath: workspace, ActiveWorktree: wt},
+		result:            CycleResult{Cycle: 7, FinalVerdict: VerdictPASS},
+		retryConfig:       retryCfg,
+	}
+	dr := dispatchResult{
+		resp:          PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS, ArtifactsDir: workspace},
+		attemptCount:  1,
+		phaseWorktree: wt,
+		runner:        runner,
+		phaseReq:      PhaseRequest{Cycle: 7, ProjectRoot: repo, Workspace: workspace, Worktree: wt},
+	}
+
+	action, err := cr.reviewAndGuard(PhaseBuild, &dr)
+	if err != nil {
+		t.Fatalf("corrected deliverable should pass after leak recovery: %v", err)
+	}
+	if action != loopNext {
+		t.Fatalf("review action=%v, want loopNext", action)
+	}
+	if runner.calls != 2 || reviewer.calls != 2 {
+		t.Fatalf("runner calls=%d reviewer calls=%d, want 2 each", runner.calls, reviewer.calls)
+	}
+}
+
+func gitInRepoNoFatal(repo string, args ...string) string {
+	cmdArgs := append([]string{"-C", repo}, args...)
+	out, _ := exec.Command("git", cmdArgs...).CombinedOutput()
+	return strings.TrimSpace(string(out))
+}
 
 // buildleak_recover_test.go — Option A for the cycle-160 incident
 // (docs/operations/multicli-validation-run-2026-05-31.md §"Implementation plan for A").

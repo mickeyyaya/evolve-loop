@@ -120,16 +120,18 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		cr.cs.AuditRepairActive = false
 	}
 	phaseReq := PhaseRequest{
-		Cycle:         cr.cycle,
-		ProjectRoot:   cr.req.ProjectRoot,
-		Workspace:     cr.cs.WorkspacePath,
-		Worktree:      phaseWorktree,
-		RunID:         cr.cs.RunID,
-		GoalHash:      cr.req.GoalHash,
-		PreviousPhase: string(cr.current),
-		Env:           cr.envSnap,
-		Context:       phaseCtx,
-		BypassPolicy:  cr.req.BypassPolicy,
+		Cycle:                           cr.cycle,
+		ProjectRoot:                     cr.req.ProjectRoot,
+		Workspace:                       cr.cs.WorkspacePath,
+		Worktree:                        phaseWorktree,
+		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
+		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
+		RunID:                           cr.cs.RunID,
+		GoalHash:                        cr.req.GoalHash,
+		PreviousPhase:                   string(cr.current),
+		Env:                             cr.envSnap,
+		Context:                         phaseCtx,
+		BypassPolicy:                    cr.req.BypassPolicy,
 		// Runtime operator directives snapshotted once at cycle start (same value
 		// for every phase this cycle); empty ⇒ byte-identical dispatch.
 		OperatorDirectives: cr.directivesSet.Merged,
@@ -173,6 +175,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
 	// reads disk as before (byte-identical dispatch).
 	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
+	if next != PhaseBuild {
+		projectBuildExplanation(cr.req.ProjectRoot, cr.cs).apply(&phaseReq)
+	}
 	// ADR-0050 Phase 3.4 (SHADOW) + Phase 3.10 (ENFORCE input). When
 	// EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the same
 	// upstream this phase is about to receive, compare it to the legacy routing

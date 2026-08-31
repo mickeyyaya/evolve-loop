@@ -30,6 +30,7 @@ func TestRole_DeniesControlPlaneEditInBuildPhase(t *testing.T) {
 		"knowledge-base/research/flag-campaign-plan.json",
 		"skills/audit/SKILL.md",
 		".claude/settings.json",
+		"go/internal/core/orchestrator.go", // fresh explanation activation call site
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Edit",
@@ -59,7 +60,7 @@ func TestRole_AllowsLegitWorktreeWritesUnderProtection(t *testing.T) {
 	g := NewRole(s, false)
 
 	for _, rel := range []string{
-		"go/internal/core/orchestrator.go",  // ordinary source
+		"go/internal/core/observer.go",      // unrelated ordinary source
 		"go/acs/cycle20/predicates_test.go", // the cycle's OWN predicates (NOT under regression/)
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{

@@ -47,6 +47,12 @@ func (o *Options) acquireShipLock() (release func(), err error) {
 // Returns nil on success (commit + push completed, or DryRun skipped them).
 // Returns *IntegrityError on tree-SHA binding mismatch.
 func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
+	worktree, typedWorktree, err := activeWorktreeForShip(opts)
+	if err != nil {
+		return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+			"ship: resolve host-bound active worktree: "+err.Error())
+	}
+
 	// Branch detection — refuse detached HEAD.
 	branch, err := currentBranch(ctx, opts)
 	if err != nil {
@@ -58,15 +64,47 @@ func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 
 	// Decide worktree path: only for --class cycle with active_worktree set.
-	if opts.Class == ClassCycle {
-		if wt := readActiveWorktree(opts); wt != "" && wt != opts.ProjectRoot {
-			if _, err := os.Stat(wt); err == nil {
-				return shipFromWorktree(ctx, opts, res, branch, wt)
+	if opts.Class == ClassCycle && worktree != "" && worktree != opts.ProjectRoot {
+		info, statErr := os.Stat(worktree)
+		if statErr == nil && info.IsDir() {
+			return shipFromWorktree(ctx, opts, res, branch, worktree)
+		}
+		if typedWorktree {
+			if statErr == nil {
+				statErr = fmt.Errorf("not a directory")
 			}
+			return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+				fmt.Sprintf("ship: host-bound active worktree %s is unavailable: %v", worktree, statErr),
+				"worktree", worktree)
 		}
 	}
 
 	return shipDirect(ctx, opts, res, branch)
+}
+
+// activeWorktreeForShip returns the PhaseRunner's typed host identity when it
+// is present. A Builder-writable run.json may corroborate that identity but can
+// never select or clear the tree Ship mutates.
+func activeWorktreeForShip(opts *Options) (worktree string, typed bool, err error) {
+	if opts.Class != ClassCycle || opts.ActiveWorktree == "" {
+		return readActiveWorktree(opts), false, nil
+	}
+	if opts.WorkspacePath != "" {
+		runState := filepath.Join(opts.WorkspacePath, core.RunStateFile)
+		if _, statErr := os.Stat(runState); statErr == nil {
+			state, readErr := readStateMap(runState)
+			if readErr != nil {
+				return "", true, fmt.Errorf("read run.json mirror: %w", readErr)
+			}
+			mirrored := stateString(state, "active_worktree")
+			if mirrored != opts.ActiveWorktree {
+				return "", true, fmt.Errorf("run.json active_worktree %q does not match host identity %q", mirrored, opts.ActiveWorktree)
+			}
+		} else if !os.IsNotExist(statErr) {
+			return "", true, fmt.Errorf("inspect run.json mirror: %w", statErr)
+		}
+	}
+	return opts.ActiveWorktree, true, nil
 }
 
 // detectColliders returns the sorted list of paths that are incoming from the
@@ -555,12 +593,10 @@ func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch
 // writeShipBinding emits .evolve/runs/cycle-<N>/ship-binding.json for
 // post-ship audit. Best-effort; failure is a WARN, not a ship failure.
 func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
-	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
-	csMap, err := readStateMap(csPath)
+	cid, ok, err := cycleIDForShip(opts)
 	if err != nil {
 		return err
 	}
-	cid, ok := stateInt(csMap, "cycle_id")
 	if !ok {
 		return errors.New("no cycle_id in cycle-state.json")
 	}

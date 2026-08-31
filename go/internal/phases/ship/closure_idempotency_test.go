@@ -38,9 +38,11 @@ func shipWorktreeFixture(t *testing.T, cycleBranch string) (repo, wt string) {
 	addRemote(t, repo)
 	wt = makeWorktree(t, repo, cycleBranch)
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "real cycle work\n")
+	runGit(t, wt, "add", "feature.txt")
+	boundTree := strings.TrimSpace(runGitOut(t, wt, "write-tree"))
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
-	seedAudit(t, repo, "PASS")
+	seedAuditWithBoundTree(t, repo, "PASS", boundTree)
 	return repo, wt
 }
 

@@ -56,11 +56,12 @@ const (
 type ShipStage string
 
 const (
-	StageVerifySelfSHA ShipStage = "verify-self-sha"
-	StageVerifyClass   ShipStage = "verify-class"
-	StageAtomicShip    ShipStage = "atomic-ship"
-	StagePostShip      ShipStage = "post-ship"
-	StageArgs          ShipStage = "args"
+	StageVerifyExplanation ShipStage = "verify-explanation"
+	StageVerifySelfSHA     ShipStage = "verify-self-sha"
+	StageVerifyClass       ShipStage = "verify-class"
+	StageAtomicShip        ShipStage = "atomic-ship"
+	StagePostShip          ShipStage = "post-ship"
+	StageArgs              ShipStage = "args"
 )
 
 // ShipErrorCode is the precise, debuggable failure identity. Grouped by stage;
@@ -68,6 +69,9 @@ const (
 type ShipErrorCode string
 
 const (
+	// verify-explanation
+	CodeExplanationDocumentation ShipErrorCode = "EXPLANATION_DOCUMENTATION"
+
 	// verify-self-sha
 	CodeSelfSHATampered ShipErrorCode = "SELF_SHA_TAMPERED"
 	CodeSelfSHAIO       ShipErrorCode = "SELF_SHA_IO"

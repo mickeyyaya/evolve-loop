@@ -102,6 +102,13 @@ func TestValidateContinuation_CleanPassesConflictAndGarbageFail(t *testing.T) {
 
 func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	root, wt := initContinuationRepo(t, 83)
+	oldExplanation := "docs/explain/builds/cycle-83-old-run.md"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(wt, oldExplanation)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, oldExplanation), []byte("unshipped explanation\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	m := stampedContinuation(t, root, wt, 83)
 	if err := os.WriteFile(m.FindingsPath, []byte(`{"phase":"build","summary":"export X unnamed in tests"}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -113,7 +120,10 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 
 	runners := buildRunners(nil)
 	buildR := runners[PhaseBuild].(*fakeRunner)
-	probe := &worktreeProbeRunner{fakeRunner: buildR, probeFile: "prior_work.go"}
+	probe := &worktreeProbeRunner{
+		fakeRunner: buildR, probeFile: "prior_work.go", absentFile: oldExplanation,
+		archiveFile: filepath.Base(oldExplanation),
+	}
 	runners[PhaseBuild] = probe
 	runners[PhaseTriage] = &claimingTriageRunner{fakeRunner: runners[PhaseTriage].(*fakeRunner), root: root, taskID: "task-a"}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
@@ -131,6 +141,12 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	}
 	if !probe.sawFile {
 		t.Error("prior work must be intact in the adopted worktree at build time")
+	}
+	if probe.sawAbsentFile {
+		t.Error("an unshipped ancestor explanation must leave the canonical cycle path before the new Builder runs")
+	}
+	if !probe.sawArchivedFile {
+		t.Error("unshipped ancestor explanation must be preserved in the docs archive before Build")
 	}
 	if !strings.Contains(req.Context["continuation_findings"], "export X unnamed") {
 		t.Errorf("build context must carry prior findings; got %q", req.Context["continuation_findings"])
@@ -234,14 +250,29 @@ func (r *claimingTriageRunner) Run(ctx context.Context, req PhaseRequest) (Phase
 // post-RunCycle stats race the cleanup).
 type worktreeProbeRunner struct {
 	*fakeRunner
-	probeFile string
-	sawFile   bool
+	probeFile       string
+	absentFile      string
+	archiveFile     string
+	sawFile         bool
+	sawAbsentFile   bool
+	sawArchivedFile bool
 }
 
 func (r *worktreeProbeRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	if req.Worktree != "" {
 		if _, err := os.Stat(filepath.Join(req.Worktree, r.probeFile)); err == nil {
 			r.sawFile = true
+		}
+		if r.absentFile != "" {
+			if _, err := os.Stat(filepath.Join(req.Worktree, r.absentFile)); err == nil {
+				r.sawAbsentFile = true
+			}
+		}
+		if r.archiveFile != "" {
+			pattern := filepath.Join(req.Worktree, "docs", "private", "research", "archived-*", "unshipped-build-explanations", r.archiveFile)
+			if matches, err := filepath.Glob(pattern); err == nil && len(matches) == 1 {
+				r.sawArchivedFile = true
+			}
 		}
 	}
 	return r.fakeRunner.Run(ctx, req)

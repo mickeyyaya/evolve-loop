@@ -306,6 +306,7 @@ type Config struct {
 	AllowBypass    bool
 	HumanInput     bool
 	RequireFull    bool
+	RequireSandbox bool     // fail closed when OS filesystem confinement is unavailable
 	AllowedTools   []string // from profile.allowed_tools
 	ExtraFlags     []string // forwarded to the inner CLI after `--` (direct passthrough)
 	// Realization is the per-CLI launch realization (ADR-0022): the model,
@@ -419,6 +420,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
 		// stays the single source of truth for Config construction.
 		args = append(args, "--project-root="+req.ProjectRoot)
+	}
+	if req.RequireSandbox {
+		args = append(args, "--require-sandbox")
 	}
 	if req.Completion != "" {
 		args = append(args, "--completion="+req.Completion)

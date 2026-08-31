@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -347,6 +348,46 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("read cycle-state: %w", err)
 	}
+	resumeIdentity, err := authoritativeResumeIdentity(req.ProjectRoot, resumePoint.StatePath, cs.WorkspacePath)
+	if err != nil {
+		return CycleResult{}, err
+	}
+	resumeWorkspace := resumeIdentity.workspace
+	hostCycle := cs.CycleID
+	if state.LastCycleNumber > 0 {
+		// state.json is host-owned and independent of the Builder-writable
+		// cycle-state projection. Fleet checkpoints override this with the cycle
+		// encoded in their run-directory path below.
+		hostCycle = state.LastCycleNumber
+	} else if hostCycle == 0 {
+		hostCycle = resumePoint.CycleID
+	}
+	resumeCycle := hostCycle
+	if resumeIdentity.fleet {
+		resumeCycle = resumeIdentity.cycle
+	}
+	recoveryBinding := cs
+	if recoveryBinding.CycleID == 0 {
+		recoveryBinding.CycleID = resumeCycle
+	}
+	if newBase, recoverable, recoveryErr := explanationdocs.RecoverRebaseSplit(ctx, explanationBinding(req.ProjectRoot, recoveryBinding)); recoveryErr != nil {
+		return CycleResult{}, fmt.Errorf("recover rebased Build checkpoint: %w", recoveryErr)
+	} else if recoverable {
+		cs.WorktreeBaseSHA = newBase
+		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
+			return CycleResult{}, fmt.Errorf("persist recovered rebased Build checkpoint: %w", err)
+		}
+		startPhase = PhaseBuild
+	}
+	if err := requireResumeExplanationIdentity(req.ProjectRoot, resumeWorkspace, resumeCycle, cs, resumePoint.CycleID); err != nil {
+		return CycleResult{}, err
+	}
+	if cs.CycleID != 0 && resumePoint.CycleID != 0 && cs.CycleID != resumePoint.CycleID {
+		return CycleResult{}, fmt.Errorf("resume identity mismatch: cycle-state cycle %d does not match checkpoint cycle %d", cs.CycleID, resumePoint.CycleID)
+	}
+	if cs.ActiveWorktree != "" && resumePoint.WorktreePath != "" && filepath.Clean(cs.ActiveWorktree) != filepath.Clean(resumePoint.WorktreePath) {
+		return CycleResult{}, fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
+	}
 	cycle := cs.CycleID
 	if cycle == 0 {
 		cycle = resumePoint.CycleID
@@ -379,6 +420,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	}
 
 	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
+	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 
 	// ADR-0044 C1 (deferred-to-C3 debt, now paid): the resume path was a
 	// SECOND recording boundary that wrote no timings/sidecars at all —
@@ -435,6 +477,11 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		if next == PhaseEnd {
 			break
 		}
+		if next == PhaseBuild {
+			if err := sealBuildExplanationContext(req.ProjectRoot, cs); err != nil {
+				return result, fmt.Errorf("resume seal Build explanation context: %w", err)
+			}
+		}
 
 		runner, ok := o.runners[next]
 		if !ok {
@@ -482,14 +529,16 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		if next == PhaseAudit {
 			cs.AuditRepairActive = false
 		}
-		resp, err := runner.Run(ctx, PhaseRequest{
+		phaseReq := PhaseRequest{
 			Cycle:       cycle,
 			ProjectRoot: req.ProjectRoot,
 			Workspace:   cs.WorkspacePath,
 			// CB.1: the resume path is a first-class dispatch surface and must
 			// thread the persisted worktree like the RunCycle loop does — a
 			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
-			Worktree: cs.ActiveWorktree,
+			Worktree:                        cs.ActiveWorktree,
+			WorktreeBaseSHA:                 cs.WorktreeBaseSHA,
+			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
 			// CB.5: same rule for the persisted run identity (resume reuses
 			// the run-record id, so session names stay run-scoped).
 			RunID:         cs.RunID,
@@ -497,7 +546,11 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       phaseCtx,
-		})
+		}
+		if next != PhaseBuild {
+			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
+		}
+		resp, err := runner.Run(ctx, phaseReq)
 		if err != nil {
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, phaseErr.Error(), cs.PhaseStartedAt))
@@ -507,6 +560,24 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ferr.Error(), cs.PhaseStartedAt))
 			return result, ferr
+		}
+		// Resume parity with reviewAndGuard: host normalization must finish
+		// before Build's explanation is reviewed and sealed.
+		o.normalizeBuildWorktree(ctx, next, cs)
+		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
+		if err != nil {
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, err.Error(), cs.PhaseStartedAt))
+			return result, err
+		}
+		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
+			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
+			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))
+			if refreshErr != nil {
+				return result, fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
+			}
+			if requiresBuild {
+				scheduledNext = PhaseBuild
+			}
 		}
 
 		if err := o.ledger.Append(ctx, LedgerEntry{
@@ -522,11 +593,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		}
 
 		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
-		// Cycle-156 parity: same post-build normalize RunCycle runs, driven
-		// by the persisted CycleState.WorktreeBaseSHA (empty on pre-field
-		// checkpoints → no-op).
-		o.normalizeBuildWorktree(ctx, next, cs)
-
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
@@ -630,6 +696,73 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		return result, fmt.Errorf("write state: %w", err)
 	}
 	return result, nil
+}
+
+func (o *Orchestrator) reviewResumedDeliverable(
+	ctx context.Context,
+	projectRoot string,
+	cycle int,
+	cs CycleState,
+	phase Phase,
+	runner PhaseRunner,
+	req PhaseRequest,
+	resp PhaseResponse,
+	mainDirtyBaseline map[string]bool,
+) (PhaseResponse, error) {
+	// Resume review parity is scoped to activated contracts. Legacy checkpoints
+	// retain their historical behavior.
+	if o.reviewer == nil || cs.ExplanationDocumentationVersion == 0 || resp.Verdict == VerdictSKIPPED {
+		return resp, nil
+	}
+	recoverBeforeReview := func() error {
+		if !o.leakRecoverablePhase(phase) || cs.ActiveWorktree == "" {
+			return nil
+		}
+		if recoverBuildLeak(ctx, projectRoot, cs.ActiveWorktree, mainDirtyBaseline, o.worktreePhase(phase)) {
+			return nil
+		}
+		return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", phase)
+	}
+	reviewInput := func(response PhaseResponse) ReviewInput {
+		return ReviewInput{
+			Cycle: cycle, RunID: cs.RunID,
+			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
+			Phase:                           string(phase), WorktreeBaseSHA: cs.WorktreeBaseSHA,
+			Response: response, Workspace: cs.WorkspacePath,
+			Worktree: cs.ActiveWorktree, ProjectRoot: projectRoot,
+		}
+	}
+	if err := recoverBeforeReview(); err != nil {
+		return resp, err
+	}
+	review := o.reviewer.Review(ctx, reviewInput(resp))
+	maxCorrections := (&cycleRun{o: o, cs: cs, retryConfig: o.retryConfig}).correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
+	for correction := 1; !review.Approve && correction <= maxCorrections; correction++ {
+		req.CorrectionDirective = composeCorrection(review.Reason, review.Remediation)
+		cancel := o.observer.Start(ctx, string(phase), req)
+		corrected, err := runner.Run(ctx, req)
+		if cancel != nil {
+			cancel()
+		}
+		if err != nil {
+			return corrected, fmt.Errorf("resume review gate: phase %q correction %d dispatch failed: %w", phase, correction, err)
+		}
+		if !IsVerdict(corrected.Verdict) {
+			return corrected, fmt.Errorf("resume review gate: phase %q correction %d returned non-canonical verdict %q", phase, correction, corrected.Verdict)
+		}
+		resp = corrected
+		if err := recoverBeforeReview(); err != nil {
+			return resp, err
+		}
+		// Correction output is a fresh worktree mutation. Normalize it before
+		// re-running the reviewer so a newly sealed snapshot is final.
+		o.normalizeBuildWorktree(ctx, phase, cs)
+		review = o.reviewer.Review(ctx, reviewInput(resp))
+	}
+	if !review.Approve {
+		return resp, fmt.Errorf("resume review gate: phase %q deliverable rejected after %d correction(s): %s", phase, maxCorrections, review.Reason)
+	}
+	return resp, nil
 }
 
 // --- helpers ---

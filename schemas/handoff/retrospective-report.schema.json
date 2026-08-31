@@ -37,7 +37,16 @@
       "fail_message": "## Lesson (or ANCHOR:lesson) missing — Retrospective must emit a reusable instinct/lesson"
     }
   ],
-  "conditional_sections": [],
+  "conditional_sections": [
+    {
+      "name": "explanation_documentation_review",
+      "condition": "explanation_documentation_contract_active",
+      "patterns": [
+        "^## Explanation Documentation Review"
+      ],
+      "fail_message": "## Explanation Documentation Review missing — post-Build Retrospective must verify or queue correction for the active handoff"
+    }
+  ],
   "required_content": [
     {
       "name": "lesson_yaml_pointer",

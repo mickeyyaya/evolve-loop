@@ -115,10 +115,9 @@ func checkLLMCLIStatus(o resolved) CheckResult {
 
 // checkHostCapabilities verifies the host can host the bridge. Halts: tmux
 // absent, or .evolve/ (and .evolve/runs/) not writable — the bridge cannot run
-// at all without these. Warns (degraded but runnable): profiles request
-// sandboxing the host won't provide, free disk below the threshold, or the
-// registry-backed orphan sweep cannot safely inspect a run. All accumulate; a
-// halt outranks warnings in the verdict.
+// at all without these. A required sandbox that the host cannot provide also
+// halts before phase spend. Warns cover low disk and orphan-sweep degradation.
+// All accumulate; a halt outranks warnings in the verdict.
 func checkHostCapabilities(o resolved) CheckResult {
 	const name = "host-capabilities"
 	var halts, warns []string
@@ -137,8 +136,8 @@ func checkHostCapabilities(o resolved) CheckResult {
 
 	if sandboxWanted(o.profileLister, o.profileGetter) {
 		if host := o.hostProbe(); !host.Sandbox.ExpectedToWork {
-			warns = append(warns, fmt.Sprintf(
-				"inner OS sandbox unavailable (%s); source-writing phases run UNCONFINED at the inner layer — the outer Claude Code session + Tier-1 hooks (phase-gate, role-gate, ledger SHA) are the only confinement",
+			halts = append(halts, fmt.Sprintf(
+				"required Build sandbox unavailable (%s); run on a supported non-nested host or restore OS confinement before starting the cycle",
 				host.Sandbox.Reason))
 		}
 	}
