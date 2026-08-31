@@ -221,6 +221,15 @@ func allDigits(s string) bool {
 // prompt set + match counts + workspace for one *-tmux run.
 type autoResponder struct {
 	prompts []ManifestPrompt
+	// transientRegex/transientPattern are the launched CLI's manifest-sourced
+	// temporary-upstream signature, resolved and compiled once per launch.
+	transientRegex   string
+	transientPattern *regexp.Regexp
+	// transientGate measures a 60s dwell on the artifact wait's 2s cadence.
+	// The wait loop enables it explicitly because other tick callers discard rc.
+	transientGate         *exhaustionGate
+	transientDwellEnabled bool
+	transientFired        bool
 	// exhaustedRegex is the CLI's quota/rate-limit wall pattern (manifest
 	// controls.usage.exhausted_regex via manifestExhaustedPattern, single-source),
 	// checked each tick so a walled CLI escalates (rc 85) IMMEDIATELY — the
@@ -339,17 +348,43 @@ type pendingAutoRespond struct {
 func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback int) *autoResponder {
 	var prompts []ManifestPrompt
 	var exhaustedRegex string
+	var transientRegex string
+	var transientPattern *regexp.Regexp
 	if m, err := LoadManifest(cli); err == nil {
 		prompts = m.InteractivePrompts
 		exhaustedRegex = manifestExhaustedPattern(m) // single-source wall pattern
+		transientRegex = m.TransientRegex
+		if transientRegex != "" {
+			transientPattern, err = regexp.Compile(transientRegex)
+			if err != nil && deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[%s] WARN: invalid manifest transient_regex: %v\n", cli, err)
+			}
+		}
 	}
-	return &autoResponder{prompts: prompts, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
+	return &autoResponder{prompts: prompts, transientRegex: transientRegex, transientPattern: transientPattern, transientGate: &exhaustionGate{threshold: transientDwellObservations}, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
 // tick captures the pane, decides, and applies the effect (send-keys or
 // escalation-report). Returns (action, rc) for runTmuxREPL's loop.
 func (ar *autoResponder) tick(ctx context.Context, session string) (string, int) {
-	pane, _ := ar.deps.Tmux.CapturePane(ctx, session, ar.scrollback)
+	pane, err := ar.deps.Tmux.CapturePane(ctx, session, ar.scrollback)
+	return ar.tickPane(ctx, session, pane, err == nil)
+}
+
+// transientDwellObservations is the dwell length in wait-loop observations:
+// 30 ticks at the loop's 2s cadence = the 60s the eval contract names. Sibling
+// of exhaustionPersistObservations — change them together or say why not.
+const transientDwellObservations = 30
+
+// tickPane applies one auto-response observation to a pane already captured by
+// the artifact wait loop, keeping every wait-loop consumer on one 2s frame.
+//
+// captureOK reports whether the pane capture SUCCEEDED. An errored capture is
+// "no observation", never "the pane recovered": adversarial review reproduced
+// a tmux server erroring every other tick holding the transient dwell at zero
+// forever — the empty pane read as a non-match, reset the streak, and the run
+// burned the very silence budget this mechanism exists to shortcircuit.
+func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, captureOK bool) (string, int) {
 	// ADR-0045 I1: resolve the in-flight send against THIS capture before
 	// deciding — the pattern no longer matching is the deterministic
 	// "it worked" signal ("prompt-pattern cleared on next capture").
@@ -396,6 +431,37 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	// raw for forensics (writeEscalation), the busy probe, and tryKernelAnswer.
 	scanPane := stripPromptEchoLines(pane, ar.injectedPrompt)
 	action, rc := decideAutoRespond(scanPane, ar.prompts, ar.counts, paneBusy)
+	if ar.transientDwellEnabled && ar.transientPattern != nil && captureOK {
+		if ar.transientGate == nil {
+			// Bulletproof against direct struct construction, same posture as
+			// exhaustGate below — a nil gate must degrade to "dwell disabled",
+			// not panic the wait loop.
+			ar.transientGate = &exhaustionGate{threshold: transientDwellObservations}
+		}
+		matched := !paneBusy && ar.transientPattern.MatchString(strippedForExhaustionScan(pane, ar.injectedPrompt))
+		if !matched {
+			ar.transientFired = false
+		}
+		if ar.transientGate.observe(matched) && !ar.transientFired {
+			ar.transientFired = true
+			stage := recoveryStageFromEnv(ar.deps)
+			if stage != "off" && ar.rec != nil {
+				result := "would_fast_fail"
+				if stage == "enforce" {
+					result = "fast_failed"
+				}
+				ar.rec.Record(interaction.Outcome{Event: interaction.Event{
+					Kind:    "transient_dwell",
+					Phase:   ar.phase,
+					Cycle:   ar.cycle,
+					Trigger: "transient_upstream_60s",
+				}, Result: result})
+			}
+			if stage == "enforce" {
+				return "transient_dwell", 3
+			}
+		}
+	}
 	// Exhaustion override (reuses THIS tick's capture — no extra CapturePane, so no
 	// paneSeq churn): a quota/rate-limit wall escalates (rc 85), ungated by paneBusy
 	// (a wall blocks regardless of the spinner) and overriding a lesser verdict —
