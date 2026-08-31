@@ -344,40 +344,21 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
 		return
 	}
-	// ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-
-	// blocker Task 1): a ship dispatch error is a real, diagnosed failure — the
-	// ONLY chokepoint a ship error ever passes through (unlike audit, ship has
-	// no success-path FAIL verdict; every ship failure is an err!=nil dispatch
-	// error, so this is the sole record site, mirroring persistFloorFailReasons'
-	// audit-phase chokepoint). Set in orchestrator memory (never a workspace
-	// file — same trust boundary as AuditFailReasons) so the coherence floor
-	// can tell "audit+ACS green but ship legitimately rejected" apart from a
-	// forged verdict. Cleared on ship re-dispatch by resetFloorFailReason.
+	// Preserve a ship dispatch explanation for the coherence floor even when the
+	// quota boundary skips failure learning below.
 	if fl.Failed == PhaseShip {
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
-	summary, todoID, structured := o.recordFailedApproachState(fl)
-
-	// Quota deferral short-circuit (cycle-1585, instinct inst-L1582a; restores
-	// the "no retro dispatched" half of the cycle-656 D2 checkpoint-and-defer
-	// contract). An all-families-quota-exhausted abort
-	// (cyclerun_dispatch.go:264-287) is DEFERRED, not FAILED: the quota-boundary
-	// checkpoint is already written and the loop exits rc=5 so
-	// `evolve loop --resume` re-enters the exhausted phase after the quota
-	// window resets. Dispatching retro there would run a whole LLM phase against
-	// the very wall that just drained every family, and — worse — would persist
-	// CycleState.Phase/ActiveAgent as "retro", so the resume would re-enter retro
-	// instead of the drained phase. Placed AFTER recordFailedApproachState so the
-	// deterministic state.FailedAt / carryover-todo bookkeeping the failure
-	// adapter reads is still recorded, and matched with errors.Is because the
-	// sentinel arrives multiply %w-wrapped (dispatch, then wrapCycleLevelError).
-	// This is the single chokepoint every such call site funnels through.
+	// An all-families quota exhaustion is a DEFERRED resume checkpoint, not a
+	// failed phase. Keep it out of *all* failure-learning state, including the
+	// FailedRecord and P0 carryover todo created by recordFailedApproachState.
+	// errors.Is is required because dispatch wraps the sentinel before it reaches
+	// this shared chokepoint.
 	if errors.Is(fl.Err, ErrAllFamiliesExhausted) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: all CLI families quota-exhausted; "+
-			"skipping retro dispatch (DEFERRED, resumable) — carryover todo queued only\n")
-		o.writeFailureLearningState(ctx, fl.State)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: all CLI families quota-exhausted; skipping failure learning (DEFERRED, resumable)\n")
 		return
 	}
+	summary, todoID, structured := o.recordFailedApproachState(fl)
 
 	retroRunner, ok := o.runners[PhaseRetro]
 	if !ok {

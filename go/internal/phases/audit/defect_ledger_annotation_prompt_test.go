@@ -61,6 +61,9 @@ func TestEvidenceResolves_AnnotationTolerance(t *testing.T) {
 		{"dot-only-cite", "root.md; verified by rerun", true},
 		// Pre-existing behaviors preserved.
 		{"parenthetical-annotation", "docs/x.md:2 (helper now cycle-scoped)", true},
+		// A prose suffix separated by a dash is not a citation format. Accepting
+		// the prefix alone would let an unvalidated closure claim pass the gate.
+		{"dash-suffixed-prose-is-not-truncated", "docs/x.md — claimed fixed", false},
 		{"empty", "", false},
 		{"separators-only", " ; ", false},
 	}
