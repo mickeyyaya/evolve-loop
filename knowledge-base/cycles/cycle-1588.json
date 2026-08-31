@@ -1,0 +1,234 @@
+{
+  "cycle": 1588,
+  "run_id": "01M1B0KXVYJWKN2XGXZ4MSGMSA",
+  "goal": "Fix evolve-loop pipeline defects that stop cycles from shipping. Prioritise pipeline-integrity items already queued in .evolve/inbox and carryoverTodos: verdict/disposition routing, gate correctness, and any guard that binds runtime-minted state. Each cycle must land one shippable, tested fix.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 497903,
+      "started_at": "2026-08-31T04:20:00Z",
+      "ended_at": "2026-08-31T04:28:19Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 40817,
+      "started_at": "2026-08-31T04:30:07Z",
+      "ended_at": "2026-08-31T04:30:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1986,
+        "cache_read": 134345,
+        "cache_write": 70371
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 439281,
+      "started_at": "2026-08-31T04:30:50Z",
+      "ended_at": "2026-08-31T04:38:10Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 272217,
+      "started_at": "2026-08-31T04:38:10Z",
+      "ended_at": "2026-08-31T04:42:43Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 46,
+        "output": 17442,
+        "cache_read": 2177385,
+        "cache_write": 121964
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1391981,
+      "started_at": "2026-08-31T04:42:43Z",
+      "ended_at": "2026-08-31T05:06:10Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "coverage-gate",
+      "verdict": "PASS",
+      "duration_ms": 564822,
+      "started_at": "2026-08-31T05:06:10Z",
+      "ended_at": "2026-08-31T05:15:35Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 570102,
+      "started_at": "2026-08-31T05:15:35Z",
+      "ended_at": "2026-08-31T05:27:00Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 32200,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "FAIL",
+      "duration_ms": 3642697,
+      "started_at": "2026-08-31T05:27:00Z",
+      "ended_at": "2026-08-31T07:02:48Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 42,
+        "output": 6590,
+        "cache_read": 1271815,
+        "cache_write": 72852
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 1746192,
+      "started_at": "2026-08-31T07:02:48Z",
+      "ended_at": "2026-08-31T07:31:55Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|infra-error|b17c6794d392",
+    "pre_class": "infra-error",
+    "reasons": [
+      "EGPS: red_count=1 [protectedsurface/TestEveryGateShapedFileIsProtectedSurface] (cycle ships only when red_count==0)",
+      "acs-durable (-tags acs) FAILED 5 check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: --- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.05s); pred"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1588",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 9166012,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 3642697,
+    "by_archetype_ms": {
+      "build": 1391981,
+      "control": 1746192,
+      "evaluate": 1574205,
+      "plan": 4453634
+    },
+    "total_tokens": {
+      "input": 94,
+      "output": 58218,
+      "cache_read": 3583545,
+      "cache_write": 265187
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 32200,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 94,
+        "output": 26018,
+        "cache_read": 3583545,
+        "cache_write": 265187
+      }
+    },
+    "wasted_tokens": {
+      "input": 42,
+      "output": 38790,
+      "cache_read": 1271815,
+      "cache_write": 72852
+    },
+    "cache_hit_ratio": 0.9999737696793678,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "triage",
+      "tdd"
+    ]
+  }
+}
