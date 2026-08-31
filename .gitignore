@@ -195,6 +195,8 @@ go/acs/**/evolve
 # phasespec (no SELECT metadata). Ship's staging sweep must never re-add them.
 .evolve/phases/gate-wiring-proof/
 .evolve/profiles/gate-wiring-proof.json
+.evolve/phases/production-path-wiring-proof/
+.evolve/profiles/production-path-wiring-proof.json
 .evolve/profiles/defect-disposition-preflight.json
 .evolve/profiles/disposition-preflight.json
 .evolve/profiles/inherited-defect-reconcile.json
