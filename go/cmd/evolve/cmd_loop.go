@@ -322,8 +322,13 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			lr.emitFatal(stdout, stderr, cfg, 0)
 			return 2
 		}
-		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f\n",
-			rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause)
+		fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f state=%s\n",
+			rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause, rp.StatePath)
+		// Write-back routing: a checkpoint DISCOVERED in a fleet lane's
+		// per-run file must make the resumed run read/write that same file,
+		// or its next pause orphans a checkpoint in the singleton again.
+		restoreState := core.ActivateResumeStatePath(rp, cfg.EvolveDir)
+		defer restoreState()
 		req := core.CycleRequest{
 			ProjectRoot:           cfg.ProjectRoot,
 			GoalHash:              cfg.GoalHash,
