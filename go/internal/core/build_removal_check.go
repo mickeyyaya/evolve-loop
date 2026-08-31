@@ -17,10 +17,10 @@ package core
 // carrying a "removedPaths" array (mirroring the fenced-JSON handoff contract
 // topngate already uses); anything else is invisible to this check.
 //
-// Every ambiguity is fail-open (nil): no workspace/worktree, no report, no
-// parseable block, malformed JSON, an empty list, or a path escaping the
-// worktree. The floor can never false-block a build over its own plumbing —
-// downstream deterministic gates (ACS toolchain, apicover, CI) stay armed.
+// The filesystem is only half of a tracked deletion: a path absent on disk but
+// still present in the Git index returns after a fresh checkout. Every Git
+// ambiguity remains fail-open, so the floor cannot false-block a build over a
+// missing repository or its own plumbing.
 
 import (
 	"context"
@@ -42,8 +42,9 @@ type removalClaim struct {
 
 // RemovalClaimFailures is a BuildFloorCheckFn: it reads the build report,
 // collects every path the report claims to have removed, and returns one
-// failure line per claimed path that STILL EXISTS under the worktree.
-func RemovalClaimFailures(_ context.Context, in ReviewInput) []string {
+// failure line per claimed path that still exists in the worktree or its Git
+// index.
+func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 	if in.Workspace == "" || in.Worktree == "" {
 		return nil
 	}
@@ -58,7 +59,14 @@ func RemovalClaimFailures(_ context.Context, in ReviewInput) []string {
 			continue // absolute or escaping path — not ours to adjudicate
 		}
 		if _, err := os.Stat(abs); err != nil {
-			continue // genuinely gone (or unstattable) — honest claim
+			_, code, gitErr := gitCapture(ctx, in.Worktree, "ls-files", "--error-unmatch", "--", claimed)
+			if gitErr != nil || code != 0 {
+				continue // absent and untracked, or Git is unavailable — fail open
+			}
+			failures = append(failures, fmt.Sprintf(
+				"build report claims %q was removed, but it still exists in the Git index — retire it as a tracked deletion or correct the claim",
+				claimed))
+			continue
 		}
 		failures = append(failures, fmt.Sprintf(
 			"build report claims %q was removed, but it still exists in the worktree — remove it or correct the claim (false removal claims are the cycle-660 class)",
