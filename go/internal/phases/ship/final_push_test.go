@@ -220,12 +220,9 @@ func TestShipFromWorktree_PostPushTreeSHAMismatch_BreachLog(t *testing.T) {
 
 // --- gitops: writeShipBinding WARN log ------------------------------------
 
-// TestShipFromWorktree_WriteShipBindingWarn_LogsWarn: when writeShipBinding
-// fails (e.g., cycle-state.json has no cycle_id after the ship), a WARN log
-// is appended but ship still succeeds (ExitOK).
-// We trigger this by deleting cycle-state.json mid-flight via a custom runner
-// that removes it after the ff-merge call.
-func TestShipFromWorktree_WriteShipBindingWarn_LogsWarn(t *testing.T) {
+// TestShipFromWorktree_WriteShipBindingUsesFrozenCycleIdentity proves a
+// concurrent cycle-state rewrite after push cannot redirect the binding.
+func TestShipFromWorktree_WriteShipBindingUsesFrozenCycleIdentity(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "binding-warn-branch")
@@ -238,8 +235,8 @@ func TestShipFromWorktree_WriteShipBindingWarn_LogsWarn(t *testing.T) {
 	hijack := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		rc, err := base(ctx, name, cwd, args, env, stdin, stdout, stderr)
-		// After the push succeeds, remove cycle_id from cycle-state.json so
-		// writeShipBinding can't find it.
+		// After the push succeeds, remove cycle_id from cycle-state.json. Ship
+		// must keep using the typed identity it froze before verification.
 		if name == "git" && len(args) > 0 && args[0] == "push" && rc == 0 {
 			_ = os.WriteFile(csPath, []byte(`{"phase":"done"}`), 0o644)
 		}
@@ -257,8 +254,11 @@ func TestShipFromWorktree_WriteShipBindingWarn_LogsWarn(t *testing.T) {
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	if !containsLog(res, "WARN: could not write ship-binding.json") {
-		t.Errorf("missing ship-binding WARN log; got %v", res.Logs)
+	if containsLog(res, "WARN: could not write ship-binding.json") {
+		t.Errorf("mutable cycle-state rewrite redirected the frozen binding: %v", res.Logs)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, ".evolve", "runs", "cycle-99", "ship-binding.json")); statErr != nil {
+		t.Fatalf("typed cycle-99 ship binding missing: %v", statErr)
 	}
 }
 

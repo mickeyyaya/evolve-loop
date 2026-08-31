@@ -24,6 +24,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -94,6 +95,17 @@ type Options struct {
 	// G3). Empty (standalone `evolve ship`) → the global file. Set by the ship
 	// PhaseRunner from PhaseRequest.Workspace.
 	WorkspacePath string
+
+	// Cycle explanation identity is copied from the host-owned PhaseRequest by
+	// the Phase adapter. Direct CLI calls leave these zero and the native gate
+	// resolves them from host-global cycle-state.json. They must never be
+	// populated from the Builder-writable workspace/run.json mirror.
+	CycleID                         int
+	ActiveWorktree                  string
+	WorktreeBaseSHA                 string
+	ExplanationDocumentationVersion int
+	BuildExplanation                *phaseio.ExplanationView
+	RequireBuildExplanationHandoff  bool
 
 	// ManifestGate is the ship-hygiene gate mode for the worktree ship path.
 	// "" (default) = SHADOW: log out-of-manifest paths, never block — behavior-
@@ -257,6 +269,14 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 	if opts.NowFn == nil {
 		opts.NowFn = defaultNow
 	}
+	if err := verifyNativeExplanation(ctx, &opts); err != nil {
+		return finalize(ctx, &opts, &res, shipErr(
+			core.CodeExplanationDocumentation,
+			core.ShipClassPrecondition,
+			core.StageVerifyExplanation,
+			"ship explanation documentation gate: "+err.Error(),
+		), "verify-explanation-documentation")
+	}
 
 	// 1. Self-SHA TOFU verification. Writes state.json on first-run /
 	// version-bump / legacy migration. INTEGRITY-FAILs on same-version
@@ -277,14 +297,11 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 
 	// 1.5 Check post-push idempotency.
 	if opts.Class == ClassCycle {
-		idempotent, err := checkPostPushIdempotency(ctx, &opts)
+		commitSHA, idempotent, err := checkPostPushIdempotency(ctx, &opts)
 		if err == nil && idempotent {
-			head, err := captureGitOutput(ctx, &opts, "rev-parse", "HEAD")
-			if err == nil {
-				res.CommitSHA = strings.TrimSpace(head)
-				res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
-				return finalize(ctx, &opts, &res, nil, "post-push-idempotency")
-			}
+			res.CommitSHA = commitSHA
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
+			return finalize(ctx, &opts, &res, nil, "post-push-idempotency")
 		}
 	}
 
@@ -379,28 +396,50 @@ func (o *Options) envStr(key string) string {
 	return os.Getenv(key)
 }
 
-func checkPostPushIdempotency(ctx context.Context, opts *Options) (bool, error) {
-	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
-	csMap, err := readStateMap(csPath)
-	if err != nil {
-		return false, err
-	}
-	cid, ok := stateInt(csMap, "cycle_id")
-	if !ok {
-		return false, nil
+func checkPostPushIdempotency(ctx context.Context, opts *Options) (string, bool, error) {
+	cid, ok, err := cycleIDForShip(opts)
+	if err != nil || !ok {
+		return "", false, err
 	}
 	bindingPath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "ship-binding.json")
 	bindingMap, err := readStateMap(bindingPath)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
+	bindingCycle, hasCycle := stateInt(bindingMap, "cycle")
 	bindingCommitSHA := stateString(bindingMap, "commit_sha")
-	if bindingCommitSHA == "" {
-		return false, nil
+	committedTree := stateString(bindingMap, "tree_sha_committed")
+	auditTree := stateString(bindingMap, "audit_bound_tree_sha")
+	if !hasCycle || bindingCycle != cid || bindingCommitSHA == "" || committedTree == "" || auditTree == "" || auditTree != committedTree {
+		return "", false, nil
 	}
 	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
-	return strings.TrimSpace(head) == strings.TrimSpace(bindingCommitSHA), nil
+	head = strings.TrimSpace(head)
+	if head != bindingCommitSHA {
+		return "", false, nil
+	}
+	headTree, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		return "", false, err
+	}
+	headTree = strings.TrimSpace(headTree)
+	if headTree == "" || headTree != committedTree {
+		return "", false, nil
+	}
+	return head, true, nil
+}
+
+func cycleIDForShip(opts *Options) (int, bool, error) {
+	if opts.CycleID > 0 {
+		return opts.CycleID, true, nil
+	}
+	state, err := readStateMap(opts.cycleStateFile())
+	if err != nil {
+		return 0, false, err
+	}
+	cycle, ok := stateInt(state, "cycle_id")
+	return cycle, ok && cycle > 0, nil
 }

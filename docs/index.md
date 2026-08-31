@@ -35,6 +35,7 @@
 | [capability-schema.md](architecture/capability-schema.md) | Adapter capability manifest schema + authoring guide for new CLIs |
 | [intent-phase.md](architecture/intent-phase.md) | Intent capture phase + AwN classifier specification |
 | [sequential-write-discipline.md](architecture/sequential-write-discipline.md) | Parallelization discipline rule (`parallel_eligible`) + concurrency cap (default 2 since v8.55.0) — when may a role fan out, and how many workers run at once |
+| [build-explanation-contract.md](architecture/build-explanation-contract.md) | Builder-authored rationale deliverable, provenance binding, and Audit/Ship/Retro verification lifecycle |
 
 ## Release & Operations
 

@@ -26,6 +26,7 @@
 package audit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -42,6 +43,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -93,6 +95,11 @@ var verdictInlineRE = regexp.MustCompile(`(?m)^[^\S\n]*(?:##[^\S\n]*)?\*{0,2}Ver
 // generation (a pre-staged file is then required, the legacy behavior).
 type hooks struct {
 	genVerdict func(req core.PhaseRequest) error
+	// explanationCheck independently verifies the Build-explanation handoff
+	// after the auditor has finished. A failure overrides the native Audit
+	// response without masquerading as an EGPS predicate. nil keeps legacy unit
+	// fixtures unchanged.
+	explanationCheck func(req core.PhaseRequest) error
 	// gofmtCheck reports the worktree's .go files that are not gofmt -s clean.
 	// It is the CI-parity gate that stops a cycle shipping a gofmt regression
 	// to main (cycles 339-341 shipped CI-red because the cycle-scoped audit
@@ -230,6 +237,10 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		overrodeBy = append(overrodeBy, gate)
 		verdict = core.VerdictFAIL
 	}
+	if reviewErr := validateExplanationReview(artifact, req); reviewErr != nil {
+		diags = append(diags, core.Diagnostic{Severity: "error", Message: reviewErr.Error()})
+		overrode("explanation documentation qualitative review")
+	}
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
 	// Probe quarantine runs UNCONDITIONALLY — before the verdict-exists gate.
@@ -280,6 +291,15 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 					Message:  fmt.Sprintf("acs-verdict generation failed: %s", genErr.Error()),
 				})
 			}
+		}
+	}
+	if h.explanationCheck != nil {
+		if explanationErr := h.explanationCheck(req); explanationErr != nil {
+			diags = append(diags, core.Diagnostic{
+				Severity: "error",
+				Message:  fmt.Sprintf("explanation documentation gate: %s", explanationErr.Error()),
+			})
+			overrode("explanation documentation gate unavailable")
 		}
 	}
 
@@ -766,6 +786,10 @@ type Config struct {
 	// nil = no generation (legacy: a pre-staged file is required to PASS).
 	// The registry default wires generateACSVerdict (runs acssuite).
 	GenerateVerdict func(req core.PhaseRequest) error
+	// CheckExplanation binds explanationdocs.Verify into the native Audit
+	// override. nil disables only this injected seam (tests); production defaults
+	// always wire verifyExplanationDocumentation.
+	CheckExplanation func(req core.PhaseRequest) error
 	// CheckGofmt, when set, reports the worktree .go files that are not
 	// gofmt -s clean; any offender FAILs the audit (CI-parity gate). nil = no
 	// gofmt gate. NewDefault wires gofmtCheckDefault.
@@ -809,6 +833,7 @@ func New(c Config) *Phase {
 		BaseRunner: runner.New(runner.Options{
 			Hooks: hooks{
 				genVerdict:                    c.GenerateVerdict,
+				explanationCheck:              c.CheckExplanation,
 				gofmtCheck:                    c.CheckGofmt,
 				skillsDriftCheck:              c.CheckSkillsDrift,
 				goVetCheck:                    c.CheckGoVet,
@@ -855,6 +880,7 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 		Bridge:                        br,
 		Prompts:                       prm,
 		GenerateVerdict:               generateACSVerdict,
+		CheckExplanation:              verifyExplanationDocumentation,
 		CheckGofmt:                    gofmtCheckDefault,
 		CheckSkillsDrift:              skillsDriftCheckDefault,
 		CheckGoVet:                    goVetCheckDefault,
@@ -865,6 +891,32 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 		PhaseIO:                       stage,
 		CompactPrompts:                compact,
 	})
+}
+
+// verifyExplanationDocumentation is a native host gate, deliberately separate
+// from acs-verdict.json: ACS results are execution-grounded Go predicates, and
+// this structural verifier must not impersonate one. Classify turns its error
+// into a named deterministic Audit override; Ship independently re-verifies.
+func verifyExplanationDocumentation(req core.PhaseRequest) error {
+	verified, active, verifyErr := explanationdocs.Verify(context.Background(), explanationdocs.CycleBinding{
+		ProjectRoot:     req.ProjectRoot,
+		Worktree:        req.Worktree,
+		Workspace:       req.Workspace,
+		BaseSHA:         req.WorktreeBaseSHA,
+		Cycle:           req.Cycle,
+		RunID:           req.RunID,
+		ContractVersion: req.ExplanationDocumentationVersion,
+	})
+	if verifyErr != nil {
+		return verifyErr
+	}
+	if !active {
+		return nil
+	}
+	if !explanationdocs.SameView(req.BuildExplanation, verified) {
+		return fmt.Errorf("typed Build explanation handoff does not match the verified host snapshot")
+	}
+	return nil
 }
 
 // skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs the

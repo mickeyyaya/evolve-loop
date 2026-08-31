@@ -50,8 +50,8 @@ func TestVerifyNoControlPlaneEdits_RejectsUntrackedGate(t *testing.T) {
 // over-block: an ordinary source change passes cleanly.
 func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
 	repo := makeRepo(t)
-	mustWrite(t, filepath.Join(repo, "go/internal/core/orchestrator.go"),
-		"package core\n// ordinary change\n")
+	mustWrite(t, filepath.Join(repo, "go/internal/widget/widget.go"),
+		"package widget\n// ordinary change\n")
 	opts := &Options{ProjectRoot: repo, Class: ClassCycle, Runner: execRunner}
 	var res RunResult
 	if err := verifyNoControlPlaneEdits(context.Background(), opts, &res); err != nil {

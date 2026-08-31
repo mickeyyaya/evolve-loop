@@ -179,7 +179,8 @@
     "scout-report.md:proposed_tasks",
     "scout-report.md:acceptance_criteria",
     "build-report.md:diff_summary",
-    "build-report.md:test_results"
+    "build-report.md:test_results",
+    "build-report.md:explanation_documentation"
   ],
   "context_clear_trigger_tokens": 20000,
   "output_contract": {

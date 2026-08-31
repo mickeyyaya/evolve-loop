@@ -20,8 +20,28 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
+
+func TestCompositionSnapshot_ReceivesCycleRunID(t *testing.T) {
+	want := "run-bound-to-cycle"
+	got := ""
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
+		WithCompositionSnapshot(func(_ context.Context, _ string, runID string) (CompositionAuditSnapshot, error) {
+			got = runID
+			return CompositionAuditSnapshot{}, errors.New("stop after observing binding")
+		}),
+		WithCompositionGateRunner(func(context.Context, string) map[string]string { return nil }),
+		WithCompositionVerdictWriter(func(string, CompositionVerdictInput) error { return nil }),
+	)
+	if o.compositionCarryForward(context.Background(), 1, CycleState{ActiveWorktree: "unused", RunID: want}) {
+		t.Fatal("snapshot error unexpectedly carried composition forward")
+	}
+	if got != want {
+		t.Fatalf("composition snapshot received run ID %q, want %q", got, want)
+	}
+}
 
 // TestOrchestrator_CompositionFastPathWired: false on a bare orchestrator,
 // false when only some of the three composition closures are injected

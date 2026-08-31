@@ -21,6 +21,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -599,6 +600,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			body = prompts.StripOnDemandSections(body)
 		}
 	}
+	if req.ExplanationDocumentationVersion != 0 {
+		var err error
+		body, err = b.withExplanationContract(body, phase)
+		if err != nil {
+			return core.PhaseResponse{}, fmt.Errorf("%s: load explanation contract: %w", phase, err)
+		}
+	}
 
 	materialized := digest.Materialize([]byte(body), phase)
 	shadow := digest.NewShadowRecord([]byte(body), materialized)
@@ -894,6 +902,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 			Agent:               phase,
 			Cycle:               req.Cycle,
 			BudgetScale:         req.BudgetScale,
+			RequireSandbox:      requiresExplanationSandbox(phase, req),
 			Env:                 req.Env,
 			PermissionMode:      permissionMode,
 			InteractivePolicy:   interactivePolicy,
@@ -1257,6 +1266,40 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	return resp, nil
 }
 
+func (b *BaseRunner) withExplanationContract(body, phase string) (string, error) {
+	var agentName, heading string
+	switch phase {
+	case string(core.PhaseBuild):
+		agentName = "evolve-builder-reference"
+		heading = "## Section: explanation-documentation-contract"
+	case string(core.PhaseAudit):
+		agentName = "evolve-auditor-reference"
+		heading = "## Section: explanation-documentation-review"
+	default:
+		return body, nil
+	}
+	if strings.Contains(body, heading) {
+		return body, nil
+	}
+	agent, err := b.prompts.Agent(agentName)
+	if err != nil {
+		return "", err
+	}
+	start := strings.Index(agent.Body, heading)
+	if start < 0 {
+		return "", fmt.Errorf("%s is missing %q", agentName, heading)
+	}
+	section := agent.Body[start:]
+	if next := strings.Index(section[len(heading):], "\n## Section:"); next >= 0 {
+		section = section[:len(heading)+next]
+	}
+	return strings.TrimRight(body, "\n") + "\n\n" + strings.TrimSpace(section) + "\n", nil
+}
+
+func requiresExplanationSandbox(phase string, req core.PhaseRequest) bool {
+	return phase == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0
+}
+
 // cycleContextBoundary is the single canonical marker that separates a phase
 // prompt's cache-stable static prefix (persona/rules/agent-doc body) from its
 // per-cycle dynamic tail. BaseCycleContext writes it and StaticPrefix splits on
@@ -1277,7 +1320,32 @@ func BaseCycleContext(body string, req core.PhaseRequest) string {
 	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	AppendExplanationContext(&b, req)
 	return b.String()
+}
+
+// AppendExplanationContext writes the complete verified Build-explanation
+// handoff as a single-line JSON data field plus stable convenience fields.
+// Audit and Retro share this serializer so their prompts cannot drift from the
+// evidence their deterministic report validators require.
+func AppendExplanationContext(b *strings.Builder, req core.PhaseRequest) {
+	if req.ExplanationDocumentationVersion != 0 {
+		fmt.Fprintf(b, "- explanation_documentation_version: %d\n", req.ExplanationDocumentationVersion)
+	}
+	if req.BuildExplanationState != "" {
+		fmt.Fprintf(b, "- explanation_handoff_state: %s\n", req.BuildExplanationState)
+	}
+	if req.BuildExplanationError != "" {
+		fmt.Fprintf(b, "- explanation_error_untrusted_json: %q\n", req.BuildExplanationError)
+	}
+	if explanation := req.BuildExplanation; explanation != nil {
+		fmt.Fprintf(b, "- explanation_status: %s\n", explanation.Status)
+		fmt.Fprintf(b, "- explanation_contract_version: %d\n", explanation.ContractVersion)
+		fmt.Fprintf(b, "- explanation_document: %s (sha256:%s)\n", explanation.DocumentPath, explanation.DocumentSHA256)
+		if encoded, err := json.Marshal(explanation); err == nil {
+			fmt.Fprintf(b, "- explanation_handoff_untrusted_json: %s\n", encoded)
+		}
+	}
 }
 
 // StaticPrefix returns the cache-stable prefix of a composed phase prompt:

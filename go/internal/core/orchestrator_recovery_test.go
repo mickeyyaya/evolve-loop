@@ -3,6 +3,10 @@ package core_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -83,7 +87,56 @@ type passRunner struct{ name string }
 
 func (r *passRunner) Name() string { return r.name }
 func (r *passRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	if r.name == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0 {
+		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+			return core.PhaseResponse{}, err
+		}
+		report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material changes\n"
+		if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
+			return core.PhaseResponse{}, err
+		}
+	}
 	return core.PhaseResponse{Phase: r.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
+}
+
+// explanationTestWorktree gives black-box orchestrator tests a real Git base
+// so fresh-cycle explanation activation stays enabled. The tests exercise the
+// production contract instead of silently downgrading to legacy version zero.
+type explanationTestWorktree struct{}
+
+func (explanationTestWorktree) Create(projectRoot string, cycle int) (string, error) {
+	path := filepath.Join(projectRoot, ".test-worktrees", fmt.Sprintf("cycle-%d", cycle))
+	if out, err := exec.Command("git", "-C", path, "rev-parse", "--verify", "HEAD").CombinedOutput(); err == nil && strings.TrimSpace(string(out)) != "" {
+		return path, nil
+	}
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		return "", err
+	}
+	commands := [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "test@evolve-loop.test"},
+		{"config", "user.name", "Evolve Test"},
+	}
+	for _, args := range commands {
+		if out, err := exec.Command("git", append([]string{"-C", path}, args...)...).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("git %v: %w: %s", args, err, strings.TrimSpace(string(out)))
+		}
+	}
+	if err := os.WriteFile(filepath.Join(path, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		return "", err
+	}
+	for _, args := range [][]string{{"add", ".gitignore"}, {"commit", "-q", "-m", "test base"}} {
+		if out, err := exec.Command("git", append([]string{"-C", path}, args...)...).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("git %v: %w: %s", args, err, strings.TrimSpace(string(out)))
+		}
+	}
+	return path, nil
+}
+
+func (explanationTestWorktree) Cleanup(string, string) error { return nil }
+
+func explanationHarnessOptions(opts ...core.Option) []core.Option {
+	return append([]core.Option{core.WithWorktreeProvisioner(explanationTestWorktree{})}, opts...)
 }
 
 // newRunners builds a full phase→runner map, replacing phases present in over.
@@ -105,7 +158,7 @@ func newTestOrchestrator(t *testing.T, runners map[core.Phase]core.PhaseRunner) 
 	t.Helper()
 	st := &recStorage{}
 	ld := &fakeLedger{}
-	return core.NewOrchestrator(st, ld, runners), st, ld
+	return core.NewOrchestrator(st, ld, runners, explanationHarnessOptions()...), st, ld
 }
 
 // runCycleT runs a cycle with a minimal CycleRequest and returns the result.

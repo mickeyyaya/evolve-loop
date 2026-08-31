@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
@@ -247,8 +248,17 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation seeding failed (%v) — keeping fresh worktree\n", cr.cycle, err)
 		return
 	}
-	cr.cs.ActiveWorktree = wt
 	if c.BaseSHA != "" {
+		archived, cleanupErr := explanationdocs.ArchiveUnpublishedContinuationRecords(cr.ctx, wt, c.BaseSHA)
+		if cleanupErr != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation rejected: unpublished explanation archive failed: %v\n", cr.cycle, cleanupErr)
+			if cleanupErr := cr.o.worktree.Cleanup(cr.req.ProjectRoot, wt); cleanupErr != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation cleanup after archive failure: %v\n", cr.cycle, cleanupErr)
+			}
+			return
+		} else if len(archived) > 0 {
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: archived %d unshipped ancestor explanation record(s) before Build\n", cr.cycle, len(archived))
+		}
 		cr.cs.WorktreeBaseSHA = c.BaseSHA
 	}
 	// Base advance (cycle-1365 class) — see continuation_baseadvance.go. On
@@ -256,6 +266,7 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	if healed := advanceContinuationBase(cr.ctx, wt, cr.cycle); healed != "" {
 		cr.cs.WorktreeBaseSHA = healed
 	}
+	cr.cs.ActiveWorktree = wt
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: cycle-state persist after adoption: %v\n", cr.cycle, err)
 	}

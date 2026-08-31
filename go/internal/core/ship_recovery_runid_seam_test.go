@@ -8,22 +8,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// ship_recovery_runid_seam_test.go — cycle-1571 H3, the WIRING PROOF (§3.3).
-//
-// PR #503 widened WithCompositionSnapshot from (ctx, worktree) to
-// (ctx, worktree, runID) so the composition reader could refuse a foreign run's
-// audit. Nothing asserted the value ARRIVES: every existing fixture either
-// calls latestAuditEntry directly or uses a stub that ignores its arguments.
-// Replace cs.RunID with "" at either production call site and the entire suite
-// stays green while the hardening is permanently dark — the cycle-1064 trap the
-// ship package documents in its own comments ("Options.ManifestGate was
-// silently never assigned here, leaving the manifest gate permanently shadow").
-//
-// The proof: capture what the closure actually receives on the live path
-// (recoverFromShipError -> compositionCarryForward) and compare it to the
-// RunID the orchestrator persisted for that cycle.
+// Fresh explanation contracts deliberately supersede the legacy composition
+// carry-forward shortcut: a new base invalidates the Build-authored rationale,
+// so recovery must rebuild and re-audit even when the lane patch-id is stable.
+// The direct run-ID wiring proof lives in composition_carryforward_wired_test.
 
-func TestCompositionSnapshot_ReceivesThisRunsRunID(t *testing.T) {
+func TestFreshExplanationRebase_BypassesLegacyCompositionCarryForward(t *testing.T) {
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {
@@ -37,9 +27,11 @@ func TestCompositionSnapshot_ReceivesThisRunsRunID(t *testing.T) {
 		failFirst: 1,
 		errOnFail: core.NewShipError(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip, "peer landed during audit->ship gap"),
 	}
+	builder := &explanationWritingRunner{}
 	o := core.NewOrchestrator(st, &fakeLedger{}, newRunners(map[core.Phase]core.PhaseRunner{
 		core.PhaseShip:  ship,
 		core.PhaseAudit: &countingRunner{name: "audit"},
+		core.PhaseBuild: builder,
 	}),
 		core.WithWorktreeProvisioner(fixedWorktree{dir: dir}),
 		core.WithCompositionSnapshot(func(_ context.Context, _ string, runID string) (core.CompositionAuditSnapshot, error) {
@@ -62,30 +54,10 @@ func TestCompositionSnapshot_ReceivesThisRunsRunID(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-
-	// "Never called" is a DIFFERENT failure from "called with the wrong value":
-	// if the seam is not reached the assertion below would vacuously pass.
-	if len(gotRunIDs) == 0 {
-		t.Fatal("the composition snapshot seam was never invoked — this test proves nothing until it is")
+	if len(gotRunIDs) != 0 {
+		t.Fatalf("fresh explanation rebase used legacy composition carry-forward with run IDs %v", gotRunIDs)
 	}
-
-	wantRunID := st.cycleStateRunID()
-	if wantRunID == "" {
-		t.Fatal("precondition: the orchestrator persisted no RunID for this cycle (CA.5 regression)")
+	if builder.calls < 2 {
+		t.Fatalf("fresh explanation Build ran %d time(s), want initial Build plus post-rebase rebuild", builder.calls)
 	}
-	for i, got := range gotRunIDs {
-		if got != wantRunID {
-			t.Errorf("composition snapshot call[%d] received runID %q, want this run's %q — "+
-				"run identity must reach the seam or #503's foreign-run refusal silently degrades to latest-any",
-				i, got, wantRunID)
-		}
-	}
-}
-
-// cycleStateRunID reads the RunID the orchestrator persisted, under the same
-// lock WriteCycleState takes, so the assertion stays clean under -race.
-func (s *recStorage) cycleStateRunID() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.cs.RunID
 }

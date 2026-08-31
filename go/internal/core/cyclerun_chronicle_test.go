@@ -94,7 +94,7 @@ func newTestOrchestratorOpts(t *testing.T, runners map[core.Phase]core.PhaseRunn
 	t.Helper()
 	st := &recStorage{}
 	ld := &fakeLedger{}
-	return core.NewOrchestrator(st, ld, runners, opts...), st, ld
+	return core.NewOrchestrator(st, ld, runners, explanationHarnessOptions(opts...)...), st, ld
 }
 
 func chronicleDigestPath(projectRoot string, cycle int) string {

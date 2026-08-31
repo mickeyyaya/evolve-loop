@@ -30,6 +30,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
@@ -93,6 +94,27 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
+// NewBuildExplanationReviewer returns the mandatory, inexpensive Build
+// explanation floor. Core composes it outside the optional reviewer seam, so a
+// caller cannot disable or replace the contract.
+func NewBuildExplanationReviewer() DeliverableReviewer {
+	return NewBuildFloorReviewer(func(ctx context.Context, in ReviewInput) []string {
+		return explanationDocumentationFailures(ctx, in)
+	})
+}
+
+func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []string {
+	return explanationdocs.CheckBuild(ctx, explanationdocs.CycleBinding{
+		ProjectRoot:     in.ProjectRoot,
+		Worktree:        in.Worktree,
+		Workspace:       in.Workspace,
+		BaseSHA:         in.WorktreeBaseSHA,
+		Cycle:           in.Cycle,
+		RunID:           in.RunID,
+		ContractVersion: in.ExplanationDocumentationVersion,
+	})
+}
+
 // docsFloorWarn evaluates the ADR-0077 documentation floor over the handoff's
 // change set and prints its WARN to stderr (the same channel every other
 // fail-open floor signal uses, so it lands in the phase log the auditor reads).
@@ -149,10 +171,9 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	if in.Worktree == "" {
 		return nil
 	}
-	// Note: this runs BEFORE recordAndBranch's gofmt/derived-regen normalizes;
-	// both are test-outcome-neutral today and the failure direction of any
-	// future sensitivity is a spurious REJECT (one extra ladder round), never
-	// a false approve.
+	// reviewAndGuard normalizes gofmt/derived projections before invoking this
+	// floor, so the tested tree is the exact tree the explanation snapshot and
+	// downstream Audit receive.
 	// paths comes from changedFloorPaths (cycle-base diff, HEAD fallback) —
 	// see its doc for why the base axis is load-bearing.
 	pkgs := changedGoTestPackages(paths)

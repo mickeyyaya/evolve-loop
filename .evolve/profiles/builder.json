@@ -82,12 +82,14 @@
       "{worktree_path}",
       ".evolve/runs/cycle-*"
     ],
-    "read_only_repo": false,
+    "read_only_repo": true,
     "deny_subpaths": [
       ".git",
       ".claude-plugin",
       ".evolve/state.json",
+      ".evolve/cycle-state.json",
       ".evolve/ledger.jsonl",
+      ".evolve/build-explanation-contracts",
       ".evolve/profiles",
       ".evolve/evals"
     ],

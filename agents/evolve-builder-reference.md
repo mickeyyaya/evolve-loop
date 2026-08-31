@@ -9,6 +9,87 @@ The builder's compact role-card (Layer 1) lives at
 
 ---
 
+## Section: explanation-documentation-contract
+
+Loaded when Cycle Context carries `explanation_documentation_version: 1`.
+Cycle Context is the activation authority; do not infer activation from Triage
+output. `build-report.md` stays the primary watched artifact. The host writes
+and seals the activation marker, derived handoff, and result snapshot; Builder
+must never write `.evolve/build-explanation-contracts/` or
+`build-explanation.json` directly.
+
+When the base-bound Build diff has any material path, create exactly one new
+cycle-owned document at
+`docs/explain/builds/cycle-<cycle>-<lowercase-run_id>.md`. It must contain these
+sections exactly once and in this order. This literal example is executable
+contract documentation; replace its cycle, base, paths, and claims with the
+host-provided facts for the current Build:
+
+<!-- CONTRACT-EXAMPLE:build-explanation-document -->
+```markdown
+# Build Explanation — Cycle 42
+
+## Build Binding
+- Cycle: 42
+- Base SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+## Summary
+The existing application setting now enables the requested runtime behavior.
+
+## Rationale
+Reusing the existing setting is the smallest compatible change and avoids a second configuration surface.
+
+## Changed Areas
+- `config/app.yaml` — enables the existing runtime setting without changing its schema.
+
+## Design Decisions
+The existing YAML field remains the single public control for this behavior.
+
+## Verification
+Targeted configuration tests cover both enabled and disabled runtime behavior.
+
+## Compatibility
+The setting name and schema remain unchanged.
+
+## Limitations
+This change does not add per-user overrides.
+```
+
+Write reviewable engineering rationale, alternatives, tradeoffs, and evidence;
+do not expose private chain-of-thought. Under Changed Areas, cite every material
+changed path as a bullet beginning ``- `<repo-relative-path>` `` and explain
+both what changed and why. Do not cite paths outside the base-bound Build diff.
+The document itself must be newly added in this cycle and becomes immutable
+after publication.
+
+Declare the handoff in `build-report.md`, substituting the canonical path for
+the current host cycle and run:
+
+<!-- CONTRACT-EXAMPLE:build-explanation-report-required -->
+```markdown
+## Explanation Documentation
+- Status: REQUIRED
+- Document: docs/explain/builds/cycle-42-run-42.md
+```
+
+When the base-bound Build diff has no material path, do not create a cycle
+document. Declare the concrete reason instead:
+
+<!-- CONTRACT-EXAMPLE:build-explanation-report-na -->
+```markdown
+## Explanation Documentation
+- Status: NOT_APPLICABLE
+- Reason: the base-bound Build diff changes tests only
+```
+
+Cycles without the version marker are grandfathered legacy behavior. The host
+Build floor, not Builder prose, decides required versus not-applicable and
+verifies the canonical path, headings, cycle/base binding, material-path
+coverage, git state, immutability, document SHA256, and whole-diff SHA256 before
+creating the typed handoff.
+
+---
+
 ## Section: e2e-test-generation
 
 Loaded when ANY of the following is true:

@@ -4,8 +4,10 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
 // compact_prompts_test.go — contract for prompt-ondemand-section-strip (runner half).
@@ -37,6 +39,42 @@ func runCompact(t *testing.T, compactPrompts bool) *fakeHooks {
 		t.Fatalf("Run: %v", err)
 	}
 	return hooks
+}
+
+func TestRun_ActiveExplanationContractAppendsExecutableReferenceAfterCompaction(t *testing.T) {
+	loader := prompts.NewFromFS(fstest.MapFS{
+		"agents/evolve-builder.md":           {Data: []byte("---\nname: evolve-builder\n---\n# Builder\n\n## Reference Index\ntrimmed\n")},
+		"agents/evolve-builder-reference.md": {Data: []byte("---\nname: evolve-builder-reference\n---\n# Ref\n\n## Section: explanation-documentation-contract\nCANONICAL-PATH docs/explain/builds/cycle-<cycle>-<run>.md\n\n## Section: other\nignore\n")},
+		"agents/evolve-auditor.md":           {Data: []byte("---\nname: evolve-auditor\n---\n# Auditor\n\n## Reference Index\ntrimmed\n")},
+		"agents/evolve-auditor-reference.md": {Data: []byte("---\nname: evolve-auditor-reference\n---\n# Ref\n\n## Section: explanation-documentation-review\nREVIEW-EVIDENCE implementation and tests\n\n## Section: other\nignore\n")},
+	})
+	for _, tc := range []struct{ phase, agent, required string }{
+		{phase: "build", agent: "evolve-builder", required: "CANONICAL-PATH docs/explain/builds"},
+		{phase: "audit", agent: "evolve-auditor", required: "REVIEW-EVIDENCE implementation and tests"},
+	} {
+		t.Run(tc.phase, func(t *testing.T) {
+			baseHooks := &fakeHooks{phase: tc.phase, agent: tc.agent, model: "auto", verdict: core.VerdictPASS}
+			hooks := bodyPromptHooks{fakeHooks: baseHooks}
+			bridge := &fakeBridge{writeArtifact: "x"}
+			runner := New(Options{Hooks: hooks, Bridge: bridge, Prompts: loader, CompactPrompts: true})
+			if _, err := runner.Run(context.Background(), core.PhaseRequest{
+				ProjectRoot: t.TempDir(), Workspace: t.TempDir(), ExplanationDocumentationVersion: 1,
+			}); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if !strings.Contains(bridge.gotReq.Prompt, tc.required) || strings.Contains(bridge.gotReq.Prompt, "Section: other") {
+				t.Fatalf("dispatched compact %s prompt lacks the selected executable reference section: %q", tc.phase, bridge.gotReq.Prompt)
+			}
+		})
+	}
+}
+
+type bodyPromptHooks struct{ *fakeHooks }
+
+func (h bodyPromptHooks) ComposePrompt(body string, req core.PhaseRequest) string {
+	h.gotComposeBody = body
+	h.gotComposeReq = req
+	return body
 }
 
 // TestRun_CompactPrompts_StripsDiskBody — with CompactPrompts=true the

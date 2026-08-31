@@ -261,6 +261,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if prefix, ok := sandboxPrefixForLaunch(deps, cfg); ok {
 			launchCmd = joinPrefixForTmux(prefix) + " " + launchCmd
 			fmt.Fprintf(deps.Stderr, "%s sandbox prefix applied (%d argv elements)\n", pfx, len(prefix))
+		} else if cfg.RequireSandbox {
+			fmt.Fprintf(deps.Stderr, "%s safety gate: activated Build explanation contract requires OS sandbox confinement\n", pfx)
+			return ExitSafetyGate, nil
 		}
 		_ = deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true)
 		fmt.Fprintf(deps.Stderr, "%s launching: %s\n", pfx, launchCmd)

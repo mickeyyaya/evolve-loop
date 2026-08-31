@@ -206,6 +206,15 @@ func (f *FakeRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRe
 	if f.FailErr != nil && f.Calls <= f.FailUntil {
 		return core.PhaseResponse{}, f.FailErr
 	}
+	if f.PhaseName == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0 {
+		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+			return core.PhaseResponse{}, err
+		}
+		report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material changes\n"
+		if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
+			return core.PhaseResponse{}, err
+		}
+	}
 	v := f.Verdict
 	if v == "" {
 		v = core.VerdictPASS

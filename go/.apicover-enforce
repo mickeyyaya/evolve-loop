@@ -532,6 +532,11 @@
 # persistence and prompt hint are deferred follow-ups.
 ./internal/contextfill
 
+# Build explanation documentation contract: deterministic Build-floor
+# validation, strict report parsing, and hash-bound downstream verification.
+./internal/explanationdocs
+./internal/reportdoc
+
 # SSOT digest projector (cycle-1391, new-package graduation): parses
 # "<!-- digest:role=ROLE -->...<!-- /digest -->" markers out of an SSOT
 # instruction source and returns only the requested role's tagged blocks.

@@ -26,8 +26,10 @@ import (
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -134,6 +136,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	if p.prompts == nil {
 		return core.PhaseResponse{}, fmt.Errorf("retro: prompts loader required")
 	}
+	req = refreshExplanationHandoff(ctx, req)
 
 	agent, err := p.prompts.Agent("evolve-retrospective")
 	if err != nil {
@@ -186,18 +189,21 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
 
 	bridgeReq := core.BridgeRequest{
-		CLI:                cli,
-		Profile:            profilePath,
-		Model:              model,
-		Prompt:             prompt,
-		Workspace:          req.Workspace,
-		Worktree:           retroWorktree(req),
-		SecondaryArtifacts: []string{filepath.Join(req.Workspace, "disposition.json")},
-		ArtifactPath:       artifactPath,
-		Agent:              "retrospective",
-		Cycle:              req.Cycle,
-		Env:                req.Env,
-		Skills:             overlaySkills,
+		CLI:       cli,
+		Profile:   profilePath,
+		Model:     model,
+		Prompt:    prompt,
+		Workspace: req.Workspace,
+		Worktree:  retroWorktree(req),
+		SecondaryArtifacts: []string{
+			filepath.Join(req.Workspace, "disposition.json"),
+			filepath.Join(req.Workspace, "carryover-todos.json"),
+		},
+		ArtifactPath: artifactPath,
+		Agent:        "retrospective",
+		Cycle:        req.Cycle,
+		Env:          req.Env,
+		Skills:       overlaySkills,
 	}
 	bres, bridgeErr := p.bridge.Launch(ctx, bridgeReq)
 	if bridgeErr != nil && core.DeliveryFailureCause(bridgeErr) != "" {
@@ -234,6 +240,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		}
 	}
 	verdict := core.VerdictPASS
+	var diagnostics []core.Diagnostic
+	if reviewErr := validateExplanationReview(content, req); reviewErr != nil {
+		diagnostics = append(diagnostics, core.Diagnostic{Severity: "error", Message: reviewErr.Error()})
+		verdict = core.VerdictFAIL
+	}
 	if strings.TrimSpace(content) == "" || !hasFailureLesson(req.ProjectRoot, req.Workspace, req.Cycle) {
 		verdict = core.VerdictFAIL
 	}
@@ -246,7 +257,48 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		CostUSD:      bres.CostUSD,
 		Tokens:       bres.Tokens,
 		DurationMS:   durationMS,
+		Diagnostics:  diagnostics,
 	}, nil
+}
+
+func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {
+	if req.ExplanationDocumentationVersion == 0 {
+		req.BuildExplanationState = core.BuildExplanationLegacy
+		return req
+	}
+	if req.BuildExplanationState == core.BuildExplanationNotYetBuilt {
+		return req
+	}
+	verified, active, err := explanationdocs.Verify(ctx, explanationdocs.CycleBinding{
+		ProjectRoot: req.ProjectRoot, Worktree: req.Worktree, Workspace: req.Workspace,
+		BaseSHA: req.WorktreeBaseSHA, Cycle: req.Cycle, RunID: req.RunID,
+		ContractVersion: req.ExplanationDocumentationVersion,
+	})
+	if err != nil || !active || !explanationdocs.SameView(req.BuildExplanation, verified) {
+		req.BuildExplanation = nil
+		req.BuildExplanationState = core.BuildExplanationInvalid
+		switch {
+		case err != nil:
+			req.BuildExplanationError = compactError(err)
+		case !active:
+			req.BuildExplanationError = "active explanation contract was not found"
+		default:
+			req.BuildExplanationError = "typed handoff does not match verified host snapshot"
+		}
+		return req
+	}
+	req.BuildExplanation = verified
+	req.BuildExplanationState = core.BuildExplanationAvailable
+	req.BuildExplanationError = ""
+	return req
+}
+
+func compactError(err error) string {
+	message := strings.Join(strings.Fields(err.Error()), " ")
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	return message
 }
 
 func composePrompt(body string, req core.PhaseRequest, prev string) string {
@@ -257,6 +309,7 @@ func composePrompt(body string, req core.PhaseRequest, prev string) string {
 	fmt.Fprintf(&b, "- previous_verdict: %s\n", prev)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	runner.AppendExplanationContext(&b, req)
 	return b.String()
 }
 

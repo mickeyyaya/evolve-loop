@@ -77,6 +77,34 @@ func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 	}
 }
 
+func TestRunCycleFromPhase_RejectsCheckpointIdentityMismatch(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		state CycleState
+		point ResumePoint
+	}{
+		{
+			name:  "cycle",
+			state: CycleState{CycleID: 8, WorkspacePath: "/tmp/ws"},
+			point: ResumePoint{Phase: string(PhaseAudit), CycleID: 7},
+		},
+		{
+			name:  "worktree",
+			state: CycleState{CycleID: 7, WorkspacePath: "/tmp/ws", ActiveWorktree: "/tmp/other"},
+			point: ResumePoint{Phase: string(PhaseAudit), CycleID: 7, WorktreePath: "/tmp/sealed"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			storage := &fakeStorage{cycleState: tc.state}
+			o := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil))
+			_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}, &tc.point)
+			if err == nil || !strings.Contains(err.Error(), "resume identity mismatch") {
+				t.Fatalf("mismatched %s identity error=%v", tc.name, err)
+			}
+		})
+	}
+}
+
 // TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted pins the resume-correctness
 // fix: an advisor-inserted phase (e.g. "mutation-gate") is registered in o.runners
 // at runtime via MintPhase but is NOT one of the 13 spine phases Phase.IsValid()

@@ -32,7 +32,16 @@
       "fail_message": "## Quality Signals missing — Builder must report quality signals"
     }
   ],
-  "conditional_sections": [],
+  "conditional_sections": [
+    {
+      "name": "explanation_documentation",
+      "condition": "explanation_documentation_contract_active",
+      "patterns": [
+        "^## Explanation Documentation"
+      ],
+      "fail_message": "## Explanation Documentation missing — active Build explanation contracts require REQUIRED or NOT_APPLICABLE"
+    }
+  ],
   "required_content": [
     {
       "name": "status_field",

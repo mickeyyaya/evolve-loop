@@ -55,8 +55,28 @@ type scriptedOrch struct {
 type noopRunner struct{ name string }
 
 func (n noopRunner) Name() string { return n.name }
-func (noopRunner) Run(_ context.Context, _ core.PhaseRequest) (core.PhaseResponse, error) {
+func (n noopRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	if n.name == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0 {
+		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+			return core.PhaseResponse{}, err
+		}
+		report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material changes\n"
+		if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
+			return core.PhaseResponse{}, err
+		}
+	}
 	return core.PhaseResponse{Verdict: core.VerdictPASS}, nil
+}
+
+func initLoopContractRepo(t *testing.T, projectRoot string) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(projectRoot, ".git")); err == nil {
+		return
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	initRepo(t, projectRoot)
 }
 
 // installStubDeps swaps wireOrchestratorDepsFn for one that returns
@@ -68,7 +88,8 @@ func (noopRunner) Run(_ context.Context, _ core.PhaseRequest) (core.PhaseRespons
 func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) func() {
 	t.Helper()
 	prev := wireOrchestratorDepsFn
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(projectRoot, _ string) orchDeps {
+		initLoopContractRepo(t, projectRoot)
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseIntent:       noopRunner{name: "intent"},
 			core.PhaseScout:        noopRunner{name: "scout"},

@@ -109,6 +109,32 @@ func TestRemediation_GateFailThenPassContinuesSpine(t *testing.T) {
 	}
 }
 
+type buildReviewCounter struct{ builds int }
+
+func (r *buildReviewCounter) Review(_ context.Context, in ReviewInput) ReviewResult {
+	if in.Phase == string(PhaseBuild) {
+		r.builds++
+	}
+	return ReviewResult{Approve: true}
+}
+
+func TestRemediation_BuilderFixPassesThroughBuildReviewChain(t *testing.T) {
+	runners := buildRunners(nil)
+	gate := &scriptedRunner{name: PhaseTDD, verdicts: []string{VerdictFAIL, VerdictPASS}}
+	build := &scriptedRunner{name: PhaseBuild, verdicts: []string{VerdictPASS}}
+	runners[PhaseTDD], runners[PhaseBuild] = gate, build
+	reviews := &buildReviewCounter{}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorkflowConfig(policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}),
+		WithReviewer(reviews))
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if reviews.builds != 2 {
+		t.Fatalf("Build review calls=%d, want 2 (normal Build + remediation Builder fix)", reviews.builds)
+	}
+}
+
 func TestRemediation_RoundCapIsHard(t *testing.T) {
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
 	gate, build, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictFAIL})

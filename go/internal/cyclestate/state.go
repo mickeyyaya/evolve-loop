@@ -135,6 +135,10 @@ type CycleState struct {
 	// ship-error recovery that "this cycle's audit REJECTED your previous build".
 	// A counter answers "how many"; this answers "right now".
 	AuditRepairActive bool `json:"audit_repair_active,omitempty"`
+	// ExplanationDocumentationVersion is host-owned activation state for the
+	// Build explanation contract. Fresh cycles persist the current version;
+	// legacy checkpoints decode as zero and remain grandfathered.
+	ExplanationDocumentationVersion int `json:"explanation_documentation_version,omitempty"`
 	// AuditFailReasons: the error-severity diagnostics behind an audit FAIL
 	// verdict recorded by the runner's OWN gates (set in-process at the
 	// recordFloorVerdictFailure chokepoint; cleared on every audit re-dispatch).

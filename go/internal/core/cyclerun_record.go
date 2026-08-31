@@ -12,7 +12,7 @@ import (
 
 // recordAndBranch runs the end-of-iteration record + branch step (extracted
 // behavior-preserving from RunCycle): the success "phase" ledger append, phase
-// bindings, build-worktree normalize, CompletedPhases append + cycle-state
+// bindings, CompletedPhases append + cycle-state
 // persist, phase-boundary checkpoint, the success outcome record + cursor
 // advance (current/lastVerdict), and the retro and debugger non-verdict-driven
 // branches that inject cr.scheduledNext.
@@ -52,14 +52,6 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		cr.releaseShipWindow()
 	}
 
-	// Cycle-156 fix (Option C): a committing builder (e.g. agy/Gemini
-	// following evolve-builder.md:235) leaves its work in a worktree
-	// commit, but audit + binding inspect `git diff HEAD` (empty after a
-	// commit). Soft-reset the build's commits to the cycle base so the
-	// work is pending again before audit runs (next iteration). No-op for
-	// non-committing builders. See the cycle-156 incident doc.
-	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs)
-
 	// Cycle-636 (ship-sha-repin-after-build): close the frozen-pin
 	// SELF_SHA_TAMPERED cascade (denied ship on 625->634). A legitimate in-version
 	// rebuild replaces go/bin/evolve, but the cycle-514 boot healer only re-pins at
@@ -72,7 +64,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		// Cycle-675 (new-package-graduation-buildentry-gate, 3rd recurrence):
 		// a go/internal package NEW this cycle and absent from
 		// go/.apicover-enforce fails the build phase HERE, with an explicit
-		// abort_reason — after the worktree normalize (so a committing
+		// abort_reason — after the pre-review worktree normalize (so a committing
 		// builder's work is pending again) and before the phase is marked
 		// completed. Deliberately abort-capable, unlike the WARN-only
 		// buildSelfCheck: graduation is the builder's own obligation, and the

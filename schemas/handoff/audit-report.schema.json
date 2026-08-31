@@ -23,7 +23,16 @@
       "fail_message": "## Verdict missing — Auditor must declare a verdict"
     }
   ],
-  "conditional_sections": [],
+  "conditional_sections": [
+    {
+      "name": "explanation_documentation",
+      "condition": "explanation_documentation_contract_active",
+      "patterns": [
+        "^## Explanation Documentation"
+      ],
+      "fail_message": "## Explanation Documentation missing — Auditor must independently review the active Build explanation handoff"
+    }
+  ],
   "required_content": [
     {
       "name": "verdict_value",

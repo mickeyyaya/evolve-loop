@@ -170,6 +170,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		AllowBypass:        raw.allowBypass,
 		HumanInput:         raw.humanInput,
 		RequireFull:        raw.requireFull,
+		RequireSandbox:     raw.requireSandbox,
 		AllowedTools:       prof.AllowedTools,
 		ExtraFlags:         raw.extra,
 		Realization:        RealizeFor(raw.cli, intent),
@@ -257,7 +258,7 @@ type rawLaunch struct {
 	cycle, worktree, projectRoot, agent, completion                            string
 	permissionMode, sessionName, streamOutput, runID                           string
 	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts                     string
-	validateOnly, dryRun, requireFull, allowBypass, humanInput                 bool
+	validateOnly, dryRun, requireFull, requireSandbox, allowBypass, humanInput bool
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
 
@@ -319,6 +320,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		sessionName:    get("BRIDGE_SESSION_NAME"),
 		streamOutput:   get("BRIDGE_STREAM_OUTPUT"),
 		requireFull:    truthy(get("BRIDGE_REQUIRE_FULL")),
+		requireSandbox: truthy(get("BRIDGE_REQUIRE_SANDBOX")),
 		allowBypass:    truthy(get("BRIDGE_ALLOW_BYPASS")),
 		dryRun:         truthy(get("BRIDGE_DRY_RUN")),
 		validateOnly:   truthy(get("VALIDATE_ONLY")),
@@ -350,6 +352,8 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 			r.dryRun = true
 		case a == "--require-full":
 			r.requireFull = true
+		case a == "--require-sandbox":
+			r.requireSandbox = true
 		case a == "--allow-bypass":
 			r.allowBypass = true
 		case a == "--human-input":
