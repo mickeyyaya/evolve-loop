@@ -36,12 +36,13 @@ var errWorktreeRequired = errors.New("fleet mode: explicit worktree required (re
 // into one engine + three small specs.
 
 const (
-	tmuxPromptMarkerDefault = "❯" // claude REPL marker (codex ›, agy "? for shortcuts")
-	tmuxREPLBootTimeoutS    = 60  // boot-wait deadline (poll loop)
-	tmuxArtifactTimeoutS    = 300 // artifact-wait deadline (poll @ 2s)
-	tmuxPaneWidth           = 220
-	tmuxPaneHeight          = 80
-	tmuxArtifactScrollback  = 10000 // deep capture for final scrollback
+	tmuxPromptMarkerDefault  = "❯" // claude REPL marker (codex ›, agy "? for shortcuts")
+	tmuxREPLBootTimeoutS     = 60  // boot-wait deadline (poll loop)
+	tmuxArtifactTimeoutS     = 300 // artifact-wait deadline (poll @ 2s)
+	transientRedispatchDelay = 15 * time.Second
+	tmuxPaneWidth            = 220
+	tmuxPaneHeight           = 80
+	tmuxArtifactScrollback   = 10000 // deep capture for final scrollback
 
 	// maxInjectDefer bounds how many times a mid-turn command is re-queued
 	// while the agent is busy, so a never-idle agent cannot loop forever.
@@ -506,6 +507,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	var lastVerdict ReviewVerdict
 	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp, artifactBase)
 	completed := false
+	transientShortcircuit := false
 	nudgeSent := false
 	// ADR-0045 I1: the one-shot nudge's outcome window — resolved when the
 	// run concludes, against the only evidence that matters: did the
@@ -647,6 +649,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 		}
 	}
+	ar.transientDwellEnabled = true
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
 		waitedS = elapsed
@@ -690,10 +693,17 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// The first Next() primes the baseline (echoed prompt + boot chrome are
 		// counted, not emitted); later ticks emit only the assistant output that
 		// appeared above the volatile input box. Gated so off adds no capture.
+		var waitPane string
+		channelCaptureOK := true
 		if channelOn {
-			if rendered, cerr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback); cerr == nil {
-				recordTokens(rendered)
-				for _, ln := range paneDelta.Next(rendered, paneProfile) {
+			// This is the canonical pane observation for channel-enabled waits;
+			// taking another in auto-response can skip alternating dwell frames.
+			var captureErr error
+			waitPane, captureErr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			channelCaptureOK = captureErr == nil
+			if captureErr == nil {
+				recordTokens(waitPane)
+				for _, ln := range paneDelta.Next(waitPane, paneProfile) {
 					fmt.Fprintln(paneLiveW, ln)
 				}
 			}
@@ -713,6 +723,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// full wait window with no signal.
 			fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, derr)
 			detectErrLogged = true
+		}
+		waitCaptureOK := true
+		if !channelOn {
+			// Preserve the legacy ordering: completed artifact waits break above
+			// without consuming a pane frame solely for auto-response.
+			var werr error
+			waitPane, werr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+			waitCaptureOK = werr == nil
 		}
 		// Drain live-injection envelopes BEFORE the auto-respond tick so an
 		// operator interrupt pre-empts a pending auto-reply on this tick.
@@ -740,7 +758,6 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// (marker gone) and then back to IDLE (marker visible again), and emit
 		// idle_reached exactly once on that busy→idle transition.
 		if channelOn && openCorrID != "" {
-			pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			// Busy/idle is NOT the prompt-marker's presence — the input box
 			// persists during generation for claude/agy (and ollama echoes the
 			// marker on the prompt line). livenessCenter.BusyOf reads the real
@@ -750,7 +767,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			// completion) rather than called directly, so no bridge consumer
 			// parses CLI chrome outside SignalCenter. idle_reached fires once
 			// on busy→idle.
-			if livenessCenter.BusyOf(pane, paneProfile) {
+			if livenessCenter.BusyOf(waitPane, paneProfile) {
 				sawBusy = true
 			} else if sawBusy {
 				emitChannelBreadcrumb(breadcrumbW, "idle_reached", openCorrID)
@@ -758,7 +775,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				sawBusy = false
 			}
 		}
-		action, rc := ar.tick(ctx, lp.session)
+		action, rc := ar.tickPane(ctx, lp.session, waitPane, channelCaptureOK && waitCaptureOK)
 		switch rc {
 		case 0, 1: // noop / responded
 		case 2:
@@ -770,12 +787,32 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 				intervalStart = elapsed
 				fmt.Fprintf(deps.Stderr, "%s agent extend signal — review interval refreshed\n", pfx)
 			}
+		case 3:
+			if strings.TrimSpace(waitPane) != "" {
+				lastGoodPane = waitPane
+			}
+			lastEv = StopEvent{
+				Kind:           StopArtifactTimeout,
+				Phase:          cfg.Agent,
+				Cycle:          cfg.Cycle,
+				ElapsedS:       elapsed,
+				IntervalS:      interval,
+				Busy:           false,
+				StdoutTail:     lastLines(lastGoodPane, 40),
+				InjectedPrompt: ar.injectedPrompt,
+				State:          panestream.LivenessIdle,
+			}
+			lastVerdict = ReviewVerdict{Action: ReviewStop, Reason: "transient upstream error persisted for 60s"}
+			transientShortcircuit = true
 		case 85:
 			fmt.Fprintf(deps.Stderr, "%s auto-respond escalation; abandoning run\n", pfx)
 			return ExitUnknownPrompt, nil
 		case 86:
 			fmt.Fprintf(deps.Stderr, "%s auto-respond loop guard tripped; abandoning run\n", pfx)
 			return ExitRespondLoopGuard, nil
+		}
+		if transientShortcircuit {
+			break
 		}
 		// Review checkpoint: a full interval elapsed without the artifact.
 		if elapsed-intervalStart >= interval {
@@ -992,6 +1029,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
 		// is also the final stderr line, and lifted into the error by Engine.Launch.
 		writeArtifactTimeoutMarker(transient)
+		if transientShortcircuit && ctx.Err() == nil {
+			// Deliberately a plain blocking pause: it throttles re-dispatch
+			// against a provider that just spent 60s saying "overloaded", and
+			// under cliadmit it holds this family's slot for the cooldown —
+			// which IS the point during a provider-wide 529 storm. The ctx
+			// guard skips it when the run is already cancelled; a mid-sleep
+			// cancel waits out at most 15s, bounded and small against the
+			// budget this path just saved.
+			deps.Sleep(transientRedispatchDelay)
+		}
 		return ExitArtifactTimeout, nil
 	}
 
