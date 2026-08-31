@@ -1,0 +1,9 @@
+{
+  "id": "phase-stub-shape-rule-at-ship-staging",
+  "kind": "bug",
+  "weight": 0.87,
+  "title": "Runtime-minted phase stubs still reach the index as TRACKED — move the belt from mint-time naming to a ship-time SHAPE rule",
+  "summary": "Wave-3 cycles 1572-H1 and 1574-H1 (CRITICAL) both staged .evolve/phases/production-path-wiring-proof/phase.json as a tracked ADD, redding internal/core's tracked-menu guard (TestRepoPhaseCatalog_MenuPhasesResolveAPersona). #502 fixed this at MINT time (persona-unresolvable ⇒ catalog:on-demand), but that stamp cannot reach stubs already minted on older continuation branches — these are PRE-#502 fossils, and .gitignore's per-name list (line ~196) only covers previously-seen names. Fix the CLASS at the staging seam instead: ship's staging sweep must refuse to add any .evolve/phases/*/phase.json whose shape is 'no agent field AND no sibling agent.md' regardless of name, and never delete the stub from disk (dispatch reads minted stubs from disk — un-track via git rm --cached only). Both audits independently prescribed this shape rule. Include a regression fixture built from the 1574 lane index.",
+  "connects_to": [".evolve/runs/cycle-1574/audit-report.md", ".evolve/runs/cycle-1572/audit-report.md", "go/internal/phases/ship/", "go/internal/phaseregistrar/registrar.go"],
+  "created_at": "2026-08-27T04:10:00Z"
+}

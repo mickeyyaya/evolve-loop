@@ -1,0 +1,45 @@
+{
+  "id": "eval-contract-drift",
+  "kind": "sweep",
+  "weight": 0.75,
+  "title": "Sweep: eval contract drift (7 auditor prescriptions amortised)",
+  "summary": "Eval-contract prescriptions: slug/heading agreement between scout reports and on-disk evals. Amortised from 7 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d18927437bb8d7521fca3c437c1b593ec",
+      "first_seen_cycle": 1418,
+      "text": "PRESCRIPTION: .evolve/evals/disposition-evidence-tolerant-unmarshal.md \u2014 scout-report.md Task 1 declares slug `tolerant-disposition-evidence-unmarshal` while the eval on disk transposes the words; the eval does cover the task so this is not eval-missing, but the auditor contract keys eval existence off the scout slug and would false-red; continuation scouts should copy the slug verbatim from the ancestor's eval filename"
+    },
+    {
+      "origin_id": "db4e4699a02ab96ec4a6cefd3fb338723",
+      "first_seen_cycle": 1443,
+      "text": "PRESCRIPTION: Repoint the three score_cap `evidence:` commands in .evolve/evals/context-fill-report.md at the test names that actually exist, then re-run each command and confirm its output does NOT contain `[no tests to run]` before claiming the eval is fixed."
+    },
+    {
+      "origin_id": "db09c2ba11bc8474c11c3a7078d33d915",
+      "first_seen_cycle": 1446,
+      "text": "PRESCRIPTION: Un-stage .evolve/phases/defect-disposition-preflight/phase.json from the cycle-1446 tree (git rm --cached) so the ship set equals the triaged scope, or land it as its own scoped cycle with an eval and a derived contract; if it is kept, add a classify block declaring require_sections including \"Verdict\" so the phase's deliverable can be classified FAIL, matching flake-rerun-scan"
+    },
+    {
+      "origin_id": "dc53cc75e174fe49decbb4f11e5a57a05",
+      "first_seen_cycle": 1494,
+      "text": "PRESCRIPTION: Move the three misplaced Scout evals from .evolve/runs/cycle-1494/.evolve/evals/ to .evolve/evals/ or delete them, and resolve the Scout eval output path against the project root rather than the phase cwd."
+    },
+    {
+      "origin_id": "dadfdfd37d08ed09697856193a7826291",
+      "first_seen_cycle": 1536,
+      "text": "PRESCRIPTION: Bind the ancestor task slug into triage-decision.json top_n at continuation dispatch so selection and delivery agree on the record"
+    },
+    {
+      "origin_id": "d3a084b6b30bafe148524e668e32be7f4",
+      "first_seen_cycle": 1547,
+      "text": "PRESCRIPTION: Reconcile lane-scope candidate slugs against the latest commits touching their declared target files before committing top_n, so an already-landed guard cannot be re-selected as a production task"
+    },
+    {
+      "origin_id": "d9394d66680afcdaf1558db6035a3a446",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: L1: go/internal/config/config_test.go:113-129 now expects StageOff where the supplied env would also produce StageOff for EvalGate and TriageCapGate, narrowing the env-ignored invariant from three discriminating fields to one (ContractGate); restore a discriminating expectation if that line is ever edited"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "consume-id-resolver-intent",
+  "kind": "bug",
+  "weight": 0.58,
+  "title": "Rescued intent: single-source the committed-inbox-id resolution so in-commit consumption stops missing carryover lanes",
+  "summary": "CAPTURED 2026-08-27 from branch fix/consume-id-resolver before deleting it — 96 commits behind main, conflicting, and the intent existed nowhere else (no inbox item, no commit in main). One commit touching go/internal/phases/ship/consume.go, postship.go and consume_integration_test.go: 'single-source the committed-inbox-id resolution so in-commit consumption stops missing carryover lanes'. RELEVANCE TODAY: PR #466 later fixed the PASS-lane half of consumption (ship commit consumes in-commit), and the standing rule consumption_must_ride_the_landing still applies to console/manual landings — but the CARRYOVER-lane gap this branch targeted may be unaddressed, and it is adjacent to the 764-item carryover queue finding filed the same day (a lane that consumes nothing leaves its item to age in that queue). Verify against current postship.go/consume.go whether the carryover-lane resolution is still single-sourced before re-implementing; the original diff is in the branch bundle at ~/ai/claude/backups/.",
+  "connects_to": ["go/internal/phases/ship/consume.go", "go/internal/phases/ship/postship.go"],
+  "created_at": "2026-08-27T18:01:00Z"
+}

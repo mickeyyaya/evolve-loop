@@ -1,0 +1,25 @@
+{
+  "id": "build-report-narrative",
+  "kind": "sweep",
+  "weight": 0.82,
+  "title": "Sweep: build report narrative (3 auditor prescriptions amortised)",
+  "summary": "Build-report narrative fidelity: deriving Changes from the staged diff, POSTHOC resolution, reverted-path disclosure. Caused the wave-3 cycle-1573 rejection. Amortised from 3 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d2b983c9df05b301b8630ca84748efd1a",
+      "first_seen_cycle": 1479,
+      "text": "PRESCRIPTION: Anchor the build-report Files changed POSTHOC to the cycle base (git diff --numstat origin/main...HEAD) or emit 0 when the cycle authored no commit, so a no-op cycle cannot inherit the prior commit's file count"
+    },
+    {
+      "origin_id": "d7d21ff3641691ea0af3515e6c6ee94da",
+      "first_seen_cycle": 1569,
+      "text": "PRESCRIPTION: Run the POSTHOC 'git diff --stat HEAD' and substitute the result in build-report.md before handoff"
+    },
+    {
+      "origin_id": "d848a8eaad0ccf57215999fd2edb8d8fe",
+      "first_seen_cycle": 1572,
+      "text": "PRESCRIPTION: Derive build-report.md's ## Changes from git diff --cached --name-status rather than authored prose, so the table cannot diverge from the commit"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

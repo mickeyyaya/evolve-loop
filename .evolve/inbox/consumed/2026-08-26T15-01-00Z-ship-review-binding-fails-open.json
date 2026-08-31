@@ -1,0 +1,14 @@
+{
+ "id": "ship-review-binding-fails-open",
+ "kind": "bug",
+ "weight": 0.86,
+ "title": "Ship's independent-review binding fails open across cycles \u2014 no auditor ledger entry emitted on the failing shape (phase_bindings.go:28)",
+ "summary": "Cycle-1571's audit H3 (HIGH, agent-graded): go/internal/core/phase_bindings.go:28 emits no auditor ledger entry on the shape it examined, so ship's independent-review binding fails OPEN across cycles \u2014 a ship can proceed without the binding evidence the review floor assumes. Audit-report.md of cycle-1571 carries the full trace. ALSO from the same cycle's escalation evidence, two adjacent findings worth folding into the same investigation: (a) H1 zero Triage reads with seven occurrences of the assigned id in Scout (triage did not read its input on this lane); (b) H2 a gate-induced checkout/rm deleted CORRECT RED work \u2014 the goal-text red-first insurance line ('a red test on main blocks every lane') read by the agent as 'delete the red test', destroying legitimate red-first work; this strengthens the case that item red-first-deliverable-reds-main (0.9) needs its structural resolution (ship-time guard or t.Skip convention) and the prompt-level insurance retired.",
+ "connects_to": [
+  ".evolve/runs/cycle-1571/audit-report.md",
+  "go/internal/core/phase_bindings.go",
+  ".evolve/inbox/2026-08-24T01-30-00Z-red-first-deliverable-reds-main.json"
+ ],
+ "created_at": "2026-08-26T15:01:00Z",
+ "consumed_by": "PR #503 (28e7f455) \u2014 headline defect fixed fail-closed at BOTH halves plus the composition third reader (review-sweep HIGH, same class); H2 goal-text insurance retired from wave goals; H1 residual re-filed narrower as triage-zero-input-reads (0.6). Incident doc docs/incidents/2026-08-26-audit-binding-fail-open.md + REGRESSION index row."
+}

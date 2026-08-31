@@ -1,0 +1,9 @@
+{
+  "id": "evalgate-selectedslugs-nil-blindness",
+  "kind": "bug",
+  "weight": 0.85,
+  "title": "evalgate.SelectedSlugs returns nil on a real scout shape — the eval contract gate goes vacuously green while audit catches the missing eval",
+  "summary": "Cycle-1570 (wave-2 20260826): scout selected slug config-gate-default-policy-authority with NO .evolve/evals/<slug>.md, and evalgate.SelectedSlugs returned nil on that scout-report shape — so the eval contract gate had nothing to check (vacuous pass) and the defect only surfaced as an agent-graded audit H1 (eval-integrity). The deterministic gate is BLIND to whatever report format this scout emitted; parse-tolerance or format drift lets missing evals through the exact gate built for them (the cycles-1539-1546 class, resurfacing through a parser gap instead of agent noncompliance). Fix: make SelectedSlugs loud on parse-miss (a scout report from which zero slugs parse should be a contract violation, not an empty list), pin the 1570 report shape as a regression fixture, and align the parser with whatever section format scout actually emits under the current persona.",
+  "connects_to": [".evolve/runs/cycle-1570/scout-report.md", ".evolve/runs/cycle-1570/audit-report.md", "go/internal/evalgate/"],
+  "created_at": "2026-08-26T15:00:00Z"
+}

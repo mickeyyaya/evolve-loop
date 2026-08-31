@@ -1,0 +1,9 @@
+{
+  "id": "continuation-remediation-first-contract",
+  "kind": "bug",
+  "weight": 0.84,
+  "title": "Continuations re-serve inherited defect stacks un-remediated — deferring 19/19 including both parent blockers still counted as delivery",
+  "summary": "Wave-3 1573-H2 (remediation-reversal): the continuation deferred 19 of 19 inherited defects including its parent's two BLOCKERS, both still live in the tree, while 1573-H1 found build-report.md declaring zero changed files and an empty git status against a bound tree of 10 staged files (+719/-980 incl. production Go) — narrative fidelity failure on top of the reversal. All three wave-3 lanes drew wave-2 continuation branches and all three re-served their parents' damage, which is why the wave went 0/3. Fix the contract: a continuation dispatch must either remediate its parent's blocker-class defects or be refused at mint (blockers are not deferrable), and its build-report's Changes table must be DERIVED from git diff --cached --name-status rather than authored prose (1572-M1 and 1574-M1 both found the authored table diverging from the actual commit). Ties to the standing continuation-defect-ledger work.",
+  "connects_to": [".evolve/runs/cycle-1573/audit-report.md", "go/internal/continuation/", "docs/incidents/continuation-defect-ledger.md"],
+  "created_at": "2026-08-27T04:12:00Z"
+}

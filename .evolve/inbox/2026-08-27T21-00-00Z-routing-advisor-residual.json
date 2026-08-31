@@ -1,0 +1,15 @@
+{
+  "id": "routing-advisor-residual",
+  "kind": "sweep",
+  "weight": 0.7,
+  "title": "Sweep: routing advisor residual (1 auditor prescriptions amortised)",
+  "summary": "Routing/advisor prescriptions: tier resolution and advisor-plan fidelity. Amortised from 1 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d8b1b989e2b4489859411c0965516963e",
+      "first_seen_cycle": 1522,
+      "text": "PRESCRIPTION: Give a premise-challenge BLOCK verdict an enforcement edge into the state machine, and reconcile phase-replan.json against routing-decision-*.json so a degraded replan cannot silently disagree with the executed route."
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

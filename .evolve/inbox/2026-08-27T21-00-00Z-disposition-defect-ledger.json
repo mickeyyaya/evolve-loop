@@ -1,0 +1,25 @@
+{
+  "id": "disposition-defect-ledger",
+  "kind": "sweep",
+  "weight": 0.84,
+  "title": "Sweep: disposition defect ledger (3 auditor prescriptions amortised)",
+  "summary": "Disposition + defect-ledger prescriptions: schema examples, DEFERRED reason echoing, ledger fidelity. Adjacent to ADR-0092. Amortised from 3 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d5414d39424df2aa67b63c5f1f1681c96",
+      "first_seen_cycle": 1420,
+      "text": "PRESCRIPTION: Queue release of the stale .evolve/continuation-registry.json binding for defect-disposition-contract-unsatisfiable at a batch boundary when no sibling lanes are running"
+    },
+    {
+      "origin_id": "d59951bebc1e25cf8bfd1f859479483a4",
+      "first_seen_cycle": 1446,
+      "text": "PRESCRIPTION: Add a trailing newline to .evolve/phases/defect-disposition-preflight/phase.json"
+    },
+    {
+      "origin_id": "d7644267c144ac62f0b229a6f5ed3769f",
+      "first_seen_cycle": 1538,
+      "text": "PRESCRIPTION: Add a deterministic no-work disposition after triage so mutation phases skip when triage-decision.json top_n is empty, without weakening the mandatory spine."
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

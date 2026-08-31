@@ -1,0 +1,50 @@
+{
+  "id": "ledger-binding-runid",
+  "kind": "sweep",
+  "weight": 0.83,
+  "title": "Sweep: ledger binding runid (8 auditor prescriptions amortised)",
+  "summary": "Ledger binding and run-scoping prescriptions: run_id stamping, auditor binding, cross-run refusal. Amortised from 8 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d000c233e197151b13967f71b7c279533",
+      "first_seen_cycle": 1420,
+      "text": "PRESCRIPTION: Assert state-root identity in stateRoot (e.g. require .evolve/ledger.jsonl and .git under the resolved path) instead of trusting a non-empty EVOLVE_PROJECT_ROOT plus sibling presence"
+    },
+    {
+      "origin_id": "d0472ee7f7ca3ad2dd316921d71aa84cb",
+      "first_seen_cycle": 1453,
+      "text": "PRESCRIPTION: Invoke evolve acs suite from the project root, or pass an explicit output path: it resolves .evolve/runs/<cycle>/ relative to cwd, so a worktree cwd silently writes acs-verdict.json outside the workspace that ship and audit read."
+    },
+    {
+      "origin_id": "db8dbeb87f66dd9fb8f1103def7b8ad6e",
+      "first_seen_cycle": 1502,
+      "text": "PRESCRIPTION: Persist acs-verdict.json in the same transaction that emits the build handoff, or fail the audit-phase preflight by name when it is missing, instead of relying on the auditor re-running the suite"
+    },
+    {
+      "origin_id": "d8b9b6458fc8abb79a71b11188aa0f70a",
+      "first_seen_cycle": 1502,
+      "text": "PRESCRIPTION: Generate the continuation-defect block delivered to Builder from the ancestor named in continuation-manifest.json so builder and auditor cannot disagree about inherited ids"
+    },
+    {
+      "origin_id": "d200aca37fd17b836acd380bc432062e1",
+      "first_seen_cycle": 1548,
+      "text": "PRESCRIPTION: Require the builder's ACS regression slice to persist its subprocess output to <workspace>/acs-verdict.json before the metric may be quoted in build-report.md; a sentinel evidence_path that does not resolve on disk must fail the build-to-audit gate."
+    },
+    {
+      "origin_id": "db0d387ec007f8355a8a339b5844d8833",
+      "first_seen_cycle": 1561,
+      "text": "PRESCRIPTION: Recompute the shipping-tree delta AFTER the build-to-audit transition reset and append it to build-report.md (or emit a shipping-delta.json sidecar), so the handoff narrative and the tree that ships are derived from the same bytes; today the reset at cycle-state.json phase_started_at re-parents the inherited continuation commit into the index after the builder has already written its report."
+    },
+    {
+      "origin_id": "d5c0a0189aca347548b36c5a9ef6746d5",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Fence lane rebases against a running audit phase (or re-bind audit_bound_tree_sha at gate time from cycle-state.json:active_worktree HEAD): the prior dispatch of this very cycle bound a tree that no ref carries once the rebase landed"
+    },
+    {
+      "origin_id": "d843991f870c8c179bf291f71b62087a3",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Class fix: bind the audit to the tree that ships - the 21:42 pass stamped audit_bound_tree_sha 3e89a1c0 while the commit is tree 7ef291bb, so 4 files crossed the audit boundary unreviewed"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

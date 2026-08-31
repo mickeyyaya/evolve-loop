@@ -1,0 +1,80 @@
+{
+  "id": "inbox-consume-contract",
+  "kind": "sweep",
+  "weight": 0.8,
+  "title": "Sweep: inbox consume contract (14 auditor prescriptions amortised)",
+  "summary": "Inbox consume/retire contract: consumedRecord typing, id resolution, uniqueness, lifecycle transitions. Amortised from 14 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d66740f97d5885c26660914ece9f493e4",
+      "first_seen_cycle": 1420,
+      "text": "PRESCRIPTION: Define a `consumedRecord` Go type single-sourced with a round-trip test against the .evolve/inbox/consumed/ corpus, so consume cycles stop re-deriving field names by precedent-by-example"
+    },
+    {
+      "origin_id": "d9246b6325f42d26b4169e6b2d3212238",
+      "first_seen_cycle": 1440,
+      "text": "PRESCRIPTION: Normalize the id namespace before matching in RetireCarryoverTodos: strip a leading 'todo-' from carryover ids (or mint carryover ids from the bare inbox slug) so the inbox-derived cohort retires; add a fixture using a real 'todo-<slug>' id so the gap cannot regress silently."
+    },
+    {
+      "origin_id": "dae2c525198c1da014f555ab29afdcc38",
+      "first_seen_cycle": 1452,
+      "text": "PRESCRIPTION: Require column 0 in cutClosesInboxMarker (drop the pre-anchor TrimSpace) or skip fenced regions, so quoted upstream text cannot forge a closure claim"
+    },
+    {
+      "origin_id": "d05d0e2c666646edb1a19b39055de3409",
+      "first_seen_cycle": 1452,
+      "text": "PRESCRIPTION: Add a Closes-Inbox line inside a fenced code block and inside a bullet list to TestC1452_002's negative corpus"
+    },
+    {
+      "origin_id": "dd95ba628cc6416e227a39a709c244ef5",
+      "first_seen_cycle": 1454,
+      "text": "PRESCRIPTION: Fleet dispatcher must reconcile candidate todo-ids against .evolve/inbox/processed/ before writing lane-scope.json, so already-consumed ids are filtered out before a lane is provisioned; add a regression test pinning that a processed id is never emitted into todo_ids"
+    },
+    {
+      "origin_id": "d6259b86a067b8698056ba2da7f1ed0c2",
+      "first_seen_cycle": 1493,
+      "text": "PRESCRIPTION: Add tests for the fail-closed branches at go/internal/inboxmover/retire.go:144-161 and go/internal/dispatchgate/dispatchgate.go:58-72 to lift internal/dispatchgate over the 85% coverage floor"
+    },
+    {
+      "origin_id": "d110a97a1d227f518ba3bc0b05249612b",
+      "first_seen_cycle": 1496,
+      "text": "PRESCRIPTION: Clamp Item.VerifiableBy on InjectedBy exactly as ConsoleRouted does at go/internal/inboxbatch/consoleroute.go:30-36, and make retirement a ledgered FAIL-visible event rather than a WARN line"
+    },
+    {
+      "origin_id": "de852fea051ab0f46da9222d4cebc097e",
+      "first_seen_cycle": 1498,
+      "text": "PRESCRIPTION: Correct the premise paragraph in .evolve/evals/retire-consumed-fleet-alias.md so it names the real resident entry id todo-consumed-alias-lifecycle-cleanup and cites the id field line, not the action-string line 3061; the four graders need no change"
+    },
+    {
+      "origin_id": "dd6021353ea74e899c37d238317af03e9",
+      "first_seen_cycle": 1498,
+      "text": "PRESCRIPTION: Retire todo-consumed-alias-lifecycle-cleanup from the root .evolve/state.json via `evolve carryover apply-decisions --apply` with a reviewed drop reason, from the console (root-tree authority), since a lane worktree cannot mutate root state"
+    },
+    {
+      "origin_id": "d7de28dcbea573478ed46b92af8efa47e",
+      "first_seen_cycle": 1515,
+      "text": "PRESCRIPTION: Add a table row to TestResolveContinuationForScopeRecency seeding BOTH a retirement-dir copy AND a live copy (inbox root, then processing/cycle-N/) so scopeHasLiveItem's two return-true branches execute; re-run go test -covermode=count ./internal/inboxmover and require non-zero count on continuation_retire.go:125-127 and :132-138"
+    },
+    {
+      "origin_id": "d4e7b9a5741fb0a5a6fbffe5d370fda45",
+      "first_seen_cycle": 1515,
+      "text": "PRESCRIPTION: Apply continuation.RedactHostPaths to contStamp at go/internal/inboxmover/inboxmover.go:771 before it is marshalled into m[\"continuation\"], and file a separate item to scrub the 11 already-tracked .evolve/inbox files (code-only redaction does not retract published history)"
+    },
+    {
+      "origin_id": "d25f78009d4aa495b9f6a3c7abfe42802",
+      "first_seen_cycle": 1517,
+      "text": "PRESCRIPTION: Extend the agents/evolve-builder.md:204 exemption clause to name the ## Task: header and any Closes-Inbox: marker line, in place on the existing line"
+    },
+    {
+      "origin_id": "df01bccdb6c606461b43bf500cade0677",
+      "first_seen_cycle": 1548,
+      "text": "PRESCRIPTION: Filter consumed/resolved inbox ids out of lane-scope.json BEFORE fleet dispatch so an unsatisfiable scope fails at assignment instead of after eight phases (cures the H1 / inst-L1543c class)."
+    },
+    {
+      "origin_id": "d772af4b8d857f2bba6e56b8ea14af13b",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Guard the relaunch on remaining context budget (skip when ctx.Err() != nil): both launches share the phase ctx, so a relaunch after attempt 1 consumed a 900s artifact wait can be born cancelled and burn a dispatch for nothing"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

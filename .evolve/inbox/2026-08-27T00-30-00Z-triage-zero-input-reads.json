@@ -1,0 +1,9 @@
+{
+  "id": "triage-zero-input-reads",
+  "kind": "bug",
+  "weight": 0.6,
+  "title": "Triage dropped its assigned task by asserting an unverified negative — zero reads of the assigned id's Scout occurrences",
+  "summary": "Cycle-1571 audit H1 (re-confirmed): triage asserted the assigned todo-id was absent/invalid without reading its input — the audit's evidence shows zero Triage reads while the assigned id appears seven times in the Scout report. Residual carved out of ship-review-binding-fails-open (0.86), whose headline defect (binding fail-open) was fixed console-side in PR #503 and whose H2 (goal-text red-first insurance backfire) was resolved by retiring the clause from wave goals. This H1 half needs its own fix: a triage-phase contract that the assigned id set is grounded in the scout report before a drop/negative disposition is permitted (e.g. the drop rationale must cite the scout lines consulted, deterministically checkable), plus a regression fixture from cycle-1571's artifacts.",
+  "connects_to": [".evolve/runs/cycle-1571/audit-report.md", "go/internal/phases/triage/"],
+  "created_at": "2026-08-27T00:30:00Z"
+}

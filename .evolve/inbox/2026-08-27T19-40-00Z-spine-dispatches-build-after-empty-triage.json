@@ -1,0 +1,15 @@
+{
+  "id": "spine-dispatches-build-after-empty-triage",
+  "kind": "bug",
+  "weight": 0.87,
+  "title": "A lane whose triage commits zero tasks still consumes tdd + build + audit — the spine does not short-circuit an empty selection",
+  "summary": "Two independent live occurrences across waves 3-4 (2026-08-26/27). CYCLE-1575: fleet assigned the lane exactly one id, which the cycle goal explicitly excluded; scout and triage BOTH honored the exclusion correctly — triage-report.md emits verdict FAIL with top_n=[] and the sole id in deferred, rationale 'no candidate is eligible for top_n'. TDD then correctly authored ZERO ACS predicates (test-report.md cites R9.3: predicates bind only to triage-committed work). Despite a committed task set of size 0, routing-decision-3 records 'forced-on:tdd' and routing-decision-4 records 'spine:build', and the lane entered build. CYCLE-1573: phase-timing.json shows triage:FAIL at 0m (its only id dropped as already-implemented), then tdd:PASS 1m, then build:PASS for 53 MINUTES, then audit:FAIL on narrative fidelity — 53 minutes of build on a task triage had already dropped. CONSEQUENCE: an empty or failed triage selection costs a full lane-cycle (tdd + build + all scans + audit + retro) and terminates in a guaranteed audit FAIL, which then counts toward the consecutive-failure breaker as if it were a task failure. It also manufactures exactly the condition #503/#504 hardened against: an audit-bound FAIL with no product change behind it. QUESTION FOR THE FIX: whether the spine floor (ship => build AND audit AND tdd-unless-trivial) was ever meant to imply build-unless-shipping; the floor governs what ship REQUIRES, not what an empty cycle must still run. Candidate fix: when triage returns top_n==[] (whether verdict PASS-with-nothing-eligible or FAIL), route directly to retro/close with a distinct disposition class — 'no-eligible-work', explicitly NOT a task failure and NOT breaker-counting — instead of dispatching downstream phases against an empty task set. Pair with a regression fixture built from cycle-1575's artifacts, which are a clean, uncontaminated instance: every agent behaved correctly and the sequencing alone produced the waste.",
+  "connects_to": [
+    "go/internal/core/phase_advisor.go",
+    "go/internal/core/routing.go",
+    ".evolve/runs/cycle-1575/triage-report.md",
+    ".evolve/runs/cycle-1575/routing-decision-4.json",
+    ".evolve/runs/cycle-1573/phase-timing.json"
+  ],
+  "created_at": "2026-08-27T19:40:00Z"
+}

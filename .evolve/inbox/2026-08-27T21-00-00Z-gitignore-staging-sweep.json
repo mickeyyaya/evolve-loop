@@ -1,0 +1,80 @@
+{
+  "id": "gitignore-staging-sweep",
+  "kind": "sweep",
+  "weight": 0.88,
+  "title": "Sweep: gitignore staging sweep (14 auditor prescriptions amortised)",
+  "summary": "Staging/gitignore hygiene: prescriptions about phase-stub shape rules, untracking regenerated coverage artifacts, and what may ride the shipping index. This theme CAUSED wave-3 cycle-1572 and 1574 rejections. Amortised from 14 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d4a525f6bfa1811ec6c94629b7b23c50f",
+      "first_seen_cycle": 1436,
+      "text": "PRESCRIPTION: Stage go/cmd/evolve/cmd_salvage_amplify_test.go, go/internal/deliverable/classify_bad_verdict_amplify_test.go and go/internal/deliverable/salvage_report_amplify_test.go explicitly before ship \u2014 they are untracked and not gitignored (git check-ignore rc=1), so the ship will silently land without the test-amplification phase's work"
+    },
+    {
+      "origin_id": "d779f3274d85b7ad7da57d6fe6e6056d1",
+      "first_seen_cycle": 1446,
+      "text": "PRESCRIPTION: Add a gate reconciling git status against triage-decision.json:top_n[].files so a pre-staged worktree artifact cannot enter a cycle commit unscoped"
+    },
+    {
+      "origin_id": "da1c26d4269039fae1448e48f968df9c2",
+      "first_seen_cycle": 1458,
+      "text": "PRESCRIPTION: Re-read the full staged set with git status --porcelain before writing the build-report tracking attestation, and distinguish inherited continuation paths from builder-authored ones by name"
+    },
+    {
+      "origin_id": "ddff11e5bacdbc3b2970912cfc34ed37d",
+      "first_seen_cycle": 1493,
+      "text": "PRESCRIPTION: Delete go/acs/cycle1493/test_amplification_test.go or unanchor its inner regex to -run 'TestC1493_00[12]' to match the eval's own commands, then re-run go test -count=1 ./acs/cycle1493 before any ship \u2014 leaving it untracked is not a safeguard because shipDirect runs git add -A"
+    },
+    {
+      "origin_id": "d135e59ca47cfee2b9f27d43faa04a120",
+      "first_seen_cycle": 1496,
+      "text": "PRESCRIPTION: Untracked delivered test go/internal/fleet/test_amplification_test.go is not gitignored but is not staged - run git add -f go/internal/fleet/test_amplification_test.go or the ship will silently drop the amplification coverage"
+    },
+    {
+      "origin_id": "d6b8d0603198aede0412bb5b9ff8cbbe2",
+      "first_seen_cycle": 1538,
+      "text": "PRESCRIPTION: Quarantine the bug-reproduction reproducer outside the worktree, or make ship refuse an untracked failing *_test.go, before any manual landing is taken from worktree cycle-42824668-1538."
+    },
+    {
+      "origin_id": "d017893d2ab6c00a3b0b4541e6cf685ab",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Before ship: add `.evolve/phases/production-path-wiring-proof/` to .gitignore beside the existing `.evolve/phases/gate-wiring-proof/` entry (line 196) and run `git rm --cached .evolve/phases/production-path-wiring-proof/phase.json` \u2014 do NOT delete it from disk, dispatch reads minted stubs from disk"
+    },
+    {
+      "origin_id": "d36a519a73769c9d9b34c4fdb67c868aa",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Class fix: make the .gitignore phase-stub exclusion shape-based instead of a hand-maintained per-name list, so any minted spec with no `agent` field and no agent.md is un-addable by ship's staging sweep regardless of name"
+    },
+    {
+      "origin_id": "d10ec96be5138a1848b98c5d407e691ac",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Before ship, restore go/coverage.router480.txt, go/coverage.fleetpolicy464.txt and go/coverage.fleetpolicy464.func.txt to their e9d1392b content and re-stage only lane-scope files"
+    },
+    {
+      "origin_id": "df1a66f94c99fad02d8b4d5b3e671e52c",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Class fix: filter the ship staging sweep to lane scope, or stop tracking go/coverage.*.txt entirely - they are regenerated-on-use build outputs (go/acs/cycle480/predicates_test.go:141-143 rewrites router480 before reading it) and are the whole of M2"
+    },
+    {
+      "origin_id": "d92e0266408ce004312e8c683fee08543",
+      "first_seen_cycle": 1572,
+      "text": "PRESCRIPTION: Un-track the stub without deleting it: add .evolve/phases/production-path-wiring-proof/ to .gitignore beside line 196, then git rm --cached .evolve/phases/production-path-wiring-proof/phase.json - dispatch reads minted stubs from disk"
+    },
+    {
+      "origin_id": "d96d9d97eb92a5b79098eb2581aed75fe",
+      "first_seen_cycle": 1572,
+      "text": "PRESCRIPTION: Restore the coverage artifacts: git checkout e9d1392b -- go/coverage.router480.txt go/coverage.fleetpolicy464.txt go/coverage.fleetpolicy464.func.txt, then re-stage only lane-scope paths"
+    },
+    {
+      "origin_id": "dfdf2ec9c90444cffc4cfa16b0bd49f1b",
+      "first_seen_cycle": 1572,
+      "text": "PRESCRIPTION: Class fix: replace the per-name .gitignore phase-stub list with a shape rule so any phase.json with no agent field and no sibling agent.md is un-addable by ship's staging sweep regardless of name"
+    },
+    {
+      "origin_id": "daecbd33c574933aa8e9af9a0aee58efc",
+      "first_seen_cycle": 1572,
+      "text": "PRESCRIPTION: Class fix: stop tracking go/coverage.*.txt - go/acs/cycle464/predicates_test.go:136-138 and go/acs/cycle480/predicates_test.go:141-143 regenerate them on every run, so tracking guarantees cross-lane diff noise"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "worktree-scope-continuation",
+  "kind": "sweep",
+  "weight": 0.8,
+  "title": "Sweep: worktree scope continuation (7 auditor prescriptions amortised)",
+  "summary": "Worktree/lane-scope/continuation prescriptions: base capture, snapshot guards, scope reconciliation. Amortised from 7 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d07dda894f4ef27bc468e9d77b1420d80",
+      "first_seen_cycle": 1453,
+      "text": "PRESCRIPTION: Require phase verification evidence to be cwd-independent: use git -C <worktree> or absolute paths, and assert the quoted rev-parse HEAD matches cycle-state.json worktree_base_sha before accepting a 'verified in this worktree' claim."
+    },
+    {
+      "origin_id": "d21279790047e8d78ce336d6e6f30f2e8",
+      "first_seen_cycle": 1459,
+      "text": "PRESCRIPTION: Gate TDD/Build dispatch on a non-empty triage top_n so a lane whose sole item is already resolved closes at triage instead of emitting no-work WARN reports."
+    },
+    {
+      "origin_id": "d8c3ea57dc3ef7c554a92cd42f6ae7d83",
+      "first_seen_cycle": 1479,
+      "text": "PRESCRIPTION: Retire a fleet lane once its verifiableBy command exits 0 on HEAD: run the todo's verifiableBy before dispatch and drop the lane instead of dispatching a satisfied contract"
+    },
+    {
+      "origin_id": "d0300f4d78ee856ade1da7a27742e224b",
+      "first_seen_cycle": 1508,
+      "text": "PRESCRIPTION: Gate the no-rewrite skip on the reviewer's structured violation codes rather than on rr.Blocks > 0: skip only when every violation is one the contracted artifact's bytes determine (missing/empty artifact, missing section, non-canonical verdict, missing required key), and always fall through for location-class codes such as stray_in_worktree. Add a regression lock for 'unchanged hash, violation repaired elsewhere'."
+    },
+    {
+      "origin_id": "d3dc4fbcea83f461917acdbf494e9e1f0",
+      "first_seen_cycle": 1513,
+      "text": "PRESCRIPTION: Inject the git merge-base --is-ancestor <salvage-sha> HEAD result into the scout context block whenever continuation-manifest.json is present"
+    },
+    {
+      "origin_id": "db2be6fbbd0e85595bd5201d9c06794f7",
+      "first_seen_cycle": 1538,
+      "text": "PRESCRIPTION: Make coverage-gate declare an empty gate scope when no cycle commit exists instead of falling back to HEAD~1..HEAD."
+    },
+    {
+      "origin_id": "df5792c7b490f40b583eeaa72f15f297f",
+      "first_seen_cycle": 1552,
+      "text": "PRESCRIPTION: Give a continuation lane its own selection record (id plus 'continuation of cycle-N') so triage-decision.json and build-report.md cannot disagree about what was built"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

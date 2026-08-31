@@ -1,0 +1,13 @@
+{
+ "id": "plan-mode-soak-preconditions",
+ "kind": "task",
+ "weight": 0.7,
+ "title": "Preconditions before enabling plan mode on any build lane \u2014 BRIGHT LINE: do not soak codex plan mode until (a) is measured",
+ "summary": "The plan-dialog auto-respond net is landed, but enabling plan mode deliberately needs four things first. (a) BRIGHT LINE / GATING: capture the codex pane IMMEDIATELY AFTER answering a plan-mode question and pin it as a non-match fixture, and size tail_lines from at least TWO real forms with different option counts. Today's codex fixture is hand-constructed, not captured; its 8 lines with the header anchor on line 2 tolerate only 2 appended lines, and codex is the CLI with the actual lingering precedent (codex-tmux.json records the 2026-06-03 trust-dialog loop-guard abandon at bootScrollback=200). An under-sized window fails INERT, which is the direction the compile-swallow defect just taught us to distrust. (b) DONE 2026-08-27 (PR pending): the loop now emits -c plan_mode_reasoning_effort=<tier> on every codex launch, verified live (xhigh held through /plan). Residual: still assert EFFECTIVE in-session effort somewhere, not just argv \u2014 entering plan mode drops codex from xhigh to the plan-mode preset (observed live xhigh -> medium), and every existing parity test (effort_xhigh_test.go, realizer_realmanifest_test.go, driver_credentials_test.go) pins launch flags only, so they stay green while the session runs at medium \u2014 a gate that cannot see the downgrade is worse than none because it will be cited as evidence it did not happen. (c) codex cannot enter plan mode from the loop at all today: driver_codex.go rejects permission_mode and codex-tmux.json declares no plan control; entry is /plan or Shift+Tab in-session, so the plumbing must be built deliberately. (d) Scale the phase budget for the extra plan+approval round trip before flipping a lane, not after the first exit-81. ALSO from the architect review: tail_lines:9 gives the codex plan rule ~1 line of headroom against an 8-line picker whose anchor sits on line 2, so a five-option or wrapped question pushes the anchor out and the rule goes SILENTLY INERT (decideAutoRespond has no 'rule matched nothing' signal). Size that window against a longer form as part of (a).",
+ "connects_to": [
+  "docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md",
+  "go/internal/bridge/manifests/codex-tmux.json",
+  "go/internal/bridge/driver_codex.go"
+ ],
+ "created_at": "2026-08-27T09:00:00Z"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "unify-auditor-ledger-readers",
+  "kind": "refactor",
+  "weight": 0.72,
+  "title": "Four independent readers of the auditor ledger entry — unify behind one helper with a typed sentinel",
+  "summary": "ship.findLatestAudit, cmd/evolve.latestAuditEntry, releasepreflight.checkRecentAudit, and redteamcheck each re-declare a struct/regex for the same ledger row and each encode their own scoping policy. The TODO(merge-concurrency-2026) at cmd_composition_wiring.go:105 says to fold them together 'if a third consumer appears' — the third and fourth have appeared, so the TODO is stale. Operating-policy §3.5 (single source with projection) applies; the in-repo precedent is internal/treestate, cited in ship/audit.go's own comments, plus verdictcache.ProbeEligible. Shape: a leaf package owning the scan + run-scope predicate + a typed ErrNoAuditorForRun carrying the refused foreign entry for forensics, with each consumer mapping the sentinel onto its own error vocabulary. Merges two near-identical test files as a side effect. Also refresh the stale TODO. Est. half a day, one lane.",
+  "connects_to": ["go/internal/phases/ship/audit.go", "go/cmd/evolve/cmd_composition_wiring.go", "go/internal/releasepreflight/releasepreflight.go", "go/internal/redteamcheck/redteamcheck.go"],
+  "created_at": "2026-08-27T06:00:00Z"
+}

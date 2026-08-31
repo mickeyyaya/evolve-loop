@@ -1,0 +1,9 @@
+{
+  "id": "codex-config-toml-unbounded-growth",
+  "kind": "bug",
+  "weight": 0.66,
+  "title": "evolve's own model probes have grown ~/.codex/config.toml to 13MB / 289k lines with 91,445 leaked [projects] entries",
+  "summary": "Measured 2026-08-27: ~/.codex/config.toml is 13MB across 289,103 lines, of which 91,445 are `[projects.\"/var/folders/.../evolve-models-probe-*\"]` sections — one per temp dir evolve's model-probe path has ever created. codex writes a project entry per working directory it is launched in, and the probes launch it in throwaway temp dirs, so the file grows without bound and never shrinks. HONEST SCOPE: I did NOT demonstrate a runtime cost — `codex --version` short-circuits before config parsing so my timing comparison was invalid, and I did not find a cheap entry point that parses config without a model call. So this is filed on the growth itself, not on a proven slowdown: a 13MB file that every launch reads, growing monotonically, caused by our own tooling. Fixes to consider: point the model probe at a scratch CODEX_HOME so it never touches the operator's config; or have the probe clean up its own [projects] section; or prune entries whose paths no longer exist. Verify the parse cost properly first with an entry point that actually loads config (codex doctor, or a real exec) before deciding urgency.",
+  "connects_to": ["go/internal/bridge/capture_models.go", "go/internal/bridge/doctor.go"],
+  "created_at": "2026-08-27T11:00:00Z"
+}

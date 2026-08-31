@@ -1,0 +1,6 @@
+{
+  "name": "production-path-wiring-proof",
+  "role": "production-path-wiring-proof",
+  "cli": "claude-tmux",
+  "model_tier_default": "deep"
+}

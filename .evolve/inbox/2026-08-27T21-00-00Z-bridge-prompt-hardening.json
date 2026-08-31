@@ -1,0 +1,130 @@
+{
+  "id": "bridge-prompt-hardening",
+  "kind": "sweep",
+  "weight": 0.78,
+  "title": "Sweep: bridge prompt hardening (24 auditor prescriptions amortised)",
+  "summary": "Bridge/prompt-delivery prescriptions: persona composition, tmux dispatch, prompt-body assembly. Amortised from 24 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d365e57d980d38614cb45ecc7a56c60bb",
+      "first_seen_cycle": 1418,
+      "text": "PRESCRIPTION: go/internal/phases/audit/defect_ledger.go:757-765 \u2014 the inlined dispositionSchemaExample's DEFERRED entry carries a fully-formed reusable `reason` and is echoed straight into the failing agent's next prompt, while the DEFERRED branch at :672-678 checks only non-emptiness; replace it with a self-evidently non-reusable placeholder such as \"<why THIS id is deferred \u2014 one sentence naming the id's defect>\" while keeping id/status/evidence literal"
+    },
+    {
+      "origin_id": "d567cbc5a4c061d558e92335705a1b271",
+      "first_seen_cycle": 1444,
+      "text": "PRESCRIPTION: In go/internal/tokenusage/fillpct.go, saturate or reject a negative/overflowed sum in PromptTokens and return FillPctUnmeasured from FillPct when promptTokens < 0; keep over-100% readings unclamped"
+    },
+    {
+      "origin_id": "d22c4497b5a5a621ddf2a6a2bb0555e12",
+      "first_seen_cycle": 1458,
+      "text": "PRESCRIPTION: Pass the peak-turn usage breakdown to FillWarnWithContributors when Result.PeakPromptTokens != 0, or label the appended figures explicitly as launch totals (contributors (launch totals, largest first)) so the percentage and the breakdown cannot be read as one scale"
+    },
+    {
+      "origin_id": "d08cee747e00f21283aba328515464c5d",
+      "first_seen_cycle": 1461,
+      "text": "PRESCRIPTION: Drop the bare rate.?limit alternative from agy-tmux.json controls.usage.exhausted_regex (keep it in drift_probe_regex), mirroring the codex correction"
+    },
+    {
+      "origin_id": "d0a3d0c2ddcc6ce1dcc46d98778f87503",
+      "first_seen_cycle": 1517,
+      "text": "PRESCRIPTION: Extend the agents/evolve-auditor.md:190 exemption clause to name the <!-- evolve-audit-chain --> block alongside acs-verdict.json / Ledger Entry JSON / AC-cite table \u2014 fold onto the existing line, the persona budget has one line of headroom (750/751)"
+    },
+    {
+      "origin_id": "dbb895087ef294cd241ccf3230265db0a",
+      "first_seen_cycle": 1526,
+      "text": "PRESCRIPTION: Apply the same >=8-rune floor to the forward branch of pendingAtInputLine (driver_tmux_submitverify.go:88) so a short echo candidate cannot arm a re-send, and add a table row to TestPendingAtInputLine covering a sub-floor echo."
+    },
+    {
+      "origin_id": "d7fe0c9796bf7cf46a879f22764970af8",
+      "first_seen_cycle": 1526,
+      "text": "PRESCRIPTION: Add a settle between the prompt-delivery Enter (driver_tmux_repl.go:376) and the baseline capture at :531, or re-capture inside verifySubmitted before the first judgement, so a not-yet-redrawn pane cannot produce a spurious Enter."
+    },
+    {
+      "origin_id": "dcc08470938e5f5b9dd329c8c043ecccb",
+      "first_seen_cycle": 1526,
+      "text": "PRESCRIPTION: Cover driver_tmux_submitverify.go:126 with a fixture whose CapturePane returns an error mid-resend-loop; the error is currently swallowed with no log line."
+    },
+    {
+      "origin_id": "da2d417508bdf8f2c8c3a51e05c193e8e",
+      "first_seen_cycle": 1526,
+      "text": "PRESCRIPTION: Either scope the submit-verify guard to families whose promptMarker is an input-line marker, or give tmuxLaunch a distinct inputLineMarker \u2014 for agy the marker is the footer '? for shortcuts' (driver_agytmux.go:32) and the guard is silently inert."
+    },
+    {
+      "origin_id": "d9805b3ee67fb9cc2aa7d2dd484c22b0c",
+      "first_seen_cycle": 1526,
+      "text": "PRESCRIPTION: Salvage or explicitly retire the preserved .claude/worktrees/phase-b work on driver_tmux_repl.go before the next edit to runTmuxREPL."
+    },
+    {
+      "origin_id": "de0511b4f0492f47efc4cbc40a358bd95",
+      "first_seen_cycle": 1550,
+      "text": "PRESCRIPTION: Add t.Skip(\"pending fix: artifactDetector must require a post-dispatch write\") to TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite, or revert go/internal/bridge/completion_test.go from this lane's tree and carry the reproducer forward via next-cycle-brief.json, then re-run: cd go && go test -count=1 ./internal/bridge/..."
+    },
+    {
+      "origin_id": "d5406d70a3d0010de46fbfd49ea0cc0a1",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Emit the delivery classification as a driver-authored field on the artifact-timeout marker line (delivery=prompt_submit_wedged resends=3) and parse that field, not free-text reason=\"\u2026\", restoring the ADR-0090 Decision 7 invariant; additionally strip artifactTimeoutMarker from listWorkspaceFiles output as defence-in-depth"
+    },
+    {
+      "origin_id": "d731f9a5e6d988a2eb89f456511e072dc",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Poll the completion detector once before the prompt-site short-circuit \u2014 an artifact on disk proves the prompt was submitted whatever the input line shows (same discipline as the ctx-cancel final poll at driver_tmux_repl.go:625-650)"
+    },
+    {
+      "origin_id": "d600862334db27e4a457d89a9cf056ed5",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Write the escalation report on the prompt-wedge early return so the fastest-dying timeout is not the only one without operator-facing evidence"
+    },
+    {
+      "origin_id": "d2c370d6d5632cd18f5d45cae54f23c84",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Record the KindNudge outcome before the nudge-site break at go/internal/bridge/driver_tmux_repl.go:882-887"
+    },
+    {
+      "origin_id": "daffe705353eea354e6bd564f6a0575d8",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Add a confirming observation before the prompt-site short-circuit \u2014 one further capture after a longer settle, or a completion-detector poll \u2014 so a merely slow paste-chip redraw cannot become a 2s phase kill; cover falsely-pending-then-healthy with a test"
+    },
+    {
+      "origin_id": "d55bd447a96c2c2efeb7dfc6ec4a28a48",
+      "first_seen_cycle": 1567,
+      "text": "PRESCRIPTION: Before cycle 1568 dispatches: write agents/evolve-production-path-wiring-proof.md or add \"catalog\":\"on-demand\" to .evolve/phases/production-path-wiring-proof/phase.json, then confirm go test ./internal/core/ -run TestRepoPhaseCatalog_MenuPhasesResolveAPersona -count=1 exits 0 with the stub still present"
+    },
+    {
+      "origin_id": "db665324300c016718bb1c2962a4052f2",
+      "first_seen_cycle": 1567,
+      "text": "PRESCRIPTION: Fix the phase-mint path so a minted menu phase cannot enter the git-tracked catalog without a persona or catalog:on-demand \u2014 the stub-level fix cures this instance only"
+    },
+    {
+      "origin_id": "d7570669667e23f01a2d47af42160d7d1",
+      "first_seen_cycle": 1567,
+      "text": "PRESCRIPTION: Retire or reassign the inbox item retro-prompt-delivery-stall; whichever lane next binds it also inherits the 6 OPEN defect ids in .evolve/runs/cycle-1557/defect-ledger.json"
+    },
+    {
+      "origin_id": "d82379d56eb174a9b9456d619f205adb8",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Before the second Launch in go/internal/phases/retro/retro.go, emit a [retro] WARN line naming DeliveryFailureCause(bridgeErr) and set attempt-scoped core.BridgeRequest.StdoutLog/StderrLog (honoured at go/internal/bridge/engine.go:487-489) so attempt 1's capture survives the retry"
+    },
+    {
+      "origin_id": "dc6ce2ad8c8b3c73a20956f51650b3120",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: agents/evolve-auditor.md:152 states 'WARN blocks shipping' but go/internal/phases/ship/audit.go:100-110 ships WARN unless workflow.strict_audit is set (unset in .evolve/policy.json) \u2014 correct the persona text to the fluent-by-default runtime so an operator reading the rubric predicts the real ship outcome"
+    },
+    {
+      "origin_id": "d562cfbb91540fc722b7c7bc781052a8c",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Set attempt-scoped core.BridgeRequest.StdoutLog/StderrLog on the second Launch in go/internal/phases/retro/retro.go (honoured by the bridge engine) so attempt 1's capture survives, and emit a [retro] WARN line naming core.DeliveryFailureCause(bridgeErr) before relaunching \u2014 a silent recovery is indistinguishable from a clean first try"
+    },
+    {
+      "origin_id": "d47b63a9a6d7b18d954f9d7f14150635f",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Run the retro/bridge suites under -race and pin the two live escalation-report fixtures to close the queued item's acceptance[3]"
+    },
+    {
+      "origin_id": "db816754d5f8fdf85e19195b9776f10e5",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Before ship, un-track the out-of-lane phase spec: git rm --cached .evolve/phases/production-path-wiring-proof/phase.json - do NOT delete it from disk, dispatch reads minted stubs from disk; alternatively land it as its own reviewed change WITH an agents/evolve-production-path-wiring-proof.md persona"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}

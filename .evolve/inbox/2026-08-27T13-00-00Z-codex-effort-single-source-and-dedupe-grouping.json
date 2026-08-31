@@ -1,0 +1,9 @@
+{
+  "id": "codex-effort-single-source-and-dedupe-grouping",
+  "kind": "bug",
+  "weight": 0.58,
+  "title": "Codex effort policy lives in two diverged places, and dedupeLaunchFlags mis-groups multi-value flags",
+  "summary": "Three follow-ups from the plan-mode-effort review, none blocking that landing. (1) SINGLE-SOURCE: driver_codex.go hardcodes `-c model_reasoning_effort=high` for headless codex and ignores prof.EffortLevel entirely, while codex.json declares no effort param at all — so the same policy now lives in two places that just diverged further (four tiers x two keys in codex-tmux.json vs one string literal). Also add a test row pinning that argsContainEffort's `strings.Contains(a, \"model_reasoning_effort=\")` does NOT match `plan_mode_reasoning_effort=` — it diverges at the fifth character (model_ vs mode_), i.e. one character from a false positive, with no test. (2) DEDUPE GROUPING: dedupeLaunchFlags treats a multi-value flag's values as independent standalone units, so `--allowedTools Read Write` + `--tools Bash Read Write Grep Glob` cross-contaminate. Unreachable today because AllowedTools is never threaded into the launch intent, BUT two tracked profiles already ship exactly that raw list (.evolve/profiles/error-handling-scan.json, secret-leak-scan.json), so wiring prof.AllowedTools through would silently mangle them. Fix: 'flag + the following RUN of non-flag tokens = one unit', which also simplifies the current lookahead-by-one and subsumes the dash-leading-value limitation now pinned as a known limit. (3) docs/architecture/cli-capability-matrix.md has no 'effort' row at all; add the per-family effort dial including codex's two-layer config (model_reasoning_effort + plan_mode_reasoning_effort).",
+  "connects_to": ["go/internal/bridge/driver_codex.go", "go/internal/bridge/realizer.go", "docs/architecture/cli-capability-matrix.md"],
+  "created_at": "2026-08-27T13:00:00Z"
+}

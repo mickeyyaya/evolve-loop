@@ -1,0 +1,80 @@
+{
+  "id": "retro-failure-identity",
+  "kind": "sweep",
+  "weight": 0.82,
+  "title": "Sweep: retro failure identity (14 auditor prescriptions amortised)",
+  "summary": "Retro/failure-identity prescriptions: fingerprint normalization, escalation hints, failure-digest fidelity. Amortised from 14 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d9bc45f9445be3bb9e113aafb0304f699",
+      "first_seen_cycle": 1433,
+      "text": "PRESCRIPTION: Make FileLedger.Rebaseline dry-run the forward chain walk from the prospective seal point using the already-loaded gatherAllLines data and append the seal ONLY if the walk would verify; on a would-fail result refuse having written nothing, so the failure path leaves the ledger byte-identical (go/internal/adapters/ledger/rebaseline.go:62-75)"
+    },
+    {
+      "origin_id": "d14d12472115391ab733ed4d0555cd057",
+      "first_seen_cycle": 1494,
+      "text": "PRESCRIPTION: Before the next ship of this lane, mint one .evolve/inbox/ item covering the two unbuilt acceptance criteria of sleep-time-kb-consolidation: the memo/retro warm-start brief (injection seam go/internal/phases/runner/runner.go:633; the existing operator->scout next-cycle-brief.json contract is dead on both sides and must be wired or replaced, not duplicated) and the Scout phase-token instrument that the soak measurement blocks on (scout-usage.json tokens.input == 0 in 8/8 sampled cyc\u2026"
+    },
+    {
+      "origin_id": "d6d0d110db5df72e3c9d2624f1eea203e",
+      "first_seen_cycle": 1508,
+      "text": "PRESCRIPTION: Count no-rewrite rounds in a separate counter and let CLI escalation trigger on it, leaving the contract gate's block count and the breaker untouched \u2014 this preserves AC1's breaker-neutrality without disarming the escalation remedy."
+    },
+    {
+      "origin_id": "d00b0b7d4166117172ffc122bce90cea3",
+      "first_seen_cycle": 1530,
+      "text": "PRESCRIPTION: Give the delivery-failure breadcrumb a lifetime matching the incident: remove it when the relaunch is dispatched (or on the next clean submit in verifySubmitted), or key it per attempt as <agent>-<attempt>-delivery-failure.json; add a binding test running two consecutive Observer instances over one workspace asserting the second does NOT classify"
+    },
+    {
+      "origin_id": "dc53f6254d0865e62c3943efd57adb64e",
+      "first_seen_cycle": 1530,
+      "text": "PRESCRIPTION: Rename IsDeliveryFailure's first parameter from tokens to outputSignal (or document the byte/event proxies at the call sites) so the classifier's contract matches what phaseobserver and adapters/observer actually pass"
+    },
+    {
+      "origin_id": "d2db79cec19393b5df78c06b8397892b0",
+      "first_seen_cycle": 1549,
+      "text": "PRESCRIPTION: Carry the sentinel FailureBlock from applySentinelStage to recordJudgmentLesson \u2014 add a Failure field to PhaseResponse read by recordJudgmentLesson, or have SentinelStageEnforce append the parsed defects as error-severity diagnostics \u2014 so the delivered test goes green unmodified; do NOT re-insert the hand-built diagnostic"
+    },
+    {
+      "origin_id": "dd910ec0fe8f025091c9ddeac014d607c",
+      "first_seen_cycle": 1561,
+      "text": "PRESCRIPTION: Before shipping this lane, either re-scope a lane that explicitly commits pipeline-defect-pipeline-blocker's escalation-identity fix in top_n, or disclose the inherited cycle-1554 delta (7 files / 541 insertions, incl. go/cmd/evolve/cmd_loop_escalation.go) in the ship commit body so the landing is not silent."
+    },
+    {
+      "origin_id": "d62844ad9e3b6af6fb0b9d45973401b07",
+      "first_seen_cycle": 1561,
+      "text": "PRESCRIPTION: Before shipping this lane, either re-scope a lane that explicitly commits pipeline-defect-pipeline-blocker's escalation-identity fix in top_n, or disclose the inherited delta (7 files / 541 insertions, incl. go/cmd/evolve/cmd_loop_escalation.go and .evolve/evals/pipeline-defect-pipeline-blocker.md) in the ship commit body so the landing is not silent."
+    },
+    {
+      "origin_id": "d41f78e1f063503e9ad62a14d3c164126",
+      "first_seen_cycle": 1562,
+      "text": "PRESCRIPTION: Reference interaction.ResultSubmitWedged instead of the bare \"submit_wedged\" literal at go/internal/core/failure_learning.go:245"
+    },
+    {
+      "origin_id": "dbef5a04e713a16c0f09ce338d87d4bdd",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Route the retro auto case through llmroute.Resolve so EVOLVE_RETROSPECTIVE_MODEL, absolute policy pins and autoExpand apply, and read the floor from the profile's model_tier_envelope.min instead of the Go literal \"balanced\""
+    },
+    {
+      "origin_id": "da851a40e56171e885b5878d31349fbfa",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Replace the literal \"submit_wedged\" at go/internal/core/failure_learning.go:247 with interaction.ResultSubmitWedged now that the match gates a retry decision rather than a diagnostic field"
+    },
+    {
+      "origin_id": "d1380d58beb0e30bdb4418ab3343090a7",
+      "first_seen_cycle": 1569,
+      "text": "PRESCRIPTION: Gate the clear on category: reconcile only a signal whose Category == \"verdict-incoherence\", and after clearing it re-run the floor sources the deterministic dossier candidate preempted (readFailureDecision in applyFailureDecisionFloor), so an orchestrator-classified infra-systemic halt survives"
+    },
+    {
+      "origin_id": "d6eb865fe79f01b8584121e5a9424951c",
+      "first_seen_cycle": 1569,
+      "text": "PRESCRIPTION: Add the missing negative test: a workspace with green fully-verifying artifacts AND a failure-decision.json whose category is not verdict-incoherence must still return a halting SystemFailure"
+    },
+    {
+      "origin_id": "d9eb71aa29c09df1560d3ac658a925e85",
+      "first_seen_cycle": 1569,
+      "text": "PRESCRIPTION: Either set RequireChallengeToken on the audit contract before the reconcile boundary is load-bearing, or correct the doc comment at system_failure.go:167-171 and the evidence string at coherence.go:99-103 to state what is actually verified for audit ('## Verdict' section + sentinel)"
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z"
+}
