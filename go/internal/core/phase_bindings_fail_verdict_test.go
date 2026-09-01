@@ -24,7 +24,11 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 	repo, ws := initBindingRepo(t, "cycle-13")
 	// Dirty the worktree so the content tree differs from the base tree —
 	// ProbeEligible would be TRUE, so only the verdict guard can skip the Put.
-	if err := os.WriteFile(filepath.Join(repo, "changed.txt"), []byte("delta"), 0o644); err != nil {
+	// The delta MUST be a tracked modification: since cycle-1594's declared-
+	// content contract, worktreeContentSHA stages `git add -u`, so an untracked
+	// file is residue that keeps base identity — it would make this pin pass
+	// vacuously via the fresh-base guard instead of the verdict guard.
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("delta"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	base := gitOut(t, repo, "rev-parse", "HEAD")
@@ -63,7 +67,8 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 func TestEmitPhaseBindings_AuditWARN_CachePut_Control(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-14")
-	if err := os.WriteFile(filepath.Join(repo, "changed.txt"), []byte("delta"), 0o644); err != nil {
+	// Tracked modification, not an untracked file — see the FAIL pin above.
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("delta"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	base := gitOut(t, repo, "rev-parse", "HEAD")
