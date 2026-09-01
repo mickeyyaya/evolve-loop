@@ -14,10 +14,11 @@ import (
 )
 
 func TestDeepTierFamilyArrangement(t *testing.T) {
+	// The adversarial exceptions PROJECT from claudeFamilyFloor (the one home
+	// of "which phases stay off the builder's family and why" —
+	// family_floor_test.go); only the advisor brain is pinned here directly.
 	exceptions := map[string]string{
-		"auditor":            "claude-tmux", // cross-family floor vs the codex builder
-		"adversarial-review": "claude-tmux", // adversarial independence, same principle
-		"router":             "agy-tmux",    // advisor brain — separate decision
+		"router": "agy-tmux", // advisor brain — separate decision
 	}
 	// TrackedRealProfileNames is the package's ONE funnel over the live
 	// profiles dir: the runtime mints untracked stubs into the same directory,
@@ -37,8 +38,13 @@ func TestDeepTierFamilyArrangement(t *testing.T) {
 		checked++
 		if want, ok := exceptions[name]; ok {
 			if p.CLI != want {
-				t.Errorf("%s: cli=%q, want %q — the adversarial/advisor exceptions are load-bearing", name, p.CLI, want)
+				t.Errorf("%s: cli=%q, want %q — the advisor exception is load-bearing", name, p.CLI, want)
 			}
+			continue
+		}
+		if _, floored := claudeFamilyFloor[name]; floored {
+			// Family correctness (vs the live builder) is asserted by
+			// TestClaudeFamilyFloor's reverse direction — one home, projected.
 			continue
 		}
 		if p.CLI != "codex-tmux" {
