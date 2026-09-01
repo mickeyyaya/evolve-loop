@@ -796,6 +796,13 @@ var (
 	writeVerdictWriteFile  = os.WriteFile
 )
 
+// VerdictFilename is the canonical acs-verdict artifact name. Exported so the
+// readers and retirement paths in other packages (core, phases, router) can
+// project from ONE spelling instead of re-typing the literal — the audit-report
+// name already has this via phasecontract.ArtifactFilename, and the verdict
+// name had drifted into 7+ copies before this const existed.
+const VerdictFilename = "acs-verdict.json"
+
 // WriteVerdict marshals v to <evolveDir>/runs/cycle-<N>/acs-verdict.json
 // atomically (tmp + rename) and returns the path written.
 func WriteVerdict(evolveDir string, v Verdict) (string, error) {
@@ -803,7 +810,7 @@ func WriteVerdict(evolveDir string, v Verdict) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("acssuite: mkdir %s: %w", dir, err)
 	}
-	dst := filepath.Join(dir, "acs-verdict.json")
+	dst := filepath.Join(dir, VerdictFilename)
 	buf, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("acssuite: marshal: %w", err)

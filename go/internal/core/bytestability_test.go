@@ -56,6 +56,7 @@ var additiveCycleStateKeys = []string{
 	"bookkeeping_regrade_attempted",     // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
 	"audit_repair_attempts",             // in-cycle audit-repair loop bound (wave-3 cycles 1572/1573/1574)
 	"audit_repair_active",               // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
+	"audit_dispatches",                  // audit round-supersession index; dispatch-persisted so a crashed round retires on resume (cycle-1603)
 	"explanation_documentation_version", // host-owned Build explanation contract activation
 }
 

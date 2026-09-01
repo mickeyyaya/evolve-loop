@@ -191,7 +191,7 @@ func (o *Orchestrator) detectVerdictIncoherence(ctx context.Context, cs CycleSta
 		Audit:            audit,
 		ACS:              acs,
 		AuditRan:         auditRan,
-		SubstantiveError: len(cs.AuditFailReasons) > 0 || len(cs.ShipFailReasons) > 0,
+		SubstantiveError: hasSubstantiveFailReasons(cs),
 		DeliverableValid: deliverableValid,
 	})
 	if coh.Reconciled {
@@ -206,4 +206,16 @@ func (o *Orchestrator) detectVerdictIncoherence(ctx context.Context, cs CycleSta
 		Evidence: coh.Evidence,
 		Halt:     true,
 	}, false
+}
+
+// hasSubstantiveFailReasons is the ONE spelling of "the recorded negative
+// verdict is DIAGNOSED": orchestrator memory (never agent-writable artifacts)
+// holds a persisted floor-fail reason for audit or ship. It feeds
+// coherence.VerdictInputs.SubstantiveError at both coherence surfaces (the
+// live floor here and the dossier builder) and contradicts a prose
+// verdict-incoherence claim in applyFailureDecisionFloor — three projections
+// of one belief (cycle-1603: two of them agreeing and the third missing is
+// exactly how a diagnosed downgrade halted a batch as "forgery").
+func hasSubstantiveFailReasons(cs CycleState) bool {
+	return len(cs.AuditFailReasons) > 0 || len(cs.ShipFailReasons) > 0
 }

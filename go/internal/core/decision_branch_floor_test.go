@@ -136,3 +136,71 @@ func TestDecideAfterRetroFloor_FallbackByteIdentical(t *testing.T) {
 		t.Errorf("reason = %q, want byte-identical %q", reason, wantReason)
 	}
 }
+
+// Cycle-1603 REGRESSION (2026-09-02). Round-2 of an ADR-0092 audit repair
+// inherited round-1's agent-amended acs-verdict.json (ship_eligible=false), so
+// the EGPS override downgraded the repaired PASS to FAIL with a persisted,
+// substantive fail reason. The DETERMINISTIC incoherence detector correctly
+// declined to fire (CheckVerdictCoherence's SubstantiveError guard: a diagnosed
+// downgrade is a justified negative verdict, not a forgery) — but the
+// orchestrator's PROSE failure-decision.json classified verdict-incoherence
+// anyway, and path (2) of applyFailureDecisionFloor halted the batch on prose
+// that the deterministic evidence had already contradicted.
+//
+// Contract: a prose verdict-incoherence claim is CONTRADICTED when the recorded
+// FAIL carries persisted substantive fail reasons. The cycle stays a task-level
+// FAIL (normal retro routing); no SystemFailureSignal is produced.
+func TestDecideAfterRetroFloor_Cycle1603DiagnosedDowngradeIsNotForgery(t *testing.T) {
+	o := floorOrchestrator(router.StaticPreset{})
+	dir := t.TempDir()
+	// Green artifacts, exactly the 1603 shape: repaired report PASS + acs PASS.
+	writeVerdicts(t, dir, "PASS", "PASS")
+	writeDecision(t, dir, `{"category":"verdict-incoherence","level":"system","evidence":"audit-report.md declares PASS while acs-verdict.json has ship_eligible false","action":"halt-and-diagnose","fix_type":"pipeline-repair"}`)
+	cs := CycleState{CycleID: 1603, WorkspacePath: dir, AuditFailReasons: []string{
+		"EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it",
+	}}
+
+	_, _, _, sig := o.decideAfterRetroRouted(context.Background(), 1603, cs, 1, VerdictFAIL, nil, router.RouteInput{})
+
+	if sig != nil {
+		t.Fatalf("a diagnosed EGPS downgrade must not halt as forged-verdict on prose alone; sig=%+v", sig)
+	}
+}
+
+// Converse pin: with NO recorded fail reasons the prose classification stays
+// uncontradicted and the path-(2) halt is preserved — the narrowing above must
+// not quietly disable the forgery floor. The on-disk audit verdict is FAIL so
+// the deterministic candidate stays silent and ONLY path (2) can halt here.
+func TestDecideAfterRetroFloor_ProseIncoherenceWithoutDiagnosedReasonsStillHalts(t *testing.T) {
+	o := floorOrchestrator(router.StaticPreset{})
+	dir := t.TempDir()
+	writeVerdicts(t, dir, "FAIL", "PASS") // red report → deterministic detector silent
+	writeDecision(t, dir, `{"category":"verdict-incoherence","level":"system","evidence":"recorded verdict contradicts artifacts","action":"halt-and-diagnose","fix_type":"pipeline-repair"}`)
+	cs := CycleState{CycleID: 1603, WorkspacePath: dir}
+
+	next, _, _, sig := o.decideAfterRetroRouted(context.Background(), 1603, cs, 1, VerdictFAIL, nil, router.RouteInput{})
+
+	if next != PhaseEnd {
+		t.Errorf("next = %s, want end (uncontradicted prose floor classification halts)", next)
+	}
+	if sig == nil || !sig.Halt || sig.Category != policy.CategoryVerdictIncoherence {
+		t.Fatalf("uncontradicted prose verdict-incoherence must still halt; sig=%+v", sig)
+	}
+}
+
+// The predicate's SHIP half: a diagnosed ship-floor downgrade contradicts the
+// prose claim exactly like an audit one (hasSubstantiveFailReasons is the ONE
+// spelling — this pins the half the audit-side test cannot).
+func TestDecideAfterRetroFloor_DiagnosedShipReasonsAlsoContradictProse(t *testing.T) {
+	o := floorOrchestrator(router.StaticPreset{})
+	dir := t.TempDir()
+	writeVerdicts(t, dir, "PASS", "PASS")
+	writeDecision(t, dir, `{"category":"verdict-incoherence","level":"system","evidence":"claimed","action":"halt-and-diagnose","fix_type":"pipeline-repair"}`)
+	cs := CycleState{CycleID: 1603, WorkspacePath: dir, ShipFailReasons: []string{"ship gate: repo-contract scanner rejected the tree"}}
+
+	_, _, _, sig := o.decideAfterRetroRouted(context.Background(), 1603, cs, 1, VerdictFAIL, nil, router.RouteInput{})
+
+	if sig != nil {
+		t.Fatalf("diagnosed ship-floor reasons must contradict a prose forgery claim; sig=%+v", sig)
+	}
+}

@@ -145,6 +145,20 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 	if contradicted {
 		return nil
 	}
+	// Cycle-1603: a prose claim of verdict-incoherence is ALSO contradicted when
+	// the recorded FAIL carries persisted substantive fail reasons. The
+	// deterministic detector already adjudicated exactly this question and
+	// declined via its SubstantiveError guard — a diagnosed gate downgrade
+	// (there: the EGPS ship_eligible=false override over a stale repair-round
+	// acs-verdict.json) is a justified negative verdict, not a forgery. Prose
+	// alone does not outrank that deterministic evidence; the cycle stays a
+	// task-level FAIL and routes through retro normally. Loud, not silent —
+	// failure-decision.json still asserts the category on disk, so an operator
+	// tracing a missing halt needs the overrule on record.
+	if dec.Category == policy.CategoryVerdictIncoherence && hasSubstantiveFailReasons(cs) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN floor: prose %s claim overruled — the recorded FAIL carries persisted substantive fail reasons (diagnosed downgrade, not forgery); treating as task-level FAIL\n", dec.Category)
+		return nil
+	}
 	ev := dec.Evidence
 	if ev == "" {
 		ev = dec.Justification

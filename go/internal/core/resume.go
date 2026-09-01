@@ -509,6 +509,10 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// explanation — stale reasons must never mark a later FAIL as
 			// diagnosed to the ADR-0072 floor.
 			resetFloorFailReason(&cs, next)
+			// Resume-parity for the round's verdict artifacts (cycle-1603):
+			// same supersession rule as cyclerun_dispatch.go — a resumed
+			// re-audit must not replay the previous round's verdict.
+			supersedePreviousAuditRound(&cs)
 		}
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
