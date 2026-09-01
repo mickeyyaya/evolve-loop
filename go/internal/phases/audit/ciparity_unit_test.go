@@ -122,39 +122,31 @@ func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
 	}
 }
 
-// TestIntegrationTierScope_EnvExclusiveSkipped — cycles 930/931/932 (+ cycle-3 in
-// a second repo): internal/core's integration tests drive full RunCycle
-// orchestrators over real git; under a live 2-lane fleet they false-RED the tier
-// while CI (isolated) stays green. Such env-exclusive packages are CI's job
-// (ADR-0069 backstop): all-excluded → (nil, error) so applyCIGate surfaces a
-// visible WARN instead of a false FAIL; mixed → the runnable remainder proceeds.
+// TestIntegrationTierScope_EnvExclusiveSkipped — the skip semantics, now
+// scoped to the one remaining exclusive (internal/bridge, requireTmux — no CI
+// backstop, retake can't vouch): all-excluded → (nil, error) so applyCIGate
+// surfaces a visible WARN instead of a false FAIL; mixed → the runnable
+// remainder proceeds. internal/core, cmd/evolve and internal/phases/ship left
+// the list 2026-09-01 (fossilized 2026-07-19 exclusion, superseded by the
+// 2026-07-20 serialized retake; cycle-1594 red-main cost) — see
+// TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594.
 func TestIntegrationTierScope_EnvExclusiveSkipped(t *testing.T) {
 	ctx := context.Background()
 	// All touched packages env-exclusive → explicit WARN-carrying error, no run.
-	pkgs, err := integrationTierScope(ctx, nil, "", []string{"./internal/core/..."})
+	pkgs, err := integrationTierScope(ctx, nil, "", []string{"./internal/bridge/..."})
 	if err == nil || pkgs != nil {
-		t.Fatalf("core-only scope: got (%v, %v), want (nil, env-exclusive error → WARN)", pkgs, err)
+		t.Fatalf("bridge-only scope: got (%v, %v), want (nil, env-exclusive error → WARN)", pkgs, err)
 	}
 	if !strings.Contains(err.Error(), "env-exclusive") {
 		t.Errorf("the WARN must explain the skip; got %q", err.Error())
 	}
-	// Mixed → env-exclusive dropped, runnable remainder kept. internal/bridge
-	// was this test's remainder example until 2026-08-23, when its requireTmux
-	// boot-timeout false-REDs (cycles 1539/1543/1546) put it ON the exclusive
-	// list; internal/prompts is a genuinely runnable stand-in.
-	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/core/...", "./internal/prompts/..."})
+	// Mixed → env-exclusive dropped, runnable remainder kept.
+	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/bridge/...", "./internal/prompts/..."})
 	if err != nil {
 		t.Fatalf("mixed scope must run the remainder, got err %v", err)
 	}
 	if len(pkgs) != 1 || pkgs[0] != "./internal/prompts/..." {
 		t.Errorf("pkgs = %v, want only ./internal/prompts/...", pkgs)
-	}
-	// The other two evidence-named env-exclusive packages.
-	if _, err := integrationTierScope(ctx, nil, "", []string{"./cmd/evolve/..."}); err == nil {
-		t.Error("cmd/evolve (TestFleetSoak spawns tmux fleets) must be env-exclusive")
-	}
-	if _, err := integrationTierScope(ctx, nil, "", []string{"./internal/phases/ship/..."}); err == nil {
-		t.Error("internal/phases/ship (TestShipFromWorktree drives real git worktrees) must be env-exclusive")
 	}
 	// Non-exclusive packages pass through untouched.
 	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/skilloverlay/..."})

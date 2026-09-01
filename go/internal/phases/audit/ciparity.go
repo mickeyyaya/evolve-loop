@@ -39,9 +39,8 @@ import (
 // itself cannot run (no toolchain / no module); (nil, nil) → clean.
 
 const (
-	goVetTimeout           = 4 * time.Minute
-	acsDurableTimeout      = 8 * time.Minute
-	integrationTierTimeout = 15 * time.Minute
+	goVetTimeout      = 4 * time.Minute
+	acsDurableTimeout = 8 * time.Minute
 
 	// integrationTierParallelism bounds the local integration-tier gate's -p
 	// (concurrent package test binaries) and -parallel (in-package t.Parallel
@@ -66,6 +65,11 @@ var integrationTierParallelismArg = strconv.Itoa(integrationTierParallelism)
 // const, for the same reason as runCmd below: tests shrink it to force the
 // ctx-interruption path without an 8-minute wait.
 var apicoverTimeout = 8 * time.Minute
+
+// integrationTierTimeout bounds EACH integration-tier attempt (first run and
+// serialized retake separately). A var, mirroring apicoverTimeout: tests
+// shrink it to force the ctx-interruption path without a 15-minute wait.
+var integrationTierTimeout = 15 * time.Minute
 
 // runCmd is the subprocess runner the CI-parity gates use. It is a package var
 // so tests can inject a fake runner and exercise the exit-code mapping + the
@@ -136,6 +140,33 @@ var goCompilerDiagRe = regexp.MustCompile(`^\S+\.go:\d+(:\d+)?:`)
 // (in-test orchestrator WARN lines, a git usage dump) while the last-12 cap
 // pushed the real `--- FAIL` lines out, so cycles 930/931/932 recorded verdicts
 // citing 12 lines of noise with the true offender unknowable.
+// offenderMarkerLine is the ONE home of "this line is a real failure marker"
+// — shared by offenderLines (which additionally falls back to the last lines
+// when nothing matches) and hasOffenderMarker (which must NOT inherit that
+// fallback: the deadline-kill path degrades to WARN precisely when no marker
+// exists, and the fallback would make every non-empty truncation look judged).
+func offenderMarkerLine(ln string) bool {
+	return strings.HasPrefix(ln, "--- FAIL") || // test failure header
+		strings.HasPrefix(ln, "FAIL") || // go test package summary ("FAIL\tpkg…")
+		strings.HasPrefix(ln, "panic:") || // runtime panic
+		strings.HasPrefix(ln, "# ") || // build-failure package header
+		strings.Contains(ln, "import cycle") ||
+		strings.Contains(ln, "UNCOVERED") || // apicover offender lines
+		strings.Contains(ln, "measurement error") || // apicover's synthesized infra line
+		goCompilerDiagRe.MatchString(ln) // compiler/vet diagnostics
+}
+
+// hasOffenderMarker reports whether any line of out carries a real failure
+// marker — the fallback-free projection of offenderMarkerLine.
+func hasOffenderMarker(out string) bool {
+	for _, ln := range strings.Split(out, "\n") {
+		if offenderMarkerLine(strings.TrimSpace(ln)) {
+			return true
+		}
+	}
+	return false
+}
+
 func offenderLines(out string) []string {
 	all := strings.Split(out, "\n")
 	var keep []string
@@ -144,14 +175,7 @@ func offenderLines(out string) []string {
 		if ln == "" {
 			continue
 		}
-		if strings.HasPrefix(ln, "--- FAIL") || // test failure header
-			strings.HasPrefix(ln, "FAIL") || // go test package summary ("FAIL\tpkg…")
-			strings.HasPrefix(ln, "panic:") || // runtime panic
-			strings.HasPrefix(ln, "# ") || // build-failure package header
-			strings.Contains(ln, "import cycle") ||
-			strings.Contains(ln, "UNCOVERED") || // apicover offender lines
-			strings.Contains(ln, "measurement error") || // apicover's synthesized infra line
-			goCompilerDiagRe.MatchString(ln) { // compiler/vet diagnostics
+		if offenderMarkerLine(ln) {
 			keep = append(keep, ln)
 		}
 	}
@@ -304,10 +328,14 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 	// (state.json truncates; the artifact is the one-grep diagnosis).
 	// DELIBERATE trade-offs: worst-case gate wall-clock doubles (attempt 1 +
 	// a fresh integrationTierTimeout retake — red paths only, and a false FAIL
-	// discarding a shippable cycle costs far more); a retake that itself dies
-	// (exec failure / retake-deadline kill) falls back to attempt-1 offenders —
-	// possibly contended data, but a real red must never be laundered by retake
-	// infra trouble.
+	// discarding a shippable cycle costs far more). Retake trouble splits by
+	// what it can testify to (2026-09-01): an EXEC failure falls back to
+	// attempt-1 offenders — possibly contended data, but a real red must never
+	// be laundered by retake infra trouble; a DEADLINE kill first reports any
+	// offenders the truncated output already flushed (go test emits each
+	// completed package's verdict before the SIGKILL — evidence outranks the
+	// budget), and only a marker-free truncation degrades to the fail-open
+	// WARN, because a bare exit code from a killed run is not a test verdict.
 	// logPath is set on the FIRST successful log write and never cleared: a
 	// later append failure must not drop the pointer to a real on-disk artifact
 	// that already carries attempt 1 (go-review MEDIUM).
@@ -361,8 +389,26 @@ func integrationTierCheckDefault(req core.PhaseRequest) ([]string, error) {
 		}
 		return nil, fmt.Errorf("integration tier was RED under fleet contention but GREEN on a serialized clean-env retake — contention flake absorbed, not a code defect (%s)", where)
 	}
-	// Red-then-red: genuine. The serialized clean-env retake is the truthful
-	// attempt — its offenders name the real failure.
+	if errors.Is(retakeCtx.Err(), context.DeadlineExceeded) {
+		// Deadline kill. Reachable because sysexec maps a ctx kill to a
+		// non-nil ExitError with err==nil (exit -1), so the cerr2 early-return
+		// above does not swallow it — pinned by the orchestration deadline
+		// tests. Evidence outranks the budget: report any offenders the
+		// truncated output already flushed; only a marker-free truncation
+		// degrades to WARN (2026-09-01 re-widened scope: quiet-host tier
+		// ~127s x 3.6-7.7 contention against this budget makes the deadline a
+		// live path, and it must not become a laundering channel).
+		if hasOffenderMarker(out2 + "\n" + errOut2) {
+			return offendersWithLogPointer(out2, errOut2), nil
+		}
+		where := "integration-tier.log unavailable"
+		if logPath != "" {
+			where = "both attempts: " + logPath
+		}
+		return nil, fmt.Errorf("integration tier exceeded its %s budget on the serialized retake with no test verdict in the truncated output — a deadline kill is not a judgment; degraded to WARN (%s)", integrationTierTimeout, where)
+	}
+	// Red-then-red inside budget: genuine. The serialized clean-env retake is
+	// the truthful attempt — its offenders name the real failure.
 	return offendersWithLogPointer(out2, errOut2), nil
 }
 
@@ -444,17 +490,14 @@ func acquireTierLock(req core.PhaseRequest) (release func(), note string) {
 // The one whole-module fallback is a module-root change (a `./...` pattern from
 // go.mod/go.sum/root main.go) — rare, and no narrower scope exists.
 //
-// Scoping is load-bearing for RELIABILITY, not just speed. The old unconditional
-// whole-suite `go test -race -tags integration ./...` run is parallel-unsafe
-// under the loop's contended LOCAL environment — two fleet lanes running it
-// concurrently plus real tmux/git — so heavy env-dependent tests (TestFleetSoak
-// spawns tmux fleets, TestShipFromWorktree drives real git worktrees) flaked the
-// gate EVERY cycle, producing false-REDs on tests CI passes. CI runs the same
-// command once, isolated, and stays green; scoping means a cycle that only
-// touched, say, internal/bridge never runs the fleet/ship tests at all. The rare
+// Scoping is load-bearing for RELIABILITY, not just speed: the tier stays
+// O(change) so the -race run's contention exposure is bounded, and the
+// serialized retake-on-red (below) absorbs what contention remains. The one
+// env-exclusive package (see integrationTierEnvExclusive — the record is the
+// authority) is skipped with its recorded backstop named in the WARN. The rare
 // module-root fallback is derivable (not the contention-correlated git-failure
-// case), so it does not reintroduce the flake. Whole-repo integration coverage
-// remains CI's job — the identical backstop apicover-enforce relies on.
+// case). Whole-repo integration coverage remains CI's job — the identical
+// backstop apicover-enforce relies on.
 func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, changed []string) ([]string, error) {
 	scoped := make([]string, 0, len(changed))
 	var envExclusive []string
@@ -473,8 +516,9 @@ func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, 
 	}
 	if len(scoped) == 0 && len(envExclusive) > 0 {
 		// Everything in scope is env-exclusive: surface a visible WARN (applyCIGate's
-		// could-not-run path) instead of a false FAIL. CI is the backstop.
-		return nil, fmt.Errorf("touched package(s) %s are env-exclusive under a live loop — their integration tests false-RED the tier under fleet contention (cycles 930/931/932; the requireTmux boot-timeout class, cycles 1539/1543/1546). Backstop: %s (ADR-0069)", strings.Join(envExclusive, ", "), envExclusiveBackstopNote(envExclusive))
+		// could-not-run path) instead of a false FAIL; each record names its
+		// own evidence and backstop.
+		return nil, fmt.Errorf("touched package(s) %s are env-exclusive under a live loop. Backstop: %s (ADR-0069)", strings.Join(envExclusive, ", "), envExclusiveBackstopNote(envExclusive))
 	}
 	if len(envExclusive) > 0 {
 		// Mixed scope: run the runnable remainder; name the skips in the lane log.
@@ -483,92 +527,86 @@ func integrationTierScope(ctx context.Context, run sysexec.RunFunc, dir string, 
 	return scoped, nil // may be empty (cycle touched only acs/) → gate skips
 }
 
-// integrationTierEnvExclusive names the packages whose integration-tagged tests
-// demand an EXCLUSIVE local environment and therefore cannot run reliably inside
-// the loop's contended runtime: internal/core (full RunCycle orchestrators over
-// real git — the proven false-RED producer of cycles 930/931/932 and cycle-3 in
-// a second repo: identical noise-offender fingerprint each time, green in
-// isolation), cmd/evolve (TestFleetSoak spawns real tmux fleets), and
-// internal/phases/ship (TestShipFromWorktree drives real git worktrees). CI runs
-// the exact tier once, isolated, and stays green — per-cycle parity for these
-// packages is CI's job (the same ADR-0069 rationale that scoped the tier in the
-// first place).
-// Backstop honesty (2026-08-23): the first three entries are covered by CI's
-// own integration-tier step, isolated — "CI is the backstop" is TRUE for them.
-// internal/bridge joined for the same false-RED reason (its requireTmux tests
-// boot real tmux sessions; under a live wave those boots time out — 13
-// offenders on cycle-1543, all exit=80, the same tests 7/7 PASS in 17.2s on a
-// quiet host), but its requireTmux subset SKIPS in CI (GitHub runners have no
-// tmux — the #483 finding), so its real backstop is a quiet-host run, and the
-// skip message must say that instead of asserting coverage CI provably does
-// not provide. envExclusiveBackstopNote renders the per-package truth.
-var integrationTierEnvExclusive = []string{
-	"internal/core",
-	"cmd/evolve",
-	"internal/phases/ship",
-	"internal/bridge",
+// envExclusiveEntry is the SINGLE record for one env-exclusive package: the
+// package, the evidence, and where its integration tests actually run instead.
+// Every consumer — envExclusivePkg, the emitted WARN, the lane-log note, the
+// whole-suite filter — projects from integrationTierEnvExclusive; no prose
+// restatement elsewhere is authoritative (the 2026-09-01 architecture review
+// found three stale copies inside one diff — projections, not narration).
+//
+// SELECTION CRITERION (the only thing keeping this list a scalpel, pinned by
+// TestEnvExclusive_EntriesDeclareNoCIBackstop): a package may be listed ONLY
+// when the serialized retake below cannot make red-twice trustworthy AND CI
+// provides no backstop. A package whose integration tier CI covers belongs IN
+// the lane tier. HISTORY: internal/core, cmd/evolve and internal/phases/ship
+// were excluded 2026-07-19 (8e2afef0; contention false-REDs, cycles
+// 930/931/932) and the serialized retake that properly cures that contention
+// landed ONE DAY LATER (3c5ed711) — the never-revisited skip shipped
+// cycle-1594's red to main for 2.5 days (20e839ee; #519; #518). Two notes for
+// the next adjudicator: the July evidence over-attributed cmd/evolve
+// (its fleet-soak suite is in-process fakes, no real tmux —
+// cmd_fleet_soak_test.go; its ~69s is CPU), and a compile-only floor would NOT
+// have caught 1594 (an assertion failure, not a compile failure) — running
+// the tier is the point.
+type envExclusiveEntry struct {
+	pkg string // module-relative package dir, e.g. "internal/bridge"
+	why string // the exclusion evidence
+	// backstop states where the package's integration tests actually run;
+	// rendered VERBATIM into the emitted WARN. One dishonest word here
+	// recreates the #483 defect: a gate asserting coverage that cannot occur.
+	backstop string
 }
 
-// envExclusiveQuietHostOnly names the env-exclusive packages whose integration
-// tier is NOT covered by CI either — their tests self-skip there — so the only
-// honest backstop is a run on a quiet host (loop-boot preflight or a console
-// `go test -tags integration` with no wave active).
-var envExclusiveQuietHostOnly = map[string]bool{
-	"internal/bridge": true,
-}
+// envExclusiveNoCIMarker is the machine-checkable half of the selection
+// criterion: every entry's backstop must carry it, and the rule test asserts
+// against THIS const — one home for the phrase, so rewording the prose cannot
+// silently detach the data from the contract.
+const envExclusiveNoCIMarker = "NOT covered by CI"
 
-// envExclusiveBackstopNote states, per skipped package, WHERE its integration
-// tests actually run instead. One dishonest word here recreates the defect
-// #483 removed: a gate message asserting coverage that cannot occur.
-func envExclusiveBackstopNote(pkgs []string) string {
-	var ci, quiet []string
-	for _, p := range pkgs {
-		n := strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/...")
-		n = strings.TrimSuffix(n, "/")
-		if envExclusiveQuietHostOnly[n] || quietHostSuffix(n) {
-			quiet = append(quiet, n)
-		} else {
-			ci = append(ci, n)
+var integrationTierEnvExclusive = []envExclusiveEntry{{
+	pkg:      "internal/bridge",
+	why:      "requireTmux tests boot real tmux sessions; under a live wave those boots time out (13 offenders on cycle-1543, all exit=80; the same tests 7/7 PASS in 17.2s on a quiet host)",
+	backstop: "internal/bridge's requireTmux tier is " + envExclusiveNoCIMarker + " (no tmux on runners — the #483 finding); its backstop is a quiet-host run (loop-boot preflight, or `go test -tags integration` with no wave active)",
+}}
+
+// envExclusiveEntryFor resolves a package pattern ("./internal/bridge/...", a
+// full import path, or a bare relative dir) to its record.
+func envExclusiveEntryFor(p string) (envExclusiveEntry, bool) {
+	p = strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/...")
+	p = strings.TrimSuffix(p, "/")
+	for _, e := range integrationTierEnvExclusive {
+		if p == e.pkg || strings.HasSuffix(p, "/"+e.pkg) {
+			return e, true
 		}
 	}
+	return envExclusiveEntry{}, false
+}
+
+// envExclusivePkg reports whether a package pattern denotes an env-exclusive
+// package — a projection of the record table.
+func envExclusivePkg(p string) bool {
+	_, ok := envExclusiveEntryFor(p)
+	return ok
+}
+
+// envExclusiveBackstopNote renders each skipped package's backstop, verbatim
+// from its record, deduplicated.
+func envExclusiveBackstopNote(pkgs []string) string {
+	seen := map[string]bool{}
 	var parts []string
-	if len(ci) > 0 {
-		parts = append(parts, fmt.Sprintf("CI's isolated integration-tier step covers %s", strings.Join(ci, ", ")))
-	}
-	if len(quiet) > 0 {
-		parts = append(parts, fmt.Sprintf("%s's requireTmux tier is NOT covered by CI (no tmux on runners) — its backstop is a quiet-host run (loop-boot preflight, or `go test -tags integration` with no wave active)", strings.Join(quiet, ", ")))
+	for _, p := range pkgs {
+		if e, ok := envExclusiveEntryFor(p); ok && !seen[e.pkg] {
+			seen[e.pkg] = true
+			parts = append(parts, e.why+" — "+e.backstop)
+		}
 	}
 	return strings.Join(parts, "; ")
 }
 
-// quietHostSuffix matches full import paths ending in a quiet-host-only pkg.
-func quietHostSuffix(n string) bool {
-	for q := range envExclusiveQuietHostOnly {
-		if strings.HasSuffix(n, "/"+q) {
-			return true
-		}
-	}
-	return false
-}
-
-// envExclusivePkg reports whether a package pattern ("./internal/core/...", a
-// full import path, or a bare relative dir) denotes an env-exclusive package.
-func envExclusivePkg(p string) bool {
-	p = strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/...")
-	p = strings.TrimSuffix(p, "/")
-	for _, ex := range integrationTierEnvExclusive {
-		if p == ex || strings.HasSuffix(p, "/"+ex) {
-			return true
-		}
-	}
-	return false
-}
-
 // integrationTierWholeSuite lists every module package minus /acs/ (go.yml's
-// `go list ./... | grep -v /acs/` filter) minus the env-exclusive set (their
-// integration tests cannot run reliably inside the loop's contended runtime —
-// see integrationTierEnvExclusive; CI covers them isolated) — for the
-// module-root fallback.
+// `go list ./... | grep -v /acs/` filter) minus the env-exclusive set — each
+// record in integrationTierEnvExclusive names where those tests actually run
+// instead — for the module-root fallback.
 func integrationTierWholeSuite(ctx context.Context, run sysexec.RunFunc, dir string) ([]string, error) {
 	listOut, err := sysexec.Output(ctx, run, dir, "go", "list", "./...")
 	if err != nil {
