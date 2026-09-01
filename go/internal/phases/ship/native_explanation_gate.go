@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
@@ -47,26 +45,6 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		opts.WorktreeBaseSHA = baseSHA
 		opts.RunID = runID
 	}
-	markerCycle := cycle
-	if derived, ok := cycleFromRunWorkspace(opts.ProjectRoot, workspace); ok {
-		markerCycle = derived
-	}
-	host, hostActive, err := explanationdocs.ActivationForCycle(opts.ProjectRoot, markerCycle, workspace)
-	if err != nil {
-		return fmt.Errorf("resolve host activation: %w", err)
-	}
-	if hostActive {
-		if cycle != host.Cycle || runID != host.RunID || version != host.ContractVersion ||
-			filepath.Clean(workspace) != filepath.Clean(host.Workspace) ||
-			worktree != host.Worktree || baseSHA != host.BaseSHA {
-			return fmt.Errorf("typed cycle identity does not match host activation")
-		}
-	} else {
-		if version == 0 && !opts.RequireBuildExplanationHandoff {
-			return nil
-		}
-		return fmt.Errorf("no host activation matches the typed cycle workspace")
-	}
 	binding := explanationdocs.CycleBinding{
 		ProjectRoot:     opts.ProjectRoot,
 		Worktree:        worktree,
@@ -75,6 +53,21 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		Cycle:           cycle,
 		RunID:           runID,
 		ContractVersion: version,
+	}
+	// The activation belt lives in explanationdocs (single home; audit runs
+	// the same check — architecture review 2026-09-01). Inactive means the
+	// host AGREES this is a legacy cycle; a ship that still demands the
+	// handoff keeps its refusal.
+	hostActive, err := explanationdocs.CrossCheckActivation(binding)
+	if err != nil {
+		return err
+	}
+	if !hostActive {
+		// Genuine legacy — the host agrees. A Require=true refusal here would
+		// be dead code: ship.go derives RequireBuildExplanationHandoff from
+		// version != 0, and the belt already refused every inactive+version!=0
+		// identity (2026-09-01 re-review wiring proof).
+		return nil
 	}
 	var verified *phaseio.ExplanationView
 	var active bool
@@ -102,18 +95,4 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("typed Build explanation handoff does not match the verified host snapshot")
 	}
 	return nil
-}
-
-func cycleFromRunWorkspace(projectRoot, workspace string) (int, bool) {
-	runsRoot := filepath.Clean(filepath.Join(projectRoot, ".evolve", "runs"))
-	workspace = filepath.Clean(workspace)
-	if filepath.Dir(workspace) != runsRoot {
-		return 0, false
-	}
-	raw := strings.TrimPrefix(filepath.Base(workspace), "cycle-")
-	if raw == filepath.Base(workspace) {
-		return 0, false
-	}
-	cycle, err := strconv.Atoi(raw)
-	return cycle, err == nil && cycle > 0
 }

@@ -898,7 +898,7 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 // this structural verifier must not impersonate one. Classify turns its error
 // into a named deterministic Audit override; Ship independently re-verifies.
 func verifyExplanationDocumentation(req core.PhaseRequest) error {
-	verified, active, verifyErr := explanationdocs.Verify(context.Background(), explanationdocs.CycleBinding{
+	binding := explanationdocs.CycleBinding{
 		ProjectRoot:     req.ProjectRoot,
 		Worktree:        req.Worktree,
 		Workspace:       req.Workspace,
@@ -906,7 +906,21 @@ func verifyExplanationDocumentation(req core.PhaseRequest) error {
 		Cycle:           req.Cycle,
 		RunID:           req.RunID,
 		ContractVersion: req.ExplanationDocumentationVersion,
-	})
+	}
+	// The activation belt (single home: explanationdocs, shared with ship —
+	// architecture review 2026-09-01). Before this, a dropped/zero
+	// ContractVersion silently disabled the whole gate: Verify resolved
+	// inactive and audit returned nil. Now a zero version against an ACTIVE
+	// host activation, or a live version with no host activation, fails the
+	// audit loudly; a nil return below means the host AGREES nothing applies.
+	hostActive, beltErr := explanationdocs.CrossCheckActivation(binding)
+	if beltErr != nil {
+		return beltErr
+	}
+	if !hostActive {
+		return nil
+	}
+	verified, active, verifyErr := explanationdocs.Verify(context.Background(), binding)
 	if verifyErr != nil {
 		return verifyErr
 	}
