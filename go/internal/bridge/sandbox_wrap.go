@@ -298,6 +298,34 @@ func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) 
 	return prefix[0], newArgs, true
 }
 
-func sandboxRequiredButUnavailable(cfg *Config, wrapped bool) bool {
-	return cfg != nil && cfg.RequireSandbox && !wrapped
+// sandboxRequiredButUnavailable reports whether a RequireSandbox launch must
+// fail closed. It distinguishes WHY the launch is unwrapped, because
+// ShouldWrap's three non-wrap causes differ in kind:
+//
+//   - nested LLM-CLI session: the OUTER sandbox + Tier-1 hooks already confine
+//     (ShouldWrap's own rationale — and on macOS an inner sandbox-exec
+//     EPERM-hangs the REPL). The requirement is SATISFIED, not violated;
+//     treating it as a violation made the Build-explanation contract
+//     unrunnable inside every Claude-driven session, including this repo's
+//     own e2e suite (observed: exit=2 on every pipeline e2e test).
+//   - explicit EVOLVE_SANDBOX=off: a host operator opt-out — the same posture
+//     as --human-input's host opt-in that ExitSafetyGate was built for.
+//     Honoured, but LOUDLY: the warning names the contract and the fact the
+//     phase runs unconfined.
+//   - anything else (auto/on with no usable wrap): the genuine violation this
+//     gate exists for. Fails closed, unchanged.
+func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
+	if cfg == nil || !cfg.RequireSandbox || wrapped {
+		return false
+	}
+	if sandbox.DetectNested(depEnvGetter(deps)) {
+		return false // outer layer already confines — requirement satisfied
+	}
+	if strings.TrimSpace(deps.Env[envSandboxMode]) == config.SandboxModeOff {
+		if deps.Stderr != nil {
+			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite the activated Build explanation contract\n", cfg.Agent)
+		}
+		return false
+	}
+	return true
 }

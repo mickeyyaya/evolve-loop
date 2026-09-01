@@ -302,6 +302,16 @@ func detectPhase(artifactPath string) string {
 // An empty/unknown verdict is treated as PASS by the caller (auditVerdict).
 func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	out := map[string]string{}
+	// Proof-of-read: real agents copy the workspace's challenge token into the
+	// report verbatim ("A report without it is rejected and re-dispatched").
+	// The token file lives beside the artifact in the run workspace.
+	token := ""
+	if raw, err := os.ReadFile(filepath.Join(filepath.Dir(mainPath), "challenge-token.txt")); err == nil {
+		if t := strings.TrimSpace(string(raw)); t != "" {
+			token = "<!-- challenge-token: " + t + " -->\n"
+		}
+	}
+
 	switch phase {
 	case "intent":
 		out[mainPath] = "goal: synthetic e2e\nacceptance_checks:\n  - cycle completes\n"
@@ -312,7 +322,17 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	case "tdd":
 		out[mainPath] = "# Team Context\n\n## Acceptance\n- cycle ships clean\n\n## RED Tests\n- tests/synthetic_test.go\n"
 	case "build":
-		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n"
+		// The Build-explanation contract (mandatory since the explanation-docs
+		// feature) requires every build-report to carry an
+		// `## Explanation Documentation` section. The synthetic build changes
+		// nothing in the worktree, so the truthful declaration is
+		// NOT_APPLICABLE with a Reason and no Document — the exact grammar
+		// explanationdocs.checkNotApplicable enforces. Mirrors the in-process
+		// FakeRunner fixture (test/fixtures/fakes.go), which the PR taught but
+		// this subprocess fake — the one every e2e cycle actually drives — was
+		// left without, hanging every e2e build at the deliverable floor.
+		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n\n" +
+			"## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: synthetic e2e build; the base-bound diff contains no material changes\n"
 	case "audit":
 		redCount := 0
 		if verdict == "FAIL" {
@@ -322,7 +342,16 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
 		// is mandatory for the audit verdict parse, so a prose-only fake report
 		// would fail audit and the happy-path pipeline would never reach ship.
-		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"%s\",\"schema_version\":1} -->\n", verdict, verdict, verdict)
+		// The explanation-review audit gate (validateExplanationReview) is a
+		// deterministic verdict override: when the contract is active the
+		// audit report must independently review the Build handoff. The
+		// synthetic build declares NOT_APPLICABLE (no material diff), so the
+		// faithful review is VERIFIED with Build status not_applicable, no
+		// Document fields, and concrete >=20-char Evidence.
+		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n"+
+			"## Explanation Documentation\n- Status: VERIFIED\n- Build status: not_applicable\n"+
+			"- Evidence: reviewed the NOT_APPLICABLE declaration in build-report.md against the empty base-bound diff\n"+
+			"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"%s\",\"schema_version\":1} -->\n", verdict, verdict, verdict)
 		// Production-shaped acs-verdict (the generateACSVerdict schema): the
 		// armed spine floor's audit anchor reads the TOP-LEVEL verdict field,
 		// so the legacy shape without it (pre-2026-07-16 fake) made the anchor
@@ -338,6 +367,9 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		out[lessonPath] = "id: synthetic-lesson-1\nseverity: low\nsummary: synthetic e2e lesson\n"
 	default:
 		return nil, fmt.Errorf("unknown phase %q (no known artifact contract for %s)", phase, mainPath)
+	}
+	if token != "" && out[mainPath] != "" {
+		out[mainPath] = token + out[mainPath]
 	}
 	return out, nil
 }

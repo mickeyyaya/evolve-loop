@@ -976,3 +976,41 @@ func TestResolveActivation_ExistingMarkerFailsClosedForMissingOrWrongRunIdentity
 		}
 	}
 }
+
+// Adversarial takeover finding (PR #517 e2e diagnosis): changedSince counts
+// UNTRACKED files, and the orchestrator symlinks .evolve/cycle-state.json into
+// every cycle worktree. On a host whose repo lacks the production .gitignore's
+// `.evolve/*` rule (the e2e temp projects; any fresh operator checkout), that
+// runtime-state symlink read as a MATERIAL change — forcing Status: REQUIRED
+// with a full cycle document for builds that changed no code at all, and
+// hanging every e2e pipeline cycle in the correction ladder until timeout.
+// Runtime state is not a material code change; the classifier must say so
+// itself rather than relying on every host's ignore hygiene.
+func TestMaterialPaths_RuntimeStateIsNeverMaterial(t *testing.T) {
+	got := materialPaths([]string{
+		".evolve/cycle-state.json",
+		".evolve/runs/cycle-1/build-report.md",
+		"go/internal/core/thing.go",
+	})
+	if len(got) != 1 || got[0] != "go/internal/core/thing.go" {
+		t.Fatalf("materialPaths = %v, want only the real source change — .evolve/ runtime state must never force a REQUIRED explanation", got)
+	}
+}
+
+// Review HIGH: the first fix excluded .evolve/ WHOLESALE, which laundered
+// tracked config as non-material — a build whose only change flips
+// .evolve/policy.json (gates, fleet width) could then declare NOT_APPLICABLE
+// and skip the explanation document for exactly the consequential class this
+// contract exists to document. Config is material; bookkeeping is not.
+func TestMaterialPaths_TrackedEvolveConfigIsMaterial(t *testing.T) {
+	got := materialPaths([]string{
+		".evolve/policy.json",
+		".evolve/profiles/builder.json",
+		".evolve/cycle-state.json",
+		".evolve/runs/cycle-9/build-report.md",
+	})
+	want := []string{".evolve/policy.json", ".evolve/profiles/builder.json"}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("materialPaths = %v, want %v — config changes are consequential and must stay material; runtime bookkeeping must not", got, want)
+	}
+}

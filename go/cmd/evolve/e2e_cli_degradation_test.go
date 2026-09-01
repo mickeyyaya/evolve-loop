@@ -100,6 +100,7 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	writeFallbackProfiles(t, projRoot, "claude-p", []string{"codex"})
 
 	env := append(os.Environ(),
+		"EVOLVE_SANDBOX=off", // host opt-out: pipeline-semantics tests, runners cannot promise a wrap (see e2e_pipeline_paths_test.go)
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		// No EVOLVE_CLI: the per-agent profile (cli + cli_fallback) drives the

@@ -107,7 +107,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// Workstream B: confine to worktree when this is a source-writing phase
 	// and the host can wrap (sandbox-exec / bwrap). Degrades unwrapped.
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
-	if sandboxRequiredButUnavailable(cfg, wrapped) {
+	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[claude-p] safety gate: activated Build explanation contract requires OS sandbox confinement")
 		return ExitSafetyGate, nil
 	}

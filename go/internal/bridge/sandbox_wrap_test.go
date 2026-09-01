@@ -61,7 +61,7 @@ func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing
 	if !ok || len(prefix) == 0 || len(fw.calls) != 1 {
 		t.Fatalf("required contract did not request confinement: prefix=%v ok=%v calls=%d", prefix, ok, len(fw.calls))
 	}
-	if !sandboxRequiredButUnavailable(cfg, false) || sandboxRequiredButUnavailable(cfg, true) {
+	if !sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, false) || sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, true) {
 		t.Fatal("required-sandbox fail-closed predicate is incorrect")
 	}
 }

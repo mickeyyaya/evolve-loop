@@ -349,7 +349,7 @@ func checkRequired(ctx context.Context, binding CycleBinding, declaration report
 	want := cycleDocumentPath(binding.Cycle, binding.RunID)
 	var failures []string
 	if declaration.Status != "REQUIRED" {
-		failures = append(failures, "Explanation Documentation: Status must be REQUIRED for a material Build diff")
+		failures = append(failures, fmt.Sprintf("Explanation Documentation: Status must be REQUIRED for a material Build diff (material: %s)", strings.Join(material, ", ")))
 	}
 	if declaration.Document != want || declaration.Reason != "" {
 		failures = append(failures, "Explanation Documentation: Document must be the canonical cycle-owned path and Reason must be omitted when required")
@@ -531,15 +531,52 @@ func parseDeclaration(report string) (reportDeclaration, bool, error) {
 	}, true, nil
 }
 
+// nonMaterialExactPaths and nonMaterialPrefixes are the paths a Build diff may
+// touch without becoming "material" for the explanation contract.
+//
+// The .evolve entries cover runtime BOOKKEEPING only: the orchestrator
+// symlinks cycle-state.json into every worktree, and changedSince counts
+// untracked files — on a host without the production .gitignore's `.evolve/*`
+// rule that state read as a MATERIAL change, forcing a full REQUIRED
+// explanation for builds that changed no code (every e2e pipeline cycle hung
+// this way). Deliberately NARROW (review HIGH): a blanket .evolve/ exclusion
+// would launder TRACKED config — policy.json flips gates and fleet width,
+// profiles re-route phases — as non-material, exempting exactly the
+// consequential changes this contract exists to document.
+var nonMaterialExactPaths = []string{
+	".evolve/cycle-state.json",
+	".evolve/ledger.jsonl",
+	".evolve/resolved-fingerprints.json",
+}
+
+var nonMaterialPrefixes = []string{
+	"docs/", "knowledge-base/",
+	".evolve/runs/", ".evolve/worktrees/", ".evolve/evals/",
+	"go/acs/", "acs/",
+}
+
+func isNonMaterialPath(path, lower string) bool {
+	if path == "" || pathInDirectory(path, "testdata") || isUnambiguousTestFile(lower) {
+		return true
+	}
+	for _, exact := range nonMaterialExactPaths {
+		if path == exact {
+			return true
+		}
+	}
+	for _, prefix := range nonMaterialPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func materialPaths(paths []string) []string {
 	var out []string
 	for _, raw := range paths {
 		path := normalize(raw)
-		lower := strings.ToLower(path)
-		if path == "" || strings.HasPrefix(path, "docs/") || strings.HasPrefix(path, "knowledge-base/") ||
-			strings.HasPrefix(path, ".evolve/evals/") || strings.HasPrefix(path, "go/acs/") ||
-			strings.HasPrefix(path, "acs/") || pathInDirectory(path, "testdata") ||
-			isUnambiguousTestFile(lower) {
+		if isNonMaterialPath(path, strings.ToLower(path)) {
 			continue
 		}
 		out = append(out, path)

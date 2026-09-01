@@ -42,7 +42,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["agy"])
 	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "agy"), args)
-	if sandboxRequiredButUnavailable(cfg, wrapped) {
+	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[agy] required OS sandbox is unavailable; refusing an unconfined launch")
 		return ExitSafetyGate, nil
 	}
