@@ -1,6 +1,10 @@
 package bridge
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
 
 // autorespond_decision_test.go — the full interactive-prompt decision matrix,
 // driven by the REAL embedded manifests (LoadManifest) against REAL observed
@@ -366,5 +370,97 @@ func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.
 		// Use t.Fail() (not t.Fatalf) so the test runs visibly even if the
 		// contract intentionally shifts.
 		t.Fail()
+	}
+}
+
+// TestAutoRespond_ClaudeTrustDialog_v2252 pins the claude 2.1.252 folder-trust
+// dialog (live-captured 2026-09-01, fresh dir, --dangerously-skip-permissions).
+// The 2.1.193-era rule is a fossil against this pane twice over: its regex
+// anchors on the NUMBERED option ("1. Yes, I trust this folder") that 2.1.252
+// removed, and its response (Enter) now confirms the NEW default — "❯ No,
+// exit" — killing the REPL. Live cost: wave-20260901b, all three lanes
+// (cycles 1598/1599/1600) teardown-FAILed in triage with artifact-timeout;
+// the phase prompt typed into the modal (submit_wedged resends=3) and the
+// nudge's Enter chose "No, exit". Remedy verified live the same day: Down
+// moves ❯ to "Yes, I trust this folder", Enter boots a trusted REPL.
+func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
+	m, err := LoadManifest("claude-tmux")
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	// VERBATIM from the live tmux capture (2026-09-01, claude 2.1.252).
+	pane := ` Accessing workspace:
+ /private/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/tmp.j6PN2iejzV
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this
+ folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel`
+	counts := map[string]int{}
+	a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
+	if a != "send:Down,Enter" || rc != 1 {
+		t.Fatalf("2.1.252 trust dialog must answer Down,Enter (select 'Yes, I trust this folder' off the No-default); got (%q,%d)", a, rc)
+	}
+	// Fire-once, same loop-guard discipline as the sibling trust rules
+	// (TestAutoRespond_TrustPromptFiresOnce): pin the exact sentinel, not
+	// just the suppress_once: prefix, so a future rule rename still fails
+	// loudly here.
+	for i := 0; i < 8; i++ {
+		a, rc = decideAutoRespond(pane, m.InteractivePrompts, counts, false)
+		if rc != 0 || a != "suppress_once:trust_prompt_no_default" {
+			t.Fatalf("tick %d = (%q,%d), want (suppress_once:trust_prompt_no_default, 0) — trust_prompt_no_default is fire-once; re-firing trips the loop guard and abandons the run", i+2, a, rc)
+		}
+	}
+	// The old numbered-dialog rule must still win on the OLD pane (older
+	// claude builds remain launchable), with its pre-highlighted-Yes Enter.
+	oldPane := "Quick safety check: Is this a project you created or one you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n Enter to confirm"
+	a, rc = decideAutoRespond(oldPane, m.InteractivePrompts, map[string]int{}, false)
+	if a != "send:Enter" || rc != 1 {
+		t.Fatalf("the v2.1.193 numbered dialog must keep its Enter response; got (%q,%d)", a, rc)
+	}
+}
+
+// TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles mirrors the
+// plan-mode precedent (TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles)
+// for the trust_prompt* family: this repo quotes both trust dialogs verbatim
+// on tracked files (this test's fixtures, the manifest notes, the boot-path
+// fixture, the incident doc), and an agent Reads/cats exactly these files
+// while working on the rules. The 2026-09-02 architecture-review probe showed
+// the UNANCHORED forms firing on them — a stray Enter into a working agent,
+// plus a burned once-budget that would suppress a genuine later dialog. The
+// bottom anchor (footer + \z + tail_lines) is what makes this pass: quoted
+// dialogs sit mid-document, never at end-of-capture.
+func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
+	t.Parallel()
+	m, err := LoadManifest("claude-tmux")
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	var trustRules []ManifestPrompt
+	for _, p := range m.InteractivePrompts {
+		if strings.HasPrefix(p.Name, "trust_prompt") {
+			trustRules = append(trustRules, p)
+		}
+	}
+	if len(trustRules) < 2 {
+		t.Fatalf("expected both trust rules under test, got %d", len(trustRules))
+	}
+	files := []string{
+		"autorespond_decision_test.go", // both pane fixtures verbatim
+		"driver_claudetmux_test.go",    // the boot-path dialog fixtures
+		"manifests/claude-tmux.json",   // the rules and their notes
+		"../../../docs/incidents/2026-09-01-claude-2252-trust-default-flip.md",
+	}
+	for _, f := range files {
+		body, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v (this guard is worthless if it cannot read its own sources)", f, err)
+		}
+		a, rc := decideAutoRespond(string(body), trustRules, map[string]int{}, false)
+		if rc != 0 || a != "noop" {
+			t.Fatalf("trust rule fired on rendered tracked file %s: (%q,%d) — the bottom anchor regressed", f, a, rc)
+		}
 	}
 }
