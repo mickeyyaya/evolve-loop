@@ -318,11 +318,15 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 	if cfg == nil || !cfg.RequireSandbox || wrapped {
 		return false
 	}
-	if sandbox.DetectNested(depEnvGetter(deps)) {
-		return false // outer layer already confines — requirement satisfied
-	}
-	if strings.TrimSpace(deps.Env[envSandboxMode]) == config.SandboxModeOff {
-		if deps.Stderr != nil {
+	// The three-cell decision projects from its single home (Specification —
+	// sandbox.ConfinementSatisfied); preflight's host-capabilities check
+	// displays the same predicate, so the two can no longer diverge (the
+	// 2026-09-01 nested-HALT divergence class).
+	ok, optOut, _ := sandbox.ConfinementSatisfied(
+		sandbox.DetectNested(depEnvGetter(deps)),
+		strings.TrimSpace(deps.Env[envSandboxMode]))
+	if ok {
+		if optOut && deps.Stderr != nil {
 			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite the activated Build explanation contract\n", cfg.Agent)
 		}
 		return false

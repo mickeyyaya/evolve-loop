@@ -57,6 +57,29 @@ func DetectNested(getenv func(string) string) bool {
 // boots). When !nested, capability collapses to availability — the host can't
 // be a working-but-nested case — so this single predicate matches preflight's
 // richer ExpectedToWork report in every reachable cell.
+// ConfinementSatisfied is the single home of the fail-closed confinement
+// decision for a source-writing phase whose profile REQUIRES sandboxing but
+// whose inner wrap did not apply (the Specification the bridge evaluates and
+// preflight displays — docs/architecture/sandbox-confinement-ssot.md chose
+// this package as the seam). Three cells:
+//
+//	nested        → satisfied: the outer LLM-CLI session is the only remaining
+//	                confinement; honesty note — it is UNVERIFIED unless the
+//	                sandbox.nested_fallback canary verifies it (and under
+//	                bypass-permissions Claude it does not confine writes).
+//	mode == "off" → satisfied via explicit host opt-out; optOut=true so the
+//	                caller surfaces it LOUDLY (the phase runs unconfined).
+//	otherwise     → NOT satisfied — the genuine violation; fail closed.
+func ConfinementSatisfied(nested bool, mode string) (ok, optOut bool, reason string) {
+	if nested {
+		return true, false, "nested LLM-CLI session: inner sandbox unavailable by design; the outer session is the only remaining confinement and is UNVERIFIED unless the sandbox.nested_fallback canary verifies it"
+	}
+	if strings.TrimSpace(mode) == "off" {
+		return true, true, "EVOLVE_SANDBOX=off: host opt-out honoured — the phase runs UNCONFINED despite the sandbox requirement"
+	}
+	return false, false, "inner sandbox required but unavailable"
+}
+
 func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 	switch probe.OS {
 	case "darwin", "linux":

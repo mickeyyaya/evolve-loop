@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -121,6 +122,7 @@ type Options struct {
 	// CLI / host-capability seams.
 	ProbeCLI      func(bin string) (doctor.Result, error) // default doctor.Probe
 	HostProbe     func() preflight.Profile                // default preflight.Probe(ProjectRoot)
+	SandboxMode   func() string                           // EVOLVE_SANDBOX mode (test seam; default os.Getenv)
 	DirWritable   func(dir string) bool                   // default real touch-probe
 	DiskFreeBytes func(path string) (uint64, error)       // default statfs; error → disk check skipped
 	// OrphanKill is the killer handed to the boot orphan sweep (deadline-bound
@@ -192,6 +194,7 @@ type resolved struct {
 
 	probeCLI      func(string) (doctor.Result, error)
 	hostProbe     func() preflight.Profile
+	sandboxMode   func() string
 	dirWritable   func(string) bool
 	diskFreeBytes func(string) (uint64, error)
 	orphanKill    swarm.TmuxKiller
@@ -233,6 +236,7 @@ func resolve(opts Options) (resolved, error) {
 		driverKnown:   opts.DriverKnown,
 		probeCLI:      opts.ProbeCLI,
 		hostProbe:     opts.HostProbe,
+		sandboxMode:   opts.SandboxMode,
 		dirWritable:   opts.DirWritable,
 		diskFreeBytes: opts.DiskFreeBytes,
 		orphanKill:    opts.OrphanKill,
@@ -284,6 +288,9 @@ func resolve(opts Options) (resolved, error) {
 	}
 	if o.probeCLI == nil {
 		o.probeCLI = doctor.Probe
+	}
+	if o.sandboxMode == nil {
+		o.sandboxMode = func() string { return os.Getenv("EVOLVE_SANDBOX") }
 	}
 	if o.hostProbe == nil {
 		o.hostProbe = func() preflight.Profile {

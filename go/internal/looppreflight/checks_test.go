@@ -134,7 +134,10 @@ func TestRun_HostCapabilities_SandboxWantedButUnavailable_Halts(t *testing.T) {
 		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
 	}
 	opts.HostProbe = func() preflight.Profile {
-		return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: false, Reason: "Darwin nested-Claude: EPERM"}}
+		// NON-nested (ClaudeCode.Nested zero): a standalone host with a broken
+		// sandbox is genuinely unconfined — the halt case. The nested variant
+		// warns instead: TestRun_HostCapabilities_SandboxWantedNested_WarnsNotHalts.
+		return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: false, Reason: "sandbox binary present but sandbox_apply failed (standalone host)"}}
 	}
 	r, err := Run(opts)
 	if err != nil {
@@ -200,5 +203,77 @@ func TestRun_HostCapabilities_DiskProbeError_Ignored(t *testing.T) {
 	c := findCheck(t, r, "host-capabilities")
 	if c.Level != LevelPass {
 		t.Fatalf("disk-probe error should be ignored (pass), got %s (%s)", c.Level, c.Detail)
+	}
+}
+
+// A NESTED launch is not an unconfined launch: the outer LLM-CLI session
+// already imposes OS sandbox + Tier-1 hooks, which is exactly why the
+// dispatch-time guard (bridge.sandboxRequiredButUnavailable) and the wrap
+// policy (sandbox.ShouldWrap) both treat nested as requirement-satisfied.
+// The 2026-09-01 first live launch after #518 hit this: preflight HALTed a
+// nested host that dispatch would have happily (and safely) run. Preflight
+// must agree with the gate it fronts: WARN with the doctrine, never HALT.
+func TestRun_HostCapabilities_SandboxWantedNested_WarnsNotHalts(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
+	}
+	opts.HostProbe = func() preflight.Profile {
+		return preflight.Profile{
+			Sandbox:    preflight.Sandbox{ExpectedToWork: false, Reason: "Darwin nested-Claude: sandbox_apply() returns EPERM (rc=71)"},
+			ClaudeCode: preflight.ClaudeCode{Nested: true},
+		}
+	}
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if r.Halted() {
+		t.Fatalf("a nested launch is confined by the outer session and must not HALT; got %s", r.OverallLevel)
+	}
+	c := findCheck(t, r, "host-capabilities")
+	if c.Level != LevelWarn {
+		t.Fatalf("want LevelWarn surfacing the outer-confinement doctrine, got %s (%s)", c.Level, c.Detail)
+	}
+	// Honest-WARN register (sandbox-confinement-ssot.md slice 4, re-asserted by
+	// the 2026-09-01 architecture review): state the POSTURE, never a
+	// reassuring conclusion — the inner layer is unconfined, and the outer
+	// session is unverified unless the canary (sibling check) verifies it.
+	if !strings.Contains(c.Detail, "UNCONFINED at the inner layer") || !strings.Contains(c.Detail, "UNVERIFIED") {
+		t.Fatalf("the WARN must state the honest posture; got %q", c.Detail)
+	}
+	if !strings.Contains(c.Detail, "sandbox-nested-fallback") {
+		t.Fatalf("the WARN must point at the verifying sibling check; got %q", c.Detail)
+	}
+	for _, reassuring := range []string{"degrades gracefully", "runs via OUTER confinement", "already confine"} {
+		if strings.Contains(c.Detail, reassuring) {
+			t.Fatalf("reassuring phrasing %q must not appear (honest-WARN slice); got %q", reassuring, c.Detail)
+		}
+	}
+}
+
+// EVOLVE_SANDBOX=off is the host opt-out cell of the shared predicate: the
+// dispatch gate honours it loudly and runs; preflight must WARN, not HALT
+// (before the sandbox.ConfinementSatisfied extraction the two sites diverged
+// in exactly this cell — bridge ran, preflight blocked).
+func TestRun_HostCapabilities_SandboxWantedOptOut_WarnsNotHalts(t *testing.T) {
+	opts := goodPipelineOptions(t)
+	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
+		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
+	}
+	opts.HostProbe = func() preflight.Profile {
+		return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: false, Reason: "sandbox binary present but sandbox_apply failed"}}
+	}
+	opts.SandboxMode = func() string { return "off" }
+	r, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if r.Halted() {
+		t.Fatalf("explicit host opt-out must WARN loudly, not HALT (parity with the dispatch gate); got %s", r.OverallLevel)
+	}
+	c := findCheck(t, r, "host-capabilities")
+	if c.Level != LevelWarn || !strings.Contains(c.Detail, "UNCONFINED") || !strings.Contains(c.Detail, "EVOLVE_SANDBOX=off") {
+		t.Fatalf("want loud opt-out WARN, got %s (%s)", c.Level, c.Detail)
 	}
 }

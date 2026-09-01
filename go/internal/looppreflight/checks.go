@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	sandbox "github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 )
@@ -136,9 +138,11 @@ func checkHostCapabilities(o resolved) CheckResult {
 
 	if sandboxWanted(o.profileLister, o.profileGetter) {
 		if host := o.hostProbe(); !host.Sandbox.ExpectedToWork {
-			halts = append(halts, fmt.Sprintf(
-				"required Build sandbox unavailable (%s); run on a supported non-nested host or restore OS confinement before starting the cycle",
-				host.Sandbox.Reason))
+			if halt, warn := sandboxUnavailableIssue(host, o.sandboxMode()); halt != "" {
+				halts = append(halts, halt)
+			} else {
+				warns = append(warns, warn)
+			}
 		}
 	}
 
@@ -234,5 +238,36 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 		Level:   LevelPass,
 		Message: fmt.Sprintf("CLI version inventory captured (%d bins)", len(current)),
 		Detail:  strings.Join(parts, "\n"),
+	}
+}
+
+// sandboxUnavailableIssue renders the host-capabilities outcome for "a profile
+// requires the Build sandbox but the inner wrap cannot apply". The DECISION is
+// not made here: it projects from sandbox.ConfinementSatisfied — the same
+// three-cell Specification the dispatch-time gate
+// (bridge.sandboxRequiredButUnavailable) evaluates — so preflight and the gate
+// it fronts can no longer diverge (the 2026-09-01 nested-HALT incident: the
+// first live launch after #518 HALTed a nested host dispatch would have run).
+// Exactly one of (halt, warn) is non-empty. The WARN wording states the
+// posture, never a conclusion: the inner layer is UNCONFINED, and the outer
+// session is UNVERIFIED unless the sandbox-nested-fallback canary (dial
+// sandbox.nested_fallback) verifies it — asserting outer confinement as fact
+// here would contradict that sibling check and regress the honest-WARN slice
+// of docs/architecture/sandbox-confinement-ssot.md.
+func sandboxUnavailableIssue(host preflight.Profile, mode string) (halt, warn string) {
+	ok, optOut, _ := sandbox.ConfinementSatisfied(host.ClaudeCode.Nested, mode)
+	switch {
+	case ok && optOut:
+		return "", fmt.Sprintf(
+			"EVOLVE_SANDBOX=off — host opt-out honoured; source-writing phases run UNCONFINED despite a sandbox-requiring profile (inner sandbox also unavailable: %s)",
+			host.Sandbox.Reason)
+	case ok:
+		return "", fmt.Sprintf(
+			"inner OS sandbox NOT applied (%s) — source-writing phases run UNCONFINED at the inner layer; the outer LLM-CLI session is the only remaining confinement and is UNVERIFIED unless sandbox.nested_fallback is enabled (see check sandbox-nested-fallback)",
+			host.Sandbox.Reason)
+	default:
+		return fmt.Sprintf(
+			"required Build sandbox unavailable (%s); run on a supported non-nested host or restore OS confinement before starting the cycle",
+			host.Sandbox.Reason), ""
 	}
 }
