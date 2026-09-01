@@ -6,7 +6,7 @@
   "fix": "Add a preflight step to the loop boot sequence (looppreflight, near the existing per-CLI boot-smoke probes): `go test -tags integration ./internal/bridge/ -run 'TestRealTmux'` with a bounded budget (~60-90s; measured 17.2s quiet). RED fails the preflight loudly BEFORE any lane spends tokens — a broken bridge boot path would otherwise burn whole waves. Respect --skip-preflight / --skip-preflight-boot (CI/offline). Consider caching by go-module content hash so an unchanged bridge package skips the re-run at consecutive boots.",
   "files": [
     "go/internal/looppreflight/ (the boot gate to extend)",
-    "go/internal/phases/audit/ciparity.go (envExclusiveQuietHostOnly + the skip message naming this backstop)",
+    "go/internal/phases/audit/ciparity.go (the integrationTierEnvExclusive record table (the separate quiet-host map was dissolved into it 2026-09-01) + the skip message naming this backstop)",
     "go/internal/bridge/tmux_repl_interactive_test.go (the requireTmux tier)"
   ],
   "acceptance": [

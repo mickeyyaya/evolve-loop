@@ -1,0 +1,12 @@
+{
+  "id": "ledger-fleet-concurrency-chain-runtime",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.9,
+  "title": "Runtime-plane ledger chain broken at line 118287 \u2014 native rebaseline needed",
+  "body": "evolve ledger verify: prev_hash mismatch at line 118287 (have 7872fb48..., want e5840a54...). Byte-identical across the 2026-09-01 hub migration, so the break PREDATES it \u2014 the runtime plane was GREEN on 2026-08-10 (55 epoch-anchors), so this is August fleet-wave concurrency damage, the same class as the console plane's break@78729. The original ledger-fleet-concurrency-chain inbox item is no longer in the live queue (consumed or pruned) \u2014 re-filed here. Fix the CLASS natively: epoch-anchor rebaseline (the 2026-08-10 recipe), plus whatever write-serialization gap let concurrent fleet lanes interleave ledger appends. Full pre-break history preserved in ~/ai/claude/evolve-loop/backups bundles.",
+  "created": "2026-09-01T12:00:00Z",
+  "source": "console-hub-migration-verify",
+  "resolution": "RESOLVED 2026-09-01: sealed via native `evolve ledger rebaseline` with operator note; verify now OK (chain intact, 134,286 lines). Class evidence: serialization already shipped (CA.1 flock 2026-06-11 + #450 chain-safe appends 2026-08-11); the single break (2026-08-14T15:56, two lanes 2s apart) sits in #450's deploy window, and ZERO further breaks exist across 2.5 weeks of subsequent fleet waves \u2014 stale-binary-window casualty, not a live defect. No code change needed.",
+  "consumed": "2026-09-01T12:45:00Z"
+}

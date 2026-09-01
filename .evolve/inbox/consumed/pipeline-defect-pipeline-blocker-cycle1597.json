@@ -1,0 +1,19 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/runs/cycle-1597"
+  ],
+  "created_at": "2026-09-01T02:10:05Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: 3 consecutive failed cycles ending at cycle 1597 (ceiling 3) with mixed failure identities \u2014 a batch that cannot ship 3 cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10) (rule=consecutive-failures fingerprint=audit|verdict-fail|4f74e9ecfc68). Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-pipeline-blocker-cycle1597",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-09-01T02:10:05Z. Evidence: 3 consecutive failed cycles ending at cycle 1597 (ceiling 3) with mixed failure identities \u2014 a batch that cannot ship 3 cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10) (rule=consecutive-failures fingerprint=audit|verdict-fail|4f74e9ecfc68)",
+  "priority": "P0",
+  "root_cause": "The system-failure signal reported: 3 consecutive failed cycles ending at cycle 1597 (ceiling 3) with mixed failure identities \u2014 a batch that cannot ship 3 cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10) (rule=consecutive-failures fingerprint=audit|verdict-fail|4f74e9ecfc68). Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 1597 (category=pipeline-blocker). Evidence: 3 consecutive failed cycles ending at cycle 1597 (ceiling 3) with mixed failure identities \u2014 a batch that cannot ship 3 cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10) (rule=consecutive-failures fingerprint=audit|verdict-fail|4f74e9ecfc68). This is a PIPELINE defect, not a task failure \u2014 diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (pipeline-blocker): the loop halted \u2014 3 consecutive failed cycles ending at cycle 1597 (ceiling 3) with mixed failure identities \u2014 a batch that cannot ship 3 cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10) (rule=consecutive-failures fingerprint=audit|verdict-fail|4f74e9ecfc68)",
+  "weight": 0.99,
+  "resolution": "RESOLVED 2026-09-01: deep-dive complete \u2014 cycles 1595-1597 were three LEGITIMATE adversarial-audit rejections (queue tail exceeded builder capability; task-level FAILs, no pipeline defect). Main-red inherited pair separately fixed by #519. Halt record consumed; resume authorized.",
+  "consumed": "2026-09-01T12:30:00Z"
+}

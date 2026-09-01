@@ -1,0 +1,10 @@
+{
+  "id": "explanation-identity-belief-remaining-copies",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.85,
+  "title": "Route the three remaining identity-belief copies through CrossCheckActivation (arch re-review 2026-09-01, 2 HIGHs narrowed not closed)",
+  "body": "After fix/explanation-activation-belt: the belt guards ship+audit and the workspace-normalization contradiction is unified (sameWorkspacePath shared with resolveActivation). REMAINING variant copies of 'does this typed binding match the host marker': (1) explanationdocs.resolveActivation (explanationdocs.go ~700-741) \u2014 resolution-with-adoption semantics (adopts version/worktree/base at v0, lenient empty-field guards); unify via one comparator with a strict/lenient flag, or build the belt ON it. (2) retro.refreshExplanationHandoff (retro.go:264) \u2014 version-0 => Legacy with NO host consult (the exact pre-fix audit shape); add the belt in front, mapping belt errors into the existing Invalid/NEEDS_CORRECTION degrade path. (3) core.requireResumeExplanationIdentity (build_explanation_handoff.go:106) \u2014 the belt's full table with different normalization and partial-marker leniency (host.Worktree!=\"\" guards); route through the belt AFTER deciding whether partial markers still occur live (the leniency may be a fossil of older marker schemas \u2014 check before tightening). Widen guards/explanation_activation_belt_test.go pins as each caller is routed. CAUTION per the declined-constructor analysis: the per-site tolerance differences are partly deliberate \u2014 unify semantics deliberately, not by find-replace. ALSO (actbelt go-reviewer MEDIUM, optional): contract_state.go:227 (RecoverRebaseSplit) and :327 (ActivationForCycle) still inline the Clean-both-sides workspace comparison \u2014 route through sameWorkspacePath while in there.",
+  "created": "2026-09-01T14:00:00Z",
+  "source": "console-architecture-re-review"
+}
